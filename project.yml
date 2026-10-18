@@ -27,6 +27,8 @@ targets:
         product: EchoCore
       - package: EchoKit
         product: EchoAudio
+      - package: EchoKit
+        product: EchoTranscribe
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: dinh.thi.EchoDiar
@@ -56,3 +58,4 @@ schemes:
       targets:
         - package: EchoKit/EchoCoreTests
         - package: EchoKit/EchoAudioTests
+        - package: EchoKit/EchoTranscribeTests

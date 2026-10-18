@@ -1,11 +1,13 @@
 import AppKit
 import EchoAudio
 import EchoCore
+import EchoTranscribe
 import Foundation
 import Observation
+import os
 
 /// App-wide state shared by the main window, the settings window and the menu bar item.
-/// Coordinates recording: engine → stop → compress → library refresh.
+/// Coordinates recording: engine → stop → compress → transcribe → library refresh.
 @MainActor
 @Observable
 final class AppModel {
@@ -28,12 +30,28 @@ final class AppModel {
     private(set) var isStarting = false
     var recordingError: String?
     private var compressionJobs = 0
+    private var transcriptionJobs = 0
+    /// Latest progress of each queued or running transcription, by conversation id. A `needsModel` entry stays
+    /// (its `detail` is the missing catalog id) until the job is submitted again or a model download succeeds.
+    private(set) var transcriptionProgress: [UUID: JobProgress] = [:]
+    var settingsTab: SettingsTab = .general
+    /// Running model downloads, by catalog id.
+    private(set) var downloads: [String: ModelDownload] = [:]
+    /// Last download error, by catalog id; cleared when a download of that id starts.
+    private(set) var downloadErrors: [String: String] = [:]
+    private(set) var installedModelIDs: Set<String> = []
+    private(set) var installedModelsBytes: Int64 = 0
+
+    struct ModelDownload {
+        var fraction: Double = 0
+        let task: Task<Void, any Error>
+    }
 
     var indicatorState: IndicatorState {
         switch snapshot.state {
         case .recording: .recording
         case .paused: .paused
-        case .idle: compressionJobs > 0 ? .processing : .idle
+        case .idle: compressionJobs > 0 || transcriptionJobs > 0 ? .processing : .idle
         }
     }
 
@@ -42,6 +60,9 @@ final class AppModel {
     /// Its `currentLevels()` has a single consumer: the level meter in the main window.
     @ObservationIgnored let engine: RecordingEngine
     @ObservationIgnored let library = LibraryStore()
+    /// Created with the model so FluidAudio's offline mode is set before any model load.
+    @ObservationIgnored let modelStore: ModelStore
+    @ObservationIgnored let pipeline: TranscriptionPipeline
     @ObservationIgnored private let compressor = AudioCompressor()
     @ObservationIgnored private let store: SettingsStore
     @ObservationIgnored private var recovery: Task<[RecoveredResult], Never>?
@@ -54,10 +75,13 @@ final class AppModel {
         let engine = RecordingEngine()
         self.engine = engine
         snapshot = engine.currentSnapshot()
+        let modelStore = ModelStore()
+        self.modelStore = modelStore
+        pipeline = TranscriptionPipeline(modelStore: modelStore)
     }
 
-    /// Called once by the AppDelegate after the main window is built. Later phases dispatch the DEBUG harness
-    /// launch args (`--transcribe`, `--download-model`, `--delete-model`) from here.
+    /// Called once by the AppDelegate after the main window is built. Dispatches the DEBUG harness launch args
+    /// `--transcribe`, `--download-model` and `--delete-model`.
     func start() {
         settings = store.load()
         recovery = (NSApp.delegate as? AppDelegate)?.recovery
@@ -74,8 +98,12 @@ final class AppModel {
             togglePause: { [weak self] in self?.togglePause() },
             stop: { [weak self] in self?.stopRecording() })
 
+        #if DEBUG
+        if runTranscribeHarness() || runModelHarness() { return }
+        #endif
         guard ProcessInfo.processInfo.arguments.allSatisfy({ !Self.harnessArguments.contains($0) }) else { return }
         if !settings.onboardingCompleted { OnboardingWindow.shared.show(model: self) }
+        observeTranscriptions()
         Task {
             // Subscribed before the first refresh, whose emit would otherwise be missed.
             let changes = await library.changes()
@@ -208,9 +236,137 @@ final class AppModel {
                 if let failure = result.failure {
                     NSLog("EchoDiar: compression failed for \(folder.lastPathComponent): \(failure)")
                 }
+                transcribe(after: result)
             }
             compressionJobs -= 1
             await library.refresh()
+        }
+    }
+
+    // MARK: - Transcription
+
+    /// Queues the folder once compression is done; a failed compression leaves the CAF, which is used instead.
+    /// Skipped when the folder has no usable audio or session, already has a transcript, or its last transcription
+    /// failed (a compression that keeps failing is retried at every launch; the card's "Failed — Retry" retries).
+    private func transcribe(after result: CompressionResult) {
+        switch result.failure {
+        case .sessionUnreadable?, .stillRecording?, .unsafeAudioFileName?, .sourceUnreadable?: return
+        default: break
+        }
+        let conversation = try? Conversation.read(from: result.folder)
+        guard conversation?.hasTranscript != true, conversation?.status != .transcriptionFailed else { return }
+        submitTranscription(folder: result.folder)
+    }
+
+    /// The card's "Transcribe" and "Retry": queues the conversation unless a job for it is already active.
+    func transcribe(_ id: UUID) {
+        guard !isTranscribing(id), let conversation = conversations.first(where: { $0.id == id }) else { return }
+        submitTranscription(folder: conversation.folder)
+    }
+
+    /// Queued, deferred or running; a `needsModel` result is not active.
+    func isTranscribing(_ id: UUID) -> Bool {
+        guard let step = transcriptionProgress[id]?.step else { return false }
+        return step != .needsModel
+    }
+
+    /// A failed recording is never transcribed: its audio is missing or empty.
+    private func submitTranscription(folder: URL) {
+        guard let session = try? RecordingSession.read(from: folder), !session.probe, session.state != .failed else {
+            return
+        }
+        let job = TranscriptionJob(
+            conversationID: session.id, folder: folder,
+            systemFileName: session.audioFileName == AudioCompressor.micFileName ? AudioCompressor.systemFileName : nil)
+        // Set now so the card leaves its button before the pipeline's first event arrives.
+        transcriptionProgress[session.id] = JobProgress(conversationID: session.id, step: .queued, fraction: 0)
+        transcriptionJobs += 1
+        Task {
+            do {
+                _ = try await pipeline.transcribe(job)
+            } catch {
+                NSLog("EchoDiar: transcription failed for \(folder.lastPathComponent): \(error)")
+            }
+            transcriptionJobs -= 1
+            await library.refresh()
+        }
+    }
+
+    /// The single consumer of `pipeline.progress`; refreshes the library when a job changes step, so the card
+    /// follows the `conversation.json` status the pipeline writes.
+    private func observeTranscriptions() {
+        Task { [weak self, pipeline] in
+            for await progress in pipeline.progress {
+                guard let self else { return }
+                let previous = transcriptionProgress[progress.conversationID]?.step
+                switch progress.step {
+                case .finished, .failed: transcriptionProgress[progress.conversationID] = nil
+                default: transcriptionProgress[progress.conversationID] = progress
+                }
+                if previous != progress.step { await library.refresh() }
+            }
+        }
+    }
+
+    // MARK: - Models
+
+    /// Downloads a catalog entry; progress is published at most once per 0.5%.
+    func downloadModel(_ id: String) {
+        guard downloads[id] == nil else { return }
+        downloadErrors[id] = nil
+        let task = Task.detached(priority: .utility) { [modelStore] in
+            let lastStep = OSAllocatedUnfairLock(initialState: -1)
+            try await modelStore.download(id) { progress in
+                let step = Int(progress.fraction * 200)
+                guard lastStep.withLock({ last in
+                    defer { last = max(last, step) }
+                    return step > last
+                }) else { return }
+                Task { @MainActor in self.downloads[id]?.fraction = progress.fraction }
+            }
+        }
+        downloads[id] = ModelDownload(task: task)
+        Task {
+            let result = await task.result
+            downloads[id] = nil
+            switch result {
+            case .success:
+                // Any installed WhisperKit entry can stand in for the missing default, so every card offers Transcribe.
+                transcriptionProgress = transcriptionProgress.filter { $0.value.step != .needsModel }
+            case .failure(let error) where error is CancellationError:
+                break
+            case .failure(let error):
+                NSLog("EchoDiar: model download failed for \(id): \(error)")
+                downloadErrors[id] = error.localizedDescription
+            }
+            refreshInstalledModels()
+        }
+    }
+
+    func cancelDownload(_ id: String) {
+        downloads[id]?.task.cancel()
+    }
+
+    func deleteModel(_ id: String) {
+        Task {
+            do {
+                try await Task.detached(priority: .utility) { [modelStore] in try modelStore.delete(id) }.value
+            } catch {
+                NSLog("EchoDiar: could not delete model \(id): \(error)")
+                downloadErrors[id] = error.localizedDescription
+            }
+            refreshInstalledModels()
+        }
+    }
+
+    /// Reads the installed models and their total size off the main thread.
+    func refreshInstalledModels() {
+        Task {
+            let (ids, bytes) = await Task.detached(priority: .utility) { [modelStore] in
+                (Set(ModelCatalog.all.map(\.id).filter(modelStore.isInstalled)), modelStore.totalSize())
+            }.value
+            installedModelIDs = ids
+            installedModelsBytes = bytes
         }
     }
 
@@ -256,6 +412,11 @@ final class AppModel {
 
     // MARK: - Settings
 
+    func openSettings(tab: SettingsTab) {
+        settingsTab = tab
+        SettingsWindow.shared.show(model: self)
+    }
+
     /// Applies `change` and saves the settings file.
     func updateSettings(_ change: (inout AppSettings) -> Void) {
         var updated = settings
@@ -269,3 +430,120 @@ final class AppModel {
         }
     }
 }
+
+#if DEBUG
+// MARK: - Model download and transcription harness
+
+extension AppModel {
+    /// `--transcribe <audio file> [--engine <catalog id>]`: copies the file into a temp session folder (mono =
+    /// system channel), runs the pipeline in "Process now" mode, prints the `transcript.json` path and exits 0;
+    /// exit 1 with a message on error. Progress goes to stderr. Returns false when the arg is absent.
+    private func runTranscribeHarness() -> Bool {
+        guard ProcessInfo.processInfo.arguments.contains("--transcribe") else { return false }
+        guard let path = Self.harnessValue(after: "--transcribe") else {
+            Self.finish(1, "usage: --transcribe <audio file> [--engine <catalog id>]")
+        }
+        let source = URL(fileURLWithPath: path)
+        let session = RecordingSession(state: .stopped, audioFileName: "audio." + source.pathExtension.lowercased())
+        let folder = FileManager.default.temporaryDirectory
+            .appendingPathComponent("EchoDiar-transcribe-\(session.folderName)", isDirectory: true)
+        do {
+            try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+            try FileManager.default.copyItem(at: source, to: folder.appendingPathComponent(session.audioFileName))
+            try session.write(to: folder)
+        } catch {
+            try? FileManager.default.removeItem(at: folder)
+            Self.finish(1, "error: \(error.localizedDescription)")
+        }
+        let pipeline = TranscriptionPipeline(modelStore: modelStore, deferWhenConstrained: false)
+        let job = TranscriptionJob(
+            conversationID: session.id, folder: folder, engineID: Self.harnessValue(after: "--engine"), processNow: true)
+        Task.detached(priority: .utility) {
+            var step: JobProgress.Step?
+            for await progress in pipeline.progress where progress.step != step {
+                step = progress.step
+                FileHandle.standardError.write(Data("\(progress.step.rawValue)\n".utf8))
+            }
+        }
+        Task {
+            do {
+                let url = try await pipeline.transcribe(job)
+                Self.finish(0, url.path)
+            } catch {
+                try? FileManager.default.removeItem(at: folder)
+                Self.finish(1, "error: \(error.localizedDescription)")
+            }
+        }
+        return true
+    }
+
+    private static func harnessValue(after flag: String) -> String? {
+        let arguments = ProcessInfo.processInfo.arguments
+        guard let index = arguments.firstIndex(of: flag), index + 1 < arguments.count else { return nil }
+        return arguments[index + 1]
+    }
+
+    /// `--download-model <id> [--cancel-after <s>]` (exit 0 installed, 3 cancelled, 1 failed) and
+    /// `--delete-model <id>` (exit 0, 1 failed). Returns false when neither arg is present.
+    private func runModelHarness() -> Bool {
+        let arguments = ProcessInfo.processInfo.arguments
+        let store = modelStore
+        if arguments.contains("--delete-model") {
+            guard let id = Self.harnessValue(after: "--delete-model") else { Self.finish(1, "usage: --delete-model <id>") }
+            do {
+                try store.delete(id)
+                Self.finish(0, "deleted \(id)")
+            } catch {
+                Self.finish(1, "error: \(error.localizedDescription)")
+            }
+        }
+        guard arguments.contains("--download-model") else { return false }
+        guard let id = Self.harnessValue(after: "--download-model") else {
+            Self.finish(1, "usage: --download-model <id> [--cancel-after <seconds>]")
+        }
+        let cancelAfter = Self.harnessValue(after: "--cancel-after").flatMap(Double.init)
+        Task {
+            let download = Task.detached(priority: .userInitiated) {
+                let lastPercent = OSAllocatedUnfairLock(initialState: -1)
+                try await store.download(id) { progress in
+                    let percent = Int(progress.fraction * 100)
+                    guard lastPercent.withLock({ last in
+                        defer { last = max(last, percent) }
+                        return percent > last
+                    }) else { return }
+                    Self.write(String(
+                        format: "progress %d%% %.1f/%.1f MiB",
+                        percent, Double(progress.completedBytes) / 1_048_576, Double(progress.totalBytes) / 1_048_576))
+                }
+            }
+            if let cancelAfter {
+                Task {
+                    try? await Task.sleep(for: .seconds(cancelAfter))
+                    download.cancel()
+                }
+            }
+            switch await download.result {
+            case .success:
+                guard store.isInstalled(id) else { Self.finish(1, "error: \(id) is incomplete after download") }
+                let size = store.installedSize(id)
+                Self.finish(0, String(format: "installed %@ %lld bytes (%.1f MiB)", id, size, Double(size) / 1_048_576))
+            case .failure(let error) where error is CancellationError:
+                try? FileManager.default.removeItem(at: store.partialFolder(id))
+                Self.finish(3, "cancelled \(id)")
+            case .failure(let error):
+                Self.finish(1, "error: \(error.localizedDescription)")
+            }
+        }
+        return true
+    }
+
+    nonisolated private static func write(_ line: String) {
+        FileHandle.standardOutput.write(Data((line + "\n").utf8))
+    }
+
+    private static func finish(_ code: Int32, _ message: String) -> Never {
+        write(message)
+        exit(code)
+    }
+}
+#endif

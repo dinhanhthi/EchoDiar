@@ -4,7 +4,9 @@ import Foundation
 /// `id` and `createdAt` are required; every other key is optional when read (`decodeIfPresent` + default).
 public struct Conversation: Codable, Equatable, Identifiable, Sendable {
     public enum Status: String, Codable, Sendable {
+        /// `failed`: the recording failed. `transcriptionFailed`: the last transcription job failed.
         case recording, recovered, compressing, compressionFailed, ready, transcribing, transcribed, failed
+        case transcriptionFailed
         /// A missing or unrecognized raw value (written by another build). Written back as "unknown".
         case unknown
 

@@ -42,15 +42,24 @@ final class SettingsWindow: NSObject, NSWindowDelegate {
     }
 }
 
+enum SettingsTab: Hashable {
+    case general, transcription
+}
+
 private struct SettingsView: View {
-    let model: AppModel
+    @Bindable var model: AppModel
 
     var body: some View {
-        TabView {
+        TabView(selection: $model.settingsTab) {
             GeneralSettingsTab(model: model)
                 .tabItem { Label("General", systemImage: "gearshape") }
+                .tag(SettingsTab.general)
+            ModelsSettingsView(model: model)
+                .modifier(GlassForm())
+                .tabItem { Label("Transcription", systemImage: "waveform") }
+                .tag(SettingsTab.transcription)
         }
-        .frame(width: 460, height: 260)
+        .frame(width: 560, height: 480)
     }
 }
 

@@ -1,9 +1,10 @@
 import AppKit
 import EchoCore
+import EchoTranscribe
 import SwiftUI
 
 /// One conversation of the library: source app icon, title (double-click to rename), time, duration, size,
-/// status, and the AI and Summary buttons.
+/// status, transcription progress or its action, and the AI and Summary buttons.
 struct ConversationCard: View {
     let conversation: Conversation
     let model: AppModel
@@ -19,6 +20,7 @@ struct ConversationCard: View {
                 details
             }
             Spacer(minLength: 8)
+            transcription
             Button(action: showAI) {
                 Label("AI", systemImage: "sparkles")
                     .labelStyle(.iconOnly)
@@ -48,7 +50,56 @@ struct ConversationCard: View {
             }
             Divider()
             Button("Delete…", action: confirmDelete)
-                .disabled(conversation.status == .recording || conversation.status == .compressing)
+                .disabled(conversation.status == .recording || conversation.status == .compressing
+                          || model.isTranscribing(conversation.id))
+        }
+    }
+
+    /// Progress first: a queued job's conversation is still `ready`. A `transcribing` status without a job was
+    /// left by a quit or crash, so it offers Transcribe again. A failed recording (`failed`) offers nothing.
+    @ViewBuilder private var transcription: some View {
+        let progress = model.transcriptionProgress[conversation.id]
+        if let progress, progress.step != .needsModel {
+            HStack(spacing: 6) {
+                if progress.step == .queued || progress.step == .deferred {
+                    ProgressView().controlSize(.mini)
+                } else {
+                    ProgressView(value: progress.fraction).progressViewStyle(.circular).controlSize(.mini)
+                }
+                Text(Self.stepText(progress.step))
+            }
+            .font(.caption)
+            .foregroundStyle(.secondary)
+            .help(progress.step == .deferred
+                  ? "Waiting while the Mac is hot or in Low Power Mode"
+                  : progress.fraction.formatted(.percent.precision(.fractionLength(0))))
+        } else if progress != nil {
+            Button("Needs model") { model.openSettings(tab: .transcription) }
+                .buttonStyle(RowTextButtonStyle())
+                .foregroundStyle(.orange)
+                .help("Download a transcription model in Settings")
+        } else if conversation.status == .transcriptionFailed {
+            Button("Failed — Retry") { model.transcribe(conversation.id) }
+                .buttonStyle(RowTextButtonStyle())
+                .foregroundStyle(.red)
+                .help("Transcribe this conversation again")
+        } else if conversation.status == .ready || conversation.status == .transcribing, !conversation.hasTranscript {
+            Button("Transcribe") { model.transcribe(conversation.id) }
+                .buttonStyle(RowTextButtonStyle())
+                .foregroundStyle(.secondary)
+                .help("Transcribe this conversation")
+        }
+    }
+
+    private static func stepText(_ step: JobProgress.Step) -> String {
+        switch step {
+        case .queued: "Queued"
+        case .deferred: "Waiting…"
+        case .extracting: "Preparing audio…"
+        case .transcribingMic, .transcribingSystem: "Transcribing…"
+        case .diarizing: "Identifying speakers…"
+        case .merging, .finished: "Finishing…"
+        case .needsModel, .failed: ""
         }
     }
 
@@ -119,7 +170,8 @@ struct ConversationCard: View {
     }
 }
 
-/// A short colored label for the statuses that need attention; nil for `ready` and `transcribed`.
+/// A short colored label for the statuses that need attention; nil for `ready`, `transcribed` and
+/// `transcriptionFailed` (which shows "Failed — Retry").
 private struct StatusBadge: View {
     let text: String
     let color: Color
@@ -142,6 +194,30 @@ private struct StatusBadge: View {
             .padding(.horizontal, 6)
             .padding(.vertical, 2)
             .background(color.opacity(0.18), in: Capsule())
+    }
+}
+
+/// The text buttons of a row: a capsule highlight on hover, darker while pressed.
+private struct RowTextButtonStyle: ButtonStyle {
+    func makeBody(configuration: Configuration) -> some View {
+        Highlight(configuration: configuration)
+    }
+
+    private struct Highlight: View {
+        let configuration: ButtonStyleConfiguration
+        @State private var hovered = false
+
+        var body: some View {
+            configuration.label
+                .font(.caption.weight(.medium))
+                .padding(.horizontal, 8)
+                .padding(.vertical, 3)
+                .background(
+                    Capsule().fill(configuration.isPressed ? Palette.pressedFill : hovered ? Palette.hoverFill : .clear))
+                .contentShape(Capsule())
+                .animation(.easeOut(duration: 0.12), value: hovered)
+                .onHover { hovered = $0 }
+        }
     }
 }
 
