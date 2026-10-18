@@ -12,3 +12,39 @@ docs/later/
 docs/learn/
 .coding-friend/
 # <<< coding-friend managed
+
+EchoDiar.xcodeproj/
+release/
+.DS_Store
+xcuserdata/
+.build/
+
+# Local docs (plans, context, memory, reviews, research), except the published guide
+docs/*
+!docs/RELEASING.md
+
+# coding-friend: only the cf-ship custom guide is tracked; config.json stays local
+!.coding-friend/
+.coding-friend/*
+!.coding-friend/skills/
+
+# AI tool files
+CLAUDE.md
+CLAUDE.local.md
+AGENTS.md
+GEMINI.md
+.claude/
+.cursor/
+.codex/
+.gemini/
+.mcp.json
+
+# The app project resolves packages
+Packages/EchoKit/Package.resolved
+
+# Secrets (safety net)
+sparkle_private_key*
+*_sparkle_private_key*
+*.p12
+*.pem
+*.key

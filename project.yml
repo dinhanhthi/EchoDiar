@@ -1,0 +1,53 @@
+name: EchoDiar
+options:
+  deploymentTarget:
+    macOS: "15.0"
+  xcodeVersion: "27.0"
+packages:
+  EchoKit:
+    path: Packages/EchoKit
+settings:
+  base:
+    DEVELOPMENT_TEAM: 86H6CNLN4C
+    CODE_SIGN_STYLE: Automatic
+    DEAD_CODE_STRIPPING: YES
+    ENABLE_USER_SCRIPT_SANDBOXING: YES
+targets:
+  EchoDiar:
+    type: application
+    platform: macOS
+    sources:
+      - EchoDiar
+      - path: assets/logo.icon
+      # About panel logo (never logo_square).
+      - path: assets/logo.png
+        buildPhase: resources
+    dependencies:
+      - package: EchoKit
+        product: EchoCore
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: dinh.thi.EchoDiar
+        MARKETING_VERSION: 0.1.0
+        CURRENT_PROJECT_VERSION: 1
+        ENABLE_HARDENED_RUNTIME: YES
+        ASSETCATALOG_COMPILER_APPICON_NAME: logo
+        GENERATE_INFOPLIST_FILE: YES
+        INFOPLIST_KEY_LSUIElement: YES
+        SWIFT_VERSION: "5.0"
+        SWIFT_STRICT_CONCURRENCY: complete
+        DISABLE_MANUAL_TARGET_ORDER_BUILD_WARNING: YES
+        SWIFT_EMIT_LOC_STRINGS: YES
+        LOCALIZATION_PREFERS_STRING_CATALOGS: YES
+        # Debug is Developer ID-signed too, so mic and system-audio grants survive rebuilds.
+        CODE_SIGN_STYLE: Manual
+        CODE_SIGN_IDENTITY: "Developer ID Application"
+schemes:
+  EchoDiar:
+    build:
+      parallelizeBuild: false
+      targets:
+        EchoDiar: all
+    test:
+      targets:
+        - package: EchoKit/EchoCoreTests
