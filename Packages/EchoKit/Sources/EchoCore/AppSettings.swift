@@ -17,6 +17,8 @@ public struct AppSettings: Codable, Equatable, Sendable {
     public var onboardingCompleted: Bool
     /// Live captions while recording (opt-in); the batch transcript after Stop stays the source of truth.
     public var liveTranscript: Bool
+    /// Configured AI providers; their API keys are in the Keychain, never here.
+    public var providers: [ProviderConfig]
 
     public init(
         launchAtLogin: Bool = false,
@@ -25,7 +27,8 @@ public struct AppSettings: Codable, Equatable, Sendable {
         compressionBitrateKbps: Int = 64,
         keepUncompressedAudio: Bool = false,
         onboardingCompleted: Bool = false,
-        liveTranscript: Bool = false
+        liveTranscript: Bool = false,
+        providers: [ProviderConfig] = []
     ) {
         self.launchAtLogin = launchAtLogin
         self.defaultLanguage = defaultLanguage
@@ -34,11 +37,12 @@ public struct AppSettings: Codable, Equatable, Sendable {
         self.keepUncompressedAudio = keepUncompressedAudio
         self.onboardingCompleted = onboardingCompleted
         self.liveTranscript = liveTranscript
+        self.providers = providers
     }
 
     private enum CodingKeys: String, CodingKey {
         case version, launchAtLogin, defaultLanguage, recentLanguages, compressionBitrateKbps, keepUncompressedAudio
-        case onboardingCompleted, liveTranscript
+        case onboardingCompleted, liveTranscript, providers
     }
 
     public init(from decoder: Decoder) throws {
@@ -51,6 +55,7 @@ public struct AppSettings: Codable, Equatable, Sendable {
         keepUncompressedAudio = try container.decodeIfPresent(Bool.self, forKey: .keepUncompressedAudio) ?? false
         onboardingCompleted = try container.decodeIfPresent(Bool.self, forKey: .onboardingCompleted) ?? false
         liveTranscript = try container.decodeIfPresent(Bool.self, forKey: .liveTranscript) ?? false
+        providers = try container.decodeIfPresent([ProviderConfig].self, forKey: .providers) ?? []
     }
 }
 

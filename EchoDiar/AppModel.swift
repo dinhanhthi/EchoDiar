@@ -1,4 +1,5 @@
 import AppKit
+import EchoAI
 import EchoAudio
 import EchoCore
 import EchoTranscribe
@@ -516,6 +517,48 @@ final class AppModel {
             try store.save(updated)
         } catch {
             NSLog("EchoDiar: could not save settings: \(error)")
+        }
+    }
+
+    // MARK: - AI providers
+
+    /// Every preset (with its saved changes), then the custom endpoints, in that order.
+    var providerConfigs: [ProviderConfig] {
+        let saved = Dictionary(settings.providers.map { ($0.id, $0) }, uniquingKeysWith: { first, _ in first })
+        return ProviderConfig.presets.map { saved[$0.id] ?? $0 } + settings.providers.filter { $0.preset == nil }
+    }
+
+    /// Applies `change` to the saved config `id` (or its preset, which is then saved whole) and saves the settings.
+    func updateProvider(id: String, _ change: (inout ProviderConfig) -> Void) {
+        guard var config = settings.providers.first(where: { $0.id == id })
+            ?? ProviderConfig.presets.first(where: { $0.id == id }) else { return }
+        change(&config)
+        updateSettings { settings in
+            if let index = settings.providers.firstIndex(where: { $0.id == id }) {
+                settings.providers[index] = config
+            } else {
+                settings.providers.append(config)
+            }
+        }
+    }
+
+    /// Removes the saved config (a preset goes back to its defaults) and its Keychain key.
+    func removeProvider(id: String) {
+        updateSettings { $0.providers.removeAll { $0.id == id } }
+        try? KeychainStore.deleteAPIKey(forProvider: id)
+    }
+
+    /// The client for `config`, with its Keychain key; nil for an unknown CLI preset.
+    nonisolated func makeProvider(for config: ProviderConfig) -> (any LLMProvider)? {
+        let apiKey = config.authStyle == .none ? nil : try? KeychainStore.apiKey(forProvider: config.id)
+        switch config.kind {
+        case .cli:
+            guard let preset = CLIPreset(rawValue: config.preset ?? "") else { return nil }
+            return CLIRunner(preset: preset, executableOverride: config.baseURL)
+        case .anthropic:
+            return AnthropicClient(config: config, apiKey: apiKey)
+        case .openAICompatible, .local:
+            return OpenAICompatibleClient(config: config, apiKey: apiKey)
         }
     }
 }

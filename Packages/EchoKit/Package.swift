@@ -8,6 +8,7 @@ let package = Package(
         .library(name: "EchoCore", targets: ["EchoCore"]),
         .library(name: "EchoAudio", targets: ["EchoAudio"]),
         .library(name: "EchoTranscribe", targets: ["EchoTranscribe"]),
+        .library(name: "EchoAI", targets: ["EchoAI"]),
     ],
     dependencies: [
         // Same repo and tag as argmax-oss-swift 1.1.1; this URL keeps one package identity with speech-swift's dependency.
@@ -48,6 +49,16 @@ let package = Package(
             name: "EchoTranscribeTests",
             dependencies: ["EchoTranscribe"],
             path: "Tests/EchoTranscribeTests"
+        ),
+        .target(
+            name: "EchoAI",
+            dependencies: ["EchoCore"],
+            swiftSettings: [.swiftLanguageMode(.v6)]
+        ),
+        .testTarget(
+            name: "EchoAITests",
+            dependencies: ["EchoAI"],
+            path: "Tests/EchoAITests"
         ),
     ]
 )
