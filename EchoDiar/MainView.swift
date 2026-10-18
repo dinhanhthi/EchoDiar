@@ -32,6 +32,7 @@ struct MainView: View {
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(WindowGlass().ignoresSafeArea())
+        .background(shortcutButtons)
         .frame(minWidth: 440, minHeight: 480)
         .toolbar {
             // In a narrow window the other buttons go to the overflow menu first.
@@ -50,12 +51,10 @@ struct MainView: View {
                 Button { SettingsWindow.shared.show(model: model) } label: {
                     Label("Settings", systemImage: "slider.horizontal.3")
                 }
-                .modifier(ToolbarGlassButton())
                 .help("Settings")
                 Button(action: toggleAI) {
                     Label(model.selectedTab == .ai ? "Library" : "AI", systemImage: "sparkles")
                 }
-                .modifier(ToolbarGlassButton())
                 .help(model.selectedTab == .ai ? "Show the library" : "Show the AI pane")
             }
         }
@@ -77,45 +76,58 @@ struct MainView: View {
         }
     }
 
-    /// Record/Stop (⌘R), then the target menu while idle or Pause/Resume (⇧⌘P) while recording.
-    private var recordItem: some ToolbarContent {
-        ToolbarItemGroup(placement: .navigation) {
-            Button(action: model.toggleRecording) {
-                Label(model.isRecording ? "Stop" : "Record", systemImage: model.isRecording ? "stop.circle" : "record.circle")
-            }
-            .modifier(ToolbarGlassButton())
-            .keyboardShortcut("r", modifiers: .command)
-            .disabled(model.isStarting)
-            .help(model.isRecording ? "Stop recording (⌘R)" : "Record \(targetName) (⌘R)")
-            if model.isRecording {
-                let paused = model.snapshot.state == .paused
+    /// While idle, one Record split button whose chevron picks the target; while recording, Stop and
+    /// Pause/Resume in one group, like Settings and AI. ⌘R and ⇧⌘P come from `shortcutButtons`.
+    @ToolbarContentBuilder private var recordItem: some ToolbarContent {
+        if model.isRecording {
+            let paused = model.snapshot.state == .paused
+            ToolbarItemGroup(placement: .navigation) {
+                Button(action: model.toggleRecording) {
+                    Label("Stop", systemImage: "stop.circle")
+                }
+                .disabled(model.isStarting)
+                .help("Stop recording (⌘R)")
                 Button(action: model.togglePause) {
                     Label(paused ? "Resume" : "Pause", systemImage: paused ? "play.circle" : "pause.circle")
                 }
-                .modifier(ToolbarGlassButton())
-                .keyboardShortcut("p", modifiers: [.command, .shift])
                 .help(paused ? "Resume recording (⇧⌘P)" : "Pause recording (⇧⌘P)")
-            } else {
-                targetMenu
+            }
+        } else {
+            ToolbarItem(placement: .navigation) {
+                Menu {
+                    Toggle("All system audio", isOn: targetBinding(.global))
+                    if !model.targetGroups.isEmpty {
+                        Divider()
+                        ForEach(model.targetGroups, id: \.bundleID) { group in
+                            Toggle(group.needsGlobalTap ? "\(group.name) (records all system audio)" : group.name,
+                                   isOn: targetBinding(.app(group)))
+                        }
+                    }
+                } label: {
+                    Label("Record", systemImage: "record.circle")
+                } primaryAction: {
+                    model.toggleRecording()
+                }
+                .disabled(model.isStarting)
+                .help("Record \(targetName) (⌘R)")
             }
         }
     }
 
-    private var targetMenu: some View {
-        Menu {
-            Toggle("All system audio", isOn: targetBinding(.global))
-            if !model.targetGroups.isEmpty {
-                Divider()
-                ForEach(model.targetGroups, id: \.bundleID) { group in
-                    Toggle(group.needsGlobalTap ? "\(group.name) (records all system audio)" : group.name,
-                           isOn: targetBinding(.app(group)))
-                }
-            }
-        } label: {
-            Label(targetName, systemImage: "app.badge")
+    /// Hidden buttons for ⌘R (Record/Stop) and ⇧⌘P (Pause/Resume, only while recording), since a
+    /// shortcut on `Menu(primaryAction:)` is not reliable.
+    private var shortcutButtons: some View {
+        ZStack {
+            Button("Record or stop", action: model.toggleRecording)
+                .keyboardShortcut("r", modifiers: .command)
+                .disabled(model.isStarting)
+            Button("Pause or resume", action: model.togglePause)
+                .keyboardShortcut("p", modifiers: [.command, .shift])
+                .disabled(!model.isRecording)
         }
-        .modifier(ToolbarGlassButton())
-        .help("What to record")
+        .frame(width: 0, height: 0)
+        .opacity(0)
+        .accessibilityHidden(true)
     }
 
     /// Checked when `target` is the selected one; matched by app, since process lists change.
@@ -280,16 +292,5 @@ private struct ChannelMeters: View {
     private static func fraction(_ level: Float) -> CGFloat {
         guard level > 0 else { return 0 }
         return CGFloat(min(max((20 * log10(Double(level)) + 60) / 60, 0), 1))
-    }
-}
-
-/// Glass toolbar buttons on macOS 26+ (unless `--force-fallbacks`), the default style otherwise.
-private struct ToolbarGlassButton: ViewModifier {
-    func body(content: Content) -> some View {
-        if #available(macOS 26, *), PlatformFeatures.liquidGlass {
-            content.buttonStyle(.glass)
-        } else {
-            content
-        }
     }
 }
