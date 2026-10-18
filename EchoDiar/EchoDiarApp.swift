@@ -1,4 +1,5 @@
 import AppKit
+import EchoAudio
 import SwiftUI
 
 /// AppKit entry point: no SwiftUI `App`, so SwiftUI is only loaded inside the windows.
@@ -23,11 +24,20 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
     private var statusItem: StatusItemController?
     private var window: NSWindow?
     private var sigtermSource: DispatchSourceSignal?
+    /// Crash recovery of interrupted sessions; capture must not start before it finishes.
+    private(set) var recovery: Task<[RecoveredResult], Never>?
 
     private var isTesting: Bool { ProcessInfo.processInfo.environment["XCTestConfigurationFilePath"] != nil }
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         guard !isTesting else { return }
+        #if DEBUG
+        if CaptureProbe.isRequested {
+            CaptureProbe.run()
+            return
+        }
+        #endif
+        recovery = Task.detached(priority: .background) { SessionRecovery.recover() }
         // Dark only.
         NSApp.appearance = NSAppearance(named: .darkAqua)
         NSApp.mainMenu = makeMainMenu()

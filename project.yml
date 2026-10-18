@@ -25,6 +25,8 @@ targets:
     dependencies:
       - package: EchoKit
         product: EchoCore
+      - package: EchoKit
+        product: EchoAudio
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: dinh.thi.EchoDiar
@@ -33,6 +35,8 @@ targets:
         ENABLE_HARDENED_RUNTIME: YES
         ASSETCATALOG_COMPILER_APPICON_NAME: logo
         GENERATE_INFOPLIST_FILE: YES
+        INFOPLIST_FILE: EchoDiar/Info.plist
+        CODE_SIGN_ENTITLEMENTS: EchoDiar/EchoDiar.entitlements
         INFOPLIST_KEY_LSUIElement: YES
         SWIFT_VERSION: "5.0"
         SWIFT_STRICT_CONCURRENCY: complete
@@ -51,3 +55,4 @@ schemes:
     test:
       targets:
         - package: EchoKit/EchoCoreTests
+        - package: EchoKit/EchoAudioTests

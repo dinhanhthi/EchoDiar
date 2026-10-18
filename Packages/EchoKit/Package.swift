@@ -6,6 +6,7 @@ let package = Package(
     platforms: [.macOS(.v15)],
     products: [
         .library(name: "EchoCore", targets: ["EchoCore"]),
+        .library(name: "EchoAudio", targets: ["EchoAudio"]),
     ],
     targets: [
         .target(
@@ -16,6 +17,16 @@ let package = Package(
             name: "EchoCoreTests",
             dependencies: ["EchoCore"],
             path: "Tests/EchoCoreTests"
+        ),
+        .target(
+            name: "EchoAudio",
+            dependencies: ["EchoCore"],
+            swiftSettings: [.swiftLanguageMode(.v5), .enableUpcomingFeature("StrictConcurrency")]
+        ),
+        .testTarget(
+            name: "EchoAudioTests",
+            dependencies: ["EchoAudio"],
+            path: "Tests/EchoAudioTests"
         ),
     ]
 )
