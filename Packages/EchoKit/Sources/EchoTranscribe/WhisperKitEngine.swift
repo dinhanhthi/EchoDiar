@@ -6,6 +6,8 @@ import WhisperKit
 /// tokenizer is checked before WhisperKit is created, since its fallback would fetch it from the Hub.
 public struct WhisperKitEngine: TranscriptionEngine {
     public static let defaultWindowSeconds = 30
+    /// Whisper's language codes.
+    public static let supportedLanguages = Array(Constants.languageCodes)
     /// Audio read into memory at once: 10 min of 16 kHz Float32 is about 38 MB.
     static let slabSeconds = 600.0
 
@@ -20,6 +22,19 @@ public struct WhisperKitEngine: TranscriptionEngine {
     public func transcribe(
         channelURL: URL, languageRanges: [LanguageRange], progress: @escaping @Sendable (Double) -> Void
     ) async throws -> [RawSegment] {
+        let whisper = try await Self.load(entry: entry, folder: folder)
+        do {
+            let segments = try await decode(whisper, channelURL: channelURL, ranges: languageRanges, progress: progress)
+            await whisper.unloadModels()
+            return segments
+        } catch {
+            await whisper.unloadModels()
+            throw error
+        }
+    }
+
+    /// Loads the model from `folder`; the caller unloads it. Also used by `LiveTranscriber`.
+    static func load(entry: ModelEntry, folder: URL) async throws -> WhisperKit {
         guard FileManager.default.fileExists(atPath: folder.appendingPathComponent("tokenizer.json").path) else {
             throw TranscriptionError.needsModel(entry.id)
         }
@@ -34,15 +49,7 @@ public struct WhisperKitEngine: TranscriptionEngine {
             load: true,
             download: false
         )
-        let whisper = try await WhisperKit(config)
-        do {
-            let segments = try await decode(whisper, channelURL: channelURL, ranges: languageRanges, progress: progress)
-            await whisper.unloadModels()
-            return segments
-        } catch {
-            await whisper.unloadModels()
-            throw error
-        }
+        return try await WhisperKit(config)
     }
 
     /// One decode per language range; each range is read in slabs of at most `slabSeconds`, each slab is split at

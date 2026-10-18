@@ -110,12 +110,24 @@ public final class RecordingEngine: @unchecked Sendable {
     /// Published on state changes and flag flips only; single consumer.
     public let snapshots: AsyncStream<Snapshot>
 
+    /// Read at `start`, so set it before; nil (the default) costs nothing.
+    public var liveSink: LiveSink? {
+        get { shared.withLock { $0.liveSink } }
+        set { shared.withLock { $0.liveSink = newValue } }
+    }
+
     private struct Shared {
         var snapshot = Snapshot()
         var writer: ChannelWriter?
         var micRing: RingBuffer?
         var systemRing: RingBuffer?
+        var liveSink: LiveSink?
+        var language: String?
     }
+
+    /// Gets each written block on the writer queue: interleaved Int16 16 kHz samples (see `RecordingSession.Channel`),
+    /// frame count, channel count. The pointer is valid only during the call.
+    public typealias LiveSink = @Sendable (UnsafePointer<Int16>, Int, Int) -> Void
 
     private static let monitorInterval = 1
     private static let diskCheckTicks = 60
@@ -185,7 +197,13 @@ public final class RecordingEngine: @unchecked Sendable {
             guard state != .idle, let writer, var session else { return }
             session.languageMarkers.append(.init(fileTime: writer.stats.duration, language: language))
             save(session)
+            shared.withLock { $0.language = language }
         }
+    }
+
+    /// The language of the last marker ("auto" or BCP-47), or nil when idle. Lock-only.
+    public func currentLanguage() -> String? {
+        shared.withLock { $0.language }
     }
 
     /// Peak levels (0...1) since the previous call. Lock-only; one caller, at ≤ 15 Hz.
@@ -250,6 +268,7 @@ public final class RecordingEngine: @unchecked Sendable {
             writer = try ChannelWriter(fileURL: folder.appendingPathComponent(session.audioFileName))
             let check = OutputCheck(target: target)
             writer.isTargetPlayingOutput = { check.isPlaying() }
+            writer.liveSink = liveSink
             try writer.start(micRing: micSource.ring, systemRing: system.ring, micFormat: micSource.format, systemFormat: system.format)
         } catch {
             tap.stop()
@@ -270,6 +289,7 @@ public final class RecordingEngine: @unchecked Sendable {
             $0.writer = writer
             $0.micRing = micSource.ring
             $0.systemRing = system.ring
+            $0.language = language
         }
         publish()
         return folder
@@ -342,6 +362,7 @@ public final class RecordingEngine: @unchecked Sendable {
             $0.writer = nil
             $0.micRing = nil
             $0.systemRing = nil
+            $0.language = nil
         }
         publish(stats: stats, endReason: reason)
         return session

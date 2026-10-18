@@ -30,6 +30,10 @@ struct RecordingMenuControls {
     var toggleRecording: @MainActor () -> Void
     var togglePause: @MainActor () -> Void
     var stop: @MainActor () -> Void
+    var language: @MainActor () -> String
+    /// `LanguageOptions.groups` for the current language.
+    var languageGroups: @MainActor () -> [[String]]
+    var setLanguage: @MainActor (String) -> Void
 }
 
 /// Menu bar item with a plain AppKit menu (no SwiftUI, for footprint). The menu is rebuilt each time it opens.
@@ -147,7 +151,7 @@ final class StatusItemController: NSObject, NSMenuDelegate {
         menu.addItem(quit)
     }
 
-    /// Elapsed time, Pause/Resume, Stop and the silent-tap fix. The values are read when the menu opens.
+    /// Elapsed time, Pause/Resume, Stop, Language and the silent-tap fix. The values are read when the menu opens.
     private func addRecordingItems(_ controls: RecordingMenuControls) {
         let elapsed = controls.elapsed()
         let pattern: Duration.TimeFormatStyle.Pattern = elapsed >= 3_600 ? .hourMinuteSecond : .minuteSecond
@@ -159,10 +163,29 @@ final class StatusItemController: NSObject, NSMenuDelegate {
         let stop = item("Stop Recording", #selector(stopRecording))
         stop.isEnabled = recordingEnabled
         menu.addItem(stop)
+        menu.addItem(languageItem(controls))
         if controls.silentTapSuspected() {
             menu.addItem(item("System audio is silent — Fix…", #selector(fixSilentTap)))
         }
         menu.addItem(.separator())
+    }
+
+    /// A submenu in `LanguageOptions` order; picking a language adds a marker at the current recording time.
+    private func languageItem(_ controls: RecordingMenuControls) -> NSMenuItem {
+        let current = controls.language()
+        let submenu = NSMenu()
+        for (index, group) in controls.languageGroups().enumerated() {
+            if index > 0 { submenu.addItem(.separator()) }
+            for code in group {
+                let option = item(LanguageOptions.name(code), #selector(setLanguage(_:)))
+                option.representedObject = code
+                option.state = code == current ? .on : .off
+                submenu.addItem(option)
+            }
+        }
+        let language = NSMenuItem(title: "Language", action: nil, keyEquivalent: "")
+        language.submenu = submenu
+        return language
     }
 
     private func item(_ title: String, _ action: Selector) -> NSMenuItem {
@@ -177,6 +200,9 @@ final class StatusItemController: NSObject, NSMenuDelegate {
     }
     @objc private func togglePause() { Self.controls?.togglePause() }
     @objc private func stopRecording() { Self.controls?.stop() }
+    @objc private func setLanguage(_ sender: NSMenuItem) {
+        if let code = sender.representedObject as? String { Self.controls?.setLanguage(code) }
+    }
     @objc private func fixSilentTap() { PrivacySettings.openSystemAudioRecording() }
     @objc private func openSettings() { onOpenSettings() }
     @objc private func about() { onAbout() }

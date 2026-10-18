@@ -59,17 +59,21 @@ public struct TranscriptionJob: Codable, Equatable, Sendable {
     public var systemFileName: String?
     /// Catalog id of the ASR engine; nil = the default resolution.
     public var engineID: String?
+    /// "auto" or a BCP-47 code for the whole recording, replacing the session's language markers for this run
+    /// (re-transcribe); nil = the markers.
+    public var language: String?
     /// "Process now": never deferred for thermal state or Low Power Mode.
     public var processNow: Bool
 
     public init(
         conversationID: UUID, folder: URL, systemFileName: String? = nil, engineID: String? = nil,
-        processNow: Bool = false
+        language: String? = nil, processNow: Bool = false
     ) {
         self.conversationID = conversationID
         self.folder = folder
         self.systemFileName = systemFileName
         self.engineID = engineID
+        self.language = language
         self.processNow = processNow
     }
 }

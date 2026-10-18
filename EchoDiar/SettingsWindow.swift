@@ -67,14 +67,6 @@ private struct GeneralSettingsTab: View {
     let model: AppModel
     @State private var loginItemNote: String?
 
-    /// Auto first, then the first-class content languages. The full list arrives in Phase 5.
-    private static let languages: [(code: String, name: String)] = [
-        ("auto", "Auto"),
-        ("en", "English"), ("fr", "French"), ("vi", "Vietnamese"),
-        ("de", "German"), ("es", "Spanish"), ("it", "Italian"), ("pt", "Portuguese"),
-        ("ja", "Japanese"), ("zh", "Chinese"),
-    ]
-
     var body: some View {
         Form {
             Section {
@@ -85,20 +77,10 @@ private struct GeneralSettingsTab: View {
                         .foregroundStyle(.secondary)
                 }
             }
-            Section {
-                Picker("Default language", selection: defaultLanguage) {
-                    ForEach(Self.languages, id: \.code) { Text($0.name).tag($0.code) }
-                }
-            }
         }
         .formStyle(.grouped)
         .modifier(GlassForm())
         .onAppear(perform: syncLaunchAtLogin)
-    }
-
-    private var defaultLanguage: Binding<String> {
-        Binding(get: { model.settings.defaultLanguage },
-                set: { code in model.updateSettings { $0.defaultLanguage = code } })
     }
 
     private var launchAtLogin: Binding<Bool> {

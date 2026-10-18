@@ -17,6 +17,16 @@ public actor TranscriptionPipeline {
 
     public static var registeredRuntimes: Set<ModelEntry.Runtime> { Set(engines.keys) }
 
+    /// Language codes an engine accepts: the catalog list, or the runtime's own list for multilingual entries;
+    /// empty when unknown.
+    public static func supportedLanguages(for entry: ModelEntry) -> [String] {
+        switch (entry.languages, entry.runtime) {
+        case (.codes(let codes), _): codes
+        case (.multilingual, .whisperKit): WhisperKitEngine.supportedLanguages
+        case (.multilingual, _): []
+        }
+    }
+
     /// −60 dBFS: a channel whose peak stays below is silent and skips ASR.
     public static let silencePeak: Float = 0.001
 
@@ -58,9 +68,11 @@ public actor TranscriptionPipeline {
         var started = false
         do {
             if deferWhenConstrained && !job.processNow { await waitWhileConstrained(job) }
-            guard let session = try? RecordingSession.read(from: job.folder) else {
+            guard var session = try? RecordingSession.read(from: job.folder) else {
                 throw TranscriptionError.sessionUnreadable
             }
+            // Never written back: the override only applies to this run.
+            if let language = job.language { session.languageMarkers = [.init(fileTime: 0, language: language)] }
             let sources = try channelSources(session: session, job: job)
             let firstLanguage = session.languageMarkers.min { $0.fileTime < $1.fileTime }?.language ?? "auto"
             let entry = try resolveEngine(job.engineID, language: firstLanguage)

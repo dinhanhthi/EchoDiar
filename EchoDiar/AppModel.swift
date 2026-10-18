@@ -19,6 +19,8 @@ final class AppModel {
     private(set) var settings = AppSettings()
     var selectedTab: Tab = .library
     var selectedConversationID: UUID?
+    /// The conversation whose transcript fills the library pane; nil shows the cards.
+    var openedConversationID: UUID?
     /// The library, newest first, as last emitted by `library.changes()`.
     private(set) var conversations: [Conversation] = []
     /// The last snapshot published by the engine.
@@ -28,6 +30,8 @@ final class AppModel {
     /// Apps with running audio input or output, for the Record target menu.
     private(set) var targetGroups: [AudioProcessGroup] = []
     private(set) var isStarting = false
+    /// Picked in the Record menu or while recording; nil = `settings.defaultLanguage`. Cleared when a recording ends.
+    private var languageOverride: String?
     var recordingError: String?
     private var compressionJobs = 0
     private var transcriptionJobs = 0
@@ -41,6 +45,8 @@ final class AppModel {
     private(set) var downloadErrors: [String: String] = [:]
     private(set) var installedModelIDs: Set<String> = []
     private(set) var installedModelsBytes: Int64 = 0
+    /// Live captions of the current recording; nil when the setting was off at its start, or when not recording.
+    private(set) var liveTranscript: LiveTranscriber.Snapshot?
 
     struct ModelDownload {
         var fraction: Double = 0
@@ -69,6 +75,9 @@ final class AppModel {
     /// Folder of the session being recorded; compressed when the engine reports the end.
     @ObservationIgnored private var activeFolder: URL?
     @ObservationIgnored private var terminateObserver: (any NSObjectProtocol)?
+    /// `supportedLanguages(engineID:)` by catalog id, sorted by name once.
+    @ObservationIgnored private var languageCache: [String: [String]] = [:]
+    @ObservationIgnored private var liveTranscriber: LiveTranscriber?
 
     init(store: SettingsStore = SettingsStore()) {
         self.store = store
@@ -96,7 +105,14 @@ final class AppModel {
             silentTapSuspected: { [weak self] in self?.snapshot.silentTapSuspected ?? false },
             toggleRecording: { [weak self] in self?.toggleRecording() },
             togglePause: { [weak self] in self?.togglePause() },
-            stop: { [weak self] in self?.stopRecording() })
+            stop: { [weak self] in self?.stopRecording() },
+            language: { [weak self] in self?.recordingLanguage ?? LanguageOptions.auto },
+            languageGroups: { [weak self] in
+                guard let self else { return [] }
+                return LanguageOptions.groups(
+                    selection: recordingLanguage, recent: settings.recentLanguages, supported: supportedLanguages())
+            },
+            setLanguage: { [weak self] in self?.setRecordingLanguage($0) })
 
         #if DEBUG
         if runTranscribeHarness() || runModelHarness() { return }
@@ -132,19 +148,49 @@ final class AppModel {
     func startRecording(target: CaptureTarget) {
         guard !isRecording, !isStarting else { return }
         isStarting = true
-        let language = settings.defaultLanguage
+        let language = recordingLanguage
         Task {
             _ = await recovery?.value
+            // Before the engine starts: it reads the sink at start, and the model loads meanwhile.
+            if settings.liveTranscript { startLiveTranscript() }
             do {
                 activeFolder = try await Task.detached(priority: .userInitiated) { [engine] in
                     try engine.start(target: Self.resolved(target), language: language)
                 }.value
             } catch {
+                // Not awaited: a first model load can take long, and no batch job follows a failed start.
+                let live = detachLiveTranscript()
+                Task { await live?.stop() }
                 NSLog("EchoDiar: could not start recording: \(error)")
                 recordingError = "The recording could not start (\(error))."
             }
             isStarting = false
         }
+    }
+
+    /// Connects a new transcriber to the engine's sink, publishes its updates until `detachLiveTranscript` and loads
+    /// its model.
+    private func startLiveTranscript() {
+        let live = LiveTranscriber(modelStore: modelStore) { [engine] in engine.currentLanguage() }
+        engine.liveSink = { live.append(interleaved: $0, frames: $1, channels: $2) }
+        liveTranscriber = live
+        liveTranscript = LiveTranscriber.Snapshot(state: .loading)
+        Task { [weak self] in
+            for await snapshot in live.updates {
+                guard let self, liveTranscriber === live else { return }
+                liveTranscript = snapshot
+            }
+        }
+        Task { await live.start() }
+    }
+
+    /// Disconnects and hides the current transcriber; the caller awaits its `stop()`, which unloads the model.
+    private func detachLiveTranscript() -> LiveTranscriber? {
+        engine.liveSink = nil
+        let live = liveTranscriber
+        liveTranscriber = nil
+        liveTranscript = nil
+        return live
     }
 
     func stopRecording() {
@@ -177,6 +223,39 @@ final class AppModel {
         }
     }
 
+    /// The language the next recording starts with, or the current one while recording.
+    var recordingLanguage: String { languageOverride ?? settings.defaultLanguage }
+
+    /// Before recording: the next session's language. While recording: a language marker at the current time.
+    func setRecordingLanguage(_ language: String) {
+        guard language != recordingLanguage else { return }
+        languageOverride = language
+        if isRecording { engine.setLanguage(language) }
+        rememberLanguage(language)
+    }
+
+    /// Codes the engine accepts (`engineID` nil = the catalog default), sorted by name. Later engines only
+    /// register in `TranscriptionPipeline.supportedLanguages(for:)`.
+    func supportedLanguages(engineID: String? = nil) -> [String] {
+        let entry = engineID.flatMap(ModelCatalog.entry(id:)) ?? ModelCatalog.defaultASR
+        if let cached = languageCache[entry.id] { return cached }
+        let codes = TranscriptionPipeline.supportedLanguages(for: entry)
+            .map { (code: $0, name: LanguageOptions.name($0)) }
+            .sorted { $0.name.localizedStandardCompare($1.name) == .orderedAscending }
+            .map(\.code)
+        languageCache[entry.id] = codes
+        return codes
+    }
+
+    /// Most recent first; Auto and the pinned languages are always listed, so they are not kept.
+    private func rememberLanguage(_ language: String) {
+        guard language != LanguageOptions.auto, !LanguageOptions.pinned.contains(language) else { return }
+        updateSettings {
+            let recent = [language] + $0.recentLanguages.filter { $0 != language }
+            $0.recentLanguages = Array(recent.prefix(LanguageOptions.maxRecent))
+        }
+    }
+
     /// Reloads the running apps for the target menu, off the main thread.
     func refreshTargets() {
         Task {
@@ -201,10 +280,15 @@ final class AppModel {
                 guard let self else { return }
                 self.snapshot = snapshot
                 if snapshot.state == .idle, let reason = snapshot.endReason {
+                    languageOverride = nil
                     if let message = Self.stopMessage(reason) { recordingError = message }
-                    if let folder = activeFolder {
-                        activeFolder = nil
-                        compress([folder])
+                    let folder = activeFolder
+                    activeFolder = nil
+                    let live = detachLiveTranscript()
+                    Task {
+                        // The live model is unloaded first, so the batch model is never loaded next to it.
+                        await live?.stop()
+                        if let folder { self.compress([folder]) }
                     }
                 }
             }
@@ -258,10 +342,13 @@ final class AppModel {
         submitTranscription(folder: result.folder)
     }
 
-    /// The card's "Transcribe" and "Retry": queues the conversation unless a job for it is already active.
-    func transcribe(_ id: UUID) {
+    /// The card's "Transcribe" and "Retry", and the transcript's "Re-transcribe" (`engineID` = a catalog id, nil =
+    /// the default resolution; `language` replaces the recording's language markers, nil keeps them): queues the
+    /// conversation unless a job for it is already active.
+    func transcribe(_ id: UUID, engineID: String? = nil, language: String? = nil) {
         guard !isTranscribing(id), let conversation = conversations.first(where: { $0.id == id }) else { return }
-        submitTranscription(folder: conversation.folder)
+        if let language { rememberLanguage(language) }
+        submitTranscription(folder: conversation.folder, engineID: engineID, language: language)
     }
 
     /// Queued, deferred or running; a `needsModel` result is not active.
@@ -271,13 +358,14 @@ final class AppModel {
     }
 
     /// A failed recording is never transcribed: its audio is missing or empty.
-    private func submitTranscription(folder: URL) {
+    private func submitTranscription(folder: URL, engineID: String? = nil, language: String? = nil) {
         guard let session = try? RecordingSession.read(from: folder), !session.probe, session.state != .failed else {
             return
         }
         let job = TranscriptionJob(
             conversationID: session.id, folder: folder,
-            systemFileName: session.audioFileName == AudioCompressor.micFileName ? AudioCompressor.systemFileName : nil)
+            systemFileName: session.audioFileName == AudioCompressor.micFileName ? AudioCompressor.systemFileName : nil,
+            engineID: engineID, language: language)
         // Set now so the card leaves its button before the pipeline's first event arrives.
         transcriptionProgress[session.id] = JobProgress(conversationID: session.id, step: .queued, fraction: 0)
         transcriptionJobs += 1
@@ -401,6 +489,7 @@ final class AppModel {
     /// Moves the conversation to the Trash.
     func deleteConversation(_ id: UUID) {
         if selectedConversationID == id { selectedConversationID = nil }
+        if openedConversationID == id { openedConversationID = nil }
         Task {
             do {
                 try await library.delete(id: id)

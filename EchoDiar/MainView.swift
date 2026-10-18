@@ -19,6 +19,10 @@ struct MainView: View {
             if model.isRecording {
                 RecordingHeader(model: model, live: windowVisible)
                     .padding([.horizontal, .top], 12)
+                if let live = model.liveTranscript {
+                    LiveTranscriptView(snapshot: live)
+                        .padding([.horizontal, .top], 12)
+                }
             } else if model.selectedTarget.globalTapFallback {
                 GlobalTapNote(appName: targetName)
                     .padding([.horizontal, .top], 12)
@@ -76,8 +80,8 @@ struct MainView: View {
         }
     }
 
-    /// While idle, one Record split button whose chevron picks the target; while recording, Stop and
-    /// Pause/Resume in one group, like Settings and AI. ⌘R and ⇧⌘P come from `shortcutButtons`.
+    /// While idle, one Record split button whose chevron picks the target and the language; while recording,
+    /// Stop and Pause/Resume in one group, like Settings and AI. ⌘R and ⇧⌘P come from `shortcutButtons`.
     @ToolbarContentBuilder private var recordItem: some ToolbarContent {
         if model.isRecording {
             let paused = model.snapshot.state == .paused
@@ -103,6 +107,8 @@ struct MainView: View {
                                    isOn: targetBinding(.app(group)))
                         }
                     }
+                    Divider()
+                    LanguagePicker(title: "Language", selection: languageBinding, model: model)
                 } label: {
                     Label("Record", systemImage: "record.circle")
                 } primaryAction: {
@@ -138,6 +144,10 @@ struct MainView: View {
         )
     }
 
+    private var languageBinding: Binding<String> {
+        Binding(get: { model.recordingLanguage }, set: { model.setRecordingLanguage($0) })
+    }
+
     private static func targetID(_ target: CaptureTarget) -> String? {
         if case .app(let group) = target { return group.bundleID }
         return nil
@@ -159,7 +169,25 @@ struct MainView: View {
         reduceMotion ? .opacity : .move(edge: edge).combined(with: .opacity)
     }
 
-    @ViewBuilder private var libraryPane: some View {
+    /// The cards, or the opened conversation's transcript sliding in over them.
+    private var libraryPane: some View {
+        ZStack {
+            if let conversation = openedConversation {
+                TranscriptView(conversation: conversation, model: model)
+                    .id(conversation.id)
+                    .transition(paneTransition(from: .trailing))
+            } else {
+                cardsPane.transition(paneTransition(from: .leading))
+            }
+        }
+    }
+
+    /// nil when none is opened or it was deleted.
+    private var openedConversation: Conversation? {
+        model.openedConversationID.flatMap { id in model.conversations.first { $0.id == id } }
+    }
+
+    @ViewBuilder private var cardsPane: some View {
         let groups = DayGroup.groups(from: model.conversations)
         if groups.isEmpty {
             GlassCards {
@@ -213,6 +241,7 @@ private struct RecordingHeader: View {
                 if live && !paused {
                     ChannelMeters(engine: model.engine)
                 }
+                languageMenu
             }
             .padding(.horizontal, 14)
             .padding(.vertical, 10)
@@ -227,6 +256,24 @@ private struct RecordingHeader: View {
                 SilentTapBanner { PrivacySettings.openSystemAudioRecording() }
             }
         }
+    }
+
+    /// Picking a language adds a marker at the current recording time.
+    private var languageMenu: some View {
+        Menu {
+            LanguagePicker(
+                title: "Language",
+                selection: Binding(get: { model.recordingLanguage }, set: { model.setRecordingLanguage($0) }),
+                model: model)
+                .pickerStyle(.inline)
+                .labelsHidden()
+        } label: {
+            Label(LanguageOptions.name(model.recordingLanguage), systemImage: "globe")
+        }
+        .menuStyle(.borderlessButton)
+        .fixedSize()
+        .foregroundStyle(.secondary)
+        .help("Language from now on")
     }
 
     private var elapsedText: some View {

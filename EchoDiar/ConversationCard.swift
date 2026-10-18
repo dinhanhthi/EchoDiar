@@ -4,7 +4,8 @@ import EchoTranscribe
 import SwiftUI
 
 /// One conversation of the library: source app icon, title (double-click to rename), time, duration, size,
-/// status, transcription progress or its action, and the AI and Summary buttons.
+/// status, transcription progress or its action, and the AI and Summary buttons. A click elsewhere opens the
+/// transcript.
 struct ConversationCard: View {
     let conversation: Conversation
     let model: AppModel
@@ -20,7 +21,7 @@ struct ConversationCard: View {
                 details
             }
             Spacer(minLength: 8)
-            transcription
+            TranscriptionStatus(conversation: conversation, model: model)
             Button(action: showAI) {
                 Label("AI", systemImage: "sparkles")
                     .labelStyle(.iconOnly)
@@ -43,6 +44,9 @@ struct ConversationCard: View {
         .padding(.horizontal, 14)
         .padding(.vertical, 10)
         .modifier(GlassCard(cornerRadius: 20))
+        // Buttons take their own clicks; the title's double click is handled before this.
+        .contentShape(Rectangle())
+        .onTapGesture(perform: open)
         .contextMenu {
             Button("Rename", action: beginEditing)
             Button("Reveal in Finder") {
@@ -55,9 +59,90 @@ struct ConversationCard: View {
         }
     }
 
+    @ViewBuilder private var title: some View {
+        if editing {
+            TextField("Title", text: $draft)
+                .textFieldStyle(.plain)
+                .font(.headline)
+                .focused($titleFocused)
+                .onAppear { titleFocused = true }
+                .onSubmit {
+                    editing = false
+                    if draft != conversation.title { model.renameConversation(conversation.id, to: draft) }
+                }
+                .onExitCommand { editing = false }
+                // Clicking elsewhere cancels, like Esc; only Return saves.
+                .onChange(of: titleFocused) { _, focused in if !focused { editing = false } }
+        } else {
+            Text(conversation.title)
+                .font(.headline)
+                .lineLimit(1)
+                .truncationMode(.tail)
+                .onTapGesture(count: 2, perform: beginEditing)
+                // After the double click, so a double click renames instead of opening.
+                .onTapGesture(perform: open)
+                .help(conversation.title)
+        }
+    }
+
+    private var details: some View {
+        HStack(spacing: 8) {
+            Text(conversation.createdAt.formatted(date: .abbreviated, time: .shortened))
+            if conversation.duration > 0 {
+                Text(Self.durationText(conversation.duration)).monospacedDigit()
+            }
+            if conversation.sizeBytes > 0 {
+                Text(ByteCountFormatter.string(fromByteCount: conversation.sizeBytes, countStyle: .file))
+            }
+            if let badge = StatusBadge(status: conversation.status) { badge }
+        }
+        .font(.caption)
+        .foregroundStyle(.secondary)
+        .lineLimit(1)
+    }
+
+    /// m:ss, or h:mm:ss from one hour.
+    static func durationText(_ seconds: Double) -> String {
+        let pattern: Duration.TimeFormatStyle.Pattern = seconds >= 3_600 ? .hourMinuteSecond : .minuteSecond
+        return Duration.seconds(seconds).formatted(.time(pattern: pattern))
+    }
+
+    private func beginEditing() {
+        draft = conversation.title
+        editing = true
+    }
+
+    /// Not while the title is being edited: clicks in its field must not open the transcript.
+    private func open() {
+        guard !editing else { return }
+        withAnimation(.snappy) { model.openedConversationID = conversation.id }
+    }
+
+    private func showAI() {
+        model.selectedConversationID = conversation.id
+        withAnimation(.snappy) { model.selectedTab = .ai }
+    }
+
+    private func confirmDelete() {
+        let alert = NSAlert()
+        alert.messageText = "Delete \"\(conversation.title)\"?"
+        alert.informativeText = "The recording and its files are moved to the Trash."
+        alert.addButton(withTitle: "Delete").hasDestructiveAction = true
+        alert.addButton(withTitle: "Cancel")
+        guard alert.runModal() == .alertFirstButtonReturn else { return }
+        model.deleteConversation(conversation.id)
+    }
+}
+
+/// A conversation's transcription progress, or its action: Needs model, Failed — Retry, or Transcribe. Shared by
+/// the card and the transcript header.
+struct TranscriptionStatus: View {
+    let conversation: Conversation
+    let model: AppModel
+
     /// Progress first: a queued job's conversation is still `ready`. A `transcribing` status without a job was
     /// left by a quit or crash, so it offers Transcribe again. A failed recording (`failed`) offers nothing.
-    @ViewBuilder private var transcription: some View {
+    var body: some View {
         let progress = model.transcriptionProgress[conversation.id]
         if let progress, progress.step != .needsModel {
             HStack(spacing: 6) {
@@ -102,77 +187,11 @@ struct ConversationCard: View {
         case .needsModel, .failed: ""
         }
     }
-
-    @ViewBuilder private var title: some View {
-        if editing {
-            TextField("Title", text: $draft)
-                .textFieldStyle(.plain)
-                .font(.headline)
-                .focused($titleFocused)
-                .onAppear { titleFocused = true }
-                .onSubmit {
-                    editing = false
-                    if draft != conversation.title { model.renameConversation(conversation.id, to: draft) }
-                }
-                .onExitCommand { editing = false }
-                // Clicking elsewhere cancels, like Esc; only Return saves.
-                .onChange(of: titleFocused) { _, focused in if !focused { editing = false } }
-        } else {
-            Text(conversation.title)
-                .font(.headline)
-                .lineLimit(1)
-                .truncationMode(.tail)
-                .onTapGesture(count: 2, perform: beginEditing)
-                .help(conversation.title)
-        }
-    }
-
-    private var details: some View {
-        HStack(spacing: 8) {
-            Text(conversation.createdAt.formatted(date: .abbreviated, time: .shortened))
-            if conversation.duration > 0 {
-                Text(Self.durationText(conversation.duration)).monospacedDigit()
-            }
-            if conversation.sizeBytes > 0 {
-                Text(ByteCountFormatter.string(fromByteCount: conversation.sizeBytes, countStyle: .file))
-            }
-            if let badge = StatusBadge(status: conversation.status) { badge }
-        }
-        .font(.caption)
-        .foregroundStyle(.secondary)
-        .lineLimit(1)
-    }
-
-    /// m:ss, or h:mm:ss from one hour.
-    private static func durationText(_ seconds: Double) -> String {
-        let pattern: Duration.TimeFormatStyle.Pattern = seconds >= 3_600 ? .hourMinuteSecond : .minuteSecond
-        return Duration.seconds(seconds).formatted(.time(pattern: pattern))
-    }
-
-    private func beginEditing() {
-        draft = conversation.title
-        editing = true
-    }
-
-    private func showAI() {
-        model.selectedConversationID = conversation.id
-        withAnimation(.snappy) { model.selectedTab = .ai }
-    }
-
-    private func confirmDelete() {
-        let alert = NSAlert()
-        alert.messageText = "Delete \"\(conversation.title)\"?"
-        alert.informativeText = "The recording and its files are moved to the Trash."
-        alert.addButton(withTitle: "Delete").hasDestructiveAction = true
-        alert.addButton(withTitle: "Cancel")
-        guard alert.runModal() == .alertFirstButtonReturn else { return }
-        model.deleteConversation(conversation.id)
-    }
 }
 
 /// A short colored label for the statuses that need attention; nil for `ready`, `transcribed` and
 /// `transcriptionFailed` (which shows "Failed — Retry").
-private struct StatusBadge: View {
+struct StatusBadge: View {
     let text: String
     let color: Color
 

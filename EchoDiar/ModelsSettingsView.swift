@@ -2,7 +2,8 @@ import EchoCore
 import EchoTranscribe
 import SwiftUI
 
-/// The Transcription tab: the ASR and diarization catalog by tier, with Download, Cancel and Delete.
+/// The Transcription tab: the default language and the live transcript switch, then the ASR and diarization catalog by tier, with Download,
+/// Cancel and Delete.
 struct ModelsSettingsView: View {
     let model: AppModel
 
@@ -14,6 +15,13 @@ struct ModelsSettingsView: View {
     var body: some View {
         VStack(spacing: 0) {
             Form {
+                Section {
+                    LanguagePicker(title: "Default language", selection: defaultLanguage, model: model)
+                    Toggle(isOn: liveTranscript) {
+                        Text("Live transcript")
+                        Text("Shows text while recording with an installed Whisper model (more CPU). The transcript made after Stop stays the one that is saved.")
+                    }
+                }
                 ForEach(ModelEntry.Tier.allCases, id: \.self) { tier in
                     let entries = Self.entries.filter { $0.tier == tier }
                     if !entries.isEmpty {
@@ -35,6 +43,16 @@ struct ModelsSettingsView: View {
             .padding(.bottom, 12)
         }
         .task { model.refreshInstalledModels() }
+    }
+
+    private var liveTranscript: Binding<Bool> {
+        Binding(get: { model.settings.liveTranscript },
+                set: { isOn in model.updateSettings { $0.liveTranscript = isOn } })
+    }
+
+    private var defaultLanguage: Binding<String> {
+        Binding(get: { model.settings.defaultLanguage },
+                set: { code in model.updateSettings { $0.defaultLanguage = code } })
     }
 }
 
