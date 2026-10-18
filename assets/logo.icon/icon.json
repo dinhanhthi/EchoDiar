@@ -9,10 +9,10 @@
           "image-name" : "logo.png",
           "name" : "logo",
           "position" : {
-            "scale" : 0.9,
+            "scale" : 1,
             "translation-in-points" : [
-              0,
-              0
+              -1.5,
+              -4
             ]
           }
         }
