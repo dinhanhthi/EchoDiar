@@ -7,19 +7,39 @@ public struct AppSettings: Codable, Equatable, Sendable {
     public var launchAtLogin: Bool
     /// A language code, or "auto" to detect it.
     public var defaultLanguage: String
+    /// Total AAC bitrate of the compressed 2-channel `audio.m4a`.
+    public var compressionBitrateKbps: Int
+    /// Keep the uncompressed CAF next to the m4a after compression.
+    public var keepUncompressedAudio: Bool
+    /// Set by "Done" in the first-run onboarding window.
+    public var onboardingCompleted: Bool
 
-    public init(launchAtLogin: Bool = false, defaultLanguage: String = "auto") {
+    public init(
+        launchAtLogin: Bool = false,
+        defaultLanguage: String = "auto",
+        compressionBitrateKbps: Int = 64,
+        keepUncompressedAudio: Bool = false,
+        onboardingCompleted: Bool = false
+    ) {
         self.launchAtLogin = launchAtLogin
         self.defaultLanguage = defaultLanguage
+        self.compressionBitrateKbps = compressionBitrateKbps
+        self.keepUncompressedAudio = keepUncompressedAudio
+        self.onboardingCompleted = onboardingCompleted
     }
 
-    private enum CodingKeys: String, CodingKey { case version, launchAtLogin, defaultLanguage }
+    private enum CodingKeys: String, CodingKey {
+        case version, launchAtLogin, defaultLanguage, compressionBitrateKbps, keepUncompressedAudio, onboardingCompleted
+    }
 
     public init(from decoder: Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
         version = try container.decodeIfPresent(Int.self, forKey: .version) ?? 1
         launchAtLogin = try container.decodeIfPresent(Bool.self, forKey: .launchAtLogin) ?? false
         defaultLanguage = try container.decodeIfPresent(String.self, forKey: .defaultLanguage) ?? "auto"
+        compressionBitrateKbps = try container.decodeIfPresent(Int.self, forKey: .compressionBitrateKbps) ?? 64
+        keepUncompressedAudio = try container.decodeIfPresent(Bool.self, forKey: .keepUncompressedAudio) ?? false
+        onboardingCompleted = try container.decodeIfPresent(Bool.self, forKey: .onboardingCompleted) ?? false
     }
 }
 

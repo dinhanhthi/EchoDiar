@@ -23,12 +23,24 @@ enum IndicatorState: CaseIterable {
     }
 }
 
+/// Recording actions and live values for the menu, set by the app model so the controller never sees it.
+struct RecordingMenuControls {
+    var elapsed: @MainActor () -> TimeInterval
+    var silentTapSuspected: @MainActor () -> Bool
+    var toggleRecording: @MainActor () -> Void
+    var togglePause: @MainActor () -> Void
+    var stop: @MainActor () -> Void
+}
+
 /// Menu bar item with a plain AppKit menu (no SwiftUI, for footprint). The menu is rebuilt each time it opens.
 @MainActor
 final class StatusItemController: NSObject, NSMenuDelegate {
+    /// Set once at launch; the menu falls back to `onToggleRecording` without it.
+    static var controls: RecordingMenuControls?
+
     var state: IndicatorState = .idle { didSet { updateIcon() } }
-    /// Enables Start/Stop Recording; the owner turns it on once recording exists.
-    var recordingEnabled = false
+    /// Enables Start/Stop Recording.
+    var recordingEnabled = true
 
     private let onOpenMain: () -> Void
     private let onOpenSettings: () -> Void
@@ -107,9 +119,13 @@ final class StatusItemController: NSObject, NSMenuDelegate {
         menu.removeAllItems()
         menu.addItem(item("Open EchoDiar", #selector(openMain)))
         let active = state == .recording || state == .paused
-        let record = item(active ? "Stop Recording" : "Start Recording", #selector(toggleRecording))
-        record.isEnabled = recordingEnabled
-        menu.addItem(record)
+        if active, let controls = Self.controls {
+            addRecordingItems(controls)
+        } else {
+            let record = item("Start Recording", #selector(toggleRecording))
+            record.isEnabled = recordingEnabled
+            menu.addItem(record)
+        }
         menu.addItem(item("Settings…", #selector(openSettings)))
         #if DEBUG
         let simulate = NSMenuItem(title: "Simulate state", action: nil, keyEquivalent: "")
@@ -131,6 +147,24 @@ final class StatusItemController: NSObject, NSMenuDelegate {
         menu.addItem(quit)
     }
 
+    /// Elapsed time, Pause/Resume, Stop and the silent-tap fix. The values are read when the menu opens.
+    private func addRecordingItems(_ controls: RecordingMenuControls) {
+        let elapsed = controls.elapsed()
+        let pattern: Duration.TimeFormatStyle.Pattern = elapsed >= 3_600 ? .hourMinuteSecond : .minuteSecond
+        let time = Duration.seconds(elapsed).formatted(.time(pattern: pattern))
+        let status = NSMenuItem(title: "\(state == .paused ? "Paused" : "Recording") \(time)", action: nil, keyEquivalent: "")
+        status.isEnabled = false
+        menu.addItem(status)
+        menu.addItem(item(state == .paused ? "Resume" : "Pause", #selector(togglePause)))
+        let stop = item("Stop Recording", #selector(stopRecording))
+        stop.isEnabled = recordingEnabled
+        menu.addItem(stop)
+        if controls.silentTapSuspected() {
+            menu.addItem(item("System audio is silent — Fix…", #selector(fixSilentTap)))
+        }
+        menu.addItem(.separator())
+    }
+
     private func item(_ title: String, _ action: Selector) -> NSMenuItem {
         let item = NSMenuItem(title: title, action: action, keyEquivalent: "")
         item.target = self
@@ -138,7 +172,12 @@ final class StatusItemController: NSObject, NSMenuDelegate {
     }
 
     @objc private func openMain() { onOpenMain() }
-    @objc private func toggleRecording() { onToggleRecording() }
+    @objc private func toggleRecording() {
+        if let controls = Self.controls { controls.toggleRecording() } else { onToggleRecording() }
+    }
+    @objc private func togglePause() { Self.controls?.togglePause() }
+    @objc private func stopRecording() { Self.controls?.stop() }
+    @objc private func fixSilentTap() { PrivacySettings.openSystemAudioRecording() }
     @objc private func openSettings() { onOpenSettings() }
     @objc private func about() { onAbout() }
     @objc private func terminate() { NSApp.terminate(nil) }
