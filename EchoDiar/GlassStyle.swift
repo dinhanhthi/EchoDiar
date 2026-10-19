@@ -37,6 +37,18 @@ struct RowIconButtonStyle: ButtonStyle {
     }
 }
 
+/// The buttons of Settings: one size, in a capsule, Liquid Glass on macOS 26+ (unless `--force-fallbacks`), bordered
+/// otherwise.
+struct SettingsButtonStyle: PrimitiveButtonStyle {
+    func makeBody(configuration: Configuration) -> some View {
+        if #available(macOS 26, *), PlatformFeatures.liquidGlass {
+            Button(configuration).buttonStyle(.glass).buttonBorderShape(.capsule).controlSize(.small)
+        } else {
+            Button(configuration).buttonStyle(.bordered).buttonBorderShape(.capsule).controlSize(.small)
+        }
+    }
+}
+
 /// A small on/off switch; the system switch stays wide even at `.mini` on macOS 26.
 struct CompactSwitch: ToggleStyle {
     static let height: CGFloat = 19
