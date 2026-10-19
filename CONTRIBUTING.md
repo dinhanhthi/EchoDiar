@@ -79,11 +79,15 @@ Never pass `-derivedDataPath` to local `xcodebuild` builds and tests. The defaul
   - `EchoAudio`: process tap, mic capture, channel writer, recording engine, crash recovery, AAC compression. Depends on EchoCore.
   - Planned: `EchoTranscribe` (transcription, speaker separation), `EchoAI` (AI providers, summary), `EchoLocalLLM` (on-device models).
 - `assets/`: `logo.icon` (app icon) and `logo.png` (README and About panel).
-- `scripts/`: `dev.sh` and `vm-test.sh`.
+- `scripts/`: `dev.sh`, `vm-test.sh`, `measure.sh` (memory and CPU targets), and the release scripts `build-and-notarize.sh`, `bump-version.sh`, `publish-release.sh`, `publish-appcast.sh`, `ship.sh` (see docs/RELEASING.md).
 
 ## Commit style
 
 One-line conventional commits: `<type>(<scope>): <summary>`, for example `fix(audio): keep the CAF when the encode fails`. Types: `feat`, `fix`, `docs`, `style`, `refactor`, `test`, `chore`. No body.
+
+## Releasing
+
+Releases are built, signed, notarized and published from a maintainer's Mac, not in CI. Run `/cf-ship` (guide: `.coding-friend/skills/cf-ship-custom/SKILL.md`): it picks the version, writes the `CHANGELOG.md` section, commits `chore(release): vX.Y.Z` and runs `scripts/ship.sh`, which chains `build-and-notarize.sh`, `publish-release.sh` and `publish-appcast.sh`. See [docs/RELEASING.md](docs/RELEASING.md) for the one-time setup (Developer ID, notary profile, Sparkle key), the manual steps and rollback.
 
 ## License
 

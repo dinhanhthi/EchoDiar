@@ -6,6 +6,10 @@ options:
 packages:
   EchoKit:
     path: Packages/EchoKit
+  Sparkle:
+    url: https://github.com/sparkle-project/Sparkle
+    # Sparkle 2.10.0, pinned by commit (git ls-remote ... refs/tags/2.10.0; lightweight tag, no ^{}).
+    revision: eef1a539a373c1f1a320624b1130fc5de7b2e100
 settings:
   base:
     DEVELOPMENT_TEAM: 86H6CNLN4C
@@ -33,6 +37,7 @@ targets:
         product: EchoAI
       - package: EchoKit
         product: EchoLocalLLM
+      - package: Sparkle
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: dinh.thi.EchoDiar

@@ -48,3 +48,10 @@ sparkle_private_key*
 *.p12
 *.pem
 *.key
+*.p8
+*.pfx
+*.cer
+*.mobileprovision
+*.keychain*
+.env*
+*private_key*

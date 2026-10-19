@@ -20,6 +20,7 @@ enum EchoDiarApp {
 @MainActor
 final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSMenuItemValidation {
     let model = AppModel()
+    let updater = Updater()
 
     private var statusItem: StatusItemController?
     private var window: NSWindow?
@@ -45,7 +46,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSMe
             onOpenMain: { [weak self] in self?.showMainWindow() },
             onOpenSettings: { [weak self] in self?.showSettings() },
             onToggleRecording: {},  // Recording arrives in Phase 3.
-            onAbout: { [weak self] in self?.showAbout() })
+            onAbout: { [weak self] in self?.showAbout() },
+            updater: updater)
         observeIndicatorState()
         // SIGTERM (`killall`, logout) goes through terminate, so applicationWillTerminate runs.
         signal(SIGTERM, SIG_IGN)
@@ -61,6 +63,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSMe
             showMainWindow()
         }
         model.start()
+        updater.start()
     }
 
     func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows flag: Bool) -> Bool {

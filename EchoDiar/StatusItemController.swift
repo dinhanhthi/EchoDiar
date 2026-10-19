@@ -53,6 +53,7 @@ final class StatusItemController: NSObject, NSMenuDelegate {
     private let onOpenSettings: () -> Void
     private let onToggleRecording: () -> Void
     private let onAbout: () -> Void
+    private let updater: Updater
     private let statusItem: NSStatusItem
     private let menu = NSMenu()
     private let symbolConfiguration = NSImage.SymbolConfiguration(pointSize: 15, weight: .regular)
@@ -60,11 +61,12 @@ final class StatusItemController: NSObject, NSMenuDelegate {
     private var effectView: NSImageView?
 
     init(onOpenMain: @escaping () -> Void, onOpenSettings: @escaping () -> Void,
-         onToggleRecording: @escaping () -> Void, onAbout: @escaping () -> Void) {
+         onToggleRecording: @escaping () -> Void, onAbout: @escaping () -> Void, updater: Updater) {
         self.onOpenMain = onOpenMain
         self.onOpenSettings = onOpenSettings
         self.onToggleRecording = onToggleRecording
         self.onAbout = onAbout
+        self.updater = updater
         // Fixed width, so the item keeps its size while the button's own image is cleared for processing.
         statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.squareLength)
         super.init()
@@ -153,6 +155,10 @@ final class StatusItemController: NSObject, NSMenuDelegate {
         menu.addItem(simulate)
         #endif
         menu.addItem(.separator())
+        // Disabled while the updater is off (no SUPublicEDKey yet).
+        let update = item(updater.updateAvailable ? "Update Available…" : "Check for Updates…", #selector(checkForUpdates))
+        update.isEnabled = updater.canCheck
+        menu.addItem(update)
         menu.addItem(item("About EchoDiar", #selector(about)))
         menu.addItem(.separator())
         let quit = NSMenuItem(title: "Quit", action: nil, keyEquivalent: "")
@@ -216,6 +222,7 @@ final class StatusItemController: NSObject, NSMenuDelegate {
     @objc private func stopAskingForDetectedApp() { Self.controls?.stopAskingForDetectedApp() }
     @objc private func fixSilentTap() { PrivacySettings.openSystemAudioRecording() }
     @objc private func openSettings() { onOpenSettings() }
+    @objc private func checkForUpdates() { updater.checkForUpdates() }
     @objc private func about() { onAbout() }
     @objc private func terminate() { NSApp.terminate(nil) }
 
