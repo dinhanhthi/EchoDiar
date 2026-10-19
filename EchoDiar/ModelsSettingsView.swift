@@ -3,11 +3,27 @@ import EchoCore
 import EchoTranscribe
 import SwiftUI
 
-/// The Transcription tab: the default language, the live transcript switch and engine, then the ASR and diarization
-/// catalog by tier, with Download, Cancel, Delete and Set default, then the configured cloud engines. Rows that cannot
-/// transcribe the default language are disabled with a note.
+/// The Transcription tab, one inner tab per section: the default language with the live transcript switch and engine,
+/// the ASR and diarization catalog by tier (one tab each) with Download, Cancel, Delete and Set default, and the
+/// configured cloud engines. Rows that cannot transcribe the default language are disabled with a note.
 struct ModelsSettingsView: View {
     let model: AppModel
+
+    @State private var tab = Tab.general
+
+    private enum Tab: Hashable, CaseIterable {
+        case general, tier(ModelEntry.Tier), cloud
+
+        static let allCases: [Tab] = [.general] + ModelEntry.Tier.allCases.map(Tab.tier) + [.cloud]
+
+        var title: LocalizedStringKey {
+            switch self {
+            case .general: "General"
+            case .tier(let tier): LocalizedStringKey(tier.rawValue.capitalized)
+            case .cloud: "Cloud"
+            }
+        }
+    }
 
     private static let entries = ModelCatalog.visibleEntries(
         registeredEngineRuntimes: TranscriptionPipeline.registeredRuntimes
@@ -15,32 +31,16 @@ struct ModelsSettingsView: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            Form {
-                Section {
-                    LanguagePicker(title: "Default language", selection: defaultLanguage, model: model)
-                    Toggle(isOn: liveTranscript) {
-                        Text("Live transcript")
-                        Text("Shows text while recording with the live engine below (more CPU). The transcript made after Stop stays the one that is saved.")
+            SettingsSectionTabs(selection: $tab, title: \.title) { tab in
+                switch tab {
+                case .general: generalSection
+                case .tier(let tier):
+                    Section {
+                        ForEach(Self.entries.filter { $0.tier == tier }) { ModelRow(entry: $0, model: model) }
                     }
-                    Picker(selection: liveTranscriptEngine) {
-                        Text("Whisper Large v3 Turbo").tag(AppSettings.defaultLiveTranscriptEngine)
-                        Text("Nemotron 3.5 streaming").tag(NemotronStreamingEngine.entryID)
-                    } label: {
-                        Text("Live transcript engine")
-                        Text("Nemotron is recommended for Vietnamese live captions (Vietnamese is experimental). Without the picked model installed, another installed live model is used.")
-                    }
+                case .cloud: cloudSection
                 }
-                ForEach(ModelEntry.Tier.allCases, id: \.self) { tier in
-                    let entries = Self.entries.filter { $0.tier == tier }
-                    if !entries.isEmpty {
-                        Section(tier.rawValue.capitalized) {
-                            ForEach(entries) { ModelRow(entry: $0, model: model) }
-                        }
-                    }
-                }
-                cloudSection
             }
-            .formStyle(.grouped)
             HStack {
                 Text("Installed: \(ByteCountFormatter.string(fromByteCount: model.installedModelsBytes, countStyle: .file))")
                 Spacer()
@@ -52,6 +52,23 @@ struct ModelsSettingsView: View {
             .padding(.bottom, 12)
         }
         .task { model.refreshInstalledModels() }
+    }
+
+    private var generalSection: some View {
+        Section {
+            LanguagePicker(title: "Default language", selection: defaultLanguage, model: model)
+            Toggle(isOn: liveTranscript) {
+                Text("Live transcript")
+                Text("Shows text while recording with the live engine below (more CPU). The transcript made after Stop stays the one that is saved.")
+            }
+            Picker(selection: liveTranscriptEngine) {
+                Text("Whisper Large v3 Turbo").tag(AppSettings.defaultLiveTranscriptEngine)
+                Text("Nemotron 3.5 streaming").tag(NemotronStreamingEngine.entryID)
+            } label: {
+                Text("Live transcript engine")
+                Text("Nemotron is recommended for Vietnamese live captions (Vietnamese is experimental). Without the picked model installed, another installed live model is used.")
+            }
+        }
     }
 
     /// Configured cloud engines (AI & Cloud: enabled, with a key and a model) with Set default.
@@ -69,8 +86,6 @@ struct ModelsSettingsView: View {
                 }
             }
             ForEach(configs) { CloudEngineRow(config: $0, model: model) }
-        } header: {
-            Text("Cloud")
         } footer: {
             Text("Prices are approximate list prices per audio hour; the mic and system channels are sent and billed separately.")
                 .font(.caption)

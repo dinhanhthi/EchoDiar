@@ -2,8 +2,8 @@ import AppKit
 import EchoCore
 import SwiftUI
 
-/// The Storage tab: disk usage by kind and the largest conversations, deleting the audio of transcribed
-/// conversations, auto-delete with a preview, compression, and the data folder.
+/// The Storage tab, one inner tab per section: disk usage by kind and the largest conversations with the data folder,
+/// deleting the audio of transcribed conversations and compression, and auto-delete with a preview.
 struct StorageSettingsView: View {
     let model: AppModel
     @State private var usage: LibraryStore.Usage?
@@ -16,57 +16,33 @@ struct StorageSettingsView: View {
     @State private var windowVisible = true
     @State private var confirmingAudioDelete = false
     @State private var deleting = false
+    @State private var tab = Tab.usage
+
+    private enum Tab: CaseIterable {
+        case usage, audio, autoDelete
+
+        var title: LocalizedStringKey {
+            switch self {
+            case .usage: "Usage"
+            case .audio: "Audio"
+            case .autoDelete: "Auto-delete"
+            }
+        }
+    }
 
     private static let bitrates = [32, 48, 64, 96, 128]
     private static let largestCount = 5
 
     var body: some View {
-        Form {
-            usageSection
-            Section("Audio") {
-                let candidates = transcribedWithAudio
-                LabeledContent {
-                    Button("Delete audio of transcribed conversations…") { confirmingAudioDelete = true }
-                        .disabled(candidates.isEmpty || deleting)
-                } label: {
-                    Text("Free space")
-                    Text("Transcripts, summaries and chats stay; playback and re-transcribing are no longer possible.")
-                }
-                Toggle(isOn: model.setting(\.deleteAudioAfterTranscription)) {
-                    Text("Delete audio after transcription")
-                    Text("Moves the audio to the Trash once a transcription succeeds.")
-                }
-                Picker("Compression bitrate", selection: model.setting(\.compressionBitrateKbps)) {
-                    ForEach(Self.bitrates, id: \.self) { Text("\($0) kbps").tag($0) }
-                    if !Self.bitrates.contains(model.settings.compressionBitrateKbps) {
-                        Text("\(model.settings.compressionBitrateKbps) kbps").tag(model.settings.compressionBitrateKbps)
-                    }
-                }
-                Toggle(isOn: model.setting(\.keepUncompressedAudio)) {
-                    Text("Keep uncompressed audio")
-                    Text("Keeps the original CAF next to the compressed file (about 10 times larger).")
-                }
-            }
-            autoDeleteSection
-            Section {
-                LabeledContent("Data folder") {
-                    HStack {
-                        Text((RecordingSession.conversationsRoot.path as NSString).abbreviatingWithTildeInPath)
-                            .foregroundStyle(.secondary)
-                            .lineLimit(1)
-                            .truncationMode(.middle)
-                            .textSelection(.enabled)
-                        Button("Open in Finder") {
-                            let root = RecordingSession.conversationsRoot
-                            // Created on the first recording, so it may not exist yet.
-                            try? FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
-                            NSWorkspace.shared.open(root)
-                        }
-                    }
-                }
+        SettingsSectionTabs(selection: $tab, title: \.title) { tab in
+            switch tab {
+            case .usage:
+                usageSection
+                dataFolderSection
+            case .audio: audioSection
+            case .autoDelete: autoDeleteSection
             }
         }
-        .formStyle(.grouped)
         // Measured again after a deletion or a new conversation, and only while the tab is shown (it stays alive) in
         // the Settings window on screen.
         .task(id: UsageKey(visible: shown, library: libraryKey, models: model.installedModelsBytes)) {
@@ -121,7 +97,7 @@ struct StorageSettingsView: View {
     // MARK: - Usage
 
     private var usageSection: some View {
-        Section("Usage") {
+        Section {
             if let usage {
                 UsageBar(usage: usage)
                 usageRow("Audio", usage.audio, color: .blue)
@@ -160,6 +136,55 @@ struct StorageSettingsView: View {
 
     static func bytes(_ count: Int64) -> String {
         ByteCountFormatter.string(fromByteCount: count, countStyle: .file)
+    }
+
+    private var dataFolderSection: some View {
+        Section {
+            LabeledContent("Data folder") {
+                HStack {
+                    Text((RecordingSession.conversationsRoot.path as NSString).abbreviatingWithTildeInPath)
+                        .foregroundStyle(.secondary)
+                        .lineLimit(1)
+                        .truncationMode(.middle)
+                        .textSelection(.enabled)
+                    Button("Open in Finder") {
+                        let root = RecordingSession.conversationsRoot
+                        // Created on the first recording, so it may not exist yet.
+                        try? FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+                        NSWorkspace.shared.open(root)
+                    }
+                }
+            }
+        }
+    }
+
+    // MARK: - Audio
+
+    private var audioSection: some View {
+        Section {
+            let candidates = transcribedWithAudio
+            LabeledContent {
+                Button("Delete audio of transcribed conversations…") { confirmingAudioDelete = true }
+                    .disabled(candidates.isEmpty || deleting)
+            } label: {
+                Text("Free space")
+                Text("Transcripts, summaries and chats stay; playback and re-transcribing are no longer possible.")
+            }
+            Toggle(isOn: model.setting(\.deleteAudioAfterTranscription)) {
+                Text("Delete audio after transcription")
+                Text("Moves the audio to the Trash once a transcription succeeds.")
+            }
+            Picker("Compression bitrate", selection: model.setting(\.compressionBitrateKbps)) {
+                ForEach(Self.bitrates, id: \.self) { Text("\($0) kbps").tag($0) }
+                if !Self.bitrates.contains(model.settings.compressionBitrateKbps) {
+                    Text("\(model.settings.compressionBitrateKbps) kbps").tag(model.settings.compressionBitrateKbps)
+                }
+            }
+            Toggle(isOn: model.setting(\.keepUncompressedAudio)) {
+                Text("Keep uncompressed audio")
+                Text("Keeps the original CAF next to the compressed file (about 10 times larger).")
+            }
+        }
     }
 
     // MARK: - Delete audio
@@ -209,8 +234,6 @@ struct StorageSettingsView: View {
                     }
                 }
             }
-        } header: {
-            Text("Auto-delete")
         }
     }
 

@@ -2,8 +2,8 @@ import EchoAI
 import EchoCore
 import SwiftUI
 
-/// The AI & Cloud tab: the on-device AI models for summaries and chat, cloud API presets, speech-to-text APIs, local hosts (scanned on demand), subscription CLIs and
-/// custom OpenAI-compatible endpoints. API keys go to the Keychain only; everything else is saved in `AppSettings.providers`.
+/// The AI & Cloud tab, in inner tabs: on this Mac (the AI models for summaries and chat, local hosts scanned on demand),
+/// cloud API presets with custom OpenAI-compatible endpoints, speech-to-text APIs, and subscription CLIs. API keys go to the Keychain only; everything else is saved in `AppSettings.providers`.
 struct ProvidersSettingsView: View {
     let model: AppModel
 
@@ -11,55 +11,71 @@ struct ProvidersSettingsView: View {
     @State private var scanning = false
     @State private var customLocalURL = ""
     @State private var cliStatus: [CLIPreset: CLIStatus] = [:]
+    @State private var tab = Tab.onThisMac
+
+    private enum Tab: CaseIterable {
+        case onThisMac, cloudAPIs, speechToText, cli
+
+        var title: LocalizedStringKey {
+            switch self {
+            case .onThisMac: "On this Mac"
+            case .cloudAPIs: "Cloud APIs"
+            case .speechToText: "Speech to text"
+            case .cli: "CLIs"
+            }
+        }
+    }
 
     private static let mlxEntries = ModelCatalog.llm.filter { $0.runtime == .mlx }
 
     var body: some View {
-        Form {
-            Section {
-                Label("Data sent to cloud providers or CLIs leaves this Mac.", systemImage: "info.circle")
-                    .foregroundStyle(.secondary)
-            }
-            llmSection
-            Section("Cloud APIs") {
-                ForEach(configs { $0.preset != nil && [.openAICompatible, .anthropic].contains($0.kind) }) { config in
-                    APIProviderRow(config: config, model: model)
+        SettingsSectionTabs(selection: $tab, title: \.title) { tab in
+            switch tab {
+            case .onThisMac:
+                llmSection
+                localHosts
+            case .cloudAPIs:
+                dataLeavesNotice
+                Section {
+                    ForEach(configs { $0.preset != nil && [.openAICompatible, .anthropic].contains($0.kind) }) { config in
+                        APIProviderRow(config: config, model: model)
+                    }
                 }
-            }
-            Section {
-                ForEach(configs { $0.kind == .speechToText }) { config in
-                    SpeechProviderRow(config: config, model: model)
+                Section {
+                    ForEach(configs { $0.preset == nil && $0.kind == .openAICompatible }) { config in
+                        APIProviderRow(config: config, model: model)
+                    }
+                    Button("Add Endpoint") {
+                        model.updateSettings { $0.providers.append(.custom()) }
+                    }
+                    .controlSize(.small)
+                } header: {
+                    Text("Custom OpenAI-compatible endpoints")
                 }
-            } header: {
-                Text("Speech to text")
-            } footer: {
-                Text("Cloud transcription engines for Settings > Transcription. OpenAI, Groq, Mistral, Google Gemini and custom endpoints above transcribe too, with their transcription model.")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-            }
-            localHosts
-            Section("Subscription CLIs") {
-                ForEach(configs { $0.kind == .cli }) { config in
-                    if let preset = CLIPreset(rawValue: config.id) {
-                        CLIProviderRow(config: config, preset: preset, status: cliStatus[preset], model: model) {
-                            detect(preset)
+            case .speechToText:
+                dataLeavesNotice
+                Section {
+                    ForEach(configs { $0.kind == .speechToText }) { config in
+                        SpeechProviderRow(config: config, model: model)
+                    }
+                } footer: {
+                    Text("Cloud transcription engines for Settings > Transcription. OpenAI, Groq, Mistral, Google Gemini and custom endpoints transcribe too, with their transcription model.")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+            case .cli:
+                dataLeavesNotice
+                Section {
+                    ForEach(configs { $0.kind == .cli }) { config in
+                        if let preset = CLIPreset(rawValue: config.id) {
+                            CLIProviderRow(config: config, preset: preset, status: cliStatus[preset], model: model) {
+                                detect(preset)
+                            }
                         }
                     }
                 }
             }
-            Section {
-                ForEach(configs { $0.preset == nil && $0.kind == .openAICompatible }) { config in
-                    APIProviderRow(config: config, model: model)
-                }
-                Button("Add Endpoint") {
-                    model.updateSettings { $0.providers.append(.custom()) }
-                }
-                .controlSize(.small)
-            } header: {
-                Text("Custom OpenAI-compatible endpoints")
-            }
         }
-        .formStyle(.grouped)
         .task { await scan() }
         .task { model.refreshInstalledModels() }
         .task {
@@ -72,11 +88,18 @@ struct ProvidersSettingsView: View {
         model.providerConfigs.filter(isIncluded)
     }
 
-    // MARK: - Local hosts
+    private var dataLeavesNotice: some View {
+        Section {
+            Label("Data sent to cloud providers or CLIs leaves this Mac.", systemImage: "info.circle")
+                .foregroundStyle(.secondary)
+        }
+    }
+
+    // MARK: - AI models
 
     /// Models for summaries and chat: Apple Foundation Models' status (macOS 26), then the MLX downloads.
     private var llmSection: some View {
-        Section("AI models (summaries and chat)") {
+        Section {
             if #available(macOS 26, *), PlatformFeatures.foundationModels {
                 LabeledContent("Apple Foundation Models (system)") {
                     if let reason = AppleFoundationModelProvider.unavailableReason {
@@ -87,8 +110,12 @@ struct ProvidersSettingsView: View {
                 }
             }
             ForEach(Self.mlxEntries) { ModelRow(entry: $0, model: model) }
+        } header: {
+            Text("AI models (summaries and chat)")
         }
     }
+
+    // MARK: - Local hosts
 
     private var localHosts: some View {
         Section("Local hosts") {
@@ -193,6 +220,7 @@ private struct APIProviderRow: View {
     let model: AppModel
 
     @State private var expanded = false
+    @State private var pendingKey = ""
 
     private var isCustom: Bool { config.preset == nil }
 
@@ -208,7 +236,7 @@ private struct APIProviderRow: View {
                         Text("None").tag(ProviderConfig.AuthStyle.none)
                     }
                 }
-                if config.authStyle != .none { APIKeyField(providerID: config.id, model: model) }
+                if config.authStyle != .none { APIKeyField(providerID: config.id, model: model, key: $pendingKey) }
                 TextField("Base URL", text: binding(\.baseURL), prompt: Text(config.id == "azure" ? "https://<resource>.openai.azure.com/openai/v1" : ""))
                 if config.id == "azure" {
                     Text("Required: your resource's https://<resource>.openai.azure.com/openai/v1 URL.")
@@ -219,8 +247,9 @@ private struct APIProviderRow: View {
                     try await model.makeProvider(for: config)?.listModels() ?? []
                 }
                 if CloudTranscription.supports(config) { TranscriptionModelField(config: config, model: model) }
-                HStack {
-                    TestButton(title: "Test", config: config, model: model)
+                HStack(alignment: .top) {
+                    TestButton(title: "Test", config: config, model: model,
+                               pendingKey: config.authStyle != .none ? $pendingKey : nil)
                     Spacer()
                     if config.kind == .local || isCustom {
                         Button("Remove", role: .destructive) { model.removeProvider(id: config.id) }
@@ -229,6 +258,7 @@ private struct APIProviderRow: View {
                 }
             }
             .padding(.vertical, 4)
+            .padding(.leading, disclosureIndent)
         } label: {
             Toggle(isOn: binding(\.enabled)) {
                 Text(config.displayName.isEmpty ? "Untitled" : config.displayName)
@@ -249,11 +279,12 @@ private struct SpeechProviderRow: View {
     let model: AppModel
 
     @State private var expanded = false
+    @State private var pendingKey = ""
 
     var body: some View {
         DisclosureGroup(isExpanded: $expanded) {
             VStack(alignment: .leading, spacing: 8) {
-                APIKeyField(providerID: config.id, model: model)
+                APIKeyField(providerID: config.id, model: model, key: $pendingKey)
                 if config.preset == "assemblyai" {
                     Text("AssemblyAI picks its model for the language (Universal).")
                         .font(.caption)
@@ -262,7 +293,7 @@ private struct SpeechProviderRow: View {
                     TranscriptionModelField(config: config, model: model)
                 }
                 // A free GET that needs a valid key; no audio is uploaded.
-                TestButton(title: "Test", config: config, model: model) {
+                TestButton(title: "Test", config: config, model: model, pendingKey: $pendingKey) {
                     guard let key = try KeychainStore.apiKey(forProvider: config.id) else {
                         throw LLMError.provider("Save a key first.")
                     }
@@ -274,6 +305,7 @@ private struct SpeechProviderRow: View {
                 }
             }
             .padding(.vertical, 4)
+            .padding(.leading, disclosureIndent)
         } label: {
             Toggle(isOn: Binding(get: { config.enabled },
                                  set: { value in model.updateProvider(id: config.id) { $0.enabled = value } })) {
@@ -310,6 +342,7 @@ private struct CLIProviderRow: View {
                     .disabled(!isInstalled)
             }
             .padding(.vertical, 4)
+            .padding(.leading, disclosureIndent)
         } label: {
             Toggle(isOn: binding(\.enabled)) {
                 HStack(spacing: 6) {
@@ -350,26 +383,37 @@ private struct CLIProviderRow: View {
 
 // MARK: - Fields
 
-/// The API key, written to the Keychain on Return. Only "Saved" is shown; the key is never read back into the UI.
+/// Leading inset of an expanded row's content, so it lines up with the row's title after the disclosure chevron.
+private let disclosureIndent: CGFloat = 18
+
+/// The API key, written to the Keychain on Return, on leaving the field, or by Save and Test (`TestButton`). Only
+/// "Saved" is shown; the key is never read back into the UI.
 private struct APIKeyField: View {
     let providerID: String
     let model: AppModel
+    @Binding var key: String
 
-    @State private var key = ""
     @State private var saved = false
     @State private var error: String?
+    @FocusState private var focused: Bool
 
     var body: some View {
         VStack(alignment: .leading, spacing: 4) {
-            HStack {
-                SecureField("API key", text: $key, prompt: Text(saved ? "Enter a new key to replace it" : "Paste the key, then Return"))
-                    .onSubmit(save)
-                if saved {
-                    Label("Saved", systemImage: "checkmark.circle.fill")
-                        .font(.caption)
-                        .foregroundStyle(.green)
-                    Button("Remove") { perform { try KeychainStore.deleteAPIKey(forProvider: providerID) } }
-                        .controlSize(.small)
+            LabeledContent("API key") {
+                HStack {
+                    SecureField("API key", text: $key, prompt: Text(saved ? "Enter a new key to replace it" : "Paste the key, then Save"))
+                        .labelsHidden()
+                        .focused($focused)
+                        .onSubmit(save)
+                        // Leaving the field saves too, so a pasted key is not lost without Return.
+                        .onChange(of: focused) { _, focused in if !focused { save() } }
+                    if saved {
+                        Label("Saved", systemImage: "checkmark.circle.fill")
+                            .font(.caption)
+                            .foregroundStyle(.green)
+                        Button("Remove") { perform { try KeychainStore.deleteAPIKey(forProvider: providerID) } }
+                            .controlSize(.small)
+                    }
                 }
             }
             if let error {
@@ -377,13 +421,12 @@ private struct APIKeyField: View {
             }
         }
         .onAppear(perform: refresh)
+        // Save and Test write the key outside this field.
+        .onChange(of: model.keychainVersion) { refresh() }
     }
 
     private func save() {
-        let trimmed = key.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !trimmed.isEmpty else { return }
-        perform { try KeychainStore.setAPIKey(trimmed, forProvider: providerID) }
-        key = ""
+        perform { try saveAPIKey($key, providerID: providerID, model: model) }
     }
 
     private func perform(_ change: () throws -> Void) {
@@ -482,37 +525,58 @@ private struct ModelField: View {
     }
 }
 
-/// Sends a one-token "ping" (CLIs: a tiny prompt), or runs `check` when set, and shows OK or a short error. Not run
-/// while idle.
+/// Sends a one-token "ping" (CLIs: a tiny prompt), or runs `check` when set, and shows OK or a short error below.
+/// With `pendingKey`, a Save button writes the typed key to the Keychain, and Test saves it first. Not run while idle.
 private struct TestButton: View {
     let title: String
     let config: ProviderConfig
     let model: AppModel
+    var pendingKey: Binding<String>?
     var check: (@MainActor () async throws -> Void)?
 
     @State private var task: Task<Void, Never>?
     @State private var result: (ok: Bool, text: String)?
 
     var body: some View {
-        HStack(spacing: 6) {
-            Button(task == nil ? title : "Cancel") {
-                if let task { task.cancel() } else { run() }
+        VStack(alignment: .leading, spacing: 4) {
+            HStack(spacing: 6) {
+                Button(task == nil ? title : "Cancel") {
+                    if let task { task.cancel() } else { run() }
+                }
+                .controlSize(.small)
+                if let pendingKey {
+                    Button("Save") { _ = save(pendingKey) }
+                        .controlSize(.small)
+                        .disabled(task != nil || pendingKey.wrappedValue.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                }
+                if task != nil { ProgressView().controlSize(.small) }
             }
-            .controlSize(.small)
-            if task != nil {
-                ProgressView().controlSize(.small)
-            } else if let result {
+            if task == nil, let result {
                 Text(result.text)
                     .font(.caption)
                     .foregroundStyle(result.ok ? .green : .red)
-                    .lineLimit(2)
+                    .lineLimit(3)
             }
         }
         .onDisappear { task?.cancel() }
     }
 
+    /// Writes the typed key; false, with the error shown, when the Keychain refuses it.
+    private func save(_ key: Binding<String>) -> Bool {
+        do {
+            try saveAPIKey(key, providerID: config.id, model: model)
+            result = nil
+            return true
+        } catch {
+            result = (false, shortMessage(error))
+            return false
+        }
+    }
+
     private func run() {
         result = nil
+        // A key pasted without Return is tested, not the one already in the Keychain.
+        if let pendingKey, !save(pendingKey) { return }
         let provider = model.makeProvider(for: config)
         guard provider != nil || check != nil else { return }
         let modelID = config.defaultModel.trimmingCharacters(in: .whitespaces)
@@ -533,6 +597,15 @@ private struct TestButton: View {
             task = nil
         }
     }
+}
+
+/// Writes a typed API key to the Keychain and clears the field; does nothing when it is blank.
+@MainActor private func saveAPIKey(_ key: Binding<String>, providerID: String, model: AppModel) throws {
+    let trimmed = key.wrappedValue.trimmingCharacters(in: .whitespacesAndNewlines)
+    guard !trimmed.isEmpty else { return }
+    try KeychainStore.setAPIKey(trimmed, forProvider: providerID)
+    key.wrappedValue = ""
+    model.keychainChanged()
 }
 
 /// The first line of an error, at most 160 characters.

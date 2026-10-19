@@ -111,7 +111,6 @@ private struct SettingsView: View {
                         .accessibilityHidden(!selected)
                 }
             }
-            .buttonStyle(SettingsButtonStyle())
             .navigationTitle(model.settingsTab.label.title)
             .toolbar {
                 ToolbarItemGroup(placement: .navigation) {

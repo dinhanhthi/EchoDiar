@@ -3,8 +3,8 @@ import CoreAudio
 import EchoCore
 import SwiftUI
 
-/// The Recording tab: the microphone, meeting detection and per-app behavior, auto-stop,
-/// the floating pill's anchor, and what happens after a recording stops.
+/// The Recording tab, one inner tab per section: the microphone, meeting detection and per-app behavior with the
+/// floating pill's anchor, auto-stop, and what happens after a recording stops.
 struct RecordingSettingsView: View {
     let model: AppModel
     @State private var microphones: [InputDevice] = []
@@ -16,85 +16,30 @@ struct RecordingSettingsView: View {
         return MeetingApps.known.filter { seen.insert($0.appBundleID).inserted }
     }()
 
-    var body: some View {
-        Form {
-            Section {
-                Picker("Microphone", selection: model.setting(\.micDeviceUID)) {
-                    Text("System default").tag(String?.none)
-                    ForEach(microphones) { Text($0.name).tag(String?.some($0.id)) }
-                    if let uid = model.settings.micDeviceUID, !microphones.contains(where: { $0.id == uid }) {
-                        Text("Unavailable device").tag(String?.some(uid))
-                    }
-                }
-                Picker(selection: model.setting(\.routeChangeBehavior)) {
-                    Text("Ask to stop").tag(RouteChangeBehavior.ask)
-                    Text("Keep recording").tag(RouteChangeBehavior.continue)
-                    Text("Stop recording").tag(RouteChangeBehavior.stop)
-                } label: {
-                    Text("When the microphone disconnects")
-                    Text("Recording continues with the default input until then.")
-                }
-            }
-            Section("Meetings") {
-                Toggle(isOn: model.setting(\.meetingDetection)) {
-                    Text("Detect meetings")
-                    Text("Offers to record when a meeting app starts using the microphone.")
-                }
-                ForEach(Self.meetingApps, id: \.appBundleID) { app in
-                    Picker(app.name, selection: behavior(app)) {
-                        Text("Ask").tag(MeetingBehavior.ask)
-                        if !app.isBrowser { Text("Always record").tag(MeetingBehavior.always) }
-                        Text("Ignore").tag(MeetingBehavior.ignore)
-                    }
-                }
-                .disabled(!model.settings.meetingDetection)
-                Toggle(isOn: model.setting(\.attachPillToWindow)) {
-                    Text("Attach the indicator to the meeting window")
-                    Text("Keeps it at the window's top-right corner. Needs Accessibility access.")
-                }
-                if model.settings.attachPillToWindow && !accessibilityTrusted {
-                    LabeledContent("EchoDiar has no Accessibility access.") {
-                        Button("Grant Accessibility…", action: WindowAnchor.openAccessibilitySettings)
-                    }
-                    .foregroundStyle(.secondary)
-                }
-            }
-            Section {
-                NumberRow(
-                    title: "Stop when the app is quiet for", unit: "s",
-                    value: model.setting(\.endMonitor.sourceInactiveSeconds),
-                    range: MeetingEndMonitor.Configuration.sourceInactiveRange)
-                NumberRow(
-                    title: "Stop after silence of", unit: "min",
-                    value: model.setting(\.endMonitor.silenceMinutes),
-                    range: MeetingEndMonitor.Configuration.silenceRange)
-                NumberRow(
-                    title: "Stop after a recording length of", unit: "min",
-                    value: model.setting(\.endMonitor.maxDurationMinutes),
-                    range: MeetingEndMonitor.Configuration.maxDurationRange)
-            } header: {
-                Text("Auto-stop")
-            } footer: {
-                Text("The indicator asks before stopping, with a 15 s countdown.")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-            }
-            Section("After recording") {
-                Toggle("Transcribe automatically", isOn: model.setting(\.autoTranscribe))
-                Picker(selection: model.setting(\.speakerCountHint)) {
-                    Text("Auto").tag(Int?.none)
-                    ForEach(AppSettings.speakerCountHintRange, id: \.self) { Text("\($0)").tag(Int?.some($0)) }
-                } label: {
-                    Text("Number of other speakers")
-                    Text("A hint for telling the system audio's speakers apart.")
-                }
-                Toggle(isOn: model.setting(\.deferTranscriptionWhenConstrained)) {
-                    Text("Wait when the Mac is hot or in Low Power Mode")
-                    Text("Transcription starts once the Mac is ready.")
-                }
+    @State private var tab = Tab.microphone
+
+    private enum Tab: CaseIterable {
+        case microphone, meetings, autoStop, afterRecording
+
+        var title: LocalizedStringKey {
+            switch self {
+            case .microphone: "Microphone"
+            case .meetings: "Meetings"
+            case .autoStop: "Auto-stop"
+            case .afterRecording: "After recording"
             }
         }
-        .formStyle(.grouped)
+    }
+
+    var body: some View {
+        SettingsSectionTabs(selection: $tab, title: \.title) { tab in
+            switch tab {
+            case .microphone: microphoneSection
+            case .meetings: meetingsSection
+            case .autoStop: autoStopSection
+            case .afterRecording: afterRecordingSection
+            }
+        }
         .task {
             microphones = await Task.detached(priority: .utility) { InputDevice.all() }.value
         }
@@ -104,11 +49,124 @@ struct RecordingSettingsView: View {
         }
     }
 
+    private var microphoneSection: some View {
+        Section {
+            Picker("Microphone", selection: model.setting(\.micDeviceUID)) {
+                Text("System default").tag(String?.none)
+                ForEach(microphones) { Text($0.name).tag(String?.some($0.id)) }
+                if let uid = model.settings.micDeviceUID, !microphones.contains(where: { $0.id == uid }) {
+                    Text("Unavailable device").tag(String?.some(uid))
+                }
+            }
+            Picker(selection: model.setting(\.routeChangeBehavior)) {
+                Text("Ask to stop").tag(RouteChangeBehavior.ask)
+                Text("Keep recording").tag(RouteChangeBehavior.continue)
+                Text("Stop recording").tag(RouteChangeBehavior.stop)
+            } label: {
+                Text("When the microphone disconnects")
+                Text("Recording continues with the default input until then.")
+            }
+        }
+    }
+
+    private var meetingsSection: some View {
+        Section {
+            Toggle(isOn: model.setting(\.meetingDetection)) {
+                Text("Detect meetings")
+                Text("Offers to record when a meeting app starts using the microphone.")
+            }
+            ForEach(Self.meetingApps, id: \.appBundleID) { app in
+                Picker(app.name, selection: behavior(app)) {
+                    Text("Ask").tag(MeetingBehavior.ask)
+                    if !app.isBrowser { Text("Always record").tag(MeetingBehavior.always) }
+                    Text("Ignore").tag(MeetingBehavior.ignore)
+                }
+            }
+            .disabled(!model.settings.meetingDetection)
+            Toggle(isOn: model.setting(\.attachPillToWindow)) {
+                Text("Attach the indicator to the meeting window")
+                Text("Keeps it at the window's top-right corner. Needs Accessibility access.")
+            }
+            if model.settings.attachPillToWindow && !accessibilityTrusted {
+                LabeledContent("EchoDiar has no Accessibility access.") {
+                    Button("Grant Accessibility…", action: WindowAnchor.openAccessibilitySettings)
+                }
+                .foregroundStyle(.secondary)
+            }
+        }
+    }
+
+    private var autoStopSection: some View {
+        Section {
+            NumberRow(
+                title: "Stop when the app is quiet for", unit: "s",
+                value: model.setting(\.endMonitor.sourceInactiveSeconds),
+                range: MeetingEndMonitor.Configuration.sourceInactiveRange)
+            NumberRow(
+                title: "Stop after silence of", unit: "min",
+                value: model.setting(\.endMonitor.silenceMinutes),
+                range: MeetingEndMonitor.Configuration.silenceRange)
+            NumberRow(
+                title: "Stop after a recording length of", unit: "min",
+                value: model.setting(\.endMonitor.maxDurationMinutes),
+                range: MeetingEndMonitor.Configuration.maxDurationRange)
+        } footer: {
+            Text("The indicator asks before stopping, with a 15 s countdown.")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+        }
+    }
+
+    private var afterRecordingSection: some View {
+        Section {
+            Toggle("Transcribe automatically", isOn: model.setting(\.autoTranscribe))
+            Picker(selection: model.setting(\.speakerCountHint)) {
+                Text("Auto").tag(Int?.none)
+                ForEach(AppSettings.speakerCountHintRange, id: \.self) { Text("\($0)").tag(Int?.some($0)) }
+            } label: {
+                Text("Number of other speakers")
+                Text("A hint for telling the system audio's speakers apart.")
+            }
+            Toggle(isOn: model.setting(\.deferTranscriptionWhenConstrained)) {
+                Text("Wait when the Mac is hot or in Low Power Mode")
+                Text("Transcription starts once the Mac is ready.")
+            }
+        }
+    }
+
     /// "Ask" is stored as no entry, the default.
     private func behavior(_ app: MeetingApp) -> Binding<MeetingBehavior> {
         Binding(
             get: { model.settings.perAppBehavior[app.appBundleID] ?? .ask },
             set: { value in model.updateSettings { $0.perAppBehavior[app.appBundleID] = value == .ask ? nil : value } })
+    }
+}
+
+/// The sections of a Settings page as tabs: a segmented control at the top, the selected section's form below.
+struct SettingsSectionTabs<Tab: Hashable & CaseIterable, Content: View>: View where Tab.AllCases: RandomAccessCollection {
+    @Binding var selection: Tab
+    let title: (Tab) -> LocalizedStringKey
+    @ViewBuilder let content: (Tab) -> Content
+
+    var body: some View {
+        VStack(spacing: 0) {
+            // A menu when the tabs are wider than the pane, so the pane never grows past the window.
+            ViewThatFits(in: .horizontal) {
+                picker.pickerStyle(.segmented).fixedSize()
+                picker.pickerStyle(.menu).fixedSize()
+            }
+            .labelsHidden()
+            .padding(.horizontal, 20)
+            .padding(.top, 12)
+            Form { content(selection) }
+                .formStyle(.grouped)
+        }
+    }
+
+    private var picker: some View {
+        Picker("Section", selection: $selection) {
+            ForEach(Tab.allCases, id: \.self) { Text(title($0)).tag($0) }
+        }
     }
 }
 
