@@ -64,9 +64,8 @@ struct TranscriptView: View {
                 if conversation.hasTranscript && !failed {
                     TranscriptionStatus(conversation: conversation, model: model)
                 }
-                actions
             }
-            // A failed re-transcription gets its own row, so the title and the icons keep their space.
+            // A failed re-transcription gets its own row, so the title keeps its space.
             if conversation.hasTranscript && failed {
                 HStack(alignment: .firstTextBaseline, spacing: 8) {
                     TranscriptionFailureReason(conversation: conversation, model: model)
@@ -74,14 +73,15 @@ struct TranscriptView: View {
                     TranscriptionStatus(conversation: conversation, model: model)
                 }
             }
-            HStack(spacing: 8) {
-                if transcript != nil {
-                    ScrollView(.horizontal, showsIndicators: false) {
-                        HStack(spacing: 6) {
-                            ForEach(speakers, id: \.self, content: speakerChip)
-                        }
+            if transcript != nil && !speakers.isEmpty {
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(spacing: 6) {
+                        ForEach(speakers, id: \.self, content: speakerChip)
                     }
                 }
+            }
+            HStack(spacing: 8) {
+                actions
                 Spacer(minLength: 8)
                 if hasAudio { transport }
             }
@@ -136,8 +136,10 @@ struct TranscriptView: View {
         .lineLimit(1)
     }
 
+    /// Small bordered buttons, each with its own background (no glass on the glass card); Re-transcribe shows its
+    /// menu arrow.
     private var actions: some View {
-        HStack(spacing: 14) {
+        HStack(spacing: 6) {
             iconButton("Copy transcript", systemImage: "doc.on.doc", action: copyTranscript)
                 .disabled(transcript?.segments.isEmpty ?? true)
             retranscribeMenu
@@ -153,10 +155,9 @@ struct TranscriptView: View {
         Button(action: action) {
             Label(title, systemImage: systemImage)
                 .labelStyle(.iconOnly)
-                .font(.system(size: 15))
         }
-        .buttonStyle(RowIconButtonStyle())
-        .foregroundStyle(.secondary)
+        .buttonStyle(.bordered)
+        .controlSize(.small)
         .help(title)
     }
 
@@ -174,12 +175,11 @@ struct TranscriptView: View {
         } label: {
             Label("Re-transcribe", systemImage: "arrow.clockwise")
                 .labelStyle(.iconOnly)
-                .font(.system(size: 15))
         }
-        .menuStyle(.borderlessButton)
-        .menuIndicator(.hidden)
+        .menuStyle(.button)
+        .buttonStyle(.bordered)
+        .controlSize(.small)
         .fixedSize()
-        .foregroundStyle(.secondary)
         .disabled(!canTranscribe)
         .help("Re-transcribe with another model or language")
     }

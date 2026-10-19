@@ -19,29 +19,31 @@ struct ConversationCard: View {
             AppIcon(bundleID: conversation.sourceBundleID)
             VStack(alignment: .leading, spacing: 4) {
                 title
-                details
-                TranscriptionFailureReason(conversation: conversation, model: model)
-            }
-            .layoutPriority(1)
-            Spacer(minLength: 8)
-            TranscriptionStatus(conversation: conversation, model: model)
-            Button { showAI(.chat) } label: {
-                Label("AI", systemImage: "sparkles")
-                    .labelStyle(.iconOnly)
-                    .font(.system(size: 15))
-            }
-            .buttonStyle(RowIconButtonStyle())
-            .foregroundStyle(.secondary)
-            .help("Ask AI about this conversation")
-            if conversation.hasSummary {
-                Button { showAI(.summary) } label: {
-                    Label("Summary", systemImage: "text.alignleft")
-                        .labelStyle(.iconOnly)
-                        .font(.system(size: 15))
+                // The status and buttons share the details row, so the title keeps the full width.
+                HStack(spacing: 12) {
+                    details
+                    Spacer(minLength: 8)
+                    TranscriptionStatus(conversation: conversation, model: model)
+                    Button { showAI(.chat) } label: {
+                        Label("AI", systemImage: "sparkles")
+                            .labelStyle(.iconOnly)
+                            .font(.system(size: 15))
+                    }
+                    .buttonStyle(RowIconButtonStyle())
+                    .foregroundStyle(.secondary)
+                    .help("Ask AI about this conversation")
+                    if conversation.hasSummary {
+                        Button { showAI(.summary) } label: {
+                            Label("Summary", systemImage: "text.alignleft")
+                                .labelStyle(.iconOnly)
+                                .font(.system(size: 15))
+                        }
+                        .buttonStyle(RowIconButtonStyle())
+                        .foregroundStyle(.secondary)
+                        .help("Show the summary")
+                    }
                 }
-                .buttonStyle(RowIconButtonStyle())
-                .foregroundStyle(.secondary)
-                .help("Show the summary")
+                TranscriptionFailureReason(conversation: conversation, model: model)
             }
         }
         .padding(.horizontal, 14)
@@ -161,6 +163,8 @@ struct TranscriptionStatus: View {
                 }
                 Text(Self.stepText(progress.step))
             }
+            .lineLimit(1)
+            .fixedSize()
             .font(.caption)
             .foregroundStyle(.secondary)
             .help(progress.step == .deferred
@@ -169,6 +173,7 @@ struct TranscriptionStatus: View {
         } else if progress != nil {
             Button("Needs model") { model.openSettings(tab: .transcription) }
                 .buttonStyle(RowTextButtonStyle())
+                .fixedSize()
                 .foregroundStyle(.orange)
                 .help("Download a transcription model in Settings")
         } else if Self.showsFailure(conversation, model) {
@@ -196,6 +201,7 @@ struct TranscriptionStatus: View {
         } else if conversation.status == .ready || conversation.status == .transcribing, !conversation.hasTranscript {
             Button("Transcribe") { model.transcribe(conversation.id) }
                 .buttonStyle(RowTextButtonStyle())
+                .fixedSize()
                 .foregroundStyle(.secondary)
                 .help("Transcribe this conversation")
         }
