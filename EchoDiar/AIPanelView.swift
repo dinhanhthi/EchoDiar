@@ -33,6 +33,8 @@ struct AIPanelView: View {
     private static let inputHeight = BottomBarButtonStyle.height
     /// Chat's menu row, above the question: a bit smaller.
     private static let chatMenuHeight: CGFloat = 28
+    /// The model badge and the round Copy under an answer.
+    private static let answerFooterHeight: CGFloat = 22
 
     var body: some View {
         VStack(spacing: 10) {
@@ -103,7 +105,7 @@ struct AIPanelView: View {
     private var messages: some View {
         ScrollViewReader { proxy in
             ScrollView {
-                VStack(alignment: .leading, spacing: 10) {
+                VStack(alignment: .leading, spacing: 20) {
                     ForEach(Array(chat.enumerated()), id: \.offset) { _, message in
                         messageView(message.role, text: message.text, model: message.model)
                     }
@@ -141,10 +143,24 @@ struct AIPanelView: View {
                 .background(Palette.hoverFill, in: RoundedRectangle(cornerRadius: 10, style: .continuous))
                 .frame(maxWidth: .infinity, alignment: .trailing)
         } else {
-            VStack(alignment: .leading, spacing: 2) {
+            VStack(alignment: .leading, spacing: 6) {
                 MarkdownText(text: text, isStreaming: isStreaming)
-                if let model, !model.isEmpty {
-                    Text(model).font(.caption2).foregroundStyle(.tertiary)
+                HStack(spacing: 6) {
+                    if let model, !model.isEmpty {
+                        Text(model)
+                            .font(.caption2)
+                            .foregroundStyle(.secondary)
+                            .padding(.horizontal, 8)
+                            .frame(height: Self.answerFooterHeight)
+                            .background(Capsule().fill(Palette.inputSurface))
+                    }
+                    if !isStreaming {
+                        Button { copyAnswer(text) } label: {
+                            Label("Copy", systemImage: "square.on.square").labelStyle(.iconOnly).font(.caption2)
+                        }
+                        .buttonStyle(BottomBarButtonStyle(height: Self.answerFooterHeight, horizontalPadding: 0))
+                        .help("Copy the answer")
+                    }
                 }
             }
         }
@@ -213,9 +229,17 @@ struct AIPanelView: View {
                     Spacer(minLength: 0)
                     copyButton
                     if summaryJob != nil {
-                        ProgressView().controlSize(.small)
                         Button("Cancel", action: model.cancelAIJob)
                             .buttonStyle(BottomBarButtonStyle())
+                        // Stays blue while it runs: not disabled (that dims it), it just takes no clicks.
+                        Button {} label: {
+                            HStack(spacing: 6) {
+                                ProgressView().controlSize(.small)
+                                Text("Summarizing")
+                            }
+                        }
+                        .buttonStyle(BottomBarButtonStyle(prominent: true))
+                        .allowsHitTesting(false)
                     } else if summary == nil {
                         Button("Summarize") { start(.summary) }
                             .buttonStyle(BottomBarButtonStyle(prominent: true))
@@ -263,8 +287,11 @@ struct AIPanelView: View {
                     .fill(Palette.inputSurface))
             copyButton
             if questionJob != nil {
-                Button("Cancel", action: model.cancelAIJob)
-                    .buttonStyle(BottomBarButtonStyle())
+                Button(action: model.cancelAIJob) {
+                    Label("Stop", systemImage: "stop.fill").labelStyle(.iconOnly)
+                }
+                .buttonStyle(BottomBarButtonStyle(prominent: true, horizontalPadding: 0))
+                .help("Stop the answer")
             } else {
                 Button("Send", action: ask)
                     .buttonStyle(BottomBarButtonStyle(prominent: true))
@@ -504,6 +531,16 @@ struct AIPanelView: View {
         pasteboard.setString(prompt, forType: .string)
         pasteboard.setString("", forType: transient)
         withAnimation { toast = "Copied — paste into any chat" }
+        Task {
+            try? await Task.sleep(for: .seconds(2))
+            withAnimation { toast = nil }
+        }
+    }
+
+    private func copyAnswer(_ text: String) {
+        NSPasteboard.general.clearContents()
+        NSPasteboard.general.setString(text, forType: .string)
+        withAnimation { toast = "Copied" }
         Task {
             try? await Task.sleep(for: .seconds(2))
             withAnimation { toast = nil }

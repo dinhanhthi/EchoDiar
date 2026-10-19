@@ -503,11 +503,13 @@ private struct SpeakerChipShape: ViewModifier {
 }
 
 /// The segments; redrawn when the play head enters another segment, not at every tick. While playing, the list
-/// follows the play head: Play scrolls to its segment, and so does each next segment.
+/// follows the play head: Play scrolls to its segment, and so does each next segment, until the user scrolls away
+/// (or jumps to a search result); the next Play, or a click on a segment, follows again.
 private struct SegmentList: View {
     let transcript: Transcript
     let playback: PlaybackController
     @Binding var scrollTarget: UUID?
+    @State private var following = false
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var body: some View {
@@ -520,24 +522,33 @@ private struct SegmentList: View {
                             segment: segment, name: transcript.displayName(for: segment.speaker),
                             active: segment.id == active
                         ) {
+                            following = true
                             playback.play(from: segment.start)
                         }
                     }
                 }
                 .padding(.vertical, 4)
             }
+            // The user's own scrolling (wheel, trackpad, scroller); `.animating` is `follow`'s scrollTo.
+            .onScrollPhaseChange { _, phase in
+                if phase != .idle && phase != .animating { following = false }
+            }
             .onChange(of: scrollTarget, initial: true) {
                 guard let scrollTarget else { return }
+                following = false
                 proxy.scrollTo(scrollTarget, anchor: .center)
                 self.scrollTarget = nil
             }
             .onChange(of: active) { follow(active, proxy) }
-            .onChange(of: playback.isPlaying) { follow(active, proxy) }
+            .onChange(of: playback.isPlaying) {
+                following = playback.isPlaying
+                follow(active, proxy)
+            }
         }
     }
 
     private func follow(_ segment: UUID?, _ proxy: ScrollViewProxy) {
-        guard playback.isPlaying, let segment else { return }
+        guard playback.isPlaying, following, let segment else { return }
         withAnimation(reduceMotion ? nil : .easeInOut(duration: 0.25)) {
             proxy.scrollTo(segment, anchor: .center)
         }
