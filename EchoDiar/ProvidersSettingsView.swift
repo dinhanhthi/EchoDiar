@@ -228,7 +228,9 @@ private struct APIProviderRow: View {
         DisclosureGroup(isExpanded: $expanded) {
             VStack(alignment: .leading, spacing: 8) {
                 if isCustom && config.kind == .openAICompatible {
-                    TextField("Name", text: binding(\.displayName))
+                    FieldRow("Name") {
+                        TextField("Name", text: binding(\.displayName)).labelsHidden()
+                    }
                     Picker("Authentication", selection: binding(\.authStyle)) {
                         Text("Bearer token").tag(ProviderConfig.AuthStyle.bearer)
                         Text("api-key header").tag(ProviderConfig.AuthStyle.apiKeyHeader)
@@ -237,7 +239,10 @@ private struct APIProviderRow: View {
                     }
                 }
                 if config.authStyle != .none { APIKeyField(providerID: config.id, model: model, key: $pendingKey) }
-                TextField("Base URL", text: binding(\.baseURL), prompt: Text(config.id == "azure" ? "https://<resource>.openai.azure.com/openai/v1" : ""))
+                FieldRow("Base URL") {
+                    TextField("Base URL", text: binding(\.baseURL), prompt: Text(config.id == "azure" ? "https://<resource>.openai.azure.com/openai/v1" : ""))
+                        .labelsHidden()
+                }
                 if config.id == "azure" {
                     Text("Required: your resource's https://<resource>.openai.azure.com/openai/v1 URL.")
                         .font(.caption)
@@ -328,8 +333,11 @@ private struct CLIProviderRow: View {
     var body: some View {
         DisclosureGroup(isExpanded: $expanded) {
             VStack(alignment: .leading, spacing: 8) {
-                TextField("Path override", text: binding(\.baseURL), prompt: Text("Search PATH"))
-                    .onSubmit(redetect)
+                FieldRow("Path override") {
+                    TextField("Path override", text: binding(\.baseURL), prompt: Text("Search PATH"))
+                        .labelsHidden()
+                        .onSubmit(redetect)
+                }
                 ModelField(config: config, model: model, prompt: modelPrompt) {
                     try await model.makeProvider(for: config)?.listModels() ?? []
                 }
@@ -386,6 +394,25 @@ private struct CLIProviderRow: View {
 /// Leading inset of an expanded row's content, so it lines up with the row's title after the disclosure chevron.
 private let disclosureIndent: CGFloat = 18
 
+/// A label, a gap, then the input stretched over the rest of the row, followed by its buttons. Plain labeled fields
+/// in the grouped form right-align their text or butt against the label.
+private struct FieldRow<Input: View>: View {
+    let label: LocalizedStringKey
+    @ViewBuilder let input: Input
+
+    init(_ label: LocalizedStringKey, @ViewBuilder input: () -> Input) {
+        self.label = label
+        self.input = input()
+    }
+
+    var body: some View {
+        HStack(spacing: 12) {
+            Text(label)
+            input.textFieldStyle(.roundedBorder)
+        }
+    }
+}
+
 /// The API key, written to the Keychain on Return, on leaving the field, or by Save and Test (`TestButton`). Only
 /// "Saved" is shown; the key is never read back into the UI.
 private struct APIKeyField: View {
@@ -399,21 +426,19 @@ private struct APIKeyField: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 4) {
-            LabeledContent("API key") {
-                HStack {
-                    SecureField("API key", text: $key, prompt: Text(saved ? "Enter a new key to replace it" : "Paste the key, then Save"))
-                        .labelsHidden()
-                        .focused($focused)
-                        .onSubmit(save)
-                        // Leaving the field saves too, so a pasted key is not lost without Return.
-                        .onChange(of: focused) { _, focused in if !focused { save() } }
-                    if saved {
-                        Label("Saved", systemImage: "checkmark.circle.fill")
-                            .font(.caption)
-                            .foregroundStyle(.green)
-                        Button("Remove") { perform { try KeychainStore.deleteAPIKey(forProvider: providerID) } }
-                            .controlSize(.small)
-                    }
+            FieldRow("API key") {
+                SecureField("API key", text: $key, prompt: Text(saved ? "Enter a new key to replace it" : "Paste the key, then Save"))
+                    .labelsHidden()
+                    .focused($focused)
+                    .onSubmit(save)
+                    // Leaving the field saves too, so a pasted key is not lost without Return.
+                    .onChange(of: focused) { _, focused in if !focused { save() } }
+                if saved {
+                    Label("Saved", systemImage: "checkmark.circle.fill")
+                        .font(.caption)
+                        .foregroundStyle(.green)
+                    Button("Remove") { perform { try KeychainStore.deleteAPIKey(forProvider: providerID) } }
+                        .controlSize(.small)
                 }
             }
             if let error {
@@ -453,11 +478,12 @@ private struct TranscriptionModelField: View {
     var body: some View {
         let defaultModel = CloudTranscription.defaultModel(for: config)
         let known = OpenAICompatibleTranscriber.presetModels[config.preset ?? ""] ?? []
-        HStack {
+        FieldRow("Transcription model") {
             TextField("Transcription model", text: Binding(
                 get: { config.transcriptionModel },
                 set: { value in model.updateProvider(id: config.id) { $0.transcriptionModel = value } }
             ), prompt: Text(defaultModel.isEmpty ? "Model id, e.g. whisper-1" : defaultModel))
+            .labelsHidden()
             if known.count > 1 {
                 Menu("Models") {
                     ForEach(known, id: \.self) { id in
@@ -484,8 +510,8 @@ private struct ModelField: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 4) {
-            HStack {
-                TextField("Model", text: modelBinding, prompt: Text(prompt))
+            FieldRow("Model") {
+                TextField("Model", text: modelBinding, prompt: Text(prompt)).labelsHidden()
                 if let models, !models.isEmpty {
                     Menu("\(models.count) model\(models.count == 1 ? "" : "s")") {
                         ForEach(models, id: \.self) { id in
@@ -525,7 +551,8 @@ private struct ModelField: View {
     }
 }
 
-/// Sends a one-token "ping" (CLIs: a tiny prompt), or runs `check` when set, and shows OK or a short error below.
+/// Sends a one-token "ping" (CLIs: a tiny prompt), or runs `check` when set, and shows OK beside it or a short error
+/// below.
 /// With `pendingKey`, a Save button writes the typed key to the Keychain, and Test saves it first. Not run while idle.
 private struct TestButton: View {
     let title: String
@@ -549,12 +576,16 @@ private struct TestButton: View {
                         .controlSize(.small)
                         .disabled(task != nil || pendingKey.wrappedValue.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
                 }
-                if task != nil { ProgressView().controlSize(.small) }
+                if task != nil {
+                    ProgressView().controlSize(.small)
+                } else if let result, result.ok {
+                    Text(result.text).font(.caption).foregroundStyle(.green)
+                }
             }
-            if task == nil, let result {
+            if task == nil, let result, !result.ok {
                 Text(result.text)
                     .font(.caption)
-                    .foregroundStyle(result.ok ? .green : .red)
+                    .foregroundStyle(.red)
                     .lineLimit(3)
             }
         }
