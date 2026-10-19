@@ -860,7 +860,7 @@ final class AppModel {
     /// Auto-delete on: schedules the daily run and runs it once now (launch, or when turned on). Off: stops it.
     /// Reads the setting when it runs, so quick toggles end in the last state.
     private func syncRetention() {
-        Task {
+        Task { [self] in
             guard settings.autoDeleteEnabled else {
                 await library.stopRetentionSchedule()
                 return

@@ -13,7 +13,7 @@ final class SystemEventsMonitor {
     private var observers: [(center: NotificationCenter, token: any NSObjectProtocol)] = []
 
     /// Replaces any previous handler.
-    func start(onEvent: @escaping @MainActor (Event) -> Void) {
+    func start(onEvent: @escaping @MainActor @Sendable (Event) -> Void) {
         stop()
         let workspace = NSWorkspace.shared.notificationCenter
         let distributed = DistributedNotificationCenter.default()
@@ -35,7 +35,7 @@ final class SystemEventsMonitor {
     /// `handler` gets the notification's app (pid, bundle id), if any.
     private func observe(
         _ center: NotificationCenter, _ name: Notification.Name,
-        handler: @escaping @MainActor ((pid: pid_t, bundleID: String?)?) -> Void
+        handler: @escaping @MainActor @Sendable ((pid: pid_t, bundleID: String?)?) -> Void
     ) {
         let token = center.addObserver(forName: name, object: nil, queue: .main) { note in
             let app = (note.userInfo?[NSWorkspace.applicationUserInfoKey] as? NSRunningApplication)
