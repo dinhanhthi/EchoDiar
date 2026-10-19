@@ -15,6 +15,12 @@ struct MainView: View {
     /// Transcript text by conversation for the search, read off the main thread only once a query is typed; read
     /// again when the conversation's size changes (a new transcript). Released with the window.
     @State private var transcriptTexts: [UUID: SearchText] = [:]
+    /// The search bar fills the toolbar in place of its buttons, from the Search button or ⌘F until it is closed.
+    @State private var searchExpanded = false
+    /// The window's width, which the search bar fills from its leading edge.
+    @State private var windowWidth: CGFloat = 0
+    /// Where the closed search bar was, in the window, while it shrinks back into the Search button.
+    @State private var searchBarGhost: CGRect?
 
     private struct SearchText {
         let size: Int64
@@ -49,43 +55,62 @@ struct MainView: View {
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(WindowGlass().ignoresSafeArea())
+        .overlay {
+            if let searchBarGhost {
+                Color.clear
+                    .overlay(alignment: .topLeading) {
+                        SearchBarGhost(frame: searchBarGhost) { self.searchBarGhost = nil }
+                    }
+                    .ignoresSafeArea()
+                    .allowsHitTesting(false)
+            }
+        }
         .frame(minWidth: 440, minHeight: 480)
+        .onGeometryChange(for: CGFloat.self) { $0.size.width } action: { windowWidth = $0 }
         .task(id: query) {
             if !query.isEmpty { try? await Task.sleep(for: .milliseconds(200)) }
             if !Task.isCancelled { debouncedQuery = query }
         }
         .task(id: debouncedQuery.isEmpty ? nil : model.conversations) { await loadTranscriptTexts() }
+        .onChange(of: model.searchPresented, initial: true) { _, presented in
+            if presented { searchExpanded = true }
+        }
         .toolbar {
-            // In a narrow window the other buttons go to the overflow menu first.
-            if #available(macOS 26.1, *) {
-                recordItem.visibilityPriority(.high)
+            if searchExpanded {
+                searchBarItem
             } else {
-                recordItem
-            }
-            // Pushes Settings and AI to the trailing edge.
-            if #available(macOS 26, *) {
-                ToolbarSpacer(.flexible)
-            } else {
-                ToolbarItem { Spacer() }
-            }
-            ToolbarItemGroup {
-                Button { SettingsWindow.shared.show(model: model) } label: {
-                    Label("Settings", systemImage: "slider.horizontal.3")
+                // In a narrow window the other buttons go to the overflow menu first.
+                if #available(macOS 26.1, *) {
+                    recordItem.visibilityPriority(.high)
+                } else {
+                    recordItem
                 }
-                .help("Settings")
-                Button(action: toggleAI) {
-                    Label(model.selectedTab == .ai ? "Library" : "AI", systemImage: "sparkles")
+                // Pushes Settings and AI to the trailing edge.
+                if #available(macOS 26, *) {
+                    ToolbarSpacer(.flexible)
+                } else {
+                    ToolbarItem { Spacer() }
                 }
-                .help(model.selectedTab == .ai ? "Show the library (⌘I)" : "Show the AI pane (⌘I)")
-            }
-            // Its own capsule, after Settings and AI.
-            if #available(macOS 26, *) {
-                ToolbarSpacer(.fixed)
-            }
-            ToolbarItem {
-                ToolbarSearchField(text: $query, focused: searchPresented, prompt: "Search")
-                    .frame(width: ToolbarSearchField.width)
+                ToolbarItemGroup {
+                    Button { SettingsWindow.shared.show(model: model) } label: {
+                        Label("Settings", systemImage: "slider.horizontal.3")
+                    }
+                    .help("Settings")
+                    Button(action: toggleAI) {
+                        Label(model.selectedTab == .ai ? "Library" : "AI", systemImage: "sparkles")
+                    }
+                    .help(model.selectedTab == .ai ? "Show the library (⌘I)" : "Show the AI pane (⌘I)")
+                }
+                // Its own capsule, after Settings and AI.
+                if #available(macOS 26, *) {
+                    ToolbarSpacer(.fixed)
+                }
+                ToolbarItem {
+                    Button(action: model.showSearch) {
+                        Label("Search", systemImage: "magnifyingglass")
+                    }
                     .help("Search conversations (⌘F)")
+                }
             }
         }
         .task { model.refreshTargets() }
@@ -250,6 +275,25 @@ struct MainView: View {
         Binding(get: { model.searchPresented }, set: { model.searchPresented = $0 })
     }
 
+    /// The search bar alone in the toolbar, with its own glass: the toolbar's shared capsule would not follow its
+    /// width while it grows and shrinks.
+    @ToolbarContentBuilder private var searchBarItem: some ToolbarContent {
+        if #available(macOS 26, *) {
+            ToolbarItem { searchBar }.sharedBackgroundVisibility(.hidden)
+        } else {
+            ToolbarItem { searchBar }
+        }
+    }
+
+    private var searchBar: some View {
+        ToolbarSearchBar(text: $query, focusRequest: searchPresented, windowWidth: windowWidth) { frame in
+            query = ""
+            // The toolbar fades its buttons in, in an animated transaction, while the bar's ghost shrinks.
+            if !reduceMotion { searchBarGhost = frame }
+            withAnimation(reduceMotion ? nil : ToolbarSearchBar.animation) { searchExpanded = false }
+        }
+    }
+
     private var searchTerm: String { debouncedQuery.trimmingCharacters(in: .whitespacesAndNewlines) }
 
     /// Conversations whose title or transcript contains the query (case and accent insensitive); all without one.
@@ -280,40 +324,109 @@ struct MainView: View {
     }
 }
 
-/// The main window's search field. A fixed width (not `.searchable`): the system search item widens when focused and
-/// pushed Record, Settings and AI into the toolbar's overflow menu in the 440 pt wide window. 140 pt leaves about
-/// 28 pt to spare there (measured on macOS 27).
-private struct ToolbarSearchField: NSViewRepresentable {
-    static let width: CGFloat = 140
+/// The main window's search bar, in place of the toolbar's buttons: it grows out of the Search button's place to the
+/// toolbar's width, and shrinks back before the buttons return. Not `.searchable`: the system search item widened
+/// when focused and pushed Record, Settings and AI into the toolbar's overflow menu in the 440 pt wide window.
+private struct ToolbarSearchBar: View {
+    static let height: CGFloat = 34
+    /// From the window's trailing edge, like the toolbar's buttons.
+    static let trailingInset: CGFloat = 8
+    /// Growing and shrinking.
+    static let animation = Animation.snappy(duration: 3)
 
     @Binding var text: String
-    /// ⌘F sets it to focus the field; false again once editing ends.
-    @Binding var focused: Bool
-    let prompt: String
+    /// ⌘F sets it to focus the field; false again once focused.
+    @Binding var focusRequest: Bool
+    let windowWidth: CGFloat
+    /// X or Escape, with the bar's frame in the window (top-left origin).
+    let onClose: (CGRect) -> Void
+    @State private var expanded = false
+    /// The toolbar does not stretch its items: the bar reaches from its leading edge in the window, measured, to the
+    /// window's trailing edge. It grows once measured, from where the Search button was.
+    @State private var origin: CGPoint?
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
+    var body: some View {
+        HStack(spacing: 0) {
+            // The Search button's icon, at its place.
+            Image(systemName: "magnifyingglass")
+                .font(.body)
+                .imageScale(.large)
+                .frame(width: Self.height, height: Self.height)
+            SearchTextField(text: $text, focusRequest: $focusRequest, onEscape: close)
+                .opacity(expanded ? 1 : 0)
+            // As big as the Search button: its highlight fills the bar's end.
+            Button(action: close) {
+                Image(systemName: "xmark")
+                    .font(.body)
+                    .imageScale(.large)
+                    .frame(width: Self.height - 10, height: Self.height - 10)
+            }
+            .buttonStyle(RowIconButtonStyle())
+            .frame(width: Self.height, height: Self.height)
+            .help("Close search (Esc)")
+            .opacity(expanded ? 1 : 0)
+        }
+        .frame(width: expanded ? nil : Self.height, height: Self.height, alignment: .leading)
+        .clipped()
+        .modifier(GlassCard(cornerRadius: Self.height / 2))
+        .frame(minWidth: Self.height, idealWidth: width, maxWidth: width, alignment: .trailing)
+        .opacity(origin == nil ? 0 : 1)
+        .background(WindowOriginReader { point in
+            guard origin != point else { return }
+            let first = origin == nil
+            origin = point
+            if first { withAnimation(reduceMotion ? nil : Self.animation) { expanded = true } }
+        })
+    }
+
+    private var width: CGFloat {
+        guard let origin else { return Self.height }
+        return max(windowWidth - origin.x - Self.trailingInset, Self.height)
+    }
+
+    private func close() {
+        onClose(CGRect(origin: origin ?? .zero, size: CGSize(width: width, height: Self.height)))
+    }
+}
+
+/// The search bar's text field. AppKit's: a SwiftUI field in a toolbar item that was just added did not take the
+/// focus.
+private struct SearchTextField: NSViewRepresentable {
+    @Binding var text: String
+    /// ⌘F sets it to focus the field; false again once asked.
+    @Binding var focusRequest: Bool
+    let onEscape: () -> Void
 
     func makeNSView(context: Context) -> Field {
         let field = Field()
-        field.placeholderString = prompt
+        field.isBordered = false
+        field.drawsBackground = false
+        field.focusRingType = .none
+        field.usesSingleLineMode = true
+        field.cell?.isScrollable = true
+        field.placeholderString = String(localized: "Search")
         field.setAccessibilityLabel("Search conversations")
         field.delegate = context.coordinator
-        field.target = context.coordinator
-        field.action = #selector(Coordinator.searched(_:))
         return field
     }
 
     func updateNSView(_ field: Field, context: Context) {
         context.coordinator.parent = self
         if field.stringValue != text { field.stringValue = text }
-        if focused, field.currentEditor() == nil {
-            // A new window may not hold the field yet: it focuses itself once it does.
+        if focusRequest {
+            // A new toolbar item may not be in the window yet: it focuses itself once it is.
             field.focusInWindow = true
-            DispatchQueue.main.async { field.focusIfInWindow() }
+            DispatchQueue.main.async {
+                field.focusIfInWindow()
+                focusRequest = false
+            }
         }
     }
 
     func makeCoordinator() -> Coordinator { Coordinator(parent: self) }
 
-    final class Field: NSSearchField {
+    final class Field: NSTextField {
         var focusInWindow = false
 
         override func viewDidMoveToWindow() {
@@ -328,25 +441,79 @@ private struct ToolbarSearchField: NSViewRepresentable {
         }
     }
 
-    @MainActor final class Coordinator: NSObject, NSSearchFieldDelegate {
-        var parent: ToolbarSearchField
+    @MainActor final class Coordinator: NSObject, NSTextFieldDelegate {
+        var parent: SearchTextField
 
-        init(parent: ToolbarSearchField) {
+        init(parent: SearchTextField) {
             self.parent = parent
         }
 
         func controlTextDidChange(_ notification: Notification) {
-            guard let field = notification.object as? NSSearchField else { return }
+            guard let field = notification.object as? NSTextField else { return }
             parent.text = field.stringValue
         }
 
-        /// Also the clear button and Escape, which change the text without `controlTextDidChange`.
-        @objc func searched(_ field: NSSearchField) {
-            if parent.text != field.stringValue { parent.text = field.stringValue }
+        /// Escape closes the search bar.
+        func control(_ control: NSControl, textView: NSTextView, doCommandBy selector: Selector) -> Bool {
+            guard selector == #selector(NSResponder.cancelOperation(_:)) else { return false }
+            parent.onEscape()
+            return true
+        }
+    }
+}
+
+/// The closed search bar, under the toolbar where it was: it shrinks back into the Search button and fades out while
+/// the toolbar's buttons fade in. The toolbar removes the bar's own item at once.
+private struct SearchBarGhost: View {
+    let frame: CGRect
+    let onDone: () -> Void
+    @State private var collapsed = false
+
+    var body: some View {
+        Image(systemName: "magnifyingglass")
+            .font(.body)
+            .imageScale(.large)
+            .frame(width: frame.height, height: frame.height)
+            .frame(width: collapsed ? frame.height : frame.width, alignment: .leading)
+            .modifier(GlassCard(cornerRadius: frame.height / 2))
+            .opacity(collapsed ? 0 : 1)
+            .frame(width: frame.width, alignment: .trailing)
+            .offset(x: frame.minX, y: frame.minY)
+            .onAppear {
+                withAnimation(ToolbarSearchBar.animation) { collapsed = true } completion: { onDone() }
+            }
+    }
+}
+
+/// Reports this view's top-left corner in its window (top-left origin), each time it is laid out there.
+private struct WindowOriginReader: NSViewRepresentable {
+    let onChange: (CGPoint) -> Void
+
+    func makeNSView(context: Context) -> Probe { Probe() }
+
+    func updateNSView(_ probe: Probe, context: Context) {
+        probe.onChange = onChange
+    }
+
+    final class Probe: NSView {
+        var onChange: ((CGPoint) -> Void)?
+
+        override func viewDidMoveToWindow() {
+            super.viewDidMoveToWindow()
+            report()
         }
 
-        func controlTextDidEndEditing(_ notification: Notification) {
-            parent.focused = false
+        override func layout() {
+            super.layout()
+            report()
+        }
+
+        /// On the next turn: SwiftUI may be laying out the toolbar.
+        private func report() {
+            guard let window else { return }
+            let frame = convert(bounds, to: nil)
+            let origin = CGPoint(x: frame.minX, y: window.frame.height - frame.maxY)
+            DispatchQueue.main.async { self.onChange?(origin) }
         }
     }
 }
