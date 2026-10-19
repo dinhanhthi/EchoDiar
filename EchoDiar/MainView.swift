@@ -401,6 +401,9 @@ struct MainView: View {
                 )
                 .padding(.horizontal, 4)
                 .fixedSize()
+                // Each section's own tabs: another section replaces them, instead of the selection sliding and
+                // resizing from the old section's tab (its title truncated meanwhile).
+                .id(section)
             }
         }
     }
