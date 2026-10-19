@@ -56,31 +56,20 @@ struct ConversationListView: View {
     }
 }
 
-/// "Today", "Yesterday", or the date as muted text, centered on a rule that stays inside the list's padding, with a
-/// gap on both sides. On the window's glass, so cards scrolling under the pinned header do not show through.
+/// "Today", "Yesterday", or the date as muted text, centered. On the window's glass, so cards scrolling under the
+/// pinned header do not show through.
 private struct DayHeader: View {
     let day: Date
 
     var body: some View {
-        HStack(spacing: 10) {
-            rule
-            Text(title)
-                .font(.caption.weight(.semibold))
-                .foregroundStyle(.secondary)
-                .fixedSize()
-                .accessibilityAddTraits(.isHeader)
-            rule
-        }
-        .padding(.vertical, 6)
-        // The list's 12 pt padding, so the background reaches the column edges.
-        .background(WindowGlass().padding(.horizontal, -12))
-    }
-
-    private var rule: some View {
-        Rectangle()
-            .fill(Color.white.opacity(0.12))
-            .frame(height: 1)
-            .accessibilityHidden(true)
+        Text(title)
+            .font(.caption.weight(.semibold))
+            .foregroundStyle(.secondary)
+            .accessibilityAddTraits(.isHeader)
+            .frame(maxWidth: .infinity)
+            .padding(.vertical, 6)
+            // The list's 12 pt padding, so the background reaches the column edges.
+            .background(WindowGlass().padding(.horizontal, -12))
     }
 
     private var title: String {
