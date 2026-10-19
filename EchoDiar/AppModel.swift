@@ -195,6 +195,8 @@ final class AppModel {
     @ObservationIgnored private var pill: FloatingPillController?
     @ObservationIgnored private var endWatch: EndWatch?
     @ObservationIgnored private var endWatchGeneration = 0
+    /// Bundle IDs of the meeting apps whose mic is on, per the detector (every known app, ignored ones too).
+    @ObservationIgnored private var meetingMics: Set<String> = []
     @ObservationIgnored private var autoStartNoticeTask: Task<Void, Never>?
     /// Created on the normal launch path only (not for the DEBUG harnesses).
     @ObservationIgnored private var hotKey: GlobalHotKey?
@@ -1353,6 +1355,12 @@ extension AppModel {
         var timer: Timer?
         /// The last `.audible` fed (the monitor starts silent).
         var audible = false
+        /// The last `.systemAudible` fed.
+        var systemAudible = false
+        /// The meeting app whose mic feeds `.sourceInputActive`: the recorded app, nil (any known one) for global.
+        var meetingBundleID: String?
+        /// The last `.sourceInputActive` fed; off is fed only after on.
+        var meetingMic = false
         /// `Snapshot.micRoutesLost` already handled.
         var routesLost = 0
     }
@@ -1422,6 +1430,8 @@ extension AppModel {
             meetingDetector.start()
         } else {
             meetingDetector.stop()
+            // The stopped detector emits no `ended`: the monitor keeps the last mic state.
+            meetingMics.removeAll()
             detectedMeeting = nil
             dismissMeetingPrompt()
         }
@@ -1430,6 +1440,8 @@ extension AppModel {
     /// "Ignore" apps are skipped; "Always" starts recording them (browsers still ask), else the pill asks. Nothing
     /// starts while recording.
     private func meetingDetected(_ meeting: DetectedMeeting) {
+        meetingMics.insert(meeting.bundleID)
+        syncMeetingMic()
         var behavior = settings.perAppBehavior[meeting.app.appBundleID] ?? .ask
         guard behavior != .ignore else { return }
         if behavior == .always, meeting.app.isBrowser { behavior = .ask }
@@ -1443,11 +1455,24 @@ extension AppModel {
         }
     }
 
-    /// The app's mic is off (call over, or a muted web client): forget it and drop its prompt. Never an end signal.
+    /// The app's mic is off (call over, or a muted web client): forget it and drop its prompt. Never an end signal
+    /// alone: the call-ended trigger also needs the system channel silent.
     private func meetingEnded(_ meeting: DetectedMeeting) {
+        meetingMics.remove(meeting.bundleID)
+        syncMeetingMic()
         guard detectedMeeting?.bundleID == meeting.bundleID else { return }
         detectedMeeting = nil
         if case .meetingDetected(let shown)? = pillPrompt, shown.bundleID == meeting.bundleID { pillPrompt = nil }
+    }
+
+    /// Feeds the end monitor's call-ended trigger whether the recorded meeting app's mic is on (any known app's for a
+    /// global recording). Off is fed only after on, so a recording that never saw a meeting mic never gets the prompt.
+    private func syncMeetingMic() {
+        guard let watch = endWatch else { return }
+        let active = watch.meetingBundleID.map(meetingMics.contains) ?? !meetingMics.isEmpty
+        guard active != watch.meetingMic else { return }
+        endWatch?.meetingMic = active
+        recordEnd(.sourceInputActive(active))
     }
 
     /// Starts the end monitor of the recording that just started: a ≤ 1 Hz evaluation timer and, for an app target,
@@ -1467,6 +1492,7 @@ extension AppModel {
         if case .app(let group) = target {
             let app = MeetingApps.app(forBundleID: group.bundleID)
             sourceApp = SourceApp(name: app?.name ?? group.name, appBundleID: app?.appBundleID ?? group.bundleID)
+            watch.meetingBundleID = group.bundleID
             // Covers plain processes too (`afplay`), which `SystemEventsMonitor` does not see quit.
             for pid in Set(group.processes.map(\.pid)) {
                 let source = DispatchSource.makeProcessSource(identifier: pid, eventMask: .exit, queue: .main)
@@ -1492,6 +1518,7 @@ extension AppModel {
         watch.timer = timer
         let sourceGone = sourceApp != nil && watch.livePIDs.isEmpty
         endWatch = watch
+        syncMeetingMic()
         if let autoStarted { showAutoStartNotice(autoStarted) }
         if sourceGone { recordEnd(.sourceExited) }
     }
@@ -1547,8 +1574,8 @@ extension AppModel {
         }
     }
 
-    /// Every second while recording: feeds `.audible` from the writer's silence runs (paused counts as silent: wall
-    /// clock), evaluates, then stops once a still-shown end prompt's countdown is over.
+    /// Every second while recording: feeds `.audible` and `.systemAudible` from the writer's silence runs (paused
+    /// counts as silent: wall clock), evaluates, then stops once a still-shown end prompt's countdown is over.
     private func endTick() {
         guard let watch = endWatch else { return }
         let now = Date()
@@ -1560,6 +1587,13 @@ extension AppModel {
             endWatch?.audible = audible
             let since = audible || snapshot.state != .recording ? now : now.addingTimeInterval(-quiet)
             endWatch?.monitor.record(.audible(audible), at: since)
+        }
+        let systemQuiet = snapshot.systemSilentSeconds
+        let systemAudible = snapshot.state == .recording && systemQuiet < 2 && systemQuiet + 0.5 < snapshot.elapsed
+        if systemAudible != watch.systemAudible {
+            endWatch?.systemAudible = systemAudible
+            let since = systemAudible || snapshot.state != .recording ? now : now.addingTimeInterval(-systemQuiet)
+            endWatch?.monitor.record(.systemAudible(systemAudible), at: since)
         }
         evaluateEnd()
         // Only a prompt that still holds after the fresh inputs stops the recording.

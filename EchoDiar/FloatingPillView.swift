@@ -158,6 +158,7 @@ struct FloatingPillView: View {
         switch reason {
         case .sourceExited: return "\(app) quit — stop recording?"
         case .sourceInactive: return "\(app) stopped using audio — stop recording?"
+        case .callEnded: return "The call seems to be over — stop recording?"
         case .silence: return "No sound for \(model.settings.endMonitor.effectiveSilenceMinutes) min — stop recording?"
         case .screenLocked: return "Screen locked — stop recording?"
         case .inputRouteLost: return "Microphone disconnected — stop recording?"

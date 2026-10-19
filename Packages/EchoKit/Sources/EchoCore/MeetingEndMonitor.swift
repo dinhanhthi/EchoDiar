@@ -11,6 +11,9 @@ import Foundation
 ///   prompt with a countdown (default action Stop). "Keep recording" snoozes that trigger for `snoozeDuration`;
 ///   a condition that still holds afterwards prompts again.
 /// - Source inactivity is ignored once the source app quit (its own prompt covers it).
+/// - Call ended: the system channel went silent after it had been audible while the meeting app's mic is off, both
+///   for `callEndedSeconds`. Either alone is normal mid-call (others quiet, a muted web client); also ignored once
+///   the source app quit.
 /// - The recording starts as silent: the silence prompt fires unless `audible(true)` arrives within the threshold.
 /// - `evaluate` returns the same prompt on every call while its condition holds; the caller dedupes, and dismisses
 ///   the prompt when the result drops back to `.none`.
@@ -65,6 +68,10 @@ public struct MeetingEndMonitor: Sendable {
         case sourceActive(Bool)
         /// The mic or system channel is above the silence floor (`false`: both silent).
         case audible(Bool)
+        /// The system channel alone is above the silence floor.
+        case systemAudible(Bool)
+        /// The meeting app's mic input is running.
+        case sourceInputActive(Bool)
         case screenLocked(Bool)
         /// The input device went away (AirPods disconnect); fed only when the route-change setting asks to stop.
         case inputRouteLost
@@ -73,7 +80,7 @@ public struct MeetingEndMonitor: Sendable {
     }
 
     public enum Reason: String, Codable, Sendable {
-        case sourceExited, sourceInactive, silence, screenLocked, inputRouteLost, systemSleep, diskFull, maxDuration
+        case sourceExited, sourceInactive, callEnded, silence, screenLocked, inputRouteLost, systemSleep, diskFull, maxDuration
     }
 
     public enum Action: Equatable, Sendable {
@@ -85,6 +92,7 @@ public struct MeetingEndMonitor: Sendable {
 
     public static let promptCountdown = 15
     public static let snoozeDuration: TimeInterval = 10 * 60
+    public static let callEndedSeconds: TimeInterval = 30
 
     public let configuration: Configuration
     public let startedAt: Date
@@ -92,6 +100,9 @@ public struct MeetingEndMonitor: Sendable {
     private var sourceExited = false
     private var sourceInactiveSince: Date?
     private var silentSince: Date?
+    private var systemHeard = false
+    private var systemSilentSince: Date?
+    private var sourceInputInactiveSince: Date?
     private var screenLocked = false
     private var inputRouteLost = false
     private var stopReason: Reason?
@@ -108,6 +119,10 @@ public struct MeetingEndMonitor: Sendable {
         case .sourceExited: sourceExited = true
         case .sourceActive(let active): sourceInactiveSince = active ? nil : (sourceInactiveSince ?? time)
         case .audible(let audible): silentSince = audible ? nil : (silentSince ?? time)
+        case .systemAudible(let audible):
+            systemHeard = systemHeard || audible
+            systemSilentSince = audible || !systemHeard ? nil : (systemSilentSince ?? time)
+        case .sourceInputActive(let active): sourceInputInactiveSince = active ? nil : (sourceInputInactiveSince ?? time)
         case .screenLocked(let locked): screenLocked = locked
         case .inputRouteLost: if !isSnoozed(.inputRouteLost, at: time) { inputRouteLost = true }
         case .systemSleep: stopReason = stopReason ?? .systemSleep
@@ -133,12 +148,19 @@ public struct MeetingEndMonitor: Sendable {
             (.inputRouteLost, inputRouteLost),
             (.screenLocked, screenLocked),
             (.sourceInactive, !sourceExited && Self.held(since: sourceInactiveSince, for: inactiveThreshold, at: now)),
+            (.callEnded, !sourceExited && Self.held(since: callEndedSince, for: Self.callEndedSeconds, at: now)),
             (.silence, Self.held(since: silentSince, for: silenceThreshold, at: now)),
         ]
         for (reason, fired) in triggers where fired && !isSnoozed(reason, at: now) {
             return .promptStop(reason: reason, countdown: Self.promptCountdown)
         }
         return .none
+    }
+
+    /// When both call-ended conditions started holding.
+    private var callEndedSince: Date? {
+        guard let systemSilentSince, let sourceInputInactiveSince else { return nil }
+        return max(systemSilentSince, sourceInputInactiveSince)
     }
 
     private func isSnoozed(_ reason: Reason, at time: Date) -> Bool {

@@ -55,7 +55,8 @@ public final class ChannelWriter: @unchecked Sendable {
         /// Continuous trailing duration under -60 dBFS.
         public var micSilentSeconds: Double = 0
         public var systemSilentSeconds: Double = 0
-        /// System channel all zeros for 5 s while `isTargetPlayingOutput` reports output.
+        /// System channel all zeros since the start, for 5 s at least, while `isTargetPlayingOutput` reports output.
+        /// Zeros after sound mean the target went quiet (a call ended with its output still open), not a blocked tap.
         public var silentTapSuspected = false
         /// First write-path error; writing stops after it and `stop()` rethrows it.
         public var failure: ChannelWriterError?
@@ -357,7 +358,7 @@ public final class ChannelWriter: @unchecked Sendable {
     private func publishStats() {
         let mic = streams[RecordingSession.Channel.mic]
         let system = streams[RecordingSession.Channel.system]
-        let suspected = system.zeroFrames >= Self.silentTapFrames && (targetPlaying?() ?? false)
+        let suspected = !system.heard && system.zeroFrames >= Self.silentTapFrames && (targetPlaying?() ?? false)
         let frames = framesWritten
         statsLock.withLock {
             $0.framesWritten = frames
@@ -390,6 +391,8 @@ public final class ChannelWriter: @unchecked Sendable {
         var staged: [Float] = []
         private(set) var silentFrames = 0
         private(set) var zeroFrames = 0
+        /// A non-zero window was written: the tap delivers audio.
+        private(set) var heard = false
 
         private var converter: AVAudioConverter
         private var input: AVAudioPCMBuffer
@@ -509,6 +512,7 @@ public final class ChannelWriter: @unchecked Sendable {
                     vDSP_maxmgv(buffer.baseAddress! + offset, 1, &peak, vDSP_Length(n))
                     silentFrames = peak < ChannelWriter.silenceThreshold ? silentFrames + n : 0
                     zeroFrames = peak < ChannelWriter.zeroThreshold ? zeroFrames + n : 0
+                    heard = heard || peak >= ChannelWriter.zeroThreshold
                     offset += n
                 }
             }

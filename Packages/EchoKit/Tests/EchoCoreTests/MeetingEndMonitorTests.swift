@@ -31,6 +31,29 @@ struct MeetingEndMonitorTests {
         #expect(monitor.evaluate(now: at(100 + 600)) == .promptStop(reason: .silence, countdown: 15))
     }
 
+    @Test func systemQuietAfterSoundWithTheMeetingMicOffPromptsCallEnded() {
+        var monitor = monitor()
+        monitor.record(.sourceInputActive(true), at: start)
+        monitor.record(.systemAudible(true), at: at(10))
+        monitor.record(.systemAudible(false), at: at(100))
+        monitor.record(.sourceInputActive(false), at: at(110))
+        #expect(monitor.evaluate(now: at(110 + 29)) == MeetingEndMonitor.Action.none)
+        #expect(monitor.evaluate(now: at(110 + 30)) == .promptStop(reason: .callEnded, countdown: 15))
+    }
+
+    @Test func callEndedNeedsSoundFirstAndTheMeetingMicOff() {
+        var neverHeard = monitor()
+        neverHeard.record(.systemAudible(false), at: at(10))
+        neverHeard.record(.sourceInputActive(false), at: at(10))
+        #expect(neverHeard.evaluate(now: at(300)) == MeetingEndMonitor.Action.none)
+
+        var micStillOn = monitor()
+        micStillOn.record(.sourceInputActive(true), at: start)
+        micStillOn.record(.systemAudible(true), at: at(10))
+        micStillOn.record(.systemAudible(false), at: at(20))
+        #expect(micStillOn.evaluate(now: at(300)) == MeetingEndMonitor.Action.none)
+    }
+
     @Test func sleepStopsNow() {
         var monitor = monitor()
         monitor.record(.systemSleep, at: at(30))
