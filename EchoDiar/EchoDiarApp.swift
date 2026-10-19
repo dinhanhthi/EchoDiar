@@ -239,9 +239,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSMe
 
     @objc private func goBack() { model.goBack() }
 
+    /// Focuses the toolbar search of the current page (conversations, or settings on the Settings page).
     @objc private func showSearch() {
-        model.showSearch()
         showMainWindow()
+        model.showSearch()
     }
 
     /// Titles follow the recording; page items are enabled where they apply.
@@ -317,7 +318,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSMe
         viewMenu.addItem(withTitle: "Recordings", action: #selector(showLibrary), keyEquivalent: "2").target = self
         viewMenu.addItem(withTitle: "Chat", action: #selector(openChat), keyEquivalent: "i").target = self
         viewMenu.addItem(withTitle: "Back", action: #selector(goBack), keyEquivalent: "[").target = self
-        viewMenu.addItem(withTitle: "Search Conversations", action: #selector(showSearch), keyEquivalent: "f").target = self
+        viewMenu.addItem(withTitle: "Search", action: #selector(showSearch), keyEquivalent: "f").target = self
         let windowMenu = NSMenu(title: "Window")
         windowMenu.addItem(withTitle: "Close", action: #selector(NSWindow.performClose(_:)), keyEquivalent: "w")
         windowMenu.addItem(withTitle: "Minimize", action: #selector(NSWindow.performMiniaturize(_:)), keyEquivalent: "m")

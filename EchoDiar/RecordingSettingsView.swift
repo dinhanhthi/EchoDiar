@@ -18,7 +18,7 @@ struct RecordingSettingsView: View {
 
     @State private var tab = Tab.microphone
 
-    private enum Tab: CaseIterable {
+    private enum Tab: String, CaseIterable {
         case microphone, meetings, autoStop, afterRecording
 
         var title: LocalizedStringKey {
@@ -44,10 +44,19 @@ struct RecordingSettingsView: View {
             microphones = await Task.detached(priority: .utility) { InputDevice.all() }.value
         }
         .task { model.refreshInstalledModels() }
+        .onChange(of: model.pendingSettingsSubTab, initial: true) { showPendingTab() }
+        .onChange(of: model.settingsTab) { showPendingTab() }
         .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in
             // Back from System Settings.
             accessibilityTrusted = WindowAnchor.isTrusted
         }
+    }
+
+    /// Shows the inner tab a deep link asked for (`AppModel.openSettings(tab:subTab:)`) once this section is selected.
+    private func showPendingTab() {
+        guard model.settingsTab == .recording, let id = model.pendingSettingsSubTab, let pending = Tab(rawValue: id) else { return }
+        tab = pending
+        model.pendingSettingsSubTab = nil
     }
 
     private var microphoneSection: some View {

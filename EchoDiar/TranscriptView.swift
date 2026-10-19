@@ -347,11 +347,14 @@ struct TranscriptView: View {
         updated.speakerNames[speaker] = name.isEmpty ? nil : name
         transcript = updated
         let folder = conversation.folder
+        let id = conversation.id
+        let model = model
         Task.detached(priority: .utility) {
             do {
                 var stored = try Transcript.read(from: folder)
                 stored.speakerNames[speaker] = name.isEmpty ? nil : name
                 try stored.write(to: folder)
+                await model.transcriptEdited(id)
             } catch {
                 NSLog("EchoDiar: could not save the speaker name in \(folder.lastPathComponent): \(error)")
             }

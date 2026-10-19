@@ -16,7 +16,7 @@ struct StorageSettingsView: View {
     @State private var deleting = false
     @State private var tab = Tab.usage
 
-    private enum Tab: CaseIterable {
+    private enum Tab: String, CaseIterable {
         case usage, audio, autoDelete
 
         var title: LocalizedStringKey {
@@ -41,6 +41,8 @@ struct StorageSettingsView: View {
             case .autoDelete: autoDeleteSection
             }
         }
+        .onChange(of: model.pendingSettingsSubTab, initial: true) { showPendingTab() }
+        .onChange(of: model.settingsTab) { showPendingTab() }
         // Measured again after a deletion or a new conversation, and only while the tab is shown (it stays alive) on
         // the Settings page of the main window on screen.
         .task(id: UsageKey(visible: shown, library: libraryKey, models: model.installedModelsBytes)) {
@@ -87,6 +89,13 @@ struct StorageSettingsView: View {
 
     /// The Storage tab is selected on the Settings page and the main window is on screen.
     private var shown: Bool { model.route == .settings && model.settingsTab == .storage && model.mainWindowVisible }
+
+    /// Shows the inner tab a deep link asked for (`AppModel.openSettings(tab:subTab:)`) once this section is selected.
+    private func showPendingTab() {
+        guard model.settingsTab == .storage, let id = model.pendingSettingsSubTab, let pending = Tab(rawValue: id) else { return }
+        tab = pending
+        model.pendingSettingsSubTab = nil
+    }
 
     // MARK: - Usage
 

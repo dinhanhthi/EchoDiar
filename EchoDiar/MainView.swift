@@ -13,9 +13,10 @@ struct MainView: View {
     @State private var query = ""
     /// `query` once typing pauses for 200 ms (at once when cleared): what the cards are filtered by.
     @State private var debouncedQuery = ""
-    /// Transcript text by conversation for the search, read off the main thread only once a query is typed; read
-    /// again when the conversation's size changes (a new transcript). Released with the window.
-    @State private var transcriptTexts: [UUID: SearchText] = [:]
+    /// Searchable text by conversation (speakers, transcript, summary, chat), read off the main thread only once a
+    /// query is typed; read again when the conversation's size changes (a new transcript) or an AI job ends (a new
+    /// summary or chat). Released with the window.
+    @State private var searchDocuments: [UUID: SearchDocument] = [:]
     /// The search bar fills the toolbar in place of its buttons, from the Search button or ⌘F until it is closed.
     @State private var searchExpanded = false
     /// The window's width, which the search bar fills from its leading edge.
@@ -30,9 +31,19 @@ struct MainView: View {
     @State private var renamingTitle = false
     @State private var titleDraft = ""
 
-    private struct SearchText {
+    private struct SearchDocument {
         let size: Int64
-        let text: String
+        let jobsEnded: Int
+        let edits: Int
+        let document: ConversationSearch.Document
+    }
+
+    /// Reloads the search documents while a query is typed: the conversations changed, an AI job ended, or a
+    /// speaker was renamed.
+    private struct SearchLoadKey: Equatable {
+        let conversations: [Conversation]
+        let jobsEnded: Int
+        let transcriptEdits: [UUID: Int]
     }
 
     /// The pages that slide, left to right; moving between two conversations stays on the same page.
@@ -64,7 +75,7 @@ struct MainView: View {
                 switch Page(shownRoute) {
                 case .list: cardsPane.transition(pageTransition)
                 case .entry: entryPane.transition(pageTransition)
-                case .settings: SettingsView(model: model).transition(pageTransition)
+                case .settings: SettingsView(model: model, query: $query).transition(pageTransition)
                 }
             }
         }
@@ -77,11 +88,9 @@ struct MainView: View {
             }
             forward = Page(new).rawValue >= Page(old).rawValue
             withAnimation(Self.paneAnimation) { shownRoute = new }
-            // Settings has no search: entering it closes the bar and clears the query.
-            if new == .settings {
-                query = ""
-                searchExpanded = false
-            }
+            // The search is per page kind: conversations on the list and entries, settings on Settings. Entering or
+            // leaving Settings clears the query; the bar stays open.
+            if old == .settings || new == .settings { query = "" }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(Palette.windowBackground.ignoresSafeArea())
@@ -112,7 +121,12 @@ struct MainView: View {
             if !query.isEmpty { try? await Task.sleep(for: .milliseconds(200)) }
             if !Task.isCancelled { debouncedQuery = query }
         }
-        .task(id: debouncedQuery.isEmpty ? nil : model.conversations) { await loadTranscriptTexts() }
+        // Settings search filters the settings, not the library: no documents to read there.
+        .task(id: debouncedQuery.isEmpty || model.route == .settings
+                ? nil : SearchLoadKey(conversations: model.conversations, jobsEnded: model.aiJobsEnded,
+                                transcriptEdits: model.transcriptEdits)) {
+            await loadSearchDocuments()
+        }
         .onChange(of: model.searchPresented, initial: true) { _, presented in
             if presented { searchExpanded = true }
         }
@@ -147,12 +161,10 @@ struct MainView: View {
                         Label("Settings", systemImage: "slider.horizontal.3")
                     }
                     .help("Settings")
-                    if model.route != .settings {
-                        Button(action: model.showSearch) {
-                            Label("Search", systemImage: "magnifyingglass")
-                        }
-                        .help("Search conversations (⌘F)")
+                    Button(action: model.showSearch) {
+                        Label("Search", systemImage: "magnifyingglass")
                     }
+                    .help(model.route == .settings ? "Search settings (⌘F)" : "Search conversations (⌘F)")
                 }
             }
         }
@@ -502,7 +514,9 @@ struct MainView: View {
     private var searchBar: some View {
         ToolbarSearchBar(
             text: $query, focusRequest: searchPresented, windowWidth: windowWidth,
-            maxWidth: wide ? ToolbarSearchBar.wideWidth : nil
+            maxWidth: wide ? ToolbarSearchBar.wideWidth : nil,
+            accessibilityLabel: model.route == .settings
+                ? String(localized: "Search settings") : String(localized: "Search conversations")
         ) { frame in
             query = ""
             // The toolbar fades its buttons in, in an animated transaction, while the bar's ghost shrinks.
@@ -513,27 +527,48 @@ struct MainView: View {
 
     private var searchTerm: String { debouncedQuery.trimmingCharacters(in: .whitespacesAndNewlines) }
 
-    /// Conversations whose title or transcript contains the query (case and accent insensitive); all without one.
+    /// Conversations whose title, speakers, transcript, summary or chat contain the query (case and accent
+    /// insensitive), on the list and in the sidebar alike; all without one. Title only until a document is read.
     private var searchResults: [Conversation] {
         let term = searchTerm
         guard !term.isEmpty else { return model.conversations }
-        return model.conversations.filter {
-            $0.title.localizedStandardContains(term) || transcriptTexts[$0.id]?.text.localizedStandardContains(term) == true
+        return model.conversations.filter { conversation in
+            guard var document = searchDocuments[conversation.id]?.document else {
+                return conversation.title.localizedStandardContains(term)
+            }
+            // The current title: a rename does not change the size.
+            document.title = conversation.title
+            return document.matches(term)
         }
     }
 
-    /// Reads the transcripts not read yet, or changed since; titles match meanwhile.
-    private func loadTranscriptTexts() async {
-        let stale = model.conversations.filter { $0.hasTranscript && transcriptTexts[$0.id]?.size != $0.sizeBytes }
-        guard !debouncedQuery.isEmpty, !stale.isEmpty else { return }
+    /// Reads the documents not read yet, or stale (size changed, an AI job ended or a speaker was renamed since);
+    /// titles match meanwhile.
+    /// Missing transcript, summary or chat files leave their fields empty.
+    private func loadSearchDocuments() async {
+        let jobsEnded = model.aiJobsEnded
+        let transcriptEdits = model.transcriptEdits
+        let stale = model.conversations.filter { conversation in
+            guard conversation.hasTranscript else { return false }
+            let cached = searchDocuments[conversation.id]
+            return cached?.size != conversation.sizeBytes || cached?.jobsEnded != jobsEnded
+                || cached?.edits != transcriptEdits[conversation.id, default: 0]
+        }
+        guard !debouncedQuery.isEmpty, model.route != .settings, !stale.isEmpty else { return }
         let loaded = await Task.detached(priority: .utility) {
             stale.map { conversation in
-                let text = (try? Transcript.read(from: conversation.folder))?.segments.map(\.text).joined(separator: "\n")
-                return (conversation.id, SearchText(size: conversation.sizeBytes, text: text ?? ""))
+                let document = ConversationSearch.document(
+                    title: conversation.title,
+                    transcript: try? Transcript.read(from: conversation.folder),
+                    summary: Conversation.readSummary(from: conversation.folder),
+                    chat: ChatLog.read(from: conversation.folder))
+                return (conversation.id, SearchDocument(size: conversation.sizeBytes, jobsEnded: jobsEnded,
+                                                        edits: transcriptEdits[conversation.id, default: 0],
+                                                        document: document))
             }
         }.value
         guard !Task.isCancelled else { return }
-        for (id, text) in loaded { transcriptTexts[id] = text }
+        for (id, document) in loaded { searchDocuments[id] = document }
     }
 }
 
@@ -557,6 +592,8 @@ private struct ToolbarSearchBar: View {
     /// A fixed width after a flexible spacer (the bar then sits at the trailing edge); nil fills the toolbar from the
     /// bar's leading edge.
     let maxWidth: CGFloat?
+    /// The field's, which names what it searches.
+    let accessibilityLabel: String
     /// X or Escape, with the bar's frame in the window (top-left origin).
     let onClose: (CGRect) -> Void
     @State private var expanded = false
@@ -572,7 +609,9 @@ private struct ToolbarSearchBar: View {
                 .font(.body)
                 .imageScale(.large)
                 .frame(width: Self.height, height: Self.height)
-            SearchTextField(text: $text, focusRequest: $focusRequest, onEscape: close)
+            SearchTextField(
+                text: $text, focusRequest: $focusRequest, accessibilityLabel: accessibilityLabel, onEscape: close
+            )
                 .opacity(expanded ? 1 : 0)
             // As big as the Search button: its highlight fills the bar's end.
             Button(action: close) {
@@ -616,6 +655,7 @@ private struct SearchTextField: NSViewRepresentable {
     @Binding var text: String
     /// ⌘F sets it to focus the field; false again once asked.
     @Binding var focusRequest: Bool
+    let accessibilityLabel: String
     let onEscape: () -> Void
 
     func makeNSView(context: Context) -> Field {
@@ -626,13 +666,13 @@ private struct SearchTextField: NSViewRepresentable {
         field.usesSingleLineMode = true
         field.cell?.isScrollable = true
         field.placeholderString = String(localized: "Search")
-        field.setAccessibilityLabel("Search conversations")
         field.delegate = context.coordinator
         return field
     }
 
     func updateNSView(_ field: Field, context: Context) {
         context.coordinator.parent = self
+        field.setAccessibilityLabel(accessibilityLabel)
         if field.stringValue != text { field.stringValue = text }
         if focusRequest {
             // A new toolbar item may not be in the window yet: it focuses itself once it is.

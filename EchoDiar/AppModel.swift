@@ -62,6 +62,8 @@ final class AppModel {
     /// update.
     private(set) var keychainVersion = 0
     var settingsTab: SettingsTab = .general
+    /// The inner tab (its raw id) the Settings section `settingsTab` should show; its view clears it once shown.
+    var pendingSettingsSubTab: String?
     /// Running model downloads, by catalog id.
     private(set) var downloads: [String: ModelDownload] = [:]
     /// Last download error, by catalog id; cleared when a download of that id starts.
@@ -79,6 +81,8 @@ final class AppModel {
     private(set) var aiError: (conversationID: UUID, message: String)?
     /// Bumped when an AI job ends, so the AI tab reloads `summary.md` and `chat.json`.
     private(set) var aiJobsEnded = 0
+    /// Bumped per conversation when a speaker is renamed in `transcript.json`, so search rereads that document.
+    private(set) var transcriptEdits: [UUID: Int] = [:]
     /// Recording time of the last clicked citation, for the opened transcript.
     var pendingTranscriptTime: Double?
     /// The meeting app whose mic use was detected last (menu "Detected: Zoom"); nil once its mic is off.
@@ -835,6 +839,10 @@ final class AppModel {
 
     // MARK: - Library
 
+    func transcriptEdited(_ id: UUID) {
+        transcriptEdits[id, default: 0] += 1
+    }
+
     func renameConversation(_ id: UUID, to title: String) {
         Task {
             do {
@@ -934,6 +942,12 @@ final class AppModel {
         (NSApp.delegate as? AppDelegate)?.showMainWindow()
     }
 
+    /// `openSettings(tab:)` on the inner tab `subTab` of that section (a search result).
+    func openSettings(tab: SettingsTab?, subTab: String?) {
+        pendingSettingsSubTab = subTab
+        openSettings(tab: tab)
+    }
+
     /// Applies `change` and saves the settings file.
     func updateSettings(_ change: (inout AppSettings) -> Void) {
         var updated = settings
@@ -960,10 +974,9 @@ final class AppModel {
         OnboardingWindow.shared.show(model: self)
     }
 
-    /// ⌘F: the search field focused. The list, a conversation and the recording stay (the query filters the cards or
-    /// the sidebar); Settings goes to the list.
+    /// ⌘F: the search field focused, on the current page: the query filters the cards or the sidebar, or on Settings
+    /// the settings.
     func showSearch() {
-        if route == .settings { route = .list }
         searchPresented = true
     }
 

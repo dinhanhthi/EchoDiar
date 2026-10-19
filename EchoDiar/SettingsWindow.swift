@@ -25,6 +25,9 @@ enum SettingsTab: CaseIterable, Identifiable {
 /// is the selection, so `openSettings(tab:)` deep-links.
 struct SettingsView: View {
     @Bindable var model: AppModel
+    /// The toolbar's search query on this page: while not empty, the sidebar lists the sections with hits and the
+    /// detail shows the matching settings.
+    @Binding var query: String
     /// Sections opened so far: kept alive like TabView's tabs, so leaving AI & Cloud does not rerun its scans.
     @State private var opened: Set<SettingsTab> = []
     @FocusState private var sidebarFocused: Bool
@@ -32,7 +35,7 @@ struct SettingsView: View {
     var body: some View {
         HStack(spacing: 0) {
             List(selection: selection) {
-                ForEach(SettingsTab.allCases) { tab in
+                ForEach(visibleTabs) { tab in
                     Label(tab.label.title, systemImage: tab.label.icon).tag(tab)
                 }
             }
@@ -44,13 +47,14 @@ struct SettingsView: View {
             Divider()
             ZStack {
                 ForEach(SettingsTab.allCases.filter(opened.contains)) { tab in
-                    let selected = tab == model.settingsTab
+                    let selected = tab == model.settingsTab && !searching
                     content(tab)
                         .opacity(selected ? 1 : 0)
                         .allowsHitTesting(selected)
                         .disabled(!selected)
                         .accessibilityHidden(!selected)
                 }
+                if searching { SettingsSearchResults(model: model, query: $query) }
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
             .modifier(GlassForm())
@@ -59,9 +63,23 @@ struct SettingsView: View {
         .onChange(of: model.settingsTab, initial: true) { _, new in opened.insert(new) }
     }
 
-    /// Ignores deselection (a click in the empty sidebar): a section is always shown.
+    private var searching: Bool { !query.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }
+
+    /// Every section, or while searching only those with a matching setting.
+    private var visibleTabs: [SettingsTab] {
+        guard searching else { return SettingsTab.allCases }
+        let hits = Set(SettingsSearchItem.all.filter { $0.matches(query) }.map(\.tab))
+        return SettingsTab.allCases.filter(hits.contains)
+    }
+
+    /// Ignores deselection (a click in the empty sidebar): a section is always shown. While searching nothing is
+    /// highlighted, and picking a section clears the search and opens it.
     private var selection: Binding<SettingsTab?> {
-        Binding(get: { model.settingsTab }, set: { if let tab = $0 { model.settingsTab = tab } })
+        Binding(get: { searching ? nil : model.settingsTab }, set: {
+            guard let tab = $0 else { return }
+            query = ""
+            model.settingsTab = tab
+        })
     }
 
     @ViewBuilder

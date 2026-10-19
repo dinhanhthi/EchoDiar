@@ -13,7 +13,7 @@ struct ProvidersSettingsView: View {
     @State private var cliStatus: [CLIPreset: CLIStatus] = [:]
     @State private var tab = Tab.onThisMac
 
-    private enum Tab: CaseIterable {
+    private enum Tab: String, CaseIterable {
         case onThisMac, cloudAPIs, speechToText, cli
 
         var title: LocalizedStringKey {
@@ -78,10 +78,19 @@ struct ProvidersSettingsView: View {
         }
         .task { await scan() }
         .task { model.refreshInstalledModels() }
+        .onChange(of: model.pendingSettingsSubTab, initial: true) { showPendingTab() }
+        .onChange(of: model.settingsTab) { showPendingTab() }
         .task {
             // Once per window: the first PATH lookup runs the login shell (~4 s) and each check spawns `--version`.
             if cliStatus.isEmpty { CLIPreset.allCases.forEach(detect) }
         }
+    }
+
+    /// Shows the inner tab a deep link asked for (`AppModel.openSettings(tab:subTab:)`) once this section is selected.
+    private func showPendingTab() {
+        guard model.settingsTab == .providers, let id = model.pendingSettingsSubTab, let pending = Tab(rawValue: id) else { return }
+        tab = pending
+        model.pendingSettingsSubTab = nil
     }
 
     private func configs(_ isIncluded: (ProviderConfig) -> Bool) -> [ProviderConfig] {

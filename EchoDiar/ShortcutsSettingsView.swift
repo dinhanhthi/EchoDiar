@@ -13,7 +13,7 @@ struct ShortcutsSettingsView: View {
         ("Show the recording", "⌘1"),
         ("Show the recordings list", "⌘2"),
         ("Open the chat of the open conversation", "⌘I"),
-        ("Search conversations", "⌘F"),
+        ("Search conversations or settings", "⌘F"),
         ("Settings", "⌘,"),
         ("Back", "⌘[ / Esc"),
         ("Play / Pause the transcript audio", "Space"),

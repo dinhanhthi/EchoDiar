@@ -16,6 +16,20 @@ struct ModelsSettingsView: View {
 
         static let allCases: [Tab] = [.general] + ModelEntry.Tier.allCases.map(Tab.tier) + [.cloud]
 
+        /// The stable id deep links use: "general", "tier-<tier>", "cloud".
+        var id: String {
+            switch self {
+            case .general: "general"
+            case .tier(let tier): "tier-\(tier.rawValue)"
+            case .cloud: "cloud"
+            }
+        }
+
+        init?(id: String) {
+            guard let tab = Self.allCases.first(where: { $0.id == id }) else { return nil }
+            self = tab
+        }
+
         var title: LocalizedStringKey {
             switch self {
             case .general: "General"
@@ -52,6 +66,15 @@ struct ModelsSettingsView: View {
             .padding(.bottom, 12)
         }
         .task { model.refreshInstalledModels() }
+        .onChange(of: model.pendingSettingsSubTab, initial: true) { showPendingTab() }
+        .onChange(of: model.settingsTab) { showPendingTab() }
+    }
+
+    /// Shows the inner tab a deep link asked for (`AppModel.openSettings(tab:subTab:)`) once this section is selected.
+    private func showPendingTab() {
+        guard model.settingsTab == .transcription, let id = model.pendingSettingsSubTab, let pending = Tab(id: id) else { return }
+        tab = pending
+        model.pendingSettingsSubTab = nil
     }
 
     private var generalSection: some View {
