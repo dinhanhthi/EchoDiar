@@ -6,7 +6,8 @@ import Testing
 struct SettingsStoreTests {
     @Test func saveThenLoadRoundTrips() throws {
         try withTemporaryStore { store in
-            let settings = AppSettings(launchAtLogin: true, defaultLanguage: "fr")
+            let settings = AppSettings(
+                launchAtLogin: true, defaultLanguage: "fr", pillWindowOffset: PillPosition(x: -40, y: -12))
             try store.save(settings)
             #expect(store.load() == settings)
         }

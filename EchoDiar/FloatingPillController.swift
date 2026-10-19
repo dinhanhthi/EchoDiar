@@ -6,7 +6,8 @@ import SwiftUI
 /// Shows while recording (unless "Show floating indicator" is off, or an EchoDiar window is key and
 /// `hidePillWhenAppActive` is on) and for every prompt, which must stay answerable. Its top-right corner stays put
 /// while its content grows or shrinks. Dragged positions are saved per display (default: the top-right edge); with
-/// "Attach to meeting window" and Accessibility it sits at the meeting window's top-right corner instead.
+/// "Attach to meeting window" and Accessibility it follows the meeting window instead, where it was dragged relative
+/// to the window's top-right corner (default: just inside it).
 @MainActor
 final class FloatingPillController {
     /// Gap between the pill and the screen edge or the meeting window's corner.
@@ -21,6 +22,9 @@ final class FloatingPillController {
     private var anchor: WindowAnchor?
     /// The meeting window's frame while anchored and it has one.
     private var anchorFrame: CGRect?
+    /// The pill's top-right corner from the meeting window's while anchored, set at once by a drag (its save is
+    /// delayed); nil = `inset` inside it.
+    private var windowOffset: PillPosition?
     private var placing = false
     /// The next `place` starts from the saved spot; otherwise it keeps the current top-right corner, so a drag whose
     /// save is still pending is not undone.
@@ -126,14 +130,15 @@ final class FloatingPillController {
 
     // MARK: - Placement
 
-    /// The top-right corner at the anchored window's top-right, else where it is, else (when shown) at the saved spot
-    /// of the pill's display (default: its top-right edge); clamped into that display's visible frame.
+    /// The top-right corner at its offset from the anchored window's top-right, else where it is, else (when shown) at
+    /// the saved spot of the pill's display (default: its top-right edge); clamped into that display's visible frame.
     private func place() {
         guard hosting != nil, let screen = anchorFrame.flatMap(Self.screen(containing:)) ?? currentScreen else { return }
         let visible = screen.visibleFrame
         let corner: CGPoint
         if let window = anchorFrame {
-            corner = CGPoint(x: window.maxX - Self.inset, y: window.maxY - Self.inset)
+            let offset = windowOffset ?? PillPosition(x: -Self.inset, y: -Self.inset)
+            corner = CGPoint(x: window.maxX + offset.x, y: window.maxY + offset.y)
         } else if !restoreSaved {
             corner = CGPoint(x: panel.frame.maxX, y: panel.frame.maxY)
         } else if let key = Self.displayKey(screen), let saved = model.settings.pillPositions[key] {
@@ -156,10 +161,12 @@ final class FloatingPillController {
         Self.screen(containing: panel.frame) ?? NSScreen.main ?? NSScreen.screens.first
     }
 
-    /// A drag by the user (not `place`), saved 0.5 s after the last move; anchored pills snap back instead.
+    /// A drag by the user (not `place`), saved 0.5 s after the last move; anchored pills keep it relative to the window.
     private func panelMoved() {
         guard !placing else { return }
-        if anchorFrame != nil { return place() }
+        if let window = anchorFrame {
+            windowOffset = PillPosition(x: panel.frame.maxX - window.maxX, y: panel.frame.maxY - window.maxY)
+        }
         saveTask?.cancel()
         saveTask = Task { [weak self] in
             try? await Task.sleep(for: .milliseconds(500))
@@ -169,6 +176,9 @@ final class FloatingPillController {
     }
 
     private func savePosition() {
+        if anchorFrame != nil {
+            return model.updateSettings { [windowOffset] in $0.pillWindowOffset = windowOffset }
+        }
         guard let screen = currentScreen, let key = Self.displayKey(screen) else { return }
         let visible = screen.visibleFrame
         let frame = panel.frame
@@ -202,6 +212,7 @@ final class FloatingPillController {
         anchor = nil
         anchorFrame = nil
         if let pid {
+            windowOffset = model.settings.pillWindowOffset
             // Reports the window's frame at once, which places the pill.
             anchor = WindowAnchor(pid: pid) { [weak self] frame in
                 self?.anchorFrame = frame

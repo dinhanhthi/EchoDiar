@@ -47,6 +47,8 @@ public struct AppSettings: Codable, Equatable, Sendable {
     public var hidePillWhenAppActive: Bool
     /// Keep the pill at the meeting window's top-right corner (needs Accessibility).
     public var attachPillToWindow: Bool
+    /// Where the attached pill was dragged, from the meeting window's top-right corner; nil = just inside it.
+    public var pillWindowOffset: PillPosition?
     /// Auto-stop thresholds.
     public var endMonitor: MeetingEndMonitor.Configuration
     /// What losing the recording microphone does.
@@ -92,6 +94,7 @@ public struct AppSettings: Codable, Equatable, Sendable {
         showPill: Bool = true,
         hidePillWhenAppActive: Bool = false,
         attachPillToWindow: Bool = false,
+        pillWindowOffset: PillPosition? = nil,
         endMonitor: MeetingEndMonitor.Configuration = MeetingEndMonitor.Configuration(),
         routeChangeBehavior: RouteChangeBehavior = .ask,
         autoTranscribe: Bool = true,
@@ -125,6 +128,7 @@ public struct AppSettings: Codable, Equatable, Sendable {
         self.showPill = showPill
         self.hidePillWhenAppActive = hidePillWhenAppActive
         self.attachPillToWindow = attachPillToWindow
+        self.pillWindowOffset = pillWindowOffset
         self.endMonitor = endMonitor
         self.routeChangeBehavior = routeChangeBehavior
         self.autoTranscribe = autoTranscribe
@@ -146,7 +150,7 @@ public struct AppSettings: Codable, Equatable, Sendable {
         case onboardingCompleted, liveTranscript, liveTranscriptEngine, defaultASRModelID, providers
         case cloudSTTConfirmed, defaultAIProviderID, defaultAIModel, summaryLanguage
         case micDeviceUID, meetingDetection, perAppBehavior, pillPositions, showPill, hidePillWhenAppActive
-        case attachPillToWindow, endMonitor, routeChangeBehavior
+        case attachPillToWindow, pillWindowOffset, endMonitor, routeChangeBehavior
         case autoTranscribe, speakerCountHint, deferTranscriptionWhenConstrained
         case autoDeleteEnabled, autoDeleteAfterDays, autoDeleteMode, deleteAudioAfterTranscription
         case globalHotKey, globalHotKeyEnabled
@@ -177,6 +181,7 @@ public struct AppSettings: Codable, Equatable, Sendable {
         showPill = try container.decodeIfPresent(Bool.self, forKey: .showPill) ?? true
         hidePillWhenAppActive = try container.decodeIfPresent(Bool.self, forKey: .hidePillWhenAppActive) ?? false
         attachPillToWindow = try container.decodeIfPresent(Bool.self, forKey: .attachPillToWindow) ?? false
+        pillWindowOffset = try container.decodeIfPresent(PillPosition.self, forKey: .pillWindowOffset)
         endMonitor = try container.decodeIfPresent(MeetingEndMonitor.Configuration.self, forKey: .endMonitor)
             ?? MeetingEndMonitor.Configuration()
         routeChangeBehavior = try container.decodeIfPresent(RouteChangeBehavior.self, forKey: .routeChangeBehavior) ?? .ask
@@ -253,7 +258,8 @@ public struct HotKey: Codable, Equatable, Sendable {
     }
 }
 
-/// The pill's top-right corner, in points from the top-right corner of its display's visible frame (x, y ≤ 0).
+/// The pill's top-right corner, in points from the top-right corner of its display's visible frame (x, y ≤ 0) or,
+/// for `pillWindowOffset`, of the meeting window.
 public struct PillPosition: Codable, Equatable, Sendable {
     public var x: Double
     public var y: Double
