@@ -77,8 +77,8 @@ struct SettingsView: View {
             .frame(width: 200)
             // A raised card like the toolbar's capsules, instead of a divider beside the sections.
             .modifier(GlassCard(cornerRadius: 20, raised: true))
-            // Less on top: the toolbar's own bottom inset already sits above it.
-            .padding(.top, 4)
+            // On top as far as a grouped form's first section, so the card and the form start level.
+            .padding(.top, 20)
             .padding([.leading, .bottom], 12)
             ZStack {
                 ForEach(SettingsTab.allCases.filter(opened.contains)) { tab in
