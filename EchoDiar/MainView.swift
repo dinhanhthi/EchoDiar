@@ -332,7 +332,7 @@ private struct ToolbarSearchBar: View {
     /// From the window's trailing edge, like the toolbar's buttons.
     static let trailingInset: CGFloat = 8
     /// Growing and shrinking.
-    static let animation = Animation.snappy(duration: 3)
+    static let animation = Animation.snappy(duration: 0.3)
 
     @Binding var text: String
     /// ⌘F sets it to focus the field; false again once focused.
@@ -476,7 +476,8 @@ private struct SearchBarGhost: View {
             .frame(width: frame.height, height: frame.height)
             .frame(width: collapsed ? frame.height : frame.width, alignment: .leading)
             .modifier(GlassCard(cornerRadius: frame.height / 2))
-            .opacity(collapsed ? 0 : 1)
+            // Seen while it shrinks, gone as it reaches the Search button.
+            .animation(.easeIn(duration: 0.3)) { $0.opacity(collapsed ? 0 : 1) }
             .frame(width: frame.width, alignment: .trailing)
             .offset(x: frame.minX, y: frame.minY)
             .onAppear {
