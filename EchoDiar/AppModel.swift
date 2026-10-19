@@ -85,6 +85,10 @@ final class AppModel {
     /// The app whose detection ("Always") started the recording: the pill shows "Recording <App>" for its first
     /// 10 s even when the indicator is hidden.
     private(set) var autoStartedAppName: String?
+    /// Why the global record shortcut could not be registered; nil when registered or off.
+    private(set) var hotKeyError: String?
+    /// ⌘F asks the main window's search field to take the focus; false again once it stops editing.
+    var searchPresented = false
 
     enum PillPrompt: Equatable {
         case meetingDetected(DetectedMeeting)
@@ -192,6 +196,10 @@ final class AppModel {
     @ObservationIgnored private var endWatch: EndWatch?
     @ObservationIgnored private var endWatchGeneration = 0
     @ObservationIgnored private var autoStartNoticeTask: Task<Void, Never>?
+    /// Created on the normal launch path only (not for the DEBUG harnesses).
+    @ObservationIgnored private var hotKey: GlobalHotKey?
+    /// The Shortcuts tab is recording a new shortcut: the current one is unregistered meanwhile.
+    @ObservationIgnored private var hotKeyCapturing = false
 
     init(store: SettingsStore = SettingsStore()) {
         self.store = store
@@ -237,6 +245,8 @@ final class AppModel {
         #endif
         guard ProcessInfo.processInfo.arguments.allSatisfy({ !Self.harnessArguments.contains($0) }) else { return }
         if !settings.onboardingCompleted { OnboardingWindow.shared.show(model: self) }
+        hotKey = GlobalHotKey { [weak self] in self?.toggleRecording() }
+        syncHotKey()
         observeTranscriptions()
         startMeetingServices()
         Task {
@@ -254,6 +264,7 @@ final class AppModel {
             } else {
                 compress(folders)
             }
+            syncRetention()
         }
     }
 
@@ -506,10 +517,12 @@ final class AppModel {
 
     // MARK: - Transcription
 
-    /// Queues the folder once compression is done; a failed compression leaves the CAF, which is used instead.
+    /// Queues the folder once compression is done, when "auto-transcribe after stop" is on; a failed compression
+    /// leaves the CAF, which is used instead.
     /// Skipped when the folder has no usable audio or session, already has a transcript, or its last transcription
     /// failed (a compression that keeps failing is retried at every launch; the card's "Failed — Retry" retries).
     private func transcribe(after result: CompressionResult) {
+        guard settings.autoTranscribe else { return }
         switch result.failure {
         case .sessionUnreadable?, .stillRecording?, .unsafeAudioFileName?, .sourceUnreadable?: return
         default: break
@@ -572,7 +585,9 @@ final class AppModel {
         let job = TranscriptionJob(
             conversationID: session.id, folder: folder,
             systemFileName: session.audioFileName == AudioCompressor.micFileName ? AudioCompressor.systemFileName : nil,
-            engineID: engineID ?? preferred, language: language)
+            engineID: engineID ?? preferred, language: language,
+            // Per job rather than a re-created pipeline: the pipeline and its progress stream live as long as the app.
+            processNow: !settings.deferTranscriptionWhenConstrained, speakerCountHint: settings.speakerCountHint)
         transcriptionErrors[session.id] = nil
         // Set now so the card leaves its button before the pipeline's first event arrives.
         transcriptionProgress[session.id] = JobProgress(conversationID: session.id, step: .queued, fraction: 0)
@@ -580,6 +595,7 @@ final class AppModel {
         Task {
             do {
                 _ = try await pipeline.transcribe(job, cloud: cloud)
+                if settings.deleteAudioAfterTranscription { await deleteAudio(of: session.id) }
             } catch TranscriptionError.cloud(let provider, let reason) {
                 // The kind only ("HTTP 400", "invalid API key"): the reason can quote the provider's error body.
                 let kind = reason.prefix { $0 != ":" }
@@ -808,6 +824,73 @@ final class AppModel {
         }
     }
 
+    /// Moves the conversation's audio to the Trash; its transcript, summary and chat stay.
+    func deleteAudio(of id: UUID) async {
+        do {
+            try await library.deleteAudio(id: id)
+        } catch {
+            NSLog("EchoDiar: could not delete the audio of conversation \(id): \(error)")
+        }
+    }
+
+    // MARK: - Auto-delete
+
+    /// Conversations auto-delete would move to the Trash now with `settings` (Storage tab preview), from the cached
+    /// library (no rescan); off the main thread, since audio only lists each candidate's folder.
+    func retentionPreview(settings: AppSettings) async -> [RetentionPolicy.Deletion] {
+        let busy = busyConversationIDs
+        let candidates = conversations.filter { !busy.contains($0.id) }
+        return await Task.detached(priority: .utility) {
+            RetentionPolicy.select(conversations: candidates, now: Date(), settings: settings)
+        }.value
+    }
+
+    /// Bytes on disk by kind and the largest conversations (Storage tab).
+    func storageUsage() async -> LibraryStore.Usage {
+        await library.usage { [modelStore] in modelStore.totalSize() }
+    }
+
+    /// Conversations with a queued or running transcription, a pending cloud confirmation, or an AI job.
+    private var busyConversationIDs: Set<UUID> {
+        var ids = Set(transcriptionProgress.keys).union(pendingCloudRuns.map(\.conversationID))
+        if let id = aiJob?.conversationID { ids.insert(id) }
+        return ids
+    }
+
+    /// Auto-delete on: schedules the daily run and runs it once now (launch, or when turned on). Off: stops it.
+    /// Reads the setting when it runs, so quick toggles end in the last state.
+    private func syncRetention() {
+        Task {
+            guard settings.autoDeleteEnabled else {
+                await library.stopRetentionSchedule()
+                return
+            }
+            await library.startRetentionSchedule { [weak self] in await self?.runRetention() }
+            await runRetention()
+        }
+    }
+
+    private func runRetention() async {
+        guard settings.autoDeleteEnabled else { return }
+        let done = await library.applyRetention(settings: settings) { [weak self] id in
+            await self?.isBusy(id) ?? true
+        }
+        for deletion in done where deletion.mode == .wholeConversation {
+            if selectedConversationID == deletion.conversationID { selectedConversationID = nil }
+            if openedConversationID == deletion.conversationID { openedConversationID = nil }
+        }
+    }
+
+    /// Asked by auto-delete right before each deletion.
+    private func isBusy(_ id: UUID) -> Bool {
+        busyConversationIDs.contains(id)
+    }
+
+    /// Storage tab: moves the audio of these conversations to the Trash, skipping any that got a job meanwhile.
+    func deleteAudio(of ids: [UUID]) async {
+        for id in ids where !isBusy(id) { await deleteAudio(of: id) }
+    }
+
     // MARK: - Settings
 
     func openSettings(tab: SettingsTab) {
@@ -821,6 +904,9 @@ final class AppModel {
         change(&updated)
         guard updated != settings else { return }
         let detectionChanged = updated.meetingDetection != settings.meetingDetection
+        let retentionChanged = updated.autoDeleteEnabled != settings.autoDeleteEnabled
+        let hotKeyChanged = updated.globalHotKey != settings.globalHotKey
+            || updated.globalHotKeyEnabled != settings.globalHotKeyEnabled
         settings = updated
         do {
             try store.save(updated)
@@ -828,6 +914,36 @@ final class AppModel {
             NSLog("EchoDiar: could not save settings: \(error)")
         }
         if detectionChanged { syncMeetingDetection() }
+        if retentionChanged { syncRetention() }
+        if hotKeyChanged { syncHotKey() }
+    }
+
+    /// "Show onboarding again" in General: the first-run window from its first step.
+    func showOnboarding() {
+        updateSettings { $0.onboardingCompleted = false }
+        OnboardingWindow.shared.show(model: self)
+    }
+
+    /// ⌘F: the library with the search field focused.
+    func showSearch() {
+        selectedTab = .library
+        openedConversationID = nil
+        searchPresented = true
+    }
+
+    // MARK: - Global shortcut
+
+    /// While the Shortcuts tab records a new shortcut, the current one is unregistered so it reaches the recorder.
+    func setHotKeyCapture(_ capturing: Bool) {
+        hotKeyCapturing = capturing
+        syncHotKey()
+    }
+
+    /// Registers `globalHotKey` when it is on (and not being recorded), else unregisters it.
+    private func syncHotKey() {
+        guard let hotKey else { return }
+        let key = settings.globalHotKeyEnabled && !hotKeyCapturing ? settings.globalHotKey : nil
+        hotKeyError = hotKey.register(key)
     }
 
     // MARK: - AI providers

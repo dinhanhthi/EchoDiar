@@ -44,6 +44,7 @@ targets:
         INFOPLIST_FILE: EchoDiar/Info.plist
         CODE_SIGN_ENTITLEMENTS: EchoDiar/EchoDiar.entitlements
         INFOPLIST_KEY_LSUIElement: YES
+        INFOPLIST_KEY_NSHumanReadableCopyright: "© 2026 Anh-Thi Dinh"
         SWIFT_VERSION: "5.0"
         SWIFT_STRICT_CONCURRENCY: complete
         DISABLE_MANUAL_TARGET_ORDER_BUILD_WARNING: YES

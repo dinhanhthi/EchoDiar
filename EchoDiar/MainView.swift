@@ -9,6 +9,17 @@ struct MainView: View {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     /// False while the window is hidden, minimized or covered, so the header stops its timers.
     @State private var windowVisible = true
+    @State private var query = ""
+    /// `query` once typing pauses for 200 ms (at once when cleared): what the cards are filtered by.
+    @State private var debouncedQuery = ""
+    /// Transcript text by conversation for the search, read off the main thread only once a query is typed; read
+    /// again when the conversation's size changes (a new transcript). Released with the window.
+    @State private var transcriptTexts: [UUID: SearchText] = [:]
+
+    private struct SearchText {
+        let size: Int64
+        let text: String
+    }
 
     init(model: AppModel) {
         self.model = model
@@ -33,11 +44,17 @@ struct MainView: View {
                 case .ai: aiPane.transition(paneTransition(from: .trailing))
                 }
             }
+            // Whoever switches the pane (toolbar, menu, card, citation), it moves the same way.
+            .animation(Self.paneAnimation, value: model.selectedTab)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(WindowGlass().ignoresSafeArea())
-        .background(shortcutButtons)
         .frame(minWidth: 440, minHeight: 480)
+        .task(id: query) {
+            if !query.isEmpty { try? await Task.sleep(for: .milliseconds(200)) }
+            if !Task.isCancelled { debouncedQuery = query }
+        }
+        .task(id: debouncedQuery.isEmpty ? nil : model.conversations) { await loadTranscriptTexts() }
         .toolbar {
             // In a narrow window the other buttons go to the overflow menu first.
             if #available(macOS 26.1, *) {
@@ -59,8 +76,16 @@ struct MainView: View {
                 Button(action: toggleAI) {
                     Label(model.selectedTab == .ai ? "Library" : "AI", systemImage: "sparkles")
                 }
-                .keyboardShortcut("i", modifiers: .command)
                 .help(model.selectedTab == .ai ? "Show the library (⌘I)" : "Show the AI pane (⌘I)")
+            }
+            // Its own capsule, after Settings and AI.
+            if #available(macOS 26, *) {
+                ToolbarSpacer(.fixed)
+            }
+            ToolbarItem {
+                ToolbarSearchField(text: $query, focused: searchPresented, prompt: "Search")
+                    .frame(width: ToolbarSearchField.width)
+                    .help("Search conversations (⌘F)")
             }
         }
         .task { model.refreshTargets() }
@@ -93,13 +118,20 @@ struct MainView: View {
     }
 
     /// While idle, one Record split button whose chevron picks the target and the language; while recording,
-    /// Stop and Pause/Resume in one group, like Settings and AI. ⌘R and ⇧⌘P come from `shortcutButtons`.
+    /// Stop (red, pulsing unless paused or Reduce Motion) and Pause/Resume in one group, like Settings and AI. ⌘R and
+    /// ⇧⌘P come from the main menu.
     @ToolbarContentBuilder private var recordItem: some ToolbarContent {
         if model.isRecording {
             let paused = model.snapshot.state == .paused
             ToolbarItemGroup(placement: .navigation) {
                 Button(action: model.toggleRecording) {
-                    Label("Stop", systemImage: "stop.circle")
+                    Label {
+                        Text("Stop")
+                    } icon: {
+                        Image(systemName: "stop.circle.fill")
+                            .foregroundStyle(.red)
+                            .symbolEffect(.pulse, isActive: !paused && !reduceMotion && windowVisible)
+                    }
                 }
                 .disabled(model.isStarting)
                 .help("Stop recording (⌘R)")
@@ -134,22 +166,6 @@ struct MainView: View {
         }
     }
 
-    /// Hidden buttons for ⌘R (Record/Stop) and ⇧⌘P (Pause/Resume, only while recording), since a
-    /// shortcut on `Menu(primaryAction:)` is not reliable.
-    private var shortcutButtons: some View {
-        ZStack {
-            Button("Record or stop", action: model.toggleRecording)
-                .keyboardShortcut("r", modifiers: .command)
-                .disabled(model.isStarting)
-            Button("Pause or resume", action: model.togglePause)
-                .keyboardShortcut("p", modifiers: [.command, .shift])
-                .disabled(!model.isRecording)
-        }
-        .frame(width: 0, height: 0)
-        .opacity(0)
-        .accessibilityHidden(true)
-    }
-
     /// Checked when `target` is the selected one; matched by app, since process lists change.
     private func targetBinding(_ target: CaptureTarget) -> Binding<Bool> {
         Binding(
@@ -173,10 +189,11 @@ struct MainView: View {
     }
 
     private func toggleAI() {
-        withAnimation(.snappy) {
-            model.selectedTab = model.selectedTab == .ai ? .library : .ai
-        }
+        model.selectedTab = model.selectedTab == .ai ? .library : .ai
     }
+
+    /// The pane switches: Library, transcript, AI.
+    private static let paneAnimation = Animation.snappy(duration: 0.25)
 
     /// A slide from `edge` with a fade; only the fade with Reduce Motion.
     private func paneTransition(from edge: Edge) -> AnyTransition {
@@ -194,6 +211,7 @@ struct MainView: View {
                 cardsPane.transition(paneTransition(from: .leading))
             }
         }
+        .animation(Self.paneAnimation, value: model.openedConversationID)
     }
 
     /// nil when none is opened or it was deleted.
@@ -202,25 +220,134 @@ struct MainView: View {
     }
 
     @ViewBuilder private var cardsPane: some View {
-        let groups = DayGroup.groups(from: model.conversations)
-        if groups.isEmpty {
-            GlassCards {
-                Text("No conversations yet — press ⌘R to record")
-                    .foregroundStyle(.secondary)
-                    .padding(.horizontal, 20)
-                    .padding(.vertical, 16)
-                    .modifier(GlassCard(cornerRadius: 20))
-            }
-            .padding(12)
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
+        let groups = DayGroup.groups(from: searchResults)
+        if model.conversations.isEmpty {
+            emptyState("No conversations yet — press ⌘R to record")
+        } else if groups.isEmpty {
+            emptyState("No conversations match \"\(searchTerm)\"")
         } else {
             ConversationListView(model: model, groups: groups)
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
     }
 
+    private func emptyState(_ text: String) -> some View {
+        GlassCards {
+            Text(text)
+                .foregroundStyle(.secondary)
+                .multilineTextAlignment(.center)
+                .padding(.horizontal, 20)
+                .padding(.vertical, 16)
+                .modifier(GlassCard(cornerRadius: 20))
+        }
+        .padding(12)
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+    }
+
+    // MARK: - Search
+
+    private var searchPresented: Binding<Bool> {
+        Binding(get: { model.searchPresented }, set: { model.searchPresented = $0 })
+    }
+
+    private var searchTerm: String { debouncedQuery.trimmingCharacters(in: .whitespacesAndNewlines) }
+
+    /// Conversations whose title or transcript contains the query (case and accent insensitive); all without one.
+    private var searchResults: [Conversation] {
+        let term = searchTerm
+        guard !term.isEmpty else { return model.conversations }
+        return model.conversations.filter {
+            $0.title.localizedStandardContains(term) || transcriptTexts[$0.id]?.text.localizedStandardContains(term) == true
+        }
+    }
+
+    /// Reads the transcripts not read yet, or changed since; titles match meanwhile.
+    private func loadTranscriptTexts() async {
+        let stale = model.conversations.filter { $0.hasTranscript && transcriptTexts[$0.id]?.size != $0.sizeBytes }
+        guard !debouncedQuery.isEmpty, !stale.isEmpty else { return }
+        let loaded = await Task.detached(priority: .utility) {
+            stale.map { conversation in
+                let text = (try? Transcript.read(from: conversation.folder))?.segments.map(\.text).joined(separator: "\n")
+                return (conversation.id, SearchText(size: conversation.sizeBytes, text: text ?? ""))
+            }
+        }.value
+        guard !Task.isCancelled else { return }
+        for (id, text) in loaded { transcriptTexts[id] = text }
+    }
+
     private var aiPane: some View {
         AIPanelView(model: model)
+    }
+}
+
+/// The main window's search field. A fixed width (not `.searchable`): the system search item widens when focused and
+/// pushed Record, Settings and AI into the toolbar's overflow menu in the 440 pt wide window. 140 pt leaves about
+/// 28 pt to spare there (measured on macOS 27).
+private struct ToolbarSearchField: NSViewRepresentable {
+    static let width: CGFloat = 140
+
+    @Binding var text: String
+    /// ⌘F sets it to focus the field; false again once editing ends.
+    @Binding var focused: Bool
+    let prompt: String
+
+    func makeNSView(context: Context) -> Field {
+        let field = Field()
+        field.placeholderString = prompt
+        field.setAccessibilityLabel("Search conversations")
+        field.delegate = context.coordinator
+        field.target = context.coordinator
+        field.action = #selector(Coordinator.searched(_:))
+        return field
+    }
+
+    func updateNSView(_ field: Field, context: Context) {
+        context.coordinator.parent = self
+        if field.stringValue != text { field.stringValue = text }
+        if focused, field.currentEditor() == nil {
+            // A new window may not hold the field yet: it focuses itself once it does.
+            field.focusInWindow = true
+            DispatchQueue.main.async { field.focusIfInWindow() }
+        }
+    }
+
+    func makeCoordinator() -> Coordinator { Coordinator(parent: self) }
+
+    final class Field: NSSearchField {
+        var focusInWindow = false
+
+        override func viewDidMoveToWindow() {
+            super.viewDidMoveToWindow()
+            focusIfInWindow()
+        }
+
+        func focusIfInWindow() {
+            guard focusInWindow, let window else { return }
+            focusInWindow = false
+            window.makeFirstResponder(self)
+        }
+    }
+
+    @MainActor final class Coordinator: NSObject, NSSearchFieldDelegate {
+        var parent: ToolbarSearchField
+
+        init(parent: ToolbarSearchField) {
+            self.parent = parent
+        }
+
+        func controlTextDidChange(_ notification: Notification) {
+            guard let field = notification.object as? NSSearchField else { return }
+            parent.text = field.stringValue
+        }
+
+        /// Also the clear button and Escape, which change the text without `controlTextDidChange`.
+        @objc func searched(_ field: NSSearchField) {
+            if parent.text != field.stringValue { parent.text = field.stringValue }
+        }
+
+        func controlTextDidEndEditing(_ notification: Notification) {
+            parent.focused = false
+        }
     }
 }
 

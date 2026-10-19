@@ -1,6 +1,5 @@
 import AppKit
 import EchoCore
-import ServiceManagement
 import SwiftUI
 
 /// The Settings window: created once, reused on every open. Later phases add sections to `SettingsTab`.
@@ -57,15 +56,19 @@ final class SettingsWindow: NSObject, NSWindowDelegate {
 
 /// A sidebar section. Adding one: a case, its row in `label`, its view in `SettingsView.content`.
 enum SettingsTab: CaseIterable, Identifiable {
-    case general, transcription, providers
+    case general, recording, transcription, providers, storage, shortcuts, about
 
     var id: Self { self }
 
     var label: (title: String, icon: String) {
         switch self {
         case .general: ("General", "gearshape")
+        case .recording: ("Recording", "record.circle")
         case .transcription: ("Transcription", "waveform")
         case .providers: ("AI & Cloud", "sparkles")
+        case .storage: ("Storage", "internaldrive")
+        case .shortcuts: ("Shortcuts", "keyboard")
+        case .about: ("About", "info.circle")
         }
     }
 }
@@ -127,59 +130,14 @@ private struct SettingsView: View {
     @ViewBuilder
     private func content(_ tab: SettingsTab) -> some View {
         switch tab {
-        case .general: GeneralSettingsTab(model: model)
+        case .general: GeneralSettingsView(model: model)
+        case .recording: RecordingSettingsView(model: model)
         case .transcription: ModelsSettingsView(model: model)
         case .providers: ProvidersSettingsView(model: model)
+        case .storage: StorageSettingsView(model: model)
+        case .shortcuts: ShortcutsSettingsView(model: model)
+        case .about: AboutSettingsView()
         }
-    }
-}
-
-private struct GeneralSettingsTab: View {
-    let model: AppModel
-    @State private var loginItemNote: String?
-
-    var body: some View {
-        Form {
-            Section {
-                Toggle("Launch at login", isOn: launchAtLogin)
-                if let loginItemNote {
-                    Text(loginItemNote)
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                }
-            }
-        }
-        .formStyle(.grouped)
-        .onAppear(perform: syncLaunchAtLogin)
-    }
-
-    private var launchAtLogin: Binding<Bool> {
-        Binding(get: { model.settings.launchAtLogin }, set: { setLaunchAtLogin($0) })
-    }
-
-    private func setLaunchAtLogin(_ enabled: Bool) {
-        loginItemNote = nil
-        do {
-            if enabled {
-                try SMAppService.mainApp.register()
-                if SMAppService.mainApp.status == .requiresApproval {
-                    loginItemNote = "Approve EchoDiar in System Settings > General > Login Items."
-                    SMAppService.openSystemSettingsLoginItems()
-                }
-            } else {
-                try SMAppService.mainApp.unregister()
-            }
-        } catch {
-            loginItemNote = error.localizedDescription
-        }
-        syncLaunchAtLogin()
-    }
-
-    /// The login item can also be changed in System Settings; the toggle follows its real state.
-    private func syncLaunchAtLogin() {
-        let status = SMAppService.mainApp.status
-        let registered = status == .enabled || status == .requiresApproval
-        model.updateSettings { $0.launchAtLogin = registered }
     }
 }
 
@@ -193,5 +151,60 @@ private struct GlassForm: ViewModifier {
         } else {
             content
         }
+    }
+}
+
+/// Logo, version, license and the GitHub link.
+private struct AboutSettingsView: View {
+    var body: some View {
+        Form {
+            Section {
+                VStack(spacing: 10) {
+                    if let logo = AboutInfo.logo {
+                        Image(nsImage: logo)
+                            .resizable()
+                            .interpolation(.high)
+                            .frame(width: 96, height: 96)
+                            .accessibilityHidden(true)
+                    }
+                    Text("EchoDiar").font(.title2.weight(.semibold))
+                    Text("Version \(AboutInfo.version)")
+                        .foregroundStyle(.secondary)
+                    Text("Licensed under AGPL-3.0")
+                        .foregroundStyle(.secondary)
+                    Link("github.com/dinhanhthi/EchoDiar", destination: AboutInfo.repository)
+                    if let copyright = AboutInfo.copyright {
+                        Text(copyright)
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                }
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 12)
+            }
+        }
+        .formStyle(.grouped)
+    }
+}
+
+/// Shared by the Settings About section and the About panel.
+enum AboutInfo {
+    static let repository = URL(string: "https://github.com/dinhanhthi/EchoDiar")!
+
+    /// Loaded by file: `NSImage(named: "logo")` would return the app icon, which shares the name.
+    static var logo: NSImage? {
+        Bundle.main.url(forResource: "logo", withExtension: "png").flatMap { NSImage(contentsOf: $0) }
+    }
+
+    /// "0.1.0 (1)".
+    static var version: String {
+        let info = Bundle.main.infoDictionary
+        let short = info?["CFBundleShortVersionString"] as? String ?? "?"
+        let build = info?["CFBundleVersion"] as? String
+        return build.map { "\(short) (\($0))" } ?? short
+    }
+
+    static var copyright: String? {
+        Bundle.main.infoDictionary?["NSHumanReadableCopyright"] as? String
     }
 }

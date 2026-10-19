@@ -65,10 +65,12 @@ public struct TranscriptionJob: Codable, Equatable, Sendable {
     public var language: String?
     /// "Process now": never deferred for thermal state or Low Power Mode.
     public var processNow: Bool
+    /// Speakers expected on the system channel for this run; nil = the pipeline's `speakerCountHint`.
+    public var speakerCountHint: Int?
 
     public init(
         conversationID: UUID, folder: URL, systemFileName: String? = nil, engineID: String? = nil,
-        language: String? = nil, processNow: Bool = false
+        language: String? = nil, processNow: Bool = false, speakerCountHint: Int? = nil
     ) {
         self.conversationID = conversationID
         self.folder = folder
@@ -76,6 +78,7 @@ public struct TranscriptionJob: Codable, Equatable, Sendable {
         self.engineID = engineID
         self.language = language
         self.processNow = processNow
+        self.speakerCountHint = speakerCountHint
     }
 }
 

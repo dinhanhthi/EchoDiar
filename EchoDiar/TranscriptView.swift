@@ -25,6 +25,8 @@ struct TranscriptView: View {
     @State private var retranscribeLanguage = ""
     /// The segment the list scrolls to, set by an AI citation; cleared once scrolled.
     @State private var scrollTarget: UUID?
+    /// The folder still has audio: false once Storage or auto-delete moved it to the Trash (no Play, no Re-transcribe).
+    @State private var hasAudio = true
 
     var body: some View {
         VStack(spacing: 10) {
@@ -81,7 +83,7 @@ struct TranscriptView: View {
                     }
                 }
                 Spacer(minLength: 8)
-                transport
+                if hasAudio { transport }
             }
         }
         .padding(.horizontal, 14)
@@ -182,9 +184,9 @@ struct TranscriptView: View {
         .help("Re-transcribe with another model or language")
     }
 
-    /// Not while a job runs or the audio is still being recorded or compressed.
+    /// Not while a job runs, the audio is still being recorded or compressed, or it was deleted.
     private var canTranscribe: Bool {
-        !model.isTranscribing(conversation.id) && conversation.status != .recording
+        hasAudio && !model.isTranscribing(conversation.id) && conversation.status != .recording
             && conversation.status != .compressing && conversation.status != .failed
     }
 
@@ -322,16 +324,17 @@ struct TranscriptView: View {
         let folder = conversation.folder
         let wantsTranscript = conversation.hasTranscript
         let playable = conversation.status != .recording && conversation.status != .compressing
-        let (loaded, audio) = await Task.detached(priority: .utility) {
+        let (loaded, audio, hasAudio) = await Task.detached(priority: .utility) {
             let transcript = wantsTranscript ? try? Transcript.read(from: folder) : nil
             let audio = playable
                 ? (try? RecordingSession.read(from: folder)).flatMap {
                     ConversationFiles.audioURL(in: folder, fileName: $0.audioFileName)
                 }
                 : nil
-            return (transcript, audio)
+            return (transcript, audio, !LibraryStore.audioFiles(in: folder).isEmpty)
         }.value
         guard !Task.isCancelled else { return }
+        self.hasAudio = hasAudio
         transcript = loaded
         speakers = loaded.map(Self.speakers) ?? []
         loadFailed = wantsTranscript && loaded == nil

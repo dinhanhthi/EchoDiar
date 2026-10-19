@@ -18,7 +18,7 @@ enum EchoDiarApp {
 
 /// Owns the app state for the app lifetime. Under XCTest it sets nothing up.
 @MainActor
-final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
+final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSMenuItemValidation {
     let model = AppModel()
 
     private var statusItem: StatusItemController?
@@ -123,6 +123,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
 
     func windowWillClose(_ notification: Notification) {
         guard let closing = notification.object as? NSWindow, closing === window else { return }
+        // The next window opens without the search field focused.
+        model.searchPresented = false
         // Release the window and its SwiftUI hierarchy after it finishes closing; it is recreated on the next open.
         Task { @MainActor [weak self] in
             self?.window = nil
@@ -140,11 +142,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
                                                    name: NSApplication.didResignActiveNotification, object: nil)
         }
         bringToFront(nil)
-        // Loaded by file: `NSImage(named: "logo")` would return the app icon, which shares the name.
-        let logo = Bundle.main.url(forResource: "logo", withExtension: "png").flatMap { NSImage(contentsOf: $0) }
-        // Queued after bringToFront's activation.
+        let logo = AboutInfo.logo
+        // Queued after bringToFront's activation. Version and copyright come from the Info.plist.
         Task { @MainActor in
-            NSApp.orderFrontStandardAboutPanel(options: [.applicationIcon: logo as Any])
+            NSApp.orderFrontStandardAboutPanel(options: [.applicationIcon: logo as Any, .credits: Self.aboutCredits])
         }
     }
 
@@ -153,7 +154,57 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         if window == nil { NSApp.setActivationPolicy(.accessory) }
     }
 
-    /// App menu (About, Settings, Hide, Quit), Edit and Window menus so text fields and shortcuts work.
+    /// "Licensed under AGPL-3.0" and the GitHub link, centered under the version.
+    private static var aboutCredits: NSAttributedString {
+        let paragraph = NSMutableParagraphStyle()
+        paragraph.alignment = .center
+        let attributes: [NSAttributedString.Key: Any] = [
+            .font: NSFont.systemFont(ofSize: NSFont.smallSystemFontSize), .paragraphStyle: paragraph,
+            .foregroundColor: NSColor.secondaryLabelColor,
+        ]
+        let credits = NSMutableAttributedString(string: "Licensed under AGPL-3.0\n", attributes: attributes)
+        var link = attributes
+        link[.link] = AboutInfo.repository
+        credits.append(NSAttributedString(string: "github.com/dinhanhthi/EchoDiar", attributes: link))
+        return credits
+    }
+
+    // MARK: - Main menu actions (the menu owns ⌘R, ⇧⌘P, ⌘I and ⌘F, so they work from every window)
+
+    @objc private func toggleRecording() { model.toggleRecording() }
+
+    @objc private func togglePause() { model.togglePause() }
+
+    /// A hidden main window opens on the AI pane.
+    @objc private func toggleAI() {
+        let shown = window?.isVisible == true
+        showMainWindow()
+        model.selectedTab = shown && model.selectedTab == .ai ? .library : .ai
+    }
+
+    @objc private func showSearch() {
+        showMainWindow()
+        model.showSearch()
+    }
+
+    /// Titles follow the recording and the shown pane.
+    func validateMenuItem(_ item: NSMenuItem) -> Bool {
+        switch item.action {
+        case #selector(toggleRecording):
+            item.title = model.isRecording ? "Stop Recording" : "Start Recording"
+            return !model.isStarting
+        case #selector(togglePause):
+            item.title = model.snapshot.state == .paused ? "Resume Recording" : "Pause Recording"
+            return model.isRecording
+        case #selector(toggleAI):
+            item.title = model.selectedTab == .ai && window?.isVisible == true ? "Show Library" : "Show AI"
+            return true
+        default:
+            return true
+        }
+    }
+
+    /// App menu (About, Settings, Hide, Quit), File (recording), Edit, View (AI, search) and Window menus.
     private func makeMainMenu() -> NSMenu {
         let appMenu = NSMenu()
         appMenu.addItem(withTitle: "About EchoDiar", action: #selector(showAbout), keyEquivalent: "").target = self
@@ -162,17 +213,23 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         appMenu.addItem(.separator())
         appMenu.addItem(withTitle: "Hide EchoDiar", action: #selector(NSApplication.hide(_:)), keyEquivalent: "h")
         appMenu.addItem(withTitle: "Quit EchoDiar", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q")
+        let fileMenu = NSMenu(title: "File")
+        fileMenu.addItem(withTitle: "Start Recording", action: #selector(toggleRecording), keyEquivalent: "r").target = self
+        fileMenu.addItem(withTitle: "Pause Recording", action: #selector(togglePause), keyEquivalent: "P").target = self
         let editMenu = NSMenu(title: "Edit")
         editMenu.addItem(withTitle: "Cut", action: #selector(NSText.cut(_:)), keyEquivalent: "x")
         editMenu.addItem(withTitle: "Copy", action: #selector(NSText.copy(_:)), keyEquivalent: "c")
         editMenu.addItem(withTitle: "Paste", action: #selector(NSText.paste(_:)), keyEquivalent: "v")
         editMenu.addItem(withTitle: "Select All", action: #selector(NSText.selectAll(_:)), keyEquivalent: "a")
+        let viewMenu = NSMenu(title: "View")
+        viewMenu.addItem(withTitle: "Show AI", action: #selector(toggleAI), keyEquivalent: "i").target = self
+        viewMenu.addItem(withTitle: "Search Conversations", action: #selector(showSearch), keyEquivalent: "f").target = self
         let windowMenu = NSMenu(title: "Window")
         windowMenu.addItem(withTitle: "Close", action: #selector(NSWindow.performClose(_:)), keyEquivalent: "w")
         windowMenu.addItem(withTitle: "Minimize", action: #selector(NSWindow.performMiniaturize(_:)), keyEquivalent: "m")
         NSApp.windowsMenu = windowMenu
         let mainMenu = NSMenu()
-        for submenu in [appMenu, editMenu, windowMenu] {
+        for submenu in [appMenu, fileMenu, editMenu, viewMenu, windowMenu] {
             let item = NSMenuItem()
             item.submenu = submenu
             mainMenu.addItem(item)

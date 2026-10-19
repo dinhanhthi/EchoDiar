@@ -115,7 +115,8 @@ public actor TranscriptionPipeline {
             let diarizerID = ModelCatalog.defaultDiarizer.id
             let diarizer = modelStore.isInstalled(diarizerID)
                 ? modelStore.folder(for: diarizerID).map {
-                    SpeakerDiarizer(entryID: diarizerID, folder: $0, speakerCountHint: speakerCountHint)
+                    SpeakerDiarizer(
+                        entryID: diarizerID, folder: $0, speakerCountHint: job.speakerCountHint ?? speakerCountHint)
                 }
                 : nil
 

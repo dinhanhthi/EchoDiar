@@ -51,6 +51,22 @@ public struct AppSettings: Codable, Equatable, Sendable {
     public var endMonitor: MeetingEndMonitor.Configuration
     /// What losing the recording microphone does.
     public var routeChangeBehavior: RouteChangeBehavior
+    /// Queue the batch transcription when a recording stops (after compression).
+    public var autoTranscribe: Bool
+    /// Expected number of speakers on the system channel for diarization, 1...20; nil = detect.
+    public var speakerCountHint: Int?
+    /// Wait while the Mac is hot or in Low Power Mode before a transcription job starts.
+    public var deferTranscriptionWhenConstrained: Bool
+    /// Move old transcribed conversations (or their audio) to the Trash daily, see `RetentionPolicy`.
+    public var autoDeleteEnabled: Bool
+    /// Age in days, 1...3650, after which auto-delete applies.
+    public var autoDeleteAfterDays: Int
+    public var autoDeleteMode: RetentionMode
+    /// Move the audio to the Trash once a transcription succeeds; transcript, summary and chat stay.
+    public var deleteAudioAfterTranscription: Bool
+    /// Global record start/stop shortcut, in Carbon terms for `RegisterEventHotKey`.
+    public var globalHotKey: HotKey
+    public var globalHotKeyEnabled: Bool
 
     public static let defaultLiveTranscriptEngine = "whisperkit-turbo-632"
 
@@ -77,7 +93,16 @@ public struct AppSettings: Codable, Equatable, Sendable {
         hidePillWhenAppActive: Bool = false,
         attachPillToWindow: Bool = false,
         endMonitor: MeetingEndMonitor.Configuration = MeetingEndMonitor.Configuration(),
-        routeChangeBehavior: RouteChangeBehavior = .ask
+        routeChangeBehavior: RouteChangeBehavior = .ask,
+        autoTranscribe: Bool = true,
+        speakerCountHint: Int? = nil,
+        deferTranscriptionWhenConstrained: Bool = true,
+        autoDeleteEnabled: Bool = false,
+        autoDeleteAfterDays: Int = 90,
+        autoDeleteMode: RetentionMode = .audioOnly,
+        deleteAudioAfterTranscription: Bool = false,
+        globalHotKey: HotKey = .defaultRecord,
+        globalHotKeyEnabled: Bool = true
     ) {
         self.launchAtLogin = launchAtLogin
         self.defaultLanguage = defaultLanguage
@@ -102,7 +127,19 @@ public struct AppSettings: Codable, Equatable, Sendable {
         self.attachPillToWindow = attachPillToWindow
         self.endMonitor = endMonitor
         self.routeChangeBehavior = routeChangeBehavior
+        self.autoTranscribe = autoTranscribe
+        self.speakerCountHint = speakerCountHint
+        self.deferTranscriptionWhenConstrained = deferTranscriptionWhenConstrained
+        self.autoDeleteEnabled = autoDeleteEnabled
+        self.autoDeleteAfterDays = autoDeleteAfterDays
+        self.autoDeleteMode = autoDeleteMode
+        self.deleteAudioAfterTranscription = deleteAudioAfterTranscription
+        self.globalHotKey = globalHotKey
+        self.globalHotKeyEnabled = globalHotKeyEnabled
     }
+
+    public static let autoDeleteDaysRange = 1...3650
+    public static let speakerCountHintRange = 1...20
 
     private enum CodingKeys: String, CodingKey {
         case version, launchAtLogin, defaultLanguage, recentLanguages, compressionBitrateKbps, keepUncompressedAudio
@@ -110,6 +147,9 @@ public struct AppSettings: Codable, Equatable, Sendable {
         case cloudSTTConfirmed, defaultAIProviderID, defaultAIModel, summaryLanguage
         case micDeviceUID, meetingDetection, perAppBehavior, pillPositions, showPill, hidePillWhenAppActive
         case attachPillToWindow, endMonitor, routeChangeBehavior
+        case autoTranscribe, speakerCountHint, deferTranscriptionWhenConstrained
+        case autoDeleteEnabled, autoDeleteAfterDays, autoDeleteMode, deleteAudioAfterTranscription
+        case globalHotKey, globalHotKeyEnabled
     }
 
     public init(from decoder: Decoder) throws {
@@ -140,6 +180,25 @@ public struct AppSettings: Codable, Equatable, Sendable {
         endMonitor = try container.decodeIfPresent(MeetingEndMonitor.Configuration.self, forKey: .endMonitor)
             ?? MeetingEndMonitor.Configuration()
         routeChangeBehavior = try container.decodeIfPresent(RouteChangeBehavior.self, forKey: .routeChangeBehavior) ?? .ask
+        autoTranscribe = try container.decodeIfPresent(Bool.self, forKey: .autoTranscribe) ?? true
+        speakerCountHint = try container.decodeIfPresent(Int.self, forKey: .speakerCountHint)
+            .map { Self.clamped($0, to: Self.speakerCountHintRange) }
+        deferTranscriptionWhenConstrained = try container.decodeIfPresent(
+            Bool.self, forKey: .deferTranscriptionWhenConstrained) ?? true
+        autoDeleteEnabled = try container.decodeIfPresent(Bool.self, forKey: .autoDeleteEnabled) ?? false
+        autoDeleteAfterDays = Self.clamped(
+            try container.decodeIfPresent(Int.self, forKey: .autoDeleteAfterDays) ?? 90, to: Self.autoDeleteDaysRange)
+        autoDeleteMode = try container.decodeIfPresent(RetentionMode.self, forKey: .autoDeleteMode) ?? .audioOnly
+        deleteAudioAfterTranscription = try container.decodeIfPresent(
+            Bool.self, forKey: .deleteAudioAfterTranscription) ?? false
+        // A shortcut without ⌘, ⌥ or ⌃ (a hand-edited file) would take a key away from typing everywhere.
+        let hotKey = try container.decodeIfPresent(HotKey.self, forKey: .globalHotKey) ?? .defaultRecord
+        globalHotKey = hotKey.hasCommandModifier ? hotKey : .defaultRecord
+        globalHotKeyEnabled = try container.decodeIfPresent(Bool.self, forKey: .globalHotKeyEnabled) ?? true
+    }
+
+    private static func clamped(_ value: Int, to range: ClosedRange<Int>) -> Int {
+        min(max(value, range.lowerBound), range.upperBound)
     }
 }
 
@@ -159,6 +218,39 @@ public enum RouteChangeBehavior: String, Codable, Sendable {
     case ask
     case `continue`
     case stop
+}
+
+/// What auto-delete moves to the Trash.
+public enum RetentionMode: String, Codable, Sendable {
+    /// The audio files only; transcript, summary and chat stay.
+    case audioOnly
+    /// The whole conversation folder.
+    case wholeConversation
+
+    /// An unrecognized raw value (written by another build) falls back to the less destructive `audioOnly`.
+    public init(from decoder: Decoder) throws {
+        self = RetentionMode(rawValue: try decoder.singleValueContainer().decode(String.self)) ?? .audioOnly
+    }
+}
+
+/// A global keyboard shortcut in Carbon terms: a virtual key code (`kVK_*`) and a Carbon modifier mask
+/// (`cmdKey` 1 << 8, `shiftKey` 1 << 9, `optionKey` 1 << 11, `controlKey` 1 << 12).
+public struct HotKey: Codable, Equatable, Sendable {
+    public var keyCode: UInt32
+    public var modifiers: UInt32
+
+    /// ⌥⌘R: `kVK_ANSI_R` with `optionKey | cmdKey`.
+    public static let defaultRecord = HotKey(keyCode: 0x0F, modifiers: 1 << 11 | 1 << 8)
+
+    public init(keyCode: UInt32, modifiers: UInt32) {
+        self.keyCode = keyCode
+        self.modifiers = modifiers
+    }
+
+    /// Has ⌘, ⌥ or ⌃: a shortcut with ⇧ alone (or none) would take a key away from typing everywhere.
+    public var hasCommandModifier: Bool {
+        modifiers & (1 << 8 | 1 << 11 | 1 << 12) != 0
+    }
 }
 
 /// The pill's top-right corner, in points from the top-right corner of its display's visible frame (x, y ≤ 0).
