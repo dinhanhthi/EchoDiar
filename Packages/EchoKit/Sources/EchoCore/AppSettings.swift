@@ -66,6 +66,8 @@ public struct AppSettings: Codable, Equatable, Sendable {
     public var autoDeleteMode: RetentionMode
     /// Move the audio to the Trash once a transcription succeeds; transcript, summary and chat stay.
     public var deleteAudioAfterTranscription: Bool
+    /// The library's Delete moves a conversation to the Trash without asking first.
+    public var deleteWithoutConfirmation: Bool
     /// Global record start/stop shortcut, in Carbon terms for `RegisterEventHotKey`.
     public var globalHotKey: HotKey
     public var globalHotKeyEnabled: Bool
@@ -104,6 +106,7 @@ public struct AppSettings: Codable, Equatable, Sendable {
         autoDeleteAfterDays: Int = 90,
         autoDeleteMode: RetentionMode = .audioOnly,
         deleteAudioAfterTranscription: Bool = false,
+        deleteWithoutConfirmation: Bool = false,
         globalHotKey: HotKey = .defaultRecord,
         globalHotKeyEnabled: Bool = true
     ) {
@@ -138,6 +141,7 @@ public struct AppSettings: Codable, Equatable, Sendable {
         self.autoDeleteAfterDays = autoDeleteAfterDays
         self.autoDeleteMode = autoDeleteMode
         self.deleteAudioAfterTranscription = deleteAudioAfterTranscription
+        self.deleteWithoutConfirmation = deleteWithoutConfirmation
         self.globalHotKey = globalHotKey
         self.globalHotKeyEnabled = globalHotKeyEnabled
     }
@@ -153,7 +157,7 @@ public struct AppSettings: Codable, Equatable, Sendable {
         case attachPillToWindow, pillWindowOffset, endMonitor, routeChangeBehavior
         case autoTranscribe, speakerCountHint, deferTranscriptionWhenConstrained
         case autoDeleteEnabled, autoDeleteAfterDays, autoDeleteMode, deleteAudioAfterTranscription
-        case globalHotKey, globalHotKeyEnabled
+        case deleteWithoutConfirmation, globalHotKey, globalHotKeyEnabled
     }
 
     public init(from decoder: Decoder) throws {
@@ -196,6 +200,7 @@ public struct AppSettings: Codable, Equatable, Sendable {
         autoDeleteMode = try container.decodeIfPresent(RetentionMode.self, forKey: .autoDeleteMode) ?? .audioOnly
         deleteAudioAfterTranscription = try container.decodeIfPresent(
             Bool.self, forKey: .deleteAudioAfterTranscription) ?? false
+        deleteWithoutConfirmation = try container.decodeIfPresent(Bool.self, forKey: .deleteWithoutConfirmation) ?? false
         // A shortcut without ⌘, ⌥ or ⌃ (a hand-edited file) would take a key away from typing everywhere.
         let hotKey = try container.decodeIfPresent(HotKey.self, forKey: .globalHotKey) ?? .defaultRecord
         globalHotKey = hotKey.hasCommandModifier ? hotKey : .defaultRecord

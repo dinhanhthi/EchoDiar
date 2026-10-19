@@ -4,9 +4,9 @@ import EchoCore
 import EchoTranscribe
 import SwiftUI
 
-/// One conversation of the library: source app icon, title (double-click to rename), time, duration, size,
-/// status, transcription progress or its action, and the AI and Summary buttons. A click elsewhere opens the
-/// transcript.
+/// One conversation of the library: source app icon, title (double-click to rename), time, duration, size and
+/// status, then a bottom row with the transcription progress or its action and the AI, Summary, Reveal in Finder and
+/// Delete buttons. A click elsewhere opens the transcript.
 struct ConversationCard: View {
     let conversation: Conversation
     let model: AppModel
@@ -19,31 +19,24 @@ struct ConversationCard: View {
             AppIcon(bundleID: conversation.sourceBundleID)
             VStack(alignment: .leading, spacing: 4) {
                 title
-                // The status and buttons share the details row, so the title keeps the full width.
-                HStack(spacing: 12) {
-                    details
-                    Spacer(minLength: 8)
-                    TranscriptionStatus(conversation: conversation, model: model)
-                    Button { showAI(.chat) } label: {
-                        Label("AI", systemImage: "sparkles")
-                            .labelStyle(.iconOnly)
-                            .font(.system(size: 15))
-                    }
-                    .buttonStyle(RowIconButtonStyle())
-                    .foregroundStyle(.secondary)
-                    .help("Ask AI about this conversation")
-                    if conversation.hasSummary {
-                        Button { showAI(.summary) } label: {
-                            Label("Summary", systemImage: "text.alignleft")
-                                .labelStyle(.iconOnly)
-                                .font(.system(size: 15))
-                        }
-                        .buttonStyle(RowIconButtonStyle())
-                        .foregroundStyle(.secondary)
-                        .help("Show the summary")
-                    }
-                }
+                details
                 TranscriptionFailureReason(conversation: conversation, model: model)
+                // The status and buttons have their own row, so the title and details keep the full width.
+                HStack(spacing: 12) {
+                    TranscriptionStatus(conversation: conversation, model: model)
+                    Spacer(minLength: 8)
+                    rowButton("AI", systemImage: "sparkles") { showAI(.chat) }
+                        .help("Ask AI about this conversation")
+                    if conversation.hasSummary {
+                        rowButton("Summary", systemImage: "text.alignleft") { showAI(.summary) }
+                            .help("Show the summary")
+                    }
+                    rowButton("Reveal in Finder", systemImage: "folder", action: revealInFinder)
+                        .help("Reveal in Finder")
+                    rowButton("Delete", systemImage: "trash", action: delete)
+                        .disabled(!canDelete)
+                        .help("Move this conversation to the Trash")
+                }
             }
         }
         .padding(.horizontal, 14)
@@ -54,14 +47,27 @@ struct ConversationCard: View {
         .onTapGesture(perform: open)
         .contextMenu {
             Button("Rename", action: beginEditing)
-            Button("Reveal in Finder") {
-                NSWorkspace.shared.activateFileViewerSelecting([conversation.folder])
-            }
+            Button("Reveal in Finder", action: revealInFinder)
             Divider()
-            Button("Delete…", action: confirmDelete)
-                .disabled(conversation.status == .recording || conversation.status == .compressing
-                          || model.isTranscribing(conversation.id))
+            Button(model.settings.deleteWithoutConfirmation ? "Delete" : "Delete…", action: delete)
+                .disabled(!canDelete)
         }
+    }
+
+    private func rowButton(_ title: String, systemImage: String, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            Label(title, systemImage: systemImage)
+                .labelStyle(.iconOnly)
+                .font(.system(size: 15))
+        }
+        .buttonStyle(RowIconButtonStyle())
+        .foregroundStyle(.secondary)
+    }
+
+    /// Not while it is recorded, compressed or transcribed.
+    private var canDelete: Bool {
+        conversation.status != .recording && conversation.status != .compressing
+            && !model.isTranscribing(conversation.id)
     }
 
     @ViewBuilder private var title: some View {
@@ -125,6 +131,19 @@ struct ConversationCard: View {
 
     private func showAI(_ focus: AppModel.AIFocus) {
         withAnimation(.snappy) { model.showAI(conversationID: conversation.id, focus: focus) }
+    }
+
+    private func revealInFinder() {
+        NSWorkspace.shared.activateFileViewerSelecting([conversation.folder])
+    }
+
+    /// Asks first unless "Delete conversations without confirmation" is on.
+    private func delete() {
+        if model.settings.deleteWithoutConfirmation {
+            model.deleteConversation(conversation.id)
+        } else {
+            confirmDelete()
+        }
     }
 
     private func confirmDelete() {

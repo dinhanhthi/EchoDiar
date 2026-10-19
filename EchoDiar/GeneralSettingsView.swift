@@ -3,7 +3,7 @@ import EchoCore
 import ServiceManagement
 import SwiftUI
 
-/// The General tab: login item, floating indicator, the consent message and the onboarding again.
+/// The General tab: login item, floating indicator, delete confirmation, the consent message and the onboarding again.
 struct GeneralSettingsView: View {
     let model: AppModel
     @State private var loginItemNote: String?
@@ -29,6 +29,12 @@ struct GeneralSettingsView: View {
                 }
                 Toggle("Hide it while an EchoDiar window is in front", isOn: model.setting(\.hidePillWhenAppActive))
                     .disabled(!model.settings.showPill)
+            }
+            Section("Library") {
+                Toggle(isOn: model.setting(\.deleteWithoutConfirmation)) {
+                    Text("Delete conversations without confirmation")
+                    Text("They still go to the Trash.")
+                }
             }
             Section("Consent") {
                 VStack(alignment: .leading, spacing: 8) {
