@@ -599,11 +599,13 @@ private struct TestButton: View {
     }
 }
 
-/// Writes a typed API key to the Keychain and clears the field; does nothing when it is blank.
+/// Writes a typed API key to the Keychain and clears the field; does nothing when it is blank. Spaces and line breaks
+/// are dropped anywhere: a key copied across a wrapped line has one inside, and URLSession then silently drops the
+/// whole auth header (the provider answers "header is required").
 @MainActor private func saveAPIKey(_ key: Binding<String>, providerID: String, model: AppModel) throws {
-    let trimmed = key.wrappedValue.trimmingCharacters(in: .whitespacesAndNewlines)
-    guard !trimmed.isEmpty else { return }
-    try KeychainStore.setAPIKey(trimmed, forProvider: providerID)
+    let cleaned = key.wrappedValue.filter { !$0.isWhitespace }
+    guard !cleaned.isEmpty else { return }
+    try KeychainStore.setAPIKey(cleaned, forProvider: providerID)
     key.wrappedValue = ""
     model.keychainChanged()
 }
