@@ -24,6 +24,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSMe
 
     private var statusItem: StatusItemController?
     private var window: NSWindow?
+    private let sizer = MainWindowSizer()
+    /// Esc and Space of the main window.
+    private var keyMonitor: Any?
     private var sigtermSource: DispatchSourceSignal?
     /// Crash recovery of interrupted sessions; capture must not start before it finishes.
     private(set) var recovery: Task<[RecoveredResult], Never>?
@@ -31,6 +34,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSMe
     private var isTesting: Bool { ProcessInfo.processInfo.environment["XCTestConfigurationFilePath"] != nil }
 
     func applicationDidFinishLaunching(_ notification: Notification) {
+        // Tooltips after 0.25 s instead of the system's 1.5 s.
+        UserDefaults.standard.register(defaults: ["NSInitialToolTipDelay": 250])
         guard !isTesting else { return }
         #if DEBUG
         if CaptureProbe.isRequested {
@@ -42,6 +47,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSMe
         // Dark only.
         NSApp.appearance = NSAppearance(named: .darkAqua)
         NSApp.mainMenu = makeMainMenu()
+        installKeyMonitor()
         statusItem = StatusItemController(
             onOpenMain: { [weak self] in self?.showMainWindow() },
             onOpenSettings: { [weak self] in self?.showSettings() },
@@ -49,6 +55,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSMe
             onAbout: { [weak self] in self?.showAbout() },
             updater: updater)
         observeIndicatorState()
+        observeRoute()
         // SIGTERM (`killall`, logout) goes through terminate, so applicationWillTerminate runs.
         signal(SIGTERM, SIG_IGN)
         let source = DispatchSource.makeSignalSource(signal: SIGTERM, queue: .main)
@@ -81,11 +88,26 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSMe
         }
     }
 
+    /// Resizes the main window when the route moves to the other layout; re-armed after each change.
+    private func observeRoute() {
+        withObservationTracking {
+            _ = model.route
+        } onChange: { [weak self] in
+            // onChange fires before the new value is stored; read it on the next turn.
+            Task { @MainActor [weak self] in
+                guard let self else { return }
+                if let window, window.isVisible { sizer.switchTo(MainWindowLayout(model.route), window: window) }
+                observeRoute()
+            }
+        }
+    }
+
     func showMainWindow() {
         if window == nil {
-            // MainView (task 1.7) is expected as `struct MainView: View { init(model: AppModel) }`.
-            let hosting = NSHostingController(rootView: MainView(model: model))
-            // The SwiftUI toolbar (Record, Settings, AI) becomes the window's toolbar, in the traffic-light row.
+            let hosting = NSHostingController(rootView: MainView(model: model, updater: updater))
+            // The sizer owns the window's size and bounds, not the SwiftUI content.
+            hosting.sizingOptions = []
+            // The SwiftUI toolbar (Back, Record, Settings, Search) becomes the window's toolbar, in the traffic-light row.
             hosting.sceneBridgingOptions = [.toolbars]
             let window = NSWindow(contentViewController: hosting)
             window.title = "EchoDiar"
@@ -97,19 +119,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSMe
             // Full size content: the translucent background runs under the toolbar too.
             window.styleMask = [.titled, .closable, .miniaturizable, .resizable, .fullSizeContentView]
             window.isReleasedWhenClosed = false
-            if !window.setFrameAutosaveName("Main") || !window.setFrameUsingName("Main") {
-                window.center()
-            }
+            sizer.place(window, layout: MainWindowLayout(model.route))
             window.delegate = self
             self.window = window
         }
         bringToFront(window)
     }
 
-    /// SettingsWindow (task 1.8) is expected as a `@MainActor final class` with `static let shared` and
-    /// `func show(model: AppModel)` that creates its window once and brings it to the front.
+    /// The Settings page of the main window.
     @objc func showSettings() {
-        SettingsWindow.shared.show(model: model)
+        model.openSettings()
     }
 
     /// Shows the Dock icon and activates the app on the next turn (the `.regular` switch from LSUIElement is
@@ -128,14 +147,37 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSMe
         guard let closing = notification.object as? NSWindow, closing === window else { return }
         // The next window opens without the search field focused.
         model.searchPresented = false
+        model.mainWindowVisible = false
         // Release the window and its SwiftUI hierarchy after it finishes closing; it is recreated on the next open.
         Task { @MainActor [weak self] in
             self?.window = nil
+            // Each open starts on the list; set once the window is gone, so the closing window is not resized.
+            self?.model.route = .list
             let otherWindowOpen = NSApp.windows.contains {
                 $0 !== closing && $0.isVisible && $0.styleMask.contains(.titled)
             }
             if !otherWindowOpen { NSApp.setActivationPolicy(.accessory) }
         }
+    }
+
+    func windowDidEndLiveResize(_ notification: Notification) {
+        if let window = notification.object as? NSWindow { sizer.save(window) }
+    }
+
+    func windowDidMove(_ notification: Notification) {
+        if let window = notification.object as? NSWindow { sizer.save(window) }
+    }
+
+    func windowDidChangeOcclusionState(_ notification: Notification) {
+        guard let window = notification.object as? NSWindow else { return }
+        let visible = window.occlusionState.contains(.visible)
+        model.mainWindowVisible = visible
+        // A route change while hidden (⌘H) or minimized did not resize the window.
+        if visible { sizer.switchTo(MainWindowLayout(model.route), window: window) }
+    }
+
+    func windowDidExitFullScreen(_ notification: Notification) {
+        if let window = notification.object as? NSWindow { sizer.exitedFullScreen(window) }
     }
 
     @objc func showAbout() {
@@ -172,35 +214,37 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSMe
         return credits
     }
 
-    // MARK: - Main menu actions (the menu owns ⌘R, ⇧⌘P, ⌘I and ⌘F, so they work from every window)
+    // MARK: - Main menu actions (the menu owns ⌘R, ⇧⌘P, ⌘1, ⌘2, ⌘I, ⌘[ and ⌘F, so they work from every window)
+    // The route is set before the window is shown, so a new window opens at that route's size.
 
     @objc private func toggleRecording() { model.toggleRecording() }
 
     @objc private func togglePause() { model.togglePause() }
 
-    /// A hidden main window opens on the AI pane; a shown one goes back to the recording, else the library.
-    @objc private func toggleAI() {
-        let shown = window?.isVisible == true
-        showMainWindow()
-        model.selectedTab = shown && model.selectedTab == .ai ? (model.isRecording ? .live : .library) : .ai
-    }
-
     @objc private func showRecordingPage() {
+        model.route = .recording
         showMainWindow()
-        model.selectedTab = .live
     }
 
     @objc private func showLibrary() {
+        model.route = .list
         showMainWindow()
-        model.selectedTab = .library
     }
+
+    /// The Chat tab of the open conversation.
+    @objc private func openChat() {
+        model.detailTab = .chat
+        showMainWindow()
+    }
+
+    @objc private func goBack() { model.goBack() }
 
     @objc private func showSearch() {
-        showMainWindow()
         model.showSearch()
+        showMainWindow()
     }
 
-    /// Titles follow the recording and the shown pane.
+    /// Titles follow the recording; page items are enabled where they apply.
     func validateMenuItem(_ item: NSMenuItem) -> Bool {
         switch item.action {
         case #selector(toggleRecording):
@@ -209,18 +253,49 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSMe
         case #selector(togglePause):
             item.title = model.snapshot.state == .paused ? "Resume Recording" : "Pause Recording"
             return model.isRecording
-        case #selector(toggleAI):
-            let back = model.isRecording ? "Show Recording" : "Show Recordings"
-            item.title = model.selectedTab == .ai && window?.isVisible == true ? back : "Show AI"
-            return true
         case #selector(showRecordingPage):
             return model.isRecording
+        case #selector(openChat):
+            if case .conversation = model.route { return true }
+            return false
+        case #selector(goBack):
+            return model.route != .list
         default:
             return true
         }
     }
 
-    /// App menu (About, Settings, Hide, Quit), File (recording), Edit, View (AI, search) and Window menus.
+    // MARK: - Esc and Space
+
+    /// One local monitor for the main window: Esc goes back (not on the list) and Space plays or pauses the open
+    /// transcript. Keys pass through with ⌘, ⌥ or ⌃, in other windows, while the Shortcuts tab records a shortcut
+    /// and while a text field or text view is edited (search, title, speaker name, chat).
+    private func installKeyMonitor() {
+        keyMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak self] event in
+            let handled = MainActor.assumeIsolated { self?.handleKey(event) ?? false }
+            return handled ? nil : event
+        }
+    }
+
+    private func handleKey(_ event: NSEvent) -> Bool {
+        guard let window, event.window === window, !model.isCapturingHotKey,
+              event.modifierFlags.intersection([.command, .option, .control]).isEmpty
+        else { return false }
+        if let text = window.firstResponder as? NSTextView, text.isEditable { return false }
+        switch event.keyCode {
+        case 53 where model.route != .list:  // kVK_Escape
+            model.goBack()
+            return true
+        case 49:  // kVK_Space
+            guard case .conversation = model.route, model.detailTab == .transcript else { return false }
+            NotificationCenter.default.post(name: .togglePlayback, object: nil)
+            return true
+        default:
+            return false
+        }
+    }
+
+    /// App menu (About, Settings, Hide, Quit), File (recording), Edit, View (pages, back, search) and Window menus.
     private func makeMainMenu() -> NSMenu {
         let appMenu = NSMenu()
         appMenu.addItem(withTitle: "About EchoDiar", action: #selector(showAbout), keyEquivalent: "").target = self
@@ -240,7 +315,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSMe
         let viewMenu = NSMenu(title: "View")
         viewMenu.addItem(withTitle: "Recording", action: #selector(showRecordingPage), keyEquivalent: "1").target = self
         viewMenu.addItem(withTitle: "Recordings", action: #selector(showLibrary), keyEquivalent: "2").target = self
-        viewMenu.addItem(withTitle: "Show AI", action: #selector(toggleAI), keyEquivalent: "i").target = self
+        viewMenu.addItem(withTitle: "Chat", action: #selector(openChat), keyEquivalent: "i").target = self
+        viewMenu.addItem(withTitle: "Back", action: #selector(goBack), keyEquivalent: "[").target = self
         viewMenu.addItem(withTitle: "Search Conversations", action: #selector(showSearch), keyEquivalent: "f").target = self
         let windowMenu = NSMenu(title: "Window")
         windowMenu.addItem(withTitle: "Close", action: #selector(NSWindow.performClose(_:)), keyEquivalent: "w")

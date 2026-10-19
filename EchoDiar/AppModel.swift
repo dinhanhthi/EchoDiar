@@ -12,13 +12,17 @@ import Foundation
 import Observation
 import os
 
-/// App-wide state shared by the main window, the settings window and the menu bar item.
+/// App-wide state shared by the main window (Settings included) and the menu bar item.
 /// Coordinates recording: engine → stop → compress → transcribe → library refresh.
 @MainActor
 @Observable
 final class AppModel {
-    /// The main window's pages: the open recording (only while recording), the library and the AI pane.
-    enum Tab { case live, library, ai }
+    /// What the main window shows: the cards, one conversation, the open recording (only while recording) or
+    /// Settings.
+    enum Route: Equatable { case list, conversation(UUID), recording, settings }
+
+    /// The open conversation's tab.
+    enum DetailTab { case transcript, summary, chat }
 
     /// DEBUG harness launch args handled here; they skip onboarding and auto-queued work.
     static let harnessArguments: Set<String> = [
@@ -26,10 +30,12 @@ final class AppModel {
     ]
 
     private(set) var settings = AppSettings()
-    var selectedTab: Tab = .library
-    var selectedConversationID: UUID?
-    /// The conversation whose transcript fills the library pane; nil shows the cards.
-    var openedConversationID: UUID?
+    var route: Route = .list
+    var detailTab: DetailTab = .transcript
+    /// Where Back leaves Settings to: the route Settings was opened from.
+    private(set) var settingsReturnRoute: Route = .list
+    /// The main window is on screen (not closed, minimized or covered); timers and scans run only then.
+    var mainWindowVisible = false
     /// The library, newest first, as last emitted by `library.changes()`.
     private(set) var conversations: [Conversation] = []
     /// The last snapshot published by the engine.
@@ -73,8 +79,6 @@ final class AppModel {
     private(set) var aiError: (conversationID: UUID, message: String)?
     /// Bumped when an AI job ends, so the AI tab reloads `summary.md` and `chat.json`.
     private(set) var aiJobsEnded = 0
-    /// The AI pane's tab: chat or summary.
-    var aiFocus: AIFocus = .chat
     /// Recording time of the last clicked citation, for the opened transcript.
     var pendingTranscriptTime: Double?
     /// The meeting app whose mic use was detected last (menu "Detected: Zoom"); nil once its mic is off.
@@ -113,8 +117,6 @@ final class AppModel {
         let folder: URL
         let language: String?
     }
-
-    enum AIFocus { case summary, chat }
 
     struct AIJob {
         enum Kind: Equatable { case summary, question(String) }
@@ -205,6 +207,8 @@ final class AppModel {
     @ObservationIgnored private var hotKey: GlobalHotKey?
     /// The Shortcuts tab is recording a new shortcut: the current one is unregistered meanwhile.
     @ObservationIgnored private var hotKeyCapturing = false
+    /// The Shortcuts tab is recording a new shortcut: the main window's Esc and Space go to it.
+    var isCapturingHotKey: Bool { hotKeyCapturing }
 
     init(store: SettingsStore = SettingsStore()) {
         self.store = store
@@ -247,6 +251,7 @@ final class AppModel {
 
         #if DEBUG
         if runTranscribeHarness() || runLiveTranscribeHarness() || runModelHarness() { return }
+        DebugLibrarySeed.run()
         #endif
         guard ProcessInfo.processInfo.arguments.allSatisfy({ !Self.harnessArguments.contains($0) }) else { return }
         if !settings.onboardingCompleted { OnboardingWindow.shared.show(model: self) }
@@ -428,11 +433,11 @@ final class AppModel {
                 guard let self else { return }
                 let wasRecording = isRecording
                 self.snapshot = snapshot
-                // A new recording opens its page; the library replaces it once it ends.
+                // A new recording opens its page; the list replaces it once it ends.
                 if !wasRecording && isRecording {
-                    selectedTab = .live
-                } else if wasRecording && !isRecording && selectedTab == .live {
-                    selectedTab = .library
+                    route = .recording
+                } else if wasRecording && !isRecording && route == .recording {
+                    route = .list
                 }
                 micRoutesLost(snapshot.micRoutesLost)
                 if snapshot.state == .idle, let reason = snapshot.endReason {
@@ -823,10 +828,10 @@ final class AppModel {
         }
     }
 
-    /// Moves the conversation to the Trash.
+    /// Moves the conversation to the Trash, cancelling its AI job first so it does not write into the trashed folder.
     func deleteConversation(_ id: UUID) {
-        if selectedConversationID == id { selectedConversationID = nil }
-        if openedConversationID == id { openedConversationID = nil }
+        if route == .conversation(id) { route = .list }
+        if aiJob?.conversationID == id { cancelAIJob() }
         Task {
             do {
                 try await library.delete(id: id)
@@ -888,8 +893,7 @@ final class AppModel {
             await self?.isBusy(id) ?? true
         }
         for deletion in done where deletion.mode == .wholeConversation {
-            if selectedConversationID == deletion.conversationID { selectedConversationID = nil }
-            if openedConversationID == deletion.conversationID { openedConversationID = nil }
+            if route == .conversation(deletion.conversationID) { route = .list }
         }
     }
 
@@ -905,9 +909,12 @@ final class AppModel {
 
     // MARK: - Settings
 
-    func openSettings(tab: SettingsTab) {
-        settingsTab = tab
-        SettingsWindow.shared.show(model: self)
+    /// The Settings page of the main window, on `tab` when given; Back returns to the page it was opened from.
+    func openSettings(tab: SettingsTab? = nil) {
+        if let tab { settingsTab = tab }
+        if route != .settings { settingsReturnRoute = route }
+        route = .settings
+        (NSApp.delegate as? AppDelegate)?.showMainWindow()
     }
 
     /// Applies `change` and saves the settings file.
@@ -936,11 +943,33 @@ final class AppModel {
         OnboardingWindow.shared.show(model: self)
     }
 
-    /// ⌘F: the library with the search field focused.
+    /// ⌘F: the search field focused, on the list when Settings is shown.
     func showSearch() {
-        selectedTab = .library
-        openedConversationID = nil
+        if route == .settings { route = .list }
         searchPresented = true
+    }
+
+    // MARK: - Navigation
+
+    /// Shows the conversation on `tab`.
+    func open(_ id: UUID, tab: DetailTab = .transcript) {
+        detailTab = tab
+        route = .conversation(id)
+    }
+
+    /// Esc, ⌘[ and the toolbar's Back: a conversation or the recording goes to the list; Settings goes to the page
+    /// it was opened from, or the list when that conversation is gone or that recording has ended.
+    func goBack() {
+        switch route {
+        case .list: break
+        case .conversation, .recording: route = .list
+        case .settings:
+            switch settingsReturnRoute {
+            case .conversation(let id) where !conversations.contains(where: { $0.id == id }): route = .list
+            case .recording where !isRecording: route = .list
+            default: route = settingsReturnRoute
+            }
+        }
     }
 
     // MARK: - Global shortcut
@@ -1093,17 +1122,11 @@ extension AppModel {
         }
     }
 
-    func showAI(conversationID: UUID, focus: AIFocus) {
-        selectedConversationID = conversationID
-        aiFocus = focus
-        selectedTab = .ai
-    }
-
     /// Shows the conversation's transcript and keeps `time` for it to scroll and seek to.
     func openTranscript(conversationID: UUID, at time: Double) {
         pendingTranscriptTime = time
-        openedConversationID = conversationID
-        selectedTab = .library
+        detailTab = .transcript
+        route = .conversation(conversationID)
     }
 
     /// Starts a summary or a question with `provider` and `model` (saved as the AI tab default). `summary` and

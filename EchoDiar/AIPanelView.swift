@@ -3,11 +3,12 @@ import EchoAI
 import EchoCore
 import SwiftUI
 
-/// The AI pane, in two tabs on one conversation's transcript: Chat (questions with streamed answers) and Summary
-/// (the saved summary, Generate / Regenerate). The bar at the bottom holds the tab's actions, "Copy as prompt", and
-/// small menus for the conversation, the model (every usable provider with its models) and the output language.
+/// The Summary or Chat tab of the open conversation (`AppModel.detailTab`): Chat (questions with streamed answers) or
+/// Summary (the saved summary, Generate / Regenerate). The bar at the bottom holds the tab's actions, "Copy as
+/// prompt", and small menus for the model (every usable provider with its models) and the output language.
 /// `[mm:ss]` citations open the transcript at that time.
 struct AIPanelView: View {
+    let conversation: Conversation
     let model: AppModel
     @State private var transcript: Transcript?
     @State private var summary: String?
@@ -21,24 +22,17 @@ struct AIPanelView: View {
 
     var body: some View {
         VStack(spacing: 10) {
-            Picker("AI", selection: tabBinding) {
-                Text("Chat").tag(AppModel.AIFocus.chat)
-                Text("Summary").tag(AppModel.AIFocus.summary)
-            }
-            .pickerStyle(.segmented)
-            .labelsHidden()
-            .fixedSize()
             ZStack {
-                switch model.aiFocus {
-                case .chat: chatPane
-                case .summary: summaryPane
+                if model.detailTab == .chat {
+                    chatPane
+                } else {
+                    summaryPane
                 }
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
             errorText
             bottomBar
         }
-        .padding(12)
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
         .overlay(alignment: .bottom) { toastView }
         .environment(\.openURL, OpenURLAction(handler: openLink))
@@ -53,18 +47,14 @@ struct AIPanelView: View {
             Text(url.absoluteString)
         }
         .task { model.refreshInstalledModels() }
-        .task(id: LoadKey(id: conversation?.id, hasTranscript: conversation?.hasTranscript ?? false,
+        .task(id: LoadKey(id: conversation.id, hasTranscript: conversation.hasTranscript,
                           jobsEnded: model.aiJobsEnded)) { await load() }
     }
 
     private struct LoadKey: Equatable {
-        let id: UUID?
+        let id: UUID
         let hasTranscript: Bool
         let jobsEnded: Int
-    }
-
-    private var tabBinding: Binding<AppModel.AIFocus> {
-        Binding(get: { model.aiFocus }, set: { model.aiFocus = $0 })
     }
 
     // MARK: - Chat
@@ -151,12 +141,11 @@ struct AIPanelView: View {
 
     /// Why nothing can run for this conversation.
     private var emptyNote: String? {
-        guard let conversation else { return "No transcribed conversation yet." }
-        return conversation.hasTranscript ? nil : "This conversation has no transcript yet."
+        conversation.hasTranscript ? nil : "This conversation has no transcript yet."
     }
 
     @ViewBuilder private var errorText: some View {
-        if let error = model.aiError, error.conversationID == conversation?.id {
+        if let error = model.aiError, error.conversationID == conversation.id {
             Text(error.message)
                 .font(.callout)
                 .foregroundStyle(.red)
@@ -172,8 +161,7 @@ struct AIPanelView: View {
         VStack(alignment: .leading, spacing: 8) {
             busyElsewhere
             HStack(spacing: 12) {
-                switch model.aiFocus {
-                case .chat:
+                if model.detailTab == .chat {
                     TextField("Ask about this conversation", text: $question)
                         .textFieldStyle(.plain)
                         .onSubmit(ask)
@@ -184,7 +172,7 @@ struct AIPanelView: View {
                         iconButton("Ask", systemImage: "paperplane", action: ask)
                             .disabled(!canRun || question.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
                     }
-                case .summary:
+                } else {
                     if summaryJob != nil {
                         ProgressView().controlSize(.small)
                     }
@@ -199,7 +187,6 @@ struct AIPanelView: View {
                 }
             }
             HStack(spacing: 2) {
-                conversationMenu
                 modelMenu
                 languageMenu
                 Spacer(minLength: 0)
@@ -216,7 +203,7 @@ struct AIPanelView: View {
     /// A job of another conversation or of the other tab: it blocks Ask and Generate until it ends, so it says what
     /// runs and can be cancelled from here.
     @ViewBuilder private var busyElsewhere: some View {
-        if let job = model.aiJob, (model.aiFocus == .chat ? questionJob : summaryJob) == nil {
+        if let job = model.aiJob, (model.detailTab == .chat ? questionJob : summaryJob) == nil {
             let title = model.conversations.first { $0.id == job.conversationID }?.title ?? "another conversation"
             HStack(spacing: 6) {
                 ProgressView().controlSize(.small)
@@ -235,23 +222,9 @@ struct AIPanelView: View {
     private var copyButton: some View {
         iconButton("Copy as prompt", systemImage: "doc.on.clipboard", action: copyPrompt)
             .disabled(transcript == nil)
-            .help(model.aiFocus == .chat
+            .help(model.detailTab == .chat
                   ? "Copy the transcript and the question as a prompt for any chat app"
                   : "Copy the transcript as a summary prompt for any chat app")
-    }
-
-    private var conversationMenu: some View {
-        Menu {
-            Picker("Conversation", selection: conversationBinding) {
-                ForEach(conversations) { Text($0.title).tag(Optional($0.id)) }
-            }
-            .pickerStyle(.inline)
-            .labelsHidden()
-        } label: {
-            menuLabel(conversation?.title ?? "No conversation", systemImage: "text.bubble")
-        }
-        .modifier(CompactMenu(maxWidth: 130))
-        .help("Conversation")
     }
 
     /// Every provider with the models it offers, on this Mac first; Foundation Models shows why it cannot run.
@@ -372,21 +345,6 @@ struct AIPanelView: View {
 
     // MARK: - State
 
-    /// Transcribed conversations, plus the selected one even without a transcript.
-    private var conversations: [Conversation] {
-        model.conversations.filter { $0.hasTranscript || $0.id == model.selectedConversationID }
-    }
-
-    /// The card's conversation, else the newest transcribed one.
-    private var conversation: Conversation? {
-        let all = conversations
-        return all.first { $0.id == model.selectedConversationID } ?? all.first { $0.hasTranscript }
-    }
-
-    private var conversationBinding: Binding<UUID?> {
-        Binding(get: { conversation?.id }, set: { model.selectedConversationID = $0 })
-    }
-
     private var languageBinding: Binding<String> {
         Binding(get: { model.settings.summaryLanguage }, set: { value in model.updateSettings { $0.summaryLanguage = value } })
     }
@@ -397,12 +355,12 @@ struct AIPanelView: View {
     }
 
     private var summaryJob: AppModel.AIJob? {
-        guard let job = model.aiJob, job.conversationID == conversation?.id, job.kind == .summary else { return nil }
+        guard let job = model.aiJob, job.conversationID == conversation.id, job.kind == .summary else { return nil }
         return job
     }
 
     private var questionJob: AppModel.AIJob? {
-        guard let job = model.aiJob, job.conversationID == conversation?.id, job.kind != .summary else { return nil }
+        guard let job = model.aiJob, job.conversationID == conversation.id, job.kind != .summary else { return nil }
         return job
     }
 
@@ -411,10 +369,7 @@ struct AIPanelView: View {
     }
 
     private func load() async {
-        guard let folder = conversation?.folder else {
-            (transcript, summary, chat) = (nil, nil, [])
-            return
-        }
+        let folder = conversation.folder
         let (loaded, savedSummary, messages) = await Task.detached(priority: .utility) {
             (try? Transcript.read(from: folder), Conversation.readSummary(from: folder), ChatLog.read(from: folder).messages)
         }.value
@@ -423,7 +378,7 @@ struct AIPanelView: View {
     }
 
     private func start(_ kind: AppModel.AIJob.Kind) {
-        guard let conversation, let transcript, let provider = model.currentAIProvider else { return }
+        guard let transcript, let provider = model.currentAIProvider else { return }
         model.startAIJob(
             kind, conversation: conversation, transcript: transcript, summary: summary, history: chat,
             provider: provider, model: model.aiModel(for: provider))
@@ -437,9 +392,9 @@ struct AIPanelView: View {
     }
 
     private func copyPrompt() {
-        guard let conversation, let transcript else { return }
+        guard let transcript else { return }
         let prompt = PromptBuilder.copyPrompt(
-            conversation: conversation, transcript: transcript, question: model.aiFocus == .chat ? question : nil,
+            conversation: conversation, transcript: transcript, question: model.detailTab == .chat ? question : nil,
             languageSetting: model.settings.summaryLanguage)
         // Transient (nspasteboard.org) and this Mac only: clipboard managers and Universal Clipboard skip the transcript.
         let pasteboard = NSPasteboard.general
@@ -460,8 +415,8 @@ struct AIPanelView: View {
     /// dropped.
     private func openLink(_ url: URL) -> OpenURLAction.Result {
         if url.scheme == MarkdownText.citationScheme {
-            guard let id = conversation?.id,
-                  let seconds = Int(url.absoluteString.dropFirst(MarkdownText.citationScheme.count + 1)),
+            let id = conversation.id
+            guard let seconds = Int(url.absoluteString.dropFirst(MarkdownText.citationScheme.count + 1)),
                   (0...86_400).contains(seconds) else { return .discarded }
             withAnimation(.snappy) { model.openTranscript(conversationID: id, at: Double(seconds)) }
             return .handled

@@ -1,18 +1,20 @@
 import AppKit
+import Observation
 import os
 import Sparkle
 
 /// Sparkle updater, started only when `SUPublicEDKey` is a base64 Ed25519 public key (32 bytes); an empty or
 /// malformed key would show a misconfiguration alert.
 /// Background checks (at launch, then every `SUScheduledCheckInterval`) never pop Sparkle's dialog: a found update
-/// sets `updateAvailable`, which turns the menu bar menu's item into "Update Available…".
-/// The menu reads both flags each time it opens, so nothing observes them.
+/// sets `updateAvailable`, which turns the menu bar menu's item into "Update Available…" and shows the main window's
+/// Update button. The menu reads both flags each time it opens; the toolbar observes `updateAvailable`.
 @MainActor
+@Observable
 final class Updater: NSObject {
     private(set) var canCheck = false
     private(set) var updateAvailable = false
 
-    private var controller: SPUStandardUpdaterController!
+    @ObservationIgnored private var controller: SPUStandardUpdaterController!
 
     override init() {
         super.init()
@@ -20,6 +22,10 @@ final class Updater: NSObject {
     }
 
     func start() {
+        #if DEBUG
+        // VM check of the Update button.
+        if ProcessInfo.processInfo.arguments.contains("--fake-update") { updateAvailable = true }
+        #endif
         let key = (Bundle.main.object(forInfoDictionaryKey: "SUPublicEDKey") as? String ?? "")
             .trimmingCharacters(in: .whitespacesAndNewlines)
         guard Data(base64Encoded: key)?.count == 32 else {

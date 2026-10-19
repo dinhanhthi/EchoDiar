@@ -5,8 +5,8 @@ import EchoTranscribe
 import SwiftUI
 
 /// One conversation of the library: source app icon, title (double-click to rename), time, duration, size and
-/// status, then a bottom row with the transcription progress or its action and the AI, Summary, Reveal in Finder and
-/// Delete buttons. A click elsewhere opens the transcript.
+/// status, then a bottom row with the AI, Summary, Reveal in Finder and Delete buttons and the transcription progress
+/// or its action. A click elsewhere opens the transcript.
 struct ConversationCard: View {
     let conversation: Conversation
     let model: AppModel
@@ -21,14 +21,12 @@ struct ConversationCard: View {
                 title
                 details
                 TranscriptionFailureReason(conversation: conversation, model: model)
-                // The status and buttons have their own row, so the title and details keep the full width.
+                // The buttons and status have their own row under the title and details, from the same leading edge.
                 HStack(spacing: 12) {
-                    TranscriptionStatus(conversation: conversation, model: model)
-                    Spacer(minLength: 8)
-                    rowButton("AI", systemImage: "sparkles") { showAI(.chat) }
+                    rowButton("AI", systemImage: "sparkles") { model.open(conversation.id, tab: .chat) }
                         .help("Ask AI about this conversation")
                     if conversation.hasSummary {
-                        rowButton("Summary", systemImage: "text.alignleft") { showAI(.summary) }
+                        rowButton("Summary", systemImage: "text.alignleft") { model.open(conversation.id, tab: .summary) }
                             .help("Show the summary")
                     }
                     rowButton("Reveal in Finder", systemImage: "folder", action: revealInFinder)
@@ -36,6 +34,8 @@ struct ConversationCard: View {
                     rowButton("Delete", systemImage: "trash", action: delete)
                         .disabled(!canDelete)
                         .help("Move this conversation to the Trash")
+                    TranscriptionStatus(conversation: conversation, model: model)
+                    Spacer(minLength: 0)
                 }
             }
         }
@@ -126,11 +126,7 @@ struct ConversationCard: View {
     /// Not while the title is being edited: clicks in its field must not open the transcript.
     private func open() {
         guard !editing else { return }
-        withAnimation(.snappy) { model.openedConversationID = conversation.id }
-    }
-
-    private func showAI(_ focus: AppModel.AIFocus) {
-        withAnimation(.snappy) { model.showAI(conversationID: conversation.id, focus: focus) }
+        model.open(conversation.id)
     }
 
     private func revealInFinder() {

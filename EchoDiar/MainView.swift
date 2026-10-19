@@ -3,13 +3,12 @@ import EchoAudio
 import EchoCore
 import SwiftUI
 
-/// The main window, one page at a time: the open recording (while recording), the conversation library or the AI pane,
-/// picked in the toolbar next to Settings and Search; Record (or Stop and Pause) on the leading side.
+/// The main window, one page per `AppModel.Route`: the cards, a conversation, the open recording (while recording)
+/// or Settings. Back and Record (or Stop and Pause) on the leading side; Settings and Search on the trailing side.
 struct MainView: View {
     let model: AppModel
+    let updater: Updater
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
-    /// False while the window is hidden, minimized or covered, so the header stops its timers.
-    @State private var windowVisible = true
     @State private var query = ""
     /// `query` once typing pauses for 200 ms (at once when cleared): what the cards are filtered by.
     @State private var debouncedQuery = ""
@@ -22,9 +21,9 @@ struct MainView: View {
     @State private var windowWidth: CGFloat = 0
     /// Where the closed search bar was, in the window, while it shrinks back into the Search button.
     @State private var searchBarGhost: CGRect?
-    /// The page on screen; it follows `page` with an animation.
-    @State private var shownPage = AppModel.Tab.library
-    /// The last page change went to a page further right in the toolbar (Recording, Recordings, AI).
+    /// The route on screen; it follows `model.route`, with a slide when the page changes.
+    @State private var shownRoute = AppModel.Route.list
+    /// The last page change went to a page further right (list, entry, Settings).
     @State private var forward = true
 
     private struct SearchText {
@@ -32,8 +31,22 @@ struct MainView: View {
         let text: String
     }
 
-    init(model: AppModel) {
+    /// The pages that slide, left to right; moving between two conversations stays on the same page.
+    private enum Page: Int {
+        case list, entry, settings
+
+        init(_ route: AppModel.Route) {
+            switch route {
+            case .list: self = .list
+            case .conversation, .recording: self = .entry
+            case .settings: self = .settings
+            }
+        }
+    }
+
+    init(model: AppModel, updater: Updater) {
         self.model = model
+        self.updater = updater
     }
 
     var body: some View {
@@ -42,18 +55,28 @@ struct MainView: View {
                 GlobalTapNote(appName: targetName)
                     .padding([.horizontal, .top], 12)
             }
+            // Rendered from `shownRoute`, so the leaving page keeps its content while it slides out.
             ZStack {
-                switch shownPage {
-                case .live: livePane.transition(pageTransition)
-                case .library: libraryPane.transition(pageTransition)
-                case .ai: aiPane.transition(pageTransition)
+                switch Page(shownRoute) {
+                case .list: cardsPane.transition(pageTransition)
+                case .entry: entryPane.transition(pageTransition)
+                case .settings: SettingsView(model: model).transition(pageTransition)
                 }
             }
         }
         // Whoever switches the page (toolbar, menu, card, citation, a recording starting), it slides the same way.
-        .onChange(of: page, initial: true) { old, new in
-            forward = Self.order(new) >= Self.order(old)
-            withAnimation(Self.paneAnimation) { shownPage = new }
+        .onChange(of: model.route, initial: true) { old, new in
+            guard Page(old) != Page(new) else {
+                shownRoute = new
+                return
+            }
+            forward = Page(new).rawValue >= Page(old).rawValue
+            withAnimation(Self.paneAnimation) { shownRoute = new }
+            // Settings has no search: entering it closes the bar and clears the query.
+            if new == .settings {
+                query = ""
+                searchExpanded = false
+            }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(WindowGlass().ignoresSafeArea())
@@ -67,7 +90,6 @@ struct MainView: View {
                     .allowsHitTesting(false)
             }
         }
-        .frame(minWidth: 440, minHeight: 480)
         .onGeometryChange(for: CGFloat.self) { $0.size.width } action: { windowWidth = $0 }
         .task(id: query) {
             if !query.isEmpty { try? await Task.sleep(for: .milliseconds(200)) }
@@ -78,51 +100,58 @@ struct MainView: View {
             if presented { searchExpanded = true }
         }
         .toolbar {
-            if searchExpanded {
-                searchBarItem
-            } else {
+            // The compact window's search bar replaces every button; a wide one keeps Back, Record and Update.
+            if !searchExpanded || wide {
                 // In a narrow window the other buttons go to the overflow menu first.
                 if #available(macOS 26.1, *) {
-                    recordItem.visibilityPriority(.high)
+                    leadingItems.visibilityPriority(.high)
                 } else {
-                    recordItem
+                    leadingItems
                 }
-                // Pushes Settings and AI to the trailing edge.
-                if #available(macOS 26, *) {
-                    ToolbarSpacer(.flexible)
-                } else {
-                    ToolbarItem { Spacer() }
+            }
+            if searchExpanded {
+                if wide {
+                    flexibleSpacer
+                    updateItem
                 }
-                ToolbarItemGroup {
-                    if model.isRecording {
-                        pageToggle(.live, "Recording", systemImage: "waveform", help: "Show the recording (⌘1)")
+                searchBarItem
+            } else {
+                // Pushes the other capsules to the trailing edge.
+                flexibleSpacer
+                // Interim until the recording card replaces it.
+                if model.isRecording {
+                    ToolbarItemGroup {
+                        Toggle(isOn: Binding(
+                            get: { model.route == .recording },
+                            set: { if $0 { model.route = .recording } else { model.goBack() } }
+                        )) {
+                            Label("Recording", systemImage: "waveform")
+                        }
+                        .help("Show the recording (⌘1)")
                     }
-                    pageToggle(.library, "Recordings", systemImage: "list.bullet", help: "Show the recordings (⌘2)")
-                    pageToggle(.ai, "AI", systemImage: "sparkles", help: "Show the AI pane (⌘I)")
+                    fixedSpacer
                 }
-                // Settings and Search in their own capsule, after the pages.
-                if #available(macOS 26, *) {
-                    ToolbarSpacer(.fixed)
-                }
+                updateItem
                 ToolbarItemGroup {
-                    Button { SettingsWindow.shared.show(model: model) } label: {
+                    Toggle(isOn: Binding(
+                        get: { model.route == .settings },
+                        set: { if $0 { model.openSettings() } else { model.goBack() } }
+                    )) {
                         Label("Settings", systemImage: "slider.horizontal.3")
                     }
                     .help("Settings")
-                    Button(action: model.showSearch) {
-                        Label("Search", systemImage: "magnifyingglass")
+                    if model.route != .settings {
+                        Button(action: model.showSearch) {
+                            Label("Search", systemImage: "magnifyingglass")
+                        }
+                        .help("Search conversations (⌘F)")
                     }
-                    .help("Search conversations (⌘F)")
                 }
             }
         }
         .task { model.refreshTargets() }
         .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in
             if !model.isRecording { model.refreshTargets() }
-        }
-        .onReceive(NotificationCenter.default.publisher(for: NSWindow.didChangeOcclusionStateNotification)) { note in
-            guard let window = note.object as? NSWindow, window.contentViewController is NSHostingController<MainView> else { return }
-            windowVisible = window.occlusionState.contains(.visible)
         }
         .alert("Recording problem", isPresented: Binding(
             get: { model.recordingError != nil },
@@ -145,54 +174,93 @@ struct MainView: View {
         }
     }
 
-    /// While idle, one Record split button whose chevron picks the target and the language; while recording,
-    /// Stop (red, pulsing unless paused or Reduce Motion) and Pause/Resume in one group, like Settings and AI. ⌘R and
-    /// ⇧⌘P come from the main menu.
-    @ToolbarContentBuilder private var recordItem: some ToolbarContent {
-        if model.isRecording {
-            let paused = model.snapshot.state == .paused
-            ToolbarItemGroup(placement: .navigation) {
-                Button(action: model.toggleRecording) {
-                    Label {
-                        Text("Stop")
-                    } icon: {
-                        Image(systemName: "stop.circle.fill")
-                            .foregroundStyle(.red)
-                            .symbolEffect(.pulse, isActive: !paused && !reduceMotion && windowVisible)
-                    }
+    /// The leading capsule: Back (not on the list), then while idle one Record split button whose chevron picks the
+    /// target and the language; while recording, Stop (red, pulsing unless paused or Reduce Motion) and Pause/Resume.
+    /// ⌘R and ⇧⌘P come from the main menu.
+    @ToolbarContentBuilder private var leadingItems: some ToolbarContent {
+        ToolbarItemGroup(placement: .navigation) {
+            if model.route != .list {
+                Button(action: model.goBack) {
+                    Label("Back", systemImage: "chevron.left")
                 }
-                .disabled(model.isStarting)
-                .help("Stop recording (⌘R)")
-                Button(action: model.togglePause) {
-                    Label(paused ? "Resume" : "Pause", systemImage: paused ? "play.circle" : "pause.circle")
-                }
-                .help(paused ? "Resume recording (⇧⌘P)" : "Pause recording (⇧⌘P)")
+                .help("Back (Esc)")
             }
-        } else {
-            ToolbarItem(placement: .navigation) {
-                Menu {
-                    Toggle("All system audio", isOn: targetBinding(.global))
-                        // Menu content is built when the menu opens: apps that started playing since show up.
-                        .onAppear { model.refreshTargets() }
-                    if !model.targetGroups.isEmpty {
-                        Divider()
-                        ForEach(model.targetGroups, id: \.bundleID) { group in
-                            Toggle(group.needsGlobalTap ? "\(group.name) (records all system audio)" : group.name,
-                                   isOn: targetBinding(.app(group)))
-                        }
-                    }
-                    Divider()
-                    LanguagePicker(title: "Language", selection: languageBinding, model: model)
-                } label: {
-                    Label("Record", systemImage: "record.circle")
-                } primaryAction: {
-                    model.toggleRecording()
-                }
-                .disabled(model.isStarting)
-                .help("Record \(targetName) (⌘R)")
-            }
+            recordButtons
         }
     }
+
+    @ViewBuilder private var recordButtons: some View {
+        if model.isRecording {
+            let paused = model.snapshot.state == .paused
+            Button(action: model.toggleRecording) {
+                Label {
+                    Text("Stop")
+                } icon: {
+                    Image(systemName: "stop.circle.fill")
+                        .foregroundStyle(.red)
+                        .symbolEffect(.pulse, isActive: !paused && !reduceMotion && model.mainWindowVisible)
+                }
+            }
+            .disabled(model.isStarting)
+            .help("Stop recording (⌘R)")
+            Button(action: model.togglePause) {
+                Label(paused ? "Resume" : "Pause", systemImage: paused ? "play.circle" : "pause.circle")
+            }
+            .help(paused ? "Resume recording (⇧⌘P)" : "Pause recording (⇧⌘P)")
+        } else {
+            Menu {
+                Toggle("All system audio", isOn: targetBinding(.global))
+                    // Menu content is built when the menu opens: apps that started playing since show up.
+                    .onAppear { model.refreshTargets() }
+                if !model.targetGroups.isEmpty {
+                    Divider()
+                    ForEach(model.targetGroups, id: \.bundleID) { group in
+                        Toggle(group.needsGlobalTap ? "\(group.name) (records all system audio)" : group.name,
+                               isOn: targetBinding(.app(group)))
+                    }
+                }
+                Divider()
+                LanguagePicker(title: "Language", selection: languageBinding, model: model)
+            } label: {
+                Label("Record", systemImage: "record.circle")
+            } primaryAction: {
+                model.toggleRecording()
+            }
+            .disabled(model.isStarting)
+            .help("Record \(targetName) (⌘R)")
+        }
+    }
+
+    /// Its own capsule, before Settings and Search, while Sparkle found an update.
+    @ToolbarContentBuilder private var updateItem: some ToolbarContent {
+        if updater.updateAvailable {
+            ToolbarItem {
+                Button { updater.checkForUpdates() } label: {
+                    Label("Update", systemImage: "arrow.down.circle")
+                }
+                .help("Install the available update")
+            }
+            fixedSpacer
+        }
+    }
+
+    @ToolbarContentBuilder private var flexibleSpacer: some ToolbarContent {
+        if #available(macOS 26, *) {
+            ToolbarSpacer(.flexible)
+        } else {
+            ToolbarItem { Spacer() }
+        }
+    }
+
+    /// Separates two capsules on macOS 26.
+    @ToolbarContentBuilder private var fixedSpacer: some ToolbarContent {
+        if #available(macOS 26, *) {
+            ToolbarSpacer(.fixed)
+        }
+    }
+
+    /// A conversation, the recording or Settings: the window has its wide size.
+    private var wide: Bool { MainWindowLayout(model.route) == .wide }
 
     /// Checked when `target` is the selected one; matched by app, since process lists change.
     private func targetBinding(_ target: CaptureTarget) -> Binding<Bool> {
@@ -216,51 +284,43 @@ struct MainView: View {
         return "All system audio"
     }
 
-    /// A page button, shown selected while its page is on screen.
-    private func pageToggle(_ tab: AppModel.Tab, _ title: String, systemImage: String, help: String) -> some View {
-        Toggle(isOn: Binding(get: { page == tab }, set: { if $0 { model.selectedTab = tab } })) {
-            Label(title, systemImage: systemImage)
-        }
-        .help(help)
-    }
-
-    /// The selected page; the library once the recording it showed has ended.
-    private var page: AppModel.Tab {
-        model.selectedTab == .live && !model.isRecording ? .library : model.selectedTab
-    }
-
-    /// Left to right, as in the toolbar.
-    private static func order(_ tab: AppModel.Tab) -> Int {
-        switch tab {
-        case .live: 0
-        case .library: 1
-        case .ai: 2
-        }
-    }
-
-    /// The page switches, and the library's cards and transcript.
+    /// The page switches.
     private static let paneAnimation = Animation.snappy(duration: 0.25)
 
-    /// Pages slide in the toolbar's order: a page further right comes in from the trailing edge. While `page` is ahead
-    /// of `shownPage` the direction comes from both: the leaving page keeps the transition it last rendered with.
+    /// Pages slide in their order: a page further right comes in from the trailing edge. While the route is ahead of
+    /// `shownRoute` the direction comes from both: the leaving page keeps the transition it last rendered with.
     private var pageTransition: AnyTransition {
         if reduceMotion { return .opacity }
-        let forward = page == shownPage ? forward : Self.order(page) >= Self.order(shownPage)
+        let page = Page(model.route), shown = Page(shownRoute)
+        let forward = page == shown ? forward : page.rawValue >= shown.rawValue
         let (insertion, removal): (Edge, Edge) = forward ? (.trailing, .leading) : (.leading, .trailing)
         return .asymmetric(
             insertion: .move(edge: insertion).combined(with: .opacity),
             removal: .move(edge: removal).combined(with: .opacity))
     }
 
-    /// A slide from `edge` with a fade; only the fade with Reduce Motion.
-    private func paneTransition(from edge: Edge) -> AnyTransition {
-        reduceMotion ? .opacity : .move(edge: edge).combined(with: .opacity)
+    /// The shown conversation (its state and playback reset per conversation) or the recording; the cards when the
+    /// conversation is gone or the recording has ended.
+    @ViewBuilder private var entryPane: some View {
+        switch shownRoute {
+        case .conversation(let id):
+            if let conversation = model.conversations.first(where: { $0.id == id }) {
+                TranscriptView(conversation: conversation, model: model)
+                    .id(id)
+            } else {
+                cardsPane
+            }
+        case .recording where model.isRecording:
+            livePane
+        default:
+            cardsPane
+        }
     }
 
     /// The recording's clock, meters and language, then its live transcript filling the page.
     private var livePane: some View {
         VStack(spacing: 12) {
-            RecordingHeader(model: model, live: windowVisible)
+            RecordingHeader(model: model, live: model.mainWindowVisible)
             if let live = model.liveTranscript {
                 LiveTranscriptView(snapshot: live)
             } else {
@@ -273,25 +333,6 @@ struct MainView: View {
         }
         .padding(12)
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
-    }
-
-    /// The cards, or the opened conversation's transcript sliding in over them.
-    private var libraryPane: some View {
-        ZStack {
-            if let conversation = openedConversation {
-                TranscriptView(conversation: conversation, model: model)
-                    .id(conversation.id)
-                    .transition(paneTransition(from: .trailing))
-            } else {
-                cardsPane.transition(paneTransition(from: .leading))
-            }
-        }
-        .animation(Self.paneAnimation, value: model.openedConversationID)
-    }
-
-    /// nil when none is opened or it was deleted.
-    private var openedConversation: Conversation? {
-        model.openedConversationID.flatMap { id in model.conversations.first { $0.id == id } }
     }
 
     @ViewBuilder private var cardsPane: some View {
@@ -325,7 +366,7 @@ struct MainView: View {
         Binding(get: { model.searchPresented }, set: { model.searchPresented = $0 })
     }
 
-    /// The search bar alone in the toolbar, with its own glass: the toolbar's shared capsule would not follow its
+    /// The search bar in its own toolbar item, with its own glass: the toolbar's shared capsule would not follow its
     /// width while it grows and shrinks.
     @ToolbarContentBuilder private var searchBarItem: some ToolbarContent {
         if #available(macOS 26, *) {
@@ -336,7 +377,10 @@ struct MainView: View {
     }
 
     private var searchBar: some View {
-        ToolbarSearchBar(text: $query, focusRequest: searchPresented, windowWidth: windowWidth) { frame in
+        ToolbarSearchBar(
+            text: $query, focusRequest: searchPresented, windowWidth: windowWidth,
+            maxWidth: wide ? ToolbarSearchBar.wideWidth : nil
+        ) { frame in
             query = ""
             // The toolbar fades its buttons in, in an animated transaction, while the bar's ghost shrinks.
             if !reduceMotion { searchBarGhost = frame }
@@ -368,19 +412,18 @@ struct MainView: View {
         guard !Task.isCancelled else { return }
         for (id, text) in loaded { transcriptTexts[id] = text }
     }
-
-    private var aiPane: some View {
-        AIPanelView(model: model)
-    }
 }
 
 /// The main window's search bar, in place of the toolbar's buttons: it grows out of the Search button's place to the
-/// toolbar's width, and shrinks back before the buttons return. Not `.searchable`: the system search item widened
-/// when focused and pushed Record, Settings and AI into the toolbar's overflow menu in the 440 pt wide window.
+/// toolbar's width (or `maxWidth` at the trailing edge in a wide window), and shrinks back before the buttons return.
+/// Not `.searchable`: the system search item widened when focused and pushed Record, Settings and AI into the
+/// toolbar's overflow menu in the 440 pt wide window.
 private struct ToolbarSearchBar: View {
     static let height: CGFloat = 34
     /// From the window's trailing edge, like the toolbar's buttons.
     static let trailingInset: CGFloat = 8
+    /// In a wide window, which keeps Back, Record and Update beside the bar.
+    static let wideWidth: CGFloat = 360
     /// Growing and shrinking.
     static let animation = Animation.snappy(duration: 0.3)
 
@@ -388,6 +431,9 @@ private struct ToolbarSearchBar: View {
     /// ⌘F sets it to focus the field; false again once focused.
     @Binding var focusRequest: Bool
     let windowWidth: CGFloat
+    /// A fixed width after a flexible spacer (the bar then sits at the trailing edge); nil fills the toolbar from the
+    /// bar's leading edge.
+    let maxWidth: CGFloat?
     /// X or Escape, with the bar's frame in the window (top-left origin).
     let onClose: (CGRect) -> Void
     @State private var expanded = false
@@ -432,6 +478,7 @@ private struct ToolbarSearchBar: View {
 
     private var width: CGFloat {
         guard let origin else { return Self.height }
+        if let maxWidth { return maxWidth }
         return max(windowWidth - origin.x - Self.trailingInset, Self.height)
     }
 

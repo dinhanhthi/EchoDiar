@@ -11,11 +11,11 @@ struct ShortcutsSettingsView: View {
         ("Record / Stop", "⌘R"),
         ("Pause / Resume", "⇧⌘P"),
         ("Show the recording", "⌘1"),
-        ("Show the recordings", "⌘2"),
-        ("Show AI / back", "⌘I"),
+        ("Show the recordings list", "⌘2"),
+        ("Open the chat of the open conversation", "⌘I"),
         ("Search conversations", "⌘F"),
         ("Settings", "⌘,"),
-        ("Back to the library", "Esc"),
+        ("Back", "⌘[ / Esc"),
         ("Play / Pause the transcript audio", "Space"),
     ]
 
@@ -74,9 +74,11 @@ private struct HotKeyRecorder: View {
                     .foregroundStyle(.secondary)
             }
         }
-        // The monitor takes every key of the app: it stops when the user leaves the tab or the window.
+        // The monitor takes every key of the app: it stops when the user leaves the tab (kept alive, so no
+        // onDisappear), the Settings page or the window.
         .onDisappear(perform: stop)
         .onChange(of: model.settingsTab) { stop() }
+        .onChange(of: model.route) { stop() }
         .onReceive(NotificationCenter.default.publisher(for: NSWindow.didResignKeyNotification)) { _ in stop() }
     }
 

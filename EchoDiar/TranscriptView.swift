@@ -3,9 +3,14 @@ import EchoCore
 import EchoTranscribe
 import SwiftUI
 
-/// One conversation's transcript inside the main window: title (double-click to rename), details, speakers
-/// (click to rename), playback and actions, then the segments. A click on a segment plays from its start.
-/// Esc goes back to the library, Space plays or pauses.
+extension Notification.Name {
+    /// Space in the main window on a conversation's Transcript tab (posted by the app delegate's key monitor).
+    static let togglePlayback = Notification.Name("EchoDiar.togglePlayback")
+}
+
+/// One conversation inside the main window: title (double-click to rename), details, speakers (click to rename),
+/// playback and actions, then the Transcript, Summary and Chat tabs. A click on a segment plays from its start; Space
+/// plays or pauses. Stays mounted across tabs, so playback goes on in Summary and Chat.
 struct TranscriptView: View {
     let conversation: Conversation
     let model: AppModel
@@ -31,14 +36,31 @@ struct TranscriptView: View {
     var body: some View {
         VStack(spacing: 10) {
             header
-            content
+            // Interim tabs, restyled later.
+            Picker("View", selection: Binding(get: { model.detailTab }, set: { model.detailTab = $0 })) {
+                Text("Transcript").tag(AppModel.DetailTab.transcript)
+                Text("Summary").tag(AppModel.DetailTab.summary)
+                Text("Chat").tag(AppModel.DetailTab.chat)
+            }
+            .pickerStyle(.segmented)
+            .labelsHidden()
+            .fixedSize()
+            if model.detailTab == .transcript {
+                content
+            } else {
+                AIPanelView(conversation: conversation, model: model)
+            }
         }
         .padding(12)
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
-        .background(shortcutButtons)
         .task(id: conversation) { await load() }
         .task { model.refreshInstalledModels() }
         .onChange(of: model.pendingTranscriptTime) { showPendingTime() }
+        // Not while a title or speaker name is edited: the text field takes Space.
+        .onReceive(NotificationCenter.default.publisher(for: .togglePlayback)) { _ in
+            guard playback.isReady, !editingTitle, renaming == nil else { return }
+            playback.togglePlay()
+        }
         .onDisappear { playback.close() }
     }
 
@@ -47,14 +69,6 @@ struct TranscriptView: View {
     private var header: some View {
         VStack(alignment: .leading, spacing: 10) {
             HStack(spacing: 12) {
-                Button(action: close) {
-                    Label("Back", systemImage: "chevron.left")
-                        .labelStyle(.iconOnly)
-                        .font(.system(size: 15, weight: .semibold))
-                }
-                .buttonStyle(RowIconButtonStyle())
-                .foregroundStyle(.secondary)
-                .help("Back to the library (Esc)")
                 VStack(alignment: .leading, spacing: 4) {
                     title
                     details
@@ -167,8 +181,6 @@ struct TranscriptView: View {
             iconButton("Copy transcript", systemImage: "doc.on.doc", action: copyTranscript)
                 .disabled(transcript?.segments.isEmpty ?? true)
             retranscribeMenu
-            iconButton("AI", systemImage: "sparkles", action: showAI)
-                .help("Ask AI about this conversation")
             iconButton("Reveal in Finder", systemImage: "folder") {
                 NSWorkspace.shared.activateFileViewerSelecting([conversation.folder])
             }
@@ -380,15 +392,6 @@ struct TranscriptView: View {
         scrollTarget = segment.id
     }
 
-    private func close() {
-        withAnimation(.snappy) { model.openedConversationID = nil }
-    }
-
-    private func showAI() {
-        model.selectedConversationID = conversation.id
-        withAnimation(.snappy) { model.selectedTab = .ai }
-    }
-
     /// One "Name [mm:ss]: text" line per segment, with the renamed names.
     private func copyTranscript() {
         guard let transcript else { return }
@@ -402,22 +405,6 @@ struct TranscriptView: View {
     /// mm:ss; minutes go past 59 in recordings longer than an hour.
     static func timestamp(_ seconds: Double) -> String {
         Duration.seconds(seconds).formatted(.time(pattern: .minuteSecond(padMinuteToLength: 2)))
-    }
-
-    /// Hidden buttons for Esc (back) and Space (play or pause), off while a title or speaker name is edited so
-    /// the text field gets those keys.
-    private var shortcutButtons: some View {
-        ZStack {
-            Button("Back", action: close)
-                .keyboardShortcut(.escape, modifiers: [])
-            Button("Play or pause", action: playback.togglePlay)
-                .keyboardShortcut(.space, modifiers: [])
-                .disabled(!playback.isReady)
-        }
-        .disabled(editingTitle || renaming != nil)
-        .frame(width: 0, height: 0)
-        .opacity(0)
-        .accessibilityHidden(true)
     }
 }
 

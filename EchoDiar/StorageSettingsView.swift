@@ -12,8 +12,6 @@ struct StorageSettingsView: View {
     @State private var confirmingAutoDelete = false
     /// A mode or age change made while auto-delete is on that deletes more, waiting for its confirmation.
     @State private var pendingChange: PendingChange?
-    /// False while the Settings window is closed, minimized or covered: no scans then.
-    @State private var windowVisible = true
     @State private var confirmingAudioDelete = false
     @State private var deleting = false
     @State private var tab = Tab.usage
@@ -43,8 +41,8 @@ struct StorageSettingsView: View {
             case .autoDelete: autoDeleteSection
             }
         }
-        // Measured again after a deletion or a new conversation, and only while the tab is shown (it stays alive) in
-        // the Settings window on screen.
+        // Measured again after a deletion or a new conversation, and only while the tab is shown (it stays alive) on
+        // the Settings page of the main window on screen.
         .task(id: UsageKey(visible: shown, library: libraryKey, models: model.installedModelsBytes)) {
             guard shown else { return }
             usage = await model.storageUsage()
@@ -53,10 +51,6 @@ struct StorageSettingsView: View {
                              mode: model.settings.autoDeleteMode, library: libraryKey)) {
             guard shown else { return }
             preview = await model.retentionPreview(settings: model.settings)
-        }
-        .onReceive(NotificationCenter.default.publisher(for: NSWindow.didChangeOcclusionStateNotification)) { note in
-            guard let window = note.object as? NSWindow, window.frameAutosaveName == "SettingsSidebar" else { return }
-            windowVisible = window.occlusionState.contains(.visible)
         }
         .alert(
             "Delete the audio of \(transcribedWithAudio.count) transcribed conversation\(transcribedWithAudio.count == 1 ? "" : "s")?",
@@ -91,8 +85,8 @@ struct StorageSettingsView: View {
         }
     }
 
-    /// The Storage tab is selected and the Settings window is on screen.
-    private var shown: Bool { model.settingsTab == .storage && windowVisible }
+    /// The Storage tab is selected on the Settings page and the main window is on screen.
+    private var shown: Bool { model.route == .settings && model.settingsTab == .storage && model.mainWindowVisible }
 
     // MARK: - Usage
 

@@ -2,58 +2,6 @@ import AppKit
 import EchoCore
 import SwiftUI
 
-/// The Settings window: created once, reused on every open. Later phases add sections to `SettingsTab`.
-@MainActor
-final class SettingsWindow: NSObject, NSWindowDelegate {
-    static let shared = SettingsWindow()
-
-    private var window: NSWindow?
-
-    func show(model: AppModel) {
-        if window == nil {
-            let window = NSWindow(
-                contentRect: NSRect(x: 0, y: 0, width: 760, height: 540),
-                styleMask: [.titled, .closable, .miniaturizable, .resizable, .fullSizeContentView],
-                backing: .buffered,
-                defer: false
-            )
-            window.title = "Settings"
-            // Full-height sidebar under the traffic lights; the detail's toolbar shows back/forward and the section title.
-            window.titleVisibility = .visible
-            window.titlebarAppearsTransparent = true
-            window.contentMinSize = NSSize(width: 760, height: 520)
-            window.isReleasedWhenClosed = false
-            let hostingView = NSHostingView(rootView: SettingsView(model: model))
-            // The window keeps its size on every section; the forms scroll instead.
-            hostingView.sizingOptions = []
-            window.contentView = hostingView
-            // Not "Settings": that name holds the frame of the old fixed 600x540 window.
-            if !window.setFrameAutosaveName("SettingsSidebar") || !window.setFrameUsingName("SettingsSidebar") {
-                window.center()
-            }
-            window.delegate = self
-            self.window = window
-        }
-        // Same as the main window: a Dock icon while open, so Settings does not open behind other apps.
-        NSApp.setActivationPolicy(.regular)
-        Task { @MainActor [window] in
-            NSApp.activate(ignoringOtherApps: true)
-            window?.makeKeyAndOrderFront(nil)
-            window?.orderFrontRegardless()
-        }
-    }
-
-    func windowWillClose(_ notification: Notification) {
-        guard let closing = notification.object as? NSWindow else { return }
-        Task { @MainActor in
-            let otherWindowOpen = NSApp.windows.contains {
-                $0 !== closing && $0.isVisible && $0.styleMask.contains(.titled)
-            }
-            if !otherWindowOpen { NSApp.setActivationPolicy(.accessory) }
-        }
-    }
-}
-
 /// A sidebar section. Adding one: a case, its row in `label`, its view in `SettingsView.content`.
 enum SettingsTab: CaseIterable, Identifiable {
     case general, recording, transcription, providers, storage, shortcuts, about
@@ -73,21 +21,16 @@ enum SettingsTab: CaseIterable, Identifiable {
     }
 }
 
-/// Sidebar of sections, the selected one on the right. `AppModel.settingsTab` is the selection, so
-/// `openSettings(tab:)` deep-links.
-private struct SettingsView: View {
+/// The Settings page of the main window: sidebar of sections, the selected one on the right. `AppModel.settingsTab`
+/// is the selection, so `openSettings(tab:)` deep-links.
+struct SettingsView: View {
     @Bindable var model: AppModel
     /// Sections opened so far: kept alive like TabView's tabs, so leaving AI & Cloud does not rerun its scans.
     @State private var opened: Set<SettingsTab> = []
     @FocusState private var sidebarFocused: Bool
-    /// Sections visited before and after the current one, like Xcode's Settings arrows.
-    @State private var back: [SettingsTab] = []
-    @State private var forward: [SettingsTab] = []
-    /// Set while back/forward changes the selection, so `onChange` does not record it as a new visit.
-    @State private var navigating = false
 
     var body: some View {
-        NavigationSplitView {
+        HStack(spacing: 0) {
             List(selection: selection) {
                 ForEach(SettingsTab.allCases) { tab in
                     Label(tab.label.title, systemImage: tab.label.icon).tag(tab)
@@ -95,12 +38,8 @@ private struct SettingsView: View {
             }
             .listStyle(.sidebar)
             .focused($sidebarFocused)
-            // The hosted split view ignores the ideal width alone and opens the sidebar too narrow.
-            .frame(minWidth: 190)
-            .navigationSplitViewColumnWidth(min: 190, ideal: 200, max: 260)
-            // No toolbar in this window: keep the sidebar from being collapsed out of reach.
-            .toolbar(removing: .sidebarToggle)
-        } detail: {
+            .frame(width: 200)
+            Divider()
             ZStack {
                 ForEach(SettingsTab.allCases.filter(opened.contains)) { tab in
                     let selected = tab == model.settingsTab
@@ -111,46 +50,11 @@ private struct SettingsView: View {
                         .accessibilityHidden(!selected)
                 }
             }
-            .navigationTitle(model.settingsTab.label.title)
-            .toolbar {
-                ToolbarItemGroup(placement: .navigation) {
-                    Button("Back", systemImage: "chevron.left") { go(from: &back, to: &forward) }
-                        .disabled(back.isEmpty)
-                    Button("Forward", systemImage: "chevron.right") { go(from: &forward, to: &back) }
-                        .disabled(forward.isEmpty)
-                }
-            }
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
             .modifier(GlassForm())
-            // Opaque titlebar band behind the toolbar, so scrolled rows never show through the title.
-            .overlay(alignment: .top) {
-                GeometryReader { proxy in
-                    Rectangle()
-                        .fill(Color(nsColor: .windowBackgroundColor))
-                        .overlay(alignment: .bottom) { Divider() }
-                        .frame(height: proxy.safeAreaInsets.top)
-                        .ignoresSafeArea(.container, edges: .top)
-                }
-                .allowsHitTesting(false)
-            }
         }
         .onAppear { sidebarFocused = true }
-        .onChange(of: model.settingsTab, initial: true) { old, new in
-            opened.insert(new)
-            if navigating {
-                navigating = false
-            } else if old != new {
-                back.append(old)
-                forward.removeAll()
-            }
-        }
-    }
-
-    /// Moves to the last section of `source`, pushing the current one onto `other`.
-    private func go(from source: inout [SettingsTab], to other: inout [SettingsTab]) {
-        guard let tab = source.popLast() else { return }
-        other.append(model.settingsTab)
-        navigating = true
-        model.settingsTab = tab
+        .onChange(of: model.settingsTab, initial: true) { _, new in opened.insert(new) }
     }
 
     /// Ignores deselection (a click in the empty sidebar): a section is always shown.
