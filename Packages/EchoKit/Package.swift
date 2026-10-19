@@ -9,6 +9,7 @@ let package = Package(
         .library(name: "EchoAudio", targets: ["EchoAudio"]),
         .library(name: "EchoTranscribe", targets: ["EchoTranscribe"]),
         .library(name: "EchoAI", targets: ["EchoAI"]),
+        .library(name: "EchoLocalLLM", targets: ["EchoLocalLLM"]),
     ],
     dependencies: [
         // Same repo and tag as argmax-oss-swift 1.1.1; this URL keeps one package identity with speech-swift's dependency.
@@ -16,10 +17,11 @@ let package = Package(
         // traits: [] drops the default NemoTextProcessing trait (prebuilt Rust xcframework, only used for TTS/ITN).
         .package(url: "https://github.com/FluidInference/FluidAudio", exact: "0.17.7", traits: []),
         .package(url: "https://github.com/soniqo/speech-swift", exact: "0.0.28"),
-        // Not linked yet (EchoLocalLLM, Phase 9); declared now so both MLX users resolve together.
-        // speech-swift 0.0.28 pins mlx-swift-lm 3.31.4 and swift-transformers from 1.1.6.
+        // speech-swift 0.0.28 pins mlx-swift-lm 3.31.4 and takes mlx-swift from 0.30.0 and swift-transformers from
+        // 1.1.6; EchoLocalLLM pins the versions they resolve to.
         .package(url: "https://github.com/ml-explore/mlx-swift-lm", exact: "3.31.4"),
-        .package(url: "https://github.com/huggingface/swift-transformers", .upToNextMajor(from: "1.1.6")),
+        .package(url: "https://github.com/ml-explore/mlx-swift", exact: "0.31.6"),
+        .package(url: "https://github.com/huggingface/swift-transformers", exact: "1.3.5"),
     ],
     targets: [
         .target(
@@ -66,6 +68,18 @@ let package = Package(
             name: "EchoAITests",
             dependencies: ["EchoAI"],
             path: "Tests/EchoAITests"
+        ),
+        .target(
+            name: "EchoLocalLLM",
+            dependencies: [
+                "EchoCore",
+                "EchoAI",
+                .product(name: "MLX", package: "mlx-swift"),
+                .product(name: "MLXLLM", package: "mlx-swift-lm"),
+                .product(name: "MLXLMCommon", package: "mlx-swift-lm"),
+                .product(name: "Tokenizers", package: "swift-transformers"),
+            ],
+            swiftSettings: [.swiftLanguageMode(.v6)]
         ),
     ]
 )

@@ -59,7 +59,8 @@ struct MainView: View {
                 Button(action: toggleAI) {
                     Label(model.selectedTab == .ai ? "Library" : "AI", systemImage: "sparkles")
                 }
-                .help(model.selectedTab == .ai ? "Show the library" : "Show the AI pane")
+                .keyboardShortcut("i", modifiers: .command)
+                .help(model.selectedTab == .ai ? "Show the library (⌘I)" : "Show the AI pane (⌘I)")
             }
         }
         .task { model.refreshTargets() }
@@ -217,15 +218,7 @@ struct MainView: View {
     }
 
     private var aiPane: some View {
-        GlassCards {
-            Label("AI summaries and questions arrive in a later version", systemImage: "sparkles")
-                .foregroundStyle(.secondary)
-                .padding(.horizontal, 20)
-                .padding(.vertical, 16)
-                .modifier(GlassCard(cornerRadius: 20))
-        }
-        .padding(12)
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        AIPanelView(model: model)
     }
 }
 

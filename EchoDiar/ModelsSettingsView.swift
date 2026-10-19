@@ -4,15 +4,17 @@ import EchoTranscribe
 import SwiftUI
 
 /// The Transcription tab: the default language, the live transcript switch and engine, then the ASR and diarization
-/// catalog by tier, with Download, Cancel, Delete and Set default, then the configured cloud engines. Rows that cannot
-/// transcribe the default language are disabled with a note.
+/// catalog by tier, with Download, Cancel, Delete and Set default, then the AI models (Foundation Models status, MLX
+/// downloads) and the configured cloud engines. Rows that cannot transcribe the default language are disabled with a
+/// note.
 struct ModelsSettingsView: View {
     let model: AppModel
 
-    /// LLM entries join in Phase 9.
     private static let entries = ModelCatalog.visibleEntries(
         registeredEngineRuntimes: TranscriptionPipeline.registeredRuntimes
     ).filter { $0.kind != .llm }
+
+    private static let mlxEntries = ModelCatalog.llm.filter { $0.runtime == .mlx }
 
     var body: some View {
         VStack(spacing: 0) {
@@ -39,6 +41,7 @@ struct ModelsSettingsView: View {
                         }
                     }
                 }
+                llmSection
                 cloudSection
             }
             .formStyle(.grouped)
@@ -53,6 +56,22 @@ struct ModelsSettingsView: View {
             .padding(.bottom, 12)
         }
         .task { model.refreshInstalledModels() }
+    }
+
+    /// Models for summaries and chat: Apple Foundation Models' status (macOS 26), then the MLX downloads.
+    private var llmSection: some View {
+        Section("AI models (summaries and chat)") {
+            if #available(macOS 26, *), PlatformFeatures.foundationModels {
+                LabeledContent("Apple Foundation Models (system)") {
+                    if let reason = AppleFoundationModelProvider.unavailableReason {
+                        Text(reason).foregroundStyle(.secondary)
+                    } else {
+                        Label("Available", systemImage: "checkmark.circle.fill").foregroundStyle(.green)
+                    }
+                }
+            }
+            ForEach(Self.mlxEntries) { ModelRow(entry: $0, model: model) }
+        }
     }
 
     /// Configured cloud engines (AI & Cloud: enabled, with a key and a model) with Set default.

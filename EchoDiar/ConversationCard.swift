@@ -25,7 +25,7 @@ struct ConversationCard: View {
             .layoutPriority(1)
             Spacer(minLength: 8)
             TranscriptionStatus(conversation: conversation, model: model)
-            Button(action: showAI) {
+            Button { showAI(.chat) } label: {
                 Label("AI", systemImage: "sparkles")
                     .labelStyle(.iconOnly)
                     .font(.system(size: 15))
@@ -34,7 +34,7 @@ struct ConversationCard: View {
             .foregroundStyle(.secondary)
             .help("Ask AI about this conversation")
             if conversation.hasSummary {
-                Button(action: showAI) {
+                Button { showAI(.summary) } label: {
                     Label("Summary", systemImage: "text.alignleft")
                         .labelStyle(.iconOnly)
                         .font(.system(size: 15))
@@ -121,9 +121,8 @@ struct ConversationCard: View {
         withAnimation(.snappy) { model.openedConversationID = conversation.id }
     }
 
-    private func showAI() {
-        model.selectedConversationID = conversation.id
-        withAnimation(.snappy) { model.selectedTab = .ai }
+    private func showAI(_ focus: AppModel.AIFocus) {
+        withAnimation(.snappy) { model.showAI(conversationID: conversation.id, focus: focus) }
     }
 
     private func confirmDelete() {

@@ -5,6 +5,7 @@ import AVFoundation
 import EchoAI
 import EchoAudio
 import EchoCore
+import EchoLocalLLM
 import EchoTranscribe
 import Foundation
 import Observation
@@ -64,6 +65,16 @@ final class AppModel {
     private(set) var liveTranscript: LiveTranscriber.Snapshot?
     /// Apple Speech locales reserved by EchoDiar (BCP-47), read with the installed models.
     private(set) var appleSpeechReservedLocales: [String] = []
+    /// The running summary or question; one at a time.
+    private(set) var aiJob: AIJob?
+    /// Why the last AI job of a conversation failed.
+    private(set) var aiError: (conversationID: UUID, message: String)?
+    /// Bumped when an AI job ends, so the AI tab reloads `summary.md` and `chat.json`.
+    private(set) var aiJobsEnded = 0
+    /// Where the AI tab scrolls to when a card opens it.
+    var aiFocus: AIFocus = .chat
+    /// Recording time of the last clicked citation, for the opened transcript.
+    var pendingTranscriptTime: Double?
 
     struct PendingCloudRun {
         let providerID: String
@@ -74,6 +85,47 @@ final class AppModel {
         let conversationID: UUID
         let folder: URL
         let language: String?
+    }
+
+    enum AIFocus { case summary, chat }
+
+    struct AIJob {
+        enum Kind: Equatable { case summary, question(String) }
+        let conversationID: UUID
+        let kind: Kind
+        /// What a long summary is doing before its text starts.
+        var status: String?
+        /// The answer so far.
+        var text = ""
+        var task: Task<Void, Never>?
+    }
+
+    /// A provider the AI tab offers: an in-app model (LLM catalog entry id) or a configured `ProviderConfig`.
+    struct AIProvider: Identifiable {
+        enum Kind { case inApp, localHost, cloud, cli }
+        let id: String
+        let name: String
+        let kind: Kind
+        /// The config's model; the entry id for in-app models.
+        let defaultModel: String
+        /// Why it cannot run now (Foundation Models); nil when it can.
+        var unavailableReason: String?
+        var cliPreset: CLIPreset?
+        /// A local host whose base URL is not a loopback address (another machine on the network).
+        var remoteHost = false
+
+        var leavesMac: Bool { kind == .cloud || kind == .cli || remoteHost }
+
+        /// Whether `baseURL`'s host is this Mac: localhost, 127.0.0.0/8 or ::1.
+        static func isLoopback(baseURL: String) -> Bool {
+            guard let host = URL(string: baseURL.trimmingCharacters(in: .whitespaces))?.host()?.lowercased() else {
+                return false
+            }
+            let bare = host.trimmingCharacters(in: CharacterSet(charactersIn: "[]"))
+            if bare == "localhost" || bare == "::1" { return true }
+            let octets = bare.split(separator: ".", omittingEmptySubsequences: false)
+            return octets.count == 4 && octets[0] == "127" && octets.allSatisfy { UInt8($0) != nil }
+        }
     }
 
     struct ModelDownload {
@@ -99,6 +151,7 @@ final class AppModel {
     /// The single "one heavy model at a time" lock, shared by the pipeline and live captions.
     @ObservationIgnored let modelGate = ModelLoadGate()
     @ObservationIgnored let pipeline: TranscriptionPipeline
+    @ObservationIgnored let aiService: AIService
     @ObservationIgnored private let compressor = AudioCompressor()
     @ObservationIgnored private let store: SettingsStore
     @ObservationIgnored private var recovery: Task<[RecoveredResult], Never>?
@@ -108,6 +161,7 @@ final class AppModel {
     /// `supportedLanguages(engineID:)` by catalog id, sorted by name once.
     @ObservationIgnored private var languageCache: [String: [String]] = [:]
     @ObservationIgnored private var liveTranscriber: LiveTranscriber?
+    @ObservationIgnored private var savedKeys: [String: Bool] = [:]
 
     init(store: SettingsStore = SettingsStore()) {
         self.store = store
@@ -117,6 +171,7 @@ final class AppModel {
         let modelStore = ModelStore()
         self.modelStore = modelStore
         pipeline = TranscriptionPipeline(modelStore: modelStore, gate: modelGate)
+        aiService = AIService(gate: modelGate)
     }
 
     /// Called once by the AppDelegate after the main window is built. Dispatches the DEBUG harness launch args
@@ -509,7 +564,19 @@ final class AppModel {
         }
     }
 
-    func keychainChanged() { keychainVersion += 1 }
+    func keychainChanged() {
+        savedKeys = [:]
+        keychainVersion += 1
+    }
+
+    /// Whether provider `id` has a key in the Keychain; cached until `keychainChanged()`, since the AI tab asks on
+    /// every update of a streamed answer.
+    func hasSavedKey(_ id: String) -> Bool {
+        if let cached = savedKeys[id] { return cached }
+        let saved = (try? KeychainStore.hasAPIKey(forProvider: id)) == true
+        savedKeys[id] = saved
+        return saved
+    }
 
     /// "Deepgram (nova-3)"; the provider name alone when it picks the model.
     func cloudEngineName(_ config: ProviderConfig) -> String {
@@ -698,6 +765,7 @@ final class AppModel {
     func removeProvider(id: String) {
         updateSettings { $0.providers.removeAll { $0.id == id } }
         try? KeychainStore.deleteAPIKey(forProvider: id)
+        savedKeys[id] = nil
     }
 
     /// The client for `config`, with its Keychain key; nil for an unknown CLI preset.
@@ -714,6 +782,151 @@ final class AppModel {
         case .speechToText:
             return nil
         }
+    }
+
+    /// The in-app model of LLM catalog entry `entryID`; nil when it is not installed or needs macOS 26. Callers run
+    /// it inside `modelGate` (owner `.llm`); Foundation Models reports why it is unavailable when streaming.
+    nonisolated func makeLocalProvider(entryID: String) -> (any LLMProvider)? {
+        guard let entry = ModelCatalog.entry(id: entryID), entry.kind == .llm else { return nil }
+        switch entry.runtime {
+        case .foundationModels:
+            guard #available(macOS 26, *), PlatformFeatures.foundationModels else { return nil }
+            return AppleFoundationModelProvider()
+        case .mlx:
+            guard modelStore.isInstalled(entryID), let folder = modelStore.folder(for: entryID) else { return nil }
+            return MLXProvider(entryID: entryID, folder: folder)
+        default:
+            return nil
+        }
+    }
+}
+
+// MARK: - AI tab
+
+extension AppModel {
+    /// Apple Foundation Models (with its unavailable reason), installed MLX models, then the enabled providers with
+    /// what they need (base URL, saved key).
+    var aiProviders: [AIProvider] {
+        _ = keychainVersion
+        var providers: [AIProvider] = []
+        for entry in ModelCatalog.llm {
+            if entry.runtime == .foundationModels {
+                providers.append(AIProvider(
+                    id: entry.id, name: entry.displayName, kind: .inApp, defaultModel: entry.id,
+                    unavailableReason: Self.foundationModelsUnavailableReason))
+            } else if entry.runtime == .mlx, installedModelIDs.contains(entry.id) {
+                providers.append(AIProvider(id: entry.id, name: entry.displayName, kind: .inApp, defaultModel: entry.id))
+            }
+        }
+        for config in providerConfigs where config.enabled && config.kind != .speechToText {
+            let kind: AIProvider.Kind
+            switch config.kind {
+            case .cli: kind = .cli
+            case .local: kind = .localHost
+            default: kind = .cloud
+            }
+            if kind != .cli {
+                guard !config.baseURL.trimmingCharacters(in: .whitespaces).isEmpty,
+                      config.authStyle == .none || hasSavedKey(config.id) else { continue }
+            }
+            providers.append(AIProvider(
+                id: config.id, name: config.displayName, kind: kind, defaultModel: config.defaultModel,
+                cliPreset: kind == .cli ? CLIPreset(rawValue: config.preset ?? "") : nil,
+                remoteHost: kind == .localHost && !AIProvider.isLoopback(baseURL: config.baseURL)))
+        }
+        return providers
+    }
+
+    static var foundationModelsUnavailableReason: String? {
+        if #available(macOS 26, *) { return AppleFoundationModelProvider.unavailableReason }
+        return "Apple Foundation Models need macOS 26."
+    }
+
+    /// The default provider when it can run, else the first one that can.
+    var currentAIProvider: AIProvider? {
+        let usable = aiProviders.filter { $0.unavailableReason == nil }
+        return usable.first { $0.id == settings.defaultAIProviderID } ?? usable.first
+    }
+
+    /// The saved model for the default provider, else the provider's own.
+    func aiModel(for provider: AIProvider) -> String {
+        if provider.id == settings.defaultAIProviderID, let model = settings.defaultAIModel, !model.isEmpty { return model }
+        return provider.defaultModel
+    }
+
+    func setAIProvider(_ id: String) {
+        updateSettings {
+            $0.defaultAIProviderID = id
+            $0.defaultAIModel = nil
+        }
+    }
+
+    func showAI(conversationID: UUID, focus: AIFocus) {
+        selectedConversationID = conversationID
+        aiFocus = focus
+        selectedTab = .ai
+    }
+
+    /// Shows the conversation's transcript and keeps `time` for it to scroll and seek to.
+    func openTranscript(conversationID: UUID, at time: Double) {
+        pendingTranscriptTime = time
+        openedConversationID = conversationID
+        selectedTab = .library
+    }
+
+    /// Starts a summary or a question with `provider` and `model` (saved as the AI tab default). `summary` and
+    /// `history` are the conversation's saved summary and chat, sent with a question.
+    func startAIJob(
+        _ kind: AIJob.Kind, conversation: Conversation, transcript: Transcript, summary: String?,
+        history: [ChatLog.Message], provider: AIProvider, model: String
+    ) {
+        guard aiJob == nil else { return }
+        let model = model.trimmingCharacters(in: .whitespacesAndNewlines)
+        updateSettings {
+            $0.defaultAIProviderID = provider.id
+            $0.defaultAIModel = model == provider.defaultModel ? nil : model
+        }
+        aiError = nil
+        let client = provider.kind == .inApp
+            ? makeLocalProvider(entryID: provider.id)
+            : providerConfigs.first { $0.id == provider.id }.flatMap(makeProvider(for:))
+        guard let client else {
+            aiError = (conversation.id, "\(provider.name) is not available.")
+            return
+        }
+        let stream = switch kind {
+        case .summary:
+            aiService.summarize(
+                conversation: conversation, transcript: transcript, provider: client, model: model,
+                language: settings.summaryLanguage)
+        case .question(let question):
+            aiService.ask(
+                question: question, conversation: conversation, transcript: transcript, summary: summary,
+                history: history, provider: client, providerID: provider.id, model: model)
+        }
+        let task = Task { [weak self] in
+            do {
+                for try await update in stream {
+                    switch update {
+                    case .status(let status): self?.aiJob?.status = status
+                    case .text(let text):
+                        self?.aiJob?.status = nil
+                        self?.aiJob?.text += text
+                    }
+                }
+            } catch where !Task.isCancelled {
+                self?.aiError = (conversation.id, error.localizedDescription)
+            } catch {}
+            guard let self else { return }
+            aiJob = nil
+            aiJobsEnded += 1
+            await library.refresh()
+        }
+        aiJob = AIJob(conversationID: conversation.id, kind: kind, task: task)
+    }
+
+    func cancelAIJob() {
+        aiJob?.task?.cancel()
     }
 }
 

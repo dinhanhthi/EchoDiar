@@ -27,6 +27,12 @@ public struct AppSettings: Codable, Equatable, Sendable {
     /// Destinations (`<provider id>@<scheme://host[:port]>`) whose one-time "audio leaves this Mac" confirmation for
     /// cloud transcription was accepted; a changed base URL asks again (older bare provider ids no longer match).
     public var cloudSTTConfirmed: [String]
+    /// AI tab provider: a `ProviderConfig` id or an LLM catalog entry id (Foundation Models, MLX); nil = none picked.
+    public var defaultAIProviderID: String?
+    /// Model for `defaultAIProviderID`; nil = that config's `defaultModel`.
+    public var defaultAIModel: String?
+    /// Summary language: "auto" (the transcript's dominant language), "en", "fr", "vi" or another BCP-47 code.
+    public var summaryLanguage: String
 
     public static let defaultLiveTranscriptEngine = "whisperkit-turbo-632"
 
@@ -41,7 +47,10 @@ public struct AppSettings: Codable, Equatable, Sendable {
         liveTranscriptEngine: String = AppSettings.defaultLiveTranscriptEngine,
         defaultASRModelID: String? = nil,
         providers: [ProviderConfig] = [],
-        cloudSTTConfirmed: [String] = []
+        cloudSTTConfirmed: [String] = [],
+        defaultAIProviderID: String? = nil,
+        defaultAIModel: String? = nil,
+        summaryLanguage: String = "auto"
     ) {
         self.launchAtLogin = launchAtLogin
         self.defaultLanguage = defaultLanguage
@@ -54,12 +63,15 @@ public struct AppSettings: Codable, Equatable, Sendable {
         self.defaultASRModelID = defaultASRModelID
         self.providers = providers
         self.cloudSTTConfirmed = cloudSTTConfirmed
+        self.defaultAIProviderID = defaultAIProviderID
+        self.defaultAIModel = defaultAIModel
+        self.summaryLanguage = summaryLanguage
     }
 
     private enum CodingKeys: String, CodingKey {
         case version, launchAtLogin, defaultLanguage, recentLanguages, compressionBitrateKbps, keepUncompressedAudio
         case onboardingCompleted, liveTranscript, liveTranscriptEngine, defaultASRModelID, providers
-        case cloudSTTConfirmed
+        case cloudSTTConfirmed, defaultAIProviderID, defaultAIModel, summaryLanguage
     }
 
     public init(from decoder: Decoder) throws {
@@ -77,6 +89,9 @@ public struct AppSettings: Codable, Equatable, Sendable {
         defaultASRModelID = try container.decodeIfPresent(String.self, forKey: .defaultASRModelID)
         providers = try container.decodeIfPresent([ProviderConfig].self, forKey: .providers) ?? []
         cloudSTTConfirmed = try container.decodeIfPresent([String].self, forKey: .cloudSTTConfirmed) ?? []
+        defaultAIProviderID = try container.decodeIfPresent(String.self, forKey: .defaultAIProviderID)
+        defaultAIModel = try container.decodeIfPresent(String.self, forKey: .defaultAIModel)
+        summaryLanguage = try container.decodeIfPresent(String.self, forKey: .summaryLanguage) ?? "auto"
     }
 }
 

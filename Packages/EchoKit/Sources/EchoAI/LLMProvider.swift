@@ -24,6 +24,44 @@ public protocol LLMProvider: Sendable {
     func contextWindow(model: String) async -> Int
 }
 
+/// An in-app model (Foundation Models, MLX). `AIService` loads it once per job inside `ModelLoadGate` (owner `.llm`)
+/// and calls the generator directly in the job's task, so the model is unloaded before the gate is released.
+public protocol LocalLLMProvider: LLMProvider {
+    /// Loads the model, runs `body` with it, then unloads it and restores any process-wide state. Returns (or
+    /// throws) only once the model is unloaded, also when `body` throws or the task is cancelled.
+    func withLoadedModel<T: Sendable>(
+        model: String, _ body: @Sendable (any LocalLLMGenerator) async throws -> T
+    ) async throws -> T
+}
+
+/// A loaded in-app model, valid inside `LocalLLMProvider.withLoadedModel`.
+public protocol LocalLLMGenerator: Sendable {
+    /// Passes the pieces of the answer to `onText` and returns the whole answer once generation has stopped
+    /// (early, without throwing, when the task is cancelled).
+    func generate(
+        messages: [LLMMessage], maxTokens: Int, onText: @escaping @Sendable (String) -> Void
+    ) async throws -> String
+}
+
+extension LocalLLMProvider {
+    /// One answer with the model loaded for it alone (no `ModelLoadGate`); `AIService` uses `withLoadedModel`.
+    public func stream(messages: [LLMMessage], model: String, maxTokens: Int) -> AsyncThrowingStream<String, Error> {
+        AsyncThrowingStream { continuation in
+            let task = Task(priority: .utility) {
+                do {
+                    _ = try await withLoadedModel(model: model) { generator in
+                        try await generator.generate(messages: messages, maxTokens: maxTokens) { continuation.yield($0) }
+                    }
+                    continuation.finish()
+                } catch {
+                    continuation.finish(throwing: error)
+                }
+            }
+            continuation.onTermination = { _ in task.cancel() }
+        }
+    }
+}
+
 public enum LLMError: Error, LocalizedError {
     case invalidBaseURL(String)
     case httpStatus(Int, String)

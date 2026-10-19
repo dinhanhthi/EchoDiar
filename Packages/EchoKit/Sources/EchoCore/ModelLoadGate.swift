@@ -8,7 +8,7 @@ import Foundation
 /// batch job already running finishes first, so live captions started during it wait for its end.
 public actor ModelLoadGate {
     public enum Owner: String, Sendable {
-        case liveTranscript, transcriptionJob
+        case liveTranscript, transcriptionJob, llm
     }
 
     private struct Waiter {

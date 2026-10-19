@@ -31,6 +31,8 @@ targets:
         product: EchoTranscribe
       - package: EchoKit
         product: EchoAI
+      - package: EchoKit
+        product: EchoLocalLLM
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: dinh.thi.EchoDiar

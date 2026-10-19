@@ -131,6 +131,90 @@ public struct Conversation: Codable, Equatable, Identifiable, Sendable {
         conversation.folder = folder
         return conversation
     }
+
+    /// The AI summary (Markdown) next to `conversation.json`.
+    public static let summaryFileName = "summary.md"
+
+    /// The saved summary; nil when there is none.
+    public static func readSummary(from folder: URL) -> String? {
+        try? String(contentsOf: folder.appendingPathComponent(summaryFileName), encoding: .utf8)
+    }
+
+    /// Writes `summary.md` atomically and sets `hasSummary` in a freshly read `conversation.json` (`self` when the
+    /// folder has none yet), so a status written meanwhile survives.
+    public func writeSummary(_ summary: String) throws {
+        try Data(summary.utf8).write(to: folder.appendingPathComponent(Self.summaryFileName), options: .atomic)
+        var stored = (try? Conversation.read(from: folder)) ?? self
+        stored.hasSummary = true
+        try stored.write()
+    }
+}
+
+/// The `chat.json` file format, version 1: the AI tab's questions and answers about one conversation, oldest first.
+/// Dates are ISO 8601. Only `role` and `text` are required in a message.
+public struct ChatLog: Codable, Equatable, Sendable {
+    public struct Message: Codable, Equatable, Sendable {
+        public enum Role: String, Codable, Sendable {
+            case user, assistant
+        }
+
+        public var role: Role
+        public var text: String
+        /// The AI tab provider id (`ProviderConfig` id or LLM catalog entry id); answers only.
+        public var provider: String?
+        public var model: String?
+        public var timestamp: Date?
+
+        public init(role: Role, text: String, provider: String? = nil, model: String? = nil, timestamp: Date? = Date()) {
+            self.role = role
+            self.text = text
+            self.provider = provider
+            self.model = model
+            self.timestamp = timestamp
+        }
+    }
+
+    public static let fileName = "chat.json"
+
+    public var version = 1
+    public var messages: [Message]
+
+    public init(messages: [Message] = []) {
+        self.messages = messages
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case version, messages
+    }
+
+    public init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        version = try c.decodeIfPresent(Int.self, forKey: .version) ?? 1
+        messages = try c.decodeIfPresent([Message].self, forKey: .messages) ?? []
+    }
+
+    /// An empty log when the file is missing or unreadable.
+    public static func read(from folder: URL) -> ChatLog {
+        guard let data = try? Data(contentsOf: folder.appendingPathComponent(fileName)) else { return ChatLog() }
+        return (try? decode(data)) ?? ChatLog()
+    }
+
+    public func write(to folder: URL) throws {
+        try encoded().write(to: folder.appendingPathComponent(Self.fileName), options: .atomic)
+    }
+
+    public func encoded() throws -> Data {
+        let encoder = JSONEncoder()
+        encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
+        encoder.dateEncodingStrategy = .iso8601
+        return try encoder.encode(self)
+    }
+
+    public static func decode(_ data: Data) throws -> ChatLog {
+        let decoder = JSONDecoder()
+        decoder.dateDecodingStrategy = .iso8601
+        return try decoder.decode(ChatLog.self, from: data)
+    }
 }
 
 /// Paths inside a conversation folder built from untrusted names, such as `session.audioFileName`.
