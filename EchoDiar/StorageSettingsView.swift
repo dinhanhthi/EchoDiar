@@ -50,7 +50,19 @@ struct StorageSettingsView: View {
             autoDeleteSection
             Section {
                 LabeledContent("Data folder") {
-                    Button("Open in Finder") { NSWorkspace.shared.open(RecordingSession.conversationsRoot) }
+                    HStack {
+                        Text((RecordingSession.conversationsRoot.path as NSString).abbreviatingWithTildeInPath)
+                            .foregroundStyle(.secondary)
+                            .lineLimit(1)
+                            .truncationMode(.middle)
+                            .textSelection(.enabled)
+                        Button("Open in Finder") {
+                            let root = RecordingSession.conversationsRoot
+                            // Created on the first recording, so it may not exist yet.
+                            try? FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+                            NSWorkspace.shared.open(root)
+                        }
+                    }
                 }
             }
         }
