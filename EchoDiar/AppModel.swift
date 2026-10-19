@@ -1053,9 +1053,13 @@ final class AppModel {
         savedKeys[id] = nil
     }
 
-    /// The client for `config`, with its Keychain key; nil for an unknown CLI preset.
-    nonisolated func makeProvider(for config: ProviderConfig) -> (any LLMProvider)? {
-        let apiKey = config.authStyle == .none ? nil : try? KeychainStore.apiKey(forProvider: config.id)
+    /// The client for `config`, with its Keychain key; nil for an unknown CLI preset. Throws when the Keychain
+    /// refuses the key, or a preset that needs one has none: sent without it, the provider only answers HTTP 401.
+    nonisolated func makeProvider(for config: ProviderConfig) throws -> (any LLMProvider)? {
+        let apiKey = config.authStyle == .none ? nil : try KeychainStore.apiKey(forProvider: config.id)
+        if config.preset != nil, config.authStyle != .none, apiKey?.isEmpty ?? true {
+            throw LLMError.provider("Save a key first.")
+        }
         switch config.kind {
         case .cli:
             guard let preset = CLIPreset(rawValue: config.preset ?? "") else { return nil }
@@ -1179,9 +1183,15 @@ extension AppModel {
             $0.defaultAIModel = model == provider.defaultModel ? nil : model
         }
         aiError = nil
-        let client = provider.kind == .inApp
-            ? makeLocalProvider(entryID: provider.id)
-            : providerConfigs.first { $0.id == provider.id }.flatMap(makeProvider(for:))
+        let client: (any LLMProvider)?
+        do {
+            client = provider.kind == .inApp
+                ? makeLocalProvider(entryID: provider.id)
+                : try providerConfigs.first { $0.id == provider.id }.flatMap(makeProvider(for:))
+        } catch {
+            aiError = (conversation.id, "\(provider.name): \(error.localizedDescription)")
+            return
+        }
         guard let client else {
             aiError = (conversation.id, "\(provider.name) is not available.")
             return

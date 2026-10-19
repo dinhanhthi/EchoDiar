@@ -690,7 +690,13 @@ private struct TestButton: View {
         result = nil
         // A key pasted without Return is tested, not the one already in the Keychain.
         if let pendingKey, !save(pendingKey) { return }
-        let provider = model.makeProvider(for: config)
+        let provider: (any LLMProvider)?
+        do {
+            provider = try model.makeProvider(for: config)
+        } catch {
+            result = (false, shortMessage(error))
+            return
+        }
         guard provider != nil || check != nil else { return }
         let modelID = config.defaultModel.trimmingCharacters(in: .whitespaces)
         task = Task {
