@@ -9,8 +9,7 @@ import SwiftUI
 struct ModelsSettingsView: View {
     let model: AppModel
 
-    @State private var tab = Tab.general
-
+    /// Ids in `SettingsTab.transcription.subTabs`; picked in the toolbar.
     private enum Tab: Hashable, CaseIterable {
         case general, tier(ModelEntry.Tier), cloud
 
@@ -29,15 +28,9 @@ struct ModelsSettingsView: View {
             guard let tab = Self.allCases.first(where: { $0.id == id }) else { return nil }
             self = tab
         }
-
-        var title: LocalizedStringKey {
-            switch self {
-            case .general: "General"
-            case .tier(let tier): LocalizedStringKey(tier.rawValue.capitalized)
-            case .cloud: "Cloud"
-            }
-        }
     }
+
+    private var tab: Tab { model.settingsSubTab(.transcription).flatMap(Tab.init(id:)) ?? .general }
 
     private static let entries = ModelCatalog.visibleEntries(
         registeredEngineRuntimes: TranscriptionPipeline.registeredRuntimes
@@ -45,7 +38,7 @@ struct ModelsSettingsView: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            SettingsSectionTabs(selection: $tab, title: \.title) { tab in
+            Form {
                 switch tab {
                 case .general: generalSection
                 case .tier(let tier):
@@ -55,6 +48,7 @@ struct ModelsSettingsView: View {
                 case .cloud: cloudSection
                 }
             }
+            .formStyle(.grouped)
             HStack {
                 Text("Installed: \(ByteCountFormatter.string(fromByteCount: model.installedModelsBytes, countStyle: .file))")
                 Spacer()
@@ -66,15 +60,6 @@ struct ModelsSettingsView: View {
             .padding(.vertical, 12)
         }
         .task { model.refreshInstalledModels() }
-        .onChange(of: model.pendingSettingsSubTab, initial: true) { showPendingTab() }
-        .onChange(of: model.settingsTab) { showPendingTab() }
-    }
-
-    /// Shows the inner tab a deep link asked for (`AppModel.openSettings(tab:subTab:)`) once this section is selected.
-    private func showPendingTab() {
-        guard model.settingsTab == .transcription, let id = model.pendingSettingsSubTab, let pending = Tab(id: id) else { return }
-        tab = pending
-        model.pendingSettingsSubTab = nil
     }
 
     private var generalSection: some View {
@@ -254,19 +239,36 @@ struct ModelRow: View {
         .foregroundStyle(.secondary)
     }
 
+    /// The quality in the app's three main languages, on one line ("Quality in English and French: Good · Vietnamese:
+    /// Fair"), so it reads as a rating of those, not as the only languages; the languages badge says which it takes.
+    /// The speaker model's quality does not depend on the language: its English note says so.
     @ViewBuilder private var notes: some View {
-        let fr = entry.qualityNotes.fr
-        let vi = entry.qualityNotes.vi
+        let notes = entry.qualityNotes
+        let rated = [("English", notes.en), ("French", notes.fr), ("Vietnamese", notes.vi)].filter { !$0.1.isEmpty }
         Group {
-            if !fr.isEmpty && fr == vi {
-                Text("French and Vietnamese: \(fr)")
-            } else {
-                if !fr.isEmpty { Text("French: \(fr)") }
-                if !vi.isEmpty { Text("Vietnamese: \(vi)") }
+            if entry.kind == .diarization {
+                if !notes.en.isEmpty { Text(notes.en) }
+            } else if !rated.isEmpty {
+                Text("Quality in \(Self.qualityText(rated))")
             }
         }
         .font(.caption)
         .foregroundStyle(.secondary)
+    }
+
+    /// Languages with the same note joined: "English and French: Good · Vietnamese: Fair".
+    private static func qualityText(_ rated: [(language: String, note: String)]) -> String {
+        var groups: [(languages: [String], note: String)] = []
+        for (language, note) in rated {
+            if let index = groups.firstIndex(where: { $0.note == note }) {
+                groups[index].languages.append(language)
+            } else {
+                groups.append(([language], note))
+            }
+        }
+        return groups
+            .map { "\(ListFormatter.localizedString(byJoining: $0.languages)): \($0.note)" }
+            .joined(separator: " · ")
     }
 
     private static func sizeText(_ mib: Int) -> String {

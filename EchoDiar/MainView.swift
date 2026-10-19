@@ -206,6 +206,7 @@ struct MainView: View {
         }
         ToolbarItemGroup(placement: leadingPlacement) { recordButtons }
             .highVisibilityPriority()
+        settingsTabsItem
         if let conversation = toolbarConversation, titleFits {
             // As far from the record capsule as Back is.
             fixedSpacer
@@ -385,6 +386,25 @@ struct MainView: View {
         }
     }
 
+    /// The Settings section's inner tabs, in a capsule like a conversation's tabs, after the record capsule. Hidden
+    /// while the search bar is open: its results replace the section, and the bar takes the room.
+    @ToolbarContentBuilder private var settingsTabsItem: some ToolbarContent {
+        let section = model.settingsTab
+        if model.route == .settings, !searchExpanded, !section.subTabs.isEmpty {
+            fixedSpacer
+            ToolbarItem(placement: leadingPlacement) {
+                CapsuleTabs(
+                    selection: Binding(get: { model.settingsSubTab(section) ?? "" },
+                                       set: { model.settingsSubTabs[section] = $0 }),
+                    tabs: section.subTabs.map(\.id),
+                    title: { id in Text(section.subTabs.first { $0.id == id }?.title ?? "") }
+                )
+                .padding(.horizontal, 4)
+                .fixedSize()
+            }
+        }
+    }
+
     /// A conversation's tabs, in a capsule of their own like the buttons', at the trailing edge after Settings and
     /// Search (or the search bar).
     @ToolbarContentBuilder private var tabsItem: some ToolbarContent {
@@ -399,7 +419,7 @@ struct MainView: View {
     private var tabs: some View {
         CapsuleTabs(
             selection: Binding(get: { model.detailTab }, set: { model.detailTab = $0 }),
-            tabs: TranscriptView.tabs, title: TranscriptView.tabTitle
+            tabs: TranscriptView.tabs, title: { Text(TranscriptView.tabTitle($0)) }
         )
         .padding(.horizontal, 4)
         .fixedSize()

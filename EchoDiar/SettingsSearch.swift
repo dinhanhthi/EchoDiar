@@ -26,29 +26,10 @@ struct SettingsSearchItem: Identifiable {
         return [tab.label.title, subTab, title].compactMap { $0 }.joined(separator: " › ")
     }
 
-    /// The title of the inner tab `subTab`, as its view shows it (those views keep their tab enums private).
+    /// The title of the inner tab `subTab`, as the toolbar shows it.
     var subTabTitle: String? {
-        guard let subTab else { return nil }
-        let title: LocalizedStringResource? = switch (tab, subTab) {
-        case (.recording, "microphone"): "Microphone"
-        case (.recording, "meetings"): "Meetings"
-        case (.recording, "autoStop"): "Auto-stop"
-        case (.recording, "afterRecording"): "After recording"
-        case (.transcription, "general"): "General"
-        case (.transcription, "tier-fast"): "Fast"
-        case (.transcription, "tier-balanced"): "Balanced"
-        case (.transcription, "tier-quality"): "Quality"
-        case (.transcription, "cloud"): "Cloud"
-        case (.providers, "onThisMac"): "On this Mac"
-        case (.providers, "cloudAPIs"): "Cloud APIs"
-        case (.providers, "speechToText"): "Speech to text"
-        case (.providers, "cli"): "CLIs"
-        case (.storage, "usage"): "Usage"
-        case (.storage, "audio"): "Audio"
-        case (.storage, "autoDelete"): "Auto-delete"
-        default: nil
-        }
-        return title.map { String(localized: $0) }
+        guard let subTab, let title = tab.subTabs.first(where: { $0.id == subTab })?.title else { return nil }
+        return String(localized: title)
     }
 
     /// Every searchable row, in the order of the sidebar and of each section's tabs.

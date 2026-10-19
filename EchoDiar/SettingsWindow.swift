@@ -19,6 +19,37 @@ enum SettingsTab: CaseIterable, Identifiable {
         case .about: ("About", "info.circle")
         }
     }
+
+    /// The section's inner tabs, shown in the toolbar after the record capsule: the ids deep links and
+    /// `AppModel.settingsSubTabs` use, with their titles. Empty for a section without tabs.
+    var subTabs: [SettingsSubTab] {
+        switch self {
+        case .recording:
+            [.init(id: "microphone", title: "Microphone"), .init(id: "meetings", title: "Meetings"),
+             .init(id: "autoStop", title: "Auto-stop"), .init(id: "afterRecording", title: "After recording")]
+        case .transcription:
+            [.init(id: "general", title: "General")]
+                + ModelEntry.Tier.allCases.map {
+                    .init(id: "tier-\($0.rawValue)", title: LocalizedStringResource(
+                        String.LocalizationValue($0.rawValue.capitalized)))
+                }
+                + [.init(id: "cloud", title: "Cloud")]
+        case .providers:
+            [.init(id: "onThisMac", title: "On this Mac"), .init(id: "cloudAPIs", title: "Cloud APIs"),
+             .init(id: "speechToText", title: "Speech to text"), .init(id: "cli", title: "CLIs")]
+        case .storage:
+            [.init(id: "usage", title: "Usage"), .init(id: "audio", title: "Audio"),
+             .init(id: "autoDelete", title: "Auto-delete")]
+        case .general, .shortcuts, .about:
+            []
+        }
+    }
+}
+
+/// An inner tab of a Settings section.
+struct SettingsSubTab {
+    let id: String
+    let title: LocalizedStringResource
 }
 
 /// The Settings page of the main window: sidebar of sections, the selected one on the right. `AppModel.settingsTab`
@@ -40,11 +71,15 @@ struct SettingsView: View {
                 }
             }
             .listStyle(.sidebar)
-            // On the window background, like the rest of the page.
+            // On the card, not a sidebar material of its own.
             .scrollContentBackground(.hidden)
             .focused($sidebarFocused)
             .frame(width: 200)
-            Divider()
+            // A raised card like the toolbar's capsules, instead of a divider beside the sections.
+            .modifier(GlassCard(cornerRadius: 20, raised: true))
+            // Less on top: the toolbar's own bottom inset already sits above it.
+            .padding(.top, 4)
+            .padding([.leading, .bottom], 12)
             ZStack {
                 ForEach(SettingsTab.allCases.filter(opened.contains)) { tab in
                     let selected = tab == model.settingsTab && !searching

@@ -11,25 +11,18 @@ struct ProvidersSettingsView: View {
     @State private var scanning = false
     @State private var customLocalURL = ""
     @State private var cliStatus: [CLIPreset: CLIStatus] = [:]
-    @State private var tab = Tab.onThisMac
 
-    private enum Tab: String, CaseIterable {
+    /// Ids in `SettingsTab.providers.subTabs`; picked in the toolbar.
+    private enum Tab: String {
         case onThisMac, cloudAPIs, speechToText, cli
-
-        var title: LocalizedStringKey {
-            switch self {
-            case .onThisMac: "On this Mac"
-            case .cloudAPIs: "Cloud APIs"
-            case .speechToText: "Speech to text"
-            case .cli: "CLIs"
-            }
-        }
     }
+
+    private var tab: Tab { model.settingsSubTab(.providers).flatMap(Tab.init) ?? .onThisMac }
 
     private static let mlxEntries = ModelCatalog.llm.filter { $0.runtime == .mlx }
 
     var body: some View {
-        SettingsSectionTabs(selection: $tab, title: \.title) { tab in
+        Form {
             switch tab {
             case .onThisMac:
                 llmSection
@@ -76,21 +69,13 @@ struct ProvidersSettingsView: View {
                 }
             }
         }
+        .formStyle(.grouped)
         .task { await scan() }
         .task { model.refreshInstalledModels() }
-        .onChange(of: model.pendingSettingsSubTab, initial: true) { showPendingTab() }
-        .onChange(of: model.settingsTab) { showPendingTab() }
         .task {
             // Once per window: the first PATH lookup runs the login shell (~4 s) and each check spawns `--version`.
             if cliStatus.isEmpty { CLIPreset.allCases.forEach(detect) }
         }
-    }
-
-    /// Shows the inner tab a deep link asked for (`AppModel.openSettings(tab:subTab:)`) once this section is selected.
-    private func showPendingTab() {
-        guard model.settingsTab == .providers, let id = model.pendingSettingsSubTab, let pending = Tab(rawValue: id) else { return }
-        tab = pending
-        model.pendingSettingsSubTab = nil
     }
 
     private func configs(_ isIncluded: (ProviderConfig) -> Bool) -> [ProviderConfig] {
@@ -126,19 +111,9 @@ struct ProvidersSettingsView: View {
 
     // MARK: - Local hosts
 
+    /// Scan sits on the header's line, at its trailing edge.
     private var localHosts: some View {
-        Section("Local hosts") {
-            HStack {
-                Button("Scan") { Task { await scan() } }
-                    .controlSize(.small)
-                    .disabled(scanning)
-                if scanning {
-                    ProgressView().controlSize(.small)
-                } else if hosts?.isEmpty == true {
-                    Text("None found").foregroundStyle(.secondary)
-                }
-                Spacer()
-            }
+        Section {
             ForEach(hosts ?? [], id: \.baseURL) { host in
                 HStack {
                     VStack(alignment: .leading) {
@@ -164,6 +139,19 @@ struct ProvidersSettingsView: View {
                 Button("Add", action: addCustomLocal)
                     .controlSize(.small)
                     .disabled(Self.hostAndPort(customLocalURL) == nil)
+            }
+        } header: {
+            HStack {
+                Text("Local hosts")
+                Spacer()
+                if scanning {
+                    ProgressView().controlSize(.small)
+                } else if hosts?.isEmpty == true {
+                    Text("None found").font(.callout).fontWeight(.regular).foregroundStyle(.secondary)
+                }
+                Button("Scan") { Task { await scan() } }
+                    .controlSize(.small)
+                    .disabled(scanning)
             }
         }
     }
@@ -279,6 +267,7 @@ private struct APIProviderRow: View {
                 if config.kind == .local || (isCustom && !config.baseURL.isEmpty) { Text(config.baseURL) }
             }
         }
+        .disclosureGroupStyle(TitleChevronDisclosureStyle())
     }
 
     private func binding<Value>(_ keyPath: WritableKeyPath<ProviderConfig, Value>) -> Binding<Value> {
@@ -326,6 +315,7 @@ private struct SpeechProviderRow: View {
                 Text(config.displayName)
             }
         }
+        .disclosureGroupStyle(TitleChevronDisclosureStyle())
     }
 }
 
@@ -369,6 +359,7 @@ private struct CLIProviderRow: View {
                 statusText
             }
         }
+        .disclosureGroupStyle(TitleChevronDisclosureStyle())
     }
 
     private var isInstalled: Bool {
@@ -401,7 +392,7 @@ private struct CLIProviderRow: View {
 // MARK: - Fields
 
 /// Leading inset of an expanded row's content, so it lines up with the row's title after the disclosure chevron.
-private let disclosureIndent: CGFloat = 18
+private let disclosureIndent = TitleChevronDisclosureStyle.indent
 
 /// A label, a gap, then the input stretched over the rest of the row, followed by its buttons. Plain labeled fields
 /// in the grouped form right-align their text or butt against the label.

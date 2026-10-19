@@ -14,25 +14,19 @@ struct StorageSettingsView: View {
     @State private var pendingChange: PendingChange?
     @State private var confirmingAudioDelete = false
     @State private var deleting = false
-    @State private var tab = Tab.usage
 
-    private enum Tab: String, CaseIterable {
+    /// Ids in `SettingsTab.storage.subTabs`; picked in the toolbar.
+    private enum Tab: String {
         case usage, audio, autoDelete
-
-        var title: LocalizedStringKey {
-            switch self {
-            case .usage: "Usage"
-            case .audio: "Audio"
-            case .autoDelete: "Auto-delete"
-            }
-        }
     }
+
+    private var tab: Tab { model.settingsSubTab(.storage).flatMap(Tab.init) ?? .usage }
 
     private static let bitrates = [32, 48, 64, 96, 128]
     private static let largestCount = 5
 
     var body: some View {
-        SettingsSectionTabs(selection: $tab, title: \.title) { tab in
+        Form {
             switch tab {
             case .usage:
                 usageSection
@@ -41,8 +35,7 @@ struct StorageSettingsView: View {
             case .autoDelete: autoDeleteSection
             }
         }
-        .onChange(of: model.pendingSettingsSubTab, initial: true) { showPendingTab() }
-        .onChange(of: model.settingsTab) { showPendingTab() }
+        .formStyle(.grouped)
         // Measured again after a deletion or a new conversation, and only while the tab is shown (it stays alive) on
         // the Settings page of the main window on screen.
         .task(id: UsageKey(visible: shown, library: libraryKey, models: model.installedModelsBytes)) {
@@ -90,13 +83,6 @@ struct StorageSettingsView: View {
     /// The Storage tab is selected on the Settings page and the main window is on screen.
     private var shown: Bool { model.route == .settings && model.settingsTab == .storage && model.mainWindowVisible }
 
-    /// Shows the inner tab a deep link asked for (`AppModel.openSettings(tab:subTab:)`) once this section is selected.
-    private func showPendingTab() {
-        guard model.settingsTab == .storage, let id = model.pendingSettingsSubTab, let pending = Tab(rawValue: id) else { return }
-        tab = pending
-        model.pendingSettingsSubTab = nil
-    }
-
     // MARK: - Usage
 
     private var usageSection: some View {
@@ -111,13 +97,17 @@ struct StorageSettingsView: View {
                 }
                 if !usage.conversations.isEmpty {
                     DisclosureGroup("Largest conversations") {
-                        ForEach(usage.conversations.prefix(Self.largestCount)) { conversation in
-                            LabeledContent(conversation.title) {
-                                Text(Self.bytes(conversation.total)).monospacedDigit()
+                        VStack(alignment: .leading, spacing: 8) {
+                            ForEach(usage.conversations.prefix(Self.largestCount)) { conversation in
+                                LabeledContent(conversation.title) {
+                                    Text(Self.bytes(conversation.total)).monospacedDigit()
+                                }
+                                .lineLimit(1)
                             }
-                            .lineLimit(1)
                         }
+                        .padding(.leading, TitleChevronDisclosureStyle.indent)
                     }
+                    .disclosureGroupStyle(TitleChevronDisclosureStyle())
                 }
             } else {
                 ProgressView().frame(maxWidth: .infinity)
@@ -230,12 +220,16 @@ struct StorageSettingsView: View {
                 DisclosureGroup(model.settings.autoDeleteEnabled
                                 ? "Next run: \(countText(preview.count))"
                                 : "Would delete now: \(countText(preview.count))") {
-                    ForEach(preview, id: \.conversationID) { deletion in
-                        Text(title(of: deletion))
-                            .lineLimit(1)
-                            .foregroundStyle(.secondary)
+                    VStack(alignment: .leading, spacing: 8) {
+                        ForEach(preview, id: \.conversationID) { deletion in
+                            Text(title(of: deletion))
+                                .lineLimit(1)
+                                .foregroundStyle(.secondary)
+                        }
                     }
+                    .padding(.leading, TitleChevronDisclosureStyle.indent)
                 }
+                .disclosureGroupStyle(TitleChevronDisclosureStyle())
             }
         }
     }

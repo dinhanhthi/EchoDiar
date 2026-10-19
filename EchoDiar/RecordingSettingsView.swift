@@ -16,23 +16,15 @@ struct RecordingSettingsView: View {
         return MeetingApps.known.filter { seen.insert($0.appBundleID).inserted }
     }()
 
-    @State private var tab = Tab.microphone
-
-    private enum Tab: String, CaseIterable {
+    /// Ids in `SettingsTab.recording.subTabs`; picked in the toolbar.
+    private enum Tab: String {
         case microphone, meetings, autoStop, afterRecording
-
-        var title: LocalizedStringKey {
-            switch self {
-            case .microphone: "Microphone"
-            case .meetings: "Meetings"
-            case .autoStop: "Auto-stop"
-            case .afterRecording: "After recording"
-            }
-        }
     }
 
+    private var tab: Tab { model.settingsSubTab(.recording).flatMap(Tab.init) ?? .microphone }
+
     var body: some View {
-        SettingsSectionTabs(selection: $tab, title: \.title) { tab in
+        Form {
             switch tab {
             case .microphone: microphoneSection
             case .meetings: meetingsSection
@@ -40,23 +32,15 @@ struct RecordingSettingsView: View {
             case .afterRecording: afterRecordingSection
             }
         }
+        .formStyle(.grouped)
         .task {
             microphones = await Task.detached(priority: .utility) { InputDevice.all() }.value
         }
         .task { model.refreshInstalledModels() }
-        .onChange(of: model.pendingSettingsSubTab, initial: true) { showPendingTab() }
-        .onChange(of: model.settingsTab) { showPendingTab() }
         .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in
             // Back from System Settings.
             accessibilityTrusted = WindowAnchor.isTrusted
         }
-    }
-
-    /// Shows the inner tab a deep link asked for (`AppModel.openSettings(tab:subTab:)`) once this section is selected.
-    private func showPendingTab() {
-        guard model.settingsTab == .recording, let id = model.pendingSettingsSubTab, let pending = Tab(rawValue: id) else { return }
-        tab = pending
-        model.pendingSettingsSubTab = nil
     }
 
     private var microphoneSection: some View {
@@ -159,34 +143,6 @@ struct RecordingSettingsView: View {
         Binding(
             get: { model.settings.perAppBehavior[app.appBundleID] ?? .ask },
             set: { value in model.updateSettings { $0.perAppBehavior[app.appBundleID] = value == .ask ? nil : value } })
-    }
-}
-
-/// The sections of a Settings page as tabs: capsule tabs at the top, the selected section's form below.
-struct SettingsSectionTabs<Tab: Hashable & CaseIterable, Content: View>: View where Tab.AllCases: RandomAccessCollection {
-    @Binding var selection: Tab
-    let title: (Tab) -> LocalizedStringKey
-    @ViewBuilder let content: (Tab) -> Content
-
-    var body: some View {
-        VStack(spacing: 0) {
-            // A menu when the tabs are wider than the pane, so the pane never grows past the window.
-            ViewThatFits(in: .horizontal) {
-                CapsuleTabs(selection: $selection, tabs: Array(Tab.allCases), title: title).fixedSize()
-                picker.pickerStyle(.menu).fixedSize()
-            }
-            .labelsHidden()
-            .padding(.horizontal, 20)
-            .padding(.vertical, 12)
-            Form { content(selection) }
-                .formStyle(.grouped)
-        }
-    }
-
-    private var picker: some View {
-        Picker("Section", selection: $selection) {
-            ForEach(Tab.allCases, id: \.self) { Text(title($0)).tag($0) }
-        }
     }
 }
 

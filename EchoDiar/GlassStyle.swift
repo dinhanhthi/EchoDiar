@@ -134,7 +134,7 @@ struct GlassCard: ViewModifier {
 struct CapsuleTabs<Tab: Hashable>: View {
     @Binding var selection: Tab
     let tabs: [Tab]
-    let title: (Tab) -> LocalizedStringKey
+    let title: (Tab) -> Text
     @Namespace private var namespace
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
@@ -175,7 +175,7 @@ struct CapsuleTabs<Tab: Hashable>: View {
 
     private struct Item: View {
         let tab: Tab
-        let title: LocalizedStringKey
+        let title: Text
         let selected: Bool
         let namespace: Namespace.ID
         let action: () -> Void
@@ -185,7 +185,7 @@ struct CapsuleTabs<Tab: Hashable>: View {
 
         var body: some View {
             Button(action: action) {
-                Text(title)
+                title
                     .font(.callout)
                     .lineLimit(1)
                     .foregroundStyle(selected ? Color.white : Color.secondary)
@@ -200,6 +200,49 @@ struct CapsuleTabs<Tab: Hashable>: View {
             .buttonStyle(.plain)
             .onHover { hovered = $0 }
             .accessibilityAddTraits(selected ? .isSelected : [])
+        }
+    }
+}
+
+/// A disclosure row whose chevron sits on the title's line, not halfway down a title with a subtitle. A click anywhere
+/// on the header row toggles it, not only on the chevron; the row's own controls (its switch) keep their clicks.
+struct TitleChevronDisclosureStyle: DisclosureGroupStyle {
+    /// The chevron's width: content inset by it lines up with the title.
+    static let indent: CGFloat = 18
+
+    func makeBody(configuration: Configuration) -> some View {
+        TitleChevronDisclosure(configuration: configuration)
+    }
+}
+
+private struct TitleChevronDisclosure: View {
+    let configuration: DisclosureGroupStyleConfiguration
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            HStack(alignment: .firstTextBaseline, spacing: 0) {
+                Button(action: toggle) {
+                    Image(systemName: "chevron.right")
+                        .font(.system(size: 10, weight: .bold))
+                        .rotationEffect(.degrees(configuration.isExpanded ? 90 : 0))
+                        .frame(width: TitleChevronDisclosureStyle.indent, alignment: .leading)
+                        .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel(configuration.isExpanded ? "Collapse" : "Expand")
+                configuration.label
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .contentShape(Rectangle())
+            .onTapGesture(perform: toggle)
+            if configuration.isExpanded { configuration.content }
+        }
+    }
+
+    private func toggle() {
+        withAnimation(reduceMotion ? nil : .snappy(duration: 0.2)) {
+            configuration.$isExpanded.wrappedValue.toggle()
         }
     }
 }

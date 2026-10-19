@@ -62,8 +62,9 @@ final class AppModel {
     /// update.
     private(set) var keychainVersion = 0
     var settingsTab: SettingsTab = .general
-    /// The inner tab (its raw id) the Settings section `settingsTab` should show; its view clears it once shown.
-    var pendingSettingsSubTab: String?
+    /// The inner tab (its id in `SettingsTab.subTabs`) each Settings section shows; a section missing here shows its
+    /// first.
+    var settingsSubTabs: [SettingsTab: String] = [:]
     /// Running model downloads, by catalog id.
     private(set) var downloads: [String: ModelDownload] = [:]
     /// Last download error, by catalog id; cleared when a download of that id starts.
@@ -944,8 +945,13 @@ final class AppModel {
 
     /// `openSettings(tab:)` on the inner tab `subTab` of that section (a search result).
     func openSettings(tab: SettingsTab?, subTab: String?) {
-        pendingSettingsSubTab = subTab
         openSettings(tab: tab)
+        if let subTab { settingsSubTabs[settingsTab] = subTab }
+    }
+
+    /// The inner tab `tab` shows: the one picked last, else its first; nil for a section without tabs.
+    func settingsSubTab(_ tab: SettingsTab) -> String? {
+        settingsSubTabs[tab] ?? tab.subTabs.first?.id
     }
 
     /// Applies `change` and saves the settings file.
