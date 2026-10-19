@@ -125,7 +125,6 @@ public actor LibraryStore {
         scheduler.tolerance = 3_600
         scheduler.qualityOfService = .background
         scheduler.schedule { completion in
-            nonisolated(unsafe) let completion = completion
             Task {
                 await run()
                 completion(.finished)
