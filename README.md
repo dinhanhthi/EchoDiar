@@ -1,6 +1,6 @@
 <div align="center">
 
-<img src="assets/logo.png" width="128" alt="EchoDiar icon">
+<img src="assets/logo_square_512.png" width="128" alt="EchoDiar icon">
 
 # EchoDiar
 

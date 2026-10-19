@@ -178,10 +178,7 @@ private struct AboutSettingsView: View {
 enum AboutInfo {
     static let repository = URL(string: "https://github.com/dinhanhthi/EchoDiar")!
 
-    /// Loaded by file: `NSImage(named: "logo")` would return the app icon, which shares the name.
-    static var logo: NSImage? {
-        Bundle.main.url(forResource: "logo", withExtension: "png").flatMap { NSImage(contentsOf: $0) }
-    }
+    static var logo: NSImage? { NSImage(named: "logo_square_512") }
 
     /// "0.1.0 (1)".
     static var version: String {

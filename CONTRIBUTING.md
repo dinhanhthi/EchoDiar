@@ -78,7 +78,7 @@ Never pass `-derivedDataPath` to local `xcodebuild` builds and tests. The defaul
   - `EchoCore`: settings, recording session and conversation models, library store. No dependencies.
   - `EchoAudio`: process tap, mic capture, channel writer, recording engine, crash recovery, AAC compression. Depends on EchoCore.
   - Planned: `EchoTranscribe` (transcription, speaker separation), `EchoAI` (AI providers, summary), `EchoLocalLLM` (on-device models).
-- `assets/`: `logo.icon` (app icon) and `logo.png` (README and About panel).
+- `assets/`: `logo.icon` (app icon), `logo_square*.png` (README, About panel, website) and `logo_white.png` / `logo_black.png` (menu bar, dark / light).
 - `scripts/`: `dev.sh`, `vm-test.sh`, `measure.sh` (memory and CPU targets), and the release scripts `build-and-notarize.sh`, `bump-version.sh`, `publish-release.sh`, `publish-appcast.sh`, `ship.sh` (see docs/RELEASING.md).
 
 ## Commit style

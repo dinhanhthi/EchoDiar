@@ -1,18 +1,21 @@
 {
   "fill" : {
-    "automatic-gradient" : "display-p3:0.06362,0.05718,0.06441,1.00000"
+    "linear-gradient" : [
+      "display-p3:0.21337,0.47437,0.30164,1.00000",
+      "display-p3:0.06000,0.18277,0.11128,1.00000"
+    ]
   },
   "groups" : [
     {
       "layers" : [
         {
-          "image-name" : "logo.png",
-          "name" : "logo",
+          "image-name" : "logo_white.png",
+          "name" : "logo_white",
           "position" : {
-            "scale" : 1,
+            "scale" : 0.95,
             "translation-in-points" : [
-              -1.5,
-              -4
+              7,
+              -23
             ]
           }
         }

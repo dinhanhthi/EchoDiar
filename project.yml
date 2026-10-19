@@ -23,8 +23,13 @@ targets:
     sources:
       - EchoDiar
       - path: assets/logo.icon
-      # About panel logo (never logo_square).
-      - path: assets/logo.png
+      # About panel logo.
+      - path: assets/logo_square_512.png
+        buildPhase: resources
+      # Menu bar icon: white on a dark menu bar, black on a light one.
+      - path: assets/logo_white.png
+        buildPhase: resources
+      - path: assets/logo_black.png
         buildPhase: resources
     dependencies:
       - package: EchoKit

@@ -82,7 +82,7 @@ final class StatusItemController: NSObject, NSMenuDelegate {
         switch state {
         case .idle:
             stopEffect()
-            button.image = symbol("waveform", tint: nil)
+            button.image = Self.logo
         case .recording:
             stopEffect()
             button.image = symbol("record.circle.fill", tint: .systemRed)
@@ -94,6 +94,17 @@ final class StatusItemController: NSObject, NSMenuDelegate {
             startEffect(in: button)
         }
     }
+
+    /// The idle icon: `logo_white` on a dark menu bar, `logo_black` on a light one. Drawn per appearance, so it
+    /// follows the menu bar (which tracks the wallpaper, not only the system appearance).
+    private static let logo: NSImage? = {
+        guard let white = NSImage(named: "logo_white"), let black = NSImage(named: "logo_black") else { return nil }
+        return NSImage(size: NSSize(width: 18, height: 18), flipped: false) { rect in
+            let dark = NSAppearance.currentDrawing().bestMatch(from: [.aqua, .darkAqua]) == .darkAqua
+            (dark ? white : black).draw(in: rect)
+            return true
+        }
+    }()
 
     /// A template image when `tint` is nil, so it follows the menu bar's tint.
     private func symbol(_ name: String, tint: NSColor?) -> NSImage? {
