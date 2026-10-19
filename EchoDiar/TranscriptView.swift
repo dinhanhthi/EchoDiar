@@ -54,11 +54,20 @@ struct TranscriptView: View {
                     title
                     details
                 }
+                .layoutPriority(1)
                 Spacer(minLength: 8)
-                if conversation.hasTranscript {
+                if conversation.hasTranscript && !failed {
                     TranscriptionStatus(conversation: conversation, model: model)
                 }
                 actions
+            }
+            // A failed re-transcription gets its own row, so the title and the icons keep their space.
+            if conversation.hasTranscript && failed {
+                HStack(alignment: .firstTextBaseline, spacing: 8) {
+                    TranscriptionFailureReason(conversation: conversation, model: model)
+                    Spacer(minLength: 8)
+                    TranscriptionStatus(conversation: conversation, model: model)
+                }
             }
             HStack(spacing: 8) {
                 if transcript != nil {
@@ -76,6 +85,8 @@ struct TranscriptView: View {
         .padding(.vertical, 10)
         .modifier(GlassCard(cornerRadius: 20))
     }
+
+    private var failed: Bool { TranscriptionStatus.showsFailure(conversation, model) }
 
     @ViewBuilder private var title: some View {
         if editingTitle {
@@ -144,25 +155,15 @@ struct TranscriptView: View {
         .help(title)
     }
 
-    /// Installed batch ASR models; picking one transcribes the conversation again with it, in the language picked
-    /// below them.
+    /// Installed batch ASR models and configured cloud engines; picking one transcribes the conversation again with
+    /// it, in the language picked below them.
     private var retranscribeMenu: some View {
-        let engines = ModelCatalog.asr.filter {
-            !$0.liveOnly && TranscriptionPipeline.registeredRuntimes.contains($0.runtime)
-                && model.installedModelIDs.contains($0.id)
-        }
-        return Menu {
-            if engines.isEmpty {
-                Button("Download a model…") { model.openSettings(tab: .transcription) }
-            } else {
-                Section("Transcribe again with") {
-                    ForEach(engines) { entry in
-                        Button(entry.displayName) {
-                            let language = retranscribeLanguage.isEmpty ? nil : retranscribeLanguage
-                            model.transcribe(conversation.id, engineID: entry.id, language: language)
-                        }
-                    }
-                }
+        Menu {
+            EngineMenuItems(title: "Transcribe again with", model: model) { engineID in
+                let language = retranscribeLanguage.isEmpty ? nil : retranscribeLanguage
+                model.transcribe(conversation.id, engineID: engineID, language: language)
+            }
+            if !model.installedBatchEngines.isEmpty || !model.cloudEngineConfigs.isEmpty {
                 LanguagePicker(title: "Language", selection: $retranscribeLanguage, model: model, asRecorded: true)
             }
         } label: {
@@ -285,6 +286,8 @@ struct TranscriptView: View {
             VStack(spacing: 10) {
                 Text(emptyText).foregroundStyle(.secondary)
                 if !conversation.hasTranscript {
+                    TranscriptionFailureReason(conversation: conversation, model: model)
+                        .multilineTextAlignment(.center)
                     TranscriptionStatus(conversation: conversation, model: model)
                 }
             }

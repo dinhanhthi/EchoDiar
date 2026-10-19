@@ -57,7 +57,8 @@ public struct TranscriptionJob: Codable, Equatable, Sendable {
     /// Set when the audio was compressed into two mono files: `session.audioFileName` is then the mic file
     /// and this one the system file. nil: a stereo file (ch0 mic, ch1 system) or a mono file used as system.
     public var systemFileName: String?
-    /// Catalog id of the ASR engine; nil = the default resolution.
+    /// Catalog id of the ASR engine, or a cloud engine id (`cloud:<provider id>`, run with the `CloudEngine` passed
+    /// to `TranscriptionPipeline.transcribe`); nil = the default resolution.
     public var engineID: String?
     /// "auto" or a BCP-47 code for the whole recording, replacing the session's language markers for this run
     /// (re-transcribe); nil = the markers.
@@ -106,6 +107,8 @@ public enum TranscriptionError: Error, LocalizedError {
     case sessionUnreadable
     case audioUnreadable(String)
     case engineFailed(String)
+    /// A cloud API refused or failed the request; `reason` is short ("invalid API key").
+    case cloud(provider: String, reason: String)
 
     public var errorDescription: String? {
         switch self {
@@ -114,6 +117,7 @@ public enum TranscriptionError: Error, LocalizedError {
         case .sessionUnreadable: "The recording's session.json is missing or unreadable."
         case .audioUnreadable(let detail): "Could not read the audio (\(detail))."
         case .engineFailed(let detail): "Transcription failed (\(detail))."
+        case .cloud(let provider, let reason): "\(provider): \(reason)"
         }
     }
 }

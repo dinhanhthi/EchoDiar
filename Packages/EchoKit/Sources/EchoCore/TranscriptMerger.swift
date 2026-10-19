@@ -8,12 +8,15 @@ public struct RawSegment: Codable, Equatable, Sendable {
     public var text: String
     /// BCP-47 code detected by the engine, if any.
     public var detectedLanguage: String?
+    /// The cloud provider's own speaker label ("A", "speaker_1", ...); nil for local engines.
+    public var speaker: String?
 
-    public init(start: Double, end: Double, text: String, detectedLanguage: String? = nil) {
+    public init(start: Double, end: Double, text: String, detectedLanguage: String? = nil, speaker: String? = nil) {
         self.start = start
         self.end = end
         self.text = text
         self.detectedLanguage = detectedLanguage
+        self.speaker = speaker
     }
 }
 
@@ -43,6 +46,8 @@ public enum TranscriptMerger {
 
     /// Rules:
     /// - Mic segments get speaker `me`.
+    /// - A system segment with a provider speaker label (cloud engines; the pipeline then passes no turns) takes
+    ///   `s1…sN` by first appearance of its label in the system segments sorted by start.
     /// - A system segment takes the single turn with the largest time overlap (ties: the earlier turn). Speakers
     ///   are numbered `s1…sN` in order of first appearance in the turns sorted by start. With no turns, or no
     ///   overlapping turn, the segment gets `s1` (the pipeline adds `Transcript.diarizationMissingNote` when
@@ -65,6 +70,12 @@ public enum TranscriptMerger {
         for turn in sortedTurns where labels[turn.speakerIndex] == nil {
             labels[turn.speakerIndex] = Transcript.Speaker.system(labels.count + 1)
         }
+        var providerLabels: [String: String] = [:]
+        for raw in system.sorted(by: { $0.start < $1.start }) {
+            if let label = raw.speaker, providerLabels[label] == nil {
+                providerLabels[label] = Transcript.Speaker.system(providerLabels.count + 1)
+            }
+        }
 
         let systemTokens = system.map { tokens(of: $0.text) }
         let keptMic = mic.filter { segment in
@@ -76,7 +87,8 @@ public enum TranscriptMerger {
             entries.append((0, index, segment(raw, channel: .mic, speaker: Transcript.Speaker.me, markers: markers)))
         }
         for (index, raw) in system.enumerated() {
-            let speaker = bestTurn(for: raw, in: sortedTurns).flatMap { labels[$0.speakerIndex] }
+            let speaker = raw.speaker.flatMap { providerLabels[$0] }
+                ?? bestTurn(for: raw, in: sortedTurns).flatMap { labels[$0.speakerIndex] }
                 ?? Transcript.Speaker.system(1)
             entries.append((1, index, segment(raw, channel: .system, speaker: speaker, markers: markers)))
         }

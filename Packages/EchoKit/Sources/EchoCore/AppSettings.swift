@@ -19,10 +19,14 @@ public struct AppSettings: Codable, Equatable, Sendable {
     public var liveTranscript: Bool
     /// Catalog id of the live captions engine: a WhisperKit entry or the Nemotron streaming entry.
     public var liveTranscriptEngine: String
-    /// Catalog id of the ASR engine for new transcriptions; nil = the catalog default.
+    /// Catalog id of the ASR engine for new transcriptions, or a cloud engine id (`cloud:<provider id>`); nil = the
+    /// catalog default.
     public var defaultASRModelID: String?
     /// Configured AI providers; their API keys are in the Keychain, never here.
     public var providers: [ProviderConfig]
+    /// Destinations (`<provider id>@<scheme://host[:port]>`) whose one-time "audio leaves this Mac" confirmation for
+    /// cloud transcription was accepted; a changed base URL asks again (older bare provider ids no longer match).
+    public var cloudSTTConfirmed: [String]
 
     public static let defaultLiveTranscriptEngine = "whisperkit-turbo-632"
 
@@ -36,7 +40,8 @@ public struct AppSettings: Codable, Equatable, Sendable {
         liveTranscript: Bool = false,
         liveTranscriptEngine: String = AppSettings.defaultLiveTranscriptEngine,
         defaultASRModelID: String? = nil,
-        providers: [ProviderConfig] = []
+        providers: [ProviderConfig] = [],
+        cloudSTTConfirmed: [String] = []
     ) {
         self.launchAtLogin = launchAtLogin
         self.defaultLanguage = defaultLanguage
@@ -48,11 +53,13 @@ public struct AppSettings: Codable, Equatable, Sendable {
         self.liveTranscriptEngine = liveTranscriptEngine
         self.defaultASRModelID = defaultASRModelID
         self.providers = providers
+        self.cloudSTTConfirmed = cloudSTTConfirmed
     }
 
     private enum CodingKeys: String, CodingKey {
         case version, launchAtLogin, defaultLanguage, recentLanguages, compressionBitrateKbps, keepUncompressedAudio
         case onboardingCompleted, liveTranscript, liveTranscriptEngine, defaultASRModelID, providers
+        case cloudSTTConfirmed
     }
 
     public init(from decoder: Decoder) throws {
@@ -69,6 +76,7 @@ public struct AppSettings: Codable, Equatable, Sendable {
             ?? Self.defaultLiveTranscriptEngine
         defaultASRModelID = try container.decodeIfPresent(String.self, forKey: .defaultASRModelID)
         providers = try container.decodeIfPresent([ProviderConfig].self, forKey: .providers) ?? []
+        cloudSTTConfirmed = try container.decodeIfPresent([String].self, forKey: .cloudSTTConfirmed) ?? []
     }
 }
 

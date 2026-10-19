@@ -1,4 +1,5 @@
 import AppKit
+import EchoAI
 import EchoCore
 import EchoTranscribe
 import SwiftUI
@@ -19,7 +20,9 @@ struct ConversationCard: View {
             VStack(alignment: .leading, spacing: 4) {
                 title
                 details
+                TranscriptionFailureReason(conversation: conversation, model: model)
             }
+            .layoutPriority(1)
             Spacer(minLength: 8)
             TranscriptionStatus(conversation: conversation, model: model)
             Button(action: showAI) {
@@ -134,11 +137,17 @@ struct ConversationCard: View {
     }
 }
 
-/// A conversation's transcription progress, or its action: Needs model, Failed — Retry, or Transcribe. Shared by
-/// the card and the transcript header.
+/// A conversation's transcription progress, or its action: Needs model, Retry (with a "Retry with another engine"
+/// menu; the audio is kept; the reason is `TranscriptionFailureReason`), or Transcribe. Shared by the card and the
+/// transcript header.
 struct TranscriptionStatus: View {
     let conversation: Conversation
     let model: AppModel
+
+    /// The failed transcription state: Retry and its engine menu, with the reason shown apart.
+    static func showsFailure(_ conversation: Conversation, _ model: AppModel) -> Bool {
+        model.transcriptionProgress[conversation.id] == nil && conversation.status == .transcriptionFailed
+    }
 
     /// Progress first: a queued job's conversation is still `ready`. A `transcribing` status without a job was
     /// left by a quit or crash, so it offers Transcribe again. A failed recording (`failed`) offers nothing.
@@ -163,11 +172,28 @@ struct TranscriptionStatus: View {
                 .buttonStyle(RowTextButtonStyle())
                 .foregroundStyle(.orange)
                 .help("Download a transcription model in Settings")
-        } else if conversation.status == .transcriptionFailed {
-            Button("Failed — Retry") { model.transcribe(conversation.id) }
-                .buttonStyle(RowTextButtonStyle())
-                .foregroundStyle(.red)
-                .help("Transcribe this conversation again")
+        } else if Self.showsFailure(conversation, model) {
+            HStack(spacing: 2) {
+                Button("Retry") { model.transcribe(conversation.id) }
+                    .buttonStyle(RowTextButtonStyle())
+                    .foregroundStyle(.red)
+                    .lineLimit(1)
+                    .help("Transcription failed — transcribe this conversation again")
+                Menu {
+                    EngineMenuItems(title: "Retry with another engine", model: model) {
+                        model.transcribe(conversation.id, engineID: $0)
+                    }
+                } label: {
+                    Label("Retry with another engine", systemImage: "chevron.down")
+                        .labelStyle(.iconOnly)
+                }
+                .menuStyle(.borderlessButton)
+                .menuIndicator(.hidden)
+                .fixedSize()
+                .foregroundStyle(.secondary)
+                .help("Retry with another engine")
+            }
+            .fixedSize()
         } else if conversation.status == .ready || conversation.status == .transcribing, !conversation.hasTranscript {
             Button("Transcribe") { model.transcribe(conversation.id) }
                 .buttonStyle(RowTextButtonStyle())
@@ -189,8 +215,57 @@ struct TranscriptionStatus: View {
     }
 }
 
+/// Why the last transcription failed, in red under the details, up to two lines (the full text on hover); only in
+/// the failed state. The reason is kept in memory, so after a relaunch it reads "Transcription failed".
+struct TranscriptionFailureReason: View {
+    let conversation: Conversation
+    let model: AppModel
+
+    var body: some View {
+        if TranscriptionStatus.showsFailure(conversation, model) {
+            let reason = model.transcriptionErrors[conversation.id] ?? "Transcription failed"
+            Text(reason)
+                .font(.caption)
+                .foregroundStyle(.red)
+                .lineLimit(2)
+                .truncationMode(.tail)
+                .fixedSize(horizontal: false, vertical: true)
+                .help(reason)
+        }
+    }
+}
+
+/// Installed local engines, then the configured cloud engines under "Cloud", for the Retry and Re-transcribe menus;
+/// "Download a model…" when there are none. `pick` gets a catalog or cloud engine id.
+struct EngineMenuItems: View {
+    let title: String
+    let model: AppModel
+    let pick: (String) -> Void
+
+    var body: some View {
+        let local = model.installedBatchEngines
+        let cloud = model.cloudEngineConfigs
+        if local.isEmpty && cloud.isEmpty {
+            Button("Download a model…") { model.openSettings(tab: .transcription) }
+        } else {
+            if !local.isEmpty {
+                Section(title) {
+                    ForEach(local) { entry in Button(entry.displayName) { pick(entry.id) } }
+                }
+            }
+            if !cloud.isEmpty {
+                Section(local.isEmpty ? "\(title) (cloud)" : "Cloud") {
+                    ForEach(cloud) { config in
+                        Button(model.cloudEngineName(config)) { pick(CloudTranscription.engineID(providerID: config.id)) }
+                    }
+                }
+            }
+        }
+    }
+}
+
 /// A short colored label for the statuses that need attention; nil for `ready`, `transcribed` and
-/// `transcriptionFailed` (which shows "Failed — Retry").
+/// `transcriptionFailed` (which shows its reason and Retry).
 struct StatusBadge: View {
     let text: String
     let color: Color

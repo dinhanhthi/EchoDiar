@@ -2,8 +2,8 @@ import EchoAI
 import EchoCore
 import SwiftUI
 
-/// The AI & Cloud tab: cloud API presets, local hosts (scanned on demand), subscription CLIs and custom
-/// OpenAI-compatible endpoints. API keys go to the Keychain only; everything else is saved in `AppSettings.providers`.
+/// The AI & Cloud tab: cloud API presets, speech-to-text APIs, local hosts (scanned on demand), subscription CLIs and
+/// custom OpenAI-compatible endpoints. API keys go to the Keychain only; everything else is saved in `AppSettings.providers`.
 struct ProvidersSettingsView: View {
     let model: AppModel
 
@@ -19,9 +19,20 @@ struct ProvidersSettingsView: View {
                     .foregroundStyle(.secondary)
             }
             Section("Cloud APIs") {
-                ForEach(configs { $0.preset != nil && $0.kind != .local && $0.kind != .cli }) { config in
+                ForEach(configs { $0.preset != nil && [.openAICompatible, .anthropic].contains($0.kind) }) { config in
                     APIProviderRow(config: config, model: model)
                 }
+            }
+            Section {
+                ForEach(configs { $0.kind == .speechToText }) { config in
+                    SpeechProviderRow(config: config, model: model)
+                }
+            } header: {
+                Text("Speech to text")
+            } footer: {
+                Text("Cloud transcription engines for Settings > Transcription. OpenAI, Groq, Mistral, Google Gemini and custom endpoints above transcribe too, with their transcription model.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
             }
             localHosts
             Section("Subscription CLIs") {
@@ -177,7 +188,7 @@ private struct APIProviderRow: View {
                         Text("None").tag(ProviderConfig.AuthStyle.none)
                     }
                 }
-                if config.authStyle != .none { APIKeyField(providerID: config.id) }
+                if config.authStyle != .none { APIKeyField(providerID: config.id, model: model) }
                 TextField("Base URL", text: binding(\.baseURL), prompt: Text(config.id == "azure" ? "https://<resource>.openai.azure.com/openai/v1" : ""))
                 if config.id == "azure" {
                     Text("Required: your resource's https://<resource>.openai.azure.com/openai/v1 URL.")
@@ -187,6 +198,7 @@ private struct APIProviderRow: View {
                 ModelField(config: config, model: model, prompt: config.id == "azure" ? "Deployment name" : "Model id") {
                     try await model.makeProvider(for: config)?.listModels() ?? []
                 }
+                if CloudTranscription.supports(config) { TranscriptionModelField(config: config, model: model) }
                 HStack {
                     TestButton(title: "Test", config: config, model: model)
                     Spacer()
@@ -208,6 +220,46 @@ private struct APIProviderRow: View {
     private func binding<Value>(_ keyPath: WritableKeyPath<ProviderConfig, Value>) -> Binding<Value> {
         Binding(get: { config[keyPath: keyPath] },
                 set: { value in model.updateProvider(id: config.id) { $0[keyPath: keyPath] = value } })
+    }
+}
+
+/// A speech-to-text API: enable toggle; expanded, its key, transcription model and a key check.
+private struct SpeechProviderRow: View {
+    let config: ProviderConfig
+    let model: AppModel
+
+    @State private var expanded = false
+
+    var body: some View {
+        DisclosureGroup(isExpanded: $expanded) {
+            VStack(alignment: .leading, spacing: 8) {
+                APIKeyField(providerID: config.id, model: model)
+                if config.preset == "assemblyai" {
+                    Text("AssemblyAI picks its model for the language (Universal).")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                } else {
+                    TranscriptionModelField(config: config, model: model)
+                }
+                // A free GET that needs a valid key; no audio is uploaded.
+                TestButton(title: "Test", config: config, model: model) {
+                    guard let key = try KeychainStore.apiKey(forProvider: config.id) else {
+                        throw LLMError.provider("Save a key first.")
+                    }
+                    do {
+                        try await CloudTranscription.checkKey(config: config, apiKey: key)
+                    } catch let error as LLMError {
+                        throw LLMError.provider(CloudTranscription.failureReason(error))
+                    }
+                }
+            }
+            .padding(.vertical, 4)
+        } label: {
+            Toggle(isOn: Binding(get: { config.enabled },
+                                 set: { value in model.updateProvider(id: config.id) { $0.enabled = value } })) {
+                Text(config.displayName)
+            }
+        }
     }
 }
 
@@ -281,6 +333,7 @@ private struct CLIProviderRow: View {
 /// The API key, written to the Keychain on Return. Only "Saved" is shown; the key is never read back into the UI.
 private struct APIKeyField: View {
     let providerID: String
+    let model: AppModel
 
     @State private var key = ""
     @State private var saved = false
@@ -321,10 +374,37 @@ private struct APIKeyField: View {
             self.error = error.localizedDescription
         }
         refresh()
+        model.keychainChanged()
     }
 
     private func refresh() {
         saved = (try? KeychainStore.hasAPIKey(forProvider: providerID)) ?? false
+    }
+}
+
+/// The cloud transcription model; empty = the vendor default shown as the prompt.
+private struct TranscriptionModelField: View {
+    let config: ProviderConfig
+    let model: AppModel
+
+    var body: some View {
+        let defaultModel = CloudTranscription.defaultModel(for: config)
+        let known = OpenAICompatibleTranscriber.presetModels[config.preset ?? ""] ?? []
+        HStack {
+            TextField("Transcription model", text: Binding(
+                get: { config.transcriptionModel },
+                set: { value in model.updateProvider(id: config.id) { $0.transcriptionModel = value } }
+            ), prompt: Text(defaultModel.isEmpty ? "Model id, e.g. whisper-1" : defaultModel))
+            if known.count > 1 {
+                Menu("Models") {
+                    ForEach(known, id: \.self) { id in
+                        Button(id) { model.updateProvider(id: config.id) { $0.transcriptionModel = id } }
+                    }
+                }
+                .fixedSize()
+                .controlSize(.small)
+            }
+        }
     }
 }
 
@@ -382,11 +462,13 @@ private struct ModelField: View {
     }
 }
 
-/// Sends a one-token "ping" (CLIs: a tiny prompt) and shows OK or a short error. Not run while idle.
+/// Sends a one-token "ping" (CLIs: a tiny prompt), or runs `check` when set, and shows OK or a short error. Not run
+/// while idle.
 private struct TestButton: View {
     let title: String
     let config: ProviderConfig
     let model: AppModel
+    var check: (@MainActor () async throws -> Void)?
 
     @State private var task: Task<Void, Never>?
     @State private var result: (ok: Bool, text: String)?
@@ -411,12 +493,17 @@ private struct TestButton: View {
 
     private func run() {
         result = nil
-        guard let provider = model.makeProvider(for: config) else { return }
+        let provider = model.makeProvider(for: config)
+        guard provider != nil || check != nil else { return }
         let modelID = config.defaultModel.trimmingCharacters(in: .whitespaces)
         task = Task {
             do {
-                let stream = provider.stream(messages: [LLMMessage(role: .user, content: "ping")], model: modelID, maxTokens: 1)
-                for try await _ in stream { break }
+                if let check {
+                    try await check()
+                } else if let provider {
+                    let stream = provider.stream(messages: [LLMMessage(role: .user, content: "ping")], model: modelID, maxTokens: 1)
+                    for try await _ in stream { break }
+                }
                 try Task.checkCancellation()
                 result = (true, "OK")
             } catch {

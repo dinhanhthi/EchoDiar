@@ -21,6 +21,21 @@ struct TranscriptMergerTests {
         #expect(segments.map(\.channel) == [.mic, .system, .system])
     }
 
+    @Test func providerSpeakerLabelsBecomeSystemSpeakersInOrderOfFirstAppearance() {
+        let mic = [RawSegment(start: 0, end: 1, text: "Hi", speaker: "A")]
+        // Out of order, and B overlaps A: the label decides, not time overlap.
+        let system = [
+            RawSegment(start: 6, end: 8, text: "Third", speaker: "A"),
+            RawSegment(start: 2, end: 9, text: "First", speaker: "B"),
+            RawSegment(start: 3, end: 4, text: "Second", speaker: "A"),
+        ]
+
+        let segments = TranscriptMerger.merge(mic: mic, system: system, turns: [], languageMarkers: [])
+
+        #expect(segments.map(\.text) == ["Hi", "First", "Second", "Third"])
+        #expect(segments.map(\.speaker) == ["me", "s1", "s2", "s2"])
+    }
+
     @Test func languageMarkersBecomeSegmentLanguagesWithAutoFallback() {
         let markers = [
             RecordingSession.LanguageMarker(fileTime: 0, language: "auto"),

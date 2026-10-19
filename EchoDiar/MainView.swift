@@ -78,6 +78,17 @@ struct MainView: View {
         } message: {
             Text(model.recordingError ?? "")
         }
+        // One-time per provider and destination (`AppSettings.cloudSTTConfirmed`); answered for every pending run
+        // of that destination.
+        .alert(
+            "Send audio to \(model.pendingCloudRuns.first?.providerName ?? "")?",
+            isPresented: Binding(get: { !model.pendingCloudRuns.isEmpty }, set: { _ in })
+        ) {
+            Button("Send") { model.resolvePendingCloudRuns(allowed: true) }
+            Button("Cancel", role: .cancel) { model.resolvePendingCloudRuns(allowed: false) }
+        } message: {
+            Text("Audio leaves this Mac: the recording's mic and system channels are uploaded to \(model.pendingCloudRuns.first?.providerName ?? "the provider") (\(model.pendingCloudRuns.first?.host ?? "")) for transcription and billed by them. The provider may keep the audio under its own retention policy. You are asked once per provider and destination.")
+        }
     }
 
     /// While idle, one Record split button whose chevron picks the target and the language; while recording,

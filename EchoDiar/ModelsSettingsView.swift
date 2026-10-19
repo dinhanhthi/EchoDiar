@@ -1,10 +1,11 @@
+import EchoAI
 import EchoCore
 import EchoTranscribe
 import SwiftUI
 
 /// The Transcription tab: the default language, the live transcript switch and engine, then the ASR and diarization
-/// catalog by tier, with Download, Cancel, Delete and Set default. Rows that cannot transcribe the default language are
-/// disabled with a note.
+/// catalog by tier, with Download, Cancel, Delete and Set default, then the configured cloud engines. Rows that cannot
+/// transcribe the default language are disabled with a note.
 struct ModelsSettingsView: View {
     let model: AppModel
 
@@ -38,6 +39,7 @@ struct ModelsSettingsView: View {
                         }
                     }
                 }
+                cloudSection
             }
             .formStyle(.grouped)
             HStack {
@@ -51,6 +53,30 @@ struct ModelsSettingsView: View {
             .padding(.bottom, 12)
         }
         .task { model.refreshInstalledModels() }
+    }
+
+    /// Configured cloud engines (AI & Cloud: enabled, with a key and a model) with Set default.
+    private var cloudSection: some View {
+        Section {
+            Label("Audio leaves this Mac: cloud engines upload the recording to the provider.", systemImage: "exclamationmark.icloud")
+                .foregroundStyle(.orange)
+            let configs = model.cloudEngineConfigs
+            if configs.isEmpty {
+                HStack {
+                    Text("No cloud engine configured.").foregroundStyle(.secondary)
+                    Spacer()
+                    Button("Add an API key…") { model.settingsTab = .providers }
+                        .controlSize(.small)
+                }
+            }
+            ForEach(configs) { CloudEngineRow(config: $0, model: model) }
+        } header: {
+            Text("Cloud")
+        } footer: {
+            Text("Prices are approximate list prices per audio hour; the mic and system channels are sent and billed separately.")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+        }
     }
 
     private var liveTranscript: Binding<Bool> {
@@ -223,6 +249,45 @@ private struct ModelRow: View {
         case .codes(let codes):
             "\(codes.count) languages"
         }
+    }
+}
+
+private struct CloudEngineRow: View {
+    let config: ProviderConfig
+    let model: AppModel
+
+    /// Approximate pay-as-you-go prices per audio hour (docs/research/asr-diarization-models.md F, 2026-10-18).
+    private static let prices: [String: String] = [
+        "openai": "~$0.36/h", "groq": "~$0.04/h", "mistral": "~$0.18/h", "gemini": "~$0.23/h + output",
+        "elevenlabs": "~$0.22/h", "deepgram": "~$0.26/h", "assemblyai": "~$0.23/h",
+    ]
+
+    private var engineID: String { CloudTranscription.engineID(providerID: config.id) }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            HStack(spacing: 8) {
+                Text(model.cloudEngineName(config))
+                    .lineLimit(1)
+                    .truncationMode(.tail)
+                if model.defaultASRModelID == engineID { Badge(text: "Default", color: .accentColor) }
+                Spacer(minLength: 8)
+                if model.defaultASRModelID != engineID {
+                    Button("Set default") { model.setDefaultASRModel(engineID) }
+                        .controlSize(.small)
+                }
+            }
+            HStack(spacing: 4) {
+                Badge(text: "Cloud")
+                if let price = config.preset.flatMap({ Self.prices[$0] }) { Badge(text: price + " (approx.)") }
+            }
+            if config.preset == "gemini" {
+                Text("LLM transcription — timestamps approximate.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+        }
+        .padding(.vertical, 2)
     }
 }
 

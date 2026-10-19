@@ -45,6 +45,7 @@ let package = Package(
             name: "EchoTranscribe",
             dependencies: [
                 "EchoCore",
+                "EchoAI",
                 .product(name: "WhisperKit", package: "WhisperKit"),
                 .product(name: "FluidAudio", package: "FluidAudio"),
                 .product(name: "Qwen3ASR", package: "speech-swift"),

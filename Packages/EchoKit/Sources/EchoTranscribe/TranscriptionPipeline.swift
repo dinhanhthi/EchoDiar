@@ -1,6 +1,7 @@
 import Accelerate
 import AudioToolbox
 import AVFoundation
+import EchoAI
 import EchoCore
 import Foundation
 
@@ -74,13 +75,14 @@ public actor TranscriptionPipeline {
         }
     }
 
-    /// Runs after every job queued before it; returns the `transcript.json` URL.
-    public func transcribe(_ job: TranscriptionJob) async throws -> URL {
+    /// Runs after every job queued before it; returns the `transcript.json` URL. `cloud`: the job's cloud engine
+    /// (resolved by the app from settings and the Keychain), which replaces `job.engineID`'s resolution.
+    public func transcribe(_ job: TranscriptionJob, cloud: CloudEngine? = nil) async throws -> URL {
         emit(job, .queued, 0)
         let previous = tail
         let task = Task(priority: .utility) {
             await previous?.value
-            return try await self.run(job)
+            return try await self.run(job, cloud: cloud)
         }
         tail = Task { _ = await task.result }
         return try await task.value
@@ -93,7 +95,13 @@ public actor TranscriptionPipeline {
         var channel: Int
     }
 
-    private func run(_ job: TranscriptionJob) async throws -> URL {
+    /// Transcribes one channel: the 16 kHz extract, its source channel, which channel it is, and progress 0...1.
+    private typealias ChannelASR = @Sendable (
+        _ extracted: URL, _ source: ChannelSource, _ channel: Transcript.Channel,
+        _ progress: @escaping @Sendable (Double) -> Void
+    ) async throws -> [RawSegment]
+
+    private func run(_ job: TranscriptionJob, cloud: CloudEngine?) async throws -> URL {
         var started = false
         do {
             if deferWhenConstrained && !job.processNow { await waitWhileConstrained(job) }
@@ -103,14 +111,7 @@ public actor TranscriptionPipeline {
             // Never written back: the override only applies to this run.
             if let language = job.language { session.languageMarkers = [.init(fileTime: 0, language: language)] }
             let sources = try channelSources(session: session, job: job)
-            let firstLanguage = session.languageMarkers.min { $0.fileTime < $1.fileTime }?.language ?? "auto"
-            let selected = try resolveEngine(job.engineID, language: firstLanguage)
-            let (entry, engineFallback) = await fallback(
-                for: selected, markers: session.languageMarkers, language: firstLanguage)
-            guard let factory = Self.engines[entry.runtime],
-                  let modelFolder = modelStore.folder(for: entry.id) ?? (entry.repo == nil ? modelStore.root : nil) else {
-                throw TranscriptionError.unknownEngine(entry.id)
-            }
+            let ranges = LanguageRange.ranges(from: session.languageMarkers)
             let diarizerID = ModelCatalog.defaultDiarizer.id
             let diarizer = modelStore.isInstalled(diarizerID)
                 ? modelStore.folder(for: diarizerID).map {
@@ -118,13 +119,41 @@ public actor TranscriptionPipeline {
                 }
                 : nil
 
-            started = true
-            let engine = factory(entry, modelFolder)
-            let url = try await gate.withExclusiveModel(owner: .transcriptionJob) { [self, session] in
+            let url: URL
+            if let cloud {
+                // No local ASR model: only a local diarization takes the gate (inside `process`).
+                started = true
                 Self.updateConversation(in: job.folder) { $0.status = .transcribing }
-                return try await process(
-                    job, session: session, sources: sources, engine: engine, entry: entry,
-                    engineFallback: engineFallback, diarizer: diarizer)
+                let language = Self.cloudLanguage(ranges)
+                url = try await process(
+                    job, session: session, sources: sources, engineID: cloud.engineID,
+                    modelID: cloud.model.isEmpty ? nil : cloud.model, engineFallback: nil, diarizer: diarizer,
+                    gateDiarization: true
+                ) { _, source, channel, _ in
+                    try await Self.cloudSegments(cloud, source: source, language: language, diarize: channel == .system)
+                }
+            } else {
+                let firstLanguage = session.languageMarkers.min { $0.fileTime < $1.fileTime }?.language ?? "auto"
+                let selected = try resolveEngine(job.engineID, language: firstLanguage)
+                let (entry, engineFallback) = await fallback(
+                    for: selected, markers: session.languageMarkers, language: firstLanguage)
+                guard let factory = Self.engines[entry.runtime],
+                      let modelFolder = modelStore.folder(for: entry.id) ?? (entry.repo == nil ? modelStore.root : nil) else {
+                    throw TranscriptionError.unknownEngine(entry.id)
+                }
+
+                started = true
+                let engine = factory(entry, modelFolder)
+                url = try await gate.withExclusiveModel(owner: .transcriptionJob) { [self, session] in
+                    Self.updateConversation(in: job.folder) { $0.status = .transcribing }
+                    return try await process(
+                        job, session: session, sources: sources, engineID: entry.id,
+                        modelID: [entry.repo, entry.subfolder].compactMap { $0 }.joined(separator: "/"),
+                        engineFallback: engineFallback, diarizer: diarizer, gateDiarization: false
+                    ) { extracted, _, _, progress in
+                        try await engine.transcribe(channelURL: extracted, languageRanges: ranges, progress: progress)
+                    }
+                }
             }
             Self.updateConversation(in: job.folder) {
                 $0.status = .transcribed
@@ -145,21 +174,25 @@ public actor TranscriptionPipeline {
         }
     }
 
+    /// Extracts each channel (skipping silent ones), runs `asr` on it, diarizes the system channel unless `asr`
+    /// returned provider speaker labels, merges and writes `transcript.json`. `gateDiarization`: the caller does
+    /// not hold the `ModelLoadGate` (cloud ASR), so the diarizer takes it.
     private func process(
         _ job: TranscriptionJob, session: RecordingSession, sources: (mic: ChannelSource?, system: ChannelSource?),
-        engine: any TranscriptionEngine, entry: ModelEntry, engineFallback: String?, diarizer: SpeakerDiarizer?
+        engineID: String, modelID: String?, engineFallback: String?, diarizer: SpeakerDiarizer?,
+        gateDiarization: Bool, asr: ChannelASR
     ) async throws -> URL {
         let fm = FileManager.default
         let work = fm.temporaryDirectory.appendingPathComponent("EchoDiar-transcribe-\(UUID().uuidString)")
         try fm.createDirectory(at: work, withIntermediateDirectories: true)
         defer { try? fm.removeItem(at: work) }
-        let ranges = LanguageRange.ranges(from: session.languageMarkers)
 
         var mic: [RawSegment] = []
         if let source = sources.mic {
             emit(job, .extracting, 0)
             if let url = try await extract(source, to: work.appendingPathComponent("mic.caf")) {
-                mic = try await engine.transcribe(channelURL: url, languageRanges: ranges) { [self] fraction in
+                emit(job, .transcribingMic, 0.05)
+                mic = try await asr(url, source, .mic) { [self] fraction in
                     emit(job, .transcribingMic, 0.05 + 0.35 * fraction)
                 }
                 try? fm.removeItem(at: url)
@@ -171,29 +204,61 @@ public actor TranscriptionPipeline {
         if let source = sources.system {
             emit(job, .extracting, 0.4)
             if let url = try await extract(source, to: work.appendingPathComponent("system.caf")) {
-                system = try await engine.transcribe(channelURL: url, languageRanges: ranges) { [self] fraction in
+                emit(job, .transcribingSystem, 0.45)
+                system = try await asr(url, source, .system) { [self] fraction in
                     emit(job, .transcribingSystem, 0.45 + 0.35 * fraction)
                 }
-                if let diarizer, !system.isEmpty {
+                if let diarizer, !system.isEmpty, !system.contains(where: { $0.speaker != nil }) {
                     emit(job, .diarizing, 0.8)
-                    turns = try await diarizer.diarize(channelURL: url) { [self] fraction in
-                        emit(job, .diarizing, 0.8 + 0.15 * fraction)
+                    let diarize: @Sendable () async throws -> [DiarizationTurn] = { [self] in
+                        try await diarizer.diarize(channelURL: url) { [self] fraction in
+                            emit(job, .diarizing, 0.8 + 0.15 * fraction)
+                        }
                     }
+                    turns = gateDiarization
+                        ? try await gate.withExclusiveModel(owner: .transcriptionJob, diarize)
+                        : try await diarize()
                 }
             }
         }
 
         emit(job, .merging, 0.95)
+        let providerSpeakers = system.contains { $0.speaker != nil }
         let transcript = Transcript(
             segments: TranscriptMerger.merge(
                 mic: mic, system: system, turns: turns, languageMarkers: session.languageMarkers),
-            engineID: entry.id,
-            modelID: [entry.repo, entry.subfolder].compactMap { $0 }.joined(separator: "/"),
+            engineID: engineID,
+            modelID: modelID,
             engineFallback: engineFallback,
-            notes: diarizer == nil && !system.isEmpty ? [Transcript.diarizationMissingNote] : []
+            notes: diarizer == nil && !system.isEmpty && !providerSpeakers ? [Transcript.diarizationMissingNote] : []
         )
         try transcript.write(to: job.folder)
         return job.folder.appendingPathComponent(Transcript.fileName)
+    }
+
+    /// One channel through a cloud API, from the compressed source (not the 16 kHz extract); errors other than a
+    /// cancellation become `TranscriptionError.cloud` with a short reason.
+    private static func cloudSegments(
+        _ cloud: CloudEngine, source: ChannelSource, language: String?, diarize: Bool
+    ) async throws -> [RawSegment] {
+        do {
+            let segments = try await CloudTranscription.transcribe(
+                source: source.url, channel: source.channel, with: cloud.transcriber, language: language, diarize: diarize)
+            return segments.map {
+                RawSegment(start: $0.start, end: $0.end, text: $0.text, detectedLanguage: $0.language, speaker: $0.speaker)
+            }
+        } catch let error as CancellationError {
+            throw error
+        } catch {
+            throw TranscriptionError.cloud(provider: cloud.name, reason: CloudTranscription.failureReason(error))
+        }
+    }
+
+    /// The language sent to a cloud API for the whole recording: the single language of `ranges`, nil (detect)
+    /// when it is Auto or the recording switches languages.
+    static func cloudLanguage(_ ranges: [LanguageRange]) -> String? {
+        let languages = Set(ranges.map(\.language))
+        return languages.count == 1 ? languages.first ?? nil : nil
     }
 
     /// Stereo: ch0 mic, ch1 system. Two mono files: `audioFileName` mic, `systemFileName` system. A single
@@ -348,6 +413,24 @@ public actor TranscriptionPipeline {
         guard var conversation = try? Conversation.read(from: folder) else { return }
         change(&conversation)
         try? conversation.write()
+    }
+}
+
+/// A cloud transcription engine for one job, resolved by the app from its settings and the Keychain.
+public struct CloudEngine: Sendable {
+    /// `cloud:<provider id>`, written as the transcript's `engineID`.
+    public var engineID: String
+    /// Provider name for error reasons ("Deepgram: invalid API key").
+    public var name: String
+    /// Written as the transcript's `modelID`; empty when the provider picks it.
+    public var model: String
+    public var transcriber: any CloudTranscriber
+
+    public init(engineID: String, name: String, model: String, transcriber: any CloudTranscriber) {
+        self.engineID = engineID
+        self.name = name
+        self.model = model
+        self.transcriber = transcriber
     }
 }
 

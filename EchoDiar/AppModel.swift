@@ -44,6 +44,14 @@ final class AppModel {
     /// Latest progress of each queued or running transcription, by conversation id. A `needsModel` entry stays
     /// (its `detail` is the missing catalog id) until the job is submitted again or a model download succeeds.
     private(set) var transcriptionProgress: [UUID: JobProgress] = [:]
+    /// Short reason of each conversation's last failed transcription ("Deepgram: invalid API key"), in memory only;
+    /// cleared when the conversation is submitted again.
+    private(set) var transcriptionErrors: [UUID: String] = [:]
+    /// Cloud runs waiting for their destination's one-time "audio leaves this Mac" confirmation, oldest first.
+    private(set) var pendingCloudRuns: [PendingCloudRun] = []
+    /// Bumped when Settings saves or removes an API key, so views listing cloud engines (which read the Keychain)
+    /// update.
+    private(set) var keychainVersion = 0
     var settingsTab: SettingsTab = .general
     /// Running model downloads, by catalog id.
     private(set) var downloads: [String: ModelDownload] = [:]
@@ -56,6 +64,17 @@ final class AppModel {
     private(set) var liveTranscript: LiveTranscriber.Snapshot?
     /// Apple Speech locales reserved by EchoDiar (BCP-47), read with the installed models.
     private(set) var appleSpeechReservedLocales: [String] = []
+
+    struct PendingCloudRun {
+        let providerID: String
+        let providerName: String
+        /// `CloudTranscription.destination(for:)` when the run was queued; the confirmation is stored under it.
+        let consentKey: String
+        let host: String
+        let conversationID: UUID
+        let folder: URL
+        let language: String?
+    }
 
     struct ModelDownload {
         var fraction: Double = 0
@@ -356,8 +375,8 @@ final class AppModel {
         submitTranscription(folder: result.folder)
     }
 
-    /// The card's "Transcribe" and "Retry", and the transcript's "Re-transcribe" (`engineID` = a catalog id, nil =
-    /// the default resolution; `language` replaces the recording's language markers, nil keeps them): queues the
+    /// The card's "Transcribe" and "Retry", and the transcript's "Re-transcribe" (`engineID` = a catalog id or a cloud
+    /// engine id, nil = the default resolution; `language` replaces the recording's language markers, nil keeps them): queues the
     /// conversation unless a job for it is already active.
     func transcribe(_ id: UUID, engineID: String? = nil, language: String? = nil) {
         guard !isTranscribing(id), let conversation = conversations.first(where: { $0.id == id }) else { return }
@@ -372,10 +391,34 @@ final class AppModel {
     }
 
     /// A failed recording is never transcribed: its audio is missing or empty. `engineID` nil = the default set in
-    /// the Models tab when usable for the recording's first language, else the pipeline's default resolution.
+    /// the Models tab when usable for the recording's first language, else the pipeline's default resolution. A cloud
+    /// engine (picked or default) runs only while its provider is configured, else the local resolution applies; the
+    /// first run per provider and destination waits for the confirmation in the main window, which opens if closed.
     private func submitTranscription(folder: URL, engineID: String? = nil, language: String? = nil) {
         guard let session = try? RecordingSession.read(from: folder), !session.probe, session.state != .failed else {
             return
+        }
+        var engineID = engineID
+        var cloud: CloudEngine?
+        if let providerID = CloudTranscription.providerID(engineID: engineID ?? settings.defaultASRModelID) {
+            if let config = cloudEngineConfigs.first(where: { $0.id == providerID }) {
+                // Bound to the destination, so an edited base URL asks again; an invalid one never counts as confirmed.
+                let destination = CloudTranscription.destination(for: config)
+                guard let destination, settings.cloudSTTConfirmed.contains(destination.consentKey) else {
+                    if let destination, !pendingCloudRuns.contains(where: { $0.folder == folder }) {
+                        if pendingCloudRuns.isEmpty { showMainWindowIfHidden() }
+                        pendingCloudRuns.append(PendingCloudRun(
+                            providerID: providerID, providerName: config.displayName,
+                            consentKey: destination.consentKey, host: destination.host, conversationID: session.id,
+                            folder: folder, language: language))
+                    }
+                    return
+                }
+                cloud = makeCloudEngine(config)
+                engineID = cloud?.engineID
+            } else if CloudTranscription.providerID(engineID: engineID) != nil {
+                engineID = nil
+            }
         }
         // The Models tab's default only when usable for the first language, else the pipeline's default resolution.
         let firstLanguage = language ?? session.languageMarkers.min { $0.fileTime < $1.fileTime }?.language ?? "auto"
@@ -386,12 +429,17 @@ final class AppModel {
             conversationID: session.id, folder: folder,
             systemFileName: session.audioFileName == AudioCompressor.micFileName ? AudioCompressor.systemFileName : nil,
             engineID: engineID ?? preferred, language: language)
+        transcriptionErrors[session.id] = nil
         // Set now so the card leaves its button before the pipeline's first event arrives.
         transcriptionProgress[session.id] = JobProgress(conversationID: session.id, step: .queued, fraction: 0)
         transcriptionJobs += 1
         Task {
             do {
-                _ = try await pipeline.transcribe(job)
+                _ = try await pipeline.transcribe(job, cloud: cloud)
+            } catch TranscriptionError.cloud(let provider, let reason) {
+                // The kind only ("HTTP 400", "invalid API key"): the reason can quote the provider's error body.
+                let kind = reason.prefix { $0 != ":" }
+                NSLog("EchoDiar: \(provider) transcription failed for \(folder.lastPathComponent): \(kind)")
             } catch {
                 NSLog("EchoDiar: transcription failed for \(folder.lastPathComponent): \(error)")
             }
@@ -408,12 +456,73 @@ final class AppModel {
                 guard let self else { return }
                 let previous = transcriptionProgress[progress.conversationID]?.step
                 switch progress.step {
-                case .finished, .failed: transcriptionProgress[progress.conversationID] = nil
+                case .finished: transcriptionProgress[progress.conversationID] = nil
+                case .failed:
+                    transcriptionProgress[progress.conversationID] = nil
+                    transcriptionErrors[progress.conversationID] = progress.detail
                 default: transcriptionProgress[progress.conversationID] = progress
                 }
                 if previous != progress.step { await library.refresh() }
             }
         }
+    }
+
+    /// The main window's answer to the first pending cloud run's confirmation: every pending run for that
+    /// destination is submitted (and the destination remembered) or dropped (the conversation keeps its Transcribe
+    /// button). Runs whose conversation got a job meanwhile are skipped, so no second paid job starts. Submitting
+    /// re-reads the config, so a base URL changed since the alert asks again.
+    func resolvePendingCloudRuns(allowed: Bool) {
+        guard let first = pendingCloudRuns.first else { return }
+        let runs = pendingCloudRuns.filter { $0.consentKey == first.consentKey }
+        pendingCloudRuns.removeAll { $0.consentKey == first.consentKey }
+        guard allowed else { return }
+        if !settings.cloudSTTConfirmed.contains(first.consentKey) {
+            updateSettings { $0.cloudSTTConfirmed.append(first.consentKey) }
+        }
+        for run in runs where !isTranscribing(run.conversationID) {
+            submitTranscription(
+                folder: run.folder, engineID: CloudTranscription.engineID(providerID: run.providerID), language: run.language)
+        }
+    }
+
+    /// Opens (or deminiaturizes) the main window so the cloud confirmation is seen, e.g. after a recording made
+    /// from the menu bar.
+    private func showMainWindowIfHidden() {
+        guard let delegate = NSApp.delegate as? AppDelegate else { return }
+        // The main window is the only one whose delegate is the AppDelegate.
+        if !NSApp.windows.contains(where: { $0.delegate === delegate && $0.isVisible }) { delegate.showMainWindow() }
+    }
+
+    /// Installed batch ASR models, in catalog order.
+    var installedBatchEngines: [ModelEntry] {
+        ModelCatalog.asr.filter {
+            !$0.liveOnly && TranscriptionPipeline.registeredRuntimes.contains($0.runtime) && installedModelIDs.contains($0.id)
+        }
+    }
+
+    /// Enabled cloud transcription providers with a model, a base URL (custom endpoints) and a saved key.
+    var cloudEngineConfigs: [ProviderConfig] {
+        _ = keychainVersion
+        return providerConfigs.filter { config in
+            config.enabled && CloudTranscription.isComplete(config)
+                && (!CloudTranscription.needsKey(config) || (try? KeychainStore.hasAPIKey(forProvider: config.id)) == true)
+        }
+    }
+
+    func keychainChanged() { keychainVersion += 1 }
+
+    /// "Deepgram (nova-3)"; the provider name alone when it picks the model.
+    func cloudEngineName(_ config: ProviderConfig) -> String {
+        let model = CloudTranscription.model(for: config)
+        return model.isEmpty ? config.displayName : "\(config.displayName) (\(model))"
+    }
+
+    private func makeCloudEngine(_ config: ProviderConfig) -> CloudEngine {
+        let apiKey = CloudTranscription.needsKey(config) ? try? KeychainStore.apiKey(forProvider: config.id) : nil
+        return CloudEngine(
+            engineID: CloudTranscription.engineID(providerID: config.id), name: config.displayName,
+            model: CloudTranscription.model(for: config),
+            transcriber: CloudTranscription.makeTranscriber(config: config, apiKey: apiKey))
     }
 
     // MARK: - Models
@@ -484,7 +593,8 @@ final class AppModel {
         }
     }
 
-    /// The ASR model new recordings are transcribed with: the one set in the Models tab, else the catalog default.
+    /// The ASR model new recordings are transcribed with: the one set in the Models tab (a catalog or cloud engine id),
+    /// else the catalog default.
     var defaultASRModelID: String { settings.defaultASRModelID ?? ModelCatalog.defaultASR.id }
 
     /// Picking the catalog default stores nil, so the pipeline's default resolution applies again.
@@ -601,6 +711,8 @@ final class AppModel {
             return AnthropicClient(config: config, apiKey: apiKey)
         case .openAICompatible, .local:
             return OpenAICompatibleClient(config: config, apiKey: apiKey)
+        case .speechToText:
+            return nil
         }
     }
 }
