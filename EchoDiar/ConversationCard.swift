@@ -6,10 +6,14 @@ import SwiftUI
 
 /// One conversation of the library: source app icon, title (double-click to rename), time, duration, size and
 /// status, then a bottom row with the AI, Summary, Reveal in Finder and Delete buttons and the transcription progress
-/// or its action. A click elsewhere opens the transcript.
+/// or its action. A click elsewhere opens the transcript. Compact (the wide layout's sidebar) drops the buttons, which
+/// stay in the context menu and the detail, and keeps the status, and a click keeps the detail's tab; selected adds an
+/// accent fill and stroke.
 struct ConversationCard: View {
     let conversation: Conversation
     let model: AppModel
+    var compact = false
+    var selected = false
     @State private var editing = false
     @State private var draft = ""
     @FocusState private var titleFocused: Bool
@@ -23,25 +27,36 @@ struct ConversationCard: View {
                 TranscriptionFailureReason(conversation: conversation, model: model)
                 // The buttons and status have their own row under the title and details, from the same leading edge.
                 HStack(spacing: 12) {
-                    rowButton("AI", systemImage: "sparkles") { model.open(conversation.id, tab: .chat) }
-                        .help("Ask AI about this conversation")
-                    if conversation.hasSummary {
-                        rowButton("Summary", systemImage: "text.alignleft") { model.open(conversation.id, tab: .summary) }
+                    if !compact {
+                        rowButton("AI", systemImage: "sparkles") { model.open(conversation.id, tab: .chat) }
+                            .help("Ask AI about this conversation")
+                        if conversation.hasSummary {
+                            rowButton("Summary", systemImage: "text.alignleft") {
+                                model.open(conversation.id, tab: .summary)
+                            }
                             .help("Show the summary")
+                        }
+                        rowButton("Reveal in Finder", systemImage: "folder", action: revealInFinder)
+                            .help("Reveal in Finder")
+                        rowButton("Delete", systemImage: "trash", action: delete)
+                            .disabled(!canDelete)
+                            .help("Move this conversation to the Trash")
                     }
-                    rowButton("Reveal in Finder", systemImage: "folder", action: revealInFinder)
-                        .help("Reveal in Finder")
-                    rowButton("Delete", systemImage: "trash", action: delete)
-                        .disabled(!canDelete)
-                        .help("Move this conversation to the Trash")
                     TranscriptionStatus(conversation: conversation, model: model)
                     Spacer(minLength: 0)
                 }
             }
         }
-        .padding(.horizontal, 14)
-        .padding(.vertical, 10)
+        .padding(.horizontal, compact ? 10 : 14)
+        .padding(.vertical, compact ? 8 : 10)
+        // The fill sits under the content, on the glass; the stroke on top.
+        .background {
+            if selected { Self.shape.fill(Color.accentColor.opacity(0.18)) }
+        }
         .modifier(GlassCard(cornerRadius: 20))
+        .overlay {
+            if selected { Self.shape.strokeBorder(Color.accentColor, lineWidth: 1.5).allowsHitTesting(false) }
+        }
         // Buttons take their own clicks; the title's double click is handled before this.
         .contentShape(Rectangle())
         .onTapGesture(perform: open)
@@ -53,6 +68,9 @@ struct ConversationCard: View {
                 .disabled(!canDelete)
         }
     }
+
+    /// The `GlassCard` shape, for the selection.
+    private static let shape = RoundedRectangle(cornerRadius: 20, style: .continuous)
 
     private func rowButton(_ title: String, systemImage: String, action: @escaping () -> Void) -> some View {
         Button(action: action) {
@@ -124,9 +142,10 @@ struct ConversationCard: View {
     }
 
     /// Not while the title is being edited: clicks in its field must not open the transcript.
+    /// The transcript; in the sidebar, the tab the detail shows.
     private func open() {
         guard !editing else { return }
-        model.open(conversation.id)
+        model.open(conversation.id, tab: compact ? model.detailTab : .transcript)
     }
 
     private func revealInFinder() {

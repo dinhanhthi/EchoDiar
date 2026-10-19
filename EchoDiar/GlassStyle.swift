@@ -95,6 +95,69 @@ struct GlassCard: ViewModifier {
     }
 }
 
+/// Tabs in a small glass capsule, the toolbar's selected-toggle look: the selected tab is an accent capsule that
+/// slides between the tabs (no slide under Reduce Motion).
+struct CapsuleTabs<Tab: Hashable>: View {
+    @Binding var selection: Tab
+    let tabs: [Tab]
+    let title: (Tab) -> LocalizedStringKey
+    @Namespace private var namespace
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
+    var body: some View {
+        HStack(spacing: 2) {
+            ForEach(tabs, id: \.self) { tab in
+                Item(title: title(tab), selected: tab == selection, namespace: namespace) { selection = tab }
+            }
+        }
+        .padding(3)
+        .animation(reduceMotion ? nil : .snappy(duration: 0.25), value: selection)
+        .modifier(CapsuleGlass())
+    }
+
+    private struct Item: View {
+        let title: LocalizedStringKey
+        let selected: Bool
+        let namespace: Namespace.ID
+        let action: () -> Void
+        @State private var hovered = false
+
+        var body: some View {
+            Button(action: action) {
+                Text(title)
+                    .font(.callout)
+                    .lineLimit(1)
+                    .foregroundStyle(selected ? Color.white : Color.secondary)
+                    .padding(.horizontal, 12)
+                    .frame(height: 24)
+                    .background {
+                        if selected {
+                            Capsule()
+                                .fill(Color.accentColor)
+                                .matchedGeometryEffect(id: "selection", in: namespace)
+                        } else if hovered {
+                            Capsule().fill(Palette.hoverFill)
+                        }
+                    }
+                    .contentShape(Capsule())
+            }
+            .buttonStyle(.plain)
+            .onHover { hovered = $0 }
+            .accessibilityAddTraits(selected ? .isSelected : [])
+        }
+    }
+
+    private struct CapsuleGlass: ViewModifier {
+        func body(content: Content) -> some View {
+            if #available(macOS 26, *), PlatformFeatures.liquidGlass {
+                content.glassEffect(.regular, in: .capsule)
+            } else {
+                content.background(.regularMaterial, in: Capsule())
+            }
+        }
+    }
+}
+
 /// Groups glass cards in a `GlassEffectContainer` when Liquid Glass is on.
 struct GlassCards<Content: View>: View {
     @ViewBuilder let content: Content

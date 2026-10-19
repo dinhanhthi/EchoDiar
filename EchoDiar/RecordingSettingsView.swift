@@ -151,7 +151,7 @@ struct RecordingSettingsView: View {
     }
 }
 
-/// The sections of a Settings page as tabs: a segmented control at the top, the selected section's form below.
+/// The sections of a Settings page as tabs: capsule tabs at the top, the selected section's form below.
 struct SettingsSectionTabs<Tab: Hashable & CaseIterable, Content: View>: View where Tab.AllCases: RandomAccessCollection {
     @Binding var selection: Tab
     let title: (Tab) -> LocalizedStringKey
@@ -161,7 +161,7 @@ struct SettingsSectionTabs<Tab: Hashable & CaseIterable, Content: View>: View wh
         VStack(spacing: 0) {
             // A menu when the tabs are wider than the pane, so the pane never grows past the window.
             ViewThatFits(in: .horizontal) {
-                picker.pickerStyle(.segmented).fixedSize()
+                CapsuleTabs(selection: $selection, tabs: Array(Tab.allCases), title: title).fixedSize()
                 picker.pickerStyle(.menu).fixedSize()
             }
             .labelsHidden()

@@ -4,8 +4,8 @@ import EchoCore
 import SwiftUI
 
 /// The Summary or Chat tab of the open conversation (`AppModel.detailTab`): Chat (questions with streamed answers) or
-/// Summary (the saved summary, Generate / Regenerate). The bar at the bottom holds the tab's actions, "Copy as
-/// prompt", and small menus for the model (every usable provider with its models) and the output language.
+/// Summary (the saved summary, Summarize / Re-summarize). The bar at the bottom is one row: small menus for the model
+/// (every usable provider with its models) and the output language, "Copy as prompt" and the tab's action.
 /// `[mm:ss]` citations open the transcript at that time.
 struct AIPanelView: View {
     let conversation: Conversation
@@ -156,40 +156,43 @@ struct AIPanelView: View {
 
     // MARK: - Bottom bar
 
-    /// The tab's actions, then the small menus and any notice about where the data goes.
+    /// One row: the question (Chat), the small menus, "Copy as prompt" and the tab's action; then any notice about
+    /// where the data goes.
     private var bottomBar: some View {
         VStack(alignment: .leading, spacing: 8) {
             busyElsewhere
-            HStack(spacing: 12) {
+            HStack(spacing: 8) {
                 if model.detailTab == .chat {
                     TextField("Ask about this conversation", text: $question)
                         .textFieldStyle(.plain)
+                        .frame(minWidth: 120)
                         .onSubmit(ask)
+                    modelMenu
+                    languageMenu
                     copyButton
                     if questionJob != nil {
-                        iconButton("Cancel", systemImage: "stop.circle", action: model.cancelAIJob)
+                        Button("Cancel", action: model.cancelAIJob)
+                            .modifier(CapsuleButton())
                     } else {
-                        iconButton("Ask", systemImage: "paperplane", action: ask)
+                        Button("Send", action: ask)
+                            .modifier(CapsuleButton(prominent: true))
                             .disabled(!canRun || question.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
                     }
                 } else {
-                    if summaryJob != nil {
-                        ProgressView().controlSize(.small)
-                    }
+                    modelMenu
+                    languageMenu
                     Spacer(minLength: 0)
                     copyButton
                     if summaryJob != nil {
+                        ProgressView().controlSize(.small)
                         Button("Cancel", action: model.cancelAIJob)
+                            .modifier(CapsuleButton())
                     } else {
-                        Button(summary == nil ? "Generate" : "Regenerate") { start(.summary) }
+                        Button(summary == nil ? "Summarize" : "Re-summarize") { start(.summary) }
+                            .modifier(CapsuleButton(prominent: true))
                             .disabled(!canRun)
                     }
                 }
-            }
-            HStack(spacing: 2) {
-                modelMenu
-                languageMenu
-                Spacer(minLength: 0)
             }
             hints
                 .font(.caption)
@@ -212,7 +215,7 @@ struct AIPanelView: View {
                     .truncationMode(.middle)
                 Spacer(minLength: 0)
                 Button("Cancel", action: model.cancelAIJob)
-                    .controlSize(.small)
+                    .modifier(CapsuleButton())
             }
             .font(.caption)
             .foregroundStyle(.secondary)
@@ -220,8 +223,11 @@ struct AIPanelView: View {
     }
 
     private var copyButton: some View {
-        iconButton("Copy as prompt", systemImage: "doc.on.clipboard", action: copyPrompt)
-            .disabled(transcript == nil)
+        Button(action: copyPrompt) {
+            Label("Copy as prompt", systemImage: "doc.on.clipboard").labelStyle(.iconOnly)
+        }
+        .modifier(CapsuleButton())
+        .disabled(transcript == nil)
             .help(model.detailTab == .chat
                   ? "Copy the transcript and the question as a prompt for any chat app"
                   : "Copy the transcript as a summary prompt for any chat app")
@@ -253,7 +259,7 @@ struct AIPanelView: View {
         } label: {
             menuLabel(modelTitle, systemImage: "cpu")
         }
-        .modifier(CompactMenu(maxWidth: 220))
+        .modifier(CompactMenu(maxWidth: 180))
         .layoutPriority(1)
         .help("Model for summaries and questions")
     }
@@ -273,7 +279,7 @@ struct AIPanelView: View {
         guard let provider = model.currentAIProvider else { return "No AI model" }
         guard provider.kind != .inApp else { return provider.name }
         let id = currentModel ?? ""
-        return "\(provider.name) · \(id.isEmpty ? "Default" : id)"
+        return id.isEmpty ? provider.name : id
     }
 
     private var languageMenu: some View {
@@ -290,7 +296,7 @@ struct AIPanelView: View {
             .pickerStyle(.inline)
             .labelsHidden()
         } label: {
-            menuLabel(LanguageOptions.name(model.settings.summaryLanguage), systemImage: "globe")
+            menuLabel(LanguageOptions.shortCode(model.settings.summaryLanguage), systemImage: "globe")
         }
         .modifier(CompactMenu(maxWidth: nil))
         .help("Language of summaries and answers (Auto = the transcript's language for summaries, the question's for answers)")
@@ -298,7 +304,7 @@ struct AIPanelView: View {
 
     private func menuLabel(_ title: String, systemImage: String) -> some View {
         Label {
-            Text(title).lineLimit(1).truncationMode(.middle)
+            Text(title).lineLimit(1).truncationMode(.tail)
         } icon: {
             Image(systemName: systemImage)
         }
@@ -319,17 +325,6 @@ struct AIPanelView: View {
         if let note = provider?.cliPreset.flatMap(CLIRunner.containmentNote(for:)) {
             Label(note, systemImage: "exclamationmark.shield")
         }
-    }
-
-    private func iconButton(_ title: String, systemImage: String, action: @escaping () -> Void) -> some View {
-        Button(action: action) {
-            Label(title, systemImage: systemImage)
-                .labelStyle(.iconOnly)
-                .font(.system(size: 15))
-        }
-        .buttonStyle(RowIconButtonStyle())
-        .foregroundStyle(.secondary)
-        .help(title)
     }
 
     @ViewBuilder private var toastView: some View {
@@ -427,21 +422,55 @@ struct AIPanelView: View {
     }
 }
 
-/// A small borderless menu of the AI pane's bottom bar: its title's width, a long one cut to `maxWidth` (never cut
-/// without one).
+/// A small capsule button of the AI pane's bottom bar; `prominent` for the tab's main action.
+private struct CapsuleButton: ViewModifier {
+    var prominent = false
+
+    func body(content: Content) -> some View {
+        Group {
+            if prominent {
+                content.buttonStyle(.borderedProminent)
+            } else {
+                content.buttonStyle(.bordered)
+            }
+        }
+        .buttonBorderShape(.capsule)
+        .controlSize(.small)
+    }
+}
+
+/// A small capsule menu of the AI pane's bottom bar: its title's width, a long one cut to `maxWidth` with an ellipsis
+/// (never cut without one).
 private struct CompactMenu: ViewModifier {
     let maxWidth: CGFloat?
 
     func body(content: Content) -> some View {
         let menu = content
-            .menuStyle(.borderlessButton)
-            .font(.caption)
-            .foregroundStyle(.secondary)
+            .menuStyle(.button)
+            .buttonStyle(.bordered)
+            .buttonBorderShape(.capsule)
+            .controlSize(.small)
         if let maxWidth {
-            menu.frame(maxWidth: maxWidth, alignment: .leading).fixedSize(horizontal: false, vertical: true)
+            WidthCap(maxWidth: maxWidth) { menu }
         } else {
             menu.fixedSize()
         }
+    }
+}
+
+/// Its content at the proposed width, at most `maxWidth`, and no wider than the content: unlike
+/// `frame(maxWidth:)`, a short title leaves no gap after it.
+private struct WidthCap: Layout {
+    let maxWidth: CGFloat
+
+    func sizeThatFits(proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) -> CGSize {
+        guard let content = subviews.first else { return .zero }
+        let width = min(proposal.width ?? content.sizeThatFits(.unspecified).width, maxWidth)
+        return content.sizeThatFits(ProposedViewSize(width: width, height: proposal.height))
+    }
+
+    func placeSubviews(in bounds: CGRect, proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) {
+        subviews.first?.place(at: bounds.origin, proposal: ProposedViewSize(width: bounds.width, height: bounds.height))
     }
 }
 

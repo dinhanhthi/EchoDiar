@@ -21,6 +21,15 @@ enum LanguageOptions {
     static func name(_ code: String) -> String {
         code == auto ? "Auto" : Locale(identifier: "en").localizedString(forLanguageCode: code) ?? code
     }
+
+    /// Compact label ("VI", "ZH" for "zh-Hans"); "" is `LanguagePicker`'s "As recorded" tag. Lists keep `name`.
+    static func shortCode(_ code: String) -> String {
+        switch code {
+        case auto: String(localized: "Auto")
+        case "": String(localized: "As recorded")
+        default: (Locale.Language(identifier: code).languageCode?.identifier ?? code).uppercased()
+        }
+    }
 }
 
 /// A language picker for menus (a submenu) and forms (a pop-up button), in `LanguageOptions` order.

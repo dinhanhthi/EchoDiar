@@ -36,14 +36,10 @@ struct TranscriptView: View {
     var body: some View {
         VStack(spacing: 10) {
             header
-            // Interim tabs, restyled later.
-            Picker("View", selection: Binding(get: { model.detailTab }, set: { model.detailTab = $0 })) {
-                Text("Transcript").tag(AppModel.DetailTab.transcript)
-                Text("Summary").tag(AppModel.DetailTab.summary)
-                Text("Chat").tag(AppModel.DetailTab.chat)
-            }
-            .pickerStyle(.segmented)
-            .labelsHidden()
+            CapsuleTabs(
+                selection: Binding(get: { model.detailTab }, set: { model.detailTab = $0 }),
+                tabs: [.transcript, .summary, .chat], title: Self.tabTitle
+            )
             .fixedSize()
             if model.detailTab == .transcript {
                 content
@@ -62,6 +58,14 @@ struct TranscriptView: View {
             playback.togglePlay()
         }
         .onDisappear { playback.close() }
+    }
+
+    private static func tabTitle(_ tab: AppModel.DetailTab) -> LocalizedStringKey {
+        switch tab {
+        case .transcript: "Transcript"
+        case .summary: "Summary"
+        case .chat: "Chat"
+        }
     }
 
     // MARK: - Header
@@ -90,11 +94,10 @@ struct TranscriptView: View {
             if transcript?.notes.contains(Transcript.diarizationMissingNote) == true {
                 diarizationMissingNotice
             }
+            // Wraps to more rows when the speakers do not fit on one.
             if transcript != nil && !speakers.isEmpty {
-                ScrollView(.horizontal, showsIndicators: false) {
-                    HStack(spacing: 6) {
-                        ForEach(speakers, id: \.self, content: speakerChip)
-                    }
+                FlowLayout(spacing: 6) {
+                    ForEach(speakers, id: \.self, content: speakerChip)
                 }
             }
             HStack(spacing: 8) {
@@ -416,6 +419,42 @@ private struct PlaybackTime: View {
         Text("\(TranscriptView.timestamp(playback.currentTime)) / \(TranscriptView.timestamp(playback.duration))")
             .font(.caption.monospacedDigit())
             .foregroundStyle(.secondary)
+    }
+}
+
+/// Places its views left to right, starting a new row when the next one does not fit the proposed width.
+private struct FlowLayout: Layout {
+    var spacing: CGFloat
+
+    func sizeThatFits(proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) -> CGSize {
+        arrange(subviews, width: proposal.width ?? .infinity).size
+    }
+
+    func placeSubviews(in bounds: CGRect, proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) {
+        let frames = arrange(subviews, width: bounds.width).frames
+        for (subview, frame) in zip(subviews, frames) {
+            subview.place(
+                at: CGPoint(x: bounds.minX + frame.minX, y: bounds.minY + frame.minY),
+                proposal: ProposedViewSize(frame.size))
+        }
+    }
+
+    private func arrange(_ subviews: Subviews, width: CGFloat) -> (frames: [CGRect], size: CGSize) {
+        var frames: [CGRect] = []
+        var x: CGFloat = 0, y: CGFloat = 0, rowHeight: CGFloat = 0, maxX: CGFloat = 0
+        for subview in subviews {
+            let size = subview.sizeThatFits(.unspecified)
+            if x > 0 && x + size.width > width {
+                x = 0
+                y += rowHeight + spacing
+                rowHeight = 0
+            }
+            frames.append(CGRect(origin: CGPoint(x: x, y: y), size: size))
+            maxX = max(maxX, x + size.width)
+            x += size.width + spacing
+            rowHeight = max(rowHeight, size.height)
+        }
+        return (frames, CGSize(width: maxX, height: y + rowHeight))
     }
 }
 

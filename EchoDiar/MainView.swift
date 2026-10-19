@@ -299,21 +299,44 @@ struct MainView: View {
             removal: .move(edge: removal).combined(with: .opacity))
     }
 
-    /// The shown conversation (its state and playback reset per conversation) or the recording; the cards when the
-    /// conversation is gone or the recording has ended.
+    /// The wide layout: the compact cards as a sidebar, then the shown conversation (its state and playback reset per
+    /// conversation) or the recording. The sidebar stays while the entry changes. The cards when the conversation is
+    /// gone or the recording has ended.
     @ViewBuilder private var entryPane: some View {
-        switch shownRoute {
-        case .conversation(let id):
-            if let conversation = model.conversations.first(where: { $0.id == id }) {
-                TranscriptView(conversation: conversation, model: model)
-                    .id(id)
-            } else {
-                cardsPane
+        if entryShown {
+            HStack(spacing: 0) {
+                libraryPane(compact: true, selectedID: selectedID)
+                    .frame(width: 300)
+                Divider()
+                entryDetail
             }
-        case .recording where model.isRecording:
-            livePane
-        default:
+        } else {
             cardsPane
+        }
+    }
+
+    /// The conversation still exists, or the recording still runs.
+    private var entryShown: Bool {
+        switch shownRoute {
+        case .conversation(let id): model.conversations.contains { $0.id == id }
+        case .recording: model.isRecording
+        default: false
+        }
+    }
+
+    /// The sidebar's selected card: the shown conversation.
+    private var selectedID: UUID? {
+        if case .conversation(let id) = shownRoute { return id }
+        return nil
+    }
+
+    @ViewBuilder private var entryDetail: some View {
+        if case .conversation(let id) = shownRoute,
+           let conversation = model.conversations.first(where: { $0.id == id }) {
+            TranscriptView(conversation: conversation, model: model)
+                .id(id)
+        } else {
+            livePane
         }
     }
 
@@ -335,14 +358,19 @@ struct MainView: View {
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
     }
 
-    @ViewBuilder private var cardsPane: some View {
+    private var cardsPane: some View {
+        libraryPane(compact: false, selectedID: nil)
+    }
+
+    /// The cards matching the search, or why there are none.
+    @ViewBuilder private func libraryPane(compact: Bool, selectedID: UUID?) -> some View {
         let groups = DayGroup.groups(from: searchResults)
         if model.conversations.isEmpty {
             emptyState("No conversations yet — press ⌘R to record")
         } else if groups.isEmpty {
             emptyState("No conversations match \"\(searchTerm)\"")
         } else {
-            ConversationListView(model: model, groups: groups)
+            ConversationListView(model: model, groups: groups, compact: compact, selectedID: selectedID)
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
     }

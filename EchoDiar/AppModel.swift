@@ -943,7 +943,8 @@ final class AppModel {
         OnboardingWindow.shared.show(model: self)
     }
 
-    /// ⌘F: the search field focused, on the list when Settings is shown.
+    /// ⌘F: the search field focused. The list, a conversation and the recording stay (the query filters the cards or
+    /// the sidebar); Settings goes to the list.
     func showSearch() {
         if route == .settings { route = .list }
         searchPresented = true
