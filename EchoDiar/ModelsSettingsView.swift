@@ -63,7 +63,7 @@ struct ModelsSettingsView: View {
             .font(.caption)
             .foregroundStyle(.secondary)
             .padding(.horizontal, 20)
-            .padding(.bottom, 12)
+            .padding(.vertical, 12)
         }
         .task { model.refreshInstalledModels() }
         .onChange(of: model.pendingSettingsSubTab, initial: true) { showPendingTab() }

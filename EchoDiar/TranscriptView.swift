@@ -389,25 +389,27 @@ struct TranscriptView: View {
 
     // MARK: - Segments
 
-    @ViewBuilder private var content: some View {
-        if let transcript, !transcript.segments.isEmpty {
-            SegmentList(transcript: transcript, playback: playback, scrollTarget: $scrollTarget)
-        } else if loading {
-            ProgressView().frame(maxHeight: .infinity)
-        } else {
-            VStack(spacing: 10) {
-                Text(emptyText).foregroundStyle(.secondary)
-                if !conversation.hasTranscript {
-                    TranscriptionFailureReason(conversation: conversation, model: model)
-                        .multilineTextAlignment(.center)
-                    TranscriptionStatus(conversation: conversation, model: model)
+    /// The segments in a card like Summary's and Chat's, or a note in its middle while there are none.
+    private var content: some View {
+        Group {
+            if let transcript, !transcript.segments.isEmpty {
+                SegmentList(transcript: transcript, playback: playback, scrollTarget: $scrollTarget)
+            } else if loading {
+                ProgressView()
+            } else {
+                VStack(spacing: 10) {
+                    Text(emptyText).foregroundStyle(.secondary)
+                    if !conversation.hasTranscript {
+                        TranscriptionFailureReason(conversation: conversation, model: model)
+                            .multilineTextAlignment(.center)
+                        TranscriptionStatus(conversation: conversation, model: model)
+                    }
                 }
+                .padding(20)
             }
-            .padding(.horizontal, 20)
-            .padding(.vertical, 16)
-            .modifier(GlassCard(cornerRadius: 20))
-            .frame(maxHeight: .infinity)
         }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .modifier(GlassCard(cornerRadius: 20))
     }
 
     private var loading: Bool { conversation.hasTranscript && transcript == nil && !loadFailed }
@@ -527,7 +529,8 @@ private struct SegmentList: View {
                         }
                     }
                 }
-                .padding(.vertical, 4)
+                // With the rows' own padding, the text sits as far from the card's edges as the summary's.
+                .padding(4)
             }
             // The user's own scrolling (wheel, trackpad, scroller); `.animating` is `follow`'s scrollTo.
             .onScrollPhaseChange { _, phase in

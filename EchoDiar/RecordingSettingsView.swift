@@ -79,7 +79,19 @@ struct RecordingSettingsView: View {
         }
     }
 
-    private var meetingsSection: some View {
+    @ViewBuilder private var meetingsSection: some View {
+        Section {
+            Toggle(isOn: model.setting(\.attachPillToWindow)) {
+                Text("Attach the indicator to the meeting window")
+                Text("Keeps it at the window's top-right corner. Needs Accessibility access.")
+            }
+            if model.settings.attachPillToWindow && !accessibilityTrusted {
+                LabeledContent("EchoDiar has no Accessibility access.") {
+                    Button("Grant Accessibility…", action: WindowAnchor.openAccessibilitySettings)
+                }
+                .foregroundStyle(.secondary)
+            }
+        }
         Section {
             Toggle(isOn: model.setting(\.meetingDetection)) {
                 Text("Detect meetings")
@@ -93,16 +105,6 @@ struct RecordingSettingsView: View {
                 }
             }
             .disabled(!model.settings.meetingDetection)
-            Toggle(isOn: model.setting(\.attachPillToWindow)) {
-                Text("Attach the indicator to the meeting window")
-                Text("Keeps it at the window's top-right corner. Needs Accessibility access.")
-            }
-            if model.settings.attachPillToWindow && !accessibilityTrusted {
-                LabeledContent("EchoDiar has no Accessibility access.") {
-                    Button("Grant Accessibility…", action: WindowAnchor.openAccessibilitySettings)
-                }
-                .foregroundStyle(.secondary)
-            }
         }
     }
 
@@ -175,7 +177,7 @@ struct SettingsSectionTabs<Tab: Hashable & CaseIterable, Content: View>: View wh
             }
             .labelsHidden()
             .padding(.horizontal, 20)
-            .padding(.top, 12)
+            .padding(.vertical, 12)
             Form { content(selection) }
                 .formStyle(.grouped)
         }

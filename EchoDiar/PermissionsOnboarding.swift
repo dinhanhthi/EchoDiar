@@ -215,9 +215,10 @@ private struct OnboardingView: View {
             }
         }
         .padding(.horizontal, 24)
-        .padding(.top, 36)
+        // Under the title bar's safe area: about as far below the traffic lights as Continue is above the bottom edge.
+        .padding(.top, 12)
         .padding(.bottom, 20)
-        .frame(width: 520, height: 400)
+        .frame(width: 520, height: 376)
         .background(WindowGlass().ignoresSafeArea())
     }
 }

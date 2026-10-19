@@ -468,7 +468,6 @@ struct MainView: View {
             HStack(spacing: 0) {
                 libraryPane(compact: true, selectedID: selectedID)
                     .frame(width: 300)
-                Divider()
                 entryDetail
             }
         } else {

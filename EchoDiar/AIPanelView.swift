@@ -168,23 +168,32 @@ struct AIPanelView: View {
 
     // MARK: - Summary
 
+    /// The summary, or a note in the middle while there is none.
     private var summaryPane: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: 8) {
-                if let job = summaryJob {
-                    if let status = job.status {
-                        Text(status).foregroundStyle(.secondary)
+        Group {
+            if summaryJob == nil && summary == nil {
+                Text(emptyNote ?? "No summary yet.")
+                    .foregroundStyle(.secondary)
+                    .multilineTextAlignment(.center)
+                    .padding(20)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+            } else {
+                ScrollView {
+                    VStack(alignment: .leading, spacing: 8) {
+                        if let job = summaryJob {
+                            if let status = job.status {
+                                Text(status).foregroundStyle(.secondary)
+                            }
+                            MarkdownText(text: job.text, isStreaming: true)
+                        } else if let summary {
+                            MarkdownText(text: summary)
+                        }
                     }
-                    MarkdownText(text: job.text, isStreaming: true)
-                } else if let summary {
-                    MarkdownText(text: summary)
-                } else {
-                    Text(emptyNote ?? "No summary yet.").foregroundStyle(.secondary)
+                    .padding(.horizontal, 14)
+                    .padding(.vertical, 10)
+                    .frame(maxWidth: .infinity, alignment: .leading)
                 }
             }
-            .padding(.horizontal, 14)
-            .padding(.vertical, 10)
-            .frame(maxWidth: .infinity, alignment: .leading)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         .modifier(GlassCard(cornerRadius: 20))
