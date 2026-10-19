@@ -18,8 +18,8 @@ final class SettingsWindow: NSObject, NSWindowDelegate {
                 defer: false
             )
             window.title = "Settings"
-            // Full-height sidebar under the traffic lights; the detail shows the section title instead.
-            window.titleVisibility = .hidden
+            // Full-height sidebar under the traffic lights; the detail's toolbar shows back/forward and the section title.
+            window.titleVisibility = .visible
             window.titlebarAppearsTransparent = true
             window.contentMinSize = NSSize(width: 760, height: 520)
             window.isReleasedWhenClosed = false
@@ -80,6 +80,11 @@ private struct SettingsView: View {
     /// Sections opened so far: kept alive like TabView's tabs, so leaving AI & Cloud does not rerun its scans.
     @State private var opened: Set<SettingsTab> = []
     @FocusState private var sidebarFocused: Bool
+    /// Sections visited before and after the current one, like Xcode's Settings arrows.
+    @State private var back: [SettingsTab] = []
+    @State private var forward: [SettingsTab] = []
+    /// Set while back/forward changes the selection, so `onChange` does not record it as a new visit.
+    @State private var navigating = false
 
     var body: some View {
         NavigationSplitView {
@@ -96,30 +101,57 @@ private struct SettingsView: View {
             // No toolbar in this window: keep the sidebar from being collapsed out of reach.
             .toolbar(removing: .sidebarToggle)
         } detail: {
-            VStack(alignment: .leading, spacing: 0) {
-                // In the title bar row, like System Settings (the detail column is clear of the traffic lights).
-                Text(model.settingsTab.label.title)
-                    .font(.title3.weight(.semibold))
-                    .padding(.horizontal, 20)
-                    .frame(height: 32)
-                ZStack {
-                    ForEach(SettingsTab.allCases.filter(opened.contains)) { tab in
-                        let selected = tab == model.settingsTab
-                        content(tab)
-                            .opacity(selected ? 1 : 0)
-                            .allowsHitTesting(selected)
-                            .disabled(!selected)
-                            .accessibilityHidden(!selected)
-                    }
+            ZStack {
+                ForEach(SettingsTab.allCases.filter(opened.contains)) { tab in
+                    let selected = tab == model.settingsTab
+                    content(tab)
+                        .opacity(selected ? 1 : 0)
+                        .allowsHitTesting(selected)
+                        .disabled(!selected)
+                        .accessibilityHidden(!selected)
                 }
-                // Scrolled rows otherwise slide up under the title.
-                .clipped()
             }
-            .ignoresSafeArea(.container, edges: .top)
+            .buttonStyle(SettingsButtonStyle())
+            .navigationTitle(model.settingsTab.label.title)
+            .toolbar {
+                ToolbarItemGroup(placement: .navigation) {
+                    Button("Back", systemImage: "chevron.left") { go(from: &back, to: &forward) }
+                        .disabled(back.isEmpty)
+                    Button("Forward", systemImage: "chevron.right") { go(from: &forward, to: &back) }
+                        .disabled(forward.isEmpty)
+                }
+            }
             .modifier(GlassForm())
+            // Opaque titlebar band behind the toolbar, so scrolled rows never show through the title.
+            .overlay(alignment: .top) {
+                GeometryReader { proxy in
+                    Rectangle()
+                        .fill(Color(nsColor: .windowBackgroundColor))
+                        .overlay(alignment: .bottom) { Divider() }
+                        .frame(height: proxy.safeAreaInsets.top)
+                        .ignoresSafeArea(.container, edges: .top)
+                }
+                .allowsHitTesting(false)
+            }
         }
         .onAppear { sidebarFocused = true }
-        .onChange(of: model.settingsTab, initial: true) { opened.insert(model.settingsTab) }
+        .onChange(of: model.settingsTab, initial: true) { old, new in
+            opened.insert(new)
+            if navigating {
+                navigating = false
+            } else if old != new {
+                back.append(old)
+                forward.removeAll()
+            }
+        }
+    }
+
+    /// Moves to the last section of `source`, pushing the current one onto `other`.
+    private func go(from source: inout [SettingsTab], to other: inout [SettingsTab]) {
+        guard let tab = source.popLast() else { return }
+        other.append(model.settingsTab)
+        navigating = true
+        model.settingsTab = tab
     }
 
     /// Ignores deselection (a click in the empty sidebar): a section is always shown.
