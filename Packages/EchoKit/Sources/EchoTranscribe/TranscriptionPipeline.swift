@@ -6,14 +6,25 @@ import Foundation
 
 /// Batch transcription of recording folders, one job at a time: extract each channel to 16 kHz mono, skip silent
 /// channels, ASR mic, ASR system, diarize system, merge, write `transcript.json`. Models are loaded inside each
-/// step and unloaded before the next. Never touches EchoAudio: `AppModel` runs compression first.
+/// step and unloaded before the next, while the job holds the `ModelLoadGate` (it waits while live captions hold
+/// it). Never touches EchoAudio: `AppModel` runs compression first.
 public actor TranscriptionPipeline {
     public typealias EngineFactory = @Sendable (_ entry: ModelEntry, _ folder: URL) -> any TranscriptionEngine
 
-    /// Batch engines by catalog runtime.
-    public static let engines: [ModelEntry.Runtime: EngineFactory] = [
-        .whisperKit: { WhisperKitEngine(entry: $0, folder: $1) },
-    ]
+    /// Batch engines by catalog runtime. Apple Speech only on macOS 26+ without `--force-fallbacks`; system
+    /// engines get the Models root as `folder` and ignore it.
+    public static let engines: [ModelEntry.Runtime: EngineFactory] = {
+        var engines: [ModelEntry.Runtime: EngineFactory] = [
+            .whisperKit: { WhisperKitEngine(entry: $0, folder: $1) },
+            // Parakeet v3 / Ultra; Nemotron is live only and the diarizer is not an ASR entry, so neither resolves here.
+            .fluidAudio: { ParakeetEngine(entry: $0, folder: $1) },
+            .speechSwift: { Qwen3ASREngine(entry: $0, folder: $1) },
+        ]
+        if #available(macOS 26, *), PlatformFeatures.speechAnalyzer {
+            engines[.appleSpeech] = { entry, _ in AppleSpeechEngine(entry: entry) }
+        }
+        return engines
+    }()
 
     public static var registeredRuntimes: Set<ModelEntry.Runtime> { Set(engines.keys) }
 
@@ -21,10 +32,20 @@ public actor TranscriptionPipeline {
     /// empty when unknown.
     public static func supportedLanguages(for entry: ModelEntry) -> [String] {
         switch (entry.languages, entry.runtime) {
-        case (.codes(let codes), _): codes
-        case (.multilingual, .whisperKit): WhisperKitEngine.supportedLanguages
-        case (.multilingual, _): []
+        case (.codes(let codes), _): return codes
+        case (.multilingual, .whisperKit): return WhisperKitEngine.supportedLanguages
+        case (.multilingual, .appleSpeech):
+            guard #available(macOS 26, *), PlatformFeatures.speechAnalyzer else { return [] }
+            return AppleSpeechEngine.supportedLanguages
+        case (.multilingual, _): return []
         }
+    }
+
+    /// Downloaded entries: installed in `Models/`. System entries (no repo): the OS feature is available.
+    public static func isUsable(_ entry: ModelEntry, in modelStore: ModelStore) -> Bool {
+        guard entry.repo == nil else { return modelStore.isInstalled(entry.id) }
+        guard entry.runtime == .appleSpeech, #available(macOS 26, *) else { return false }
+        return AppleSpeechEngine.isAvailable
     }
 
     /// −60 dBFS: a channel whose peak stays below is silent and skips ASR.
@@ -34,15 +55,23 @@ public actor TranscriptionPipeline {
     public nonisolated let progress: AsyncStream<JobProgress>
     private nonisolated let continuation: AsyncStream<JobProgress>.Continuation
     private let modelStore: ModelStore
+    private let gate: ModelLoadGate
     private let deferWhenConstrained: Bool
     private let speakerCountHint: Int?
     private var tail: Task<Void, Never>?
 
-    public init(modelStore: ModelStore, deferWhenConstrained: Bool = true, speakerCountHint: Int? = nil) {
+    public init(
+        modelStore: ModelStore, gate: ModelLoadGate, deferWhenConstrained: Bool = true, speakerCountHint: Int? = nil
+    ) {
         self.modelStore = modelStore
+        self.gate = gate
         self.deferWhenConstrained = deferWhenConstrained
         self.speakerCountHint = speakerCountHint
         (progress, continuation) = AsyncStream.makeStream(bufferingPolicy: .bufferingNewest(64))
+        // `supportedLanguages(for:)` is synchronous; Apple's locale list is async, so it is cached once here.
+        if #available(macOS 26, *), PlatformFeatures.speechAnalyzer {
+            Task.detached(priority: .utility) { await AppleSpeechEngine.loadSupportedLanguages() }
+        }
     }
 
     /// Runs after every job queued before it; returns the `transcript.json` URL.
@@ -75,8 +104,11 @@ public actor TranscriptionPipeline {
             if let language = job.language { session.languageMarkers = [.init(fileTime: 0, language: language)] }
             let sources = try channelSources(session: session, job: job)
             let firstLanguage = session.languageMarkers.min { $0.fileTime < $1.fileTime }?.language ?? "auto"
-            let entry = try resolveEngine(job.engineID, language: firstLanguage)
-            guard let factory = Self.engines[entry.runtime], let modelFolder = modelStore.folder(for: entry.id) else {
+            let selected = try resolveEngine(job.engineID, language: firstLanguage)
+            let (entry, engineFallback) = await fallback(
+                for: selected, markers: session.languageMarkers, language: firstLanguage)
+            guard let factory = Self.engines[entry.runtime],
+                  let modelFolder = modelStore.folder(for: entry.id) ?? (entry.repo == nil ? modelStore.root : nil) else {
                 throw TranscriptionError.unknownEngine(entry.id)
             }
             let diarizerID = ModelCatalog.defaultDiarizer.id
@@ -87,10 +119,13 @@ public actor TranscriptionPipeline {
                 : nil
 
             started = true
-            Self.updateConversation(in: job.folder) { $0.status = .transcribing }
-            let url = try await process(
-                job, session: session, sources: sources, engine: factory(entry, modelFolder), entry: entry,
-                diarizer: diarizer)
+            let engine = factory(entry, modelFolder)
+            let url = try await gate.withExclusiveModel(owner: .transcriptionJob) { [self, session] in
+                Self.updateConversation(in: job.folder) { $0.status = .transcribing }
+                return try await process(
+                    job, session: session, sources: sources, engine: engine, entry: entry,
+                    engineFallback: engineFallback, diarizer: diarizer)
+            }
             Self.updateConversation(in: job.folder) {
                 $0.status = .transcribed
                 $0.hasTranscript = true
@@ -112,7 +147,7 @@ public actor TranscriptionPipeline {
 
     private func process(
         _ job: TranscriptionJob, session: RecordingSession, sources: (mic: ChannelSource?, system: ChannelSource?),
-        engine: any TranscriptionEngine, entry: ModelEntry, diarizer: SpeakerDiarizer?
+        engine: any TranscriptionEngine, entry: ModelEntry, engineFallback: String?, diarizer: SpeakerDiarizer?
     ) async throws -> URL {
         let fm = FileManager.default
         let work = fm.temporaryDirectory.appendingPathComponent("EchoDiar-transcribe-\(UUID().uuidString)")
@@ -154,6 +189,7 @@ public actor TranscriptionPipeline {
                 mic: mic, system: system, turns: turns, languageMarkers: session.languageMarkers),
             engineID: entry.id,
             modelID: [entry.repo, entry.subfolder].compactMap { $0 }.joined(separator: "/"),
+            engineFallback: engineFallback,
             notes: diarizer == nil && !system.isEmpty ? [Transcript.diarizationMissingNote] : []
         )
         try transcript.write(to: job.folder)
@@ -183,26 +219,85 @@ public actor TranscriptionPipeline {
         )
     }
 
-    /// Explicit engine → the catalog default if installed → the smallest installed WhisperKit entry usable for
-    /// `language` → "Needs model" (the default).
+    /// Explicit engine, else `defaultEngine(language:isUsable:)`, else "Needs model" (the default).
     private func resolveEngine(_ requested: String?, language: String) throws -> ModelEntry {
         if let requested {
             guard let entry = ModelCatalog.entry(id: requested), entry.kind == .asr, !entry.liveOnly,
                   Self.engines[entry.runtime] != nil else {
                 throw TranscriptionError.unknownEngine(requested)
             }
-            guard modelStore.isInstalled(entry.id) else { throw TranscriptionError.needsModel(entry.id) }
+            guard Self.isUsable(entry, in: modelStore) else { throw TranscriptionError.needsModel(entry.id) }
             return entry
         }
-        let installed = ModelCatalog.asr.filter {
-            !$0.liveOnly && Self.engines[$0.runtime] != nil && modelStore.isInstalled($0.id)
+        guard let entry = Self.defaultEngine(language: language, isUsable: { Self.isUsable($0, in: modelStore) }) else {
+            throw TranscriptionError.needsModel(ModelCatalog.defaultASR.id)
         }
+        return entry
+    }
+
+    /// With no engine chosen: the catalog default if usable → the smallest usable WhisperKit entry selectable for
+    /// `language` → the first usable batch entry that `supports` `language`, then selectable for it, in catalog order.
+    static func defaultEngine(language: String, isUsable: (ModelEntry) -> Bool) -> ModelEntry? {
+        let installed = ModelCatalog.asr.filter { !$0.liveOnly && engines[$0.runtime] != nil && isUsable($0) }
         if let entry = installed.first(where: \.isDefault) { return entry }
-        let fallback = installed
+        return installed
             .filter { $0.runtime == .whisperKit && $0.isSelectable(for: language) }
             .min { $0.diskMB < $1.diskMB }
-        guard let fallback else { throw TranscriptionError.needsModel(ModelCatalog.defaultASR.id) }
-        return fallback
+            ?? installed.first { supports($0, language: language) }
+            ?? installed.first { $0.isSelectable(for: language) }
+    }
+
+    /// The Models tab's default `id` when it is a usable batch entry that `supports` `language`, else nil for
+    /// `defaultEngine(language:isUsable:)`: a stored default is a preference, not an explicit choice.
+    public static func preferredEngineID(_ id: String?, language: String, isUsable: (ModelEntry) -> Bool) -> String? {
+        guard let id, let entry = ModelCatalog.entry(id: id), entry.kind == .asr, !entry.liveOnly,
+              engines[entry.runtime] != nil, isUsable(entry), supports(entry, language: language) else { return nil }
+        return id
+    }
+
+    /// Selectable for `language` and, for a code, listed in `supportedLanguages(for:)` by its primary code. An
+    /// empty list is unknown and counts as supported; "auto" needs no code.
+    static func supports(_ entry: ModelEntry, language: String) -> Bool {
+        guard entry.isSelectable(for: language) else { return false }
+        let supported = supportedLanguages(for: entry)
+        return language == "auto" || supported.isEmpty || supported.contains(WhisperKitEngine.whisperLanguage(language))
+    }
+
+    /// `entry`'s supported languages (Apple's list loaded first), then `languageFallback`.
+    private func fallback(
+        for entry: ModelEntry, markers: [RecordingSession.LanguageMarker], language: String
+    ) async -> (entry: ModelEntry, engineFallback: String?) {
+        var supported = Self.supportedLanguages(for: entry)
+        if entry.runtime == .appleSpeech, #available(macOS 26, *), PlatformFeatures.speechAnalyzer {
+            supported = await AppleSpeechEngine.loadSupportedLanguages()
+        }
+        let languages = LanguageRange.ranges(from: markers).compactMap(\.language).map(WhisperKitEngine.whisperLanguage)
+        return Self.languageFallback(
+            for: entry, supported: supported, markerLanguages: languages, language: language,
+            isInstalled: { modelStore.isInstalled($0) })
+    }
+
+    /// `entry`, or an installed WhisperKit stand-in (the default first, else the smallest) when one of
+    /// `markerLanguages` (primary codes) is not in `supported`, with `entry.id` as the fallback note. An empty
+    /// `supported` list is unknown and counts as supported. The stand-in transcribes the whole job, so it must
+    /// support every marker language and be selectable for `language`; with none, `entry` runs anyway.
+    static func languageFallback(
+        for entry: ModelEntry, supported: [String], markerLanguages: [String], language: String,
+        isInstalled: (String) -> Bool
+    ) -> (entry: ModelEntry, engineFallback: String?) {
+        guard !supported.isEmpty, markerLanguages.contains(where: { !supported.contains($0) }) else {
+            return (entry, nil)
+        }
+        let standIns = ModelCatalog.asr.filter { candidate in
+            let candidateLanguages = supportedLanguages(for: candidate)
+            return candidate.runtime == .whisperKit && candidate.id != entry.id && isInstalled(candidate.id)
+                && candidate.isSelectable(for: language)
+                && (candidateLanguages.isEmpty || markerLanguages.allSatisfy(candidateLanguages.contains))
+        }
+        guard let standIn = standIns.first(where: \.isDefault) ?? standIns.min(by: { $0.diskMB < $1.diskMB }) else {
+            return (entry, nil)
+        }
+        return (standIn, entry.id)
     }
 
     /// The extracted file, or nil when the channel is silent.

@@ -5,15 +5,16 @@ import Synchronization
 import WhisperKit
 
 /// Opt-in live captions while recording, in memory only: the batch transcript after Stop stays the source of truth.
-/// Takes the writer's 16 kHz blocks and decodes ~10 s windows per channel (mic lines "Me", system lines "Others")
-/// with one WhisperKit model, loaded by `start()` and unloaded by `stop()`.
+/// Takes the writer's 16 kHz blocks and decodes windows per channel (mic lines "Me", system lines "Others") with
+/// one model, loaded by `start()` (once the `ModelLoadGate` is free) and unloaded by `stop()`: a WhisperKit entry
+/// (~10 s windows) or the Nemotron streaming entry (4.48 s windows fed to one stream per channel).
 ///
 /// Samples wait in a buffer capped at one window, so when decoding falls behind the oldest audio is dropped.
 /// The model lives only inside the decode task, never in actor state (`WhisperKit` is not Sendable).
 public actor LiveTranscriber {
     public enum State: Sendable, Equatable {
         case loading, listening
-        /// No WhisperKit model is installed; nothing is loaded.
+        /// No live model is installed; nothing is loaded.
         case noModel
         case failed(String)
     }
@@ -40,7 +41,7 @@ public actor LiveTranscriber {
     }
 
     /// The live model when installed; else the smallest installed multilingual WhisperKit entry.
-    public static let preferredModelID = "whisperkit-turbo-632"
+    public static let preferredModelID = AppSettings.defaultLiveTranscriptEngine
     static let maxLines = 200
     static let defaultWindowSeconds = 10
     /// The end of a window is decoded again at the start of the next, so a word cut at the boundary is not lost.
@@ -55,14 +56,21 @@ public actor LiveTranscriber {
     private nonisolated let wake: AsyncStream<Void>
     private nonisolated let wakeContinuation: AsyncStream<Void>.Continuation
     private nonisolated let modelStore: ModelStore
+    private nonisolated let gate: ModelLoadGate
+    private nonisolated let engineID: String
     private nonisolated let language: @Sendable () -> String?
     private var snapshot = Snapshot(state: .loading)
     private var nextLineID = 0
     private var decoder: Task<Void, Never>?
 
-    /// `language` gives the current marker language ("auto", a BCP-47 code, or nil = detect), read per window.
-    public init(modelStore: ModelStore, language: @escaping @Sendable () -> String?) {
+    /// `engineID` is the catalog id picked in settings (see `model(in:engineID:)`). `language` gives the current
+    /// marker language ("auto", a BCP-47 code, or nil = detect), read per window.
+    public init(
+        modelStore: ModelStore, gate: ModelLoadGate, engineID: String, language: @escaping @Sendable () -> String?
+    ) {
         self.modelStore = modelStore
+        self.gate = gate
+        self.engineID = engineID
         self.language = language
         (updates, updatesContinuation) = AsyncStream.makeStream(bufferingPolicy: .bufferingNewest(1))
         (wake, wakeContinuation) = AsyncStream.makeStream(bufferingPolicy: .bufferingNewest(1))
@@ -71,7 +79,7 @@ public actor LiveTranscriber {
     /// Loads the model at `.utility` QoS and starts decoding; publishes `noModel` instead when none is installed.
     public func start() {
         guard decoder == nil, !buffer.withLock({ $0.closed }) else { return }
-        guard let entry = Self.model(in: modelStore), let folder = modelStore.folder(for: entry.id) else {
+        guard let entry = Self.model(in: modelStore, engineID: engineID), let folder = modelStore.folder(for: entry.id) else {
             buffer.withLock { $0.close() }
             publish(.noModel)
             return
@@ -103,25 +111,41 @@ public actor LiveTranscriber {
 
     // MARK: - Decode task
 
-    /// Owns the model from load to unload.
+    /// Holds the model gate from load to unload.
     private nonisolated func decode(entry: ModelEntry, folder: URL) async {
-        let whisper: WhisperKit
         do {
-            whisper = try await WhisperKitEngine.load(entry: entry, folder: folder)
+            try await gate.withExclusiveModel(owner: .liveTranscript) { [self] in
+                try await run(entry: entry, folder: folder)
+            }
         } catch {
             buffer.withLock { $0.close() }
             if !Task.isCancelled { await publish(.failed(error.localizedDescription)) }
-            return
         }
+    }
+
+    /// Owns the model from load to unload. Nemotron streams keep their context, so its windows do not overlap.
+    private nonisolated func run(entry: ModelEntry, folder: URL) async throws {
+        if entry.id == NemotronStreamingEngine.entryID {
+            let engine = try await NemotronStreamingEngine.load(folder: folder, channels: 2)
+            buffer.withLock { $0.resize(windowSamples: engine.windowSamples) }
+            await listen(overlap: 0) { await transcribe($0, with: engine) }
+            await engine.unload()
+        } else {
+            let whisper = try await WhisperKitEngine.load(entry: entry, folder: folder)
+            await listen(overlap: Self.overlapSeconds * WhisperKit.sampleRate) { await transcribe($0, with: whisper) }
+            await whisper.unloadModels()
+        }
+    }
+
+    /// Decodes every full window until `stop()`.
+    private nonisolated func listen(overlap: Int, _ transcribe: (Window) async -> [(Speaker, String)]) async {
         await publish(.listening)
-        let overlap = Self.overlapSeconds * WhisperKit.sampleRate
         for await _ in wake {
             while let window = buffer.withLock({ $0.take(keeping: overlap) }) {
-                let lines = await transcribe(window, with: whisper)
+                let lines = await transcribe(window)
                 if !lines.isEmpty { await add(lines) }
             }
         }
-        await whisper.unloadModels()
     }
 
     /// Speech of each non-silent channel, in start order across both.
@@ -143,6 +167,24 @@ public actor LiveTranscriber {
         return found.sorted { $0.start < $1.start }.map { ($0.speaker, $0.text) }
     }
 
+    /// Text of each non-silent channel's stream, mic first.
+    private nonisolated func transcribe(
+        _ window: Window, with engine: NemotronStreamingEngine
+    ) async -> [(Speaker, String)] {
+        let language = language()
+        var found: [(Speaker, String)] = []
+        let channels = [
+            (RecordingSession.Channel.mic, Speaker.me, window.mic),
+            (RecordingSession.Channel.system, .others, window.system),
+        ]
+        for (channel, speaker, samples) in channels where Self.peak(samples) >= TranscriptionPipeline.silencePeak {
+            guard let text = try? await engine.transcribe(samples, channel: channel, language: language),
+                  !text.isEmpty else { continue }
+            found.append((speaker, text))
+        }
+        return found
+    }
+
     // MARK: - State
 
     private func publish(_ state: State) {
@@ -161,12 +203,19 @@ public actor LiveTranscriber {
 
     // MARK: - Helpers
 
-    /// The preferred model if installed, else the smallest installed WhisperKit entry usable in any language.
-    static func model(in store: ModelStore) -> ModelEntry? {
+    /// The selected engine (a WhisperKit entry or Nemotron streaming) if installed, else the preferred model if
+    /// installed, else the smallest installed WhisperKit entry usable in any language, else Nemotron if installed.
+    static func model(in store: ModelStore, engineID: String) -> ModelEntry? {
+        if let selected = ModelCatalog.entry(id: engineID), selected.kind == .asr,
+           selected.runtime == .whisperKit || selected.id == NemotronStreamingEngine.entryID,
+           store.isInstalled(selected.id) {
+            return selected
+        }
         if let preferred = ModelCatalog.entry(id: preferredModelID), store.isInstalled(preferred.id) { return preferred }
         return ModelCatalog.asr
             .filter { $0.runtime == .whisperKit && !$0.vietnameseOnly && !$0.liveOnly && store.isInstalled($0.id) }
             .min { $0.diskMB < $1.diskMB }
+            ?? ModelCatalog.entry(id: NemotronStreamingEngine.entryID).flatMap { store.isInstalled($0.id) ? $0 : nil }
     }
 
     private static func channel(_ index: Int, of samples: UnsafePointer<Int16>, frames: Int, channels: Int) -> [Float] {
@@ -204,6 +253,13 @@ public actor LiveTranscriber {
             mic.removeFirst(max(0, mic.count - windowSamples))
             system.removeFirst(max(0, system.count - windowSamples))
             return mic.count >= windowSamples
+        }
+
+        /// Keeps only the newest `windowSamples` already buffered.
+        mutating func resize(windowSamples: Int) {
+            self.windowSamples = windowSamples
+            mic.removeFirst(max(0, mic.count - windowSamples))
+            system.removeFirst(max(0, system.count - windowSamples))
         }
 
         /// The full window, leaving its last `overlap` samples for the next one.

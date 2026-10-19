@@ -1,4 +1,7 @@
 import AppKit
+#if DEBUG
+import AVFoundation
+#endif
 import EchoAI
 import EchoAudio
 import EchoCore
@@ -15,7 +18,9 @@ final class AppModel {
     enum Tab { case library, ai }
 
     /// DEBUG harness launch args handled here; they skip onboarding and auto-queued work.
-    static let harnessArguments: Set<String> = ["--transcribe", "--download-model", "--delete-model"]
+    static let harnessArguments: Set<String> = [
+        "--transcribe", "--download-model", "--delete-model", "--live-transcribe",
+    ]
 
     private(set) var settings = AppSettings()
     var selectedTab: Tab = .library
@@ -44,10 +49,13 @@ final class AppModel {
     private(set) var downloads: [String: ModelDownload] = [:]
     /// Last download error, by catalog id; cleared when a download of that id starts.
     private(set) var downloadErrors: [String: String] = [:]
+    /// Downloaded models, plus Apple Speech when the system provides it.
     private(set) var installedModelIDs: Set<String> = []
     private(set) var installedModelsBytes: Int64 = 0
     /// Live captions of the current recording; nil when the setting was off at its start, or when not recording.
     private(set) var liveTranscript: LiveTranscriber.Snapshot?
+    /// Apple Speech locales reserved by EchoDiar (BCP-47), read with the installed models.
+    private(set) var appleSpeechReservedLocales: [String] = []
 
     struct ModelDownload {
         var fraction: Double = 0
@@ -69,6 +77,8 @@ final class AppModel {
     @ObservationIgnored let library = LibraryStore()
     /// Created with the model so FluidAudio's offline mode is set before any model load.
     @ObservationIgnored let modelStore: ModelStore
+    /// The single "one heavy model at a time" lock, shared by the pipeline and live captions.
+    @ObservationIgnored let modelGate = ModelLoadGate()
     @ObservationIgnored let pipeline: TranscriptionPipeline
     @ObservationIgnored private let compressor = AudioCompressor()
     @ObservationIgnored private let store: SettingsStore
@@ -87,7 +97,7 @@ final class AppModel {
         snapshot = engine.currentSnapshot()
         let modelStore = ModelStore()
         self.modelStore = modelStore
-        pipeline = TranscriptionPipeline(modelStore: modelStore)
+        pipeline = TranscriptionPipeline(modelStore: modelStore, gate: modelGate)
     }
 
     /// Called once by the AppDelegate after the main window is built. Dispatches the DEBUG harness launch args
@@ -116,7 +126,7 @@ final class AppModel {
             setLanguage: { [weak self] in self?.setRecordingLanguage($0) })
 
         #if DEBUG
-        if runTranscribeHarness() || runModelHarness() { return }
+        if runTranscribeHarness() || runLiveTranscribeHarness() || runModelHarness() { return }
         #endif
         guard ProcessInfo.processInfo.arguments.allSatisfy({ !Self.harnessArguments.contains($0) }) else { return }
         if !settings.onboardingCompleted { OnboardingWindow.shared.show(model: self) }
@@ -172,7 +182,9 @@ final class AppModel {
     /// Connects a new transcriber to the engine's sink, publishes its updates until `detachLiveTranscript` and loads
     /// its model.
     private func startLiveTranscript() {
-        let live = LiveTranscriber(modelStore: modelStore) { [engine] in engine.currentLanguage() }
+        let live = LiveTranscriber(modelStore: modelStore, gate: modelGate, engineID: settings.liveTranscriptEngine) {
+            [engine] in engine.currentLanguage()
+        }
         engine.liveSink = { live.append(interleaved: $0, frames: $1, channels: $2) }
         liveTranscriber = live
         liveTranscript = LiveTranscriber.Snapshot(state: .loading)
@@ -244,7 +256,8 @@ final class AppModel {
             .map { (code: $0, name: LanguageOptions.name($0)) }
             .sorted { $0.name.localizedStandardCompare($1.name) == .orderedAscending }
             .map(\.code)
-        languageCache[entry.id] = codes
+        // Apple Speech's list loads asynchronously: an early empty answer is not kept.
+        if !codes.isEmpty { languageCache[entry.id] = codes }
         return codes
     }
 
@@ -358,15 +371,21 @@ final class AppModel {
         return step != .needsModel
     }
 
-    /// A failed recording is never transcribed: its audio is missing or empty.
+    /// A failed recording is never transcribed: its audio is missing or empty. `engineID` nil = the default set in
+    /// the Models tab when usable for the recording's first language, else the pipeline's default resolution.
     private func submitTranscription(folder: URL, engineID: String? = nil, language: String? = nil) {
         guard let session = try? RecordingSession.read(from: folder), !session.probe, session.state != .failed else {
             return
         }
+        // The Models tab's default only when usable for the first language, else the pipeline's default resolution.
+        let firstLanguage = language ?? session.languageMarkers.min { $0.fileTime < $1.fileTime }?.language ?? "auto"
+        let preferred = TranscriptionPipeline.preferredEngineID(
+            settings.defaultASRModelID, language: firstLanguage,
+            isUsable: { TranscriptionPipeline.isUsable($0, in: modelStore) })
         let job = TranscriptionJob(
             conversationID: session.id, folder: folder,
             systemFileName: session.audioFileName == AudioCompressor.micFileName ? AudioCompressor.systemFileName : nil,
-            engineID: engineID, language: language)
+            engineID: engineID ?? preferred, language: language)
         // Set now so the card leaves its button before the pipeline's first event arrives.
         transcriptionProgress[session.id] = JobProgress(conversationID: session.id, step: .queued, fraction: 0)
         transcriptionJobs += 1
@@ -444,18 +463,41 @@ final class AppModel {
                 NSLog("EchoDiar: could not delete model \(id): \(error)")
                 downloadErrors[id] = error.localizedDescription
             }
+            // Otherwise every new recording would stop at "Needs model".
+            if settings.defaultASRModelID == id { updateSettings { $0.defaultASRModelID = nil } }
             refreshInstalledModels()
         }
     }
 
-    /// Reads the installed models and their total size off the main thread.
+    /// Reads the installed models, their total size and Apple Speech's reserved locales off the main thread.
     func refreshInstalledModels() {
         Task {
             let (ids, bytes) = await Task.detached(priority: .utility) { [modelStore] in
-                (Set(ModelCatalog.all.map(\.id).filter(modelStore.isInstalled)), modelStore.totalSize())
+                let usable = ModelCatalog.all.filter { TranscriptionPipeline.isUsable($0, in: modelStore) }
+                return (Set(usable.map(\.id)), modelStore.totalSize())
             }.value
             installedModelIDs = ids
             installedModelsBytes = bytes
+            if #available(macOS 26, *), PlatformFeatures.speechAnalyzer {
+                appleSpeechReservedLocales = await AppleSpeechEngine.reservedLocaleIdentifiers()
+            }
+        }
+    }
+
+    /// The ASR model new recordings are transcribed with: the one set in the Models tab, else the catalog default.
+    var defaultASRModelID: String { settings.defaultASRModelID ?? ModelCatalog.defaultASR.id }
+
+    /// Picking the catalog default stores nil, so the pipeline's default resolution applies again.
+    func setDefaultASRModel(_ id: String) {
+        updateSettings { $0.defaultASRModelID = id == ModelCatalog.defaultASR.id ? nil : id }
+    }
+
+    /// Releases EchoDiar's Apple Speech locale reservations; macOS removes the shared assets later.
+    func releaseAppleSpeechAssets() {
+        guard #available(macOS 26, *), PlatformFeatures.speechAnalyzer else { return }
+        Task {
+            await AppleSpeechEngine.releaseAssets()
+            refreshInstalledModels()
         }
     }
 
@@ -587,7 +629,7 @@ extension AppModel {
             try? FileManager.default.removeItem(at: folder)
             Self.finish(1, "error: \(error.localizedDescription)")
         }
-        let pipeline = TranscriptionPipeline(modelStore: modelStore, deferWhenConstrained: false)
+        let pipeline = TranscriptionPipeline(modelStore: modelStore, gate: modelGate, deferWhenConstrained: false)
         let job = TranscriptionJob(
             conversationID: session.id, folder: folder, engineID: Self.harnessValue(after: "--engine"), processNow: true)
         Task.detached(priority: .utility) {
@@ -607,6 +649,92 @@ extension AppModel {
             }
         }
         return true
+    }
+
+    /// `--live-transcribe <audio file> [--engine <catalog id>] [--language <code>]`: once the live model listens,
+    /// streams the file (system channel, mic silent) through a `LiveTranscriber` at real-time pace, then 12 s of
+    /// silence so its last window is decoded, prints every line and exits 0; exit 1 when no live model is installed
+    /// or loading fails. `--engine` defaults to the settings' live engine, `--language` to Auto.
+    private func runLiveTranscribeHarness() -> Bool {
+        guard ProcessInfo.processInfo.arguments.contains("--live-transcribe") else { return false }
+        guard let path = Self.harnessValue(after: "--live-transcribe") else {
+            Self.finish(1, "usage: --live-transcribe <audio file> [--engine <catalog id>] [--language <code>]")
+        }
+        let samples: [Float]
+        do {
+            samples = try Self.monoSamples(of: URL(fileURLWithPath: path))
+        } catch {
+            Self.finish(1, "error: \(error.localizedDescription)")
+        }
+        let engineID = Self.harnessValue(after: "--engine") ?? settings.liveTranscriptEngine
+        let language = Self.harnessValue(after: "--language")
+        let live = LiveTranscriber(modelStore: modelStore, gate: modelGate, engineID: engineID) { language }
+        Task {
+            await live.start()
+            var printed = 0
+            var feeder: Task<Void, Never>?
+            let started = Date()
+            for await snapshot in live.updates {
+                for line in snapshot.lines where line.id >= printed {
+                    Self.write(String(format: "%5.1fs %@: %@", -started.timeIntervalSinceNow, line.speaker.rawValue, line.text))
+                    printed = line.id + 1
+                }
+                switch snapshot.state {
+                case .noModel: Self.finish(1, "error: no live model installed")
+                case .failed(let message): Self.finish(1, "error: \(message)")
+                case .listening where feeder == nil:
+                    Self.write(String(format: "listening after %.1fs", -started.timeIntervalSinceNow))
+                    feeder = Task.detached(priority: .utility) { await Self.feed(samples + [Float](repeating: 0, count: 12 * 16_000), to: live) }
+                default: break
+                }
+            }
+            Self.finish(0, String(format: "done after %.1fs: %d lines", -started.timeIntervalSinceNow, printed))
+        }
+        return true
+    }
+
+    /// 100 ms interleaved Int16 stereo blocks (mic silent) every 100 ms, then a short wait for the last decode.
+    nonisolated private static func feed(_ samples: [Float], to live: LiveTranscriber) async {
+        let block = 1_600
+        for start in stride(from: 0, to: samples.count, by: block) {
+            let frames = min(block, samples.count - start)
+            var interleaved = [Int16](repeating: 0, count: frames * 2)
+            for frame in 0..<frames {
+                let value = max(-1, min(1, samples[start + frame])) * Float(Int16.max)
+                interleaved[frame * 2 + RecordingSession.Channel.system] = Int16(value)
+            }
+            interleaved.withUnsafeBufferPointer { live.append(interleaved: $0.baseAddress!, frames: frames, channels: 2) }
+            try? await Task.sleep(for: .milliseconds(100))
+        }
+        try? await Task.sleep(for: .seconds(5))
+        await live.stop()
+    }
+
+    /// The file as 16 kHz mono Float32.
+    nonisolated private static func monoSamples(of url: URL) throws -> [Float] {
+        let file = try AVAudioFile(forReading: url)
+        guard let format = AVAudioFormat(commonFormat: .pcmFormatFloat32, sampleRate: 16_000, channels: 1, interleaved: false),
+              let converter = AVAudioConverter(from: file.processingFormat, to: format),
+              let input = AVAudioPCMBuffer(pcmFormat: file.processingFormat, frameCapacity: AVAudioFrameCount(file.length)),
+              let output = AVAudioPCMBuffer(
+                  pcmFormat: format,
+                  frameCapacity: AVAudioFrameCount(Double(file.length) * 16_000 / file.processingFormat.sampleRate) + 4_096)
+        else { throw CocoaError(.fileReadCorruptFile) }
+        try file.read(into: input)
+        converter.downmix = true
+        var consumed = false
+        var conversionError: NSError?
+        converter.convert(to: output, error: &conversionError) { _, status in
+            guard !consumed else {
+                status.pointee = .endOfStream
+                return nil
+            }
+            consumed = true
+            status.pointee = .haveData
+            return input
+        }
+        if let conversionError { throw conversionError }
+        return Array(UnsafeBufferPointer(start: output.floatChannelData![0], count: Int(output.frameLength)))
     }
 
     private static func harnessValue(after flag: String) -> String? {

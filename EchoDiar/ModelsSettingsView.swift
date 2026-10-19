@@ -2,8 +2,9 @@ import EchoCore
 import EchoTranscribe
 import SwiftUI
 
-/// The Transcription tab: the default language and the live transcript switch, then the ASR and diarization catalog by tier, with Download,
-/// Cancel and Delete.
+/// The Transcription tab: the default language, the live transcript switch and engine, then the ASR and diarization
+/// catalog by tier, with Download, Cancel, Delete and Set default. Rows that cannot transcribe the default language are
+/// disabled with a note.
 struct ModelsSettingsView: View {
     let model: AppModel
 
@@ -19,7 +20,14 @@ struct ModelsSettingsView: View {
                     LanguagePicker(title: "Default language", selection: defaultLanguage, model: model)
                     Toggle(isOn: liveTranscript) {
                         Text("Live transcript")
-                        Text("Shows text while recording with an installed Whisper model (more CPU). The transcript made after Stop stays the one that is saved.")
+                        Text("Shows text while recording with the live engine below (more CPU). The transcript made after Stop stays the one that is saved.")
+                    }
+                    Picker(selection: liveTranscriptEngine) {
+                        Text("Whisper Large v3 Turbo").tag(AppSettings.defaultLiveTranscriptEngine)
+                        Text("Nemotron 3.5 streaming").tag(NemotronStreamingEngine.entryID)
+                    } label: {
+                        Text("Live transcript engine")
+                        Text("Nemotron is recommended for Vietnamese live captions (Vietnamese is experimental). Without the picked model installed, another installed live model is used.")
                     }
                 }
                 ForEach(ModelEntry.Tier.allCases, id: \.self) { tier in
@@ -50,6 +58,11 @@ struct ModelsSettingsView: View {
                 set: { isOn in model.updateSettings { $0.liveTranscript = isOn } })
     }
 
+    private var liveTranscriptEngine: Binding<String> {
+        Binding(get: { model.settings.liveTranscriptEngine },
+                set: { id in model.updateSettings { $0.liveTranscriptEngine = id } })
+    }
+
     private var defaultLanguage: Binding<String> {
         Binding(get: { model.settings.defaultLanguage },
                 set: { code in model.updateSettings { $0.defaultLanguage = code } })
@@ -67,19 +80,31 @@ private struct ModelRow: View {
                     .lineLimit(1)
                     .truncationMode(.tail)
                     .help(entry.displayName)
-                if entry.isDefault { Badge(text: "Default", color: .accentColor) }
+                if isDefault { Badge(text: "Default", color: .accentColor) }
                 Spacer(minLength: 8)
                 actions
             }
             HStack(spacing: 4) {
+                Badge(text: entry.tier.rawValue.capitalized)
                 if entry.kind == .diarization { Badge(text: "Speakers") }
-                Badge(text: Self.sizeText(entry.diskMB))
-                Badge(text: (entry.ramIsEstimate ? "~" : "") + Self.ramText(entry.ramMB) + " RAM")
+                if entry.liveOnly { Badge(text: "Live only") }
+                if entry.repo == nil {
+                    Badge(text: "System")
+                } else {
+                    Badge(text: Self.sizeText(entry.diskMB))
+                    Badge(text: (entry.ramIsEstimate ? "~" : "") + Self.ramText(entry.ramMB) + " RAM")
+                }
                 Badge(text: Self.languagesText(entry.languages))
                 Badge(text: entry.license)
                 Badge(text: "macOS \(entry.minimumMacOS)+")
             }
             notes
+            if let unsupportedNote {
+                Text(unsupportedNote)
+                    .font(.caption)
+                    .foregroundStyle(.orange)
+            }
+            if entry.runtime == .appleSpeech, model.installedModelIDs.contains(entry.id) { appleSpeechDetails }
             if UInt64(entry.ramMB) * 1_048_576 > ProcessInfo.processInfo.physicalMemory / 2 {
                 Label("Needs more than half of this Mac's memory.", systemImage: "exclamationmark.triangle.fill")
                     .font(.caption)
@@ -94,8 +119,38 @@ private struct ModelRow: View {
         .padding(.vertical, 2)
     }
 
+    /// The default ASR model of new recordings, or the catalog default of other kinds.
+    private var isDefault: Bool {
+        entry.kind == .asr ? model.defaultASRModelID == entry.id : entry.isDefault
+    }
+
+    /// Set for an ASR row that cannot transcribe the default language (e.g. "No Vietnamese"); Auto never disables.
+    private var unsupportedNote: String? {
+        let language = model.settings.defaultLanguage
+        guard entry.kind == .asr, language != LanguageOptions.auto, !language.isEmpty else { return nil }
+        let primary = String(language.lowercased().split(whereSeparator: { $0 == "-" || $0 == "_" }).first ?? "")
+        let supported = TranscriptionPipeline.supportedLanguages(for: entry)
+        guard (!supported.isEmpty && !supported.contains(primary)) || !entry.isSelectable(for: language) else {
+            return nil
+        }
+        return "No \(LanguageOptions.name(primary))"
+    }
+
     @ViewBuilder private var actions: some View {
-        if let download = model.downloads[entry.id] {
+        if entry.kind == .asr, !entry.liveOnly, !isDefault, model.installedModelIDs.contains(entry.id) {
+            Button("Set default") { model.setDefaultASRModel(entry.id) }
+                .controlSize(.small)
+                .disabled(unsupportedNote != nil)
+        }
+        if entry.runtime == .appleSpeech, !model.installedModelIDs.contains(entry.id) {
+            Text("Not available on this Mac")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+        } else if entry.repo == nil {
+            Text("Built in")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+        } else if let download = model.downloads[entry.id] {
             ProgressView(value: download.fraction)
                 .frame(width: 90)
             Text(download.fraction.formatted(.percent.precision(.fractionLength(0))))
@@ -111,16 +166,29 @@ private struct ModelRow: View {
             Button("Delete") { model.deleteModel(entry.id) }
                 .controlSize(.small)
                 .disabled(model.transcriptionProgress.keys.contains(where: model.isTranscribing))
-        } else if entry.repo == nil {
-            Text("Built in")
-                .font(.caption)
-                .foregroundStyle(.secondary)
         } else {
             Button("Download") { model.downloadModel(entry.id) }
                 .controlSize(.small)
-                .disabled(!ProcessInfo.processInfo.isOperatingSystemAtLeast(
+                .disabled(unsupportedNote != nil || !ProcessInfo.processInfo.isOperatingSystemAtLeast(
                     OperatingSystemVersion(majorVersion: entry.minimumMacOS, minorVersion: 0, patchVersion: 0)))
         }
+    }
+
+    /// Apple Speech keeps its language assets outside `Models/`: EchoDiar can only release its reservations.
+    @ViewBuilder private var appleSpeechDetails: some View {
+        let reserved = model.appleSpeechReservedLocales
+        VStack(alignment: .leading, spacing: 4) {
+            Text("System model — language assets installed on demand. Auto uses the default language (no language detection).")
+            HStack {
+                Text("Reserved by EchoDiar: \(reserved.isEmpty ? "none" : reserved.joined(separator: ", "))")
+                Spacer(minLength: 8)
+                Button("Remove language assets") { model.releaseAppleSpeechAssets() }
+                    .controlSize(.small)
+                    .disabled(reserved.isEmpty)
+            }
+        }
+        .font(.caption)
+        .foregroundStyle(.secondary)
     }
 
     @ViewBuilder private var notes: some View {

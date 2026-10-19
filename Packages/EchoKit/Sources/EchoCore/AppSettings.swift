@@ -17,8 +17,14 @@ public struct AppSettings: Codable, Equatable, Sendable {
     public var onboardingCompleted: Bool
     /// Live captions while recording (opt-in); the batch transcript after Stop stays the source of truth.
     public var liveTranscript: Bool
+    /// Catalog id of the live captions engine: a WhisperKit entry or the Nemotron streaming entry.
+    public var liveTranscriptEngine: String
+    /// Catalog id of the ASR engine for new transcriptions; nil = the catalog default.
+    public var defaultASRModelID: String?
     /// Configured AI providers; their API keys are in the Keychain, never here.
     public var providers: [ProviderConfig]
+
+    public static let defaultLiveTranscriptEngine = "whisperkit-turbo-632"
 
     public init(
         launchAtLogin: Bool = false,
@@ -28,6 +34,8 @@ public struct AppSettings: Codable, Equatable, Sendable {
         keepUncompressedAudio: Bool = false,
         onboardingCompleted: Bool = false,
         liveTranscript: Bool = false,
+        liveTranscriptEngine: String = AppSettings.defaultLiveTranscriptEngine,
+        defaultASRModelID: String? = nil,
         providers: [ProviderConfig] = []
     ) {
         self.launchAtLogin = launchAtLogin
@@ -37,12 +45,14 @@ public struct AppSettings: Codable, Equatable, Sendable {
         self.keepUncompressedAudio = keepUncompressedAudio
         self.onboardingCompleted = onboardingCompleted
         self.liveTranscript = liveTranscript
+        self.liveTranscriptEngine = liveTranscriptEngine
+        self.defaultASRModelID = defaultASRModelID
         self.providers = providers
     }
 
     private enum CodingKeys: String, CodingKey {
         case version, launchAtLogin, defaultLanguage, recentLanguages, compressionBitrateKbps, keepUncompressedAudio
-        case onboardingCompleted, liveTranscript, providers
+        case onboardingCompleted, liveTranscript, liveTranscriptEngine, defaultASRModelID, providers
     }
 
     public init(from decoder: Decoder) throws {
@@ -55,6 +65,9 @@ public struct AppSettings: Codable, Equatable, Sendable {
         keepUncompressedAudio = try container.decodeIfPresent(Bool.self, forKey: .keepUncompressedAudio) ?? false
         onboardingCompleted = try container.decodeIfPresent(Bool.self, forKey: .onboardingCompleted) ?? false
         liveTranscript = try container.decodeIfPresent(Bool.self, forKey: .liveTranscript) ?? false
+        liveTranscriptEngine = try container.decodeIfPresent(String.self, forKey: .liveTranscriptEngine)
+            ?? Self.defaultLiveTranscriptEngine
+        defaultASRModelID = try container.decodeIfPresent(String.self, forKey: .defaultASRModelID)
         providers = try container.decodeIfPresent([ProviderConfig].self, forKey: .providers) ?? []
     }
 }

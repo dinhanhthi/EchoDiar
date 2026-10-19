@@ -39,7 +39,7 @@ struct LiveTranscriptView: View {
         switch snapshot.state {
         case .loading: "Live transcript: loading the model…"
         case .listening: snapshot.lines.isEmpty ? "Live transcript: listening…" : "Live transcript"
-        case .noModel: "No live model installed — download a Whisper model in Settings › Transcription."
+        case .noModel: "No live model installed — download a Whisper or Nemotron model in Settings › Transcription."
         case .failed(let message): "Live transcript stopped: \(message)"
         }
     }
