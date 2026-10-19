@@ -7,6 +7,14 @@ enum Palette {
     static let hoverFill = Color.white.opacity(0.1)
     static let pressedFill = Color.white.opacity(0.2)
     static let switchOffFill = Color.white.opacity(0.22)
+    /// The window, under the toolbar too. #1C1C1E
+    static let windowBackground = Color(red: 28 / 255, green: 28 / 255, blue: 30 / 255)
+    /// Cards and panels, a step above the window. #2C2C2E
+    static let surface = Color(red: 44 / 255, green: 44 / 255, blue: 46 / 255)
+    /// Text fields and input bars, a step above the cards. #3A3A3C
+    static let inputSurface = Color(red: 58 / 255, green: 58 / 255, blue: 60 / 255)
+    /// The 1 pt edge of cards and panels.
+    static let surfaceBorder = Color.white.opacity(0.08)
 }
 
 /// The icon buttons of a row: a round highlight on hover, darker and a bit smaller while pressed. The highlight
@@ -82,20 +90,20 @@ struct WindowGlass: NSViewRepresentable {
     func updateNSView(_ view: NSVisualEffectView, context: Context) {}
 }
 
-/// Liquid Glass on macOS 26+ (unless `--force-fallbacks`), a material card otherwise.
+/// A card or panel: solid `Palette.surface` with a 1 pt `Palette.surfaceBorder` edge, on every macOS version, so it
+/// stands out from the window background.
 struct GlassCard: ViewModifier {
     var cornerRadius: CGFloat = 14
 
     func body(content: Content) -> some View {
-        if #available(macOS 26, *), PlatformFeatures.liquidGlass {
-            content.glassEffect(.regular, in: .rect(cornerRadius: cornerRadius))
-        } else {
-            content.background(.regularMaterial, in: RoundedRectangle(cornerRadius: cornerRadius, style: .continuous))
-        }
+        let shape = RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
+        content
+            .background(shape.fill(Palette.surface))
+            .overlay(shape.strokeBorder(Palette.surfaceBorder, lineWidth: 1).allowsHitTesting(false))
     }
 }
 
-/// Tabs in a small glass capsule, the toolbar's selected-toggle look: the selected tab is an accent capsule that
+/// Tabs in a small surface capsule, the toolbar's selected-toggle look: the selected tab is an accent capsule that
 /// slides between the tabs (no slide under Reduce Motion).
 struct CapsuleTabs<Tab: Hashable>: View {
     @Binding var selection: Tab
@@ -107,15 +115,28 @@ struct CapsuleTabs<Tab: Hashable>: View {
     var body: some View {
         HStack(spacing: 2) {
             ForEach(tabs, id: \.self) { tab in
-                Item(title: title(tab), selected: tab == selection, namespace: namespace) { selection = tab }
+                Item(tab: tab, title: title(tab), selected: tab == selection, namespace: namespace) {
+                    withAnimation(animation) { selection = tab }
+                }
             }
         }
+        // One pill that follows the selected item's frame, so it slides instead of fading between items.
+        .background {
+            Capsule()
+                .fill(Color.accentColor)
+                .matchedGeometryEffect(id: selection, in: namespace, isSource: false)
+        }
         .padding(3)
-        .animation(reduceMotion ? nil : .snappy(duration: 0.25), value: selection)
-        .modifier(CapsuleGlass())
+        // Also animates a selection set from code (menu, shortcuts, card buttons).
+        .animation(animation, value: selection)
+        .background(Capsule().fill(Palette.surface))
+        .overlay(Capsule().strokeBorder(Palette.surfaceBorder, lineWidth: 1).allowsHitTesting(false))
     }
 
+    private var animation: Animation? { reduceMotion ? nil : .snappy(duration: 0.25) }
+
     private struct Item: View {
+        let tab: Tab
         let title: LocalizedStringKey
         let selected: Bool
         let namespace: Namespace.ID
@@ -131,42 +152,14 @@ struct CapsuleTabs<Tab: Hashable>: View {
                     .padding(.horizontal, 12)
                     .frame(height: 24)
                     .background {
-                        if selected {
-                            Capsule()
-                                .fill(Color.accentColor)
-                                .matchedGeometryEffect(id: "selection", in: namespace)
-                        } else if hovered {
-                            Capsule().fill(Palette.hoverFill)
-                        }
+                        if hovered && !selected { Capsule().fill(Palette.hoverFill) }
                     }
+                    .matchedGeometryEffect(id: tab, in: namespace)
                     .contentShape(Capsule())
             }
             .buttonStyle(.plain)
             .onHover { hovered = $0 }
             .accessibilityAddTraits(selected ? .isSelected : [])
-        }
-    }
-
-    private struct CapsuleGlass: ViewModifier {
-        func body(content: Content) -> some View {
-            if #available(macOS 26, *), PlatformFeatures.liquidGlass {
-                content.glassEffect(.regular, in: .capsule)
-            } else {
-                content.background(.regularMaterial, in: Capsule())
-            }
-        }
-    }
-}
-
-/// Groups glass cards in a `GlassEffectContainer` when Liquid Glass is on.
-struct GlassCards<Content: View>: View {
-    @ViewBuilder let content: Content
-
-    var body: some View {
-        if #available(macOS 26, *), PlatformFeatures.liquidGlass {
-            GlassEffectContainer { content }
-        } else {
-            content
         }
     }
 }

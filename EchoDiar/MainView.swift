@@ -4,7 +4,8 @@ import EchoCore
 import SwiftUI
 
 /// The main window, one page per `AppModel.Route`: the cards, a conversation, the open recording (while recording)
-/// or Settings. Back and Record (or Stop and Pause) on the leading side; Settings and Search on the trailing side.
+/// or Settings. Back and Record (or Stop and Pause) on the leading side; a conversation's title in the middle;
+/// Settings and Search on the trailing side.
 struct MainView: View {
     let model: AppModel
     let updater: Updater
@@ -25,6 +26,9 @@ struct MainView: View {
     @State private var shownRoute = AppModel.Route.list
     /// The last page change went to a page further right (list, entry, Settings).
     @State private var forward = true
+    /// The toolbar title's rename popover is open, with `titleDraft` in its field.
+    @State private var renamingTitle = false
+    @State private var titleDraft = ""
 
     private struct SearchText {
         let size: Int64
@@ -66,6 +70,7 @@ struct MainView: View {
         }
         // Whoever switches the page (toolbar, menu, card, citation, a recording starting), it slides the same way.
         .onChange(of: model.route, initial: true) { old, new in
+            renamingTitle = false
             guard Page(old) != Page(new) else {
                 shownRoute = new
                 return
@@ -79,7 +84,19 @@ struct MainView: View {
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .background(WindowGlass().ignoresSafeArea())
+        .background(Palette.windowBackground.ignoresSafeArea())
+        // An opaque band behind the toolbar row (drawn above it by AppKit), so scrolled content never shows through
+        // the transparent title bar; the same color as the window, so toolbar and content still read as one.
+        .overlay {
+            GeometryReader { proxy in
+                Palette.windowBackground
+                    .frame(height: proxy.safeAreaInsets.top)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+                    .ignoresSafeArea(.container, edges: .top)
+            }
+            .allowsHitTesting(false)
+        }
+        .modifier(HardTopScrollEdge())
         .overlay {
             if let searchBarGhost {
                 Color.clear
@@ -109,6 +126,9 @@ struct MainView: View {
                     leadingItems
                 }
             }
+            if let conversation = toolbarConversation, titleFits {
+                titleItem(conversation)
+            }
             if searchExpanded {
                 if wide {
                     flexibleSpacer
@@ -118,19 +138,6 @@ struct MainView: View {
             } else {
                 // Pushes the other capsules to the trailing edge.
                 flexibleSpacer
-                // Interim until the recording card replaces it.
-                if model.isRecording {
-                    ToolbarItemGroup {
-                        Toggle(isOn: Binding(
-                            get: { model.route == .recording },
-                            set: { if $0 { model.route = .recording } else { model.goBack() } }
-                        )) {
-                            Label("Recording", systemImage: "waveform")
-                        }
-                        .help("Show the recording (⌘1)")
-                    }
-                    fixedSpacer
-                }
                 updateItem
                 ToolbarItemGroup {
                     Toggle(isOn: Binding(
@@ -174,11 +181,11 @@ struct MainView: View {
         }
     }
 
-    /// The leading capsule: Back (not on the list), then while idle one Record split button whose chevron picks the
-    /// target and the language; while recording, Stop (red, pulsing unless paused or Reduce Motion) and Pause/Resume.
+    /// The leading capsule: Back (not on the list), then while idle Record and a chevron menu that picks the target
+    /// and the language; while recording, Stop (red, pulsing unless paused or Reduce Motion) and Pause/Resume.
     /// ⌘R and ⇧⌘P come from the main menu.
     @ToolbarContentBuilder private var leadingItems: some ToolbarContent {
-        ToolbarItemGroup(placement: .navigation) {
+        ToolbarItemGroup(placement: leadingPlacement) {
             if model.route != .list {
                 Button(action: model.goBack) {
                     Label("Back", systemImage: "chevron.left")
@@ -187,6 +194,13 @@ struct MainView: View {
             }
             recordButtons
         }
+    }
+
+    /// On macOS 26, a regular item declared first, before the flexible spacer, still at the leading edge (no
+    /// `.principal` item, see `titleItem`): `.navigation` items got a lighter hover than the trailing capsule's
+    /// buttons, or none.
+    private var leadingPlacement: ToolbarItemPlacement {
+        if #available(macOS 26, *) { .automatic } else { .navigation }
     }
 
     @ViewBuilder private var recordButtons: some View {
@@ -208,6 +222,13 @@ struct MainView: View {
             }
             .help(paused ? "Resume recording (⇧⌘P)" : "Pause recording (⇧⌘P)")
         } else {
+            // A plain Record button and a chevron-only menu, not a `Menu(primaryAction:)` split button: the split
+            // control had its own, lighter hover than the toolbar's other buttons.
+            Button(action: model.toggleRecording) {
+                Label("Record", systemImage: "record.circle")
+            }
+            .disabled(model.isStarting)
+            .help("Record \(targetName) (⌘R)")
             Menu {
                 Toggle("All system audio", isOn: targetBinding(.global))
                     // Menu content is built when the menu opens: apps that started playing since show up.
@@ -222,12 +243,11 @@ struct MainView: View {
                 Divider()
                 LanguagePicker(title: "Language", selection: languageBinding, model: model)
             } label: {
-                Label("Record", systemImage: "record.circle")
-            } primaryAction: {
-                model.toggleRecording()
+                Label("Recording options", systemImage: "chevron.down")
             }
+            .menuIndicator(.hidden)
             .disabled(model.isStarting)
-            .help("Record \(targetName) (⌘R)")
+            .help("Choose what to record and the language")
         }
     }
 
@@ -242,6 +262,86 @@ struct MainView: View {
             }
             fixedSpacer
         }
+    }
+
+    /// The shown conversation's title, centered in the toolbar row, with its date, duration and size under it;
+    /// double-click to rename it in a popover (Return saves, Esc or a click elsewhere cancels). Plain text, without a
+    /// capsule. On macOS 26 a regular item between two flexible spacers (the toolbar body adds the second), not
+    /// `.principal`: AppKit lays the regular leading capsule out after a principal item. The first item to drop into
+    /// the overflow menu.
+    @ToolbarContentBuilder private func titleItem(_ conversation: Conversation) -> some ToolbarContent {
+        if #available(macOS 26.1, *) {
+            ToolbarSpacer(.flexible)
+            ToolbarItem { toolbarTitle(conversation) }.sharedBackgroundVisibility(.hidden).visibilityPriority(.low)
+        } else if #available(macOS 26, *) {
+            ToolbarSpacer(.flexible)
+            ToolbarItem { toolbarTitle(conversation) }.sharedBackgroundVisibility(.hidden)
+        } else {
+            ToolbarItem(placement: .principal) { toolbarTitle(conversation) }
+        }
+    }
+
+    private func toolbarTitle(_ conversation: Conversation) -> some View {
+        VStack(spacing: 1) {
+            Text(conversation.title)
+                .font(.headline)
+                .lineLimit(1)
+                .truncationMode(.tail)
+            toolbarDetails(conversation)
+        }
+        .frame(maxWidth: Self.titleMaxWidth)
+        .fixedSize(horizontal: false, vertical: true)
+        .contentShape(Rectangle())
+        .help(conversation.title)
+        .onTapGesture(count: 2) {
+            titleDraft = conversation.title
+            renamingTitle = true
+        }
+        .popover(isPresented: $renamingTitle, arrowEdge: .bottom) {
+            TextField("Title", text: $titleDraft)
+                .onSubmit {
+                    renamingTitle = false
+                    if titleDraft != conversation.title { model.renameConversation(conversation.id, to: titleDraft) }
+                }
+                .onExitCommand { renamingTitle = false }
+                .padding(12)
+                .frame(width: 320)
+        }
+    }
+
+    /// Only the date truncates when the line is too long.
+    private func toolbarDetails(_ conversation: Conversation) -> some View {
+        HStack(spacing: 8) {
+            Text(conversation.createdAt.formatted(date: .abbreviated, time: .shortened))
+            if conversation.duration > 0 {
+                Text(ConversationCard.durationText(conversation.duration)).monospacedDigit().fixedSize()
+            }
+            if conversation.sizeBytes > 0 {
+                Text(ByteCountFormatter.string(fromByteCount: conversation.sizeBytes, countStyle: .file)).fixedSize()
+            }
+            if let badge = StatusBadge(status: conversation.status) { badge.fixedSize() }
+        }
+        .font(.caption)
+        .foregroundStyle(.secondary)
+        .lineLimit(1)
+        .truncationMode(.tail)
+    }
+
+    /// The conversation page's conversation, while it exists; no title on the other pages.
+    private var toolbarConversation: Conversation? {
+        guard case .conversation(let id) = model.route else { return nil }
+        return model.conversations.first { $0.id == id }
+    }
+
+    private static let titleMaxWidth: CGFloat = 360
+
+    /// The centered title keeps the toolbar's buttons out of the overflow menu: not while the window is narrower than
+    /// the wide layout (as it grows into it), and while searching only when the half window beside it also holds the
+    /// search bar and Update (approximate widths).
+    private var titleFits: Bool {
+        guard searchExpanded else { return windowWidth >= MainWindowLayout.wide.minSize.width }
+        let trailing = ToolbarSearchBar.wideWidth + ToolbarSearchBar.trailingInset + (updater.updateAvailable ? 52 : 0)
+        return windowWidth / 2 >= Self.titleMaxWidth / 2 + 16 + trailing
     }
 
     @ToolbarContentBuilder private var flexibleSpacer: some ToolbarContent {
@@ -336,56 +436,51 @@ struct MainView: View {
             TranscriptView(conversation: conversation, model: model)
                 .id(id)
         } else {
-            livePane
+            RecordingDetailView(model: model)
         }
-    }
-
-    /// The recording's clock, meters and language, then its live transcript filling the page.
-    private var livePane: some View {
-        VStack(spacing: 12) {
-            RecordingHeader(model: model, live: model.mainWindowVisible)
-            if let live = model.liveTranscript {
-                LiveTranscriptView(snapshot: live)
-            } else {
-                Text("Live transcript is off. Turn it on in Settings › Transcription.")
-                    .font(.callout)
-                    .foregroundStyle(.secondary)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .padding(.horizontal, 4)
-            }
-        }
-        .padding(12)
-        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
     }
 
     private var cardsPane: some View {
         libraryPane(compact: false, selectedID: nil)
     }
 
-    /// The cards matching the search, or why there are none.
+    /// The cards matching the search, or why there are none; the recording's card stays on top while recording, alone
+    /// when the library is still empty and nothing is searched.
     @ViewBuilder private func libraryPane(compact: Bool, selectedID: UUID?) -> some View {
-        let groups = DayGroup.groups(from: searchResults)
-        if model.conversations.isEmpty {
-            emptyState("No conversations yet — press ⌘R to record")
+        let groups = DayGroup.groups(from: searchResults.filter(listed))
+        if groups.isEmpty && model.isRecording && searchTerm.isEmpty {
+            ConversationListView(model: model, groups: [], compact: compact, selectedID: selectedID)
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+        } else if !model.conversations.contains(where: listed) {
+            emptyState("No conversations yet — press ⌘R to record", compact: compact)
         } else if groups.isEmpty {
-            emptyState("No conversations match \"\(searchTerm)\"")
+            emptyState("No conversations match \"\(searchTerm)\"", compact: compact)
         } else {
             ConversationListView(model: model, groups: groups, compact: compact, selectedID: selectedID)
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
     }
 
-    private func emptyState(_ text: String) -> some View {
-        GlassCards {
+    /// The recording's own entry is hidden while recording: its card is the recording card.
+    private func listed(_ conversation: Conversation) -> Bool {
+        !(model.isRecording && conversation.status == .recording)
+    }
+
+    private func emptyState(_ text: String, compact: Bool) -> some View {
+        VStack(spacing: 0) {
+            if model.isRecording {
+                RecordingCard(model: model, compact: compact, selected: model.route == .recording)
+                    .padding([.horizontal, .top], 12)
+            }
             Text(text)
                 .foregroundStyle(.secondary)
                 .multilineTextAlignment(.center)
                 .padding(.horizontal, 20)
                 .padding(.vertical, 16)
                 .modifier(GlassCard(cornerRadius: 20))
+                .padding(12)
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
-        .padding(12)
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 
     // MARK: - Search
@@ -394,7 +489,7 @@ struct MainView: View {
         Binding(get: { model.searchPresented }, set: { model.searchPresented = $0 })
     }
 
-    /// The search bar in its own toolbar item, with its own glass: the toolbar's shared capsule would not follow its
+    /// The search bar in its own toolbar item, with its own capsule: the toolbar's shared capsule would not follow its
     /// width while it grows and shrinks.
     @ToolbarContentBuilder private var searchBarItem: some ToolbarContent {
         if #available(macOS 26, *) {
@@ -493,7 +588,7 @@ private struct ToolbarSearchBar: View {
         }
         .frame(width: expanded ? nil : Self.height, height: Self.height, alignment: .leading)
         .clipped()
-        .modifier(GlassCard(cornerRadius: Self.height / 2))
+        .modifier(InputCapsule())
         .frame(minWidth: Self.height, idealWidth: width, maxWidth: width, alignment: .trailing)
         .opacity(origin == nil ? 0 : 1)
         .background(WindowOriginReader { point in
@@ -600,7 +695,7 @@ private struct SearchBarGhost: View {
             .imageScale(.large)
             .frame(width: frame.height, height: frame.height)
             .frame(width: collapsed ? frame.height : frame.width, alignment: .leading)
-            .modifier(GlassCard(cornerRadius: frame.height / 2))
+            .modifier(InputCapsule())
             // Seen while it shrinks, gone as it reaches the Search button.
             .animation(.easeIn(duration: 0.3)) { $0.opacity(collapsed ? 0 : 1) }
             .frame(width: frame.width, alignment: .trailing)
@@ -608,6 +703,16 @@ private struct SearchBarGhost: View {
             .onAppear {
                 withAnimation(ToolbarSearchBar.animation) { collapsed = true } completion: { onDone() }
             }
+    }
+}
+
+/// The search bar's capsule, an input: `Palette.inputSurface` with the cards' edge. The bar and its ghost share it so
+/// the close animation keeps the same color.
+private struct InputCapsule: ViewModifier {
+    func body(content: Content) -> some View {
+        content
+            .background(Capsule().fill(Palette.inputSurface))
+            .overlay(Capsule().strokeBorder(Palette.surfaceBorder, lineWidth: 1).allowsHitTesting(false))
     }
 }
 
@@ -644,69 +749,14 @@ private struct WindowOriginReader: NSViewRepresentable {
     }
 }
 
-/// Elapsed time, two-channel level meter and capture warnings while a recording is open.
-private struct RecordingHeader: View {
-    let model: AppModel
-    /// The window is visible: only then the clock and the meter update.
-    let live: Bool
-
-    var body: some View {
-        let paused = model.snapshot.state == .paused
-        VStack(alignment: .leading, spacing: 8) {
-            HStack(spacing: 10) {
-                Image(systemName: paused ? "pause.circle.fill" : "record.circle.fill")
-                    .foregroundStyle(paused ? .orange : .red)
-                if live {
-                    TimelineView(.periodic(from: .now, by: 1)) { _ in elapsedText }
-                } else {
-                    elapsedText
-                }
-                Text(paused ? "Paused" : "Recording")
-                    .foregroundStyle(.secondary)
-                Spacer(minLength: 8)
-                if live && !paused {
-                    ChannelMeters(feed: model.levels)
-                }
-                languageMenu
-            }
-            .padding(.horizontal, 14)
-            .padding(.vertical, 10)
-            .modifier(GlassCard(cornerRadius: 14))
-            if model.snapshot.globalTapFallback {
-                Label("This app's audio cannot be isolated, so all system audio is being recorded.",
-                      systemImage: "exclamationmark.triangle.fill")
-                    .font(.callout)
-                    .foregroundStyle(.yellow)
-            }
-            if model.snapshot.silentTapSuspected {
-                SilentTapBanner { PrivacySettings.openSystemAudioRecording() }
-            }
+/// On macOS 26, a hard top edge for the scroll views inside: the soft edge effect would fade content into the toolbar.
+private struct HardTopScrollEdge: ViewModifier {
+    func body(content: Content) -> some View {
+        if #available(macOS 26, *) {
+            content.scrollEdgeEffectStyle(.hard, for: .top)
+        } else {
+            content
         }
-    }
-
-    /// Picking a language adds a marker at the current recording time.
-    private var languageMenu: some View {
-        Menu {
-            LanguagePicker(
-                title: "Language",
-                selection: Binding(get: { model.recordingLanguage }, set: { model.setRecordingLanguage($0) }),
-                model: model)
-                .pickerStyle(.inline)
-                .labelsHidden()
-        } label: {
-            Label(LanguageOptions.name(model.recordingLanguage), systemImage: "globe")
-        }
-        .menuStyle(.borderlessButton)
-        .fixedSize()
-        .foregroundStyle(.secondary)
-        .help("Language from now on")
-    }
-
-    private var elapsedText: some View {
-        let elapsed = model.engine.currentSnapshot().elapsed
-        let pattern: Duration.TimeFormatStyle.Pattern = elapsed >= 3_600 ? .hourMinuteSecond : .minuteSecond
-        return Text(Duration.seconds(elapsed).formatted(.time(pattern: pattern)))
-            .font(.body.monospacedDigit().weight(.semibold))
     }
 }
 
@@ -720,38 +770,5 @@ private struct GlobalTapNote: View {
             .font(.callout)
             .foregroundStyle(.secondary)
             .frame(maxWidth: .infinity, alignment: .leading)
-    }
-}
-
-/// Mic and system peak bars, from the shared `LevelFeed` (15 Hz while shown).
-private struct ChannelMeters: View {
-    let feed: LevelFeed
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 3) {
-            bar("Mic", feed.mic)
-            bar("System", feed.system)
-        }
-        .frame(width: 110)
-        .task { await feed.attach() }
-    }
-
-    private func bar(_ name: String, _ level: Float) -> some View {
-        HStack(spacing: 6) {
-            Text(name)
-                .font(.caption2)
-                .foregroundStyle(.secondary)
-                .frame(width: 38, alignment: .leading)
-            GeometryReader { proxy in
-                ZStack(alignment: .leading) {
-                    Capsule().fill(Palette.hoverFill)
-                    Capsule().fill(Color.green).frame(width: proxy.size.width * LevelFeed.fraction(level))
-                }
-            }
-            .frame(height: 5)
-        }
-        .accessibilityElement(children: .ignore)
-        .accessibilityLabel("\(name) level")
-        .accessibilityValue("\(Int((LevelFeed.fraction(level) * 100).rounded())) percent")
     }
 }

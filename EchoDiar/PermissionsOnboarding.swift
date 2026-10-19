@@ -189,18 +189,16 @@ private struct OnboardingView: View {
                     .font(.callout)
                     .foregroundStyle(.secondary)
             }
-            GlassCards {
-                Group {
-                    switch step {
-                    case 0: ConsentStep()
-                    case 1: MicrophoneStep()
-                    default: SystemAudioStep(test: test)
-                    }
+            Group {
+                switch step {
+                case 0: ConsentStep()
+                case 1: MicrophoneStep()
+                default: SystemAudioStep(test: test)
                 }
-                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-                .padding(20)
-                .modifier(GlassCard(cornerRadius: 20))
             }
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+            .padding(20)
+            .modifier(GlassCard(cornerRadius: 20))
             HStack {
                 if step > 0 {
                     Button("Back") { step -= 1 }

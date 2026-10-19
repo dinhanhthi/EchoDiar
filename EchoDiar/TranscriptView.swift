@@ -8,8 +8,8 @@ extension Notification.Name {
     static let togglePlayback = Notification.Name("EchoDiar.togglePlayback")
 }
 
-/// One conversation inside the main window: title (double-click to rename), details, speakers (click to rename),
-/// playback and actions, then the Transcript, Summary and Chat tabs. A click on a segment plays from its start; Space
+/// One conversation inside the main window (its title, date, duration and size are in the toolbar): speakers (click to
+/// rename), actions and playback on one row, then the Transcript, Summary and Chat tabs. A click on a segment plays from its start; Space
 /// plays or pauses. Stays mounted across tabs, so playback goes on in Summary and Chat.
 struct TranscriptView: View {
     let conversation: Conversation
@@ -20,44 +20,86 @@ struct TranscriptView: View {
     /// `transcript.json` exists but could not be read.
     @State private var loadFailed = false
     @State private var playback = PlaybackController()
-    @State private var editingTitle = false
-    @State private var draft = ""
-    @FocusState private var titleFocused: Bool
     /// The speaker whose rename popover is open.
     @State private var renaming: String?
     @State private var nameDraft = ""
+    /// The "+N" popover listing the speakers without a chip is open.
+    @State private var showingMoreSpeakers = false
     /// Language for the next Re-transcribe; "" keeps the recording's language markers.
     @State private var retranscribeLanguage = ""
     /// The segment the list scrolls to, set by an AI citation; cleared once scrolled.
     @State private var scrollTarget: UUID?
     /// The folder still has audio: false once Storage or auto-delete moved it to the Trash (no Play, no Re-transcribe).
     @State private var hasAudio = true
+    /// The tab whose body is shown: follows `model.detailTab` one update later, so `forward` is set before the bodies
+    /// swap and both the outgoing and the incoming body slide the same way.
+    @State private var shownTab: AppModel.DetailTab
+    /// The last tab switch went right (Transcript → Summary → Chat).
+    @State private var forward = true
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
+    init(conversation: Conversation, model: AppModel) {
+        self.conversation = conversation
+        self.model = model
+        _shownTab = State(initialValue: model.detailTab)
+    }
 
     var body: some View {
         VStack(spacing: 10) {
             header
             CapsuleTabs(
                 selection: Binding(get: { model.detailTab }, set: { model.detailTab = $0 }),
-                tabs: [.transcript, .summary, .chat], title: Self.tabTitle
+                tabs: Self.tabs, title: Self.tabTitle
             )
             .fixedSize()
-            if model.detailTab == .transcript {
-                content
-            } else {
-                AIPanelView(conversation: conversation, model: model)
+            ZStack(alignment: .top) {
+                if shownTab == .transcript {
+                    content
+                        .transition(tabTransition)
+                } else {
+                    AIPanelView(conversation: conversation, model: model, tab: shownTab, transition: tabTransition)
+                        .transition(tabTransition)
+                }
             }
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .clipped()
         }
         .padding(12)
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
         .task(id: conversation) { await load() }
         .task { model.refreshInstalledModels() }
+        .onChange(of: model.detailTab) { old, new in
+            forward = (Self.tabs.firstIndex(of: new) ?? 0) > (Self.tabs.firstIndex(of: old) ?? 0)
+            // Also under Reduce Motion: `tabTransition` is then a fade.
+            withAnimation(.snappy(duration: 0.25)) { shownTab = new }
+        }
         .onChange(of: model.pendingTranscriptTime) { showPendingTime() }
-        // Not while a title or speaker name is edited: the text field takes Space.
+        // Not while a speaker name is edited: the text field takes Space.
         .onReceive(NotificationCenter.default.publisher(for: .togglePlayback)) { _ in
-            guard playback.isReady, !editingTitle, renaming == nil else { return }
+            guard playback.isReady, renaming == nil else { return }
             playback.togglePlay()
         }
         .onDisappear { playback.close() }
+    }
+
+    private static let tabs: [AppModel.DetailTab] = [.transcript, .summary, .chat]
+
+    /// Moving right, the new body comes in from the trailing edge and the old one leaves by the leading edge; the
+    /// other way round moving left. Only a fade under Reduce Motion.
+    private var tabTransition: AnyTransition {
+        if reduceMotion { return .opacity }
+        return .asymmetric(
+            insertion: .move(edge: slidesForward ? .trailing : .leading),
+            removal: .move(edge: slidesForward ? .leading : .trailing)
+        )
+        .combined(with: .opacity)
+    }
+
+    /// The outgoing body keeps the transition of its last update, the one where `model.detailTab` has changed but
+    /// `shownTab` not yet: take the direction from that pending change, else from `forward`.
+    private var slidesForward: Bool {
+        guard model.detailTab != shownTab else { return forward }
+        return (Self.tabs.firstIndex(of: model.detailTab) ?? 0) > (Self.tabs.firstIndex(of: shownTab) ?? 0)
     }
 
     private static func tabTitle(_ tab: AppModel.DetailTab) -> LocalizedStringKey {
@@ -72,18 +114,10 @@ struct TranscriptView: View {
 
     private var header: some View {
         VStack(alignment: .leading, spacing: 10) {
-            HStack(spacing: 12) {
-                VStack(alignment: .leading, spacing: 4) {
-                    title
-                    details
-                }
-                .layoutPriority(1)
-                Spacer(minLength: 8)
-                if conversation.hasTranscript && !failed {
-                    TranscriptionStatus(conversation: conversation, model: model)
-                }
+            // Not wrapped in a row: its body is often empty, which then takes no space.
+            if conversation.hasTranscript && !failed {
+                TranscriptionStatus(conversation: conversation, model: model)
             }
-            // A failed re-transcription gets its own row, so the title keeps its space.
             if conversation.hasTranscript && failed {
                 HStack(alignment: .firstTextBaseline, spacing: 8) {
                     TranscriptionFailureReason(conversation: conversation, model: model)
@@ -94,16 +128,9 @@ struct TranscriptView: View {
             if transcript?.notes.contains(Transcript.diarizationMissingNote) == true {
                 diarizationMissingNotice
             }
-            // Wraps to more rows when the speakers do not fit on one.
-            if transcript != nil && !speakers.isEmpty {
-                FlowLayout(spacing: 6) {
-                    ForEach(speakers, id: \.self, content: speakerChip)
-                }
-            }
-            HStack(spacing: 8) {
-                actions
-                Spacer(minLength: 8)
-                if hasAudio { transport }
+            // Up to three speaker chips, fewer when the row is short; "+N" lists the others.
+            ViewThatFits(in: .horizontal) {
+                ForEach(chipCounts, id: \.self) { controlRow(chips: $0) }
             }
         }
         .padding(.horizontal, 14)
@@ -134,51 +161,29 @@ struct TranscriptView: View {
         .font(.caption)
     }
 
-    @ViewBuilder private var title: some View {
-        if editingTitle {
-            TextField("Title", text: $draft)
-                .textFieldStyle(.plain)
-                .font(.headline)
-                .focused($titleFocused)
-                .onAppear { titleFocused = true }
-                .onSubmit {
-                    editingTitle = false
-                    if draft != conversation.title { model.renameConversation(conversation.id, to: draft) }
-                }
-                .onExitCommand { editingTitle = false }
-                // Clicking elsewhere cancels, like Esc; only Return saves.
-                .onChange(of: titleFocused) { _, focused in if !focused { editingTitle = false } }
-        } else {
-            Text(conversation.title)
-                .font(.headline)
-                .lineLimit(1)
-                .truncationMode(.tail)
-                .onTapGesture(count: 2) {
-                    draft = conversation.title
-                    editingTitle = true
-                }
-                .help("Double-click to rename")
-        }
-    }
-
-    private var details: some View {
+    /// Speaker chips, then the actions, then the transport at the trailing edge.
+    private func controlRow(chips: Int) -> some View {
         HStack(spacing: 8) {
-            Text(conversation.createdAt.formatted(date: .abbreviated, time: .shortened))
-            if conversation.duration > 0 {
-                Text(ConversationCard.durationText(conversation.duration)).monospacedDigit()
+            if transcript != nil && !speakers.isEmpty {
+                HStack(spacing: 6) {
+                    ForEach(speakers.prefix(chips), id: \.self, content: speakerChip)
+                    if chips < speakers.count { moreSpeakersChip(Array(speakers.dropFirst(chips))) }
+                }
             }
-            if conversation.sizeBytes > 0 {
-                Text(ByteCountFormatter.string(fromByteCount: conversation.sizeBytes, countStyle: .file))
-            }
-            if let badge = StatusBadge(status: conversation.status) { badge }
+            actions
+            Spacer(minLength: 8)
+            if hasAudio { transport }
         }
-        .font(.caption)
-        .foregroundStyle(.secondary)
-        .lineLimit(1)
     }
 
-    /// Small bordered buttons, each with its own background (no glass on the glass card); Re-transcribe shows its
-    /// menu arrow.
+    /// The chip counts `controlRow` tries, most first: 3, 2, 1, 0 (fewer when there are fewer speakers).
+    private var chipCounts: [Int] {
+        Array((0...min(Self.maxSpeakerChips, speakers.count)).reversed())
+    }
+
+    private static let maxSpeakerChips = 3
+
+    /// Small capsule buttons (Liquid Glass on macOS 26); Re-transcribe shows its menu arrow.
     private var actions: some View {
         HStack(spacing: 6) {
             iconButton("Copy transcript", systemImage: "doc.on.doc", action: copyTranscript)
@@ -195,8 +200,7 @@ struct TranscriptView: View {
             Label(title, systemImage: systemImage)
                 .labelStyle(.iconOnly)
         }
-        .buttonStyle(.bordered)
-        .controlSize(.small)
+        .modifier(HeaderButtonStyle())
         .help(title)
     }
 
@@ -216,8 +220,7 @@ struct TranscriptView: View {
                 .labelStyle(.iconOnly)
         }
         .menuStyle(.button)
-        .buttonStyle(.bordered)
-        .controlSize(.small)
+        .modifier(HeaderButtonStyle())
         .fixedSize()
         .disabled(!canTranscribe)
         .help("Re-transcribe with another model or language")
@@ -234,13 +237,13 @@ struct TranscriptView: View {
             Button(action: playback.togglePlay) {
                 Label(playback.isPlaying ? "Pause" : "Play", systemImage: playback.isPlaying ? "pause.fill" : "play.fill")
                     .labelStyle(.iconOnly)
-                    .font(.system(size: 13))
             }
-            .buttonStyle(RowIconButtonStyle())
+            .modifier(HeaderButtonStyle())
             .disabled(!playback.isReady)
             .help(playback.isPlaying ? "Pause (Space)" : "Play (Space)")
             PlaybackTime(playback: playback)
         }
+        .fixedSize()
     }
 
     // MARK: - Speakers
@@ -250,36 +253,91 @@ struct TranscriptView: View {
             nameDraft = transcript?.speakerNames[speaker] ?? ""
             renaming = speaker
         } label: {
-            HStack(spacing: 5) {
-                Circle().fill(Self.color(for: speaker)).frame(width: 7, height: 7)
-                Text(transcript?.displayName(for: speaker) ?? speaker)
-            }
-            .font(.caption.weight(.medium))
-            .padding(.horizontal, 8)
-            .padding(.vertical, 3)
-            .background(Palette.hoverFill, in: Capsule())
-            .contentShape(Capsule())
+            speakerLabel(speaker)
+                .modifier(SpeakerChipShape())
         }
         .buttonStyle(.plain)
+        // Its own width: the row tries fewer chips instead of truncating names.
+        .fixedSize()
         .disabled(model.isTranscribing(conversation.id))
         .help("Rename this speaker")
         .popover(isPresented: Binding(
-            get: { renaming == speaker },
+            get: { renaming == speaker && !showingMoreSpeakers },
             set: { if !$0 { renaming = nil } }
         )) {
-            VStack(alignment: .leading, spacing: 8) {
-                Text("Name for \(Transcript.defaultName(for: speaker))")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                TextField(Transcript.defaultName(for: speaker), text: $nameDraft)
-                    .onSubmit {
-                        rename(speaker, to: nameDraft)
-                        renaming = nil
-                    }
-            }
-            .padding(12)
-            .frame(width: 220)
+            renameForm(speaker)
         }
+    }
+
+    private func speakerLabel(_ speaker: String) -> some View {
+        HStack(spacing: 5) {
+            Circle().fill(Self.color(for: speaker)).frame(width: 7, height: 7)
+            Text(transcript?.displayName(for: speaker) ?? speaker)
+        }
+    }
+
+    /// The speakers without a chip; its popover lists them, and a click on one renames it in the same popover.
+    private func moreSpeakersChip(_ hidden: [String]) -> some View {
+        Button {
+            renaming = nil
+            showingMoreSpeakers = true
+        } label: {
+            Text(verbatim: "+\(hidden.count)")
+                .modifier(SpeakerChipShape())
+        }
+        .buttonStyle(.plain)
+        .fixedSize()
+        .disabled(model.isTranscribing(conversation.id))
+        .help("Show the other speakers")
+        .popover(isPresented: Binding(
+            get: { showingMoreSpeakers },
+            set: {
+                if !$0 {
+                    showingMoreSpeakers = false
+                    renaming = nil
+                }
+            }
+        )) {
+            if let renaming, hidden.contains(renaming) {
+                renameForm(renaming)
+            } else {
+                VStack(alignment: .leading, spacing: 2) {
+                    ForEach(hidden, id: \.self) { speaker in
+                        Button {
+                            nameDraft = transcript?.speakerNames[speaker] ?? ""
+                            renaming = speaker
+                        } label: {
+                            speakerLabel(speaker)
+                                .font(.callout)
+                                .padding(.horizontal, 8)
+                                .padding(.vertical, 4)
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                                .contentShape(Rectangle())
+                        }
+                        .buttonStyle(.plain)
+                        .help("Rename this speaker")
+                    }
+                }
+                .padding(6)
+                .frame(minWidth: 180)
+            }
+        }
+    }
+
+    /// The name field of a speaker: Return saves, Esc or a click elsewhere cancels.
+    private func renameForm(_ speaker: String) -> some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text("Name for \(Transcript.defaultName(for: speaker))")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+            TextField(Transcript.defaultName(for: speaker), text: $nameDraft)
+                .onSubmit {
+                    rename(speaker, to: nameDraft)
+                    renaming = nil
+                }
+        }
+        .padding(12)
+        .frame(width: 220)
     }
 
     /// Saves the name into `transcript.json` (read fresh, only this name changes); a blank name restores the default.
@@ -422,39 +480,30 @@ private struct PlaybackTime: View {
     }
 }
 
-/// Places its views left to right, starting a new row when the next one does not fit the proposed width.
-private struct FlowLayout: Layout {
-    var spacing: CGFloat
-
-    func sizeThatFits(proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) -> CGSize {
-        arrange(subviews, width: proposal.width ?? .infinity).size
+/// A speaker chip's capsule.
+private struct SpeakerChipShape: ViewModifier {
+    func body(content: Content) -> some View {
+        content
+            .font(.caption.weight(.medium))
+            .padding(.horizontal, 8)
+            .padding(.vertical, 3)
+            .background(Palette.hoverFill, in: Capsule())
+            .contentShape(Capsule())
     }
+}
 
-    func placeSubviews(in bounds: CGRect, proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) {
-        let frames = arrange(subviews, width: bounds.width).frames
-        for (subview, frame) in zip(subviews, frames) {
-            subview.place(
-                at: CGPoint(x: bounds.minX + frame.minX, y: bounds.minY + frame.minY),
-                proposal: ProposedViewSize(frame.size))
-        }
-    }
-
-    private func arrange(_ subviews: Subviews, width: CGFloat) -> (frames: [CGRect], size: CGSize) {
-        var frames: [CGRect] = []
-        var x: CGFloat = 0, y: CGFloat = 0, rowHeight: CGFloat = 0, maxX: CGFloat = 0
-        for subview in subviews {
-            let size = subview.sizeThatFits(.unspecified)
-            if x > 0 && x + size.width > width {
-                x = 0
-                y += rowHeight + spacing
-                rowHeight = 0
+/// The header's buttons: small capsules, Liquid Glass on macOS 26+ (unless `--force-fallbacks`), bordered otherwise.
+private struct HeaderButtonStyle: ViewModifier {
+    func body(content: Content) -> some View {
+        Group {
+            if #available(macOS 26, *), PlatformFeatures.liquidGlass {
+                content.buttonStyle(.glass)
+            } else {
+                content.buttonStyle(.bordered)
             }
-            frames.append(CGRect(origin: CGPoint(x: x, y: y), size: size))
-            maxX = max(maxX, x + size.width)
-            x += size.width + spacing
-            rowHeight = max(rowHeight, size.height)
         }
-        return (frames, CGSize(width: maxX, height: y + rowHeight))
+        .buttonBorderShape(.capsule)
+        .controlSize(.small)
     }
 }
 

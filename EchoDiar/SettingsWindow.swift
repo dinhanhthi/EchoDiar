@@ -37,6 +37,8 @@ struct SettingsView: View {
                 }
             }
             .listStyle(.sidebar)
+            // On the window background, like the rest of the page.
+            .scrollContentBackground(.hidden)
             .focused($sidebarFocused)
             .frame(width: 200)
             Divider()
@@ -76,16 +78,13 @@ struct SettingsView: View {
     }
 }
 
-/// The grouped form over the translucent window background on macOS 26+ (unless `--force-fallbacks`).
+/// The grouped form over the solid window background, on every macOS version: its rows stay the system's elevated
+/// rows.
 private struct GlassForm: ViewModifier {
     func body(content: Content) -> some View {
-        if #available(macOS 26, *), PlatformFeatures.liquidGlass {
-            content
-                .scrollContentBackground(.hidden)
-                .background(WindowGlass().ignoresSafeArea())
-        } else {
-            content
-        }
+        content
+            .scrollContentBackground(.hidden)
+            .background(Palette.windowBackground.ignoresSafeArea())
     }
 }
 

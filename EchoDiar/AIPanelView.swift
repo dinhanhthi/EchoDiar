@@ -4,12 +4,16 @@ import EchoCore
 import SwiftUI
 
 /// The Summary or Chat tab of the open conversation (`AppModel.detailTab`): Chat (questions with streamed answers) or
-/// Summary (the saved summary, Summarize / Re-summarize). The bar at the bottom is one row: small menus for the model
-/// (every usable provider with its models) and the output language, "Copy as prompt" and the tab's action.
-/// `[mm:ss]` citations open the transcript at that time.
+/// Summary (the saved summary, Summarize / Re-summarize). The bar at the bottom has small menus for the model
+/// (every usable provider with its models) and the output language, "Copy as prompt" and the tab's action; in Chat
+/// they sit above the question row. `[mm:ss]` citations open the transcript at that time.
 struct AIPanelView: View {
     let conversation: Conversation
     let model: AppModel
+    /// The pane shown: `TranscriptView`'s shown tab, which follows `model.detailTab` one update later.
+    let tab: AppModel.DetailTab
+    /// How Summary and Chat slide into each other (`TranscriptView`'s tab transition).
+    let transition: AnyTransition
     @State private var transcript: Transcript?
     @State private var summary: String?
     @State private var chat: [ChatLog.Message] = []
@@ -17,19 +21,26 @@ struct AIPanelView: View {
     @State private var toast: String?
     /// A web link from model output, opened only once its destination is confirmed.
     @State private var pendingLink: URL?
+    /// The "i" popover about where the data goes is open.
+    @State private var showingDataNotes = false
 
     private static let chatEnd = "chatEnd"
+    /// The height of a one-line question field, and of the "i", Send and Cancel buttons beside it.
+    private static let inputHeight: CGFloat = 34
 
     var body: some View {
         VStack(spacing: 10) {
             ZStack {
-                if model.detailTab == .chat {
+                if tab == .chat {
                     chatPane
+                        .transition(transition)
                 } else {
                     summaryPane
+                        .transition(transition)
                 }
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .clipped()
             errorText
             bottomBar
         }
@@ -156,29 +167,25 @@ struct AIPanelView: View {
 
     // MARK: - Bottom bar
 
-    /// One row: the question (Chat), the small menus, "Copy as prompt" and the tab's action; then any notice about
-    /// where the data goes.
+    /// Summary: one row with the small menus, "Copy as prompt" and the tab's action, then any notice about where the
+    /// data goes. Chat: the menus and "Copy as prompt", then the question with the "i" (where the data goes) and
+    /// Send, then the missing-model warning.
     private var bottomBar: some View {
         VStack(alignment: .leading, spacing: 8) {
             busyElsewhere
-            HStack(spacing: 8) {
-                if model.detailTab == .chat {
-                    TextField("Ask about this conversation", text: $question)
-                        .textFieldStyle(.plain)
-                        .frame(minWidth: 120)
-                        .onSubmit(ask)
+            if model.detailTab == .chat {
+                HStack(spacing: 8) {
                     modelMenu
                     languageMenu
+                    Spacer(minLength: 0)
                     copyButton
-                    if questionJob != nil {
-                        Button("Cancel", action: model.cancelAIJob)
-                            .modifier(CapsuleButton())
-                    } else {
-                        Button("Send", action: ask)
-                            .modifier(CapsuleButton(prominent: true))
-                            .disabled(!canRun || question.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
-                    }
-                } else {
+                }
+                questionRow
+                setupHints
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            } else {
+                HStack(spacing: 8) {
                     modelMenu
                     languageMenu
                     Spacer(minLength: 0)
@@ -193,14 +200,60 @@ struct AIPanelView: View {
                             .disabled(!canRun)
                     }
                 }
+                setupHints
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                dataNotes
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
             }
-            hints
-                .font(.caption)
-                .foregroundStyle(.secondary)
         }
         .padding(.horizontal, 14)
         .padding(.vertical, 10)
         .modifier(GlassCard(cornerRadius: 20))
+    }
+
+    /// The question (1 to 6 lines; Return sends, Shift+Return starts a new line), the "i" and Send
+    /// (Cancel while answering), at the bottom of the field: centered with it while it has one line.
+    private var questionRow: some View {
+        HStack(alignment: .bottom, spacing: 8) {
+            TextField("Ask about this conversation", text: $question, axis: .vertical)
+                .textFieldStyle(.plain)
+                .lineLimit(1...6)
+                .onSubmit(ask)
+                .onKeyPress(.return, phases: .down) { press in
+                    guard press.modifiers.contains(.shift) else { return .ignored }
+                    NSApp.sendAction(#selector(NSResponder.insertNewlineIgnoringFieldEditor(_:)), to: nil, from: nil)
+                    return .handled
+                }
+                .padding(.horizontal, 12)
+                .padding(.vertical, 7)
+                .frame(maxWidth: .infinity, minHeight: Self.inputHeight, alignment: .leading)
+                .background(RoundedRectangle(cornerRadius: Self.inputHeight / 2, style: .continuous)
+                    .fill(Palette.inputSurface))
+            if hasDataNotes {
+                Button { showingDataNotes.toggle() } label: {
+                    Image(systemName: "info.circle")
+                }
+                .buttonStyle(InputBarButtonStyle(height: Self.inputHeight, horizontalPadding: 0))
+                .help("About where data goes")
+                .popover(isPresented: $showingDataNotes, arrowEdge: .top) {
+                    VStack(alignment: .leading, spacing: 8) { dataNotes }
+                        .font(.callout)
+                        .padding(14)
+                        .frame(width: 280, alignment: .leading)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+            }
+            if questionJob != nil {
+                Button("Cancel", action: model.cancelAIJob)
+                    .buttonStyle(InputBarButtonStyle(height: Self.inputHeight))
+            } else {
+                Button("Send", action: ask)
+                    .buttonStyle(InputBarButtonStyle(height: Self.inputHeight, prominent: true))
+                    .disabled(!canRun || question.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+            }
+        }
     }
 
     /// A job of another conversation or of the other tab: it blocks Ask and Generate until it ends, so it says what
@@ -310,21 +363,34 @@ struct AIPanelView: View {
         }
     }
 
-    @ViewBuilder private var hints: some View {
-        let provider = model.currentAIProvider
-        if provider == nil {
+    /// Why no model can run: no provider set up, and why Foundation Models is unavailable.
+    @ViewBuilder private var setupHints: some View {
+        if model.currentAIProvider == nil {
             Label("No AI model: set up a provider or download a model in Settings › AI & Cloud.",
                   systemImage: "exclamationmark.triangle")
             if let reason = AppModel.foundationModelsUnavailableReason {
                 Label(reason, systemImage: "info.circle")
             }
         }
+    }
+
+    /// Where the data goes with the current provider: off this Mac, and how far a CLI agent is contained.
+    @ViewBuilder private var dataNotes: some View {
+        let provider = model.currentAIProvider
         if let provider, provider.leavesMac {
             Label("Data sent to \(provider.name) leaves this Mac.", systemImage: "info.circle")
         }
-        if let note = provider?.cliPreset.flatMap(CLIRunner.containmentNote(for:)) {
+        if let note = containmentNote {
             Label(note, systemImage: "exclamationmark.shield")
         }
+    }
+
+    private var containmentNote: String? {
+        model.currentAIProvider?.cliPreset.flatMap(CLIRunner.containmentNote(for:))
+    }
+
+    private var hasDataNotes: Bool {
+        model.currentAIProvider?.leavesMac == true || containmentNote != nil
     }
 
     @ViewBuilder private var toastView: some View {
@@ -436,6 +502,45 @@ private struct CapsuleButton: ViewModifier {
         }
         .buttonBorderShape(.capsule)
         .controlSize(.small)
+    }
+}
+
+/// A button beside the Chat question field: `height` tall (a circle for an icon), a capsule of the input color, or
+/// the accent color when `prominent`; lighter on hover, darker while pressed, dimmed when disabled.
+private struct InputBarButtonStyle: ButtonStyle {
+    let height: CGFloat
+    var prominent = false
+    var horizontalPadding: CGFloat = 14
+
+    func makeBody(configuration: Configuration) -> some View {
+        Highlight(configuration: configuration, height: height, prominent: prominent, horizontalPadding: horizontalPadding)
+    }
+
+    private struct Highlight: View {
+        let configuration: ButtonStyleConfiguration
+        let height: CGFloat
+        let prominent: Bool
+        let horizontalPadding: CGFloat
+        @State private var hovered = false
+        @Environment(\.isEnabled) private var isEnabled
+
+        var body: some View {
+            configuration.label
+                .font(.body.weight(prominent ? .semibold : .regular))
+                .foregroundStyle(prominent ? AnyShapeStyle(.white) : AnyShapeStyle(.primary))
+                .padding(.horizontal, horizontalPadding)
+                .frame(minWidth: height, minHeight: height, maxHeight: height)
+                .background(
+                    Capsule()
+                        .fill(prominent ? AnyShapeStyle(Color.accentColor) : AnyShapeStyle(Palette.inputSurface))
+                        .overlay(Capsule().fill(
+                            configuration.isPressed ? Color.black.opacity(0.2)
+                                : hovered && isEnabled ? Palette.hoverFill : .clear)))
+                .contentShape(Capsule())
+                .opacity(isEnabled ? 1 : 0.45)
+                .animation(.easeOut(duration: 0.12), value: hovered)
+                .onHover { hovered = $0 }
+        }
     }
 }
 

@@ -49,7 +49,7 @@ struct ConversationCard: View {
         }
         .padding(.horizontal, compact ? 10 : 14)
         .padding(.vertical, compact ? 8 : 10)
-        // The fill sits under the content, on the glass; the stroke on top.
+        // The fill sits under the content, on the surface; the stroke on top.
         .background {
             if selected { Self.shape.fill(Color.accentColor.opacity(0.18)) }
         }
@@ -330,7 +330,7 @@ struct StatusBadge: View {
     }
 }
 
-/// The text buttons of a row: a capsule highlight on hover, darker while pressed.
+/// The text buttons of a row, secondary style: a visible capsule fill, lighter on hover, darker while pressed.
 private struct RowTextButtonStyle: ButtonStyle {
     func makeBody(configuration: Configuration) -> some View {
         Highlight(configuration: configuration)
@@ -346,7 +346,10 @@ private struct RowTextButtonStyle: ButtonStyle {
                 .padding(.horizontal, 8)
                 .padding(.vertical, 3)
                 .background(
-                    Capsule().fill(configuration.isPressed ? Palette.pressedFill : hovered ? Palette.hoverFill : .clear))
+                    Capsule()
+                        .fill(Palette.inputSurface)
+                        .overlay(Capsule().fill(
+                            configuration.isPressed ? Color.black.opacity(0.2) : hovered ? Palette.hoverFill : .clear)))
                 .contentShape(Capsule())
                 .animation(.easeOut(duration: 0.12), value: hovered)
                 .onHover { hovered = $0 }
@@ -355,7 +358,7 @@ private struct RowTextButtonStyle: ButtonStyle {
 }
 
 /// The source app's icon, or a waveform for global recordings and apps that are not installed.
-private struct AppIcon: View {
+struct AppIcon: View {
     let bundleID: String?
 
     var body: some View {

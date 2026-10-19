@@ -22,7 +22,7 @@ struct FloatingPillView: View {
     var body: some View {
         content
             .padding(.horizontal, 12)
-            .modifier(GlassCard(cornerRadius: 14))
+            .modifier(PillGlass())
             .fixedSize()
             .gesture(WindowDragGesture())
             .onGeometryChange(for: CGSize.self) { $0.size } action: { onSize($0) }
@@ -181,5 +181,17 @@ private struct PillMeter: View {
             .frame(width: 28, height: 4)
             .accessibilityHidden(true)
             .task { await feed.attach() }
+    }
+}
+
+/// The pill floats over other apps in a clear panel: Liquid Glass on macOS 26+ (unless `--force-fallbacks`), a
+/// material otherwise. Not `GlassCard`, whose solid surface is for the main window.
+private struct PillGlass: ViewModifier {
+    func body(content: Content) -> some View {
+        if #available(macOS 26, *), PlatformFeatures.liquidGlass {
+            content.glassEffect(.regular, in: .rect(cornerRadius: 14))
+        } else {
+            content.background(.regularMaterial, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+        }
     }
 }

@@ -1,8 +1,9 @@
 import EchoCore
 import SwiftUI
 
-/// The library as cards under pinned day headers. Shows the groups it is given, so callers can filter them. Compact
-/// cards for the wide layout's sidebar, where the open entry is selected and scrolled into view.
+/// The library as cards under pinned day headers, the recording's card above them while recording. Shows the groups
+/// it is given, so callers can filter them. Compact cards for the wide layout's sidebar, where the open entry is
+/// selected and scrolled into view.
 struct ConversationListView: View {
     let model: AppModel
     let groups: [DayGroup]
@@ -13,25 +14,28 @@ struct ConversationListView: View {
     var body: some View {
         ScrollViewReader { proxy in
             ScrollView {
-                GlassCards {
-                    LazyVStack(alignment: .leading, spacing: 10, pinnedViews: .sectionHeaders) {
-                        ForEach(groups) { group in
-                            Section {
-                                ForEach(group.conversations) { conversation in
-                                    ConversationCard(
-                                        conversation: conversation, model: model, compact: compact,
-                                        selected: conversation.id == selectedID)
-                                    .id(conversation.id)
-                                    .transition(cardTransition)
-                                }
-                            } header: {
-                                DayHeader(day: group.day)
+                LazyVStack(alignment: .leading, spacing: 10, pinnedViews: .sectionHeaders) {
+                    if model.isRecording {
+                        RecordingCard(model: model, compact: compact, selected: model.route == .recording)
+                            .transition(cardTransition)
+                    }
+                    ForEach(groups) { group in
+                        Section {
+                            ForEach(group.conversations) { conversation in
+                                ConversationCard(
+                                    conversation: conversation, model: model, compact: compact,
+                                    selected: conversation.id == selectedID)
+                                .id(conversation.id)
+                                .transition(cardTransition)
                             }
+                        } header: {
+                            DayHeader(day: group.day)
                         }
                     }
-                    .padding(12)
-                    .animation(.snappy, value: groups)
                 }
+                .padding(12)
+                .animation(.snappy, value: groups)
+                .animation(.snappy, value: model.isRecording)
             }
             // Centered when the sidebar appears; later only scrolled as far as needed, so a click on a visible
             // card does not move the list.
@@ -52,19 +56,27 @@ struct ConversationListView: View {
     }
 }
 
-/// "Today", "Yesterday", or the date.
+/// "Today", "Yesterday", or the date as muted text, then a rule to the column's trailing edge. Opaque, so cards
+/// scrolling under the pinned header do not show through.
 private struct DayHeader: View {
     let day: Date
 
     var body: some View {
-        Text(title)
-            .font(.subheadline.weight(.semibold))
-            .padding(.horizontal, 10)
-            .padding(.vertical, 4)
-            .modifier(GlassCard(cornerRadius: 10))
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .padding(.top, 4)
-            .accessibilityAddTraits(.isHeader)
+        HStack(spacing: 8) {
+            Text(title)
+                .font(.caption.weight(.semibold))
+                .foregroundStyle(.secondary)
+                .fixedSize()
+                .accessibilityAddTraits(.isHeader)
+            Rectangle()
+                .fill(Color.white.opacity(0.12))
+                .frame(height: 1)
+                .padding(.trailing, -12)
+                .accessibilityHidden(true)
+        }
+        .padding(.vertical, 6)
+        // The list's 12 pt padding, so the background reaches the column edges.
+        .background(Palette.windowBackground.padding(.horizontal, -12))
     }
 
     private var title: String {

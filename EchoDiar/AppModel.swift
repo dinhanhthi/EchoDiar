@@ -189,6 +189,8 @@ final class AppModel {
     @ObservationIgnored private var recovery: Task<[RecoveredResult], Never>?
     /// Folder of the session being recorded; compressed when the engine reports the end.
     @ObservationIgnored private var activeFolder: URL?
+    /// Folder of the recording that ended on its page; opened once the library lists it, dropped if the list is left.
+    @ObservationIgnored private var pendingOpenFolder: URL?
     @ObservationIgnored private var terminateObserver: (any NSObjectProtocol)?
     /// `supportedLanguages(engineID:)` by catalog id, sorted by name once.
     @ObservationIgnored private var languageCache: [String: [String]] = [:]
@@ -263,7 +265,18 @@ final class AppModel {
             // Subscribed before the first refresh, whose emit would otherwise be missed.
             let changes = await library.changes()
             Task {
-                for await conversations in changes { self.conversations = conversations }
+                for await conversations in changes {
+                    self.conversations = conversations
+                    guard let pending = pendingOpenFolder else { continue }
+                    if route != .list {
+                        pendingOpenFolder = nil
+                    } else if let match = conversations.first(where: {
+                        $0.folder.standardizedFileURL == pending.standardizedFileURL
+                    }) {
+                        pendingOpenFolder = nil
+                        open(match.id)
+                    }
+                }
             }
             _ = await recovery?.value
             let folders = await Task.detached(priority: .utility) { [root = library.root] in
@@ -433,11 +446,15 @@ final class AppModel {
                 guard let self else { return }
                 let wasRecording = isRecording
                 self.snapshot = snapshot
-                // A new recording opens its page; the list replaces it once it ends.
-                if !wasRecording && isRecording {
-                    route = .recording
-                } else if wasRecording && !isRecording && route == .recording {
-                    route = .list
+                // A start does not navigate. An end on the recording page shows the list, then the finished entry
+                // once the library lists it; Settings opened from that page returns to the list.
+                if wasRecording && !isRecording {
+                    if route == .recording {
+                        pendingOpenFolder = activeFolder
+                        route = .list
+                    } else if route == .settings && settingsReturnRoute == .recording {
+                        settingsReturnRoute = .list
+                    }
                 }
                 micRoutesLost(snapshot.micRoutesLost)
                 if snapshot.state == .idle, let reason = snapshot.endReason {
