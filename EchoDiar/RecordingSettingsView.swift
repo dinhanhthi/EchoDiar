@@ -43,6 +43,7 @@ struct RecordingSettingsView: View {
         .task {
             microphones = await Task.detached(priority: .utility) { InputDevice.all() }.value
         }
+        .task { model.refreshInstalledModels() }
         .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in
             // Back from System Settings.
             accessibilityTrusted = WindowAnchor.isTrusted
@@ -125,7 +126,11 @@ struct RecordingSettingsView: View {
                 ForEach(AppSettings.speakerCountHintRange, id: \.self) { Text("\($0)").tag(Int?.some($0)) }
             } label: {
                 Text("Number of other speakers")
-                Text("A hint for telling the system audio's speakers apart.")
+                if model.installedModelIDs.contains(ModelCatalog.defaultDiarizer.id) {
+                    Text("A hint for telling the system audio's speakers apart.")
+                } else {
+                    Text("Needs the speaker model: download it in Transcription › Balanced.")
+                }
             }
             Toggle(isOn: model.setting(\.deferTranscriptionWhenConstrained)) {
                 Text("Wait when the Mac is hot or in Low Power Mode")

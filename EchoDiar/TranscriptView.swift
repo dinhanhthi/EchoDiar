@@ -73,6 +73,9 @@ struct TranscriptView: View {
                     TranscriptionStatus(conversation: conversation, model: model)
                 }
             }
+            if transcript?.notes.contains(Transcript.diarizationMissingNote) == true {
+                diarizationMissingNotice
+            }
             if transcript != nil && !speakers.isEmpty {
                 ScrollView(.horizontal, showsIndicators: false) {
                     HStack(spacing: 6) {
@@ -92,6 +95,27 @@ struct TranscriptView: View {
     }
 
     private var failed: Bool { TranscriptionStatus.showsFailure(conversation, model) }
+
+    /// The transcript was made without the speaker model, so every system-audio voice is Speaker 1.
+    private var diarizationMissingNotice: some View {
+        let installed = model.installedModelIDs.contains(ModelCatalog.defaultDiarizer.id)
+        return HStack(alignment: .firstTextBaseline, spacing: 8) {
+            Group {
+                Image(systemName: "person.2.slash")
+                if installed {
+                    Text("Speakers were not told apart. The speaker model is installed now: re-transcribe.")
+                } else {
+                    Text("Speakers were not told apart: the speaker model is not installed (Transcription › Balanced).")
+                }
+            }
+            .foregroundStyle(.secondary)
+            if !installed {
+                Button("Download…") { model.openSettings(tab: .transcription) }
+                    .buttonStyle(.link)
+            }
+        }
+        .font(.caption)
+    }
 
     @ViewBuilder private var title: some View {
         if editingTitle {
