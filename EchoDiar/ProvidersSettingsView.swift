@@ -2,7 +2,7 @@ import EchoAI
 import EchoCore
 import SwiftUI
 
-/// The AI & Cloud tab: cloud API presets, speech-to-text APIs, local hosts (scanned on demand), subscription CLIs and
+/// The AI & Cloud tab: the on-device AI models for summaries and chat, cloud API presets, speech-to-text APIs, local hosts (scanned on demand), subscription CLIs and
 /// custom OpenAI-compatible endpoints. API keys go to the Keychain only; everything else is saved in `AppSettings.providers`.
 struct ProvidersSettingsView: View {
     let model: AppModel
@@ -12,12 +12,15 @@ struct ProvidersSettingsView: View {
     @State private var customLocalURL = ""
     @State private var cliStatus: [CLIPreset: CLIStatus] = [:]
 
+    private static let mlxEntries = ModelCatalog.llm.filter { $0.runtime == .mlx }
+
     var body: some View {
         Form {
             Section {
                 Label("Data sent to cloud providers or CLIs leaves this Mac.", systemImage: "info.circle")
                     .foregroundStyle(.secondary)
             }
+            llmSection
             Section("Cloud APIs") {
                 ForEach(configs { $0.preset != nil && [.openAICompatible, .anthropic].contains($0.kind) }) { config in
                     APIProviderRow(config: config, model: model)
@@ -58,6 +61,7 @@ struct ProvidersSettingsView: View {
         }
         .formStyle(.grouped)
         .task { await scan() }
+        .task { model.refreshInstalledModels() }
         .task {
             // Once per window: the first PATH lookup runs the login shell (~4 s) and each check spawns `--version`.
             if cliStatus.isEmpty { CLIPreset.allCases.forEach(detect) }
@@ -69,6 +73,22 @@ struct ProvidersSettingsView: View {
     }
 
     // MARK: - Local hosts
+
+    /// Models for summaries and chat: Apple Foundation Models' status (macOS 26), then the MLX downloads.
+    private var llmSection: some View {
+        Section("AI models (summaries and chat)") {
+            if #available(macOS 26, *), PlatformFeatures.foundationModels {
+                LabeledContent("Apple Foundation Models (system)") {
+                    if let reason = AppleFoundationModelProvider.unavailableReason {
+                        Text(reason).foregroundStyle(.secondary)
+                    } else {
+                        Label("Available", systemImage: "checkmark.circle.fill").foregroundStyle(.green)
+                    }
+                }
+            }
+            ForEach(Self.mlxEntries) { ModelRow(entry: $0, model: model) }
+        }
+    }
 
     private var localHosts: some View {
         Section("Local hosts") {
