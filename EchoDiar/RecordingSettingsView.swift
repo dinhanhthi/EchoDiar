@@ -104,6 +104,10 @@ struct RecordingSettingsView: View {
                 value: model.setting(\.endMonitor.sourceInactiveSeconds),
                 range: MeetingEndMonitor.Configuration.sourceInactiveRange)
             NumberRow(
+                title: "Stop when the call seems over for", unit: "s",
+                value: model.setting(\.endMonitor.callEndedSeconds),
+                range: MeetingEndMonitor.Configuration.callEndedRange)
+            NumberRow(
                 title: "Stop after silence of", unit: "min",
                 value: model.setting(\.endMonitor.silenceMinutes),
                 range: MeetingEndMonitor.Configuration.silenceRange)

@@ -37,8 +37,21 @@ struct MeetingEndMonitorTests {
         monitor.record(.systemAudible(true), at: at(10))
         monitor.record(.systemAudible(false), at: at(100))
         monitor.record(.sourceInputActive(false), at: at(110))
-        #expect(monitor.evaluate(now: at(110 + 29)) == MeetingEndMonitor.Action.none)
-        #expect(monitor.evaluate(now: at(110 + 30)) == .promptStop(reason: .callEnded, countdown: 15))
+        #expect(monitor.evaluate(now: at(110 + 59)) == MeetingEndMonitor.Action.none)
+        #expect(monitor.evaluate(now: at(110 + 60)) == .promptStop(reason: .callEnded, countdown: 15))
+    }
+
+    @Test func pausedTimeIsNotCallEndedSilence() {
+        var monitor = monitor()
+        monitor.record(.sourceInputActive(true), at: start)
+        monitor.record(.systemAudible(true), at: at(10))
+        monitor.record(.systemAudible(false), at: at(100))
+        monitor.record(.sourceInputActive(false), at: at(110))
+        monitor.record(.paused(true), at: at(120))
+        #expect(monitor.evaluate(now: at(250)) == MeetingEndMonitor.Action.none)
+        monitor.record(.paused(false), at: at(300))
+        #expect(monitor.evaluate(now: at(300 + 59)) == MeetingEndMonitor.Action.none)
+        #expect(monitor.evaluate(now: at(300 + 60)) == .promptStop(reason: .callEnded, countdown: 15))
     }
 
     @Test func callEndedNeedsSoundFirstAndTheMeetingMicOff() {
@@ -70,9 +83,10 @@ struct MeetingEndMonitorTests {
     }
 
     @Test func absurdStoredConfigurationIsClampedAndMaxDurationStillStops() throws {
-        let json = #"{"sourceInactiveSeconds": -1, "silenceMinutes": 0, "maxDurationMinutes": 9223372036854775807}"#
+        let json = #"{"sourceInactiveSeconds": -1, "callEndedSeconds": 1, "silenceMinutes": 0, "maxDurationMinutes": 9223372036854775807}"#
         let configuration = try JSONDecoder().decode(MeetingEndMonitor.Configuration.self, from: Data(json.utf8))
-        #expect(configuration == MeetingEndMonitor.Configuration(sourceInactiveSeconds: 20, silenceMinutes: 1, maxDurationMinutes: 1_440))
+        #expect(configuration == MeetingEndMonitor.Configuration(
+            sourceInactiveSeconds: 20, callEndedSeconds: 30, silenceMinutes: 1, maxDurationMinutes: 1_440))
 
         var monitor = MeetingEndMonitor(configuration: configuration, startedAt: start)
         monitor.record(.audible(true), at: start)

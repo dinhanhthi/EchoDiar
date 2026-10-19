@@ -33,6 +33,8 @@ public struct ProviderConfig: Codable, Equatable, Sendable, Identifiable {
     public var extraHeaders: [String: String]
     /// Fallback until the model picker is filled from `listModels()`; empty = pick one (or the CLI's default).
     public var defaultModel: String
+    /// More models offered in the AI pane's model menu, next to `defaultModel`.
+    public var shownModels: [String]
     /// Cloud transcription model for configs with a speech-to-text API; empty = the vendor default.
     public var transcriptionModel: String
     public var enabled: Bool
@@ -46,6 +48,7 @@ public struct ProviderConfig: Codable, Equatable, Sendable, Identifiable {
         authStyle: AuthStyle,
         extraHeaders: [String: String] = [:],
         defaultModel: String = "",
+        shownModels: [String] = [],
         transcriptionModel: String = "",
         enabled: Bool = false
     ) {
@@ -57,6 +60,7 @@ public struct ProviderConfig: Codable, Equatable, Sendable, Identifiable {
         self.authStyle = authStyle
         self.extraHeaders = extraHeaders
         self.defaultModel = defaultModel
+        self.shownModels = shownModels
         self.transcriptionModel = transcriptionModel
         self.enabled = enabled
     }
@@ -75,6 +79,7 @@ public struct ProviderConfig: Codable, Equatable, Sendable, Identifiable {
         authStyle = value(.authStyle).flatMap(AuthStyle.init(rawValue:)) ?? AuthStyle.none
         extraHeaders = value(.extraHeaders) ?? [:]
         defaultModel = value(.defaultModel) ?? ""
+        shownModels = value(.shownModels) ?? []
         transcriptionModel = value(.transcriptionModel) ?? ""
         enabled = value(.enabled) ?? false
     }

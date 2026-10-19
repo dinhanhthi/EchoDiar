@@ -1,8 +1,8 @@
 import EchoTranscribe
 import SwiftUI
 
-/// Live captions under the recording header (setting "Live transcript"): the model state, then the newest lines,
-/// scrolled to the bottom as they arrive.
+/// Live captions on the recording page, under its header (setting "Live transcript"): the model state, then the newest
+/// lines, scrolled to the bottom as they arrive, filling the page.
 struct LiveTranscriptView: View {
     let snapshot: LiveTranscriber.Snapshot
 
@@ -23,7 +23,6 @@ struct LiveTranscriptView: View {
                         }
                         .textSelection(.enabled)
                     }
-                    .frame(maxHeight: 120)
                     .onAppear { scrollToBottom(proxy) }
                     .onChange(of: snapshot.lines.last?.id) { scrollToBottom(proxy) }
                 }
@@ -31,7 +30,7 @@ struct LiveTranscriptView: View {
         }
         .padding(.horizontal, 14)
         .padding(.vertical, 10)
-        .frame(maxWidth: .infinity, alignment: .leading)
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         .modifier(GlassCard(cornerRadius: 14))
     }
 

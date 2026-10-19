@@ -178,11 +178,21 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSMe
 
     @objc private func togglePause() { model.togglePause() }
 
-    /// A hidden main window opens on the AI pane.
+    /// A hidden main window opens on the AI pane; a shown one goes back to the recording, else the library.
     @objc private func toggleAI() {
         let shown = window?.isVisible == true
         showMainWindow()
-        model.selectedTab = shown && model.selectedTab == .ai ? .library : .ai
+        model.selectedTab = shown && model.selectedTab == .ai ? (model.isRecording ? .live : .library) : .ai
+    }
+
+    @objc private func showRecordingPage() {
+        showMainWindow()
+        model.selectedTab = .live
+    }
+
+    @objc private func showLibrary() {
+        showMainWindow()
+        model.selectedTab = .library
     }
 
     @objc private func showSearch() {
@@ -200,8 +210,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSMe
             item.title = model.snapshot.state == .paused ? "Resume Recording" : "Pause Recording"
             return model.isRecording
         case #selector(toggleAI):
-            item.title = model.selectedTab == .ai && window?.isVisible == true ? "Show Library" : "Show AI"
+            let back = model.isRecording ? "Show Recording" : "Show Recordings"
+            item.title = model.selectedTab == .ai && window?.isVisible == true ? back : "Show AI"
             return true
+        case #selector(showRecordingPage):
+            return model.isRecording
         default:
             return true
         }
@@ -225,6 +238,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSMe
         editMenu.addItem(withTitle: "Paste", action: #selector(NSText.paste(_:)), keyEquivalent: "v")
         editMenu.addItem(withTitle: "Select All", action: #selector(NSText.selectAll(_:)), keyEquivalent: "a")
         let viewMenu = NSMenu(title: "View")
+        viewMenu.addItem(withTitle: "Recording", action: #selector(showRecordingPage), keyEquivalent: "1").target = self
+        viewMenu.addItem(withTitle: "Recordings", action: #selector(showLibrary), keyEquivalent: "2").target = self
         viewMenu.addItem(withTitle: "Show AI", action: #selector(toggleAI), keyEquivalent: "i").target = self
         viewMenu.addItem(withTitle: "Search Conversations", action: #selector(showSearch), keyEquivalent: "f").target = self
         let windowMenu = NSMenu(title: "Window")

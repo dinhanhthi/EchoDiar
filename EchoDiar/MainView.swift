@@ -3,7 +3,8 @@ import EchoAudio
 import EchoCore
 import SwiftUI
 
-/// The main window: the conversation library or the AI pane, with Record, Settings and AI in the toolbar.
+/// The main window, one page at a time: the open recording (while recording), the conversation library or the AI pane,
+/// picked in the toolbar next to Settings and Search; Record (or Stop and Pause) on the leading side.
 struct MainView: View {
     let model: AppModel
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
@@ -21,6 +22,10 @@ struct MainView: View {
     @State private var windowWidth: CGFloat = 0
     /// Where the closed search bar was, in the window, while it shrinks back into the Search button.
     @State private var searchBarGhost: CGRect?
+    /// The page on screen; it follows `page` with an animation.
+    @State private var shownPage = AppModel.Tab.library
+    /// The last page change went to a page further right in the toolbar (Recording, Recordings, AI).
+    @State private var forward = true
 
     private struct SearchText {
         let size: Int64
@@ -33,25 +38,22 @@ struct MainView: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            if model.isRecording {
-                RecordingHeader(model: model, live: windowVisible)
-                    .padding([.horizontal, .top], 12)
-                if let live = model.liveTranscript {
-                    LiveTranscriptView(snapshot: live)
-                        .padding([.horizontal, .top], 12)
-                }
-            } else if model.selectedTarget.globalTapFallback {
+            if !model.isRecording && model.selectedTarget.globalTapFallback {
                 GlobalTapNote(appName: targetName)
                     .padding([.horizontal, .top], 12)
             }
             ZStack {
-                switch model.selectedTab {
-                case .library: libraryPane.transition(paneTransition(from: .leading))
-                case .ai: aiPane.transition(paneTransition(from: .trailing))
+                switch shownPage {
+                case .live: livePane.transition(pageTransition)
+                case .library: libraryPane.transition(pageTransition)
+                case .ai: aiPane.transition(pageTransition)
                 }
             }
-            // Whoever switches the pane (toolbar, menu, card, citation), it moves the same way.
-            .animation(Self.paneAnimation, value: model.selectedTab)
+        }
+        // Whoever switches the page (toolbar, menu, card, citation, a recording starting), it slides the same way.
+        .onChange(of: page, initial: true) { old, new in
+            forward = Self.order(new) >= Self.order(old)
+            withAnimation(Self.paneAnimation) { shownPage = new }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(WindowGlass().ignoresSafeArea())
@@ -92,20 +94,21 @@ struct MainView: View {
                     ToolbarItem { Spacer() }
                 }
                 ToolbarItemGroup {
+                    if model.isRecording {
+                        pageToggle(.live, "Recording", systemImage: "waveform", help: "Show the recording (⌘1)")
+                    }
+                    pageToggle(.library, "Recordings", systemImage: "list.bullet", help: "Show the recordings (⌘2)")
+                    pageToggle(.ai, "AI", systemImage: "sparkles", help: "Show the AI pane (⌘I)")
+                }
+                // Settings and Search in their own capsule, after the pages.
+                if #available(macOS 26, *) {
+                    ToolbarSpacer(.fixed)
+                }
+                ToolbarItemGroup {
                     Button { SettingsWindow.shared.show(model: model) } label: {
                         Label("Settings", systemImage: "slider.horizontal.3")
                     }
                     .help("Settings")
-                    Button(action: toggleAI) {
-                        Label(model.selectedTab == .ai ? "Library" : "AI", systemImage: "sparkles")
-                    }
-                    .help(model.selectedTab == .ai ? "Show the library (⌘I)" : "Show the AI pane (⌘I)")
-                }
-                // Its own capsule, after Settings and AI.
-                if #available(macOS 26, *) {
-                    ToolbarSpacer(.fixed)
-                }
-                ToolbarItem {
                     Button(action: model.showSearch) {
                         Label("Search", systemImage: "magnifyingglass")
                     }
@@ -213,16 +216,63 @@ struct MainView: View {
         return "All system audio"
     }
 
-    private func toggleAI() {
-        model.selectedTab = model.selectedTab == .ai ? .library : .ai
+    /// A page button, shown selected while its page is on screen.
+    private func pageToggle(_ tab: AppModel.Tab, _ title: String, systemImage: String, help: String) -> some View {
+        Toggle(isOn: Binding(get: { page == tab }, set: { if $0 { model.selectedTab = tab } })) {
+            Label(title, systemImage: systemImage)
+        }
+        .help(help)
     }
 
-    /// The pane switches: Library, transcript, AI.
+    /// The selected page; the library once the recording it showed has ended.
+    private var page: AppModel.Tab {
+        model.selectedTab == .live && !model.isRecording ? .library : model.selectedTab
+    }
+
+    /// Left to right, as in the toolbar.
+    private static func order(_ tab: AppModel.Tab) -> Int {
+        switch tab {
+        case .live: 0
+        case .library: 1
+        case .ai: 2
+        }
+    }
+
+    /// The page switches, and the library's cards and transcript.
     private static let paneAnimation = Animation.snappy(duration: 0.25)
+
+    /// Pages slide in the toolbar's order: a page further right comes in from the trailing edge. While `page` is ahead
+    /// of `shownPage` the direction comes from both: the leaving page keeps the transition it last rendered with.
+    private var pageTransition: AnyTransition {
+        if reduceMotion { return .opacity }
+        let forward = page == shownPage ? forward : Self.order(page) >= Self.order(shownPage)
+        let (insertion, removal): (Edge, Edge) = forward ? (.trailing, .leading) : (.leading, .trailing)
+        return .asymmetric(
+            insertion: .move(edge: insertion).combined(with: .opacity),
+            removal: .move(edge: removal).combined(with: .opacity))
+    }
 
     /// A slide from `edge` with a fade; only the fade with Reduce Motion.
     private func paneTransition(from edge: Edge) -> AnyTransition {
         reduceMotion ? .opacity : .move(edge: edge).combined(with: .opacity)
+    }
+
+    /// The recording's clock, meters and language, then its live transcript filling the page.
+    private var livePane: some View {
+        VStack(spacing: 12) {
+            RecordingHeader(model: model, live: windowVisible)
+            if let live = model.liveTranscript {
+                LiveTranscriptView(snapshot: live)
+            } else {
+                Text("Live transcript is off. Turn it on in Settings › Transcription.")
+                    .font(.callout)
+                    .foregroundStyle(.secondary)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(.horizontal, 4)
+            }
+        }
+        .padding(12)
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
     }
 
     /// The cards, or the opened conversation's transcript sliding in over them.

@@ -105,13 +105,13 @@ public enum TranscriptChunker {
     /// that fit (next to the saved summary and the chat `history`), merged and in time order.
     public static func questionExcerpts(
         conversation: Conversation, transcript: Transcript, question: String, summary: String?, contextWindow: Int,
-        history: [LLMMessage] = []
+        history: [LLMMessage] = [], language: OutputLanguage? = nil
     ) -> [[Transcript.Segment]] {
         var empty = transcript
         empty.segments = []
         let instructions = PromptBuilder.questionMessages(
             conversation: conversation, transcript: empty, excerpts: [], summary: summary, question: question,
-            history: history)
+            history: history, language: language)
         let limit = budget(contextWindow: contextWindow, instructionTokens: tokens(instructions))
         let lines = lineTokens(transcript.segments, transcript: transcript)
         if lines.reduce(0, +) <= limit { return [transcript.segments] }

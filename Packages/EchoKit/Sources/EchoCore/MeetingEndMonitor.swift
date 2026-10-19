@@ -13,7 +13,7 @@ import Foundation
 /// - Source inactivity is ignored once the source app quit (its own prompt covers it).
 /// - Call ended: the system channel went silent after it had been audible while the meeting app's mic is off, both
 ///   for `callEndedSeconds`. Either alone is normal mid-call (others quiet, a muted web client); also ignored once
-///   the source app quit.
+///   the source app quit. Paused time does not count: a pause measures nothing.
 /// - The recording starts as silent: the silence prompt fires unless `audible(true)` arrives within the threshold.
 /// - `evaluate` returns the same prompt on every call while its condition holds; the caller dedupes, and dismisses
 ///   the prompt when the result drops back to `.none`.
@@ -22,29 +22,37 @@ public struct MeetingEndMonitor: Sendable {
     public struct Configuration: Codable, Equatable, Sendable {
         /// Seconds the source app's input and output must both be inactive; clamped to `sourceInactiveRange`.
         public var sourceInactiveSeconds: Int
+        /// Seconds the call-ended conditions must hold; clamped to `callEndedRange`.
+        public var callEndedSeconds: Int
         /// Minutes both channels must be silent; clamped to `silenceRange`.
         public var silenceMinutes: Int
         /// Hard cap on the recording length, in minutes; clamped to `maxDurationRange`.
         public var maxDurationMinutes: Int
 
         public static let sourceInactiveRange = 20...60
+        public static let callEndedRange = 30...300
         public static let silenceRange = 1...120
         public static let maxDurationRange = 1...1_440
 
-        public init(sourceInactiveSeconds: Int = 25, silenceMinutes: Int = 10, maxDurationMinutes: Int = 240) {
+        public init(
+            sourceInactiveSeconds: Int = 25, callEndedSeconds: Int = 60, silenceMinutes: Int = 10, maxDurationMinutes: Int = 240
+        ) {
             self.sourceInactiveSeconds = sourceInactiveSeconds
+            self.callEndedSeconds = callEndedSeconds
             self.silenceMinutes = silenceMinutes
             self.maxDurationMinutes = maxDurationMinutes
         }
 
         private enum CodingKeys: String, CodingKey {
-            case sourceInactiveSeconds, silenceMinutes, maxDurationMinutes
+            case sourceInactiveSeconds, callEndedSeconds, silenceMinutes, maxDurationMinutes
         }
 
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
             sourceInactiveSeconds = Self.clamped(
                 try container.decodeIfPresent(Int.self, forKey: .sourceInactiveSeconds) ?? 25, to: Self.sourceInactiveRange)
+            callEndedSeconds = Self.clamped(
+                try container.decodeIfPresent(Int.self, forKey: .callEndedSeconds) ?? 60, to: Self.callEndedRange)
             silenceMinutes = Self.clamped(
                 try container.decodeIfPresent(Int.self, forKey: .silenceMinutes) ?? 10, to: Self.silenceRange)
             maxDurationMinutes = Self.clamped(
@@ -53,6 +61,7 @@ public struct MeetingEndMonitor: Sendable {
 
         /// The values in force, clamped again at use: a configuration built in code is not clamped.
         public var effectiveSourceInactiveSeconds: Int { Self.clamped(sourceInactiveSeconds, to: Self.sourceInactiveRange) }
+        public var effectiveCallEndedSeconds: Int { Self.clamped(callEndedSeconds, to: Self.callEndedRange) }
         public var effectiveSilenceMinutes: Int { Self.clamped(silenceMinutes, to: Self.silenceRange) }
         public var effectiveMaxDurationMinutes: Int { Self.clamped(maxDurationMinutes, to: Self.maxDurationRange) }
 
@@ -72,6 +81,8 @@ public struct MeetingEndMonitor: Sendable {
         case systemAudible(Bool)
         /// The meeting app's mic input is running.
         case sourceInputActive(Bool)
+        /// The recording is paused (`false`: resumed).
+        case paused(Bool)
         case screenLocked(Bool)
         /// The input device went away (AirPods disconnect); fed only when the route-change setting asks to stop.
         case inputRouteLost
@@ -92,7 +103,6 @@ public struct MeetingEndMonitor: Sendable {
 
     public static let promptCountdown = 15
     public static let snoozeDuration: TimeInterval = 10 * 60
-    public static let callEndedSeconds: TimeInterval = 30
 
     public let configuration: Configuration
     public let startedAt: Date
@@ -103,6 +113,7 @@ public struct MeetingEndMonitor: Sendable {
     private var systemHeard = false
     private var systemSilentSince: Date?
     private var sourceInputInactiveSince: Date?
+    private var paused = false
     private var screenLocked = false
     private var inputRouteLost = false
     private var stopReason: Reason?
@@ -123,6 +134,10 @@ public struct MeetingEndMonitor: Sendable {
             systemHeard = systemHeard || audible
             systemSilentSince = audible || !systemHeard ? nil : (systemSilentSince ?? time)
         case .sourceInputActive(let active): sourceInputInactiveSince = active ? nil : (sourceInputInactiveSince ?? time)
+        case .paused(let isPaused):
+            paused = isPaused
+            // Silence still running at resume counts from there.
+            if !isPaused, systemSilentSince != nil { systemSilentSince = time }
         case .screenLocked(let locked): screenLocked = locked
         case .inputRouteLost: if !isSnoozed(.inputRouteLost, at: time) { inputRouteLost = true }
         case .systemSleep: stopReason = stopReason ?? .systemSleep
@@ -142,13 +157,14 @@ public struct MeetingEndMonitor: Sendable {
         }
         if let stopReason { return .stopNow(reason: stopReason) }
         let inactiveThreshold = TimeInterval(configuration.effectiveSourceInactiveSeconds)
+        let callEndedThreshold = TimeInterval(configuration.effectiveCallEndedSeconds)
         let silenceThreshold = TimeInterval(configuration.effectiveSilenceMinutes) * 60
         let triggers: [(Reason, Bool)] = [
             (.sourceExited, sourceExited),
             (.inputRouteLost, inputRouteLost),
             (.screenLocked, screenLocked),
             (.sourceInactive, !sourceExited && Self.held(since: sourceInactiveSince, for: inactiveThreshold, at: now)),
-            (.callEnded, !sourceExited && Self.held(since: callEndedSince, for: Self.callEndedSeconds, at: now)),
+            (.callEnded, !sourceExited && !paused && Self.held(since: callEndedSince, for: callEndedThreshold, at: now)),
             (.silence, Self.held(since: silentSince, for: silenceThreshold, at: now)),
         ]
         for (reason, fired) in triggers where fired && !isSnoozed(reason, at: now) {

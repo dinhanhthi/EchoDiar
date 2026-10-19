@@ -3,16 +3,16 @@ import EchoAI
 import EchoCore
 import SwiftUI
 
-/// The AI tab: a conversation, a provider and model, the summary language, then the saved summary (Generate /
-/// Regenerate) and the chat (questions with streamed answers), "Copy as prompt" and Cancel. `[mm:ss]` citations
-/// open the transcript at that time.
+/// The AI pane, in two tabs on one conversation's transcript: Chat (questions with streamed answers) and Summary
+/// (the saved summary, Generate / Regenerate). The bar at the bottom holds the tab's actions, "Copy as prompt", and
+/// small menus for the conversation, the model (every usable provider with its models) and the output language.
+/// `[mm:ss]` citations open the transcript at that time.
 struct AIPanelView: View {
     let model: AppModel
     @State private var transcript: Transcript?
     @State private var summary: String?
     @State private var chat: [ChatLog.Message] = []
     @State private var question = ""
-    @State private var modelDraft = ""
     @State private var toast: String?
     /// A web link from model output, opened only once its destination is confirmed.
     @State private var pendingLink: URL?
@@ -21,23 +21,22 @@ struct AIPanelView: View {
 
     var body: some View {
         VStack(spacing: 10) {
-            header
-            ScrollViewReader { proxy in
-                ScrollView {
-                    VStack(spacing: 10) {
-                        summaryCard.id(AppModel.AIFocus.summary)
-                        chatCard
-                        Color.clear.frame(height: 1).id(Self.chatEnd)
-                    }
-                }
-                .onAppear { scroll(proxy, to: model.aiFocus) }
-                .onChange(of: model.aiFocus) { _, focus in scroll(proxy, to: focus) }
-                .onChange(of: chat.count) { _, _ in
-                    if model.aiFocus == .chat { proxy.scrollTo(Self.chatEnd, anchor: .bottom) }
-                }
-                .onChange(of: questionJob?.text.count) { _, _ in proxy.scrollTo(Self.chatEnd, anchor: .bottom) }
+            Picker("AI", selection: tabBinding) {
+                Text("Chat").tag(AppModel.AIFocus.chat)
+                Text("Summary").tag(AppModel.AIFocus.summary)
             }
-            inputBar
+            .pickerStyle(.segmented)
+            .labelsHidden()
+            .fixedSize()
+            ZStack {
+                switch model.aiFocus {
+                case .chat: chatPane
+                case .summary: summaryPane
+                }
+            }
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            errorText
+            bottomBar
         }
         .padding(12)
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
@@ -56,9 +55,6 @@ struct AIPanelView: View {
         .task { model.refreshInstalledModels() }
         .task(id: LoadKey(id: conversation?.id, hasTranscript: conversation?.hasTranscript ?? false,
                           jobsEnded: model.aiJobsEnded)) { await load() }
-        .onChange(of: model.currentAIProvider?.id, initial: true) { _, _ in
-            modelDraft = model.currentAIProvider.map(model.aiModel(for:)) ?? ""
-        }
     }
 
     private struct LoadKey: Equatable {
@@ -67,165 +63,46 @@ struct AIPanelView: View {
         let jobsEnded: Int
     }
 
-    // MARK: - Header
-
-    private var header: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            Picker("Conversation", selection: conversationBinding) {
-                ForEach(conversations) { Text($0.title).tag(Optional($0.id)) }
-            }
-            HStack(spacing: 10) {
-                providerMenu
-                if let provider = model.currentAIProvider, provider.kind != .inApp {
-                    TextField("Model", text: $modelDraft, prompt: Text(provider.kind == .cli ? "Default" : "Model id"))
-                        .textFieldStyle(.roundedBorder)
-                        .frame(maxWidth: 200)
-                }
-                Spacer(minLength: 0)
-                Picker("Language", selection: languageBinding) {
-                    Text("Auto").tag("auto")
-                    Text("English").tag("en")
-                    Text("French").tag("fr")
-                    Text("Vietnamese").tag("vi")
-                    if !["auto", "en", "fr", "vi"].contains(model.settings.summaryLanguage) {
-                        Text(model.settings.summaryLanguage).tag(model.settings.summaryLanguage)
-                    }
-                }
-                .fixedSize()
-                .help("Summary language (Auto = the transcript's language)")
-            }
-            hints
-                .font(.caption)
-                .foregroundStyle(.secondary)
-        }
-        .padding(.horizontal, 14)
-        .padding(.vertical, 10)
-        .modifier(GlassCard(cornerRadius: 20))
-    }
-
-    /// In-app and local-host models first, then cloud APIs and CLIs; Foundation Models shows why it cannot run.
-    private var providerMenu: some View {
-        let providers = model.aiProviders
-        return Menu {
-            Section("On this Mac") {
-                ForEach(providers.filter { !$0.leavesMac }) { providerItem($0) }
-            }
-            let remote = providers.filter(\.leavesMac)
-            if !remote.isEmpty {
-                Section("Cloud and CLIs") {
-                    ForEach(remote) { providerItem($0) }
-                }
-            }
-            Divider()
-            Button("Set up providers…") { model.openSettings(tab: .providers) }
-            Button("Download models…") { model.openSettings(tab: .transcription) }
-        } label: {
-            Label(model.currentAIProvider?.name ?? "No AI provider", systemImage: "cpu")
-        }
-        .fixedSize()
-        .help("Provider for summaries and questions")
-    }
-
-    private func providerItem(_ provider: AppModel.AIProvider) -> some View {
-        Toggle(isOn: Binding(
-            get: { model.currentAIProvider?.id == provider.id },
-            set: { if $0 { model.setAIProvider(provider.id) } }
-        )) {
-            Text(provider.name)
-            if let reason = provider.unavailableReason { Text(reason) }
-        }
-        .disabled(provider.unavailableReason != nil)
-    }
-
-    @ViewBuilder private var hints: some View {
-        let provider = model.currentAIProvider
-        if provider == nil {
-            Label("No AI provider: set one up in Settings › AI & Cloud, or download a model in Settings › Transcription.",
-                  systemImage: "exclamationmark.triangle")
-            if let reason = AppModel.foundationModelsUnavailableReason {
-                Label(reason, systemImage: "info.circle")
-            }
-        }
-        if let provider, provider.leavesMac {
-            Label("Data sent to \(provider.name) leaves this Mac.", systemImage: "info.circle")
-        }
-        if let note = provider?.cliPreset.flatMap(CLIRunner.containmentNote(for:)) {
-            Label(note, systemImage: "exclamationmark.shield")
-        }
-    }
-
-    // MARK: - Summary
-
-    private var summaryCard: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            HStack {
-                Text("Summary").font(.headline)
-                Spacer()
-                if summaryJob != nil { ProgressView().controlSize(.small) }
-                Button(summary == nil ? "Generate" : "Regenerate") { start(.summary) }
-                    .disabled(!canRun)
-            }
-            if let job = summaryJob {
-                if let status = job.status {
-                    Text(status).foregroundStyle(.secondary)
-                }
-                MarkdownText(text: job.text, isStreaming: true)
-            } else if let summary {
-                MarkdownText(text: summary)
-            } else {
-                Text(emptyNote ?? "No summary yet.").foregroundStyle(.secondary)
-            }
-            errorText
-        }
-        .padding(.horizontal, 14)
-        .padding(.vertical, 10)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .modifier(GlassCard(cornerRadius: 20))
-    }
-
-    /// Why nothing can run for this conversation.
-    private var emptyNote: String? {
-        guard let conversation else { return "No transcribed conversation yet." }
-        return conversation.hasTranscript ? nil : "This conversation has no transcript yet."
-    }
-
-    @ViewBuilder private var errorText: some View {
-        if let error = model.aiError, error.conversationID == conversation?.id {
-            Text(error.message)
-                .font(.callout)
-                .foregroundStyle(.red)
-                .lineLimit(4)
-        }
+    private var tabBinding: Binding<AppModel.AIFocus> {
+        Binding(get: { model.aiFocus }, set: { model.aiFocus = $0 })
     }
 
     // MARK: - Chat
 
-    private var chatCard: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            Text("Chat").font(.headline)
-            if chat.isEmpty && questionJob == nil {
-                Text("Ask a question about this conversation below.").foregroundStyle(.secondary)
-            }
-            ForEach(Array(chat.enumerated()), id: \.offset) { _, message in
-                messageView(message.role, text: message.text, model: message.model)
-            }
-            if let job = questionJob, case .question(let asked) = job.kind {
-                messageView(.user, text: asked, model: nil)
-                if job.text.isEmpty {
-                    HStack(spacing: 6) {
-                        ProgressView().controlSize(.small)
-                        if let status = job.status {
-                            Text(status).foregroundStyle(.secondary)
+    private var chatPane: some View {
+        ScrollViewReader { proxy in
+            ScrollView {
+                VStack(alignment: .leading, spacing: 10) {
+                    if chat.isEmpty && questionJob == nil {
+                        Text(emptyNote ?? "Ask a question about this conversation below.")
+                            .foregroundStyle(.secondary)
+                    }
+                    ForEach(Array(chat.enumerated()), id: \.offset) { _, message in
+                        messageView(message.role, text: message.text, model: message.model)
+                    }
+                    if let job = questionJob, case .question(let asked) = job.kind {
+                        messageView(.user, text: asked, model: nil)
+                        if job.text.isEmpty {
+                            HStack(spacing: 6) {
+                                ProgressView().controlSize(.small)
+                                if let status = job.status {
+                                    Text(status).foregroundStyle(.secondary)
+                                }
+                            }
+                        } else {
+                            messageView(.assistant, text: job.text, model: currentModel, isStreaming: true)
                         }
                     }
-                } else {
-                    messageView(.assistant, text: job.text, model: modelDraft, isStreaming: true)
+                    Color.clear.frame(height: 1).id(Self.chatEnd)
                 }
+                .padding(.horizontal, 14)
+                .padding(.vertical, 10)
             }
+            .onAppear { proxy.scrollTo(Self.chatEnd, anchor: .bottom) }
+            .onChange(of: chat.count) { _, _ in proxy.scrollTo(Self.chatEnd, anchor: .bottom) }
+            .onChange(of: questionJob?.text.count) { _, _ in proxy.scrollTo(Self.chatEnd, anchor: .bottom) }
         }
-        .padding(.horizontal, 14)
-        .padding(.vertical, 10)
-        .frame(maxWidth: .infinity, alignment: .leading)
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         .modifier(GlassCard(cornerRadius: 20))
     }
 
@@ -248,26 +125,227 @@ struct AIPanelView: View {
         }
     }
 
-    // MARK: - Input
+    // MARK: - Summary
 
-    private var inputBar: some View {
-        HStack(spacing: 12) {
-            TextField("Ask about this conversation", text: $question)
-                .textFieldStyle(.plain)
-                .onSubmit(ask)
-            if model.aiJob != nil {
-                iconButton("Cancel", systemImage: "stop.circle", action: model.cancelAIJob)
-            } else {
-                iconButton("Ask", systemImage: "paperplane", action: ask)
-                    .disabled(!canRun || question.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+    private var summaryPane: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 8) {
+                if let job = summaryJob {
+                    if let status = job.status {
+                        Text(status).foregroundStyle(.secondary)
+                    }
+                    MarkdownText(text: job.text, isStreaming: true)
+                } else if let summary {
+                    MarkdownText(text: summary)
+                } else {
+                    Text(emptyNote ?? "No summary yet.").foregroundStyle(.secondary)
+                }
             }
-            iconButton("Copy as prompt", systemImage: "doc.on.clipboard", action: copyPrompt)
-                .disabled(transcript == nil)
-                .help("Copy the transcript and the question as a prompt for any chat app")
+            .padding(.horizontal, 14)
+            .padding(.vertical, 10)
+            .frame(maxWidth: .infinity, alignment: .leading)
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+        .modifier(GlassCard(cornerRadius: 20))
+    }
+
+    /// Why nothing can run for this conversation.
+    private var emptyNote: String? {
+        guard let conversation else { return "No transcribed conversation yet." }
+        return conversation.hasTranscript ? nil : "This conversation has no transcript yet."
+    }
+
+    @ViewBuilder private var errorText: some View {
+        if let error = model.aiError, error.conversationID == conversation?.id {
+            Text(error.message)
+                .font(.callout)
+                .foregroundStyle(.red)
+                .lineLimit(4)
+                .frame(maxWidth: .infinity, alignment: .leading)
+        }
+    }
+
+    // MARK: - Bottom bar
+
+    /// The tab's actions, then the small menus and any notice about where the data goes.
+    private var bottomBar: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            busyElsewhere
+            HStack(spacing: 12) {
+                switch model.aiFocus {
+                case .chat:
+                    TextField("Ask about this conversation", text: $question)
+                        .textFieldStyle(.plain)
+                        .onSubmit(ask)
+                    copyButton
+                    if questionJob != nil {
+                        iconButton("Cancel", systemImage: "stop.circle", action: model.cancelAIJob)
+                    } else {
+                        iconButton("Ask", systemImage: "paperplane", action: ask)
+                            .disabled(!canRun || question.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                    }
+                case .summary:
+                    if summaryJob != nil {
+                        ProgressView().controlSize(.small)
+                    }
+                    Spacer(minLength: 0)
+                    copyButton
+                    if summaryJob != nil {
+                        Button("Cancel", action: model.cancelAIJob)
+                    } else {
+                        Button(summary == nil ? "Generate" : "Regenerate") { start(.summary) }
+                            .disabled(!canRun)
+                    }
+                }
+            }
+            HStack(spacing: 2) {
+                conversationMenu
+                modelMenu
+                languageMenu
+                Spacer(minLength: 0)
+            }
+            hints
+                .font(.caption)
+                .foregroundStyle(.secondary)
         }
         .padding(.horizontal, 14)
         .padding(.vertical, 10)
         .modifier(GlassCard(cornerRadius: 20))
+    }
+
+    /// A job of another conversation or of the other tab: it blocks Ask and Generate until it ends, so it says what
+    /// runs and can be cancelled from here.
+    @ViewBuilder private var busyElsewhere: some View {
+        if let job = model.aiJob, (model.aiFocus == .chat ? questionJob : summaryJob) == nil {
+            let title = model.conversations.first { $0.id == job.conversationID }?.title ?? "another conversation"
+            HStack(spacing: 6) {
+                ProgressView().controlSize(.small)
+                Text(job.kind == .summary ? "Summarizing \(title)…" : "Answering about \(title)…")
+                    .lineLimit(1)
+                    .truncationMode(.middle)
+                Spacer(minLength: 0)
+                Button("Cancel", action: model.cancelAIJob)
+                    .controlSize(.small)
+            }
+            .font(.caption)
+            .foregroundStyle(.secondary)
+        }
+    }
+
+    private var copyButton: some View {
+        iconButton("Copy as prompt", systemImage: "doc.on.clipboard", action: copyPrompt)
+            .disabled(transcript == nil)
+            .help(model.aiFocus == .chat
+                  ? "Copy the transcript and the question as a prompt for any chat app"
+                  : "Copy the transcript as a summary prompt for any chat app")
+    }
+
+    private var conversationMenu: some View {
+        Menu {
+            Picker("Conversation", selection: conversationBinding) {
+                ForEach(conversations) { Text($0.title).tag(Optional($0.id)) }
+            }
+            .pickerStyle(.inline)
+            .labelsHidden()
+        } label: {
+            menuLabel(conversation?.title ?? "No conversation", systemImage: "text.bubble")
+        }
+        .modifier(CompactMenu(maxWidth: 130))
+        .help("Conversation")
+    }
+
+    /// Every provider with the models it offers, on this Mac first; Foundation Models shows why it cannot run.
+    private var modelMenu: some View {
+        let providers = model.aiProviders
+        let inApp = providers.filter { $0.kind == .inApp }
+        let hosts = providers.filter { $0.kind != .inApp && !$0.leavesMac } + providers.filter(\.leavesMac)
+        return Menu {
+            if !inApp.isEmpty {
+                Section("On this Mac") {
+                    ForEach(inApp) { provider in modelItem(provider, provider.defaultModel, title: provider.name) }
+                }
+            }
+            ForEach(hosts) { provider in
+                Section(provider.leavesMac ? "\(provider.name) (leaves this Mac)" : provider.name) {
+                    if provider.models.isEmpty {
+                        Text("No model: choose one in Settings")
+                    }
+                    ForEach(provider.models, id: \.self) { id in
+                        modelItem(provider, id, title: id.isEmpty ? "Default" : id)
+                    }
+                }
+            }
+            Divider()
+            Button("Choose Models…") { model.openSettings(tab: .providers) }
+        } label: {
+            menuLabel(modelTitle, systemImage: "cpu")
+        }
+        .modifier(CompactMenu(maxWidth: 220))
+        .layoutPriority(1)
+        .help("Model for summaries and questions")
+    }
+
+    private func modelItem(_ provider: AppModel.AIProvider, _ id: String, title: String) -> some View {
+        Toggle(isOn: Binding(
+            get: { model.currentAIProvider?.id == provider.id && currentModel == id },
+            set: { if $0 { model.setAIModel(id, of: provider) } }
+        )) {
+            Text(title)
+            if let reason = provider.unavailableReason { Text(reason) }
+        }
+        .disabled(provider.unavailableReason != nil)
+    }
+
+    private var modelTitle: String {
+        guard let provider = model.currentAIProvider else { return "No AI model" }
+        guard provider.kind != .inApp else { return provider.name }
+        let id = currentModel ?? ""
+        return "\(provider.name) · \(id.isEmpty ? "Default" : id)"
+    }
+
+    private var languageMenu: some View {
+        Menu {
+            Picker("Language", selection: languageBinding) {
+                Text("Auto").tag("auto")
+                Text("English").tag("en")
+                Text("French").tag("fr")
+                Text("Vietnamese").tag("vi")
+                if !["auto", "en", "fr", "vi"].contains(model.settings.summaryLanguage) {
+                    Text(model.settings.summaryLanguage).tag(model.settings.summaryLanguage)
+                }
+            }
+            .pickerStyle(.inline)
+            .labelsHidden()
+        } label: {
+            menuLabel(LanguageOptions.name(model.settings.summaryLanguage), systemImage: "globe")
+        }
+        .modifier(CompactMenu(maxWidth: nil))
+        .help("Language of summaries and answers (Auto = the transcript's language for summaries, the question's for answers)")
+    }
+
+    private func menuLabel(_ title: String, systemImage: String) -> some View {
+        Label {
+            Text(title).lineLimit(1).truncationMode(.middle)
+        } icon: {
+            Image(systemName: systemImage)
+        }
+    }
+
+    @ViewBuilder private var hints: some View {
+        let provider = model.currentAIProvider
+        if provider == nil {
+            Label("No AI model: set up a provider or download a model in Settings › AI & Cloud.",
+                  systemImage: "exclamationmark.triangle")
+            if let reason = AppModel.foundationModelsUnavailableReason {
+                Label(reason, systemImage: "info.circle")
+            }
+        }
+        if let provider, provider.leavesMac {
+            Label("Data sent to \(provider.name) leaves this Mac.", systemImage: "info.circle")
+        }
+        if let note = provider?.cliPreset.flatMap(CLIRunner.containmentNote(for:)) {
+            Label(note, systemImage: "exclamationmark.shield")
+        }
     }
 
     private func iconButton(_ title: String, systemImage: String, action: @escaping () -> Void) -> some View {
@@ -287,7 +365,7 @@ struct AIPanelView: View {
                 .padding(.horizontal, 14)
                 .padding(.vertical, 8)
                 .modifier(GlassCard(cornerRadius: 14))
-                .padding(.bottom, 70)
+                .padding(.bottom, 110)
                 .transition(.opacity)
         }
     }
@@ -313,6 +391,11 @@ struct AIPanelView: View {
         Binding(get: { model.settings.summaryLanguage }, set: { value in model.updateSettings { $0.summaryLanguage = value } })
     }
 
+    /// The current provider's picked model ("" = a CLI's own default).
+    private var currentModel: String? {
+        model.currentAIProvider.map(model.aiModel(for:))
+    }
+
     private var summaryJob: AppModel.AIJob? {
         guard let job = model.aiJob, job.conversationID == conversation?.id, job.kind == .summary else { return nil }
         return job
@@ -325,14 +408,6 @@ struct AIPanelView: View {
 
     private var canRun: Bool {
         model.aiJob == nil && transcript != nil && model.currentAIProvider != nil
-    }
-
-    private func scroll(_ proxy: ScrollViewProxy, to focus: AppModel.AIFocus) {
-        if focus == .summary {
-            proxy.scrollTo(AppModel.AIFocus.summary, anchor: .top)
-        } else {
-            proxy.scrollTo(Self.chatEnd, anchor: .bottom)
-        }
     }
 
     private func load() async {
@@ -351,13 +426,12 @@ struct AIPanelView: View {
         guard let conversation, let transcript, let provider = model.currentAIProvider else { return }
         model.startAIJob(
             kind, conversation: conversation, transcript: transcript, summary: summary, history: chat,
-            provider: provider, model: modelDraft)
+            provider: provider, model: model.aiModel(for: provider))
     }
 
     private func ask() {
         let text = question.trimmingCharacters(in: .whitespacesAndNewlines)
         guard canRun, !text.isEmpty else { return }
-        model.aiFocus = .chat
         start(.question(text))
         question = ""
     }
@@ -365,8 +439,8 @@ struct AIPanelView: View {
     private func copyPrompt() {
         guard let conversation, let transcript else { return }
         let prompt = PromptBuilder.copyPrompt(
-            conversation: conversation, transcript: transcript, question: question,
-            language: OutputLanguage.resolve(setting: model.settings.summaryLanguage, transcript: transcript))
+            conversation: conversation, transcript: transcript, question: model.aiFocus == .chat ? question : nil,
+            languageSetting: model.settings.summaryLanguage)
         // Transient (nspasteboard.org) and this Mac only: clipboard managers and Universal Clipboard skip the transcript.
         let pasteboard = NSPasteboard.general
         let transient = NSPasteboard.PasteboardType("org.nspasteboard.TransientType")
@@ -395,6 +469,24 @@ struct AIPanelView: View {
         guard ["http", "https"].contains(url.scheme?.lowercased() ?? "") else { return .discarded }
         pendingLink = url
         return .handled
+    }
+}
+
+/// A small borderless menu of the AI pane's bottom bar: its title's width, a long one cut to `maxWidth` (never cut
+/// without one).
+private struct CompactMenu: ViewModifier {
+    let maxWidth: CGFloat?
+
+    func body(content: Content) -> some View {
+        let menu = content
+            .menuStyle(.borderlessButton)
+            .font(.caption)
+            .foregroundStyle(.secondary)
+        if let maxWidth {
+            menu.frame(maxWidth: maxWidth, alignment: .leading).fixedSize(horizontal: false, vertical: true)
+        } else {
+            menu.fixedSize()
+        }
     }
 }
 

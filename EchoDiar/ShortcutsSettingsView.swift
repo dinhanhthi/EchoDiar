@@ -10,7 +10,9 @@ struct ShortcutsSettingsView: View {
     static let inAppShortcuts: [(action: String, keys: String)] = [
         ("Record / Stop", "⌘R"),
         ("Pause / Resume", "⇧⌘P"),
-        ("Show AI / Library", "⌘I"),
+        ("Show the recording", "⌘1"),
+        ("Show the recordings", "⌘2"),
+        ("Show AI / back", "⌘I"),
         ("Search conversations", "⌘F"),
         ("Settings", "⌘,"),
         ("Back to the library", "Esc"),

@@ -46,10 +46,10 @@ public actor AIService {
 
     /// Streams the answer to `question`, sent with the transcript (or its BM25 excerpts on small contexts), the saved
     /// `summary` and the last messages of `history`; then appends the question and the answer to `chat.json`.
-    /// `providerID` is saved with the answer.
+    /// `providerID` is saved with the answer. `language` is the response-language setting (`"auto"` = the question's).
     public nonisolated func ask(
         question: String, conversation: Conversation, transcript: Transcript, summary: String?,
-        history: [ChatLog.Message], provider: any LLMProvider, providerID: String, model: String
+        history: [ChatLog.Message], provider: any LLMProvider, providerID: String, model: String, language: String
     ) -> AsyncThrowingStream<Update, Error> {
         let asked = Date()
         return job(provider: provider, model: model) { [self] backend, yield in
@@ -57,13 +57,18 @@ public actor AIService {
             let turns = history.suffix(Self.historyLimit).drop { $0.role != .user }.map {
                 LLMMessage(role: $0.role == .user ? .user : .assistant, content: $0.text)
             }
+            var language = OutputLanguage.answer(setting: language)
+            if #available(macOS 26, *), let foundation = provider as? AppleFoundationModelProvider,
+               let asked = language, !foundation.supports(language: asked.code) {
+                language = asked.englishFallback()
+            }
             let context = await provider.contextWindow(model: model)
             let excerpts = TranscriptChunker.questionExcerpts(
                 conversation: conversation, transcript: transcript, question: question, summary: summary,
-                contextWindow: context, history: turns)
+                contextWindow: context, history: turns, language: language)
             let messages = PromptBuilder.questionMessages(
                 conversation: conversation, transcript: transcript, excerpts: excerpts, summary: summary,
-                question: question, history: turns)
+                question: question, history: turns, language: language)
             let answer = try await Self.answer(messages, backend: backend, model: model, context: context, yield: yield)
             try Task.checkCancellation()
             try await appendChat([

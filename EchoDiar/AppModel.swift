@@ -17,7 +17,8 @@ import os
 @MainActor
 @Observable
 final class AppModel {
-    enum Tab { case library, ai }
+    /// The main window's pages: the open recording (only while recording), the library and the AI pane.
+    enum Tab { case live, library, ai }
 
     /// DEBUG harness launch args handled here; they skip onboarding and auto-queued work.
     static let harnessArguments: Set<String> = [
@@ -72,7 +73,7 @@ final class AppModel {
     private(set) var aiError: (conversationID: UUID, message: String)?
     /// Bumped when an AI job ends, so the AI tab reloads `summary.md` and `chat.json`.
     private(set) var aiJobsEnded = 0
-    /// Where the AI tab scrolls to when a card opens it.
+    /// The AI pane's tab: chat or summary.
     var aiFocus: AIFocus = .chat
     /// Recording time of the last clicked citation, for the opened transcript.
     var pendingTranscriptTime: Double?
@@ -134,6 +135,8 @@ final class AppModel {
         let kind: Kind
         /// The config's model; the entry id for in-app models.
         let defaultModel: String
+        /// What the model menu offers: `defaultModel` then the config's `shownModels`; "" is a CLI's own default.
+        var models: [String] = []
         /// Why it cannot run now (Foundation Models); nil when it can.
         var unavailableReason: String?
         var cliPreset: CLIPreset?
@@ -423,7 +426,14 @@ final class AppModel {
         Task { [weak self, engine] in
             for await snapshot in engine.snapshots {
                 guard let self else { return }
+                let wasRecording = isRecording
                 self.snapshot = snapshot
+                // A new recording opens its page; the library replaces it once it ends.
+                if !wasRecording && isRecording {
+                    selectedTab = .live
+                } else if wasRecording && !isRecording && selectedTab == .live {
+                    selectedTab = .library
+                }
                 micRoutesLost(snapshot.micRoutesLost)
                 if snapshot.state == .idle, let reason = snapshot.endReason {
                     endEndWatch()
@@ -1021,10 +1031,11 @@ extension AppModel {
         for entry in ModelCatalog.llm {
             if entry.runtime == .foundationModels {
                 providers.append(AIProvider(
-                    id: entry.id, name: entry.displayName, kind: .inApp, defaultModel: entry.id,
+                    id: entry.id, name: entry.displayName, kind: .inApp, defaultModel: entry.id, models: [entry.id],
                     unavailableReason: Self.foundationModelsUnavailableReason))
             } else if entry.runtime == .mlx, installedModelIDs.contains(entry.id) {
-                providers.append(AIProvider(id: entry.id, name: entry.displayName, kind: .inApp, defaultModel: entry.id))
+                providers.append(AIProvider(
+                    id: entry.id, name: entry.displayName, kind: .inApp, defaultModel: entry.id, models: [entry.id]))
             }
         }
         for config in providerConfigs where config.enabled && config.kind != .speechToText {
@@ -1038,8 +1049,19 @@ extension AppModel {
                 guard !config.baseURL.trimmingCharacters(in: .whitespaces).isEmpty,
                       config.authStyle == .none || hasSavedKey(config.id) else { continue }
             }
+            var models: [String] = []
+            for id in [config.defaultModel] + config.shownModels {
+                let id = id.trimmingCharacters(in: .whitespaces)
+                if !id.isEmpty && !models.contains(id) { models.append(id) }
+            }
+            if kind == .cli && config.defaultModel.trimmingCharacters(in: .whitespaces).isEmpty { models.insert("", at: 0) }
+            // The picked model stays listed, also once it is unchecked in Settings or was typed before the menu existed.
+            if config.id == settings.defaultAIProviderID, let saved = settings.defaultAIModel, !saved.isEmpty,
+               !models.contains(saved) {
+                models.append(saved)
+            }
             providers.append(AIProvider(
-                id: config.id, name: config.displayName, kind: kind, defaultModel: config.defaultModel,
+                id: config.id, name: config.displayName, kind: kind, defaultModel: config.defaultModel, models: models,
                 cliPreset: kind == .cli ? CLIPreset(rawValue: config.preset ?? "") : nil,
                 remoteHost: kind == .localHost && !AIProvider.isLoopback(baseURL: config.baseURL)))
         }
@@ -1063,10 +1085,11 @@ extension AppModel {
         return provider.defaultModel
     }
 
-    func setAIProvider(_ id: String) {
+    /// The model menu's pick: `model` of `provider` for the next summaries and questions.
+    func setAIModel(_ model: String, of provider: AIProvider) {
         updateSettings {
-            $0.defaultAIProviderID = id
-            $0.defaultAIModel = nil
+            $0.defaultAIProviderID = provider.id
+            $0.defaultAIModel = model == provider.defaultModel ? nil : model
         }
     }
 
@@ -1111,7 +1134,8 @@ extension AppModel {
         case .question(let question):
             aiService.ask(
                 question: question, conversation: conversation, transcript: transcript, summary: summary,
-                history: history, provider: client, providerID: provider.id, model: model)
+                history: history, provider: client, providerID: provider.id, model: model,
+                language: settings.summaryLanguage)
         }
         let task = Task { [weak self] in
             do {
@@ -1357,6 +1381,8 @@ extension AppModel {
         var audible = false
         /// The last `.systemAudible` fed.
         var systemAudible = false
+        /// The last `.paused` fed.
+        var paused = false
         /// The meeting app whose mic feeds `.sourceInputActive`: the recorded app, nil (any known one) for global.
         var meetingBundleID: String?
         /// The last `.sourceInputActive` fed; off is fed only after on.
@@ -1574,8 +1600,9 @@ extension AppModel {
         }
     }
 
-    /// Every second while recording: feeds `.audible` and `.systemAudible` from the writer's silence runs (paused
-    /// counts as silent: wall clock), evaluates, then stops once a still-shown end prompt's countdown is over.
+    /// Every second while recording: feeds `.audible` (paused counts as silent: wall clock), `.paused` and
+    /// `.systemAudible` from the writer's silence runs, evaluates, then stops once a still-shown end prompt's
+    /// countdown is over.
     private func endTick() {
         guard let watch = endWatch else { return }
         let now = Date()
@@ -1588,11 +1615,17 @@ extension AppModel {
             let since = audible || snapshot.state != .recording ? now : now.addingTimeInterval(-quiet)
             endWatch?.monitor.record(.audible(audible), at: since)
         }
+        let paused = snapshot.state != .recording
+        if paused != watch.paused {
+            endWatch?.paused = paused
+            endWatch?.monitor.record(.paused(paused), at: now)
+        }
+        // Not fed while paused: the call-ended trigger does not count a pause as silence.
         let systemQuiet = snapshot.systemSilentSeconds
-        let systemAudible = snapshot.state == .recording && systemQuiet < 2 && systemQuiet + 0.5 < snapshot.elapsed
-        if systemAudible != watch.systemAudible {
+        let systemAudible = systemQuiet < 2 && systemQuiet + 0.5 < snapshot.elapsed
+        if !paused, systemAudible != watch.systemAudible {
             endWatch?.systemAudible = systemAudible
-            let since = systemAudible || snapshot.state != .recording ? now : now.addingTimeInterval(-systemQuiet)
+            let since = systemAudible ? now : now.addingTimeInterval(-systemQuiet)
             endWatch?.monitor.record(.systemAudible(systemAudible), at: since)
         }
         evaluateEnd()

@@ -497,7 +497,8 @@ private struct TranscriptionModelField: View {
     }
 }
 
-/// Free-text model id; "Load models" fills a menu from the provider's `listModels()`.
+/// Free-text model id; "Load models" fills a menu from the provider's `listModels()` and a checklist of the models the
+/// AI pane's model menu offers besides this one (`ProviderConfig.shownModels`).
 private struct ModelField: View {
     let config: ProviderConfig
     let model: AppModel
@@ -507,6 +508,11 @@ private struct ModelField: View {
     @State private var models: [String]?
     @State private var loading = false
     @State private var error: String?
+    @State private var filter = ""
+    @State private var addedModel = ""
+
+    /// Above this many models the checklist scrolls and gets a filter field.
+    private static let longList = 8
 
     var body: some View {
         VStack(alignment: .leading, spacing: 4) {
@@ -531,7 +537,83 @@ private struct ModelField: View {
             } else if models?.isEmpty == true {
                 Text("No models listed; type the model id.").font(.caption).foregroundStyle(.secondary)
             }
+            shownModels
         }
+    }
+
+    /// The default model (always offered), the shown ones and the loaded ones, each with its checkbox.
+    @ViewBuilder private var shownModels: some View {
+        let defaultID = config.defaultModel.trimmingCharacters(in: .whitespaces)
+        let choices = Self.unique([defaultID] + config.shownModels + (models ?? []))
+        // Only while its field is shown: a filter left over from a longer list would hide checkboxes for good.
+        let term = choices.count > Self.longList ? filter.trimmingCharacters(in: .whitespaces) : ""
+        let shown = term.isEmpty ? choices : choices.filter { $0.localizedStandardContains(term) }
+        VStack(alignment: .leading, spacing: 4) {
+            Text("In the AI pane's model menu")
+            if choices.count > Self.longList {
+                TextField("Filter", text: $filter, prompt: Text("Filter models"))
+                    .labelsHidden()
+                    .textFieldStyle(.roundedBorder)
+                    .controlSize(.small)
+                ScrollView {
+                    checklist(shown, defaultID: defaultID)
+                }
+                .frame(height: 160)
+            } else {
+                checklist(shown, defaultID: defaultID)
+            }
+            TextField("Add a model", text: $addedModel, prompt: Text("Add a model id"))
+                .labelsHidden()
+                .textFieldStyle(.roundedBorder)
+                .controlSize(.small)
+                .frame(maxWidth: 220)
+                .onSubmit(addModel)
+            if models == nil {
+                Text("Type a model id and press Return, or load the models to pick from.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+        }
+    }
+
+    private func addModel() {
+        let id = addedModel.trimmingCharacters(in: .whitespacesAndNewlines)
+        addedModel = ""
+        guard !id.isEmpty else { return }
+        model.updateProvider(id: config.id) { config in
+            if !config.shownModels.contains(id) { config.shownModels.append(id) }
+        }
+    }
+
+    /// Non-empty ids, first occurrence kept.
+    private static func unique(_ ids: [String]) -> [String] {
+        var seen: [String] = []
+        for id in ids where !id.isEmpty && !seen.contains(id) { seen.append(id) }
+        return seen
+    }
+
+    private func checklist(_ ids: [String], defaultID: String) -> some View {
+        VStack(alignment: .leading, spacing: 2) {
+            ForEach(ids, id: \.self) { id in
+                Toggle(isOn: shownBinding(id, defaultID: defaultID)) {
+                    Text(id == defaultID ? "\(id) (default)" : id)
+                }
+                .toggleStyle(.checkbox)
+                .disabled(id == defaultID)
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    private func shownBinding(_ id: String, defaultID: String) -> Binding<Bool> {
+        Binding(
+            get: { id == defaultID || config.shownModels.contains(id) },
+            set: { isOn in
+                model.updateProvider(id: config.id) { config in
+                    config.shownModels.removeAll { $0 == id }
+                    if isOn { config.shownModels.append(id) }
+                }
+            })
     }
 
     private var modelBinding: Binding<String> {
