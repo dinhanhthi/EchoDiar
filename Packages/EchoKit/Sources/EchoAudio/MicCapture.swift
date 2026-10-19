@@ -170,7 +170,7 @@ public final class MicCapture: @unchecked Sendable {
         return AVAudioEngine()
     }
 
-    private static func deviceID(forUID uid: String) -> AudioDeviceID? {
+    static func deviceID(forUID uid: String) -> AudioDeviceID? {
         var address = AudioObjectPropertyAddress(
             mSelector: kAudioHardwarePropertyTranslateUIDToDevice,
             mScope: kAudioObjectPropertyScopeGlobal,

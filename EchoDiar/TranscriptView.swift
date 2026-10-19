@@ -23,6 +23,8 @@ struct TranscriptView: View {
     @State private var nameDraft = ""
     /// Language for the next Re-transcribe; "" keeps the recording's language markers.
     @State private var retranscribeLanguage = ""
+    /// The segment the list scrolls to, set by an AI citation; cleared once scrolled.
+    @State private var scrollTarget: UUID?
 
     var body: some View {
         VStack(spacing: 10) {
@@ -34,6 +36,7 @@ struct TranscriptView: View {
         .background(shortcutButtons)
         .task(id: conversation) { await load() }
         .task { model.refreshInstalledModels() }
+        .onChange(of: model.pendingTranscriptTime) { showPendingTime() }
         .onDisappear { playback.close() }
     }
 
@@ -279,8 +282,8 @@ struct TranscriptView: View {
 
     @ViewBuilder private var content: some View {
         if let transcript, !transcript.segments.isEmpty {
-            SegmentList(transcript: transcript, playback: playback)
-        } else if conversation.hasTranscript && transcript == nil && !loadFailed {
+            SegmentList(transcript: transcript, playback: playback, scrollTarget: $scrollTarget)
+        } else if loading {
             ProgressView().frame(maxHeight: .infinity)
         } else {
             VStack(spacing: 10) {
@@ -297,6 +300,8 @@ struct TranscriptView: View {
             .frame(maxHeight: .infinity)
         }
     }
+
+    private var loading: Bool { conversation.hasTranscript && transcript == nil && !loadFailed }
 
     private var emptyText: String {
         if loadFailed { return "The transcript could not be read." }
@@ -331,6 +336,21 @@ struct TranscriptView: View {
         speakers = loaded.map(Self.speakers) ?? []
         loadFailed = wantsTranscript && loaded == nil
         playback.load(url: audio, segments: loaded?.segments ?? [])
+        showPendingTime()
+    }
+
+    /// Takes the time of a clicked AI citation (`AppModel.pendingTranscriptTime`) once the transcript is loaded:
+    /// scrolls to the segment containing it (or the last one starting before it) and moves the play head there,
+    /// inside that segment so it is highlighted, without playing. Cleared even without segments, so a later
+    /// transcript does not jump to it.
+    private func showPendingTime() {
+        guard let time = model.pendingTranscriptTime, !loading else { return }
+        model.pendingTranscriptTime = nil
+        guard let segments = transcript?.segments,
+              let segment = segments.last(where: { $0.start <= time }) ?? segments.first
+        else { return }
+        playback.seek(to: min(max(time, segment.start), segment.end))
+        scrollTarget = segment.id
     }
 
     private func close() {
@@ -389,21 +409,29 @@ private struct PlaybackTime: View {
 private struct SegmentList: View {
     let transcript: Transcript
     let playback: PlaybackController
+    @Binding var scrollTarget: UUID?
 
     var body: some View {
         let active = playback.activeSegmentID
-        ScrollView {
-            LazyVStack(alignment: .leading, spacing: 2) {
-                ForEach(transcript.segments) { segment in
-                    SegmentRow(
-                        segment: segment, name: transcript.displayName(for: segment.speaker),
-                        active: segment.id == active
-                    ) {
-                        playback.play(from: segment.start)
+        ScrollViewReader { proxy in
+            ScrollView {
+                LazyVStack(alignment: .leading, spacing: 2) {
+                    ForEach(transcript.segments) { segment in
+                        SegmentRow(
+                            segment: segment, name: transcript.displayName(for: segment.speaker),
+                            active: segment.id == active
+                        ) {
+                            playback.play(from: segment.start)
+                        }
                     }
                 }
+                .padding(.vertical, 4)
             }
-            .padding(.vertical, 4)
+            .onChange(of: scrollTarget, initial: true) {
+                guard let scrollTarget else { return }
+                proxy.scrollTo(scrollTarget, anchor: .center)
+                self.scrollTarget = nil
+            }
         }
     }
 }

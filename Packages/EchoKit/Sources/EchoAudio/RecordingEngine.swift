@@ -93,6 +93,8 @@ public final class RecordingEngine: @unchecked Sendable {
         public var lowDisk = false
         public var micSilentSeconds: Double = 0
         public var systemSilentSeconds: Double = 0
+        /// Times the mic device in use disappeared during this recording (the mic moved to the default input).
+        public var micRoutesLost = 0
         /// Set on the snapshot published when a recording ends.
         public var endReason: EndReason?
 
@@ -135,26 +137,27 @@ public final class RecordingEngine: @unchecked Sendable {
 
     private let queue = DispatchQueue(label: "EchoDiar.RecordingEngine", qos: .userInitiated)
     private let queueKey = DispatchSpecificKey<Void>()
-    private let listenerQueue = DispatchQueue(label: "EchoDiar.RecordingEngine.output", qos: .utility)
     private let continuation: AsyncStream<Snapshot>.Continuation
     private let shared = Mutex(Shared())
     private let tap = ProcessTap()
     private let mic = MicCapture()
+    private let routes = AudioRouteMonitor()
 
     private var state = State.idle
     private var target = CaptureTarget.global
+    private var micDeviceUID: String?
     private var session: RecordingSession?
     private var folder: URL?
     private var writer: ChannelWriter?
     private var activity: (any NSObjectProtocol)?
     private var monitor: DispatchSourceTimer?
     private var ticks = 0
-    private var outputListener: AudioObjectPropertyListenerBlock?
     private var sessionGeneration: UInt64 = 0
     private var tapGeneration: UInt64 = 0
     private var micGeneration: UInt64 = 0
     private var lowDisk = false
     private var silentTapSuspected = false
+    private var micRoutesLost = 0
 
     public init() {
         (snapshots, continuation) = AsyncStream.makeStream(of: Snapshot.self, bufferingPolicy: .bufferingNewest(16))
@@ -168,11 +171,17 @@ public final class RecordingEngine: @unchecked Sendable {
     // MARK: - Public API
 
     /// Writes `session.json` before any IO, then starts the tap, the mic (silence if unavailable) and the writer.
-    /// Returns the session folder. Throws if the disk is nearly full or the tap cannot start.
+    /// Returns the session folder. Throws if the disk is nearly full or the tap cannot start; the folder is then removed.
+    /// `micDeviceUID` nil (or a device that is gone) records the default input.
     /// `probe` marks the session as recorded by the DEBUG `--capture-probe` harness.
     @discardableResult
-    public func start(target: CaptureTarget, language: String, root: URL = RecordingSession.conversationsRoot, probe: Bool = false) throws -> URL {
-        try onQueue { try startLocked(target: target, language: language, root: root, probe: probe) }
+    public func start(
+        target: CaptureTarget, language: String, micDeviceUID: String? = nil,
+        root: URL = RecordingSession.conversationsRoot, probe: Bool = false
+    ) throws -> URL {
+        try onQueue {
+            try startLocked(target: target, language: language, micDeviceUID: micDeviceUID, root: root, probe: probe)
+        }
     }
 
     /// Closes the tap and the mic (privacy indicator off) and pauses the writer.
@@ -228,21 +237,23 @@ public final class RecordingEngine: @unchecked Sendable {
         return try queue.sync(execute: body)
     }
 
-    private func startLocked(target: CaptureTarget, language: String, root: URL, probe: Bool) throws -> URL {
+    private func startLocked(target: CaptureTarget, language: String, micDeviceUID: String?, root: URL, probe: Bool) throws -> URL {
         guard state == .idle else { throw RecordingEngineError.alreadyRecording }
         try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
         let available = Self.availableCapacity(at: root)
         if let available, available < Self.minimumFreeBytes { throw RecordingEngineError.diskFull(availableBytes: available) }
         lowDisk = available.map { $0 < Self.lowDiskBytes } ?? false
         silentTapSuspected = false
+        micRoutesLost = 0
         self.target = target
+        self.micDeviceUID = micDeviceUID
 
         var session = RecordingSession(
             state: .recording,
             sourceApps: target.sourceApps,
             tapMode: target.tapMode,
             globalTapFallback: target.globalTapFallback,
-            micDeviceName: Self.defaultDeviceName(kAudioHardwarePropertyDefaultInputDevice),
+            micDeviceName: Self.inputDeviceName(uid: micDeviceUID),
             outputDeviceName: Self.defaultDeviceName(kAudioHardwarePropertyDefaultOutputDevice),
             languageMarkers: [.init(fileTime: 0, language: language)],
             probe: probe
@@ -254,7 +265,7 @@ public final class RecordingEngine: @unchecked Sendable {
         do {
             system = try startTap()
         } catch {
-            markFailed(session, in: folder)
+            discard(folder)
             throw error
         }
         let micSource = startMic()
@@ -273,7 +284,7 @@ public final class RecordingEngine: @unchecked Sendable {
         } catch {
             tap.stop()
             mic.stop()
-            markFailed(session, in: folder)
+            discard(folder)
             throw error
         }
 
@@ -283,7 +294,7 @@ public final class RecordingEngine: @unchecked Sendable {
         self.folder = folder
         self.writer = writer
         activity = ProcessInfo.processInfo.beginActivity(options: [.userInitiated, .idleSystemSleepDisabled], reason: "Recording meeting")
-        installOutputListener()
+        startRouteMonitor()
         startMonitor()
         shared.withLock {
             $0.writer = writer
@@ -321,6 +332,8 @@ public final class RecordingEngine: @unchecked Sendable {
         }
         writer.resume()
         closeOpenPause(&session)
+        // The input may have changed while paused (the swap is deferred to here).
+        session.micDeviceName = micSource.isLive ? Self.inputDeviceName(uid: micDeviceUID) : nil
         session.state = .recording
         state = .recording
         save(session)
@@ -335,7 +348,7 @@ public final class RecordingEngine: @unchecked Sendable {
         guard state != .idle, var session, let folder else { return nil }
         monitor?.cancel()
         monitor = nil
-        removeOutputListener()
+        routes.stop()
         tap.stop()
         mic.stop()
         var reason = reason
@@ -393,7 +406,7 @@ public final class RecordingEngine: @unchecked Sendable {
             guard let self else { return }
             self.queue.async { self.micChanged(generation: generation) }
         }
-        if (try? mic.start(deviceUID: nil)) != nil, let source = mic.currentSource {
+        if (try? mic.start(deviceUID: micDeviceUID)) != nil, let source = mic.currentSource {
             return (source.ring, ChannelWriter.SourceFormat(source.format), true)
         }
         mic.stop()
@@ -422,40 +435,42 @@ public final class RecordingEngine: @unchecked Sendable {
         shared.withLock { $0.micRing = source.ring }
     }
 
-    // MARK: - Default output device
+    // MARK: - Routes
 
-    private static var defaultOutputAddress: AudioObjectPropertyAddress {
-        AudioObjectPropertyAddress(
-            mSelector: kAudioHardwarePropertyDefaultOutputDevice,
-            mScope: kAudioObjectPropertyScopeGlobal,
-            mElement: kAudioObjectPropertyElementMain
-        )
-    }
-
-    private func installOutputListener() {
+    private func startRouteMonitor() {
         let generation = sessionGeneration
-        let listener: AudioObjectPropertyListenerBlock = { [weak self] _, _ in
+        routes.start(inputDeviceUID: micDeviceUID) { [weak self] event in
             guard let self else { return }
-            self.queue.async { self.outputDeviceChanged(generation: generation) }
-        }
-        var address = Self.defaultOutputAddress
-        if AudioObjectAddPropertyListenerBlock(AudioObjectID(kAudioObjectSystemObject), &address, listenerQueue, listener) == noErr {
-            outputListener = listener
+            self.queue.async { self.routeChanged(event, generation: generation) }
         }
     }
 
-    private func removeOutputListener() {
-        guard let listener = outputListener else { return }
-        var address = Self.defaultOutputAddress
-        _ = AudioObjectRemovePropertyListenerBlock(AudioObjectID(kAudioObjectSystemObject), &address, listenerQueue, listener)
-        outputListener = nil
-    }
-
-    private func outputDeviceChanged(generation: UInt64) {
+    private func routeChanged(_ event: AudioRouteMonitor.Event, generation: UInt64) {
         guard generation == sessionGeneration, var session else { return }
-        session.outputDeviceName = Self.defaultDeviceName(kAudioHardwarePropertyDefaultOutputDevice)
-        save(session)
-        rebuildTap(generation: tapGeneration)
+        switch event {
+        case .outputChanged:
+            session.outputDeviceName = Self.defaultDeviceName(kAudioHardwarePropertyDefaultOutputDevice)
+            save(session)
+            rebuildTap(generation: tapGeneration)
+        case .inputLost, .inputChanged:
+            if event == .inputLost {
+                micRoutesLost += 1
+                publish()
+            }
+            // While paused the mic is closed; resume opens the new device.
+            guard state == .recording, let writer else { return }
+            // `startMic` has closed the previous device either way.
+            let micSource = startMic()
+            if (try? writer.replaceRing(channel: .mic, ring: micSource.ring, format: micSource.format)) != nil {
+                shared.withLock { $0.micRing = micSource.ring }
+                session.micDeviceName = micSource.isLive ? Self.inputDeviceName(uid: micDeviceUID) : nil
+            } else {
+                // Not left open on a ring nothing reads: the mic channel pads silence, as with no mic.
+                mic.stop()
+                session.micDeviceName = nil
+            }
+            save(session)
+        }
     }
 
     // MARK: - Monitor (only while a session is open)
@@ -497,6 +512,7 @@ public final class RecordingEngine: @unchecked Sendable {
 
     private func publish(stats: ChannelWriter.Stats? = nil, endReason: EndReason? = nil) {
         var snapshot = Snapshot(state: state, globalTapFallback: target.globalTapFallback, lowDisk: lowDisk, endReason: endReason)
+        snapshot.micRoutesLost = micRoutesLost
         if let stats = stats ?? writer?.stats { snapshot.apply(stats) }
         shared.withLock { $0.snapshot = snapshot }
         continuation.yield(snapshot)
@@ -514,17 +530,22 @@ public final class RecordingEngine: @unchecked Sendable {
         try? session.write(to: folder)
     }
 
-    private func markFailed(_ session: RecordingSession, in folder: URL) {
-        var session = session
-        session.state = .failed
-        session.endReason = EndReason.captureFailed.rawValue
-        try? session.write(to: folder)
+    /// A start that failed before the writer ran has no audio: no conversation is left behind. A crash before this
+    /// point leaves `session.json` in `recording`, which launch recovery marks failed.
+    private func discard(_ folder: URL) {
+        try? FileManager.default.removeItem(at: folder)
     }
 
     private static func availableCapacity(at url: URL) -> Int64? {
         var url = url
         url.removeAllCachedResourceValues()
         return try? url.resourceValues(forKeys: [.volumeAvailableCapacityForImportantUsageKey]).volumeAvailableCapacityForImportantUsage
+    }
+
+    /// The picked device's name while it exists, else the default input's.
+    private static func inputDeviceName(uid: String?) -> String? {
+        if let uid, let device = MicCapture.deviceID(forUID: uid) { return deviceName(device) }
+        return defaultDeviceName(kAudioHardwarePropertyDefaultInputDevice)
     }
 
     private static func defaultDeviceName(_ selector: AudioObjectPropertySelector) -> String? {
@@ -537,9 +558,17 @@ public final class RecordingEngine: @unchecked Sendable {
         var size = UInt32(MemoryLayout<AudioDeviceID>.size)
         guard AudioObjectGetPropertyData(AudioObjectID(kAudioObjectSystemObject), &address, 0, nil, &size, &device) == noErr,
               device != kAudioObjectUnknown else { return nil }
-        address.mSelector = kAudioObjectPropertyName
+        return deviceName(device)
+    }
+
+    private static func deviceName(_ device: AudioDeviceID) -> String? {
+        var address = AudioObjectPropertyAddress(
+            mSelector: kAudioObjectPropertyName,
+            mScope: kAudioObjectPropertyScopeGlobal,
+            mElement: kAudioObjectPropertyElementMain
+        )
         var name: Unmanaged<CFString>?
-        size = UInt32(MemoryLayout<Unmanaged<CFString>?>.size)
+        var size = UInt32(MemoryLayout<Unmanaged<CFString>?>.size)
         guard AudioObjectGetPropertyData(device, &address, 0, nil, &size, &name) == noErr,
               let value = name?.takeRetainedValue() as String? else { return nil }
         return value

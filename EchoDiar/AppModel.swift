@@ -1,4 +1,5 @@
 import AppKit
+import CoreAudio
 #if DEBUG
 import AVFoundation
 #endif
@@ -75,6 +76,27 @@ final class AppModel {
     var aiFocus: AIFocus = .chat
     /// Recording time of the last clicked citation, for the opened transcript.
     var pendingTranscriptTime: Double?
+    /// The meeting app whose mic use was detected last (menu "Detected: Zoom"); nil once its mic is off.
+    private(set) var detectedMeeting: DetectedMeeting?
+    /// What the floating pill asks; nil = no question.
+    private(set) var pillPrompt: PillPrompt?
+    /// The app being recorded (`.app` targets), for the end prompt and the window anchor.
+    private(set) var sourceApp: SourceApp?
+    /// The app whose detection ("Always") started the recording: the pill shows "Recording <App>" for its first
+    /// 10 s even when the indicator is hidden.
+    private(set) var autoStartedAppName: String?
+
+    enum PillPrompt: Equatable {
+        case meetingDetected(DetectedMeeting)
+        /// The recording stops at `deadline` unless "Keep recording".
+        case meetingEnded(reason: MeetingEndMonitor.Reason, deadline: Date)
+    }
+
+    struct SourceApp: Equatable {
+        let name: String
+        /// `MeetingApp.appBundleID` for meeting apps, else the group's id; its quit ends the meeting.
+        let appBundleID: String
+    }
 
     struct PendingCloudRun {
         let providerID: String
@@ -143,8 +165,9 @@ final class AppModel {
 
     var isRecording: Bool { snapshot.state != .idle }
 
-    /// Its `currentLevels()` has a single consumer: the level meter in the main window.
+    /// Its `currentLevels()` has a single consumer: `levels`.
     @ObservationIgnored let engine: RecordingEngine
+    @ObservationIgnored let levels: LevelFeed
     @ObservationIgnored let library = LibraryStore()
     /// Created with the model so FluidAudio's offline mode is set before any model load.
     @ObservationIgnored let modelStore: ModelStore
@@ -162,11 +185,19 @@ final class AppModel {
     @ObservationIgnored private var languageCache: [String: [String]] = [:]
     @ObservationIgnored private var liveTranscriber: LiveTranscriber?
     @ObservationIgnored private var savedKeys: [String: Bool] = [:]
+    @ObservationIgnored private let meetingDetector = MeetingDetector()
+    @ObservationIgnored private let systemEvents = SystemEventsMonitor()
+    /// Created on the normal launch path only (not for the DEBUG harnesses).
+    @ObservationIgnored private var pill: FloatingPillController?
+    @ObservationIgnored private var endWatch: EndWatch?
+    @ObservationIgnored private var endWatchGeneration = 0
+    @ObservationIgnored private var autoStartNoticeTask: Task<Void, Never>?
 
     init(store: SettingsStore = SettingsStore()) {
         self.store = store
         let engine = RecordingEngine()
         self.engine = engine
+        levels = LevelFeed(engine: engine)
         snapshot = engine.currentSnapshot()
         let modelStore = ModelStore()
         self.modelStore = modelStore
@@ -197,7 +228,9 @@ final class AppModel {
                 return LanguageOptions.groups(
                     selection: recordingLanguage, recent: settings.recentLanguages, supported: supportedLanguages())
             },
-            setLanguage: { [weak self] in self?.setRecordingLanguage($0) })
+            setLanguage: { [weak self] in self?.setRecordingLanguage($0) },
+            detectedApp: { [weak self] in self?.detectedMeeting?.name },
+            stopAskingForDetectedApp: { [weak self] in self?.stopAskingForDetectedApp() })
 
         #if DEBUG
         if runTranscribeHarness() || runLiveTranscribeHarness() || runModelHarness() { return }
@@ -205,6 +238,7 @@ final class AppModel {
         guard ProcessInfo.processInfo.arguments.allSatisfy({ !Self.harnessArguments.contains($0) }) else { return }
         if !settings.onboardingCompleted { OnboardingWindow.shared.show(model: self) }
         observeTranscriptions()
+        startMeetingServices()
         Task {
             // Subscribed before the first refresh, whose emit would otherwise be missed.
             let changes = await library.changes()
@@ -239,15 +273,20 @@ final class AppModel {
             // Before the engine starts: it reads the sink at start, and the model loads meanwhile.
             if settings.liveTranscript { startLiveTranscript() }
             do {
-                activeFolder = try await Task.detached(priority: .userInitiated) { [engine] in
-                    try engine.start(target: Self.resolved(target), language: language)
+                let (folder, resolved) = try await Task.detached(priority: .userInitiated) {
+                    [engine, uid = settings.micDeviceUID] in
+                    let resolved = Self.resolved(target)
+                    return (try engine.start(target: resolved, language: language, micDeviceUID: uid), resolved)
                 }.value
+                activeFolder = folder
+                beginEndWatch(target: resolved)
             } catch {
                 // Not awaited: a first model load can take long, and no batch job follows a failed start.
                 let live = detachLiveTranscript()
                 Task { await live?.stop() }
                 NSLog("EchoDiar: could not start recording: \(error)")
-                recordingError = "The recording could not start (\(error))."
+                autoStartedAppName = nil
+                recordingError = Self.captureFailureMessage(error, action: "start")
             }
             isStarting = false
         }
@@ -305,7 +344,7 @@ final class AppModel {
             }.value
             if let failure {
                 NSLog("EchoDiar: could not resume recording: \(failure)")
-                recordingError = "The recording could not resume (\(failure))."
+                recordingError = Self.captureFailureMessage(failure, action: "resume")
             }
         }
     }
@@ -353,10 +392,15 @@ final class AppModel {
         }
     }
 
-    /// A picked app gets its current processes, which may have changed since the menu was built.
+    /// A picked app gets its current processes, which may have changed since the menu was built. On a miss the menu's
+    /// group is kept: `ProcessTap` skips its exited processes and throws `noProcesses` when none is left.
     nonisolated private static func resolved(_ target: CaptureTarget) -> CaptureTarget {
-        guard case .app(let group) = target,
-              let fresh = AudioProcessList.groups().first(where: { $0.bundleID == group.bundleID }) else { return target }
+        guard case .app(let group) = target else { return target }
+        let groups = AudioProcessList.groups()
+        guard let fresh = groups.first(where: { $0.bundleID == group.bundleID }) else {
+            NSLog("EchoDiar: \(group.bundleID) has no current audio process")
+            return target
+        }
         return .app(fresh)
     }
 
@@ -367,7 +411,9 @@ final class AppModel {
             for await snapshot in engine.snapshots {
                 guard let self else { return }
                 self.snapshot = snapshot
+                micRoutesLost(snapshot.micRoutesLost)
                 if snapshot.state == .idle, let reason = snapshot.endReason {
+                    endEndWatch()
                     languageOverride = nil
                     if let message = Self.stopMessage(reason) { recordingError = message }
                     let folder = activeFolder
@@ -390,6 +436,49 @@ final class AppModel {
         case .diskFull: "Recording stopped: disk is full."
         case .writeFailed: "Recording stopped: could not write audio."
         case .captureFailed: "Recording stopped: audio capture failed."
+        }
+    }
+
+    /// A readable sentence for a failed start or resume (`action`), with the error itself in parentheses.
+    private static func captureFailureMessage(_ error: any Error, action: String) -> String {
+        let sentence: String
+        switch error {
+        case ProcessTapError.noProcesses:
+            sentence = "The selected app stopped playing audio before recording could \(action)."
+        case RecordingEngineError.diskFull:
+            sentence = "There is not enough free disk space to record."
+        case ProcessTapError.unsupportedFormat:
+            sentence = "The system audio format is not supported."
+        case let error as ProcessTapError:
+            sentence = coreAudioSentence(error, action: action)
+        default:
+            sentence = "The recording could not \(action)."
+        }
+        return "\(sentence) (\(error))"
+    }
+
+    private static func coreAudioSentence(_ error: ProcessTapError, action: String) -> String {
+        let status: OSStatus
+        switch error {
+        case .createTap(let code), .createAggregateDevice(let code), .addFormatListener(let code),
+             .readFormat(let code), .createIOProc(let code), .startDevice(let code):
+            status = code
+        case .noProcesses, .unsupportedFormat:
+            return "The recording could not \(action)."
+        }
+        switch status {
+        case kAudioHardwareBadObjectError:
+            return "The selected app stopped playing audio before recording could \(action)."
+        case kAudioHardwareNotRunningError:
+            return "The audio system is not running. Try again in a moment."
+        case kAudioHardwareBadDeviceError:
+            return "The audio device changed while recording was starting. Try again."
+        case kAudioDevicePermissionsError:
+            return "Another app is using the audio device exclusively."
+        case kAudioHardwareIllegalOperationError:
+            return "macOS refused to capture system audio."
+        default:
+            return "The recording could not \(action)."
         }
     }
 
@@ -731,12 +820,14 @@ final class AppModel {
         var updated = settings
         change(&updated)
         guard updated != settings else { return }
+        let detectionChanged = updated.meetingDetection != settings.meetingDetection
         settings = updated
         do {
             try store.save(updated)
         } catch {
             NSLog("EchoDiar: could not save settings: \(error)")
         }
+        if detectionChanged { syncMeetingDetection() }
     }
 
     // MARK: - AI providers
@@ -1132,3 +1223,319 @@ extension AppModel {
     }
 }
 #endif
+
+// MARK: - Meetings
+
+extension AppModel {
+    /// The end monitor and its feeds for the recording in progress.
+    struct EndWatch {
+        var monitor: MeetingEndMonitor
+        /// Target pids still running; the last exit is `.sourceExited`.
+        var livePIDs: Set<pid_t> = []
+        var exitSources: [any DispatchSourceProcess] = []
+        var activity: ProcessActivityWatch?
+        var timer: Timer?
+        /// The last `.audible` fed (the monitor starts silent).
+        var audible = false
+        /// `Snapshot.micRoutesLost` already handled.
+        var routesLost = 0
+    }
+
+    /// The app the pill follows with "Attach to meeting window": the detected app while asking, else the recorded one.
+    var pillAppBundleID: String? {
+        if case .meetingDetected(let meeting)? = pillPrompt { return meeting.app.appBundleID }
+        return sourceApp?.appBundleID
+    }
+
+    /// "Record" and "Always for <App>" on the detection prompt: records the detected app's processes.
+    func recordDetectedMeeting(always: Bool = false) {
+        guard case .meetingDetected(let meeting)? = pillPrompt else { return }
+        pillPrompt = nil
+        // Never for browsers: any web page using the mic would start a recording.
+        if always, !meeting.app.isBrowser { updateSettings { $0.perAppBehavior[meeting.app.appBundleID] = .always } }
+        startRecording(target: .app(meeting.group))
+    }
+
+    /// "Not now" on the detection prompt.
+    func dismissMeetingPrompt() {
+        if case .meetingDetected? = pillPrompt { pillPrompt = nil }
+    }
+
+    /// The menu's "Stop asking for this app".
+    func stopAskingForDetectedApp() {
+        guard let meeting = detectedMeeting else { return }
+        updateSettings { $0.perAppBehavior[meeting.app.appBundleID] = .ignore }
+        detectedMeeting = nil
+        dismissMeetingPrompt()
+    }
+
+    /// "Keep recording" on the end prompt: that trigger stays quiet for 10 min.
+    func keepRecording() {
+        guard case .meetingEnded(let reason, _)? = pillPrompt else { return }
+        pillPrompt = nil
+        endWatch?.monitor.keepRecording(reason, now: Date())
+        evaluateEnd()
+    }
+
+    /// "Stop now" on the end prompt, the end of its countdown, and a lost mic with the "stop" route setting.
+    func stopFromEndPrompt() {
+        endEndWatch()
+        stopRecording()
+    }
+
+    /// The pill, sleep/lock/quit events and meeting detection; on the normal launch path only.
+    private func startMeetingServices() {
+        pill = FloatingPillController(model: self)
+        systemEvents.start { [weak self] in self?.systemEvent($0) }
+        Task { [weak self, meetingDetector] in
+            for await event in meetingDetector.events {
+                guard let self else { return }
+                switch event {
+                case .detected(let meeting): meetingDetected(meeting)
+                case .ended(let meeting): meetingEnded(meeting)
+                }
+            }
+        }
+        syncMeetingDetection()
+    }
+
+    /// Runs the detector while `meetingDetection` is on; off forgets the detected app and its prompt.
+    private func syncMeetingDetection() {
+        guard pill != nil else { return }
+        if settings.meetingDetection {
+            meetingDetector.start()
+        } else {
+            meetingDetector.stop()
+            detectedMeeting = nil
+            dismissMeetingPrompt()
+        }
+    }
+
+    /// "Ignore" apps are skipped; "Always" starts recording them (browsers still ask), else the pill asks. Nothing
+    /// starts while recording.
+    private func meetingDetected(_ meeting: DetectedMeeting) {
+        var behavior = settings.perAppBehavior[meeting.app.appBundleID] ?? .ask
+        guard behavior != .ignore else { return }
+        if behavior == .always, meeting.app.isBrowser { behavior = .ask }
+        detectedMeeting = meeting
+        guard !isRecording, !isStarting else { return }
+        if behavior == .always {
+            autoStartedAppName = meeting.name
+            startRecording(target: .app(meeting.group))
+        } else {
+            pillPrompt = .meetingDetected(meeting)
+        }
+    }
+
+    /// The app's mic is off (call over, or a muted web client): forget it and drop its prompt. Never an end signal.
+    private func meetingEnded(_ meeting: DetectedMeeting) {
+        guard detectedMeeting?.bundleID == meeting.bundleID else { return }
+        detectedMeeting = nil
+        if case .meetingDetected(let shown)? = pillPrompt, shown.bundleID == meeting.bundleID { pillPrompt = nil }
+    }
+
+    /// Starts the end monitor of the recording that just started: a ≤ 1 Hz evaluation timer and, for an app target,
+    /// its process exits and audio activity.
+    private func beginEndWatch(target: CaptureTarget) {
+        // The engine may already have stopped (disk full), its end snapshot handled.
+        let autoStarted = autoStartedAppName
+        guard engine.currentSnapshot().state != .idle else {
+            autoStartedAppName = nil
+            return
+        }
+        endEndWatch()
+        dismissMeetingPrompt()
+        endWatchGeneration += 1
+        let generation = endWatchGeneration
+        var watch = EndWatch(monitor: MeetingEndMonitor(configuration: settings.endMonitor, startedAt: Date()))
+        if case .app(let group) = target {
+            let app = MeetingApps.app(forBundleID: group.bundleID)
+            sourceApp = SourceApp(name: app?.name ?? group.name, appBundleID: app?.appBundleID ?? group.bundleID)
+            // Covers plain processes too (`afplay`), which `SystemEventsMonitor` does not see quit.
+            for pid in Set(group.processes.map(\.pid)) {
+                let source = DispatchSource.makeProcessSource(identifier: pid, eventMask: .exit, queue: .main)
+                source.setEventHandler { [weak self] in
+                    MainActor.assumeIsolated { self?.sourceProcessExited(pid, generation: generation) }
+                }
+                source.resume()
+                watch.exitSources.append(source)
+                // Checked once armed: a source on a pid that already died never fires.
+                if Self.isAlive(pid) { watch.livePIDs.insert(pid) }
+            }
+            watch.activity = ProcessActivityWatch(group: group) { [weak self] active in
+                Task { @MainActor in self?.recordEnd(.sourceActive(active), generation: generation) }
+            }
+        } else {
+            sourceApp = nil
+        }
+        let timer = Timer(timeInterval: 1, repeats: true) { [weak self] _ in
+            MainActor.assumeIsolated { self?.endTick() }
+        }
+        timer.tolerance = 0.25
+        RunLoop.main.add(timer, forMode: .common)
+        watch.timer = timer
+        let sourceGone = sourceApp != nil && watch.livePIDs.isEmpty
+        endWatch = watch
+        if let autoStarted { showAutoStartNotice(autoStarted) }
+        if sourceGone { recordEnd(.sourceExited) }
+    }
+
+    /// Stops the timer and the feeds, and drops the end prompt. Safe to call repeatedly.
+    private func endEndWatch() {
+        if let watch = endWatch {
+            watch.timer?.invalidate()
+            watch.exitSources.forEach { $0.cancel() }
+            watch.activity?.stop()
+        }
+        endWatch = nil
+        sourceApp = nil
+        autoStartNoticeTask?.cancel()
+        autoStartNoticeTask = nil
+        autoStartedAppName = nil
+        if case .meetingEnded? = pillPrompt { pillPrompt = nil }
+    }
+
+    /// Keeps "Recording <App>" on the pill for 10 s after an automatic start.
+    private func showAutoStartNotice(_ name: String) {
+        autoStartedAppName = name
+        autoStartNoticeTask?.cancel()
+        autoStartNoticeTask = Task { [weak self] in
+            try? await Task.sleep(for: .seconds(10))
+            guard !Task.isCancelled else { return }
+            self?.autoStartedAppName = nil
+        }
+    }
+
+    /// `generation` (from a feed armed by `beginEndWatch`) drops inputs meant for an earlier recording.
+    private func recordEnd(_ input: MeetingEndMonitor.Input, generation: Int? = nil) {
+        guard endWatch != nil, generation.map({ $0 == endWatchGeneration }) ?? true else { return }
+        endWatch?.monitor.record(input, at: Date())
+        evaluateEnd()
+    }
+
+    /// Shows or dismisses the end prompt, or stops now. A shown prompt keeps its deadline while its reason holds.
+    private func evaluateEnd() {
+        guard let watch = endWatch else { return }
+        let now = Date()
+        switch watch.monitor.evaluate(now: now) {
+        case .none:
+            if case .meetingEnded? = pillPrompt { pillPrompt = nil }
+        case .promptStop(let reason, let countdown):
+            if case .meetingEnded(reason, _)? = pillPrompt { return }
+            pillPrompt = .meetingEnded(reason: reason, deadline: now.addingTimeInterval(TimeInterval(countdown)))
+        case .stopNow(let reason):
+            NSLog("EchoDiar: recording stopped: \(reason.rawValue)")
+            endEndWatch()
+            // Synchronous: a `willSleep` handler has little time before the system sleeps.
+            engine.stop(reason: .user)
+        }
+    }
+
+    /// Every second while recording: feeds `.audible` from the writer's silence runs (paused counts as silent: wall
+    /// clock), evaluates, then stops once a still-shown end prompt's countdown is over.
+    private func endTick() {
+        guard let watch = endWatch else { return }
+        let now = Date()
+        let snapshot = engine.currentSnapshot()
+        let quiet = min(snapshot.micSilentSeconds, snapshot.systemSilentSeconds)
+        // A silence run as long as the recording means nothing rose above the floor yet.
+        let audible = snapshot.state == .recording && quiet < 2 && quiet + 0.5 < snapshot.elapsed
+        if audible != watch.audible {
+            endWatch?.audible = audible
+            let since = audible || snapshot.state != .recording ? now : now.addingTimeInterval(-quiet)
+            endWatch?.monitor.record(.audible(audible), at: since)
+        }
+        evaluateEnd()
+        // Only a prompt that still holds after the fresh inputs stops the recording.
+        if case .meetingEnded(_, let deadline)? = pillPrompt, now >= deadline {
+            stopFromEndPrompt()
+        }
+    }
+
+    private func sourceProcessExited(_ pid: pid_t, generation: Int) {
+        guard generation == endWatchGeneration, endWatch?.livePIDs.remove(pid) != nil,
+              endWatch?.livePIDs.isEmpty == true else { return }
+        recordEnd(.sourceExited)
+    }
+
+    /// A lost microphone, per `routeChangeBehavior`: ask through the end monitor, stop, or carry on.
+    private func micRoutesLost(_ count: Int) {
+        guard let watch = endWatch, count > watch.routesLost else { return }
+        endWatch?.routesLost = count
+        switch settings.routeChangeBehavior {
+        case .ask: recordEnd(.inputRouteLost)
+        case .stop: stopFromEndPrompt()
+        case .continue: break
+        }
+    }
+
+    private func systemEvent(_ event: SystemEventsMonitor.Event) {
+        switch event {
+        case .willSleep:
+            if endWatch != nil {
+                recordEnd(.systemSleep)
+            } else if engine.currentSnapshot().state != .idle {
+                // Started but its end watch not armed yet. Synchronous: little time before the system sleeps.
+                NSLog("EchoDiar: recording stopped: \(MeetingEndMonitor.Reason.systemSleep.rawValue)")
+                engine.stop(reason: .user)
+            }
+        case .screenLocked: recordEnd(.screenLocked(true))
+        case .screenUnlocked: recordEnd(.screenLocked(false))
+        case .didWake: break
+        case .appTerminated(_, let bundleID):
+            // FaceTime: the call runs in avconferenced, which never exits.
+            if let bundleID, bundleID == sourceApp?.appBundleID { recordEnd(.sourceExited) }
+        }
+    }
+
+    /// Alive, or alive but owned by another user.
+    nonisolated private static func isAlive(_ pid: pid_t) -> Bool {
+        kill(pid, 0) == 0 || errno == EPERM
+    }
+}
+
+/// The single reader of `RecordingEngine.currentLevels()`, whose peaks reset on each read, shared by the main
+/// window's meters and the pill's: it reads at 15 Hz only while a meter is shown.
+@MainActor
+@Observable
+final class LevelFeed {
+    private(set) var mic: Float = 0
+    private(set) var system: Float = 0
+    @ObservationIgnored private let engine: RecordingEngine
+    @ObservationIgnored private var readers = 0
+    @ObservationIgnored private var reader: Task<Void, Never>?
+
+    init(engine: RecordingEngine) {
+        self.engine = engine
+    }
+
+    /// Returns when the calling task is cancelled (a meter's `.task`); the feed reads while any caller waits here.
+    func attach() async {
+        readers += 1
+        if reader == nil {
+            reader = Task { [weak self, engine] in
+                while !Task.isCancelled {
+                    let levels = engine.currentLevels()
+                    self?.mic = levels.mic
+                    self?.system = levels.system
+                    try? await Task.sleep(for: .milliseconds(67))
+                }
+            }
+        }
+        while !Task.isCancelled {
+            try? await Task.sleep(for: .seconds(3_600))
+        }
+        readers -= 1
+        guard readers == 0 else { return }
+        reader?.cancel()
+        reader = nil
+        mic = 0
+        system = 0
+    }
+
+    /// A peak level (0...1) on a -60...0 dBFS scale.
+    static func fraction(_ level: Float) -> CGFloat {
+        guard level > 0 else { return 0 }
+        return CGFloat(min(max((20 * log10(Double(level)) + 60) / 60, 0), 1))
+    }
+}

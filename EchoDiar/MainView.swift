@@ -112,6 +112,8 @@ struct MainView: View {
             ToolbarItem(placement: .navigation) {
                 Menu {
                     Toggle("All system audio", isOn: targetBinding(.global))
+                        // Menu content is built when the menu opens: apps that started playing since show up.
+                        .onAppear { model.refreshTargets() }
                     if !model.targetGroups.isEmpty {
                         Divider()
                         ForEach(model.targetGroups, id: \.bundleID) { group in
@@ -243,7 +245,7 @@ private struct RecordingHeader: View {
                     .foregroundStyle(.secondary)
                 Spacer(minLength: 8)
                 if live && !paused {
-                    ChannelMeters(engine: model.engine)
+                    ChannelMeters(feed: model.levels)
                 }
                 languageMenu
             }
@@ -301,23 +303,17 @@ private struct GlobalTapNote: View {
     }
 }
 
-/// Mic and system peak bars. The only reader of `RecordingEngine.currentLevels()`, at 15 Hz while shown.
+/// Mic and system peak bars, from the shared `LevelFeed` (15 Hz while shown).
 private struct ChannelMeters: View {
-    let engine: RecordingEngine
-    @State private var levels: (mic: Float, system: Float) = (0, 0)
+    let feed: LevelFeed
 
     var body: some View {
         VStack(alignment: .leading, spacing: 3) {
-            bar("Mic", levels.mic)
-            bar("System", levels.system)
+            bar("Mic", feed.mic)
+            bar("System", feed.system)
         }
         .frame(width: 110)
-        .task {
-            while !Task.isCancelled {
-                levels = engine.currentLevels()
-                try? await Task.sleep(for: .milliseconds(67))
-            }
-        }
+        .task { await feed.attach() }
     }
 
     private func bar(_ name: String, _ level: Float) -> some View {
@@ -329,19 +325,13 @@ private struct ChannelMeters: View {
             GeometryReader { proxy in
                 ZStack(alignment: .leading) {
                     Capsule().fill(Palette.hoverFill)
-                    Capsule().fill(Color.green).frame(width: proxy.size.width * Self.fraction(level))
+                    Capsule().fill(Color.green).frame(width: proxy.size.width * LevelFeed.fraction(level))
                 }
             }
             .frame(height: 5)
         }
         .accessibilityElement(children: .ignore)
         .accessibilityLabel("\(name) level")
-        .accessibilityValue("\(Int((Self.fraction(level) * 100).rounded())) percent")
-    }
-
-    /// -60...0 dBFS.
-    private static func fraction(_ level: Float) -> CGFloat {
-        guard level > 0 else { return 0 }
-        return CGFloat(min(max((20 * log10(Double(level)) + 60) / 60, 0), 1))
+        .accessibilityValue("\(Int((LevelFeed.fraction(level) * 100).rounded())) percent")
     }
 }

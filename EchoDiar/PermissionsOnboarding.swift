@@ -58,6 +58,7 @@ final class OnboardingWindow: NSObject, NSWindowDelegate {
 enum PrivacySettings {
     static func openSystemAudioRecording() { open(anchor: "Privacy_AudioCapture") }
     static func openMicrophone() { open(anchor: "Privacy_Microphone") }
+    static func openAccessibility() { open(anchor: "Privacy_Accessibility") }
 
     private static func open(anchor: String) {
         let pane = "x-apple.systempreferences:com.apple.settings.PrivacySecurity.extension"

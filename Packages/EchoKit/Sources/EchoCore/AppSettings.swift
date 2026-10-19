@@ -33,6 +33,24 @@ public struct AppSettings: Codable, Equatable, Sendable {
     public var defaultAIModel: String?
     /// Summary language: "auto" (the transcript's dominant language), "en", "fr", "vi" or another BCP-47 code.
     public var summaryLanguage: String
+    /// Core Audio UID of the recording microphone; nil = the system default input (also used when it is gone).
+    public var micDeviceUID: String?
+    /// Watch known meeting apps' mic use and offer to record them.
+    public var meetingDetection: Bool
+    /// What a detected meeting app does, by `MeetingApp.appBundleID`; a missing entry asks.
+    public var perAppBehavior: [String: MeetingBehavior]
+    /// Where the floating pill was dragged, by display UUID.
+    public var pillPositions: [String: PillPosition]
+    /// "Show floating indicator" while recording; prompts show either way.
+    public var showPill: Bool
+    /// Hide the recording pill while an EchoDiar window is key.
+    public var hidePillWhenAppActive: Bool
+    /// Keep the pill at the meeting window's top-right corner (needs Accessibility).
+    public var attachPillToWindow: Bool
+    /// Auto-stop thresholds.
+    public var endMonitor: MeetingEndMonitor.Configuration
+    /// What losing the recording microphone does.
+    public var routeChangeBehavior: RouteChangeBehavior
 
     public static let defaultLiveTranscriptEngine = "whisperkit-turbo-632"
 
@@ -50,7 +68,16 @@ public struct AppSettings: Codable, Equatable, Sendable {
         cloudSTTConfirmed: [String] = [],
         defaultAIProviderID: String? = nil,
         defaultAIModel: String? = nil,
-        summaryLanguage: String = "auto"
+        summaryLanguage: String = "auto",
+        micDeviceUID: String? = nil,
+        meetingDetection: Bool = true,
+        perAppBehavior: [String: MeetingBehavior] = [:],
+        pillPositions: [String: PillPosition] = [:],
+        showPill: Bool = true,
+        hidePillWhenAppActive: Bool = false,
+        attachPillToWindow: Bool = false,
+        endMonitor: MeetingEndMonitor.Configuration = MeetingEndMonitor.Configuration(),
+        routeChangeBehavior: RouteChangeBehavior = .ask
     ) {
         self.launchAtLogin = launchAtLogin
         self.defaultLanguage = defaultLanguage
@@ -66,12 +93,23 @@ public struct AppSettings: Codable, Equatable, Sendable {
         self.defaultAIProviderID = defaultAIProviderID
         self.defaultAIModel = defaultAIModel
         self.summaryLanguage = summaryLanguage
+        self.micDeviceUID = micDeviceUID
+        self.meetingDetection = meetingDetection
+        self.perAppBehavior = perAppBehavior
+        self.pillPositions = pillPositions
+        self.showPill = showPill
+        self.hidePillWhenAppActive = hidePillWhenAppActive
+        self.attachPillToWindow = attachPillToWindow
+        self.endMonitor = endMonitor
+        self.routeChangeBehavior = routeChangeBehavior
     }
 
     private enum CodingKeys: String, CodingKey {
         case version, launchAtLogin, defaultLanguage, recentLanguages, compressionBitrateKbps, keepUncompressedAudio
         case onboardingCompleted, liveTranscript, liveTranscriptEngine, defaultASRModelID, providers
         case cloudSTTConfirmed, defaultAIProviderID, defaultAIModel, summaryLanguage
+        case micDeviceUID, meetingDetection, perAppBehavior, pillPositions, showPill, hidePillWhenAppActive
+        case attachPillToWindow, endMonitor, routeChangeBehavior
     }
 
     public init(from decoder: Decoder) throws {
@@ -92,6 +130,45 @@ public struct AppSettings: Codable, Equatable, Sendable {
         defaultAIProviderID = try container.decodeIfPresent(String.self, forKey: .defaultAIProviderID)
         defaultAIModel = try container.decodeIfPresent(String.self, forKey: .defaultAIModel)
         summaryLanguage = try container.decodeIfPresent(String.self, forKey: .summaryLanguage) ?? "auto"
+        micDeviceUID = try container.decodeIfPresent(String.self, forKey: .micDeviceUID)
+        meetingDetection = try container.decodeIfPresent(Bool.self, forKey: .meetingDetection) ?? true
+        perAppBehavior = try container.decodeIfPresent([String: MeetingBehavior].self, forKey: .perAppBehavior) ?? [:]
+        pillPositions = try container.decodeIfPresent([String: PillPosition].self, forKey: .pillPositions) ?? [:]
+        showPill = try container.decodeIfPresent(Bool.self, forKey: .showPill) ?? true
+        hidePillWhenAppActive = try container.decodeIfPresent(Bool.self, forKey: .hidePillWhenAppActive) ?? false
+        attachPillToWindow = try container.decodeIfPresent(Bool.self, forKey: .attachPillToWindow) ?? false
+        endMonitor = try container.decodeIfPresent(MeetingEndMonitor.Configuration.self, forKey: .endMonitor)
+            ?? MeetingEndMonitor.Configuration()
+        routeChangeBehavior = try container.decodeIfPresent(RouteChangeBehavior.self, forKey: .routeChangeBehavior) ?? .ask
+    }
+}
+
+/// What a detected meeting app does.
+public enum MeetingBehavior: String, Codable, Sendable {
+    /// The pill asks "Record?".
+    case ask
+    /// Recording starts on its own (the pill still shows).
+    case always
+    /// No prompt.
+    case ignore
+}
+
+/// What losing the recording microphone (AirPods disconnect) does; the mic moves to the default input either way.
+public enum RouteChangeBehavior: String, Codable, Sendable {
+    /// The pill asks to stop, with a countdown.
+    case ask
+    case `continue`
+    case stop
+}
+
+/// The pill's top-right corner, in points from the top-right corner of its display's visible frame (x, y ≤ 0).
+public struct PillPosition: Codable, Equatable, Sendable {
+    public var x: Double
+    public var y: Double
+
+    public init(x: Double, y: Double) {
+        self.x = x
+        self.y = y
     }
 }
 

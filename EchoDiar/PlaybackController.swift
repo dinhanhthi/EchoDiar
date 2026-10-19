@@ -23,12 +23,17 @@ final class PlaybackController {
     /// Sorted by start.
     @ObservationIgnored private var segments: [(id: UUID, start: Double, end: Double)] = []
     @ObservationIgnored private var ticker: Task<Void, Never>?
+    /// A `seek(to:)` made before the player existed; applied when `load` opens one.
+    @ObservationIgnored private var pendingSeek: Double?
 
     /// Opens `url` unless it is already open (nil closes the player), and sets the segments to highlight.
     func load(url: URL?, segments: [Transcript.Segment]) {
         self.segments = segments.map { ($0.id, $0.start, $0.end) }.sorted { $0.start < $1.start }
         if url != self.url {
+            // A seek made before this view's player opened (recording or compressing) still applies.
+            let pending = pendingSeek
             close()
+            pendingSeek = pending
             self.url = url
             if let url {
                 do {
@@ -37,6 +42,10 @@ final class PlaybackController {
                     self.player = player
                     duration = player.duration
                     isReady = true
+                    if let pendingSeek {
+                        self.pendingSeek = nil
+                        seek(to: pendingSeek)
+                    }
                 } catch {
                     NSLog("EchoDiar: could not open \(url.lastPathComponent) for playback: \(error)")
                 }
@@ -57,6 +66,7 @@ final class PlaybackController {
         currentTime = 0
         duration = 0
         activeSegmentID = nil
+        pendingSeek = nil
     }
 
     func togglePlay() {
@@ -84,6 +94,18 @@ final class PlaybackController {
         player.currentTime = min(max(0, time), player.duration)
         currentTime = player.currentTime
         play()
+    }
+
+    /// Moves the play head to `time` without playing; before a player exists, `load` applies it once one opens.
+    func seek(to time: Double) {
+        if let player {
+            player.currentTime = min(max(0, time), player.duration)
+            currentTime = player.currentTime
+        } else {
+            pendingSeek = time
+            currentTime = time
+        }
+        updateActiveSegment()
     }
 
     private func startTicker() {

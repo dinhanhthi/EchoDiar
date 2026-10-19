@@ -34,6 +34,9 @@ struct RecordingMenuControls {
     /// `LanguageOptions.groups` for the current language.
     var languageGroups: @MainActor () -> [[String]]
     var setLanguage: @MainActor (String) -> Void
+    /// The detected meeting app's name ("Detected: Zoom"); nil when none.
+    var detectedApp: @MainActor () -> String?
+    var stopAskingForDetectedApp: @MainActor () -> Void
 }
 
 /// Menu bar item with a plain AppKit menu (no SwiftUI, for footprint). The menu is rebuilt each time it opens.
@@ -130,6 +133,13 @@ final class StatusItemController: NSObject, NSMenuDelegate {
             record.isEnabled = recordingEnabled
             menu.addItem(record)
         }
+        if let controls = Self.controls, let app = controls.detectedApp() {
+            let detected = NSMenuItem(title: "Detected: \(app)", action: nil, keyEquivalent: "")
+            detected.isEnabled = false
+            menu.addItem(detected)
+            menu.addItem(item("Stop asking for this app", #selector(stopAskingForDetectedApp)))
+            menu.addItem(.separator())
+        }
         menu.addItem(item("Settings…", #selector(openSettings)))
         #if DEBUG
         let simulate = NSMenuItem(title: "Simulate state", action: nil, keyEquivalent: "")
@@ -203,6 +213,7 @@ final class StatusItemController: NSObject, NSMenuDelegate {
     @objc private func setLanguage(_ sender: NSMenuItem) {
         if let code = sender.representedObject as? String { Self.controls?.setLanguage(code) }
     }
+    @objc private func stopAskingForDetectedApp() { Self.controls?.stopAskingForDetectedApp() }
     @objc private func fixSilentTap() { PrivacySettings.openSystemAudioRecording() }
     @objc private func openSettings() { onOpenSettings() }
     @objc private func about() { onAbout() }

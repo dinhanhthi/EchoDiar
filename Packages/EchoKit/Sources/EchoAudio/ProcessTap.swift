@@ -118,8 +118,11 @@ public final class ProcessTap: @unchecked Sendable {
             if #available(macOS 26, *), !PlatformFeatures.forceFallbacks {
                 bundleIDs = Self.bundleIDs(of: group)
             }
-            guard !group.objectIDs.isEmpty || !bundleIDs.isEmpty else { throw ProcessTapError.noProcesses }
-            description = CATapDescription(monoMixdownOfProcesses: group.objectIDs)
+            // A process object dies with its process (a new run gets a new one), and one dead ID fails the whole
+            // tap with `kAudioHardwareBadObjectError`.
+            let objectIDs = group.objectIDs.filter { AudioProcessList.process(for: $0) != nil }
+            guard !objectIDs.isEmpty || !bundleIDs.isEmpty else { throw ProcessTapError.noProcesses }
+            description = CATapDescription(monoMixdownOfProcesses: objectIDs)
             if #available(macOS 26, *), !bundleIDs.isEmpty {
                 description.bundleIDs = bundleIDs
                 description.isProcessRestoreEnabled = true
