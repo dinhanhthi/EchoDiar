@@ -42,7 +42,7 @@ struct GeneralSettingsView: View {
                         .foregroundStyle(.secondary)
                     Text("\"\(Self.consentMessage)\"")
                         .textSelection(.enabled)
-                    Button(copied ? "Copied" : "Copy consent message", systemImage: copied ? "checkmark" : "doc.on.doc") {
+                    Button(copied ? "Copied" : "Copy consent message", systemImage: copied ? "checkmark" : "square.on.square") {
                         NSPasteboard.general.clearContents()
                         NSPasteboard.general.setString(Self.consentMessage, forType: .string)
                         copied = true

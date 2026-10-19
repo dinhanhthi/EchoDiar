@@ -4,8 +4,8 @@ import EchoCore
 import SwiftUI
 
 /// The main window, one page per `AppModel.Route`: the cards, a conversation, the open recording (while recording)
-/// or Settings. Back and Record (or Stop and Pause) on the leading side; a conversation's title in the middle;
-/// Settings and Search on the trailing side.
+/// or Settings. Back, Record (or Stop and Pause) and a conversation's title on the leading side; a conversation's
+/// Reveal in Finder, Settings and Search, then the conversation's tabs on the trailing side.
 struct MainView: View {
     let model: AppModel
     let updater: Updater
@@ -88,17 +88,19 @@ struct MainView: View {
             }
             forward = Page(new).rawValue >= Page(old).rawValue
             withAnimation(Self.paneAnimation) { shownRoute = new }
-            // The search is per page kind: conversations on the list and entries, settings on Settings. Entering or
-            // leaving Settings clears the query; the bar stays open.
-            if old == .settings || new == .settings { query = "" }
+            // Another page closes the search bar back into the Search button and clears the query; another
+            // conversation keeps it, for the sidebar it filters.
+            query = ""
+            model.searchPresented = false
+            searchExpanded = false
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .background(Palette.windowBackground.ignoresSafeArea())
-        // An opaque band behind the toolbar row (drawn above it by AppKit), so scrolled content never shows through
-        // the transparent title bar; the same color as the window, so toolbar and content still read as one.
+        .background(WindowGlass().ignoresSafeArea())
+        // A band behind the toolbar row (drawn above it by AppKit), so scrolled content never shows through the
+        // transparent title bar; the same glass as the window, so toolbar and content still read as one.
         .overlay {
             GeometryReader { proxy in
-                Palette.windowBackground
+                WindowGlass()
                     .frame(height: proxy.safeAreaInsets.top)
                     .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
                     .ignoresSafeArea(.container, edges: .top)
@@ -131,17 +133,10 @@ struct MainView: View {
             if presented { searchExpanded = true }
         }
         .toolbar {
-            // The compact window's search bar replaces every button; a wide one keeps Back, Record and Update.
+            // The compact window's search bar replaces every button; a wide one keeps Back, the title, Record,
+            // Update and the tabs.
             if !searchExpanded || wide {
-                // In a narrow window the other buttons go to the overflow menu first.
-                if #available(macOS 26.1, *) {
-                    leadingItems.visibilityPriority(.high)
-                } else {
-                    leadingItems
-                }
-            }
-            if let conversation = toolbarConversation, titleFits {
-                titleItem(conversation)
+                leadingItems
             }
             if searchExpanded {
                 if wide {
@@ -149,10 +144,12 @@ struct MainView: View {
                     updateItem
                 }
                 searchBarItem
+                if wide { tabsItem }
             } else {
                 // Pushes the other capsules to the trailing edge.
                 flexibleSpacer
                 updateItem
+                revealItem
                 ToolbarItemGroup {
                     Toggle(isOn: Binding(
                         get: { model.route == .settings },
@@ -166,6 +163,7 @@ struct MainView: View {
                     }
                     .help(model.route == .settings ? "Search settings (⌘F)" : "Search conversations (⌘F)")
                 }
+                tabsItem
             }
         }
         .task { model.refreshTargets() }
@@ -193,18 +191,25 @@ struct MainView: View {
         }
     }
 
-    /// The leading capsule: Back (not on the list), then while idle Record and a chevron menu that picks the target
-    /// and the language; while recording, Stop (red, pulsing unless paused or Reduce Motion) and Pause/Resume.
-    /// ⌘R and ⇧⌘P come from the main menu.
+    /// Back in its own capsule (not on the list), the record capsule, then a conversation's title. The record capsule:
+    /// while idle Record and a chevron menu that picks the target and the language; while recording, Stop (red,
+    /// pulsing unless paused or Reduce Motion) and Pause/Resume. ⌘R and ⇧⌘P come from the main menu. In a narrow
+    /// window the other buttons go to the overflow menu first.
     @ToolbarContentBuilder private var leadingItems: some ToolbarContent {
-        ToolbarItemGroup(placement: leadingPlacement) {
-            if model.route != .list {
-                Button(action: model.goBack) {
-                    Label("Back", systemImage: "chevron.left")
-                }
-                .help("Back (Esc)")
+        if model.route != .list {
+            ToolbarItem(placement: leadingPlacement) {
+                SingleToolbarButton(title: "Back", systemImage: "chevron.left", action: model.goBack)
+                    .help("Back (Esc)")
             }
-            recordButtons
+            .highVisibilityPriority()
+            fixedSpacer
+        }
+        ToolbarItemGroup(placement: leadingPlacement) { recordButtons }
+            .highVisibilityPriority()
+        if let conversation = toolbarConversation, titleFits {
+            // As far from the record capsule as Back is.
+            fixedSpacer
+            titleItem(conversation)
         }
     }
 
@@ -267,41 +272,35 @@ struct MainView: View {
     @ToolbarContentBuilder private var updateItem: some ToolbarContent {
         if updater.updateAvailable {
             ToolbarItem {
-                Button { updater.checkForUpdates() } label: {
-                    Label("Update", systemImage: "arrow.down.circle")
-                }
-                .help("Install the available update")
+                SingleToolbarButton(title: "Update", systemImage: "arrow.down.circle") { updater.checkForUpdates() }
+                    .help("Install the available update")
             }
             fixedSpacer
         }
     }
 
-    /// The shown conversation's title, centered in the toolbar row, with its date, duration and size under it;
-    /// double-click to rename it in a popover (Return saves, Esc or a click elsewhere cancels). Plain text, without a
-    /// capsule. On macOS 26 a regular item between two flexible spacers (the toolbar body adds the second), not
-    /// `.principal`: AppKit lays the regular leading capsule out after a principal item. The first item to drop into
-    /// the overflow menu.
+    /// The shown conversation's title, left-aligned after the record capsule, with its date, duration and size under
+    /// it; double-click to rename it in a popover (Return saves, Esc or a click elsewhere cancels). Plain text, without
+    /// a capsule. The first item to drop into the overflow menu.
     @ToolbarContentBuilder private func titleItem(_ conversation: Conversation) -> some ToolbarContent {
         if #available(macOS 26.1, *) {
-            ToolbarSpacer(.flexible)
             ToolbarItem { toolbarTitle(conversation) }.sharedBackgroundVisibility(.hidden).visibilityPriority(.low)
         } else if #available(macOS 26, *) {
-            ToolbarSpacer(.flexible)
             ToolbarItem { toolbarTitle(conversation) }.sharedBackgroundVisibility(.hidden)
         } else {
-            ToolbarItem(placement: .principal) { toolbarTitle(conversation) }
+            ToolbarItem(placement: .navigation) { toolbarTitle(conversation) }
         }
     }
 
     private func toolbarTitle(_ conversation: Conversation) -> some View {
-        VStack(spacing: 1) {
+        VStack(alignment: .leading, spacing: 1) {
             Text(conversation.title)
                 .font(.headline)
                 .lineLimit(1)
                 .truncationMode(.tail)
             toolbarDetails(conversation)
         }
-        .frame(maxWidth: Self.titleMaxWidth)
+        .frame(maxWidth: titleWidth, alignment: .leading)
         .fixedSize(horizontal: false, vertical: true)
         .contentShape(Rectangle())
         .help(conversation.title)
@@ -346,14 +345,64 @@ struct MainView: View {
     }
 
     private static let titleMaxWidth: CGFloat = 360
+    private static let titleMinWidth: CGFloat = 120
+    /// Approximate widths of the other items: the traffic lights, Back and the record capsule; the tabs; Reveal in
+    /// Finder, Settings and Search.
+    private static let leadingWidth: CGFloat = 250
+    private static let tabsWidth: CGFloat = 240
+    private static let trailingButtonsWidth: CGFloat = 150
 
-    /// The centered title keeps the toolbar's buttons out of the overflow menu: not while the window is narrower than
-    /// the wide layout (as it grows into it), and while searching only when the half window beside it also holds the
-    /// search bar and Update (approximate widths).
-    private var titleFits: Bool {
-        guard searchExpanded else { return windowWidth >= MainWindowLayout.wide.minSize.width }
-        let trailing = ToolbarSearchBar.wideWidth + ToolbarSearchBar.trailingInset + (updater.updateAvailable ? 52 : 0)
-        return windowWidth / 2 >= Self.titleMaxWidth / 2 + 16 + trailing
+    private var updateWidth: CGFloat { updater.updateAvailable ? 52 : 0 }
+
+    /// What the toolbar's other items leave of the window (the search bar in place of the trailing buttons), at most
+    /// `titleMaxWidth`: the title truncates instead of pushing buttons into the overflow menu.
+    private var titleWidth: CGFloat {
+        let trailing = searchExpanded ? searchBarWidth + ToolbarSearchBar.trailingInset : Self.trailingButtonsWidth
+        return min(Self.titleMaxWidth, windowWidth - Self.leadingWidth - Self.tabsWidth - trailing - updateWidth)
+    }
+
+    /// The wide window's search bar: shorter when the tabs beside it leave less room, so it stays out of the
+    /// overflow menu.
+    private var searchBarWidth: CGFloat {
+        let tabs = toolbarConversation == nil ? 0 : Self.tabsWidth
+        let free = windowWidth - Self.leadingWidth - tabs - ToolbarSearchBar.trailingInset - updateWidth
+        return max(min(ToolbarSearchBar.wideWidth, free), ToolbarSearchBar.height)
+    }
+
+    /// Too short a title is left out, also while the window grows into the wide layout.
+    private var titleFits: Bool { titleWidth >= Self.titleMinWidth }
+
+    /// A conversation's Reveal in Finder, before Settings and Search; hidden with them while the search bar is open.
+    @ToolbarContentBuilder private var revealItem: some ToolbarContent {
+        if let conversation = toolbarConversation {
+            ToolbarItem {
+                SingleToolbarButton(title: "Reveal in Finder", systemImage: "folder") {
+                    NSWorkspace.shared.activateFileViewerSelecting([conversation.folder])
+                }
+                .help("Reveal in Finder")
+            }
+            fixedSpacer
+        }
+    }
+
+    /// A conversation's tabs, in a capsule of their own like the buttons', at the trailing edge after Settings and
+    /// Search (or the search bar).
+    @ToolbarContentBuilder private var tabsItem: some ToolbarContent {
+        if toolbarConversation != nil {
+            fixedSpacer
+            ToolbarItem { tabs }
+        }
+    }
+
+    /// AppKit pads the sides less than the top and bottom: 4 pt more puts the selected tab as far from the capsule's
+    /// sides as from its top and bottom.
+    private var tabs: some View {
+        CapsuleTabs(
+            selection: Binding(get: { model.detailTab }, set: { model.detailTab = $0 }),
+            tabs: TranscriptView.tabs, title: TranscriptView.tabTitle
+        )
+        .padding(.horizontal, 4)
+        .fixedSize()
     }
 
     @ToolbarContentBuilder private var flexibleSpacer: some ToolbarContent {
@@ -514,7 +563,7 @@ struct MainView: View {
     private var searchBar: some View {
         ToolbarSearchBar(
             text: $query, focusRequest: searchPresented, windowWidth: windowWidth,
-            maxWidth: wide ? ToolbarSearchBar.wideWidth : nil,
+            maxWidth: wide ? searchBarWidth : nil,
             accessibilityLabel: model.route == .settings
                 ? String(localized: "Search settings") : String(localized: "Search conversations")
         ) { frame in
@@ -580,7 +629,7 @@ private struct ToolbarSearchBar: View {
     static let height: CGFloat = 34
     /// From the window's trailing edge, like the toolbar's buttons.
     static let trailingInset: CGFloat = 8
-    /// In a wide window, which keeps Back, Record and Update beside the bar.
+    /// At most, in a wide window, which keeps Back, Record, Update and the tabs beside the bar.
     static let wideWidth: CGFloat = 360
     /// Growing and shrinking.
     static let animation = Animation.snappy(duration: 0.3)
@@ -592,7 +641,7 @@ private struct ToolbarSearchBar: View {
     /// A fixed width after a flexible spacer (the bar then sits at the trailing edge); nil fills the toolbar from the
     /// bar's leading edge.
     let maxWidth: CGFloat?
-    /// The field's, which names what it searches.
+    /// The field's label and placeholder, which name what it searches.
     let accessibilityLabel: String
     /// X or Escape, with the bar's frame in the window (top-left origin).
     let onClose: (CGRect) -> Void
@@ -613,12 +662,12 @@ private struct ToolbarSearchBar: View {
                 text: $text, focusRequest: $focusRequest, accessibilityLabel: accessibilityLabel, onEscape: close
             )
                 .opacity(expanded ? 1 : 0)
-            // As big as the Search button: its highlight fills the bar's end.
+            // As big as the Search button; its highlight, inset from the bar's top and bottom like a group button's.
             Button(action: close) {
                 Image(systemName: "xmark")
                     .font(.body)
                     .imageScale(.large)
-                    .frame(width: Self.height - 10, height: Self.height - 10)
+                    .frame(width: Self.height - 16, height: Self.height - 16)
             }
             .buttonStyle(RowIconButtonStyle())
             .frame(width: Self.height, height: Self.height)
@@ -665,7 +714,6 @@ private struct SearchTextField: NSViewRepresentable {
         field.focusRingType = .none
         field.usesSingleLineMode = true
         field.cell?.isScrollable = true
-        field.placeholderString = String(localized: "Search")
         field.delegate = context.coordinator
         return field
     }
@@ -673,6 +721,7 @@ private struct SearchTextField: NSViewRepresentable {
     func updateNSView(_ field: Field, context: Context) {
         context.coordinator.parent = self
         field.setAccessibilityLabel(accessibilityLabel)
+        field.placeholderString = accessibilityLabel
         if field.stringValue != text { field.stringValue = text }
         if focusRequest {
             // A new toolbar item may not be in the window yet: it focuses itself once it is.
@@ -785,6 +834,65 @@ private struct WindowOriginReader: NSViewRepresentable {
             let frame = convert(bounds, to: nil)
             let origin = CGPoint(x: frame.minX, y: window.frame.height - frame.maxY)
             DispatchQueue.main.async { self.onChange?(origin) }
+        }
+    }
+}
+
+/// A toolbar button alone in its capsule: on macOS 26 AppKit gives it no hover highlight (only buttons of a group get
+/// one), so it draws the same small round highlight itself.
+private struct SingleToolbarButton: View {
+    let title: LocalizedStringKey
+    let systemImage: String
+    let action: () -> Void
+
+    var body: some View {
+        if #available(macOS 26, *) {
+            Button(action: action) {
+                Label(title, systemImage: systemImage)
+                    .labelStyle(.iconOnly)
+                    .font(.body)
+                    .imageScale(.large)
+            }
+            .buttonStyle(Highlight())
+        } else {
+            Button(action: action) { Label(title, systemImage: systemImage) }
+        }
+    }
+
+    /// AppKit pads the item less on the sides than above and below: 36 by 24 makes the capsule round. The highlight
+    /// is as big as a group button's.
+    private struct Highlight: ButtonStyle {
+        func makeBody(configuration: Configuration) -> some View {
+            HoverCircle(configuration: configuration)
+        }
+
+        private struct HoverCircle: View {
+            let configuration: ButtonStyleConfiguration
+            @State private var hovered = false
+
+            var body: some View {
+                configuration.label
+                    .frame(width: 36, height: 24)
+                    .background {
+                        Circle()
+                            .fill(configuration.isPressed ? Palette.pressedFill : hovered ? Palette.hoverFill : .clear)
+                            .frame(width: 28, height: 28)
+                    }
+                    .contentShape(Rectangle())
+                    .animation(.easeOut(duration: 0.12), value: hovered)
+                    .onHover { hovered = $0 }
+            }
+        }
+    }
+}
+
+private extension ToolbarContent {
+    /// On macOS 26.1, kept out of the overflow menu longer than the other items.
+    @ToolbarContentBuilder func highVisibilityPriority() -> some ToolbarContent {
+        if #available(macOS 26.1, *) {
+            visibilityPriority(.high)
+        } else {
+            self
         }
     }
 }

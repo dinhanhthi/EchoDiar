@@ -7,14 +7,20 @@ enum Palette {
     static let hoverFill = Color.white.opacity(0.1)
     static let pressedFill = Color.white.opacity(0.2)
     static let switchOffFill = Color.white.opacity(0.22)
-    /// The window, under the toolbar too. #1C1C1E
-    static let windowBackground = Color(red: 28 / 255, green: 28 / 255, blue: 30 / 255)
     /// Cards and panels, a step above the window. #2C2C2E
     static let surface = Color(red: 44 / 255, green: 44 / 255, blue: 46 / 255)
     /// Text fields and input bars, a step above the cards. #3A3A3C
     static let inputSurface = Color(red: 58 / 255, green: 58 / 255, blue: 60 / 255)
     /// The 1 pt edge of cards and panels.
     static let surfaceBorder = Color.white.opacity(0.08)
+    /// The edge of a raised card: bright at the top, dim on the sides, a faint highlight at the bottom.
+    static let raisedRim = LinearGradient(
+        stops: [
+            .init(color: .white.opacity(0.24), location: 0),
+            .init(color: .white.opacity(0.05), location: 0.45),
+            .init(color: .white.opacity(0.10), location: 1),
+        ],
+        startPoint: .top, endPoint: .bottom)
 }
 
 /// The icon buttons of a row: a round highlight on hover, darker and a bit smaller while pressed. The highlight
@@ -77,13 +83,20 @@ struct CompactSwitch: ToggleStyle {
     }
 }
 
-/// The translucent window background, blurring what is behind the window (toolbar included).
+/// The translucent window background, blurring what is behind the window (toolbar included), under a dark tint so
+/// only a little shows through.
 struct WindowGlass: NSViewRepresentable {
     func makeNSView(context: Context) -> NSVisualEffectView {
         let view = NSVisualEffectView()
         view.material = .underWindowBackground
         view.blendingMode = .behindWindow
         view.state = .followsWindowActiveState
+        let tint = NSView(frame: view.bounds)
+        tint.wantsLayer = true
+        // #1C1C1E
+        tint.layer?.backgroundColor = NSColor(srgbRed: 28 / 255, green: 28 / 255, blue: 30 / 255, alpha: 0.6).cgColor
+        tint.autoresizingMask = [.width, .height]
+        view.addSubview(tint)
         return view
     }
 
@@ -91,20 +104,33 @@ struct WindowGlass: NSViewRepresentable {
 }
 
 /// A card or panel: solid `Palette.surface` with a 1 pt `Palette.surfaceBorder` edge, on every macOS version, so it
-/// stands out from the window background.
+/// stands out from the window background. Raised (the library's entry cards) looks like the toolbar's capsules: a
+/// rim lit from above, a faint sheen at the top and a soft shadow under it.
 struct GlassCard: ViewModifier {
     var cornerRadius: CGFloat = 14
+    var raised = false
 
     func body(content: Content) -> some View {
         let shape = RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
-        content
-            .background(shape.fill(Palette.surface))
-            .overlay(shape.strokeBorder(Palette.surfaceBorder, lineWidth: 1).allowsHitTesting(false))
+        if raised {
+            content
+                .background {
+                    shape.fill(Palette.surface)
+                        .overlay(shape.fill(LinearGradient(
+                            colors: [.white.opacity(0.05), .clear], startPoint: .top, endPoint: .center)))
+                        .shadow(color: .black.opacity(0.35), radius: 6, y: 3)
+                }
+                .overlay(shape.strokeBorder(Palette.raisedRim, lineWidth: 1).allowsHitTesting(false))
+        } else {
+            content
+                .background(shape.fill(Palette.surface))
+                .overlay(shape.strokeBorder(Palette.surfaceBorder, lineWidth: 1).allowsHitTesting(false))
+        }
     }
 }
 
-/// Tabs in a small surface capsule, the toolbar's selected-toggle look: the selected tab is an accent capsule that
-/// slides between the tabs (no slide under Reduce Motion).
+/// Tabs for a toolbar item, as tall as its buttons' highlights, in the toolbar's capsule on macOS 26 (a surface capsule
+/// before): the selected tab is an accent capsule that slides between the tabs (no slide under Reduce Motion).
 struct CapsuleTabs<Tab: Hashable>: View {
     @Binding var selection: Tab
     let tabs: [Tab]
@@ -126,14 +152,26 @@ struct CapsuleTabs<Tab: Hashable>: View {
                 .fill(Color.accentColor)
                 .matchedGeometryEffect(id: selection, in: namespace, isSource: false)
         }
-        .padding(3)
         // Also animates a selection set from code (menu, shortcuts, card buttons).
         .animation(animation, value: selection)
-        .background(Capsule().fill(Palette.surface))
-        .overlay(Capsule().strokeBorder(Palette.surfaceBorder, lineWidth: 1).allowsHitTesting(false))
+        .modifier(SurfaceTrack())
     }
 
     private var animation: Animation? { reduceMotion ? nil : .snappy(duration: 0.25) }
+
+    /// Before macOS 26 the toolbar draws no capsule around its items.
+    private struct SurfaceTrack: ViewModifier {
+        func body(content: Content) -> some View {
+            if #available(macOS 26, *) {
+                content
+            } else {
+                content
+                    .padding(3)
+                    .background(Capsule().fill(Palette.surface))
+                    .overlay(Capsule().strokeBorder(Palette.surfaceBorder, lineWidth: 1).allowsHitTesting(false))
+            }
+        }
+    }
 
     private struct Item: View {
         let tab: Tab
@@ -142,6 +180,8 @@ struct CapsuleTabs<Tab: Hashable>: View {
         let namespace: Namespace.ID
         let action: () -> Void
         @State private var hovered = false
+        /// A toolbar button's highlight.
+        static var height: CGFloat { 28 }
 
         var body: some View {
             Button(action: action) {
@@ -150,7 +190,7 @@ struct CapsuleTabs<Tab: Hashable>: View {
                     .lineLimit(1)
                     .foregroundStyle(selected ? Color.white : Color.secondary)
                     .padding(.horizontal, 12)
-                    .frame(height: 24)
+                    .frame(height: Self.height)
                     .background {
                         if hovered && !selected { Capsule().fill(Palette.hoverFill) }
                     }

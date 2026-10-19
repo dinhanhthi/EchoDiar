@@ -58,7 +58,7 @@ struct RecordingCard: View {
         .background {
             if selected { Self.shape.fill(Color.accentColor.opacity(0.18)) }
         }
-        .modifier(GlassCard(cornerRadius: 20))
+        .modifier(GlassCard(cornerRadius: 20, raised: true))
         .overlay {
             if selected { Self.shape.strokeBorder(Color.accentColor, lineWidth: 1.5).allowsHitTesting(false) }
         }

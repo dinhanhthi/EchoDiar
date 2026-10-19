@@ -45,6 +45,8 @@ struct ConversationCard: View {
                     TranscriptionStatus(conversation: conversation, model: model)
                     Spacer(minLength: 0)
                 }
+                // Room between the details and the buttons; compact has no buttons, often an empty row.
+                .padding(.top, compact ? 0 : 6)
             }
         }
         .padding(.horizontal, compact ? 10 : 14)
@@ -53,7 +55,7 @@ struct ConversationCard: View {
         .background {
             if selected { Self.shape.fill(Color.accentColor.opacity(0.18)) }
         }
-        .modifier(GlassCard(cornerRadius: 20))
+        .modifier(GlassCard(cornerRadius: 20, raised: true))
         .overlay {
             if selected { Self.shape.strokeBorder(Color.accentColor, lineWidth: 1.5).allowsHitTesting(false) }
         }

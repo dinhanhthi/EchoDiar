@@ -96,13 +96,13 @@ struct SettingsView: View {
     }
 }
 
-/// The grouped form over the solid window background, on every macOS version: its rows stay the system's elevated
+/// The grouped form over the window's glass, on every macOS version: its rows stay the system's elevated
 /// rows.
 private struct GlassForm: ViewModifier {
     func body(content: Content) -> some View {
         content
             .scrollContentBackground(.hidden)
-            .background(Palette.windowBackground.ignoresSafeArea())
+            .background(WindowGlass().ignoresSafeArea())
     }
 }
 

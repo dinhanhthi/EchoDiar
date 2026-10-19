@@ -235,7 +235,7 @@ private struct ConsentStep: View {
             Text("\"\(Self.consentMessage)\"")
                 .font(.callout)
                 .foregroundStyle(.secondary)
-            Button(copied ? "Copied" : "Copy consent message", systemImage: copied ? "checkmark" : "doc.on.doc") {
+            Button(copied ? "Copied" : "Copy consent message", systemImage: copied ? "checkmark" : "square.on.square") {
                 NSPasteboard.general.clearContents()
                 NSPasteboard.general.setString(Self.consentMessage, forType: .string)
                 copied = true

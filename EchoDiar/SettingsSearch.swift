@@ -178,7 +178,7 @@ struct SettingsSearchResults: View {
                 }
             }
         }
-        .background(Palette.windowBackground.ignoresSafeArea())
+        .background(WindowGlass().ignoresSafeArea())
     }
 
     private var emptyText: String {

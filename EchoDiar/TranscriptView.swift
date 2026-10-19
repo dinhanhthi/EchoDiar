@@ -8,9 +8,10 @@ extension Notification.Name {
     static let togglePlayback = Notification.Name("EchoDiar.togglePlayback")
 }
 
-/// One conversation inside the main window (its title, date, duration and size are in the toolbar): speakers (click to
-/// rename), actions and playback on one row, then the Transcript, Summary and Chat tabs. A click on a segment plays from its start; Space
-/// plays or pauses. Stays mounted across tabs, so playback goes on in Summary and Chat.
+/// One conversation inside the main window (its title, date, duration and size, its tabs and Reveal in Finder are in
+/// the toolbar). The Transcript tab ends with a bar of speakers (click to rename), actions and playback. A click on a
+/// segment plays from its start; Space plays or pauses. Stays mounted across tabs, so playback goes on in Summary and
+/// Chat.
 struct TranscriptView: View {
     let conversation: Conversation
     let model: AppModel
@@ -45,25 +46,21 @@ struct TranscriptView: View {
     }
 
     var body: some View {
-        VStack(spacing: 10) {
-            header
-            CapsuleTabs(
-                selection: Binding(get: { model.detailTab }, set: { model.detailTab = $0 }),
-                tabs: Self.tabs, title: Self.tabTitle
-            )
-            .fixedSize()
-            ZStack(alignment: .top) {
-                if shownTab == .transcript {
+        ZStack(alignment: .top) {
+            if shownTab == .transcript {
+                // The bar slides with the transcript: it has nothing for Summary and Chat.
+                VStack(spacing: 10) {
                     content
-                        .transition(tabTransition)
-                } else {
-                    AIPanelView(conversation: conversation, model: model, tab: shownTab, transition: tabTransition)
-                        .transition(tabTransition)
+                    bottomBar
                 }
+                .transition(tabTransition)
+            } else {
+                AIPanelView(conversation: conversation, model: model, tab: shownTab, transition: tabTransition)
+                    .transition(tabTransition)
             }
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
-            .clipped()
         }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .clipped()
         .padding(12)
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
         .task(id: conversation) { await load() }
@@ -82,7 +79,7 @@ struct TranscriptView: View {
         .onDisappear { playback.close() }
     }
 
-    private static let tabs: [AppModel.DetailTab] = [.transcript, .summary, .chat]
+    static let tabs: [AppModel.DetailTab] = [.transcript, .summary, .chat]
 
     /// Moving right, the new body comes in from the trailing edge and the old one leaves by the leading edge; the
     /// other way round moving left. Only a fade under Reduce Motion.
@@ -102,7 +99,7 @@ struct TranscriptView: View {
         return (Self.tabs.firstIndex(of: model.detailTab) ?? 0) > (Self.tabs.firstIndex(of: shownTab) ?? 0)
     }
 
-    private static func tabTitle(_ tab: AppModel.DetailTab) -> LocalizedStringKey {
+    static func tabTitle(_ tab: AppModel.DetailTab) -> LocalizedStringKey {
         switch tab {
         case .transcript: "Transcript"
         case .summary: "Summary"
@@ -110,12 +107,14 @@ struct TranscriptView: View {
         }
     }
 
-    // MARK: - Header
+    // MARK: - Bottom bar
 
-    private var header: some View {
+    /// Like the Summary and Chat tabs' bars: the transcription's state, then the speakers, actions and playback.
+    private var bottomBar: some View {
         VStack(alignment: .leading, spacing: 10) {
-            // Not wrapped in a row: its body is often empty, which then takes no space.
-            if conversation.hasTranscript && !failed {
+            // Not wrapped in a row: its body is often empty, which then takes no space. A running job shows on
+            // Re-transcribe instead.
+            if conversation.hasTranscript && !failed && !model.isTranscribing(conversation.id) {
                 TranscriptionStatus(conversation: conversation, model: model)
             }
             if conversation.hasTranscript && failed {
@@ -161,7 +160,7 @@ struct TranscriptView: View {
         .font(.caption)
     }
 
-    /// Speaker chips, then the actions, then the transport at the trailing edge.
+    /// Speaker chips, then the actions and the transport at the trailing edge.
     private func controlRow(chips: Int) -> some View {
         HStack(spacing: 8) {
             if transcript != nil && !speakers.isEmpty {
@@ -170,8 +169,8 @@ struct TranscriptView: View {
                     if chips < speakers.count { moreSpeakersChip(Array(speakers.dropFirst(chips))) }
                 }
             }
-            actions
             Spacer(minLength: 8)
+            actions
             if hasAudio { transport }
         }
     }
@@ -183,25 +182,31 @@ struct TranscriptView: View {
 
     private static let maxSpeakerChips = 3
 
-    /// Small capsule buttons (Liquid Glass on macOS 26); Re-transcribe shows its menu arrow.
+    /// Copy (round) and Re-transcribe, in the accent color like Send; a spinner and "Transcribing…" in its place while a
+    /// job is queued or runs.
     private var actions: some View {
         HStack(spacing: 6) {
-            iconButton("Copy transcript", systemImage: "doc.on.doc", action: copyTranscript)
-                .disabled(transcript?.segments.isEmpty ?? true)
-            retranscribeMenu
-            iconButton("Reveal in Finder", systemImage: "folder") {
-                NSWorkspace.shared.activateFileViewerSelecting([conversation.folder])
+            Button(action: copyTranscript) {
+                Label("Copy transcript", systemImage: "square.on.square")
+                    .labelStyle(.iconOnly)
+            }
+            .buttonStyle(BottomBarButtonStyle(horizontalPadding: 0))
+            .help("Copy transcript")
+            .disabled(transcript?.segments.isEmpty ?? true)
+            if model.isTranscribing(conversation.id) {
+                Button {} label: {
+                    HStack(spacing: 8) {
+                        ProgressView().controlSize(.small)
+                        Text("Transcribing…")
+                    }
+                }
+                .buttonStyle(BottomBarButtonStyle(prominent: true))
+                .allowsHitTesting(false)
+                .fixedSize()
+            } else {
+                retranscribeMenu
             }
         }
-    }
-
-    private func iconButton(_ title: String, systemImage: String, action: @escaping () -> Void) -> some View {
-        Button(action: action) {
-            Label(title, systemImage: systemImage)
-                .labelStyle(.iconOnly)
-        }
-        .modifier(HeaderButtonStyle())
-        .help(title)
     }
 
     /// Installed batch ASR models and configured cloud engines; picking one transcribes the conversation again with
@@ -216,11 +221,13 @@ struct TranscriptView: View {
                 LanguagePicker(title: "Language", selection: $retranscribeLanguage, model: model, asRecorded: true)
             }
         } label: {
-            Label("Re-transcribe", systemImage: "arrow.clockwise")
-                .labelStyle(.iconOnly)
+            HStack(spacing: 6) {
+                Text("Re-transcribe")
+                MenuChevron()
+            }
         }
         .menuStyle(.button)
-        .modifier(HeaderButtonStyle())
+        .buttonStyle(BottomBarButtonStyle(prominent: true))
         .fixedSize()
         .disabled(!canTranscribe)
         .help("Re-transcribe with another model or language")
@@ -238,7 +245,7 @@ struct TranscriptView: View {
                 Label(playback.isPlaying ? "Pause" : "Play", systemImage: playback.isPlaying ? "pause.fill" : "play.fill")
                     .labelStyle(.iconOnly)
             }
-            .modifier(HeaderButtonStyle())
+            .buttonStyle(BottomBarButtonStyle(horizontalPadding: 0))
             .disabled(!playback.isReady)
             .help(playback.isPlaying ? "Pause (Space)" : "Play (Space)")
             PlaybackTime(playback: playback)
@@ -483,38 +490,25 @@ private struct PlaybackTime: View {
     }
 }
 
-/// A speaker chip's capsule.
+/// A speaker chip's capsule, as tall as the bar's buttons.
 private struct SpeakerChipShape: ViewModifier {
     func body(content: Content) -> some View {
         content
-            .font(.caption.weight(.medium))
-            .padding(.horizontal, 8)
-            .padding(.vertical, 3)
+            .font(.callout.weight(.medium))
+            .padding(.horizontal, 12)
+            .frame(height: BottomBarButtonStyle.height)
             .background(Palette.hoverFill, in: Capsule())
             .contentShape(Capsule())
     }
 }
 
-/// The header's buttons: small capsules, Liquid Glass on macOS 26+ (unless `--force-fallbacks`), bordered otherwise.
-private struct HeaderButtonStyle: ViewModifier {
-    func body(content: Content) -> some View {
-        Group {
-            if #available(macOS 26, *), PlatformFeatures.liquidGlass {
-                content.buttonStyle(.glass)
-            } else {
-                content.buttonStyle(.bordered)
-            }
-        }
-        .buttonBorderShape(.capsule)
-        .controlSize(.small)
-    }
-}
-
-/// The segments; redrawn when the play head enters another segment, not at every tick.
+/// The segments; redrawn when the play head enters another segment, not at every tick. While playing, the list
+/// follows the play head: Play scrolls to its segment, and so does each next segment.
 private struct SegmentList: View {
     let transcript: Transcript
     let playback: PlaybackController
     @Binding var scrollTarget: UUID?
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var body: some View {
         let active = playback.activeSegmentID
@@ -537,6 +531,15 @@ private struct SegmentList: View {
                 proxy.scrollTo(scrollTarget, anchor: .center)
                 self.scrollTarget = nil
             }
+            .onChange(of: active) { follow(active, proxy) }
+            .onChange(of: playback.isPlaying) { follow(active, proxy) }
+        }
+    }
+
+    private func follow(_ segment: UUID?, _ proxy: ScrollViewProxy) {
+        guard playback.isPlaying, let segment else { return }
+        withAnimation(reduceMotion ? nil : .easeInOut(duration: 0.25)) {
+            proxy.scrollTo(segment, anchor: .center)
         }
     }
 }

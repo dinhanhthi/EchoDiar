@@ -4,9 +4,10 @@ import EchoCore
 import SwiftUI
 
 /// The Summary or Chat tab of the open conversation (`AppModel.detailTab`): Chat (questions with streamed answers) or
-/// Summary (the saved summary, Summarize / Re-summarize). The bar at the bottom has small menus for the model
-/// (every usable provider with its models) and the output language, "Copy as prompt" and the tab's action; in Chat
-/// they sit above the question row. `[mm:ss]` citations open the transcript at that time.
+/// Summary (the saved summary, Summarize / Re-summarize). The bar at the bottom has menus for the model (every usable
+/// provider with its models) and the output language with the "i" (where the data goes), then "Copy as prompt" and
+/// the tab's action; in Chat the menus sit above the question row. `[mm:ss]` citations open the transcript at that
+/// time.
 struct AIPanelView: View {
     let conversation: Conversation
     let model: AppModel
@@ -18,15 +19,20 @@ struct AIPanelView: View {
     @State private var summary: String?
     @State private var chat: [ChatLog.Message] = []
     @State private var question = ""
+    @FocusState private var questionFocused: Bool
     @State private var toast: String?
     /// A web link from model output, opened only once its destination is confirmed.
     @State private var pendingLink: URL?
     /// The "i" popover about where the data goes is open.
     @State private var showingDataNotes = false
+    /// Re-summarize asks before the saved summary is replaced.
+    @State private var confirmingResummarize = false
 
     private static let chatEnd = "chatEnd"
-    /// The height of a one-line question field, and of the "i", Send and Cancel buttons beside it.
-    private static let inputHeight: CGFloat = 34
+    /// The height of a one-line question field, and of every control of the bottom bar but Chat's menu row.
+    private static let inputHeight = BottomBarButtonStyle.height
+    /// Chat's menu row, above the question: a bit smaller.
+    private static let chatMenuHeight: CGFloat = 28
 
     var body: some View {
         VStack(spacing: 10) {
@@ -58,6 +64,13 @@ struct AIPanelView: View {
             Text(url.absoluteString)
         }
         .task { model.refreshInstalledModels() }
+        // Opening Chat (a card's Ask AI, a tab switch) puts the cursor in the question, once the tab's slide has put
+        // the field in the window.
+        .task(id: model.detailTab) {
+            guard model.detailTab == .chat else { return }
+            try? await Task.sleep(for: .milliseconds(50))
+            if !Task.isCancelled { questionFocused = true }
+        }
         .task(id: LoadKey(id: conversation.id, hasTranscript: conversation.hasTranscript,
                           jobsEnded: model.aiJobsEnded)) { await load() }
     }
@@ -70,14 +83,27 @@ struct AIPanelView: View {
 
     // MARK: - Chat
 
+    /// The messages, or a note in the middle while there are none.
     private var chatPane: some View {
+        Group {
+            if chat.isEmpty && questionJob == nil {
+                Text(emptyNote ?? "Ask a question about this conversation below.")
+                    .foregroundStyle(.secondary)
+                    .multilineTextAlignment(.center)
+                    .padding(20)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+            } else {
+                messages
+            }
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+        .modifier(GlassCard(cornerRadius: 20))
+    }
+
+    private var messages: some View {
         ScrollViewReader { proxy in
             ScrollView {
                 VStack(alignment: .leading, spacing: 10) {
-                    if chat.isEmpty && questionJob == nil {
-                        Text(emptyNote ?? "Ask a question about this conversation below.")
-                            .foregroundStyle(.secondary)
-                    }
                     ForEach(Array(chat.enumerated()), id: \.offset) { _, message in
                         messageView(message.role, text: message.text, model: message.model)
                     }
@@ -103,8 +129,6 @@ struct AIPanelView: View {
             .onChange(of: chat.count) { _, _ in proxy.scrollTo(Self.chatEnd, anchor: .bottom) }
             .onChange(of: questionJob?.text.count) { _, _ in proxy.scrollTo(Self.chatEnd, anchor: .bottom) }
         }
-        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-        .modifier(GlassCard(cornerRadius: 20))
     }
 
     @ViewBuilder private func messageView(
@@ -167,58 +191,64 @@ struct AIPanelView: View {
 
     // MARK: - Bottom bar
 
-    /// Summary: one row with the small menus, "Copy as prompt" and the tab's action, then any notice about where the
-    /// data goes. Chat: the menus and "Copy as prompt", then the question with the "i" (where the data goes) and
-    /// Send, then the missing-model warning.
+    /// Summary: one row with the model menu, the "i" (where the data goes) and the language menu, then "Copy as
+    /// prompt" and the tab's action. Chat: the menus and the "i" (smaller), then the question with "Copy as prompt"
+    /// and Send. Then the missing-model warning.
     private var bottomBar: some View {
         VStack(alignment: .leading, spacing: 8) {
             busyElsewhere
             if model.detailTab == .chat {
                 HStack(spacing: 8) {
-                    modelMenu
-                    languageMenu
+                    modelMenu(height: Self.chatMenuHeight)
+                    languageMenu(height: Self.chatMenuHeight)
+                    dataNotesButton(height: Self.chatMenuHeight)
                     Spacer(minLength: 0)
-                    copyButton
                 }
                 questionRow
-                setupHints
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
             } else {
                 HStack(spacing: 8) {
-                    modelMenu
-                    languageMenu
+                    modelMenu(height: Self.inputHeight)
+                    dataNotesButton(height: Self.inputHeight)
+                    languageMenu(height: Self.inputHeight)
                     Spacer(minLength: 0)
                     copyButton
                     if summaryJob != nil {
                         ProgressView().controlSize(.small)
                         Button("Cancel", action: model.cancelAIJob)
-                            .modifier(CapsuleButton())
-                    } else {
-                        Button(summary == nil ? "Summarize" : "Re-summarize") { start(.summary) }
-                            .modifier(CapsuleButton(prominent: true))
+                            .buttonStyle(BottomBarButtonStyle())
+                    } else if summary == nil {
+                        Button("Summarize") { start(.summary) }
+                            .buttonStyle(BottomBarButtonStyle(prominent: true))
                             .disabled(!canRun)
+                    } else {
+                        Button("Re-summarize") { confirmingResummarize = true }
+                            .buttonStyle(BottomBarButtonStyle(prominent: true))
+                            .disabled(!canRun)
+                            .confirmationDialog("Replace the summary?", isPresented: $confirmingResummarize) {
+                                Button("Re-summarize") { start(.summary) }
+                                Button("Cancel", role: .cancel) {}
+                            } message: {
+                                Text("A new summary is made from the transcript and replaces the current one.")
+                            }
                     }
                 }
-                setupHints
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                dataNotes
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
             }
+            setupHints
+                .font(.caption)
+                .foregroundStyle(.secondary)
         }
         .padding(.horizontal, 14)
         .padding(.vertical, 10)
         .modifier(GlassCard(cornerRadius: 20))
     }
 
-    /// The question (1 to 6 lines; Return sends, Shift+Return starts a new line), the "i" and Send
+    /// The question (1 to 6 lines; Return sends, Shift+Return starts a new line), "Copy as prompt" and Send
     /// (Cancel while answering), at the bottom of the field: centered with it while it has one line.
     private var questionRow: some View {
         HStack(alignment: .bottom, spacing: 8) {
             TextField("Ask about this conversation", text: $question, axis: .vertical)
                 .textFieldStyle(.plain)
+                .focused($questionFocused)
                 .lineLimit(1...6)
                 .onSubmit(ask)
                 .onKeyPress(.return, phases: .down) { press in
@@ -231,26 +261,13 @@ struct AIPanelView: View {
                 .frame(maxWidth: .infinity, minHeight: Self.inputHeight, alignment: .leading)
                 .background(RoundedRectangle(cornerRadius: Self.inputHeight / 2, style: .continuous)
                     .fill(Palette.inputSurface))
-            if hasDataNotes {
-                Button { showingDataNotes.toggle() } label: {
-                    Image(systemName: "info.circle")
-                }
-                .buttonStyle(InputBarButtonStyle(height: Self.inputHeight, horizontalPadding: 0))
-                .help("About where data goes")
-                .popover(isPresented: $showingDataNotes, arrowEdge: .top) {
-                    VStack(alignment: .leading, spacing: 8) { dataNotes }
-                        .font(.callout)
-                        .padding(14)
-                        .frame(width: 280, alignment: .leading)
-                        .fixedSize(horizontal: false, vertical: true)
-                }
-            }
+            copyButton
             if questionJob != nil {
                 Button("Cancel", action: model.cancelAIJob)
-                    .buttonStyle(InputBarButtonStyle(height: Self.inputHeight))
+                    .buttonStyle(BottomBarButtonStyle())
             } else {
                 Button("Send", action: ask)
-                    .buttonStyle(InputBarButtonStyle(height: Self.inputHeight, prominent: true))
+                    .buttonStyle(BottomBarButtonStyle(prominent: true))
                     .disabled(!canRun || question.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
             }
         }
@@ -275,11 +292,29 @@ struct AIPanelView: View {
         }
     }
 
+    /// The "i": where the data goes with the current provider, in a popover; only when there is something to say.
+    @ViewBuilder private func dataNotesButton(height: CGFloat) -> some View {
+        if hasDataNotes {
+            Button { showingDataNotes.toggle() } label: {
+                Image(systemName: "info.circle")
+            }
+            .buttonStyle(BottomBarButtonStyle(height: height, horizontalPadding: 0))
+            .help("About where data goes")
+            .popover(isPresented: $showingDataNotes, arrowEdge: .top) {
+                VStack(alignment: .leading, spacing: 8) { dataNotes }
+                    .font(.callout)
+                    .padding(14)
+                    .frame(width: 280, alignment: .leading)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+        }
+    }
+
     private var copyButton: some View {
         Button(action: copyPrompt) {
-            Label("Copy as prompt", systemImage: "doc.on.clipboard").labelStyle(.iconOnly)
+            Label("Copy as prompt", systemImage: "square.on.square").labelStyle(.iconOnly)
         }
-        .modifier(CapsuleButton())
+        .buttonStyle(BottomBarButtonStyle(horizontalPadding: 0))
         .disabled(transcript == nil)
             .help(model.detailTab == .chat
                   ? "Copy the transcript and the question as a prompt for any chat app"
@@ -287,7 +322,7 @@ struct AIPanelView: View {
     }
 
     /// Every provider with the models it offers, on this Mac first; Foundation Models shows why it cannot run.
-    private var modelMenu: some View {
+    private func modelMenu(height: CGFloat) -> some View {
         let providers = model.aiProviders
         let inApp = providers.filter { $0.kind == .inApp }
         let hosts = providers.filter { $0.kind != .inApp && !$0.leavesMac } + providers.filter(\.leavesMac)
@@ -312,7 +347,7 @@ struct AIPanelView: View {
         } label: {
             menuLabel(modelTitle, systemImage: "cpu")
         }
-        .modifier(CompactMenu(maxWidth: 180))
+        .modifier(CompactMenu(maxWidth: 180, height: height))
         .layoutPriority(1)
         .help("Model for summaries and questions")
     }
@@ -335,7 +370,7 @@ struct AIPanelView: View {
         return id.isEmpty ? provider.name : id
     }
 
-    private var languageMenu: some View {
+    private func languageMenu(height: CGFloat) -> some View {
         Menu {
             Picker("Language", selection: languageBinding) {
                 Text("Auto").tag("auto")
@@ -351,15 +386,19 @@ struct AIPanelView: View {
         } label: {
             menuLabel(LanguageOptions.shortCode(model.settings.summaryLanguage), systemImage: "globe")
         }
-        .modifier(CompactMenu(maxWidth: nil))
+        .modifier(CompactMenu(maxWidth: nil, height: height))
         .help("Language of summaries and answers (Auto = the transcript's language for summaries, the question's for answers)")
     }
 
+    /// The bar's style draws no menu arrow: the chevron says it opens a menu.
     private func menuLabel(_ title: String, systemImage: String) -> some View {
-        Label {
-            Text(title).lineLimit(1).truncationMode(.tail)
-        } icon: {
-            Image(systemName: systemImage)
+        HStack(spacing: 6) {
+            Label {
+                Text(title).lineLimit(1).truncationMode(.tail)
+            } icon: {
+                Image(systemName: systemImage)
+            }
+            MenuChevron()
         }
     }
 
@@ -488,27 +527,24 @@ struct AIPanelView: View {
     }
 }
 
-/// A small capsule button of the AI pane's bottom bar; `prominent` for the tab's main action.
+/// A small capsule button of the AI pane's busy line.
 private struct CapsuleButton: ViewModifier {
-    var prominent = false
-
     func body(content: Content) -> some View {
-        Group {
-            if prominent {
-                content.buttonStyle(.borderedProminent)
-            } else {
-                content.buttonStyle(.bordered)
-            }
-        }
-        .buttonBorderShape(.capsule)
+        content
+            .buttonStyle(.bordered)
+            .buttonBorderShape(.capsule)
         .controlSize(.small)
     }
 }
 
-/// A button beside the Chat question field: `height` tall (a circle for an icon), a capsule of the input color, or
-/// the accent color when `prominent`; lighter on hover, darker while pressed, dimmed when disabled.
-private struct InputBarButtonStyle: ButtonStyle {
-    let height: CGFloat
+/// A button of a tab's bottom bar (also the Transcript tab's): `height` tall (a circle for an icon, with no
+/// `horizontalPadding`), a capsule of the input color, or the accent color when `prominent`; lighter on hover, darker
+/// while pressed, dimmed when disabled.
+struct BottomBarButtonStyle: ButtonStyle {
+    /// Every control of the bottom bars: buttons, menus, speaker chips and the one-line question field.
+    static let height: CGFloat = 34
+
+    var height = Self.height
     var prominent = false
     var horizontalPadding: CGFloat = 14
 
@@ -544,17 +580,25 @@ private struct InputBarButtonStyle: ButtonStyle {
     }
 }
 
-/// A small capsule menu of the AI pane's bottom bar: its title's width, a long one cut to `maxWidth` with an ellipsis
-/// (never cut without one).
+/// The arrow of a bottom bar's menu (the Transcript tab's Re-transcribe too).
+struct MenuChevron: View {
+    var body: some View {
+        Image(systemName: "chevron.down")
+            .font(.system(size: 9, weight: .bold))
+            .accessibilityHidden(true)
+    }
+}
+
+/// A capsule menu of the AI pane's bottom bar, `height` tall like the buttons beside it: its title's width, a long one
+/// cut to `maxWidth` with an ellipsis (never cut without one).
 private struct CompactMenu: ViewModifier {
     let maxWidth: CGFloat?
+    let height: CGFloat
 
     func body(content: Content) -> some View {
         let menu = content
             .menuStyle(.button)
-            .buttonStyle(.bordered)
-            .buttonBorderShape(.capsule)
-            .controlSize(.small)
+            .buttonStyle(BottomBarButtonStyle(height: height, horizontalPadding: height < BottomBarButtonStyle.height ? 12 : 14))
         if let maxWidth {
             WidthCap(maxWidth: maxWidth) { menu }
         } else {
