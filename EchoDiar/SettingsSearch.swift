@@ -134,6 +134,10 @@ struct SettingsSearchItem: Identifiable {
         .init(title: "Version", keywords: ["about", "build", "update"], tab: .about),
         .init(title: "Licensed under AGPL-3.0", keywords: ["license", "open source"], tab: .about),
         .init(title: "github.com/dinhanhthi/EchoDiar", keywords: ["GitHub", "source code", "repository"], tab: .about),
+
+        // Acknowledgements
+        .init(title: "Open-source software", keywords: ["acknowledgements", "credits", "licenses", "libraries"]
+              + Acknowledgement.all.map(\.name), tab: .acknowledgements),
     ]
 
     private static func presetNames(_ kind: ProviderConfig.Kind) -> [String] {

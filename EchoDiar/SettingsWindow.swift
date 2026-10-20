@@ -4,7 +4,7 @@ import SwiftUI
 
 /// A sidebar section. Adding one: a case, its row in `label`, its view in `SettingsView.content`.
 enum SettingsTab: CaseIterable, Identifiable {
-    case general, recording, transcription, providers, rag, storage, shortcuts, about
+    case general, recording, transcription, providers, rag, storage, shortcuts, about, acknowledgements
 
     var id: Self { self }
 
@@ -18,6 +18,7 @@ enum SettingsTab: CaseIterable, Identifiable {
         case .storage: ("Storage", "internaldrive")
         case .shortcuts: ("Shortcuts", "keyboard")
         case .about: ("About", "info.circle")
+        case .acknowledgements: ("Acknowledgements", "doc.text")
         }
     }
 
@@ -37,7 +38,7 @@ enum SettingsTab: CaseIterable, Identifiable {
         case .storage:
             [.init(id: "usage", title: "Usage"), .init(id: "audio", title: "Audio"),
              .init(id: "autoDelete", title: "Auto-delete")]
-        case .general, .rag, .shortcuts, .about:
+        case .general, .rag, .shortcuts, .about, .acknowledgements:
             []
         }
     }
@@ -47,6 +48,24 @@ enum SettingsTab: CaseIterable, Identifiable {
 struct SettingsSubTab {
     let id: String
     let title: LocalizedStringResource
+}
+
+/// A Settings section's header: its title, then what the section is about right under it (not in a footer, where it
+/// reads as part of the next section). Without a title, the description alone.
+struct SectionHeader: View {
+    var title: LocalizedStringKey?
+    let description: LocalizedStringKey
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            if let title { Text(title) }
+            Text(description)
+                .font(.caption)
+                .fontWeight(.regular)
+                .foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+        }
+    }
 }
 
 /// The Settings page of the main window: sidebar of sections, the selected one on the right. `AppModel.settingsTab`
@@ -125,6 +144,7 @@ struct SettingsView: View {
         case .storage: StorageSettingsView(model: model)
         case .shortcuts: ShortcutsSettingsView(model: model)
         case .about: AboutSettingsView()
+        case .acknowledgements: AcknowledgementsSettingsView()
         }
     }
 }
