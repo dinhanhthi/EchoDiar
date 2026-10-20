@@ -504,6 +504,7 @@ struct MainView: View {
 
     /// Pages slide a little in their order: a page further right comes in from the trailing side. While the route is
     /// ahead of `shownRoute` the direction comes from both: the leaving page keeps the transition it last rendered with.
+    /// The leaving page fades out faster, so the two pages never show through each other.
     private var pageTransition: AnyTransition {
         if reduceMotion { return .opacity }
         let page = Page(model.route), shown = Page(shownRoute)
@@ -511,7 +512,7 @@ struct MainView: View {
         let travel: CGFloat = forward ? 24 : -24
         return .asymmetric(
             insertion: .offset(x: travel).combined(with: .opacity),
-            removal: .offset(x: -travel).combined(with: .opacity))
+            removal: .offset(x: -travel).combined(with: .opacity).animation(.easeOut(duration: 0.1)))
     }
 
     /// The wide layout: the compact cards (or the library chat) as a sidebar, then the shown conversation (its state

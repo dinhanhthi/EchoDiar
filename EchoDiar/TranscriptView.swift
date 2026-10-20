@@ -81,15 +81,15 @@ struct TranscriptView: View {
     static let tabs: [AppModel.DetailTab] = [.transcript, .summary, .chat]
 
     /// Moving right, the new body comes in a little from the trailing side and the old one leaves toward the leading
-    /// side; the other way round moving left. Only a fade under Reduce Motion.
+    /// side; the other way round moving left. The old body fades out faster, so the two never show through each other.
+    /// Only a fade under Reduce Motion.
     private var tabTransition: AnyTransition {
         if reduceMotion { return .opacity }
         let travel: CGFloat = slidesForward ? 24 : -24
         return .asymmetric(
-            insertion: .offset(x: travel),
-            removal: .offset(x: -travel)
+            insertion: .offset(x: travel).combined(with: .opacity),
+            removal: .offset(x: -travel).combined(with: .opacity).animation(.easeOut(duration: 0.1))
         )
-        .combined(with: .opacity)
     }
 
     /// The outgoing body keeps the transition of its last update, the one where `model.detailTab` has changed but
