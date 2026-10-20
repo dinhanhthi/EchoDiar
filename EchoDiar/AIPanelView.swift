@@ -152,7 +152,7 @@ struct AIPanelView: View {
                     Color.clear.frame(height: 1).id(Self.chatEnd)
                 }
                 .padding(.horizontal, 14)
-                .padding(.vertical, 10)
+                .padding(.vertical, 16)
             }
             .onAppear { proxy.scrollTo(Self.chatEnd, anchor: .bottom) }
             .onChange(of: chat.count) { _, _ in proxy.scrollTo(Self.chatEnd, anchor: .bottom) }
@@ -286,7 +286,7 @@ struct AIPanelView: View {
                     if summaryJob == nil, let shown = shownSummary {
                         versionMenu(shown)
                             .padding(.horizontal, 14)
-                            .padding(.top, 10)
+                            .padding(.top, 16)
                     }
                     ScrollView {
                         VStack(alignment: .leading, spacing: 8) {
@@ -306,7 +306,9 @@ struct AIPanelView: View {
                             }
                         }
                         .padding(.horizontal, 14)
-                        .padding(.vertical, 10)
+                        // Below the version menu (shown while no summary is being written), its gap stays as it was.
+                        .padding(.top, summaryJob == nil ? 10 : 16)
+                        .padding(.bottom, 16)
                         .frame(maxWidth: .infinity, alignment: .leading)
                     }
                 }

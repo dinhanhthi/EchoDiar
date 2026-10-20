@@ -603,7 +603,8 @@ private struct SegmentList: View {
                     }
                 }
                 // With the rows' own padding, the text sits as far from the card's edges as the summary's.
-                .padding(4)
+                .padding(.horizontal, 4)
+                .padding(.vertical, 10)
             }
             // The user's own scrolling (wheel, trackpad, scroller); `.animating` is `follow`'s scrollTo.
             .onScrollPhaseChange { _, phase in
