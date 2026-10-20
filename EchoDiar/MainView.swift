@@ -281,8 +281,8 @@ struct MainView: View {
     }
 
     /// The shown conversation's title, left-aligned after the record capsule, with its date, duration and size under
-    /// it; double-click to rename it in a popover (Return saves, Esc or a click elsewhere cancels). Plain text, without
-    /// a capsule. The first item to drop into the overflow menu.
+    /// it; double-click to rename it in a popover (Return saves, Esc or a click elsewhere cancels), drag to move the
+    /// window. Plain text, without a capsule. The first item to drop into the overflow menu.
     @ToolbarContentBuilder private func titleItem(_ conversation: Conversation) -> some ToolbarContent {
         if #available(macOS 26.1, *) {
             ToolbarItem { toolbarTitle(conversation) }.sharedBackgroundVisibility(.hidden).visibilityPriority(.low)
@@ -309,6 +309,8 @@ struct MainView: View {
             titleDraft = conversation.title
             renamingTitle = true
         }
+        // Moves the window like the toolbar's empty space, which the item would otherwise take the click from.
+        .gesture(WindowDragGesture())
         .popover(isPresented: $renamingTitle, arrowEdge: .bottom) {
             TextField("Title", text: $titleDraft)
                 .onSubmit {
