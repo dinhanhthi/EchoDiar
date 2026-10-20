@@ -42,8 +42,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSMe
             CaptureProbe.run()
             return
         }
+        // The `--measure` harness never writes the real library and never checks for updates.
+        let measuring = ProcessInfo.processInfo.arguments.contains("--measure")
+        #else
+        let measuring = false
         #endif
-        recovery = Task.detached(priority: .background) { SessionRecovery.recover() }
+        if !measuring { recovery = Task.detached(priority: .background) { SessionRecovery.recover() } }
         // Dark only.
         NSApp.appearance = NSAppearance(named: .darkAqua)
         NSApp.mainMenu = makeMainMenu()
@@ -70,7 +74,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSMe
             showMainWindow()
         }
         model.start()
-        updater.start()
+        if !measuring { updater.start() }
     }
 
     func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows flag: Bool) -> Bool {

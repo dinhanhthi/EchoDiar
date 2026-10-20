@@ -1,0 +1,50 @@
+# Meeting script for scripts/measure-transcribe.sh fixture (spoken with `say`, looped to fill N minutes).
+#
+# Grammar, one item per line (blank lines and lines starting with # are ignored):
+#   <speaker>[:<flag>[,<flag>]]|<text>   a turn
+#   pause|<seconds>                      silence (noise only) after the previous turn, instead of the turn gap
+#
+#   speaker   mic  = the user, mic channel (ch0, one voice)
+#             sys1 = first remote voice, system channel (ch1)
+#             sys2 = second remote voice, system channel (ch1)
+#   flags     quiet         the turn is scaled to -20 dB (energy-VAD failure mode: speech lost as silence)
+#             overlap=<s>   crosstalk: the turn starts <s> seconds before the previous turn ends; use it only
+#                           between channels (mic over sys1/sys2 or the reverse), never on the same channel
+#
+# Between two turns there is a turn gap drawn from 0.4 to 1.2 s (seeded, so every build is the same).
+# Text rules (keep WER honest): English, no digits, no number words, no acronyms, no abbreviations such as
+# Mister or Doctor written short, no symbols, no hyphenated words, no "okay". Spelled the way Whisper writes it.
+# Keep turns of every channel within the first 40 seconds, so the 1-minute fixture has words on both channels.
+
+mic|Good morning everyone, thanks for joining the weekly planning call.
+sys1|Morning. I can hear you clearly, and the slides are ready whenever you want them.
+sys2|Hello from the design team. I just joined, so please go ahead.
+mic|Great. Let's start with the release schedule, then talk about the new recording feature.
+sys1|Sure. The release is still on track for the end of the month.
+mic:overlap=3|Wait, before that, did we fix the crash on older machines?
+sys1|Yes, that crash is gone. We found it last Thursday and the fix is already merged.
+sys2|We also checked the settings window on a small screen, and nothing is cut off anymore.
+mic|Good news. Daniel, can you walk us through the plan for the transcription work?
+sys1|Of course. Right now the app waits until the end of a meeting before it starts to transcribe anything, so people sit in front of an empty page while the model loads and works through the whole recording. For a long meeting that can take several minutes, and it feels slow even when the result is good. The idea is to transcribe while the meeting is still going. We split the audio into short pieces whenever somebody stops talking, and we send each piece to the model as soon as it is ready. When the user presses stop, most of the text already exists, and we only need to fill the small parts that are missing. We keep the model loaded during the meeting, so we do not pay the loading time again and again. We also want to measure everything carefully before and after the change, on this computer and on the virtual machine, so we know the text quality stays the same and the wait after stop really becomes short.
+pause|6
+mic|That sounds like the right direction. What is the biggest risk?
+sys1|Quiet speech. If someone talks very softly, the detector might think it is silence and skip it.
+sys2:quiet|I am talking softly on purpose right now, to see whether the quiet part still shows up.
+mic|We should keep that case in the test recording, then.
+sys2|Agreed. I will also keep an eye on how much memory the model uses during a long call.
+pause|12
+mic|Sorry, I had to mute for a moment. Where were we?
+sys1|We were talking about memory. The model needs a lot of it while it is loaded.
+mic:quiet|I will speak quietly too, so we can check the microphone side as well.
+sys2|Can we free the model when nobody has spoken for a while?
+sys1|Yes, after a long pause we can unload it and load it again when speech comes back.
+mic|Good. What about people who do not want speaker names in their transcript?
+sys2|Then we skip that step completely, which also saves time after the meeting.
+pause|18
+sys1|I am back. The network dropped for a few seconds, did I miss anything important?
+mic|Not much. We agreed to skip speaker names when the setting is off.
+sys2:quiet|Another quiet remark from me, just to be sure the soft voice is handled.
+sys1|Then I think we have a plan. I will write it down and share it after the call.
+mic|Thank you all. Let's meet again next week at the same time.
+sys2|Sounds good. Have a nice day, everyone.
+pause|8

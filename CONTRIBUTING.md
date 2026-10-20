@@ -57,7 +57,7 @@ Tests use Swift Testing and live in `Packages/EchoKit/Tests/`. They cover the gu
 
 ### DEBUG harness
 
-Debug builds accept two launch arguments:
+Debug builds accept these launch arguments:
 
 - `--capture-probe <seconds> [bundleID|pid:N|global]`: records a probe session, writes `probe.json` next to `Conversations/` and the same JSON to stdout, then quits. It needs the TCC grants, so launch it with `open` (`APP` is `EchoDiar.app` in the `BUILT_PRODUCTS_DIR` that `xcodebuild -showBuildSettings` prints; read the stdout file, not the exit code):
 
@@ -66,6 +66,29 @@ Debug builds accept two launch arguments:
   ```
 
 - `--force-fallbacks`: forces the pre-macOS 26 code paths (no Liquid Glass, process taps without bundle IDs), to check them on macOS 26+.
+
+- `--measure <caf> --out <dir> [--engine <catalog id>] [--diarizer <catalog id>] [--language <code>] [--pace <x>] [--tag <git sha>]`: copies a 2-channel 16 kHz Int16 CAF into a temp session folder (`EchoDiar-measure-<uuid>`, never `Conversations/`), runs the post-Stop sequence on it (compression, then transcription) with in-memory settings (the saved ones are neither read nor written), writes `result.json` (Stop to transcript, Stop to compressed, pipeline steps, max footprint and CPU per phase, post-conditions) and a copy of `transcript.json` to `--out`, then quits: exit 0 when every post-condition holds, else 1 with the error on stderr. Cloud engines are refused. Defaults: the catalog's default ASR, the first installed diarizer (pyannote), English, pace 1. Launch crash recovery and the update check are skipped. Add `--background` so no main window opens. `scripts/measure-transcribe.sh` runs it (see below).
+
+## Measuring transcription latency
+
+`scripts/measure-transcribe.sh` measures Stop to transcript, Stop to compressed, footprint, CPU and word error rate with the `--measure` harness, on this Mac or in the VMPal test VM:
+
+```sh
+scripts/measure-transcribe.sh fixture --minutes 15                    # make the 15-minute fixture and its reference
+scripts/measure-transcribe.sh host --label baseline --runs 2          # build Debug, run the harness twice on this Mac
+scripts/measure-transcribe.sh vm --label baseline                     # build Debug here, run the harness in the VM
+scripts/measure-transcribe.sh vm --label baseline --install-models    # also copy the models into the VM first
+scripts/measure-transcribe.sh report <result dir>...                  # one Markdown table row per run, with WER
+```
+
+`fixture` speaks `scripts/fixtures/measure-meeting.txt` with `say` into `~/EchoDiarQA/measure/fixture-<N>m.caf` plus `reference-<N>m.json`. `host` and `vm` take `--minutes` (default 15) to pick the fixture, `--runs` (default 1) and, after `--`, extra harness arguments (`-- --engine <catalog id>`); each run lands in `~/EchoDiarQA/measure/results/<label>-host-<n>` or `<label>-vm-<n>` and both end with the `report` table. `--install-models` copies whisperkit-large-v3-turbo-626 and pyannote-community-1 from this Mac's models folder into the VM (skipped when the VM has them).
+
+- Quit EchoDiar before `host`: the script refuses while it runs (in the VM too, for `vm`).
+- Run host and VM one after the other, never at once: both share this Mac's CPU and memory.
+- Nothing is built inside the VM: the script builds on this Mac and copies the zipped app and the fixture in, as `scripts/vm-test.sh` does.
+- Before the first VM run, do a 1-minute warm-up (`fixture --minutes 1`, then `vm --label warmup --minutes 1 --install-models`): the first launch compiles the CoreML models, which would inflate the first real run.
+- VM numbers are only good for before/after ratios: the VM has no Neural Engine, so its absolute times say nothing about a real Mac.
+- CPU and footprint cover the EchoDiar process only: work done in other processes (such as CoreML's compiler) is not counted.
 
 ## Xcode cache
 
@@ -79,7 +102,7 @@ Never pass `-derivedDataPath` to local `xcodebuild` builds and tests. The defaul
   - `EchoAudio`: process tap, mic capture, channel writer, recording engine, crash recovery, AAC compression. Depends on EchoCore.
   - Planned: `EchoTranscribe` (transcription, speaker separation), `EchoAI` (AI providers, summary), `EchoLocalLLM` (on-device models).
 - `assets/`: `logo.icon` (app icon), `logo_square*.png` (README, About panel, website) and `logo_white.png` / `logo_black.png` (menu bar, dark / light).
-- `scripts/`: `dev.sh`, `vm-test.sh`, `measure.sh` (memory and CPU targets), and the release scripts `build-and-notarize.sh`, `bump-version.sh`, `publish-release.sh`, `publish-appcast.sh`, `ship.sh` (see docs/RELEASING.md).
+- `scripts/`: `dev.sh`, `vm-test.sh`, `measure.sh` (memory and CPU targets), `measure-transcribe.sh` (transcription latency, with `fixtures/measure-meeting.txt`), and the release scripts `build-and-notarize.sh`, `bump-version.sh`, `publish-release.sh`, `publish-appcast.sh`, `ship.sh` (see docs/RELEASING.md).
 
 ## Commit style
 

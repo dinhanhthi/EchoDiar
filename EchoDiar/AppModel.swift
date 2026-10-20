@@ -26,7 +26,7 @@ final class AppModel {
 
     /// DEBUG harness launch args handled here; they skip onboarding and auto-queued work.
     static let harnessArguments: Set<String> = [
-        "--transcribe", "--download-model", "--delete-model", "--live-transcribe",
+        "--transcribe", "--download-model", "--delete-model", "--live-transcribe", "--measure",
     ]
 
     private(set) var settings = AppSettings()
@@ -285,7 +285,7 @@ final class AppModel {
     }
 
     /// Called once by the AppDelegate after the main window is built. Dispatches the DEBUG harness launch args
-    /// `--transcribe`, `--download-model` and `--delete-model`.
+    /// `--measure`, `--transcribe`, `--download-model` and `--delete-model`.
     func start() {
         settings = store.load()
         recovery = (NSApp.delegate as? AppDelegate)?.recovery
@@ -312,7 +312,7 @@ final class AppModel {
             stopAskingForDetectedApp: { [weak self] in self?.stopAskingForDetectedApp() })
 
         #if DEBUG
-        if runTranscribeHarness() || runLiveTranscribeHarness() || runModelHarness() { return }
+        if runMeasureHarness() || runTranscribeHarness() || runLiveTranscribeHarness() || runModelHarness() { return }
         DebugLibrarySeed.run()
         #endif
         guard ProcessInfo.processInfo.arguments.allSatisfy({ !Self.harnessArguments.contains($0) }) else { return }
@@ -531,7 +531,7 @@ final class AppModel {
                     Task {
                         // The live model is unloaded first, so the batch model is never loaded next to it.
                         await live?.stop()
-                        if let folder { self.compress([folder]) }
+                        if let folder { await self.finishRecording(folder) }
                     }
                 }
             }
@@ -613,21 +613,52 @@ final class AppModel {
         }
     }
 
+    /// A step of `finishRecording`, reported as it ends.
+    enum FinishMilestone {
+        case compressed(CompressionResult)
+        case transcribed(succeeded: Bool)
+    }
+
+    /// The post-Stop sequence for one folder, as `compress(_:)` runs it, then waits for the transcription it
+    /// queued (if any). `milestone` sees each step end.
+    func finishRecording(_ folder: URL, milestone: (@MainActor (FinishMilestone) -> Void)? = nil) async {
+        compressionJobs += 1
+        let bitrate = settings.compressionBitrateKbps
+        let keepCAF = settings.keepUncompressedAudio
+        await library.refresh()
+        let result = await compressor.compress(folder: folder, bitrateKbps: bitrate, keepCAF: keepCAF) { [library] in
+            Task { await library.refresh() }
+        }
+        if let failure = result.failure {
+            NSLog("EchoDiar: compression failed for \(folder.lastPathComponent): \(failure)")
+        }
+        milestone?(.compressed(result))
+        let job = transcribe(after: result)
+        compressionJobs -= 1
+        await library.refresh()
+        if let job {
+            let succeeded = await job.value
+            milestone?(.transcribed(succeeded: succeeded))
+        }
+    }
+
     // MARK: - Transcription
 
     /// Queues the folder once compression is done, when "auto-transcribe after stop" is on; a failed compression
     /// leaves the CAF, which is used instead.
     /// Skipped when the folder has no usable audio or session, already has a transcript, or its last transcription
     /// failed (a compression that keeps failing is retried at every launch; the card's "Failed — Retry" retries).
-    private func transcribe(after result: CompressionResult) {
-        guard settings.autoTranscribe else { return }
+    /// Returns the submitted job, nil when none was.
+    @discardableResult
+    private func transcribe(after result: CompressionResult) -> Task<Bool, Never>? {
+        guard settings.autoTranscribe else { return nil }
         switch result.failure {
-        case .sessionUnreadable?, .stillRecording?, .unsafeAudioFileName?, .sourceUnreadable?: return
+        case .sessionUnreadable?, .stillRecording?, .unsafeAudioFileName?, .sourceUnreadable?: return nil
         default: break
         }
         let conversation = try? Conversation.read(from: result.folder)
-        guard conversation?.hasTranscript != true, conversation?.status != .transcriptionFailed else { return }
-        submitTranscription(folder: result.folder)
+        guard conversation?.hasTranscript != true, conversation?.status != .transcriptionFailed else { return nil }
+        return submitTranscription(folder: result.folder)
     }
 
     /// The card's "Transcribe" and "Retry", and the transcript's "Re-transcribe" (`engineID` = a catalog id or a cloud
@@ -652,9 +683,13 @@ final class AppModel {
     /// first run per provider and destination waits for the confirmation in the main window, which opens if closed.
     /// The default cloud diarizer runs when configured with a diarizing model and the cloud ASR (if any) labels no
     /// speakers; its destination is confirmed the same way, after the ASR's, before anything is uploaded.
-    private func submitTranscription(folder: URL, engineID: String? = nil, language: String? = nil) {
+    /// Returns the job (true when it succeeded), nil when none was submitted.
+    @discardableResult
+    private func submitTranscription(
+        folder: URL, engineID: String? = nil, language: String? = nil
+    ) -> Task<Bool, Never>? {
         guard let session = try? RecordingSession.read(from: folder), !session.probe, session.state != .failed else {
-            return
+            return nil
         }
         var engineID = engineID
         var cloud: CloudEngine?
@@ -663,7 +698,7 @@ final class AppModel {
             if let config = cloudEngineConfigs.first(where: { $0.id == providerID }) {
                 guard cloudDestinationConfirmed(
                     config, engineID: CloudTranscription.engineID(providerID: providerID), session: session,
-                    folder: folder, language: language) else { return }
+                    folder: folder, language: language) else { return nil }
                 cloud = makeCloudEngine(config)
                 engineID = cloud?.engineID
                 asrLabelsSpeakers = CloudTranscription.diarizes(config, model: CloudTranscription.model(for: config))
@@ -679,7 +714,8 @@ final class AppModel {
             // A model that labels no speakers would bill a transcription for nothing: the local diarizer runs instead.
             if CloudTranscription.diarizes(config, model: model) {
                 guard cloudDestinationConfirmed(
-                    config, engineID: engineID, session: session, folder: folder, language: language) else { return }
+                    config, engineID: engineID, session: session, folder: folder, language: language
+                ) else { return nil }
                 cloudDiarizer = makeCloudEngine(config, model: model)
             }
         }
@@ -700,9 +736,11 @@ final class AppModel {
         transcriptionProgress[session.id] = JobProgress(conversationID: session.id, step: .queued, fraction: 0)
         transcriptionFractions[session.id] = nil
         transcriptionJobs += 1
-        Task {
+        return Task {
+            var succeeded = false
             do {
                 _ = try await pipeline.transcribe(job, cloud: cloud, cloudDiarizer: cloudDiarizer)
+                succeeded = true
                 if settings.deleteAudioAfterTranscription { await deleteAudio(of: session.id) }
             } catch TranscriptionError.cloud(let provider, let reason) {
                 // The kind only ("HTTP 400", "invalid API key"): the reason can quote the provider's error body.
@@ -713,6 +751,7 @@ final class AppModel {
             }
             transcriptionJobs -= 1
             await library.reload(id: session.id)
+            return succeeded
         }
     }
 
@@ -1556,6 +1595,158 @@ extension AppModel {
         return true
     }
 
+    /// `--measure <2-channel 16 kHz Int16 CAF> --out <dir> [--engine <catalog id>] [--diarizer <catalog id>]
+    /// [--language <code>] [--pace <x>] [--tag <git sha>]`: copies the fixture into a temp session folder
+    /// (`EchoDiar-measure-<uuid>`, stopped, one language marker at 0), runs `finishRecording` on it with in-memory
+    /// settings (never saved; the host's are not read: local engines only, auto-transcribe, 64 kbps, nothing
+    /// deleted, never deferred), and writes `result.json` (see `MeasureRun`) plus a copy of `transcript.json` to
+    /// `--out`. Exit 0 when every post-condition holds, else 1 with the message on stderr (and in `result.json` once
+    /// `--out` exists). The library is only read (`LibraryStore` never writes; the AppDelegate skips launch crash
+    /// recovery); the pipeline and the compressor only touch the temp folder, which is removed after a successful
+    /// run. Defaults: the catalog's default ASR, the first installed diarizer (pyannote), English, pace 1.
+    /// `--diarization on|off` (on) and `--incremental on|off` (off) are parsed for later phases; their other value is
+    /// refused until then. Other flags are ignored.
+    private func runMeasureHarness() -> Bool {
+        guard ProcessInfo.processInfo.arguments.contains("--measure") else { return false }
+        guard let fixturePath = Self.harnessValue(after: "--measure"), let outPath = Self.harnessValue(after: "--out")
+        else {
+            Self.fail("usage: --measure <2-channel 16 kHz CAF> --out <dir> [--engine <catalog id>] "
+                + "[--diarizer <catalog id>] [--language <code>] [--pace <x>] [--tag <git sha>]")
+        }
+        let out = URL(fileURLWithPath: outPath, isDirectory: true)
+        do {
+            try FileManager.default.createDirectory(at: out, withIntermediateDirectories: true)
+        } catch {
+            Self.fail("error: cannot create \(out.path): \(error.localizedDescription)")
+        }
+        let run = MeasureRun(out: out)
+        let fail: (String) -> Never = { message in
+            do { try run.write(error: message) } catch { Self.writeError("error: cannot write result.json: \(error)") }
+            Self.fail(message)
+        }
+
+        let fixture = URL(fileURLWithPath: fixturePath)
+        let engineID = Self.harnessValue(after: "--engine") ?? ModelCatalog.defaultASR.id
+        let diarizerFlag = Self.harnessValue(after: "--diarizer")
+        let language = Self.harnessValue(after: "--language") ?? "en"
+        let pace = Self.harnessValue(after: "--pace").map { Double($0) ?? 0 } ?? 1
+        let diarization = Self.harnessValue(after: "--diarization") ?? "on"
+        let incremental = Self.harnessValue(after: "--incremental") ?? "off"
+        run.fields["tag"] = Self.harnessValue(after: "--tag") ?? NSNull()
+        run.fields["options"] = [
+            "fixture": fixture.path, "engine": engineID, "diarizer": diarizerFlag ?? NSNull(), "language": language,
+            "pace": pace, "diarization": diarization, "incremental": incremental,
+        ] as [String: Any]
+        run.fields["otherInstances"] = MeasureRun.otherInstances()
+        run.fields["appNap"] = "suppressed"
+        guard pace > 0 else { fail("error: --pace must be a positive number") }
+        guard ["on", "off"].contains(diarization), ["on", "off"].contains(incremental) else {
+            fail("error: --diarization and --incremental take on or off")
+        }
+        guard diarization == "on" else { fail("error: --diarization off is not supported yet") }
+        guard incremental == "off" else { fail("error: --incremental on is not supported yet") }
+
+        // The fixture: what the recorder writes.
+        let duration: Double
+        do {
+            let format = try AVAudioFile(forReading: fixture)
+            let fileFormat = format.fileFormat
+            guard fileFormat.channelCount == 2, fileFormat.sampleRate == 16_000, fileFormat.commonFormat == .pcmFormatInt16
+            else {
+                fail("error: the fixture must be 2-channel 16 kHz Int16, not \(fileFormat.channelCount) ch "
+                    + "\(fileFormat.sampleRate) Hz")
+            }
+            duration = Double(format.length) / fileFormat.sampleRate
+        } catch {
+            fail("error: cannot read the fixture: \(error.localizedDescription)")
+        }
+        run.fields["fixture"] = ["path": fixture.path, "durationSeconds": duration]
+
+        // In-memory settings, never saved: defaults plus the run's choices, so no host setting or Keychain entry applies.
+        var measured = AppSettings()
+        measured.autoTranscribe = true
+        measured.defaultASRModelID = engineID
+        measured.defaultDiarizerModelID = diarizerFlag
+        measured.speakerCountHint = nil
+        measured.compressionBitrateKbps = 64
+        measured.deleteAudioAfterTranscription = false
+        measured.keepUncompressedAudio = false
+        measured.deferTranscriptionWhenConstrained = false
+        settings = measured
+
+        // What the job resolves to (as `submitTranscription` does): local engines only, installed, no stand-in.
+        guard CloudTranscription.providerID(engineID: engineID) == nil,
+              CloudTranscription.providerID(engineID: diarizerFlag) == nil else {
+            fail("error: cloud engines are not measured")
+        }
+        guard let engine = TranscriptionPipeline.preferredEngineID(
+            engineID, language: language, isUsable: { TranscriptionPipeline.isUsable($0, in: modelStore) })
+        else {
+            fail("error: \(engineID) is not an installed batch ASR model that supports \(language)")
+        }
+        let installedDiarizers = ModelCatalog.diarization.map(\.id).filter { modelStore.isInstalled($0) }
+        if let diarizerFlag, !installedDiarizers.contains(diarizerFlag) {
+            fail("error: \(diarizerFlag) is not an installed diarization model")
+        }
+        run.fields["engine"] = engine
+        run.fields["diarizer"] = diarizerFlag ?? installedDiarizers.first ?? NSNull()
+
+        // The stopped session, in a temp folder (never the Conversations root).
+        let session = RecordingSession(
+            state: .stopped, languageMarkers: [.init(fileTime: 0, language: language)],
+            audioFileName: AudioCompressor.cafFileName)
+        let folder = FileManager.default.temporaryDirectory
+            .appendingPathComponent("EchoDiar-measure-\(UUID().uuidString)", isDirectory: true)
+        run.fields["folder"] = folder.path
+        do {
+            try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+            try FileManager.default.copyItem(at: fixture, to: folder.appendingPathComponent(session.audioFileName))
+            try session.write(to: folder)
+        } catch {
+            try? FileManager.default.removeItem(at: folder)
+            fail("error: \(error.localizedDescription)")
+        }
+
+        // The pipeline's single progress consumer (`observeTranscriptions` never runs in a harness).
+        Task {
+            for await progress in pipeline.progress { run.progress(progress) }
+        }
+        // A windowless process gets App Napped, which the app at Stop (its recording page on screen) is not.
+        let activity = ProcessInfo.processInfo.beginActivity(options: .userInitiated, reason: "--measure")
+        Task {
+            // Recording: with `--incremental off` nothing runs during a recording, so Stop follows the setup.
+            run.markStop()
+            await finishRecording(folder) { run.milestone($0) }
+            ProcessInfo.processInfo.endActivity(activity)
+
+            let fm = FileManager.default
+            let transcript = folder.appendingPathComponent(Transcript.fileName)
+            let conversation = try? Conversation.read(from: folder)
+            let audio = (try? RecordingSession.read(from: folder))?.audioFileName ?? ""
+            let checks: [String: Bool] = [
+                "transcriptExists": fm.fileExists(atPath: transcript.path),
+                "conversationTranscribed": conversation?.status == .transcribed && conversation?.hasTranscript == true,
+                "audioIsM4A": audio.hasSuffix(".m4a") && fm.fileExists(atPath: folder.appendingPathComponent(audio).path),
+                "cafGone": !fm.fileExists(atPath: folder.appendingPathComponent(AudioCompressor.cafFileName).path),
+            ]
+            run.fields["postConditions"] = checks
+            let copy = out.appendingPathComponent(Transcript.fileName)
+            try? fm.removeItem(at: copy)
+            if checks["transcriptExists"] == true {
+                do { try fm.copyItem(at: transcript, to: copy) } catch { fail("error: cannot copy transcript.json: \(error)") }
+            }
+            let failed = checks.filter { !$0.value }.keys.sorted()
+            guard run.stopToTranscript != nil, failed.isEmpty else {
+                fail("error: " + (run.failureDetail.map { "transcription failed: \($0)" }
+                    ?? "post-conditions failed: \(failed.joined(separator: ", "))"))
+            }
+            do { try run.write(error: nil) } catch { Self.fail("error: cannot write result.json: \(error)") }
+            try? fm.removeItem(at: folder)
+            Self.finish(0, out.appendingPathComponent("result.json").path)
+        }
+        return true
+    }
+
     /// `--live-transcribe <audio file> [--engine <catalog id>] [--language <code>]`: once the live model listens,
     /// streams the file (system channel, mic silent) through a `LiveTranscriber` at real-time pace, then 12 s of
     /// silence so its last window is decoded, prints every line and exits 0; exit 1 when no live model is installed
@@ -1709,6 +1900,16 @@ extension AppModel {
     private static func finish(_ code: Int32, _ message: String) -> Never {
         write(message)
         exit(code)
+    }
+
+    nonisolated private static func writeError(_ line: String) {
+        FileHandle.standardError.write(Data((line + "\n").utf8))
+    }
+
+    /// Exit 1 with `message` on stderr.
+    private static func fail(_ message: String) -> Never {
+        writeError(message)
+        exit(1)
     }
 }
 #endif
