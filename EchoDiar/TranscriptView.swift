@@ -69,6 +69,7 @@ struct TranscriptView: View {
             withAnimation(.snappy(duration: 0.25)) { shownTab = new }
         }
         .onChange(of: model.pendingTranscriptTime) { showPendingTime() }
+        .onChange(of: model.settings.playbackChannels) { playback.setChannels(model.settings.playbackChannels) }
         // Not while a speaker name is edited: the text field takes Space.
         .onReceive(NotificationCenter.default.publisher(for: .togglePlayback)) { _ in
             guard playback.isReady, renaming == nil else { return }
@@ -455,7 +456,7 @@ struct TranscriptView: View {
         transcript = loaded
         speakers = loaded.map(Self.speakers) ?? []
         loadFailed = wantsTranscript && loaded == nil
-        playback.load(url: audio, segments: loaded?.segments ?? [])
+        playback.load(url: audio, segments: loaded?.segments ?? [], channels: model.settings.playbackChannels)
         showPendingTime()
     }
 

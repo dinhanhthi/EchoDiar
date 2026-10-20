@@ -215,6 +215,13 @@ struct StorageSettingsView: View {
                 Text("Keep uncompressed audio")
                 Text("Keeps the original CAF next to the compressed file (about 10 times larger).")
             }
+            Picker(selection: model.setting(\.playbackChannels)) {
+                Text("Both voices in both ears").tag(PlaybackChannels.mixed)
+                Text("My voice left, others right").tag(PlaybackChannels.split)
+            } label: {
+                Text("Playback")
+                Text("How the transcript plays your microphone and the meeting's sound.")
+            }
         }
     }
 

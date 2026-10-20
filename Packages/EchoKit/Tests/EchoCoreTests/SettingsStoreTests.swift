@@ -22,6 +22,18 @@ struct SettingsStoreTests {
         }
     }
 
+    /// Playback plays both voices in both ears unless the user asked to split them.
+    @Test(arguments: [#"{}"#, #"{"playbackChannels":"surround"}"#])
+    func playbackChannelsDefaultsToMixed(json: String) throws {
+        let settings = try JSONDecoder().decode(AppSettings.self, from: Data(json.utf8))
+        #expect(settings.playbackChannels == .mixed)
+    }
+
+    @Test func playbackChannelsSplitRoundTrips() throws {
+        let data = try JSONEncoder().encode(AppSettings(playbackChannels: .split))
+        #expect(try JSONDecoder().decode(AppSettings.self, from: data).playbackChannels == .split)
+    }
+
     @Test func corruptFileFallsBackToDefaultsAndIsMovedAside() throws {
         try withTemporaryStore { store in
             let corrupt = Data("not json {".utf8)

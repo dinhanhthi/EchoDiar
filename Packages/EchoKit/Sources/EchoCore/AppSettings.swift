@@ -13,6 +13,8 @@ public struct AppSettings: Codable, Equatable, Sendable {
     public var compressionBitrateKbps: Int
     /// Keep the uncompressed CAF next to the m4a after compression.
     public var keepUncompressedAudio: Bool
+    /// How the transcript plays the 2-channel recording (mic left, system right).
+    public var playbackChannels: PlaybackChannels
     /// Set by "Done" in the first-run onboarding window.
     public var onboardingCompleted: Bool
     /// Live captions while recording (opt-in); the batch transcript after Stop stays the source of truth.
@@ -80,6 +82,7 @@ public struct AppSettings: Codable, Equatable, Sendable {
         recentLanguages: [String] = [],
         compressionBitrateKbps: Int = 64,
         keepUncompressedAudio: Bool = false,
+        playbackChannels: PlaybackChannels = .mixed,
         onboardingCompleted: Bool = false,
         liveTranscript: Bool = false,
         liveTranscriptEngine: String = AppSettings.defaultLiveTranscriptEngine,
@@ -115,6 +118,7 @@ public struct AppSettings: Codable, Equatable, Sendable {
         self.recentLanguages = recentLanguages
         self.compressionBitrateKbps = compressionBitrateKbps
         self.keepUncompressedAudio = keepUncompressedAudio
+        self.playbackChannels = playbackChannels
         self.onboardingCompleted = onboardingCompleted
         self.liveTranscript = liveTranscript
         self.liveTranscriptEngine = liveTranscriptEngine
@@ -151,7 +155,7 @@ public struct AppSettings: Codable, Equatable, Sendable {
 
     private enum CodingKeys: String, CodingKey {
         case version, launchAtLogin, defaultLanguage, recentLanguages, compressionBitrateKbps, keepUncompressedAudio
-        case onboardingCompleted, liveTranscript, liveTranscriptEngine, defaultASRModelID, providers
+        case playbackChannels, onboardingCompleted, liveTranscript, liveTranscriptEngine, defaultASRModelID, providers
         case cloudSTTConfirmed, defaultAIProviderID, defaultAIModel, summaryLanguage
         case micDeviceUID, meetingDetection, perAppBehavior, pillPositions, showPill, hidePillWhenAppActive
         case attachPillToWindow, pillWindowOffset, endMonitor, routeChangeBehavior
@@ -168,6 +172,7 @@ public struct AppSettings: Codable, Equatable, Sendable {
         recentLanguages = try container.decodeIfPresent([String].self, forKey: .recentLanguages) ?? []
         compressionBitrateKbps = try container.decodeIfPresent(Int.self, forKey: .compressionBitrateKbps) ?? 64
         keepUncompressedAudio = try container.decodeIfPresent(Bool.self, forKey: .keepUncompressedAudio) ?? false
+        playbackChannels = try container.decodeIfPresent(PlaybackChannels.self, forKey: .playbackChannels) ?? .mixed
         onboardingCompleted = try container.decodeIfPresent(Bool.self, forKey: .onboardingCompleted) ?? false
         liveTranscript = try container.decodeIfPresent(Bool.self, forKey: .liveTranscript) ?? false
         liveTranscriptEngine = try container.decodeIfPresent(String.self, forKey: .liveTranscriptEngine)
@@ -228,6 +233,19 @@ public enum RouteChangeBehavior: String, Codable, Sendable {
     case ask
     case `continue`
     case stop
+}
+
+/// How the transcript plays a recording's mic (left) and system (right) channels.
+public enum PlaybackChannels: String, Codable, Sendable {
+    /// Both voices in both ears.
+    case mixed
+    /// My voice in the left ear, the others in the right, as recorded.
+    case split
+
+    /// An unrecognized raw value (written by another build) falls back to `mixed`.
+    public init(from decoder: Decoder) throws {
+        self = PlaybackChannels(rawValue: try decoder.singleValueContainer().decode(String.self)) ?? .mixed
+    }
 }
 
 /// What auto-delete moves to the Trash.

@@ -110,6 +110,8 @@ struct SettingsSearchItem: Identifiable {
         .init(title: "Compression bitrate", keywords: ["kbps", "quality", "compress"], tab: .storage, subTab: "audio"),
         .init(title: "Keep uncompressed audio", keywords: ["CAF", "original", "lossless"],
               tab: .storage, subTab: "audio"),
+        .init(title: "Playback", keywords: ["stereo", "mono", "left", "right", "ear", "headphones", "channels"],
+              tab: .storage, subTab: "audio"),
         .init(title: "Auto-delete old conversations", keywords: ["retention", "clean up", "trash", "older than", "days"],
               tab: .storage, subTab: "autoDelete"),
 
