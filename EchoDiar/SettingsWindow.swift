@@ -143,33 +143,28 @@ private struct GlassForm: ViewModifier {
 /// Logo, version, license and the GitHub link.
 private struct AboutSettingsView: View {
     var body: some View {
-        Form {
-            Section {
-                VStack(spacing: 10) {
-                    if let logo = AboutInfo.logo {
-                        Image(nsImage: logo)
-                            .resizable()
-                            .interpolation(.high)
-                            .frame(width: 96, height: 96)
-                            .accessibilityHidden(true)
-                    }
-                    Text("EchoDiar").font(.title2.weight(.semibold))
-                    Text("Version \(AboutInfo.version)")
-                        .foregroundStyle(.secondary)
-                    Text("Licensed under AGPL-3.0")
-                        .foregroundStyle(.secondary)
-                    Link("github.com/dinhanhthi/EchoDiar", destination: AboutInfo.repository)
-                    if let copyright = AboutInfo.copyright {
-                        Text(copyright)
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                    }
-                }
-                .frame(maxWidth: .infinity)
-                .padding(.vertical, 12)
+        // Straight on the window's glass, without a grouped section's card.
+        VStack(spacing: 10) {
+            if let logo = AboutInfo.logo {
+                Image(nsImage: logo)
+                    .resizable()
+                    .interpolation(.high)
+                    .frame(width: 96, height: 96)
+                    .accessibilityHidden(true)
+            }
+            Text("EchoDiar").font(.title2.weight(.semibold))
+            Text("Version \(AboutInfo.version)")
+                .foregroundStyle(.secondary)
+            Text("Licensed under AGPL-3.0")
+                .foregroundStyle(.secondary)
+            Link("github.com/dinhanhthi/EchoDiar", destination: AboutInfo.repository)
+            if let copyright = AboutInfo.copyright {
+                Text(copyright)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
             }
         }
-        .formStyle(.grouped)
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 }
 
