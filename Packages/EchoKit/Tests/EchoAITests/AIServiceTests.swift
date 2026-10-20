@@ -4,8 +4,9 @@ import Foundation
 import Synchronization
 import Testing
 
-/// Guards the summary job: map-reduce sends status lines and streams only the final reduce, the result is saved,
-/// a cancelled job saves nothing, and an in-app model is unloaded before the gate is released.
+/// Guards the summary job: map-reduce sends status lines and streams only the final reduce, the result is saved as a
+/// version, a cancelled job saves nothing, a stopped job saves what it streamed, and an in-app model is unloaded
+/// before the gate is released.
 struct AIServiceTests {
     /// Answers every request with `reply`, in two pieces, and reports a small context to force map-reduce.
     final class FakeProvider: LLMProvider {
@@ -25,6 +26,32 @@ struct AIServiceTests {
                 continuation.yield(String(reply[..<middle]))
                 continuation.yield(String(reply[middle...]))
                 continuation.finish()
+            }
+        }
+
+        func listModels() async throws -> [String] { ["fake"] }
+        func contextWindow(model: String) async -> Int { context }
+    }
+
+    /// Sends `piece` (when not empty), then waits until cancelled, as a slow answer does.
+    final class StallingProvider: LLMProvider {
+        let piece: String
+        let context: Int
+
+        init(piece: String, context: Int = 128_000) {
+            self.piece = piece
+            self.context = context
+        }
+
+        func stream(messages: [LLMMessage], model: String, maxTokens: Int) -> AsyncThrowingStream<String, Error> {
+            let piece = piece
+            return AsyncThrowingStream { continuation in
+                let task = Task {
+                    if !piece.isEmpty { continuation.yield(piece) }
+                    while !Task.isCancelled { try? await Task.sleep(for: .milliseconds(10)) }
+                    continuation.finish(throwing: CancellationError())
+                }
+                continuation.onTermination = { _ in task.cancel() }
             }
         }
 
@@ -98,8 +125,8 @@ struct AIServiceTests {
 
         var updates: [AIService.Update] = []
         for try await update in service.summarize(
-            conversation: conversation, transcript: transcript(turns: 120), provider: provider, model: "fake",
-            language: "en") {
+            conversation: conversation, transcript: transcript(turns: 120), provider: provider, providerID: "fake",
+            model: "fake", language: "en") {
             updates.append(update)
         }
 
@@ -116,6 +143,9 @@ struct AIServiceTests {
         #expect(streamed == reply)
         #expect(Conversation.readSummary(from: conversation.folder) == reply)
         #expect(try Conversation.read(from: conversation.folder).hasSummary)
+        let versions = Conversation.readSummaryVersions(from: conversation.folder)
+        #expect(versions.map(\.provider) == ["fake"])
+        #expect(versions.map(\.stopped) == [false])
     }
 
     @Test
@@ -128,8 +158,8 @@ struct AIServiceTests {
 
         var updates: [AIService.Update] = []
         for try await update in service.summarize(
-            conversation: conversation, transcript: transcript(turns: 3), provider: provider, model: "local",
-            language: "en") {
+            conversation: conversation, transcript: transcript(turns: 3), provider: provider, providerID: "local",
+            model: "local", language: "en") {
             updates.append(update)
             if case .text = update { break }
         }
@@ -140,6 +170,87 @@ struct AIServiceTests {
             #expect(provider.unloaded.withLock { $0 })
         }
         #expect(Conversation.readSummary(from: conversation.folder) == nil)
+        #expect(try !Conversation.read(from: conversation.folder).hasSummary)
+    }
+
+    @Test
+    func stoppedQuestionSavesTheStreamedPart() async throws {
+        let conversation = try makeConversation()
+        defer { try? FileManager.default.removeItem(at: conversation.folder) }
+        let service = AIService(gate: ModelLoadGate())
+
+        var streamed = ""
+        for try await update in service.ask(
+            question: "What was decided?", conversation: conversation, transcript: transcript(turns: 3), summary: nil,
+            history: [], provider: StallingProvider(piece: "Ship on Friday "), providerID: "fake", model: "fake",
+            language: "en") {
+            if case .text(let text) = update {
+                streamed += text
+                service.stop()
+            }
+        }
+
+        #expect(streamed == "Ship on Friday ")
+        let messages = ChatLog.read(from: conversation.folder).messages
+        #expect(messages.map(\.role) == [.user, .assistant])
+        #expect(messages.map(\.text) == ["What was decided?", "Ship on Friday"])
+        #expect(messages.last?.provider == "fake")
+    }
+
+    @Test
+    func stoppedSummarySavesAStoppedVersion() async throws {
+        let conversation = try makeConversation()
+        defer { try? FileManager.default.removeItem(at: conversation.folder) }
+        let service = AIService(gate: ModelLoadGate())
+
+        for try await update in service.summarize(
+            conversation: conversation, transcript: transcript(turns: 3), provider: StallingProvider(piece: "## Decisions"),
+            providerID: "fake", model: "fake", language: "en") {
+            if case .text = update { service.stop() }
+        }
+
+        let versions = Conversation.readSummaryVersions(from: conversation.folder)
+        #expect(versions.map(\.text) == ["## Decisions"])
+        #expect(versions.map(\.stopped) == [true])
+        #expect(Conversation.readSummary(from: conversation.folder) == "## Decisions")
+    }
+
+    @Test
+    func stoppedLocalSummarySavesWhatTheModelReturned() async throws {
+        let conversation = try makeConversation()
+        defer { try? FileManager.default.removeItem(at: conversation.folder) }
+        let service = AIService(gate: ModelLoadGate())
+
+        for try await update in service.summarize(
+            conversation: conversation, transcript: transcript(turns: 3), provider: FakeLocalProvider(),
+            providerID: "local", model: "local", language: "en") {
+            if case .text = update { service.stop() }
+        }
+
+        let versions = Conversation.readSummaryVersions(from: conversation.folder)
+        #expect(versions.map(\.text) == ["Partial answer"])
+        #expect(versions.map(\.stopped) == [true])
+    }
+
+    @Test
+    func summaryStoppedBeforeItsTextSavesNothing() async throws {
+        let conversation = try makeConversation()
+        defer { try? FileManager.default.removeItem(at: conversation.folder) }
+        let service = AIService(gate: ModelLoadGate())
+
+        var updates: [AIService.Update] = []
+        for try await update in service.summarize(
+            conversation: conversation, transcript: transcript(turns: 120),
+            provider: StallingProvider(piece: "Notes", context: 1_500), providerID: "fake", model: "fake",
+            language: "en") {
+            updates.append(update)
+            service.stop()
+        }
+
+        #expect(updates.count == 1)
+        guard case .status(let status) = updates.first else { Issue.record("No status first"); return }
+        #expect(status.hasPrefix("Reading part 1 of"))
+        #expect(Conversation.readSummaryVersions(from: conversation.folder).isEmpty)
         #expect(try !Conversation.read(from: conversation.folder).hasSummary)
     }
 

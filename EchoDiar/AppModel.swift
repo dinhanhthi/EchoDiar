@@ -858,7 +858,7 @@ final class AppModel {
     /// Moves the conversation to the Trash, cancelling its AI job first so it does not write into the trashed folder.
     func deleteConversation(_ id: UUID) {
         if route == .conversation(id) { route = .list }
-        if aiJob?.conversationID == id { cancelAIJob() }
+        if aiJob?.conversationID == id { aiJob?.task?.cancel() }
         Task {
             do {
                 try await library.delete(id: id)
@@ -1226,8 +1226,8 @@ extension AppModel {
         let stream = switch kind {
         case .summary:
             aiService.summarize(
-                conversation: conversation, transcript: transcript, provider: client, model: model,
-                language: settings.summaryLanguage)
+                conversation: conversation, transcript: transcript, provider: client, providerID: provider.id,
+                model: model, language: settings.summaryLanguage)
         case .question(let question):
             aiService.ask(
                 question: question, conversation: conversation, transcript: transcript, summary: summary,
@@ -1255,8 +1255,9 @@ extension AppModel {
         aiJob = AIJob(conversationID: conversation.id, kind: kind, task: task)
     }
 
-    func cancelAIJob() {
-        aiJob?.task?.cancel()
+    /// Ends the job early; the answer or summary streamed until then is saved, then the job ends as usual.
+    func stopAIJob() {
+        aiService.stop()
     }
 }
 

@@ -1,10 +1,12 @@
 import EchoCore
 import Foundation
+import Synchronization
 
 /// Summaries and questions about one conversation (docs/research/llm-providers.md F). Each job streams its answer,
-/// saves it in the conversation folder when it completes (`summary.md` + `hasSummary`, or two more `chat.json`
-/// messages) and saves nothing when cancelled or failed. In-app models (`LocalLLMProvider`: Foundation Models, MLX)
-/// run the whole job inside `ModelLoadGate` (owner `.llm`), loaded once and unloaded before the gate is released.
+/// saves it in the conversation folder when it completes (a new summary version + `hasSummary`, or two more
+/// `chat.json` messages) and saves nothing when cancelled or failed. `stop()` ends a job early and saves the answer
+/// streamed until then (a summary marked stopped); nothing when no text was streamed yet. In-app models
+/// (`LocalLLMProvider`: Foundation Models, MLX) run the whole job inside `ModelLoadGate` (owner `.llm`), loaded once and unloaded before the gate is released.
 public actor AIService {
     public enum Update: Equatable, Sendable {
         /// What a long job is doing ("Reading part 2 of 5…"), before the answer starts.
@@ -24,23 +26,50 @@ public actor AIService {
         case local(any LocalLLMGenerator)
     }
 
+    /// The text streamed by a job until it was cancelled; empty for a step that streams nothing (map and merge).
+    struct Interrupted: Error {
+        let text: String
+    }
+
+    /// The tasks of the running jobs, and those `stop()` ended.
+    final class Jobs: Sendable {
+        let running = Mutex<[UUID: Task<Void, Never>]>([:])
+        let stopped = Mutex<Set<UUID>>([])
+    }
+
     private let gate: ModelLoadGate
+    private nonisolated let jobs = Jobs()
 
     public init(gate: ModelLoadGate) {
         self.gate = gate
     }
 
+    /// Ends every running job, saving what each has streamed; their streams then finish without an error.
+    public nonisolated func stop() {
+        let tasks = jobs.running.withLock { $0 }
+        jobs.stopped.withLock { $0.formUnion(tasks.keys) }
+        for task in tasks.values { task.cancel() }
+    }
+
     /// Streams a new summary: one pass when the transcript fits, else map over the chunks and reduce the notes until
     /// one group is left; only the last reduce is streamed. `language` is the summary-language setting.
+    /// `providerID` is saved with the summary.
     public nonisolated func summarize(
-        conversation: Conversation, transcript: Transcript, provider: any LLMProvider, model: String, language: String
+        conversation: Conversation, transcript: Transcript, provider: any LLMProvider, providerID: String,
+        model: String, language: String
     ) -> AsyncThrowingStream<Update, Error> {
-        job(provider: provider, model: model) { backend, yield in
-            let summary = try await Self.summary(
-                conversation: conversation, transcript: transcript, provider: provider, backend: backend, model: model,
-                language: language, yield: yield)
-            try Task.checkCancellation()
-            try conversation.writeSummary(summary)
+        job(provider: provider, model: model) { backend, yield, isStopped in
+            let summary: String
+            var cut = false
+            do {
+                summary = try await Self.summary(
+                    conversation: conversation, transcript: transcript, provider: provider, backend: backend,
+                    model: model, language: language, yield: yield)
+            } catch let interrupted as Interrupted where isStopped() && !interrupted.text.isEmpty {
+                (summary, cut) = (interrupted.text, true)
+            }
+            if Task.isCancelled && !isStopped() { throw CancellationError() }
+            try conversation.writeSummary(summary, provider: providerID, model: model, stopped: cut)
         }
     }
 
@@ -52,7 +81,7 @@ public actor AIService {
         history: [ChatLog.Message], provider: any LLMProvider, providerID: String, model: String, language: String
     ) -> AsyncThrowingStream<Update, Error> {
         let asked = Date()
-        return job(provider: provider, model: model) { [self] backend, yield in
+        return job(provider: provider, model: model) { [self] backend, yield, isStopped in
             // Starts with a question: some APIs reject a conversation whose first turn is an answer.
             let turns = history.suffix(Self.historyLimit).drop { $0.role != .user }.map {
                 LLMMessage(role: $0.role == .user ? .user : .assistant, content: $0.text)
@@ -69,8 +98,13 @@ public actor AIService {
             let messages = PromptBuilder.questionMessages(
                 conversation: conversation, transcript: transcript, excerpts: excerpts, summary: summary,
                 question: question, history: turns, language: language)
-            let answer = try await Self.answer(messages, backend: backend, model: model, context: context, yield: yield)
-            try Task.checkCancellation()
+            let answer: String
+            do {
+                answer = try await Self.answer(messages, backend: backend, model: model, context: context, yield: yield)
+            } catch let interrupted as Interrupted where isStopped() && !interrupted.text.isEmpty {
+                answer = interrupted.text
+            }
+            if Task.isCancelled && !isStopped() { throw CancellationError() }
             try await appendChat([
                 ChatLog.Message(role: .user, text: question, timestamp: asked),
                 ChatLog.Message(role: .assistant, text: answer, provider: providerID, model: model),
@@ -85,31 +119,47 @@ public actor AIService {
         try log.write(to: folder)
     }
 
-    /// Runs `work` in a task that the stream's end cancels. An in-app model is loaded inside the gate for the whole
-    /// job and unloaded before the gate is released, also on error and cancellation.
+    /// Runs `work` in a task that the stream's end cancels, and `stop()` too (`work`'s `isStopped` then says so and
+    /// the stream finishes without an error). An in-app model is loaded inside the gate for the whole job and
+    /// unloaded before the gate is released, also on error and cancellation.
     private nonisolated func job(
         provider: any LLMProvider, model: String,
-        _ work: @escaping @Sendable (Backend, @escaping @Sendable (Update) -> Void) async throws -> Void
+        _ work: @escaping @Sendable (Backend, @escaping @Sendable (Update) -> Void, @escaping @Sendable () -> Bool)
+            async throws -> Void
     ) -> AsyncThrowingStream<Update, Error> {
-        let gate = gate
+        let (gate, jobs, id) = (gate, jobs, UUID())
+        let isStopped: @Sendable () -> Bool = { jobs.stopped.withLock { $0.contains(id) } }
         return AsyncThrowingStream { continuation in
-            let task = Task(priority: .utility) {
-                do {
-                    let yield: @Sendable (Update) -> Void = { continuation.yield($0) }
-                    if let local = provider as? any LocalLLMProvider {
-                        // Live captions hold the gate for the whole recording; a transcription for its run.
-                        yield(.status(Self.waitingStatus))
-                        try await gate.withExclusiveModel(owner: .llm) {
-                            yield(.status(Self.loadingStatus))
-                            try await local.withLoadedModel(model: model) { try await work(.local($0), yield) }
-                        }
-                    } else {
-                        try await work(.remote(provider), yield)
+            // Registered under the lock: the task's own removal waits for it, also when the job ends at once.
+            let task = jobs.running.withLock { running in
+                let task = Task(priority: .utility) {
+                    defer {
+                        jobs.running.withLock { $0[id] = nil }
+                        jobs.stopped.withLock { _ = $0.remove(id) }
                     }
-                    continuation.finish()
-                } catch {
-                    continuation.finish(throwing: error)
+                    do {
+                        let yield: @Sendable (Update) -> Void = { continuation.yield($0) }
+                        if let local = provider as? any LocalLLMProvider {
+                            // Live captions hold the gate for the whole recording; a transcription for its run.
+                            yield(.status(Self.waitingStatus))
+                            try await gate.withExclusiveModel(owner: .llm) {
+                                yield(.status(Self.loadingStatus))
+                                try await local.withLoadedModel(model: model) {
+                                    try await work(.local($0), yield, isStopped)
+                                }
+                            }
+                        } else {
+                            try await work(.remote(provider), yield, isStopped)
+                        }
+                        continuation.finish()
+                    } catch where isStopped() {
+                        continuation.finish()
+                    } catch {
+                        continuation.finish(throwing: error)
+                    }
                 }
+                running[id] = task
+                return task
             }
             continuation.onTermination = { _ in task.cancel() }
         }
@@ -190,9 +240,10 @@ public actor AIService {
 
     // MARK: Streaming
 
-    /// The whole answer to `messages`, passing each piece to `yield` when set. Throws `CancellationError` when the
-    /// job was cancelled (a cancelled stream or generation just ends) and an error for an empty answer. An in-app
-    /// model's returned text is the answer, even when its streamed pieces missed some.
+    /// The whole answer to `messages`, passing each piece to `yield` when set. Throws `Interrupted` when the job was
+    /// cancelled (a cancelled stream or generation just ends), with the text so far when it was streamed, and an
+    /// error for an empty answer. An in-app model's returned text is the answer, even when its streamed pieces
+    /// missed some.
     private static func answer(
         _ messages: [LLMMessage], backend: Backend, model: String, context: Int,
         yield: (@Sendable (Update) -> Void)? = nil
@@ -203,13 +254,15 @@ public actor AIService {
         case .local(let generator):
             text = try await generator.generate(messages: messages, maxTokens: maxTokens) { yield?(.text($0)) }
         case .remote(let provider):
-            for try await piece in provider.stream(messages: messages, model: model, maxTokens: maxTokens) {
-                text += piece
-                yield?(.text(piece))
-            }
+            do {
+                for try await piece in provider.stream(messages: messages, model: model, maxTokens: maxTokens) {
+                    text += piece
+                    yield?(.text(piece))
+                }
+            } catch where Task.isCancelled {}
         }
-        try Task.checkCancellation()
         let answer = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        if Task.isCancelled { throw Interrupted(text: yield == nil ? "" : answer) }
         guard !answer.isEmpty else { throw LLMError.provider("The model returned an empty answer.") }
         return answer
     }

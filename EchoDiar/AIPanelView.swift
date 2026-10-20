@@ -4,10 +4,10 @@ import EchoCore
 import SwiftUI
 
 /// The Summary or Chat tab of the open conversation (`AppModel.detailTab`): Chat (questions with streamed answers) or
-/// Summary (the saved summary, Summarize / Re-summarize). The bar at the bottom has menus for the model (every usable
-/// provider with its models) and the output language with the "i" (where the data goes), then "Copy as prompt" and
-/// the tab's action; in Chat the menus sit above the question row. `[mm:ss]` citations open the transcript at that
-/// time.
+/// Summary (the kept summaries, the newest first with a menu for the earlier ones, Summarize / Re-summarize). The bar
+/// at the bottom has menus for the model (every usable provider with its models) and the output language with the "i"
+/// (where the data goes), then "Copy as prompt" and the tab's action; in Chat the menus sit above the question row.
+/// `[mm:ss]` citations open the transcript at that time.
 struct AIPanelView: View {
     let conversation: Conversation
     let model: AppModel
@@ -17,6 +17,10 @@ struct AIPanelView: View {
     let transition: AnyTransition
     @State private var transcript: Transcript?
     @State private var summary: String?
+    /// Every kept summary, oldest first; `summary` is the newest.
+    @State private var summaries: [SummaryVersion] = []
+    /// The summary version shown; nil = the newest.
+    @State private var shownVersion: Int?
     @State private var chat: [ChatLog.Message] = []
     @State private var question = ""
     @FocusState private var questionFocused: Bool
@@ -25,8 +29,6 @@ struct AIPanelView: View {
     @State private var pendingLink: URL?
     /// The "i" popover about where the data goes is open.
     @State private var showingDataNotes = false
-    /// Re-summarize asks before the saved summary is replaced.
-    @State private var confirmingResummarize = false
 
     private static let chatEnd = "chatEnd"
     /// The height of a one-line question field, and of every control of the bottom bar but Chat's menu row.
@@ -168,35 +170,87 @@ struct AIPanelView: View {
 
     // MARK: - Summary
 
-    /// The summary, or a note in the middle while there is none.
+    /// The summary with the version menu pinned above it, or a note in the middle while there is none.
     private var summaryPane: some View {
         Group {
-            if summaryJob == nil && summary == nil {
+            if summaryJob == nil && summaries.isEmpty {
                 Text(emptyNote ?? "No summary yet.")
                     .foregroundStyle(.secondary)
                     .multilineTextAlignment(.center)
                     .padding(20)
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
             } else {
-                ScrollView {
-                    VStack(alignment: .leading, spacing: 8) {
-                        if let job = summaryJob {
-                            if let status = job.status {
-                                Text(status).foregroundStyle(.secondary)
-                            }
-                            MarkdownText(text: job.text)
-                        } else if let summary {
-                            MarkdownText(text: summary)
-                        }
+                VStack(alignment: .leading, spacing: 0) {
+                    if summaryJob == nil, let shown = shownSummary {
+                        versionMenu(shown)
+                            .padding(.horizontal, 14)
+                            .padding(.top, 10)
                     }
-                    .padding(.horizontal, 14)
-                    .padding(.vertical, 10)
-                    .frame(maxWidth: .infinity, alignment: .leading)
+                    ScrollView {
+                        VStack(alignment: .leading, spacing: 8) {
+                            if let job = summaryJob {
+                                // Until the first text: a remote provider sends no status before it.
+                                if job.text.isEmpty {
+                                    HStack(spacing: 6) {
+                                        ProgressView().controlSize(.small)
+                                        Text(job.status ?? String(localized: "Writing the summary…"))
+                                            .foregroundStyle(.secondary)
+                                    }
+                                } else {
+                                    MarkdownText(text: job.text)
+                                }
+                            } else if let shown = shownSummary {
+                                MarkdownText(text: shown.text)
+                            }
+                        }
+                        .padding(.horizontal, 14)
+                        .padding(.vertical, 10)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                    }
                 }
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         .modifier(GlassCard(cornerRadius: 20))
+    }
+
+    private var shownSummary: SummaryVersion? {
+        summaries.last { $0.number == shownVersion } ?? summaries.last
+    }
+
+    /// The kept summaries, newest first, each with its model, date and whether it was stopped.
+    private func versionMenu(_ shown: SummaryVersion) -> some View {
+        Menu {
+            ForEach(summaries.reversed(), id: \.number) { version in
+                Toggle(isOn: Binding(
+                    get: { version.number == shown.number },
+                    set: { if $0 { shownVersion = version.number } }
+                )) {
+                    Text("Version \(version.number)")
+                    let details = versionDetails(version)
+                    if !details.isEmpty { Text(details) }
+                }
+            }
+        } label: {
+            menuLabel(([String(localized: "Version \(shown.number)")] + [versionModel(shown)].compactMap { $0 })
+                .joined(separator: " · "), systemImage: "clock.arrow.circlepath")
+        }
+        .modifier(CompactMenu(maxWidth: 260, height: Self.chatMenuHeight))
+        .help("Earlier summaries of this conversation")
+    }
+
+    /// The model, else the provider's name, of a kept summary; nil for one saved before versions.
+    private func versionModel(_ version: SummaryVersion) -> String? {
+        if let id = version.model, !id.isEmpty { return id }
+        guard let provider = version.provider else { return nil }
+        return model.aiProviders.first { $0.id == provider }?.name ?? provider
+    }
+
+    private func versionDetails(_ version: SummaryVersion) -> String {
+        [versionModel(version), version.createdAt?.formatted(date: .abbreviated, time: .shortened),
+         version.stopped ? String(localized: "Stopped") : nil]
+            .compactMap { $0 }
+            .joined(separator: " · ")
     }
 
     /// Why nothing can run for this conversation.
@@ -238,31 +292,20 @@ struct AIPanelView: View {
                     Spacer(minLength: 0)
                     copyButton
                     if summaryJob != nil {
-                        Button("Cancel", action: model.cancelAIJob)
-                            .buttonStyle(BottomBarButtonStyle())
-                        // Stays blue while it runs: not disabled (that dims it), it just takes no clicks.
-                        Button {} label: {
-                            HStack(spacing: 6) {
-                                ProgressView().controlSize(.small)
-                                Text("Summarizing")
-                            }
+                        Button(action: model.stopAIJob) {
+                            Label("Summarizing", systemImage: "stop.fill")
                         }
                         .buttonStyle(BottomBarButtonStyle(prominent: true))
-                        .allowsHitTesting(false)
-                    } else if summary == nil {
+                        .help("Stop the summary and keep what is written so far")
+                    } else if summaries.isEmpty {
                         Button("Summarize") { start(.summary) }
                             .buttonStyle(BottomBarButtonStyle(prominent: true))
                             .disabled(!canRun)
                     } else {
-                        Button("Re-summarize") { confirmingResummarize = true }
+                        Button("Re-summarize") { start(.summary) }
                             .buttonStyle(BottomBarButtonStyle(prominent: true))
                             .disabled(!canRun)
-                            .confirmationDialog("Replace the summary?", isPresented: $confirmingResummarize) {
-                                Button("Re-summarize") { start(.summary) }
-                                Button("Cancel", role: .cancel) {}
-                            } message: {
-                                Text("A new summary is made from the transcript and replaces the current one.")
-                            }
+                            .help("Make a new summary; the earlier ones stay in the version menu")
                     }
                 }
             }
@@ -296,7 +339,7 @@ struct AIPanelView: View {
                     .fill(Palette.inputSurface))
             copyButton
             if questionJob != nil {
-                Button(action: model.cancelAIJob) {
+                Button(action: model.stopAIJob) {
                     Label("Stop", systemImage: "stop.fill").labelStyle(.iconOnly)
                 }
                 .buttonStyle(BottomBarButtonStyle(prominent: true, horizontalPadding: 0))
@@ -310,7 +353,7 @@ struct AIPanelView: View {
     }
 
     /// A job of another conversation or of the other tab: it blocks Ask and Generate until it ends, so it says what
-    /// runs and can be cancelled from here.
+    /// runs and can be stopped from here.
     @ViewBuilder private var busyElsewhere: some View {
         if let job = model.aiJob, (model.detailTab == .chat ? questionJob : summaryJob) == nil {
             let title = model.conversations.first { $0.id == job.conversationID }?.title ?? "another conversation"
@@ -320,7 +363,7 @@ struct AIPanelView: View {
                     .lineLimit(1)
                     .truncationMode(.middle)
                 Spacer(minLength: 0)
-                Button("Cancel", action: model.cancelAIJob)
+                Button("Stop", action: model.stopAIJob)
                     .modifier(CapsuleButton())
             }
             .font(.caption)
@@ -506,11 +549,13 @@ struct AIPanelView: View {
 
     private func load() async {
         let folder = conversation.folder
-        let (loaded, savedSummary, messages) = await Task.detached(priority: .utility) {
-            (try? Transcript.read(from: folder), Conversation.readSummary(from: folder), ChatLog.read(from: folder).messages)
+        let (loaded, versions, messages) = await Task.detached(priority: .utility) {
+            (try? Transcript.read(from: folder), Conversation.readSummaryVersions(from: folder),
+             ChatLog.read(from: folder).messages)
         }.value
         guard !Task.isCancelled else { return }
-        (transcript, summary, chat) = (loaded, savedSummary, messages)
+        (transcript, summaries, summary, chat) = (loaded, versions, versions.last?.text, messages)
+        shownVersion = nil
     }
 
     private func start(_ kind: AppModel.AIJob.Kind) {

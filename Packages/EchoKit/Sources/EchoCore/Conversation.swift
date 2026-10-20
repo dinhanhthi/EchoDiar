@@ -134,21 +134,118 @@ public struct Conversation: Codable, Equatable, Identifiable, Sendable {
         return conversation
     }
 
-    /// The AI summary (Markdown) next to `conversation.json`.
+    /// The AI summary (Markdown) next to `conversation.json`: the newest of the kept summaries.
     public static let summaryFileName = "summary.md"
+    /// Every summary made, `v<number>.md` with `summaries.json` (`SummaryVersion`s without their text).
+    public static let summariesFolderName = "summaries"
+    static let summaryIndexFileName = "summaries.json"
 
     /// The saved summary; nil when there is none.
     public static func readSummary(from folder: URL) -> String? {
         try? String(contentsOf: folder.appendingPathComponent(summaryFileName), encoding: .utf8)
     }
 
-    /// Writes `summary.md` atomically and sets `hasSummary` in a freshly read `conversation.json` (`self` when the
-    /// folder has none yet), so a status written meanwhile survives.
-    public func writeSummary(_ summary: String) throws {
+    /// Every kept summary, oldest first. A `summary.md` saved before versions existed is version 1, with no date
+    /// or model. Empty when there is no summary.
+    public static func readSummaryVersions(from folder: URL) -> [SummaryVersion] {
+        let summaries = folder.appendingPathComponent(summariesFolderName, isDirectory: true)
+        guard let data = try? Data(contentsOf: summaries.appendingPathComponent(summaryIndexFileName)),
+              let index = try? SummaryIndex.decode(data) else {
+            return readSummary(from: folder).map { [SummaryVersion(number: 1, text: $0)] } ?? []
+        }
+        return index.summaries.compactMap { version in
+            var version = version
+            guard let text = try? String(contentsOf: summaries.appendingPathComponent(version.fileName), encoding: .utf8)
+            else { return nil }
+            version.text = text
+            return version
+        }
+    }
+
+    /// Keeps `summary` as the next version and as `summary.md`, then sets `hasSummary` in a freshly read
+    /// `conversation.json` (`self` when the folder has none yet), so a status written meanwhile survives. `provider`
+    /// and `model` made it; `stopped` when it was stopped before its end. Files are written atomically.
+    public func writeSummary(
+        _ summary: String, provider: String? = nil, model: String? = nil, stopped: Bool = false
+    ) throws {
+        let summaries = folder.appendingPathComponent(Self.summariesFolderName, isDirectory: true)
+        try FileManager.default.createDirectory(at: summaries, withIntermediateDirectories: true)
+        var versions = Self.readSummaryVersions(from: folder)
+        // A summary from before versions has no file of its own yet.
+        for version in versions where !FileManager.default.fileExists(
+            atPath: summaries.appendingPathComponent(version.fileName).path) {
+            try Data(version.text.utf8).write(to: summaries.appendingPathComponent(version.fileName), options: .atomic)
+        }
+        let version = SummaryVersion(
+            number: (versions.last?.number ?? 0) + 1, createdAt: Date(), provider: provider, model: model,
+            stopped: stopped, text: summary)
+        try Data(summary.utf8).write(to: summaries.appendingPathComponent(version.fileName), options: .atomic)
+        versions.append(version)
+        try SummaryIndex(summaries: versions).encoded()
+            .write(to: summaries.appendingPathComponent(Self.summaryIndexFileName), options: .atomic)
         try Data(summary.utf8).write(to: folder.appendingPathComponent(Self.summaryFileName), options: .atomic)
         var stored = (try? Conversation.read(from: folder)) ?? self
         stored.hasSummary = true
         try stored.write()
+    }
+}
+
+/// One kept summary: its number (1, 2, …), when and with what it was made, and its text (in `v<number>.md`, not in
+/// `summaries.json`).
+public struct SummaryVersion: Codable, Equatable, Sendable {
+    public var number: Int
+    public var createdAt: Date?
+    /// The AI tab provider id, as in `ChatLog.Message`.
+    public var provider: String?
+    public var model: String?
+    /// Stopped before its end: the part streamed until then.
+    public var stopped = false
+    public var text = ""
+
+    public init(
+        number: Int, createdAt: Date? = nil, provider: String? = nil, model: String? = nil, stopped: Bool = false,
+        text: String
+    ) {
+        self.number = number
+        self.createdAt = createdAt
+        self.provider = provider
+        self.model = model
+        self.stopped = stopped
+        self.text = text
+    }
+
+    var fileName: String { "v\(number).md" }
+
+    private enum CodingKeys: String, CodingKey {
+        case number, createdAt, provider, model, stopped
+    }
+
+    public init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        number = try c.decode(Int.self, forKey: .number)
+        createdAt = try c.decodeIfPresent(Date.self, forKey: .createdAt)
+        provider = try c.decodeIfPresent(String.self, forKey: .provider)
+        model = try c.decodeIfPresent(String.self, forKey: .model)
+        stopped = try c.decodeIfPresent(Bool.self, forKey: .stopped) ?? false
+    }
+}
+
+/// The `summaries.json` file format, version 1. Dates are ISO 8601.
+struct SummaryIndex: Codable {
+    var version = 1
+    var summaries: [SummaryVersion]
+
+    func encoded() throws -> Data {
+        let encoder = JSONEncoder()
+        encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
+        encoder.dateEncodingStrategy = .iso8601
+        return try encoder.encode(self)
+    }
+
+    static func decode(_ data: Data) throws -> SummaryIndex {
+        let decoder = JSONDecoder()
+        decoder.dateDecodingStrategy = .iso8601
+        return try decoder.decode(SummaryIndex.self, from: data)
     }
 }
 

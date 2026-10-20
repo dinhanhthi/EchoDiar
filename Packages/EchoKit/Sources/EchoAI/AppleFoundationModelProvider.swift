@@ -53,11 +53,13 @@ public struct AppleFoundationModelProvider: LocalLLMProvider {
                 to: prompt, options: GenerationOptions(maximumResponseTokens: maxTokens))
             // Snapshots carry the whole answer so far; pass on only what is new. The last snapshot is the answer.
             var sent = ""
-            for try await snapshot in response {
-                let text = snapshot.content
-                if let delta = SnapshotDelta.delta(from: sent, to: text) { onText(delta) }
-                sent = text
-            }
+            do {
+                for try await snapshot in response {
+                    let text = snapshot.content
+                    if let delta = SnapshotDelta.delta(from: sent, to: text) { onText(delta) }
+                    sent = text
+                }
+            } catch where Task.isCancelled {}
             return sent
         }
     }

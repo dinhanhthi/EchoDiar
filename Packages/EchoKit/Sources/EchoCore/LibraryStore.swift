@@ -92,7 +92,7 @@ public actor LibraryStore {
         let current = conversations[index]
         guard current.hasAudio else { return try delete(id: id) }
         let fm = FileManager.default
-        for name in [Transcript.fileName, Conversation.summaryFileName, ChatLog.fileName] {
+        for name in [Transcript.fileName, Conversation.summaryFileName, Conversation.summariesFolderName, ChatLog.fileName] {
             let url = current.folder.appendingPathComponent(name)
             if fm.fileExists(atPath: url.path) { try fm.trashItem(at: url, resultingItemURL: nil) }
         }
