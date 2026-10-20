@@ -81,6 +81,8 @@ struct SettingsSearchItem: Identifiable {
               tab: .transcription, subTab: "transcriptionModels"),
         .init(title: "Diarization models", keywords: ["speaker model", "speakers", "pyannote", "download"],
               tab: .transcription, subTab: "diarizationModels"),
+        .init(title: "Number of other speakers", keywords: ["speaker count", "diarization", "people"],
+              tab: .transcription, subTab: "diarizationModels"),
 
         // AI
         .init(title: "AI models (summaries and chat)",

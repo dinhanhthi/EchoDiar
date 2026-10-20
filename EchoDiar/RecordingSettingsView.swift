@@ -120,17 +120,7 @@ struct RecordingSettingsView: View {
     private var afterRecordingSection: some View {
         Section {
             Toggle("Transcribe automatically", isOn: model.setting(\.autoTranscribe))
-            Picker(selection: model.setting(\.speakerCountHint)) {
-                Text("Auto").tag(Int?.none)
-                ForEach(AppSettings.speakerCountHintRange, id: \.self) { Text("\($0)").tag(Int?.some($0)) }
-            } label: {
-                Text("Number of other speakers")
-                if model.installedModelIDs.contains(ModelCatalog.defaultDiarizer.id) {
-                    Text("A hint for telling the system audio's speakers apart.")
-                } else {
-                    Text("Needs the speaker model: download it in Transcription › Diarization model.")
-                }
-            }
+            SpeakerCountPicker(model: model)
             Toggle(isOn: model.setting(\.deferTranscriptionWhenConstrained)) {
                 Text("Wait when the Mac is hot or in Low Power Mode")
                 Text("Transcription starts once the Mac is ready.")
@@ -143,6 +133,25 @@ struct RecordingSettingsView: View {
         Binding(
             get: { model.settings.perAppBehavior[app.appBundleID] ?? .ask },
             set: { value in model.updateSettings { $0.perAppBehavior[app.appBundleID] = value == .ask ? nil : value } })
+    }
+}
+
+/// The speaker count hint, shown in Recording › After recording and in Transcription › Diarization model.
+struct SpeakerCountPicker: View {
+    let model: AppModel
+
+    var body: some View {
+        Picker(selection: model.setting(\.speakerCountHint)) {
+            Text("Auto").tag(Int?.none)
+            ForEach(AppSettings.speakerCountHintRange, id: \.self) { Text("\($0)").tag(Int?.some($0)) }
+        } label: {
+            Text("Number of other speakers")
+            if model.installedModelIDs.contains(ModelCatalog.defaultDiarizer.id) {
+                Text("A hint for telling the system audio's speakers apart.")
+            } else {
+                Text("Needs the speaker model: download it in Transcription › Diarization model.")
+            }
+        }
     }
 }
 

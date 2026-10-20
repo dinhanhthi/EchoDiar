@@ -34,6 +34,7 @@ struct ModelsSettingsView: View {
                 case .diarizationModels:
                     intro("Diarization finds who spoke when. The diarization model tells the voices apart and labels each part of the transcript with its speaker.")
                     tierSections(.diarization)
+                    Section { SpeakerCountPicker(model: model) }
                 }
             }
             .formStyle(.grouped)
