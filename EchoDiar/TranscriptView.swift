@@ -529,7 +529,7 @@ private struct SegmentList: View {
                     ForEach(transcript.segments) { segment in
                         SegmentRow(
                             segment: segment, name: transcript.displayName(for: segment.speaker),
-                            active: segment.id == active
+                            active: segment.id == active, speaking: segment.id == active && playback.isPlaying
                         ) {
                             following = true
                             playback.play(from: segment.start)
@@ -565,22 +565,35 @@ private struct SegmentList: View {
     }
 }
 
-/// Timestamp, speaker dot and name, selectable text. A click outside the text plays from the segment start.
+/// Timestamp, speaker dot and name, selectable text. A click anywhere on the row, the text included, plays from
+/// the segment start; a drag still selects the text.
 private struct SegmentRow: View {
     let segment: Transcript.Segment
     let name: String
     let active: Bool
+    let speaking: Bool
     let play: () -> Void
+    @State private var hovered = false
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var body: some View {
         HStack(alignment: .firstTextBaseline, spacing: 10) {
-            Button(action: play) {
-                Text(TranscriptView.timestamp(segment.start)).monospacedDigit()
+            VStack(spacing: 4) {
+                Button(action: play) {
+                    Text(TranscriptView.timestamp(segment.start)).monospacedDigit()
+                }
+                .buttonStyle(.plain)
+                .foregroundStyle(.secondary)
+                .help("Play from here")
+                // The segment being played back.
+                if speaking {
+                    Image(systemName: "waveform")
+                        .foregroundStyle(TranscriptView.color(for: segment.speaker))
+                        .symbolEffect(.variableColor.iterative, options: .repeating, isActive: !reduceMotion)
+                        .accessibilityHidden(true)
+                }
             }
-            .buttonStyle(.plain)
             .font(.caption)
-            .foregroundStyle(.secondary)
-            .help("Play from here")
             VStack(alignment: .leading, spacing: 2) {
                 HStack(spacing: 5) {
                     Circle().fill(TranscriptView.color(for: segment.speaker)).frame(width: 7, height: 7)
@@ -588,14 +601,19 @@ private struct SegmentRow: View {
                 }
                 Text(segment.text)
                     .textSelection(.enabled)
+                    // The selectable text takes the click for itself; a tap here plays alongside it.
+                    .simultaneousGesture(TapGesture().onEnded(play))
                     .frame(maxWidth: .infinity, alignment: .leading)
             }
         }
         .padding(.horizontal, 10)
         .padding(.vertical, 6)
         .background(
-            RoundedRectangle(cornerRadius: 10, style: .continuous).fill(active ? Palette.pressedFill : .clear))
+            RoundedRectangle(cornerRadius: 10, style: .continuous)
+                .fill(active ? Palette.pressedFill : hovered ? Palette.hoverFill : .clear))
         .contentShape(Rectangle())
+        .onHover { hovered = $0 }
+        .pointerStyle(.link)
         .onTapGesture(perform: play)
         .accessibilityAddTraits(active ? .isSelected : [])
     }
