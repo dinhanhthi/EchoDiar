@@ -25,6 +25,20 @@ struct ProvidersSettingsView: View {
     private static let mlxEntries = ModelCatalog.llm.filter { $0.runtime == .mlx }
 
     var body: some View {
+        ScrollViewReader { proxy in
+            form
+                // RAG's Set Up: once the inner tab shows, its provider's row (which expands itself) comes into view.
+                .onChange(of: model.settingsExpandedProvider, initial: true) { _, id in
+                    guard let id else { return }
+                    Task {
+                        await Task.yield()
+                        withAnimation { proxy.scrollTo(id, anchor: .top) }
+                    }
+                }
+        }
+    }
+
+    private var form: some View {
         Form {
             switch tab {
             case .onThisMac:
@@ -118,9 +132,7 @@ struct ProvidersSettingsView: View {
                 Text("Whole chat").tag(0)
             }
         } header: {
-            Text("Chat")
-        } footer: {
-            Text("Earlier messages sent with each question.")
+            SectionHeader(title: "Chat", description: "Earlier messages sent with each question.")
         }
     }
 
@@ -237,6 +249,16 @@ private struct APIProviderRow: View {
     private var isCustom: Bool { config.preset == nil }
 
     var body: some View {
+        disclosure
+            .id(config.id)
+            .onChange(of: model.settingsExpandedProvider, initial: true) { _, id in
+                guard id == config.id else { return }
+                expanded = true
+                model.settingsExpandedProvider = nil
+            }
+    }
+
+    private var disclosure: some View {
         DisclosureGroup(isExpanded: $expanded) {
             VStack(alignment: .leading, spacing: 12) {
                 if isCustom && config.kind == .openAICompatible {
@@ -309,6 +331,17 @@ struct SpeechProviderRow: View {
     @State private var pendingKey = ""
 
     var body: some View {
+        disclosure
+            .id(config.id)
+            // A cloud engine's Set Up on the same page.
+            .onChange(of: model.settingsExpandedProvider, initial: true) { _, id in
+                guard id == config.id else { return }
+                expanded = true
+                model.settingsExpandedProvider = nil
+            }
+    }
+
+    private var disclosure: some View {
         DisclosureGroup(isExpanded: $expanded) {
             VStack(alignment: .leading, spacing: 12) {
                 APIKeyField(providerID: config.id, model: model, key: $pendingKey)

@@ -22,6 +22,20 @@ struct ModelsSettingsView: View {
     ).filter { $0.kind == .asr || $0.kind == .diarization }
 
     var body: some View {
+        ScrollViewReader { proxy in
+            page
+                // A cloud row's Set Up: the speech-to-text API's row below (which expands itself) comes into view.
+                .onChange(of: model.settingsExpandedProvider, initial: true) { _, id in
+                    guard let id, tab == .transcriptionModels else { return }
+                    Task {
+                        await Task.yield()
+                        withAnimation { proxy.scrollTo(id, anchor: .top) }
+                    }
+                }
+        }
+    }
+
+    private var page: some View {
         VStack(spacing: 0) {
             Form {
                 switch tab {
@@ -92,23 +106,44 @@ struct ModelsSettingsView: View {
         }
     }
 
-    /// Configured cloud engines (enabled, with a key and a model) with Set default.
-    private var cloudSection: some View {
+    /// "Cloud": the model of the default cloud engine (its own box, as it follows the default), then every provider
+    /// that transcribes, with Set default once configured (enabled, with a key and a model) or Set Up.
+    @ViewBuilder private var cloudSection: some View {
+        if let config = defaultCloudConfig {
+            Section {
+                CloudModelField(config: config, model: model)
+            } header: {
+                cloudHeader
+            }
+            cloudProviders(header: false)
+        } else {
+            cloudProviders(header: true)
+        }
+    }
+
+    private func cloudProviders(header: Bool) -> some View {
         Section {
             Label("Audio leaves this Mac: cloud engines upload the recording to the provider.", systemImage: "exclamationmark.icloud")
                 .foregroundStyle(.orange)
-            let configs = model.cloudEngineConfigs
-            if configs.isEmpty {
-                Text("No cloud engine configured: turn on a speech-to-text API below.").foregroundStyle(.secondary)
+            let configured = Set(model.cloudEngineConfigs.map(\.id))
+            ForEach(model.providerConfigs.filter(CloudTranscription.supports)) { config in
+                CloudEngineRow(config: config, model: model, configured: configured.contains(config.id))
             }
-            ForEach(configs) { CloudEngineRow(config: $0, model: model) }
         } header: {
-            Text("Cloud")
-        } footer: {
-            Text("Prices are approximate list prices per audio hour; the mic and system channels are sent and billed separately.")
-                .font(.caption)
-                .foregroundStyle(.secondary)
+            if header { cloudHeader }
         }
+    }
+
+    private var cloudHeader: some View {
+        SectionHeader(
+            title: "Cloud",
+            description: "Prices are approximate list prices per audio hour; the mic and system channels are sent and billed separately.")
+    }
+
+    /// The provider of the default transcription model when it is a configured cloud engine.
+    private var defaultCloudConfig: ProviderConfig? {
+        guard let id = CloudTranscription.providerID(engineID: model.defaultASRModelID) else { return nil }
+        return model.cloudEngineConfigs.first { $0.id == id }
     }
 
     /// The speech-to-text APIs' keys and models; the LLM APIs that transcribe too are set up in AI.
@@ -118,11 +153,9 @@ struct ModelsSettingsView: View {
                 SpeechProviderRow(config: config, model: model)
             }
         } header: {
-            Text("Speech-to-text APIs")
-        } footer: {
-            Text("OpenAI, Groq, Mistral, Google Gemini and custom endpoints transcribe too, with their transcription model: set them up in Settings › AI.")
-                .font(.caption)
-                .foregroundStyle(.secondary)
+            SectionHeader(
+                title: "Speech-to-text APIs",
+                description: "OpenAI, Groq, Mistral, Google Gemini and custom endpoints transcribe too, with their transcription model: set them up in Settings › AI.")
         }
     }
 
@@ -305,7 +338,7 @@ struct ModelRow: View {
         }
     }
 
-    private static func sizeText(_ mib: Int) -> String {
+    static func sizeText(_ mib: Int) -> String {
         mib < 1024 ? "\(mib) MiB" : String(format: "%.1f GB", Double(mib) / 1024)
     }
 
@@ -328,6 +361,8 @@ struct ModelRow: View {
 private struct CloudEngineRow: View {
     let config: ProviderConfig
     let model: AppModel
+    /// Enabled, with a key and a model: it can be the default. Else Set Up opens where it is configured.
+    let configured: Bool
 
     /// Approximate pay-as-you-go prices per audio hour (docs/research/asr-diarization-models.md F, 2026-10-18).
     private static let prices: [String: String] = [
@@ -340,12 +375,17 @@ private struct CloudEngineRow: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
             HStack(spacing: 8) {
-                Text(model.cloudEngineName(config))
+                Text(configured ? model.cloudEngineName(config) : config.displayName)
                     .lineLimit(1)
                     .truncationMode(.tail)
-                if model.defaultASRModelID == engineID { Badge(text: "Default", color: .accentColor) }
+                if configured && model.defaultASRModelID == engineID { Badge(text: "Default", color: .accentColor) }
                 Spacer(minLength: 8)
-                if model.defaultASRModelID != engineID {
+                if !configured {
+                    Button("Set Up…", action: setUp)
+                        .controlSize(.small)
+                        .help(config.kind == .speechToText
+                              ? "Add the key of \(config.displayName) below" : "Turn on \(config.displayName) in Settings › AI")
+                } else if model.defaultASRModelID != engineID {
                     Button("Set default") { model.setDefaultASRModel(engineID) }
                         .controlSize(.small)
                 }
@@ -361,6 +401,100 @@ private struct CloudEngineRow: View {
             }
         }
         .padding(.vertical, 2)
+    }
+
+    /// Speech-to-text APIs are set up in their row below on this page, the LLM APIs in Settings › AI.
+    private func setUp() {
+        model.settingsExpandedProvider = config.id
+        if config.kind != .speechToText { model.openSettings(tab: .providers, subTab: "cloudAPIs") }
+    }
+}
+
+/// The default cloud engine's transcription model: free text, a menu of the known models and, for the APIs that list
+/// their models, "Load models" (only the ones that transcribe).
+private struct CloudModelField: View {
+    let config: ProviderConfig
+    let model: AppModel
+
+    @State private var loaded: [String]?
+    @State private var loading = false
+    @State private var error: String?
+
+    /// The speech-to-text APIs have no model list; their known models are offered.
+    private static let knownModels: [String: [String]] = OpenAICompatibleTranscriber.presetModels.merging([
+        "elevenlabs": [ElevenLabsTranscriber.defaultModel], "deepgram": [DeepgramTranscriber.defaultModel],
+        "gemini": [GeminiAudioTranscriber.defaultModel],
+    ]) { first, _ in first }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            if config.preset == "assemblyai" {
+                LabeledContent("Model") { Text("Picked by AssemblyAI for the language (Universal)") }
+            } else {
+                HStack(spacing: 8) {
+                    TextField("Model", text: Binding(
+                        get: { config.transcriptionModel },
+                        set: { value in model.updateProvider(id: config.id) { $0.transcriptionModel = value } }
+                    ), prompt: Text(prompt))
+                    let choices = Self.unique((Self.knownModels[config.preset ?? ""] ?? []) + (loaded ?? []))
+                    if !choices.isEmpty {
+                        Menu("\(choices.count) model\(choices.count == 1 ? "" : "s")") {
+                            ForEach(choices, id: \.self) { id in
+                                Button(id) { model.updateProvider(id: config.id) { $0.transcriptionModel = id } }
+                            }
+                        }
+                        .fixedSize()
+                    }
+                    if config.kind == .openAICompatible {
+                        Button("Load models") { Task { await load() } }
+                            .disabled(loading)
+                        if loading { ProgressView().controlSize(.small) }
+                    }
+                }
+                if let error {
+                    Text(error).font(.caption).foregroundStyle(.red).lineLimit(2)
+                } else if loaded?.isEmpty == true {
+                    Text("No transcription models listed; type the model id.").font(.caption).foregroundStyle(.secondary)
+                }
+            }
+        }
+        // Loaded models belong to the provider they came from.
+        .onChange(of: config.id) {
+            loaded = nil
+            error = nil
+        }
+    }
+
+    private var prompt: String {
+        let fallback = CloudTranscription.defaultModel(for: config)
+        return fallback.isEmpty ? "Transcription model id, e.g. whisper-1" : fallback
+    }
+
+    private func load() async {
+        loading = true
+        defer { loading = false }
+        do {
+            let all = try await model.makeProvider(for: config)?.listModels() ?? []
+            loaded = all.filter { Self.transcribes($0, preset: config.preset) }.sorted()
+            error = nil
+        } catch {
+            self.error = error.localizedDescription.split(whereSeparator: \.isNewline).first.map(String.init)
+        }
+    }
+
+    /// Transcription models are named after it (whisper-1, gpt-4o-transcribe, voxtral-mini); Gemini transcribes with
+    /// its own models through the native audio API.
+    private static func transcribes(_ id: String, preset: String?) -> Bool {
+        let id = id.lowercased()
+        if preset == "gemini" { return id.contains("gemini") }
+        return ["whisper", "transcribe", "voxtral", "scribe", "nova", "speech"].contains { id.contains($0) }
+    }
+
+    /// Non-empty ids, first occurrence kept.
+    private static func unique(_ ids: [String]) -> [String] {
+        var seen: [String] = []
+        for id in ids where !id.isEmpty && !seen.contains(id) { seen.append(id) }
+        return seen
     }
 }
 

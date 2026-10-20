@@ -116,10 +116,9 @@ struct RecordingSettingsView: View {
                 title: "Stop after a recording length of", unit: "min",
                 value: model.setting(\.endMonitor.maxDurationMinutes),
                 range: MeetingEndMonitor.Configuration.maxDurationRange)
-        } footer: {
-            Text("The indicator asks before stopping, with a 15 s countdown. Reaching the length limit stops at once.")
-                .font(.caption)
-                .foregroundStyle(.secondary)
+        } header: {
+            SectionHeader(
+                description: "The indicator asks before stopping, with a 15 s countdown. Reaching the length limit stops at once.")
         }
     }
 

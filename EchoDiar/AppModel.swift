@@ -65,6 +65,8 @@ final class AppModel {
     /// The inner tab (its id in `SettingsTab.subTabs`) each Settings section shows; a section missing here shows its
     /// first.
     var settingsSubTabs: [SettingsTab: String] = [:]
+    /// A provider whose row Settings › AI opens and scrolls to (RAG's Set Up); its row clears it once expanded.
+    var settingsExpandedProvider: String?
     /// Running model downloads, by catalog id.
     private(set) var downloads: [String: ModelDownload] = [:]
     /// Last download error, by catalog id; cleared when a download of that id starts.
