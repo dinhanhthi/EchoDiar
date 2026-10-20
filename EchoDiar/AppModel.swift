@@ -99,6 +99,8 @@ final class AppModel {
     private(set) var autoStartedAppName: String?
     /// Why the global record shortcut could not be registered; nil when registered or off.
     private(set) var hotKeyError: String?
+    /// Why the global pause shortcut could not be registered; nil when registered or off.
+    private(set) var pauseHotKeyError: String?
     /// ⌘F asks the main window's search field to take the focus; false again once it stops editing.
     var searchPresented = false
     /// Cards are selected in the list: Esc cancels the selection instead of going back.
@@ -253,8 +255,9 @@ final class AppModel {
     @ObservationIgnored private var autoStartNoticeTask: Task<Void, Never>?
     /// Created on the normal launch path only (not for the DEBUG harnesses).
     @ObservationIgnored private var hotKey: GlobalHotKey?
-    /// The Shortcuts tab is recording a new shortcut: the current one is unregistered meanwhile.
-    @ObservationIgnored private var hotKeyCapturing = false
+    @ObservationIgnored private var pauseHotKey: GlobalHotKey?
+    /// The Shortcuts tab is recording a new shortcut: the current ones are unregistered meanwhile.
+    private var hotKeyCapturing = false
     /// The Shortcuts tab is recording a new shortcut: the main window's Esc and Space go to it.
     var isCapturingHotKey: Bool { hotKeyCapturing }
 
@@ -303,7 +306,8 @@ final class AppModel {
         #endif
         guard ProcessInfo.processInfo.arguments.allSatisfy({ !Self.harnessArguments.contains($0) }) else { return }
         if !settings.onboardingCompleted { OnboardingWindow.shared.show(model: self) }
-        hotKey = GlobalHotKey { [weak self] in self?.toggleRecording() }
+        hotKey = GlobalHotKey(id: 1) { [weak self] in self?.toggleRecording() }
+        pauseHotKey = GlobalHotKey(id: 2) { [weak self] in self?.togglePause() }
         syncHotKey()
         observeTranscriptions()
         startMeetingServices()
@@ -1040,6 +1044,8 @@ final class AppModel {
         let retentionChanged = updated.autoDeleteEnabled != settings.autoDeleteEnabled
         let hotKeyChanged = updated.globalHotKey != settings.globalHotKey
             || updated.globalHotKeyEnabled != settings.globalHotKeyEnabled
+            || updated.globalPauseHotKey != settings.globalPauseHotKey
+            || updated.globalPauseHotKeyEnabled != settings.globalPauseHotKeyEnabled
         let ragChanged = updated.ragEnabled != settings.ragEnabled
             || updated.embeddingModelID != settings.embeddingModelID
             || updated.embeddingAPIModel != settings.embeddingAPIModel
@@ -1095,17 +1101,19 @@ final class AppModel {
 
     // MARK: - Global shortcut
 
-    /// While the Shortcuts tab records a new shortcut, the current one is unregistered so it reaches the recorder.
+    /// While the Shortcuts tab records a new shortcut, the current ones are unregistered so they reach the recorder.
     func setHotKeyCapture(_ capturing: Bool) {
         hotKeyCapturing = capturing
         syncHotKey()
     }
 
-    /// Registers `globalHotKey` when it is on (and not being recorded), else unregisters it.
+    /// Registers `globalHotKey` and `globalPauseHotKey` when on (and not being recorded), else unregisters them.
     private func syncHotKey() {
-        guard let hotKey else { return }
+        guard let hotKey, let pauseHotKey else { return }
         let key = settings.globalHotKeyEnabled && !hotKeyCapturing ? settings.globalHotKey : nil
         hotKeyError = hotKey.register(key)
+        let pauseKey = settings.globalPauseHotKeyEnabled && !hotKeyCapturing ? settings.globalPauseHotKey : nil
+        pauseHotKeyError = pauseHotKey.register(pauseKey)
     }
 
     // MARK: - AI providers

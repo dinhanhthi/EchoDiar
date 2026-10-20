@@ -23,7 +23,7 @@
 - Optional cloud transcription: OpenAI-compatible services, ElevenLabs, Gemini, Deepgram and AssemblyAI.
 - AI summaries and chat with on-device Foundation Models, local MLX models, local servers (LM Studio, Ollama, ...), cloud APIs (OpenAI, Anthropic, Gemini, ...) or coding CLIs (Claude Code, Codex, OpenCode, Gemini CLI). Answers cite timestamps that jump to that moment. "Copy as prompt" for any other AI tool.
 - Meeting detection that offers to record, a floating indicator that can follow the meeting window, and auto-stop when the call ends.
-- A library grouped by day with search (⌘F), compression to AAC, crash recovery, automatic deletion of old recordings, a global shortcut (⌥⌘R) and automatic updates.
+- A library grouped by day with search (⌘F), compression to AAC, crash recovery, automatic deletion of old recordings, global shortcuts to record (⌥⌘R) and pause (⌥⌘P) and automatic updates.
 
 ## Install
 

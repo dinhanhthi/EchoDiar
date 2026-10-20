@@ -2,15 +2,18 @@ import AppKit
 import Carbon.HIToolbox
 import EchoCore
 
-/// The global record shortcut, through Carbon's `RegisterEventHotKey`: works while other apps are in front and needs
-/// no Accessibility or Input Monitoring permission. One shortcut at a time; Carbon delivers it on the main thread.
+/// A global shortcut (record, pause), through Carbon's `RegisterEventHotKey`: works while other apps are in front and
+/// needs no Accessibility or Input Monitoring permission. One shortcut per instance, told apart by `id`; Carbon
+/// delivers it on the main thread.
 @MainActor
 final class GlobalHotKey {
+    private let id: UInt32
     private let action: @MainActor () -> Void
     private var handler: EventHandlerRef?
     private var registered: EventHotKeyRef?
 
-    init(action: @escaping @MainActor () -> Void) {
+    init(id: UInt32, action: @escaping @MainActor () -> Void) {
+        self.id = id
         self.action = action
     }
 
@@ -27,8 +30,8 @@ final class GlobalHotKey {
             guard status == noErr else { return "The shortcut could not be set up (error \(status))." }
         }
         var ref: EventHotKeyRef?
-        let id = EventHotKeyID(signature: OSType(0x4544_484B), id: 1)  // "EDHK"
-        let status = RegisterEventHotKey(key.keyCode, key.modifiers, id, GetApplicationEventTarget(), 0, &ref)
+        let hotKeyID = EventHotKeyID(signature: Self.signature, id: id)
+        let status = RegisterEventHotKey(key.keyCode, key.modifiers, hotKeyID, GetApplicationEventTarget(), 0, &ref)
         switch status {
         case noErr:
             registered = ref
@@ -40,12 +43,23 @@ final class GlobalHotKey {
         }
     }
 
-    /// Never released: the instance lives as long as the app (owned by `AppModel`).
-    private static let callback: EventHandlerUPP = { _, _, userData in
-        guard let userData else { return OSStatus(eventNotHandledErr) }
+    private static let signature = OSType(0x4544_484B)  // "EDHK"
+
+    /// Never released: the instance lives as long as the app (owned by `AppModel`). Every instance's handler sees
+    /// every press: another instance's shortcut is passed on to the next handler.
+    private static let callback: EventHandlerUPP = { _, event, userData in
+        guard let event, let userData else { return OSStatus(eventNotHandledErr) }
+        var pressed = EventHotKeyID()
+        let status = GetEventParameter(
+            event, EventParamName(kEventParamDirectObject), EventParamType(typeEventHotKeyID), nil,
+            MemoryLayout<EventHotKeyID>.size, nil, &pressed)
+        guard status == noErr, pressed.signature == signature else { return OSStatus(eventNotHandledErr) }
         let hotKey = Unmanaged<GlobalHotKey>.fromOpaque(userData).takeUnretainedValue()
-        MainActor.assumeIsolated { hotKey.action() }
-        return noErr
+        return MainActor.assumeIsolated {
+            guard pressed.id == hotKey.id else { return OSStatus(eventNotHandledErr) }
+            hotKey.action()
+            return noErr
+        }
     }
 }
 

@@ -20,7 +20,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Copy as prompt: copies the transcript and your question, ready to paste into any AI tool.
 - Meeting detection that offers to record when a call starts (or starts on its own for the apps you choose), a floating recording indicator that can follow the meeting window, and auto-stop when the meeting ends.
 - Storage settings that delete old recordings automatically (the whole conversation or only its audio).
-- A global shortcut to start and stop recording (⌥⌘R by default).
+- Global shortcuts to start and stop recording (⌥⌘R by default) and to pause and resume it (⌥⌘P by default).
 - First-run onboarding with a consent reminder, the microphone prompt and a system audio test.
 - Automatic update checks in the background; "Check for Updates…" in the menu bar menu.
 - Ask across conversations (opt-in, Settings › RAG): ask about all your transcribed conversations from the sparkles button in the toolbar; answers cite the conversation and the moment, and a click opens it at that time. Conversations are indexed in the background on this Mac by default (Qwen3-Embedding, multilingual-e5, bge-m3 or Apple's built-in model), or with an embedding API after you agree for each destination; indexing pauses while recording.

@@ -84,6 +84,9 @@ public struct AppSettings: Codable, Equatable, Sendable {
     /// Global record start/stop shortcut, in Carbon terms for `RegisterEventHotKey`.
     public var globalHotKey: HotKey
     public var globalHotKeyEnabled: Bool
+    /// Global pause/resume shortcut, same terms as `globalHotKey`.
+    public var globalPauseHotKey: HotKey
+    public var globalPauseHotKeyEnabled: Bool
 
     public static let defaultLiveTranscriptEngine = "whisperkit-turbo-632"
     public static let defaultEmbeddingModelID = "mlx-qwen3-embedding-0.6b"
@@ -128,7 +131,9 @@ public struct AppSettings: Codable, Equatable, Sendable {
         deleteAudioAfterTranscription: Bool = false,
         deleteWithoutConfirmation: Bool = false,
         globalHotKey: HotKey = .defaultRecord,
-        globalHotKeyEnabled: Bool = true
+        globalHotKeyEnabled: Bool = true,
+        globalPauseHotKey: HotKey = .defaultPause,
+        globalPauseHotKeyEnabled: Bool = true
     ) {
         self.launchAtLogin = launchAtLogin
         self.defaultLanguage = defaultLanguage
@@ -170,6 +175,8 @@ public struct AppSettings: Codable, Equatable, Sendable {
         self.deleteWithoutConfirmation = deleteWithoutConfirmation
         self.globalHotKey = globalHotKey
         self.globalHotKeyEnabled = globalHotKeyEnabled
+        self.globalPauseHotKey = globalPauseHotKey
+        self.globalPauseHotKeyEnabled = globalPauseHotKeyEnabled
     }
 
     public static let autoDeleteDaysRange = 1...3650
@@ -186,7 +193,7 @@ public struct AppSettings: Codable, Equatable, Sendable {
         case attachPillToWindow, pillWindowOffset, endMonitor, routeChangeBehavior
         case autoTranscribe, speakerCountHint, deferTranscriptionWhenConstrained
         case autoDeleteEnabled, autoDeleteAfterDays, autoDeleteMode, deleteAudioAfterTranscription
-        case deleteWithoutConfirmation, globalHotKey, globalHotKeyEnabled
+        case deleteWithoutConfirmation, globalHotKey, globalHotKeyEnabled, globalPauseHotKey, globalPauseHotKeyEnabled
     }
 
     public init(from decoder: Decoder) throws {
@@ -241,6 +248,9 @@ public struct AppSettings: Codable, Equatable, Sendable {
         let hotKey = try container.decodeIfPresent(HotKey.self, forKey: .globalHotKey) ?? .defaultRecord
         globalHotKey = hotKey.hasCommandModifier ? hotKey : .defaultRecord
         globalHotKeyEnabled = try container.decodeIfPresent(Bool.self, forKey: .globalHotKeyEnabled) ?? true
+        let pauseHotKey = try container.decodeIfPresent(HotKey.self, forKey: .globalPauseHotKey) ?? .defaultPause
+        globalPauseHotKey = pauseHotKey.hasCommandModifier ? pauseHotKey : .defaultPause
+        globalPauseHotKeyEnabled = try container.decodeIfPresent(Bool.self, forKey: .globalPauseHotKeyEnabled) ?? true
     }
 
     private static func clamped(_ value: Int, to range: ClosedRange<Int>) -> Int {
@@ -300,6 +310,8 @@ public struct HotKey: Codable, Equatable, Sendable {
 
     /// ⌥⌘R: `kVK_ANSI_R` with `optionKey | cmdKey`.
     public static let defaultRecord = HotKey(keyCode: 0x0F, modifiers: 1 << 11 | 1 << 8)
+    /// ⌥⌘P: `kVK_ANSI_P` with `optionKey | cmdKey`.
+    public static let defaultPause = HotKey(keyCode: 0x23, modifiers: 1 << 11 | 1 << 8)
 
     public init(keyCode: UInt32, modifiers: UInt32) {
         self.keyCode = keyCode

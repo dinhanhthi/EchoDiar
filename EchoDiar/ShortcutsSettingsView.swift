@@ -2,7 +2,8 @@ import AppKit
 import EchoCore
 import SwiftUI
 
-/// The Shortcuts tab: the global record shortcut (recorder field, on/off, why it failed) and the in-app shortcuts.
+/// The Shortcuts tab: the global record and pause shortcuts (recorder field, on/off, why it failed) and the in-app
+/// shortcuts.
 struct ShortcutsSettingsView: View {
     let model: AppModel
 
@@ -27,13 +28,28 @@ struct ShortcutsSettingsView: View {
                     Text("Starts or stops recording from any app.")
                 }
                 LabeledContent("Shortcut") {
-                    HotKeyRecorder(model: model)
+                    HotKeyRecorder(
+                        model: model, key: \.globalHotKey, defaultKey: .defaultRecord,
+                        other: \.globalPauseHotKey, otherName: "global pause shortcut")
                 }
                 .disabled(!model.settings.globalHotKeyEnabled)
                 if let error = model.hotKeyError {
-                    Label(error, systemImage: "exclamationmark.triangle.fill")
-                        .font(.callout)
-                        .foregroundStyle(.yellow)
+                    errorLabel(error)
+                }
+            }
+            Section {
+                Toggle(isOn: model.setting(\.globalPauseHotKeyEnabled)) {
+                    Text("Global pause shortcut")
+                    Text("Pauses or resumes the recording from any app.")
+                }
+                LabeledContent("Shortcut") {
+                    HotKeyRecorder(
+                        model: model, key: \.globalPauseHotKey, defaultKey: .defaultPause,
+                        other: \.globalHotKey, otherName: "global record shortcut")
+                }
+                .disabled(!model.settings.globalPauseHotKeyEnabled)
+                if let error = model.pauseHotKeyError {
+                    errorLabel(error)
                 }
             }
             Section("In EchoDiar") {
@@ -46,6 +62,12 @@ struct ShortcutsSettingsView: View {
         }
         .formStyle(.grouped)
     }
+
+    private func errorLabel(_ error: String) -> some View {
+        Label(error, systemImage: "exclamationmark.triangle.fill")
+            .font(.callout)
+            .foregroundStyle(.yellow)
+    }
 }
 
 /// The keys with a small gap after each modifier symbol, so "⇧⌘P" does not read as one glyph.
@@ -57,10 +79,15 @@ private func keysText(_ keys: String) -> Text {
     return Text(text)
 }
 
-/// Click, then press the new shortcut; Esc cancels. The registered shortcut is off while recording, so pressing it
-/// lands here instead of toggling a recording.
+/// Click, then press the new shortcut for `key`; Esc cancels. The registered shortcuts are off while recording, so
+/// pressing one lands here instead of toggling a recording. One recorder records at a time.
 private struct HotKeyRecorder: View {
     let model: AppModel
+    let key: WritableKeyPath<AppSettings, HotKey>
+    let defaultKey: HotKey
+    /// The other global shortcut, which this one may not equal.
+    let other: KeyPath<AppSettings, HotKey>
+    let otherName: String
     @State private var monitor: Any?
     @State private var note: String?
 
@@ -69,14 +96,15 @@ private struct HotKeyRecorder: View {
             HStack(spacing: 6) {
                 Button(action: toggle) {
                     Group {
-                        if monitor == nil { keysText(model.settings.globalHotKey.displayString) } else { Text("Press a shortcut…") }
+                        if monitor == nil { keysText(model.settings[keyPath: key].displayString) } else { Text("Press a shortcut…") }
                     }
                     .monospaced()
                         .frame(minWidth: 120)
                 }
                 .help(monitor == nil ? "Click to record a new shortcut" : "Press Esc to cancel")
-                if model.settings.globalHotKey != .defaultRecord {
-                    Button("Reset") { model.updateSettings { $0.globalHotKey = .defaultRecord } }
+                .disabled(monitor == nil && model.isCapturingHotKey)
+                if model.settings[keyPath: key] != defaultKey {
+                    Button("Reset") { reset() }
                 }
             }
             if let note {
@@ -111,18 +139,32 @@ private struct HotKeyRecorder: View {
             stop()
             return
         }
-        let key = HotKey(keyCode: event.keyCode, flags: event.modifierFlags)
-        guard key.hasCommandModifier else {
+        let pressed = HotKey(keyCode: event.keyCode, flags: event.modifierFlags)
+        guard pressed.hasCommandModifier else {
             note = "Use ⌘, ⌥ or ⌃ with the key."
             return
         }
         // A global shortcut takes the keys from every app: none of the standard menu shortcuts (⌘C, ⌘Q…).
-        if let taken = Self.menuItem(for: key, in: NSApp.mainMenu) {
-            note = "\(key.displayString) is the \"\(taken.title)\" menu shortcut."
+        if let taken = Self.menuItem(for: pressed, in: NSApp.mainMenu) {
+            note = "\(pressed.displayString) is the \"\(taken.title)\" menu shortcut."
+            return
+        }
+        if pressed == model.settings[keyPath: other] {
+            note = "\(pressed.displayString) is the \(otherName)."
             return
         }
         stop()
-        model.updateSettings { $0.globalHotKey = key }
+        model.updateSettings { $0[keyPath: key] = pressed }
+    }
+
+    /// Back to `defaultKey`, unless the other shortcut has taken it.
+    private func reset() {
+        guard defaultKey != model.settings[keyPath: other] else {
+            note = "\(defaultKey.displayString) is the \(otherName)."
+            return
+        }
+        note = nil
+        model.updateSettings { $0[keyPath: key] = defaultKey }
     }
 
     /// The main menu item (submenus included) with the same shortcut.

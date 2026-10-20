@@ -126,6 +126,7 @@ struct SettingsSearchItem: Identifiable {
 
         // Shortcuts
         .init(title: "Global record shortcut", keywords: ["hotkey", "keyboard", "record from any app"], tab: .shortcuts),
+        .init(title: "Global pause shortcut", keywords: ["hotkey", "keyboard", "pause", "resume"], tab: .shortcuts),
         .init(title: "In EchoDiar", keywords: ["keyboard shortcuts", "keys"]
               + ShortcutsSettingsView.inAppShortcuts.map(\.action), tab: .shortcuts),
 
