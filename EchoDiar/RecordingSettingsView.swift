@@ -1,6 +1,8 @@
 import AppKit
 import CoreAudio
+import EchoAI
 import EchoCore
+import EchoTranscribe
 import SwiftUI
 
 /// The Recording tab, one inner tab per section: the microphone, meeting detection and per-app behavior with the
@@ -151,8 +153,15 @@ struct SpeakerCountPicker: View {
             ForEach(AppSettings.speakerCountHintRange, id: \.self) { Text("\($0)").tag(Int?.some($0)) }
         } label: {
             Text("Number of other speakers")
-            if model.installedModelIDs.contains(ModelCatalog.defaultDiarizer.id) {
+            if model.diarizerAvailable {
                 Text("A hint for telling the system audio's speakers apart.")
+                if SpeakerDiarizer.nemotronPresets[model.defaultDiarizerModelID] != nil {
+                    Text("Nemotron tells up to 8 speakers apart and ignores this number; above 8, pyannote is used when installed.")
+                } else if let providerID = CloudTranscription.providerID(engineID: model.defaultDiarizerModelID),
+                          let config = model.cloudDiarizerConfigs.first(where: { $0.id == providerID }),
+                          CloudTranscription.diarizes(config, model: CloudTranscription.diarizationModel(for: config)) {
+                    Text("Cloud diarization does not take this number.")
+                }
             } else {
                 Text("Needs the speaker model: download it in Transcription › Diarization model.")
             }

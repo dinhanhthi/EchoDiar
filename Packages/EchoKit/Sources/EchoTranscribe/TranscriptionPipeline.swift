@@ -6,9 +6,10 @@ import EchoCore
 import Foundation
 
 /// Batch transcription of recording folders, one job at a time: extract each channel to 16 kHz mono, skip silent
-/// channels, ASR mic, ASR system, diarize system, merge, write `transcript.json`. Models are loaded inside each
-/// step and unloaded before the next, while the job holds the `ModelLoadGate` (it waits while live captions hold
-/// it). Never touches EchoAudio: `AppModel` runs compression first.
+/// channels, ASR mic, ASR system, diarize system (the cloud diarizer when given, else or after its failure the
+/// local one), merge, write `transcript.json`. Models are loaded inside each step and unloaded before the next,
+/// while the job holds the `ModelLoadGate` (it waits while live captions hold it). Never touches EchoAudio:
+/// `AppModel` runs compression first.
 public actor TranscriptionPipeline {
     public typealias EngineFactory = @Sendable (_ entry: ModelEntry, _ folder: URL) -> any TranscriptionEngine
 
@@ -77,12 +78,15 @@ public actor TranscriptionPipeline {
 
     /// Runs after every job queued before it; returns the `transcript.json` URL. `cloud`: the job's cloud engine
     /// (resolved by the app from settings and the Keychain), which replaces `job.engineID`'s resolution.
-    public func transcribe(_ job: TranscriptionJob, cloud: CloudEngine? = nil) async throws -> URL {
+    /// `cloudDiarizer`: labels the system channel's speakers when the ASR does not (its text is dropped).
+    public func transcribe(
+        _ job: TranscriptionJob, cloud: CloudEngine? = nil, cloudDiarizer: CloudEngine? = nil
+    ) async throws -> URL {
         emit(job, .queued, 0)
         let previous = tail
         let task = Task(priority: .utility) {
             await previous?.value
-            return try await self.run(job, cloud: cloud)
+            return try await self.run(job, cloud: cloud, cloudDiarizer: cloudDiarizer)
         }
         tail = Task { _ = await task.result }
         return try await task.value
@@ -101,7 +105,7 @@ public actor TranscriptionPipeline {
         _ progress: @escaping @Sendable (Double) -> Void
     ) async throws -> [RawSegment]
 
-    private func run(_ job: TranscriptionJob, cloud: CloudEngine?) async throws -> URL {
+    private func run(_ job: TranscriptionJob, cloud: CloudEngine?, cloudDiarizer: CloudEngine?) async throws -> URL {
         var started = false
         do {
             if deferWhenConstrained && !job.processNow { await waitWhileConstrained(job) }
@@ -112,13 +116,12 @@ public actor TranscriptionPipeline {
             if let language = job.language { session.languageMarkers = [.init(fileTime: 0, language: language)] }
             let sources = try channelSources(session: session, job: job)
             let ranges = LanguageRange.ranges(from: session.languageMarkers)
-            let diarizerID = ModelCatalog.defaultDiarizer.id
-            let diarizer = modelStore.isInstalled(diarizerID)
-                ? modelStore.folder(for: diarizerID).map {
-                    SpeakerDiarizer(
-                        entryID: diarizerID, folder: $0, speakerCountHint: job.speakerCountHint ?? speakerCountHint)
-                }
-                : nil
+            let hint = job.speakerCountHint ?? speakerCountHint
+            let diarizerID = Self.localDiarizerID(
+                preferred: job.diarizerID, speakerCountHint: hint, isInstalled: { modelStore.isInstalled($0) })
+            let diarizer = diarizerID.flatMap { id in
+                modelStore.folder(for: id).map { SpeakerDiarizer(entryID: id, folder: $0, speakerCountHint: hint) }
+            }
 
             let url: URL
             if let cloud {
@@ -129,7 +132,7 @@ public actor TranscriptionPipeline {
                 url = try await process(
                     job, session: session, sources: sources, engineID: cloud.engineID,
                     modelID: cloud.model.isEmpty ? nil : cloud.model, engineFallback: nil, diarizer: diarizer,
-                    gateDiarization: true
+                    cloudDiarizer: cloudDiarizer, gateDiarization: true
                 ) { _, source, channel, _ in
                     try await Self.cloudSegments(cloud, source: source, language: language, diarize: channel == .system)
                 }
@@ -150,7 +153,8 @@ public actor TranscriptionPipeline {
                     return try await process(
                         job, session: session, sources: sources, engineID: entry.id,
                         modelID: [entry.repo, entry.subfolder].compactMap { $0 }.joined(separator: "/"),
-                        engineFallback: engineFallback, diarizer: diarizer, gateDiarization: false
+                        engineFallback: engineFallback, diarizer: diarizer, cloudDiarizer: cloudDiarizer,
+                        gateDiarization: false
                     ) { extracted, _, _, progress in
                         try await engine.transcribe(channelURL: extracted, languageRanges: ranges, progress: progress)
                     }
@@ -176,12 +180,14 @@ public actor TranscriptionPipeline {
     }
 
     /// Extracts each channel (skipping silent ones), runs `asr` on it, diarizes the system channel unless `asr`
-    /// returned provider speaker labels, merges and writes `transcript.json`. `gateDiarization`: the caller does
-    /// not hold the `ModelLoadGate` (cloud ASR), so the diarizer takes it.
+    /// returned provider speaker labels, merges and writes `transcript.json`. Diarization: `cloudDiarizer` first
+    /// (never takes the gate itself); `diarizer` when there is none, or after it failed or labeled no speaker
+    /// (`Transcript.cloudDiarizationFailedNote`). `gateDiarization`: the caller does not hold the `ModelLoadGate`
+    /// (cloud ASR), so the local diarizer takes it.
     private func process(
         _ job: TranscriptionJob, session: RecordingSession, sources: (mic: ChannelSource?, system: ChannelSource?),
         engineID: String, modelID: String?, engineFallback: String?, diarizer: SpeakerDiarizer?,
-        gateDiarization: Bool, asr: ChannelASR
+        cloudDiarizer: CloudEngine?, gateDiarization: Bool, asr: ChannelASR
     ) async throws -> URL {
         let fm = FileManager.default
         let work = fm.temporaryDirectory.appendingPathComponent("EchoDiar-transcribe-\(UUID().uuidString)")
@@ -202,6 +208,7 @@ public actor TranscriptionPipeline {
 
         var system: [RawSegment] = []
         var turns: [DiarizationTurn] = []
+        var notes: [String] = []
         if let source = sources.system {
             emit(job, .extracting, 0.4)
             if let url = try await extract(source, to: work.appendingPathComponent("system.caf")) {
@@ -209,29 +216,51 @@ public actor TranscriptionPipeline {
                 system = try await asr(url, source, .system) { [self] fraction in
                     emit(job, .transcribingSystem, 0.45 + 0.35 * fraction)
                 }
-                if let diarizer, !system.isEmpty, !system.contains(where: { $0.speaker != nil }) {
-                    emit(job, .diarizing, 0.8)
-                    let diarize: @Sendable () async throws -> [DiarizationTurn] = { [self] in
-                        try await diarizer.diarize(channelURL: url) { [self] fraction in
-                            emit(job, .diarizing, 0.8 + 0.15 * fraction)
+                if !system.isEmpty, !system.contains(where: { $0.speaker != nil }) {
+                    if let cloudDiarizer {
+                        emit(job, .diarizing, 0.8)
+                        do {
+                            turns = try await Self.cloudTurns(
+                                cloudDiarizer, source: source,
+                                language: Self.cloudLanguage(LanguageRange.ranges(from: session.languageMarkers)))
+                        } catch let error as CancellationError {
+                            throw error
+                        } catch {
+                            // A cancelled upload throws URLError, not CancellationError.
+                            if Task.isCancelled { throw error }
+                            // Error kind only: a provider message can carry the request or response body.
+                            NSLog("EchoDiar: cloud diarization (%@) failed: %@",
+                                  cloudDiarizer.name, String(reflecting: type(of: error)))
                         }
+                        if turns.isEmpty { notes.append(Transcript.cloudDiarizationFailedNote) }
                     }
-                    turns = gateDiarization
-                        ? try await gate.withExclusiveModel(owner: .transcriptionJob, diarize)
-                        : try await diarize()
+                    if turns.isEmpty, let diarizer {
+                        emit(job, .diarizing, 0.8)
+                        let diarize: @Sendable () async throws -> [DiarizationTurn] = { [self] in
+                            try await diarizer.diarize(channelURL: url) { [self] fraction in
+                                emit(job, .diarizing, 0.8 + 0.15 * fraction)
+                            }
+                        }
+                        turns = gateDiarization
+                            ? try await gate.withExclusiveModel(owner: .transcriptionJob, diarize)
+                            : try await diarize()
+                    }
                 }
             }
         }
 
         emit(job, .merging, 0.95)
         let providerSpeakers = system.contains { $0.speaker != nil }
+        if diarizer == nil && turns.isEmpty && !system.isEmpty && !providerSpeakers {
+            notes.append(Transcript.diarizationMissingNote)
+        }
         let transcript = Transcript(
             segments: TranscriptMerger.merge(
                 mic: mic, system: system, turns: turns, languageMarkers: session.languageMarkers),
             engineID: engineID,
             modelID: modelID,
             engineFallback: engineFallback,
-            notes: diarizer == nil && !system.isEmpty && !providerSpeakers ? [Transcript.diarizationMissingNote] : []
+            notes: notes
         )
         try transcript.write(to: job.folder)
         return job.folder.appendingPathComponent(Transcript.fileName)
@@ -253,6 +282,16 @@ public actor TranscriptionPipeline {
         } catch {
             throw TranscriptionError.cloud(provider: cloud.name, reason: CloudTranscription.failureReason(error))
         }
+    }
+
+    /// The system channel's speaker turns from a cloud diarizer, from the compressed source (not the 16 kHz
+    /// extract); the text it returns is dropped.
+    private static func cloudTurns(
+        _ cloud: CloudEngine, source: ChannelSource, language: String?
+    ) async throws -> [DiarizationTurn] {
+        let segments = try await CloudTranscription.transcribe(
+            source: source.url, channel: source.channel, with: cloud.transcriber, language: language, diarize: true)
+        return CloudTranscription.turns(from: segments)
     }
 
     /// The language sent to a cloud API for the whole recording: the single language of `ranges`, nil (detect)
@@ -327,6 +366,20 @@ public actor TranscriptionPipeline {
         guard entry.isSelectable(for: language) else { return false }
         let supported = supportedLanguages(for: entry)
         return language == "auto" || supported.isEmpty || supported.contains(WhisperKitEngine.whisperLanguage(language))
+    }
+
+    /// The local diarizer: `preferred` when it is an installed catalog diarizer, except a Nemotron pick gives way to
+    /// an installed pyannote when `speakerCountHint` is above `SpeakerDiarizer.nemotronMaxSpeakers`; else (cloud
+    /// ids and nil too) the first installed diarizer in catalog order; nil when none is installed.
+    static func localDiarizerID(preferred: String?, speakerCountHint: Int?, isInstalled: (String) -> Bool) -> String? {
+        let installed = ModelCatalog.diarization.map(\.id).filter(isInstalled)
+        guard let preferred, installed.contains(preferred) else { return installed.first }
+        let pyannote = ModelCatalog.defaultDiarizer.id
+        if SpeakerDiarizer.nemotronPresets[preferred] != nil,
+           (speakerCountHint ?? 0) > SpeakerDiarizer.nemotronMaxSpeakers, installed.contains(pyannote) {
+            return pyannote
+        }
+        return preferred
     }
 
     /// `entry`'s supported languages (Apple's list loaded first), then `languageFallback`.

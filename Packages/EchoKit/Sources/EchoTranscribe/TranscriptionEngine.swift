@@ -67,10 +67,14 @@ public struct TranscriptionJob: Codable, Equatable, Sendable {
     public var processNow: Bool
     /// Speakers expected on the system channel for this run; nil = the pipeline's `speakerCountHint`.
     public var speakerCountHint: Int?
+    /// The default diarizer: a catalog id or a cloud id (`cloud:<provider id>`, run with the `cloudDiarizer` passed to
+    /// `TranscriptionPipeline.transcribe`); the local diarizer comes from `TranscriptionPipeline.localDiarizerID`.
+    /// nil = catalog order.
+    public var diarizerID: String?
 
     public init(
         conversationID: UUID, folder: URL, systemFileName: String? = nil, engineID: String? = nil,
-        language: String? = nil, processNow: Bool = false, speakerCountHint: Int? = nil
+        language: String? = nil, processNow: Bool = false, speakerCountHint: Int? = nil, diarizerID: String? = nil
     ) {
         self.conversationID = conversationID
         self.folder = folder
@@ -79,6 +83,7 @@ public struct TranscriptionJob: Codable, Equatable, Sendable {
         self.language = language
         self.processNow = processNow
         self.speakerCountHint = speakerCountHint
+        self.diarizerID = diarizerID
     }
 }
 

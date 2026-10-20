@@ -124,7 +124,9 @@ struct TranscriptView: View {
                     TranscriptionStatus(conversation: conversation, model: model)
                 }
             }
-            if transcript?.notes.contains(Transcript.diarizationMissingNote) == true {
+            if transcript?.notes.contains(Transcript.cloudDiarizationFailedNote) == true {
+                cloudDiarizationFailedNotice
+            } else if transcript?.notes.contains(Transcript.diarizationMissingNote) == true {
                 diarizationMissingNotice
             }
             if conversation.hasAudio { PlaybackScrubber(playback: playback) }
@@ -142,7 +144,7 @@ struct TranscriptView: View {
 
     /// The transcript was made without the speaker model, so every system-audio voice is Speaker 1.
     private var diarizationMissingNotice: some View {
-        let installed = model.installedModelIDs.contains(ModelCatalog.defaultDiarizer.id)
+        let installed = model.diarizerAvailable
         return HStack(alignment: .firstTextBaseline, spacing: 8) {
             Group {
                 Image(systemName: "person.2.slash")
@@ -154,6 +156,25 @@ struct TranscriptView: View {
             }
             .foregroundStyle(.secondary)
             if !installed {
+                Button("Download…") { model.openSettings(tab: .transcription) }
+                    .buttonStyle(.link)
+            }
+        }
+        .font(.caption)
+    }
+
+    /// The cloud diarizer failed, so a model on this Mac told the speakers apart, when one was installed.
+    private var cloudDiarizationFailedNotice: some View {
+        let localMissing = transcript?.notes.contains(Transcript.diarizationMissingNote) == true
+        return HStack(alignment: .firstTextBaseline, spacing: 8) {
+            Group {
+                Image(systemName: "exclamationmark.icloud")
+                Text(localMissing
+                     ? "Cloud diarization failed and no diarization model is installed on this Mac."
+                     : "Cloud diarization failed; speakers were told apart on this Mac.")
+            }
+            .foregroundStyle(.secondary)
+            if localMissing {
                 Button("Download…") { model.openSettings(tab: .transcription) }
                     .buttonStyle(.link)
             }

@@ -69,7 +69,8 @@ public struct Transcript: Codable, Equatable, Sendable {
 
     public static let fileName = "transcript.json"
     public static let diarizationMissingNote = "diarization model not installed"
-    /// Added when the cloud diarizer failed and the local diarizer ran instead.
+    /// Added when the cloud diarizer failed or returned no speaker turns; the local diarizer ran instead when one was
+    /// installed, else `diarizationMissingNote` is added too.
     public static let cloudDiarizationFailedNote = "cloud diarization failed"
 
     public var version = 1

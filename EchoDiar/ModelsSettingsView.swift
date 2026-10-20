@@ -5,8 +5,8 @@ import SwiftUI
 
 /// The Transcription tab, one inner tab per section: the default language with the live transcript switch and engine
 /// and deleting the audio after transcription, the transcription models (local by tier, then cloud: the configured
-/// engines and the speech-to-text APIs), and the diarization models by tier, with Download, Cancel, Delete and Set
-/// default. Rows that cannot transcribe the default language are disabled with a note.
+/// engines and the speech-to-text APIs), and the diarization models (local by tier, then the cloud diarizers), with
+/// Download, Cancel, Delete and Set default. Rows that cannot transcribe the default language are disabled with a note.
 struct ModelsSettingsView: View {
     let model: AppModel
 
@@ -43,11 +43,12 @@ struct ModelsSettingsView: View {
                 case .transcriptionModels:
                     intro("Transcription turns speech into text. The transcription model listens to the recording and writes what was said, with timestamps.")
                     tierSections(.asr)
-                    cloudSection
+                    cloudSection(diarization: false)
                     speechToTextSection
                 case .diarizationModels:
                     intro("Diarization finds who spoke when. The diarization model tells the voices apart and labels each part of the transcript with its speaker.")
                     tierSections(.diarization)
+                    cloudSection(diarization: true)
                     Section { SpeakerCountPicker(model: model) }
                 }
             }
@@ -113,43 +114,56 @@ struct ModelsSettingsView: View {
     }
 
     /// "Cloud": the model of the default cloud engine (its own box, as it follows the default), then every provider
-    /// that transcribes, with Set default once configured (enabled, with a key and a model) or Set Up.
-    @ViewBuilder private var cloudSection: some View {
-        if let config = defaultCloudConfig {
+    /// that transcribes, with Set default once configured (enabled, with a key and a model) or Set Up. With
+    /// `diarization`, the default cloud diarizer's model and the providers that label speakers (configured: enabled,
+    /// with a key).
+    @ViewBuilder private func cloudSection(diarization: Bool) -> some View {
+        if let config = defaultCloudConfig(diarization: diarization) {
             Section {
-                CloudModelField(config: config, model: model)
+                CloudModelField(config: config, model: model, diarization: diarization)
             } header: {
-                cloudHeader
+                cloudHeader(diarization: diarization)
             }
-            cloudProviders(header: false)
+            cloudProviders(header: false, diarization: diarization)
         } else {
-            cloudProviders(header: true)
+            cloudProviders(header: true, diarization: diarization)
         }
     }
 
-    private func cloudProviders(header: Bool) -> some View {
+    private func cloudProviders(header: Bool, diarization: Bool) -> some View {
         Section {
-            Label("Audio leaves this Mac: cloud engines upload the recording to the provider.", systemImage: "exclamationmark.icloud")
+            Label(diarization
+                  ? "Audio leaves this Mac: the cloud diarizer uploads the system channel to the provider."
+                  : "Audio leaves this Mac: cloud engines upload the recording to the provider.",
+                  systemImage: "exclamationmark.icloud")
                 .foregroundStyle(.orange)
-            let configured = Set(model.cloudEngineConfigs.map(\.id))
-            ForEach(model.providerConfigs.filter(CloudTranscription.supports)) { config in
-                CloudEngineRow(config: config, model: model, configured: configured.contains(config.id))
+            let configured = Set((diarization ? model.cloudDiarizerConfigs : model.cloudEngineConfigs).map(\.id))
+            ForEach(model.providerConfigs.filter { config in
+                CloudTranscription.supports(config)
+                    && (!diarization || CloudTranscription.diarizationPresets.contains(config.preset ?? ""))
+            }) { config in
+                CloudEngineRow(config: config, model: model, configured: configured.contains(config.id),
+                               diarization: diarization)
             }
         } header: {
-            if header { cloudHeader }
+            if header { cloudHeader(diarization: diarization) }
         }
     }
 
-    private var cloudHeader: some View {
+    private func cloudHeader(diarization: Bool) -> some View {
         SectionHeader(
             title: "Cloud",
-            description: "Prices are approximate list prices per audio hour; the mic and system channels are sent and billed separately.")
+            description: diarization
+                ? "Only the system channel is uploaded, as one extra transcription billed by the provider; only the speaker labels are kept. Not used when the transcription model already labels speakers. Prices are approximate list prices per audio hour."
+                : "Prices are approximate list prices per audio hour; the mic and system channels are sent and billed separately.")
     }
 
-    /// The provider of the default transcription model when it is a configured cloud engine.
-    private var defaultCloudConfig: ProviderConfig? {
-        guard let id = CloudTranscription.providerID(engineID: model.defaultASRModelID) else { return nil }
-        return model.cloudEngineConfigs.first { $0.id == id }
+    /// The provider of the default transcription model (or, with `diarization`, of the default diarizer) when it is a
+    /// configured cloud engine.
+    private func defaultCloudConfig(diarization: Bool) -> ProviderConfig? {
+        let defaultID = diarization ? model.defaultDiarizerModelID : model.defaultASRModelID
+        guard let id = CloudTranscription.providerID(engineID: defaultID) else { return nil }
+        return (diarization ? model.cloudDiarizerConfigs : model.cloudEngineConfigs).first { $0.id == id }
     }
 
     /// The speech-to-text APIs' keys and models; the LLM APIs that transcribe too are set up in AI.
@@ -238,9 +252,13 @@ struct ModelRow: View {
         .padding(.vertical, 2)
     }
 
-    /// The default ASR model of new recordings, or the catalog default of other kinds.
+    /// The default ASR model or diarizer of new recordings, or the catalog default of other kinds.
     private var isDefault: Bool {
-        entry.kind == .asr ? model.defaultASRModelID == entry.id : entry.isDefault
+        switch entry.kind {
+        case .asr: model.defaultASRModelID == entry.id
+        case .diarization: model.defaultDiarizerModelID == entry.id
+        default: entry.isDefault
+        }
     }
 
     /// Set for an ASR row that cannot transcribe the default language (e.g. "No Vietnamese"); Auto never disables.
@@ -256,10 +274,13 @@ struct ModelRow: View {
     }
 
     @ViewBuilder private var actions: some View {
-        if entry.kind == .asr, !entry.liveOnly, !isDefault, model.installedModelIDs.contains(entry.id) {
-            Button("Set default") { model.setDefaultASRModel(entry.id) }
-                .controlSize(.small)
-                .disabled(unsupportedNote != nil)
+        if entry.kind == .asr || entry.kind == .diarization, !entry.liveOnly, !isDefault,
+           model.installedModelIDs.contains(entry.id) {
+            Button("Set default") {
+                if entry.kind == .asr { model.setDefaultASRModel(entry.id) } else { model.setDefaultDiarizer(entry.id) }
+            }
+            .controlSize(.small)
+            .disabled(unsupportedNote != nil)
         }
         if entry.runtime == .appleSpeech, !model.installedModelIDs.contains(entry.id) {
             Text("Not available on this Mac")
@@ -376,8 +397,11 @@ struct ModelRow: View {
 private struct CloudEngineRow: View {
     let config: ProviderConfig
     let model: AppModel
-    /// Enabled, with a key and a model: it can be the default. Else Set Up opens where it is configured.
+    /// Enabled, with a key and a model (a key alone with `diarization`): it can be the default. Else Set Up opens where
+    /// it is configured.
     let configured: Bool
+    /// A cloud diarizer (Diarization models): its diarization model, Default and Set default of the default diarizer.
+    var diarization = false
 
     /// Approximate pay-as-you-go prices per audio hour (docs/research/asr-diarization-models.md F, 2026-10-18).
     private static let prices: [String: String] = [
@@ -387,21 +411,30 @@ private struct CloudEngineRow: View {
 
     private var engineID: String { CloudTranscription.engineID(providerID: config.id) }
 
+    /// The default transcription model, or the default diarizer.
+    private var defaultID: String { diarization ? model.defaultDiarizerModelID : model.defaultASRModelID }
+
+    /// "Deepgram (nova-3)" with the model it runs; the provider name alone when it picks the model.
+    private var name: String {
+        guard diarization else { return model.cloudEngineName(config) }
+        let id = CloudTranscription.diarizationModel(for: config)
+        return id.isEmpty ? config.displayName : "\(config.displayName) (\(id))"
+    }
+
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
             HStack(spacing: 8) {
-                Text(configured ? model.cloudEngineName(config) : config.displayName)
+                Text(configured ? name : config.displayName)
                     .lineLimit(1)
                     .truncationMode(.tail)
-                if configured && model.defaultASRModelID == engineID { Badge(text: "Default", color: .accentColor, filled: true) }
+                if configured && defaultID == engineID { Badge(text: "Default", color: .accentColor, filled: true) }
                 Spacer(minLength: 8)
                 if !configured {
                     Button("Set Up…", action: setUp)
                         .controlSize(.small)
-                        .help(config.kind == .speechToText
-                              ? "Add the key of \(config.displayName) below" : "Turn on \(config.displayName) in Settings › AI")
-                } else if model.defaultASRModelID != engineID {
-                    Button("Set default") { model.setDefaultASRModel(engineID) }
+                        .help(setUpHelp)
+                } else if defaultID != engineID {
+                    Button("Set default", action: setDefault)
                         .controlSize(.small)
                 }
             }
@@ -410,7 +443,9 @@ private struct CloudEngineRow: View {
                 if let price = config.preset.flatMap({ Self.prices[$0] }) { Badge(text: price + " (approx.)") }
             }
             if config.preset == "gemini" {
-                Text("LLM transcription — timestamps approximate.")
+                Text(diarization
+                     ? "LLM diarization — timestamps approximate, speakers can be mislabeled."
+                     : "LLM transcription — timestamps approximate.")
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
@@ -418,18 +453,36 @@ private struct CloudEngineRow: View {
         .padding(.vertical, 2)
     }
 
-    /// Speech-to-text APIs are set up in their row below on this page, the LLM APIs in Settings › AI.
+    private var setUpHelp: LocalizedStringKey {
+        guard config.kind == .speechToText else { return "Turn on \(config.displayName) in Settings › AI" }
+        return diarization
+            ? "Add the key of \(config.displayName) in Transcription models"
+            : "Add the key of \(config.displayName) below"
+    }
+
+    private func setDefault() {
+        if diarization { model.setDefaultDiarizer(engineID) } else { model.setDefaultASRModel(engineID) }
+    }
+
+    /// Speech-to-text APIs are set up in their row on the Transcription models page (from Diarization models, that
+    /// page is opened first, so its scroll to the expanded row applies), the LLM APIs in Settings › AI.
     private func setUp() {
+        if diarization && config.kind == .speechToText {
+            model.openSettings(tab: .transcription, subTab: "transcriptionModels")
+        }
         model.settingsExpandedProvider = config.id
         if config.kind != .speechToText { model.openSettings(tab: .providers, subTab: "cloudAPIs") }
     }
 }
 
 /// The default cloud engine's transcription model: free text, a menu of the known models and, for the APIs that list
-/// their models, "Load models" (only the ones that transcribe).
+/// their models, "Load models" (only the ones that transcribe). With `diarization`, the default cloud diarizer's
+/// diarization model: only models that label speakers are listed, and a note says when the typed one does not.
 private struct CloudModelField: View {
     let config: ProviderConfig
     let model: AppModel
+    /// Edits `diarizationModel` (Diarization models) instead of `transcriptionModel`.
+    var diarization = false
 
     @State private var loaded: [String]?
     @State private var loading = false
@@ -444,18 +497,25 @@ private struct CloudModelField: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 4) {
             if config.preset == "assemblyai" {
-                LabeledContent("Model") { Text("Picked by AssemblyAI for the language (Universal)") }
+                LabeledContent("Model") {
+                    Text(diarization
+                         ? "Picked by AssemblyAI (Universal, speaker labels)"
+                         : "Picked by AssemblyAI for the language (Universal)")
+                }
             } else {
                 HStack(spacing: 8) {
                     TextField("Model", text: Binding(
-                        get: { config.transcriptionModel },
-                        set: { value in model.updateProvider(id: config.id) { $0.transcriptionModel = value } }
+                        get: { diarization ? config.diarizationModel : config.transcriptionModel },
+                        set: { value in setModel(value) }
                     ), prompt: Text(prompt))
-                    let choices = Self.unique((Self.knownModels[config.preset ?? ""] ?? []) + (loaded ?? []))
+                    let known = diarization
+                        ? [CloudTranscription.defaultDiarizationModel(for: config)]
+                        : Self.knownModels[config.preset ?? ""] ?? []
+                    let choices = Self.unique(known + (loaded ?? []))
                     if !choices.isEmpty {
                         Menu("\(choices.count) model\(choices.count == 1 ? "" : "s")") {
                             ForEach(choices, id: \.self) { id in
-                                Button(id) { model.updateProvider(id: config.id) { $0.transcriptionModel = id } }
+                                Button(id) { setModel(id) }
                             }
                         }
                         .fixedSize()
@@ -469,7 +529,15 @@ private struct CloudModelField: View {
                 if let error {
                     Text(error).font(.caption).foregroundStyle(.red).lineLimit(2)
                 } else if loaded?.isEmpty == true {
-                    Text("No transcription models listed; type the model id.").font(.caption).foregroundStyle(.secondary)
+                    Text(diarization
+                         ? "No diarization models listed; type the model id."
+                         : "No transcription models listed; type the model id.")
+                        .font(.caption).foregroundStyle(.secondary)
+                }
+                if diarization,
+                   !CloudTranscription.diarizes(config, model: CloudTranscription.diarizationModel(for: config)) {
+                    Text("This model does not label speakers; a model on this Mac is used instead.")
+                        .font(.caption).foregroundStyle(.orange)
                 }
             }
         }
@@ -481,8 +549,18 @@ private struct CloudModelField: View {
     }
 
     private var prompt: String {
+        if diarization {
+            let fallback = CloudTranscription.defaultDiarizationModel(for: config)
+            return fallback.isEmpty ? "Diarization model id" : fallback
+        }
         let fallback = CloudTranscription.defaultModel(for: config)
         return fallback.isEmpty ? "Transcription model id, e.g. whisper-1" : fallback
+    }
+
+    private func setModel(_ id: String) {
+        model.updateProvider(id: config.id) { provider in
+            if diarization { provider.diarizationModel = id } else { provider.transcriptionModel = id }
+        }
     }
 
     private func load() async {
@@ -490,7 +568,10 @@ private struct CloudModelField: View {
         defer { loading = false }
         do {
             let all = try await model.makeProvider(for: config)?.listModels() ?? []
-            loaded = all.filter { Self.transcribes($0, preset: config.preset) }.sorted()
+            loaded = all.filter { id in
+                Self.transcribes(id, preset: config.preset)
+                    && (!diarization || CloudTranscription.diarizes(config, model: id))
+            }.sorted()
             error = nil
         } catch {
             self.error = error.localizedDescription.split(whereSeparator: \.isNewline).first.map(String.init)

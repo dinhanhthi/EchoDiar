@@ -50,6 +50,25 @@ struct EngineRoutingTests {
         #expect(prefer(nil, installed, "auto") == nil)
     }
 
+    // MARK: - Local diarizer
+
+    /// The default diarizer when installed, except a Nemotron pick above its speaker limit with pyannote installed;
+    /// else catalog order (cloud ids and nil too).
+    @Test func localDiarizerFollowsDefaultThenCatalogOrder() {
+        let resolve = { (preferred: String?, hint: Int?, installed: Set<String>) in
+            TranscriptionPipeline.localDiarizerID(
+                preferred: preferred, speakerCountHint: hint, isInstalled: { installed.contains($0) })
+        }
+        let pyannote = "pyannote-community-1", c128 = "nemotron-3-diarization-c128"
+        let fast128 = "nemotron-3-diarization-fast128"
+        #expect(resolve(fast128, nil, [pyannote, fast128]) == fast128)
+        #expect(resolve(c128, 10, [pyannote, c128]) == pyannote)
+        #expect(resolve(c128, 10, [c128]) == c128)
+        #expect(resolve("cloud:openai", nil, [c128, fast128]) == c128)
+        #expect(resolve(nil, nil, [pyannote, fast128]) == pyannote)
+        #expect(resolve(nil, nil, []) == nil)
+    }
+
     // MARK: - Unsupported marker language
 
     @Test func unsupportedMarkerLanguageFallsBackToInstalledWhisper() {

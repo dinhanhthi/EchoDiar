@@ -59,7 +59,8 @@ final class AppModel {
     /// Short reason of each conversation's last failed transcription ("Deepgram: invalid API key"), in memory only;
     /// cleared when the conversation is submitted again.
     private(set) var transcriptionErrors: [UUID: String] = [:]
-    /// Cloud runs waiting for their destination's one-time "audio leaves this Mac" confirmation, oldest first.
+    /// Cloud runs (ASR or diarizer) waiting for their destination's one-time "audio leaves this Mac" confirmation,
+    /// oldest first.
     private(set) var pendingCloudRuns: [PendingCloudRun] = []
     /// Bumped when Settings saves or removes an API key, so views listing cloud engines (which read the Keychain)
     /// update.
@@ -128,7 +129,9 @@ final class AppModel {
     }
 
     struct PendingCloudRun {
-        let providerID: String
+        /// The ASR engine the run is submitted with once confirmed: `cloud:<provider id>` when the ASR provider asks,
+        /// the job's engine id (nil = the default resolution) when its cloud diarizer asks.
+        let engineID: String?
         let providerName: String
         /// `CloudTranscription.destination(for:)` when the run was queued; the confirmation is stored under it.
         let consentKey: String
@@ -647,30 +650,37 @@ final class AppModel {
     /// the Models tab when usable for the recording's first language, else the pipeline's default resolution. A cloud
     /// engine (picked or default) runs only while its provider is configured, else the local resolution applies; the
     /// first run per provider and destination waits for the confirmation in the main window, which opens if closed.
+    /// The default cloud diarizer runs when configured with a diarizing model and the cloud ASR (if any) labels no
+    /// speakers; its destination is confirmed the same way, after the ASR's, before anything is uploaded.
     private func submitTranscription(folder: URL, engineID: String? = nil, language: String? = nil) {
         guard let session = try? RecordingSession.read(from: folder), !session.probe, session.state != .failed else {
             return
         }
         var engineID = engineID
         var cloud: CloudEngine?
+        var asrLabelsSpeakers = false
         if let providerID = CloudTranscription.providerID(engineID: engineID ?? settings.defaultASRModelID) {
             if let config = cloudEngineConfigs.first(where: { $0.id == providerID }) {
-                // Bound to the destination, so an edited base URL asks again; an invalid one never counts as confirmed.
-                let destination = CloudTranscription.destination(for: config)
-                guard let destination, settings.cloudSTTConfirmed.contains(destination.consentKey) else {
-                    if let destination, !pendingCloudRuns.contains(where: { $0.folder == folder }) {
-                        if pendingCloudRuns.isEmpty { showMainWindowIfHidden() }
-                        pendingCloudRuns.append(PendingCloudRun(
-                            providerID: providerID, providerName: config.displayName,
-                            consentKey: destination.consentKey, host: destination.host, conversationID: session.id,
-                            folder: folder, language: language))
-                    }
-                    return
-                }
+                guard cloudDestinationConfirmed(
+                    config, engineID: CloudTranscription.engineID(providerID: providerID), session: session,
+                    folder: folder, language: language) else { return }
                 cloud = makeCloudEngine(config)
                 engineID = cloud?.engineID
+                asrLabelsSpeakers = CloudTranscription.diarizes(config, model: CloudTranscription.model(for: config))
             } else if CloudTranscription.providerID(engineID: engineID) != nil {
                 engineID = nil
+            }
+        }
+        var cloudDiarizer: CloudEngine?
+        if !asrLabelsSpeakers,
+           let providerID = CloudTranscription.providerID(engineID: settings.defaultDiarizerModelID),
+           let config = cloudDiarizerConfigs.first(where: { $0.id == providerID }) {
+            let model = CloudTranscription.diarizationModel(for: config)
+            // A model that labels no speakers would bill a transcription for nothing: the local diarizer runs instead.
+            if CloudTranscription.diarizes(config, model: model) {
+                guard cloudDestinationConfirmed(
+                    config, engineID: engineID, session: session, folder: folder, language: language) else { return }
+                cloudDiarizer = makeCloudEngine(config, model: model)
             }
         }
         // The Models tab's default only when usable for the first language, else the pipeline's default resolution.
@@ -683,7 +693,8 @@ final class AppModel {
             systemFileName: session.audioFileName == AudioCompressor.micFileName ? AudioCompressor.systemFileName : nil,
             engineID: engineID ?? preferred, language: language,
             // Per job rather than a re-created pipeline: the pipeline and its progress stream live as long as the app.
-            processNow: !settings.deferTranscriptionWhenConstrained, speakerCountHint: settings.speakerCountHint)
+            processNow: !settings.deferTranscriptionWhenConstrained, speakerCountHint: settings.speakerCountHint,
+            diarizerID: settings.defaultDiarizerModelID)
         transcriptionErrors[session.id] = nil
         // Set now so the card leaves its button before the pipeline's first event arrives.
         transcriptionProgress[session.id] = JobProgress(conversationID: session.id, step: .queued, fraction: 0)
@@ -691,7 +702,7 @@ final class AppModel {
         transcriptionJobs += 1
         Task {
             do {
-                _ = try await pipeline.transcribe(job, cloud: cloud)
+                _ = try await pipeline.transcribe(job, cloud: cloud, cloudDiarizer: cloudDiarizer)
                 if settings.deleteAudioAfterTranscription { await deleteAudio(of: session.id) }
             } catch TranscriptionError.cloud(let provider, let reason) {
                 // The kind only ("HTTP 400", "invalid API key"): the reason can quote the provider's error body.
@@ -703,6 +714,26 @@ final class AppModel {
             transcriptionJobs -= 1
             await library.reload(id: session.id)
         }
+    }
+
+    /// Whether `config`'s destination is confirmed, for the cloud ASR and the cloud diarizer alike; else the run is
+    /// queued for the main window's confirmation (submitted again with `engineID`) unless its folder already waits.
+    /// Bound to the destination, so an edited base URL asks again; an invalid one never counts as confirmed.
+    private func cloudDestinationConfirmed(
+        _ config: ProviderConfig, engineID: String?, session: RecordingSession, folder: URL, language: String?
+    ) -> Bool {
+        let destination = CloudTranscription.destination(for: config)
+        guard let destination, settings.cloudSTTConfirmed.contains(destination.consentKey) else {
+            if let destination, !pendingCloudRuns.contains(where: { $0.folder == folder }) {
+                if pendingCloudRuns.isEmpty { showMainWindowIfHidden() }
+                pendingCloudRuns.append(PendingCloudRun(
+                    engineID: engineID, providerName: config.displayName,
+                    consentKey: destination.consentKey, host: destination.host, conversationID: session.id,
+                    folder: folder, language: language))
+            }
+            return false
+        }
+        return true
     }
 
     /// The single consumer of `pipeline.progress`; reloads the job's conversation when it changes step, so the card
@@ -738,7 +769,8 @@ final class AppModel {
     /// The main window's answer to the first pending cloud run's confirmation: every pending run for that
     /// destination is submitted (and the destination remembered) or dropped (the conversation keeps its Transcribe
     /// button). Runs whose conversation got a job meanwhile are skipped, so no second paid job starts. Submitting
-    /// re-reads the config, so a base URL changed since the alert asks again.
+    /// re-reads the config, so a base URL changed since the alert asks again, and a run whose ASR and diarizer
+    /// providers differ then asks for the second destination.
     func resolvePendingCloudRuns(allowed: Bool) {
         guard let first = pendingCloudRuns.first else { return }
         let runs = pendingCloudRuns.filter { $0.consentKey == first.consentKey }
@@ -748,8 +780,7 @@ final class AppModel {
             updateSettings { $0.cloudSTTConfirmed.append(first.consentKey) }
         }
         for run in runs where !isTranscribing(run.conversationID) {
-            submitTranscription(
-                folder: run.folder, engineID: CloudTranscription.engineID(providerID: run.providerID), language: run.language)
+            submitTranscription(folder: run.folder, engineID: run.engineID, language: run.language)
         }
     }
 
@@ -777,6 +808,17 @@ final class AppModel {
         }
     }
 
+    /// Enabled providers that can be the default cloud diarizer, with a valid destination and a saved key. Their
+    /// diarization model is not checked (Settings' model field would vanish mid-typing): `submitTranscription` does.
+    var cloudDiarizerConfigs: [ProviderConfig] {
+        _ = keychainVersion
+        return providerConfigs.filter { config in
+            config.enabled && CloudTranscription.diarizationPresets.contains(config.preset ?? "")
+                && CloudTranscription.supports(config) && CloudTranscription.destination(for: config) != nil
+                && (!CloudTranscription.needsKey(config) || (try? KeychainStore.hasAPIKey(forProvider: config.id)) == true)
+        }
+    }
+
     func keychainChanged() {
         savedKeys = [:]
         keychainVersion += 1
@@ -799,12 +841,13 @@ final class AppModel {
         return model.isEmpty ? config.displayName : "\(config.displayName) (\(model))"
     }
 
-    private func makeCloudEngine(_ config: ProviderConfig) -> CloudEngine {
+    /// `model`: a cloud diarizer's diarization model; nil = the transcription model.
+    private func makeCloudEngine(_ config: ProviderConfig, model: String? = nil) -> CloudEngine {
         let apiKey = CloudTranscription.needsKey(config) ? try? KeychainStore.apiKey(forProvider: config.id) : nil
         return CloudEngine(
             engineID: CloudTranscription.engineID(providerID: config.id), name: config.displayName,
-            model: CloudTranscription.model(for: config),
-            transcriber: CloudTranscription.makeTranscriber(config: config, apiKey: apiKey))
+            model: model ?? CloudTranscription.model(for: config),
+            transcriber: CloudTranscription.makeTranscriber(config: config, apiKey: apiKey, model: model))
     }
 
     // MARK: - Models
@@ -858,6 +901,7 @@ final class AppModel {
             }
             // Otherwise every new recording would stop at "Needs model".
             if settings.defaultASRModelID == id { updateSettings { $0.defaultASRModelID = nil } }
+            if settings.defaultDiarizerModelID == id { updateSettings { $0.defaultDiarizerModelID = nil } }
             // Indexing then says the embedding model is missing.
             if ModelCatalog.entry(id: id)?.kind == .embedding { syncLibraryIndex() }
             refreshInstalledModels()
@@ -886,6 +930,23 @@ final class AppModel {
     /// Picking the catalog default stores nil, so the pipeline's default resolution applies again.
     func setDefaultASRModel(_ id: String) {
         updateSettings { $0.defaultASRModelID = id == ModelCatalog.defaultASR.id ? nil : id }
+    }
+
+    /// The diarizer new recordings use: the one set in the Models tab (a catalog or cloud engine id), else the catalog
+    /// default.
+    var defaultDiarizerModelID: String { settings.defaultDiarizerModelID ?? ModelCatalog.defaultDiarizer.id }
+
+    /// Picking the catalog default stores nil, so the pipeline's catalog order applies again.
+    func setDefaultDiarizer(_ id: String) {
+        updateSettings { $0.defaultDiarizerModelID = id == ModelCatalog.defaultDiarizer.id ? nil : id }
+    }
+
+    /// Whether speakers can be told apart: a diarization model is installed, or the default diarizer is a configured
+    /// cloud provider.
+    var diarizerAvailable: Bool {
+        let cloudID = CloudTranscription.providerID(engineID: defaultDiarizerModelID)
+        return ModelCatalog.diarization.contains { installedModelIDs.contains($0.id) }
+            || cloudDiarizerConfigs.contains { $0.id == cloudID }
     }
 
     /// Releases EchoDiar's Apple Speech locale reservations; macOS removes the shared assets later.
