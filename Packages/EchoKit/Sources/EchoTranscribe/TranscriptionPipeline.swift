@@ -497,20 +497,29 @@ enum MonoAudio {
         return peak
     }
 
-    /// Samples from `start` to `end` seconds (nil = end of file) of a mono file.
+    /// Samples from `start` to `end` seconds (nil = end of file) of a mono file, read in chunks straight into the
+    /// result: a buffer as long as the range plus its copy would double the peak (230 MB for a 1 h diarizer input),
+    /// and one `read` can return fewer frames than asked.
     static func read(_ url: URL, from start: Double, to end: Double?) throws -> [Float] {
         let file = try AVAudioFile(forReading: url, commonFormat: .pcmFormatFloat32, interleaved: false)
         let rate = file.processingFormat.sampleRate
         let first = min(file.length, AVAudioFramePosition(max(0, start) * rate))
         let last = min(file.length, end.map { AVAudioFramePosition($0 * rate) } ?? file.length)
         guard last > first else { return [] }
-        let count = AVAudioFrameCount(last - first)
-        guard let buffer = AVAudioPCMBuffer(pcmFormat: file.processingFormat, frameCapacity: count) else {
+        let count = Int(last - first)
+        guard let chunk = AVAudioPCMBuffer(pcmFormat: file.processingFormat, frameCapacity: chunkFrames) else {
             throw TranscriptionError.audioUnreadable(url.lastPathComponent)
         }
         file.framePosition = first
-        try file.read(into: buffer, frameCount: count)
-        return Array(UnsafeBufferPointer(start: buffer.floatChannelData![0], count: Int(buffer.frameLength)))
+        return try [Float](unsafeUninitializedCapacity: count) { samples, filled in
+            while filled < count {
+                try file.read(into: chunk, frameCount: min(chunkFrames, AVAudioFrameCount(count - filled)))
+                let frames = Int(chunk.frameLength)
+                guard frames > 0 else { break }
+                (samples.baseAddress! + filled).initialize(from: chunk.floatChannelData![0], count: frames)
+                filled += frames
+            }
+        }
     }
 
     static func duration(of url: URL) throws -> Double {

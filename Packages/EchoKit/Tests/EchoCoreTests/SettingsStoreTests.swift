@@ -21,8 +21,16 @@ struct SettingsStoreTests {
             #expect(store.load().chatContextMessages == 10)
             #expect(store.load().ragEnabled == false)
             #expect(store.load().embeddingModelID == "mlx-qwen3-embedding-0.6b")
+            #expect(store.load().modelIdleMinutes == 2)
             #expect(FileManager.default.fileExists(atPath: store.fileURL.path))
         }
+    }
+
+    /// A hand-edited idle time outside the offered range would keep a model forever or reload it at every pause.
+    @Test(arguments: [(0, 1), (500, 60)])
+    func modelIdleMinutesIsClamped(written: Int, read: Int) throws {
+        let settings = try JSONDecoder().decode(AppSettings.self, from: Data(#"{"modelIdleMinutes":\#(written)}"#.utf8))
+        #expect(settings.modelIdleMinutes == read)
     }
 
     /// Playback plays both voices in both ears unless the user asked to split them.

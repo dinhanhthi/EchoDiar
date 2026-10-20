@@ -21,6 +21,9 @@ public struct AppSettings: Codable, Equatable, Sendable {
     public var liveTranscript: Bool
     /// Catalog id of the live captions engine: a WhisperKit entry or the Nemotron streaming entry.
     public var liveTranscriptEngine: String
+    /// Minutes a loaded on-device model may go unused before it is freed: the live captions model while a recording
+    /// stays paused. Every other model is freed as soon as its job ends.
+    public var modelIdleMinutes: Int
     /// Catalog id of the ASR engine for new transcriptions, or a cloud engine id (`cloud:<provider id>`); nil = the
     /// catalog default.
     public var defaultASRModelID: String?
@@ -101,6 +104,7 @@ public struct AppSettings: Codable, Equatable, Sendable {
         onboardingCompleted: Bool = false,
         liveTranscript: Bool = false,
         liveTranscriptEngine: String = AppSettings.defaultLiveTranscriptEngine,
+        modelIdleMinutes: Int = 2,
         defaultASRModelID: String? = nil,
         providers: [ProviderConfig] = [],
         cloudSTTConfirmed: [String] = [],
@@ -144,6 +148,7 @@ public struct AppSettings: Codable, Equatable, Sendable {
         self.onboardingCompleted = onboardingCompleted
         self.liveTranscript = liveTranscript
         self.liveTranscriptEngine = liveTranscriptEngine
+        self.modelIdleMinutes = modelIdleMinutes
         self.defaultASRModelID = defaultASRModelID
         self.providers = providers
         self.cloudSTTConfirmed = cloudSTTConfirmed
@@ -183,10 +188,14 @@ public struct AppSettings: Codable, Equatable, Sendable {
     public static let speakerCountHintRange = 1...20
     /// Chat context sizes offered in Settings, besides 0 (the whole chat).
     public static let chatContextOptions = [4, 10, 20, 50]
+    /// Idle times offered in Settings; a hand-edited value is clamped to `modelIdleMinutesRange`.
+    public static let modelIdleMinutesOptions = [1, 2, 5, 10]
+    public static let modelIdleMinutesRange = 1...60
 
     private enum CodingKeys: String, CodingKey {
         case version, launchAtLogin, defaultLanguage, recentLanguages, compressionBitrateKbps, keepUncompressedAudio
-        case playbackChannels, onboardingCompleted, liveTranscript, liveTranscriptEngine, defaultASRModelID, providers
+        case playbackChannels, onboardingCompleted, liveTranscript, liveTranscriptEngine, modelIdleMinutes
+        case defaultASRModelID, providers
         case cloudSTTConfirmed, defaultAIProviderID, defaultAIModel, summaryLanguage, chatContextMessages
         case ragEnabled, embeddingModelID, embeddingAPIModel, cloudEmbeddingConfirmed
         case micDeviceUID, meetingDetection, perAppBehavior, pillPositions, showPill, hidePillWhenAppActive
@@ -209,6 +218,8 @@ public struct AppSettings: Codable, Equatable, Sendable {
         liveTranscript = try container.decodeIfPresent(Bool.self, forKey: .liveTranscript) ?? false
         liveTranscriptEngine = try container.decodeIfPresent(String.self, forKey: .liveTranscriptEngine)
             ?? Self.defaultLiveTranscriptEngine
+        modelIdleMinutes = Self.clamped(
+            try container.decodeIfPresent(Int.self, forKey: .modelIdleMinutes) ?? 2, to: Self.modelIdleMinutesRange)
         defaultASRModelID = try container.decodeIfPresent(String.self, forKey: .defaultASRModelID)
         providers = try container.decodeIfPresent([ProviderConfig].self, forKey: .providers) ?? []
         cloudSTTConfirmed = try container.decodeIfPresent([String].self, forKey: .cloudSTTConfirmed) ?? []

@@ -272,21 +272,7 @@ struct TranscriptionStatus: View {
     var body: some View {
         let progress = model.transcriptionProgress[conversation.id]
         if let progress, progress.step != .needsModel {
-            HStack(spacing: 6) {
-                if progress.step == .queued || progress.step == .deferred {
-                    ProgressView().controlSize(.mini)
-                } else {
-                    ProgressRing(fraction: progress.fraction)
-                }
-                Text(Self.stepText(progress.step))
-            }
-            .lineLimit(1)
-            .fixedSize()
-            .font(.caption)
-            .foregroundStyle(.secondary)
-            .help(progress.step == .deferred
-                  ? "Waiting while the Mac is hot or in Low Power Mode"
-                  : progress.fraction.formatted(.percent.precision(.fractionLength(0))))
+            ProgressLabel(progress: progress, conversationID: conversation.id, model: model)
         } else if progress != nil {
             Button("Needs model") { model.openSettings(tab: .transcription) }
                 .buttonStyle(RowTextButtonStyle())
@@ -325,6 +311,33 @@ struct TranscriptionStatus: View {
                 .foregroundStyle(.secondary)
                 .disabled(!conversation.hasAudio)
                 .help(conversation.hasAudio ? "Transcribe this conversation" : "Audio has been removed")
+        }
+    }
+
+    /// A job's ring (or spinner), step and percent. The only reader of `transcriptionFractions`, so a new percent
+    /// redraws this label alone, not every card.
+    private struct ProgressLabel: View {
+        let progress: JobProgress
+        let conversationID: UUID
+        let model: AppModel
+
+        var body: some View {
+            let fraction = model.transcriptionFractions[conversationID] ?? progress.fraction
+            HStack(spacing: 6) {
+                if progress.step == .queued || progress.step == .deferred {
+                    ProgressView().controlSize(.mini)
+                } else {
+                    ProgressRing(fraction: fraction)
+                }
+                Text(TranscriptionStatus.stepText(progress.step))
+            }
+            .lineLimit(1)
+            .fixedSize()
+            .font(.caption)
+            .foregroundStyle(.secondary)
+            .help(progress.step == .deferred
+                  ? "Waiting while the Mac is hot or in Low Power Mode"
+                  : fraction.formatted(.percent.precision(.fractionLength(0))))
         }
     }
 

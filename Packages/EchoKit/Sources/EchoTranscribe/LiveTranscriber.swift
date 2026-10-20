@@ -55,25 +55,33 @@ public actor LiveTranscriber {
     private nonisolated let updatesContinuation: AsyncStream<Snapshot>.Continuation
     /// Filled by `append` on the writer queue, emptied by the decode task.
     private nonisolated let buffer = Mutex(Buffer())
-    /// At most one pending wake-up: a full window is waiting.
+    /// At most one pending wake-up: a full window is waiting, or the idle check is due.
     private nonisolated let wake: AsyncStream<Void>
     private nonisolated let wakeContinuation: AsyncStream<Void>.Continuation
     private nonisolated let modelStore: ModelStore
     private nonisolated let gate: ModelLoadGate
     private nonisolated let engineID: String
+    private nonisolated let idleRelease: Duration?
     private nonisolated let language: @Sendable () -> String?
     private var snapshot = Snapshot(state: .loading)
     private var nextLineID = 0
     private var decoder: Task<Void, Never>?
 
-    /// `engineID` is the catalog id picked in settings (see `model(in:engineID:)`). `language` gives the current
-    /// marker language ("auto", a BCP-47 code, or nil = detect), read per window.
+    /// How often the decode task wakes without a window to see whether the model went unused for `idleRelease`.
+    static let idleCheckInterval = Duration.seconds(15)
+
+    /// `engineID` is the catalog id picked in settings (see `model(in:engineID:)`). `idleRelease` frees the model
+    /// once no window came for that long (a paused recording) and loads it again for the next one; nil keeps it
+    /// until `stop()`. `language` gives the current marker language ("auto", a BCP-47 code, or nil = detect), read
+    /// per window.
     public init(
-        modelStore: ModelStore, gate: ModelLoadGate, engineID: String, language: @escaping @Sendable () -> String?
+        modelStore: ModelStore, gate: ModelLoadGate, engineID: String, idleRelease: Duration? = nil,
+        language: @escaping @Sendable () -> String?
     ) {
         self.modelStore = modelStore
         self.gate = gate
         self.engineID = engineID
+        self.idleRelease = idleRelease
         self.language = language
         (updates, updatesContinuation) = AsyncStream.makeStream(bufferingPolicy: .bufferingNewest(1))
         (wake, wakeContinuation) = AsyncStream.makeStream(bufferingPolicy: .bufferingNewest(1))
@@ -126,34 +134,51 @@ public actor LiveTranscriber {
         }
     }
 
-    /// Owns the model from load to unload. Nemotron streams keep their context, so its windows do not overlap.
+    /// Owns the model from load to unload, and reloads it after an idle release. Nemotron streams keep their
+    /// context, so its windows do not overlap.
     private nonisolated func run(entry: ModelEntry, folder: URL) async throws {
         if entry.id == NemotronStreamingEngine.entryID {
-            let engine = try await NemotronStreamingEngine.load(folder: folder, channels: 2)
+            let load = { try await NemotronStreamingEngine.load(folder: folder, channels: 2) }
+            let engine = try await load()
             buffer.withLock { $0.resize(windowSamples: engine.windowSamples) }
-            await listen(overlap: 0) { Decoded(lines: await transcribe($0, with: engine)) }
-            await engine.unload()
+            let model = IdleModel(engine, idle: idleRelease, load: load, unload: { await $0.unload() })
+            try await listen(model, overlap: 0) { Decoded(lines: await transcribe($0, with: $1)) }
         } else {
-            let whisper = try await WhisperKitEngine.load(entry: entry, folder: folder)
-            await listen(overlap: Self.overlapSeconds * WhisperKit.sampleRate) { await transcribe($0, with: whisper) }
-            await whisper.unloadModels()
+            let load = { try await WhisperKitEngine.load(entry: entry, folder: folder) }
+            let model = IdleModel(try await load(), idle: idleRelease, load: load, unload: { await $0.unloadModels() })
+            try await listen(model, overlap: Self.overlapSeconds * WhisperKit.sampleRate) { await transcribe($0, with: $1) }
         }
     }
 
     /// Decodes every full window until `stop()`, then puts its tail back for the next one. When the tail no longer
-    /// fits, the held lines are shown at once and only `overlap` samples (or what fits) go back.
-    private nonisolated func listen(overlap: Int, _ transcribe: (Window) async -> Decoded) async {
+    /// fits, the held lines are shown at once and only `overlap` samples (or what fits) go back. While no window
+    /// comes (a paused recording) the model is freed after `idleRelease`, and the next window loads it again.
+    private nonisolated func listen<Model>(
+        _ model: IdleModel<Model>, overlap: Int, _ transcribe: (Window, Model) async -> Decoded
+    ) async throws {
         await publish(.listening)
+        let idleCheck = idleRelease.map { _ in
+            Task { [wakeContinuation] in
+                while !Task.isCancelled {
+                    try? await Task.sleep(for: Self.idleCheckInterval)
+                    wakeContinuation.yield()
+                }
+            }
+        }
+        defer { idleCheck?.cancel() }
         for await _ in wake {
             while let window = buffer.withLock({ $0.take() }) {
-                let decoded = await transcribe(window)
+                let current = try await model.get()
+                let decoded = await transcribe(window, current)
                 var lines = decoded.lines
                 if !buffer.withLock({ $0.restore(window, keep: decoded.keep, overlap: overlap) }) {
                     lines += decoded.held
                 }
                 if !lines.isEmpty { await add(lines) }
             }
+            if await model.releaseIfIdle() { MemoryRelief.trim() }
         }
+        await model.release()
     }
 
     /// Speech of each non-silent channel, in start order across both; segments from the cut on are held back and

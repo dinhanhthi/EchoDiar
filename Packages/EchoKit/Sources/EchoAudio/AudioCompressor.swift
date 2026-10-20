@@ -64,8 +64,10 @@ public final class AudioCompressor: Sendable {
     ) async -> CompressionResult {
         await withCheckedContinuation { continuation in
             queue.async {
-                continuation.resume(
-                    returning: self.run(folder: folder, bitrateKbps: bitrateKbps, keepCAF: keepCAF, started: started))
+                let result = self.run(folder: folder, bitrateKbps: bitrateKbps, keepCAF: keepCAF, started: started)
+                // The decoders and the encoder are gone; their freed pages would stay with the process.
+                MemoryRelief.trim()
+                continuation.resume(returning: result)
             }
         }
     }

@@ -41,6 +41,21 @@ public actor LibraryStore {
         return conversations
     }
 
+    /// Re-reads one conversation (a job wrote its folder) and emits, without rescanning the root: a folder that is
+    /// gone or no longer loads leaves the list. An id not in the list yet falls back to `refresh()`.
+    public func reload(id: UUID) {
+        guard let index = conversations.firstIndex(where: { $0.id == id }) else {
+            refresh()
+            return
+        }
+        if let conversation = Self.load(conversations[index].folder) {
+            conversations[index] = conversation
+        } else {
+            conversations.remove(at: index)
+        }
+        emit()
+    }
+
     /// Sets a custom title and writes `conversation.json`. A blank title is ignored. An existing file is read
     /// fresh and only its title changes, so a status written meanwhile (e.g. by the compressor) survives.
     public func rename(id: UUID, title: String) throws {

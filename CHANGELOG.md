@@ -13,7 +13,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Recordings are compressed to AAC after each session; the original is deleted only after the compressed file is checked. A recording interrupted by a crash is recovered and kept.
 - A conversation library grouped by day, with rename, Reveal in Finder, delete to the Trash and size on disk, plus search (⌘F) over titles and transcripts.
 - On-device transcription with WhisperKit, Parakeet, Qwen3-ASR or Apple Speech, with speaker separation (diarization) of the meeting audio. English, French and Vietnamese come first in every language menu. Models are downloaded only when you choose them.
-- Optional live captions while recording, with an on-device streaming model.
+- Optional live captions while recording, with an on-device streaming model. Its memory is freed while a recording stays paused (after 2 minutes by default, set in Settings > Transcription).
 - A transcript view with playback: click a line to hear it.
 - Optional cloud transcription with OpenAI-compatible services, ElevenLabs, Gemini, Deepgram and AssemblyAI. Audio is sent only after you agree for each destination, and API keys are stored in the Keychain.
 - AI summaries and chat about a conversation, with Apple's on-device Foundation Models, local MLX models, local servers (LM Studio, Ollama, Jan, ...), cloud providers (OpenAI, Anthropic, Gemini, Mistral, OpenRouter, ...) or coding CLIs (Claude, Codex, OpenCode, Gemini). Answers cite timestamps that jump to that moment in the recording.

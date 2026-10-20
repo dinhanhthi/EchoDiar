@@ -317,3 +317,20 @@ private struct MiniMeters: View {
             .frame(height: 3)
     }
 }
+
+/// The recording indicator's blink: dimmed every other second, without a fade, while `isActive`. A repeating
+/// `.pulse` redraws its window every display frame, and over Liquid Glass makes the window server recompose the glass
+/// each frame too; this changes one frame per second.
+struct RecordingBlink: ViewModifier {
+    let isActive: Bool
+
+    func body(content: Content) -> some View {
+        if isActive {
+            TimelineView(.periodic(from: .now, by: 1)) { context in
+                content.opacity(Int(context.date.timeIntervalSinceReferenceDate) % 2 == 0 ? 1 : 0.35)
+            }
+        } else {
+            content
+        }
+    }
+}

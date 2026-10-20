@@ -249,7 +249,7 @@ struct MainView: View {
                 } icon: {
                     Image(systemName: "stop.circle.fill")
                         .foregroundStyle(.red)
-                        .symbolEffect(.pulse, isActive: !paused && !reduceMotion && model.mainWindowVisible)
+                        .modifier(RecordingBlink(isActive: !paused && !reduceMotion && model.mainWindowVisible))
                 }
             }
             .disabled(model.isStarting)

@@ -79,6 +79,12 @@ struct ModelsSettingsView: View {
                 Text("Live transcript engine")
                 Text("Nemotron is recommended for Vietnamese live captions (Vietnamese is experimental). Without the picked model installed, another installed live model is used.")
             }
+            Picker(selection: model.setting(\.modelIdleMinutes)) {
+                ForEach(AppSettings.modelIdleMinutesOptions, id: \.self) { Text("\($0) min").tag($0) }
+            } label: {
+                Text("Free unused models after")
+                Text("While a recording stays paused this long, the live transcript model is freed; it loads again when you resume. Other models are freed as soon as their job ends.")
+            }
             // Also in Storage › Audio: the same setting.
             Toggle(isOn: model.setting(\.deleteAudioAfterTranscription)) {
                 Text("Delete audio after transcription")

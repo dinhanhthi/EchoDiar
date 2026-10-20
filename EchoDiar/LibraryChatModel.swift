@@ -257,19 +257,13 @@ extension AppModel {
             let stream = await self?.libraryAnswer(question, client: client, providerID: provider.id, model: model)
             if let stream {
                 do {
-                    for try await update in stream {
-                        switch update {
-                        case .status(let status): self?.aiJob?.status = status
-                        case .text(let text):
-                            self?.aiJob?.status = nil
-                            self?.aiJob?.text += text
-                        }
-                    }
+                    for try await update in stream { self?.applyAIUpdate(update) }
                 } catch where !Task.isCancelled {
                     self?.aiError = (nil, error.localizedDescription)
                 } catch {}
             }
             guard let self else { return }
+            flushAIText()
             aiJob = nil
             aiJobsEnded += 1
             syncLibraryIndex()

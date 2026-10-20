@@ -50,9 +50,12 @@ final class AppModel {
     var recordingError: String?
     private var compressionJobs = 0
     private var transcriptionJobs = 0
-    /// Latest progress of each queued or running transcription, by conversation id. A `needsModel` entry stays
-    /// (its `detail` is the missing catalog id) until the job is submitted again or a model download succeeds.
+    /// Progress of each queued or running transcription, by conversation id, written when its step (or detail)
+    /// changes: every card reads it. A `needsModel` entry stays (its `detail` is the missing catalog id) until the
+    /// job is submitted again or a model download succeeds.
     private(set) var transcriptionProgress: [UUID: JobProgress] = [:]
+    /// Latest whole-job fraction of each transcription, written once per whole percent; only its ring reads it.
+    private(set) var transcriptionFractions: [UUID: Double] = [:]
     /// Short reason of each conversation's last failed transcription ("Deepgram: invalid API key"), in memory only;
     /// cleared when the conversation is submitted again.
     private(set) var transcriptionErrors: [UUID: String] = [:]
@@ -245,6 +248,9 @@ final class AppModel {
     /// `supportedLanguages(engineID:)` by catalog id, sorted by name once.
     @ObservationIgnored private var languageCache: [String: [String]] = [:]
     @ObservationIgnored private var liveTranscriber: LiveTranscriber?
+    /// Streamed AI text not in `aiJob.text` yet, and its scheduled flush (see `applyAIUpdate`).
+    @ObservationIgnored private var pendingAIText = ""
+    @ObservationIgnored private var aiTextFlush: Task<Void, Never>?
     @ObservationIgnored private var savedKeys: [String: Bool] = [:]
     @ObservationIgnored private let meetingDetector = MeetingDetector()
     @ObservationIgnored private let systemEvents = SystemEventsMonitor()
@@ -383,9 +389,10 @@ final class AppModel {
     /// Connects a new transcriber to the engine's sink, publishes its updates until `detachLiveTranscript` and loads
     /// its model.
     private func startLiveTranscript() {
-        let live = LiveTranscriber(modelStore: modelStore, gate: modelGate, engineID: settings.liveTranscriptEngine) {
-            [engine] in engine.currentLanguage()
-        }
+        let live = LiveTranscriber(
+            modelStore: modelStore, gate: modelGate, engineID: settings.liveTranscriptEngine,
+            idleRelease: .seconds(settings.modelIdleMinutes * 60)
+        ) { [engine] in engine.currentLanguage() }
         engine.liveSink = { live.append(interleaved: $0, frames: $1, channels: $2) }
         liveTranscriber = live
         liveTranscript = LiveTranscriber.Snapshot(state: .loading)
@@ -680,6 +687,7 @@ final class AppModel {
         transcriptionErrors[session.id] = nil
         // Set now so the card leaves its button before the pipeline's first event arrives.
         transcriptionProgress[session.id] = JobProgress(conversationID: session.id, step: .queued, fraction: 0)
+        transcriptionFractions[session.id] = nil
         transcriptionJobs += 1
         Task {
             do {
@@ -693,25 +701,36 @@ final class AppModel {
                 NSLog("EchoDiar: transcription failed for \(folder.lastPathComponent): \(error)")
             }
             transcriptionJobs -= 1
-            await library.refresh()
+            await library.reload(id: session.id)
         }
     }
 
-    /// The single consumer of `pipeline.progress`; refreshes the library when a job changes step, so the card
+    /// The single consumer of `pipeline.progress`; reloads the job's conversation when it changes step, so the card
     /// follows the `conversation.json` status the pipeline writes.
     private func observeTranscriptions() {
         Task { [weak self, pipeline] in
             for await progress in pipeline.progress {
                 guard let self else { return }
-                let previous = transcriptionProgress[progress.conversationID]?.step
+                let id = progress.conversationID
+                let previous = transcriptionProgress[id]
                 switch progress.step {
-                case .finished: transcriptionProgress[progress.conversationID] = nil
+                case .finished:
+                    transcriptionProgress[id] = nil
+                    transcriptionFractions[id] = nil
                 case .failed:
-                    transcriptionProgress[progress.conversationID] = nil
-                    transcriptionErrors[progress.conversationID] = progress.detail
-                default: transcriptionProgress[progress.conversationID] = progress
+                    transcriptionProgress[id] = nil
+                    transcriptionFractions[id] = nil
+                    transcriptionErrors[id] = progress.detail
+                default:
+                    // Within a step only the ring moves, by whole percent: the cards redraw at step changes alone.
+                    if previous?.step != progress.step || previous?.detail != progress.detail {
+                        transcriptionProgress[id] = progress
+                    }
+                    if transcriptionFractions[id].map({ Int($0 * 100) }) != Int(progress.fraction * 100) {
+                        transcriptionFractions[id] = progress.fraction
+                    }
                 }
-                if previous != progress.step { await library.refresh() }
+                if previous?.step != progress.step { await library.reload(id: id) }
             }
         }
     }
@@ -1303,24 +1322,45 @@ extension AppModel {
         }
         let task = Task { [weak self] in
             do {
-                for try await update in stream {
-                    switch update {
-                    case .status(let status): self?.aiJob?.status = status
-                    case .text(let text):
-                        self?.aiJob?.status = nil
-                        self?.aiJob?.text += text
-                    }
-                }
+                for try await update in stream { self?.applyAIUpdate(update) }
             } catch where !Task.isCancelled {
                 self?.aiError = (conversation.id, error.localizedDescription)
             } catch {}
             guard let self else { return }
+            flushAIText()
             aiJob = nil
             aiJobsEnded += 1
             syncLibraryIndex()
-            await library.refresh()
+            await library.reload(id: conversation.id)
         }
         aiJob = AIJob(conversationID: conversation.id, kind: kind, task: task)
+    }
+
+    /// Shows an update of the running job's stream. Text reaches `aiJob.text` at once when it is the first, then at
+    /// most every 50 ms: the answer view lays out its whole Markdown again at each change, which per token costs
+    /// time quadratic in the answer's length.
+    func applyAIUpdate(_ update: AIService.Update) {
+        switch update {
+        case .status(let status): aiJob?.status = status
+        case .text(let text):
+            if aiJob?.status != nil { aiJob?.status = nil }
+            pendingAIText += text
+            if aiJob?.text.isEmpty == true { return flushAIText() }
+            guard aiTextFlush == nil else { return }
+            aiTextFlush = Task { [weak self] in
+                try? await Task.sleep(for: .milliseconds(50))
+                self?.flushAIText()
+            }
+        }
+    }
+
+    /// Moves the batched text into `aiJob`; called by the scheduled flush and when the stream ends.
+    func flushAIText() {
+        aiTextFlush?.cancel()
+        aiTextFlush = nil
+        guard !pendingAIText.isEmpty else { return }
+        aiJob?.text += pendingAIText
+        pendingAIText = ""
     }
 
     /// Ends the job early; the answer or summary streamed until then is saved, then the job ends as usual. A library
@@ -1926,8 +1966,11 @@ final class LevelFeed {
             reader = Task { [weak self, engine] in
                 while !Task.isCancelled {
                     let levels = engine.currentLevels()
-                    self?.mic = levels.mic
-                    self?.system = levels.system
+                    // An unchanged level (a silent channel) would still redraw every meter that reads it.
+                    if let self {
+                        if mic != levels.mic { mic = levels.mic }
+                        if system != levels.system { system = levels.system }
+                    }
                     try? await Task.sleep(for: .milliseconds(67))
                 }
             }

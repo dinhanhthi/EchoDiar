@@ -55,10 +55,11 @@ public actor ModelLoadGate {
         }
     }
 
-    /// Hands the gate to the next waiter, if any.
+    /// Hands the gate to the next waiter, if any; once no model is left, gives its freed memory back to the system.
     private func release() {
         guard !waiters.isEmpty else {
             holder = nil
+            MemoryRelief.trim()
             return
         }
         let next = waiters.removeFirst()

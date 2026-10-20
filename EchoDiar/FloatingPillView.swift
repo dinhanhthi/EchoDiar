@@ -57,7 +57,7 @@ struct FloatingPillView: View {
             Image(systemName: "circle.fill")
                 .font(.system(size: 9))
                 .foregroundStyle(tint)
-                .symbolEffect(.pulse, options: .repeating, isActive: !paused && !reduceMotion)
+                .modifier(RecordingBlink(isActive: !paused && !reduceMotion))
                 .accessibilityLabel(paused ? "Paused" : "Recording")
             if let name = model.autoStartedAppName {
                 Text("Recording \(name)")
