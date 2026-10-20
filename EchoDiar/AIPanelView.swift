@@ -38,6 +38,10 @@ struct AIPanelView: View {
     @State private var archives: [ChatArchive.Entry] = []
     /// The History panel is open.
     @State private var showingHistory = false
+    /// The alert confirming that every earlier chat is deleted is open.
+    @State private var confirmingClear = false
+    /// The earlier chat under the pointer, which shows its Remove button.
+    @State private var hoveredEntry: UUID?
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     private static let chatEnd = "chatEnd"
@@ -195,6 +199,13 @@ struct AIPanelView: View {
             HStack {
                 Text("History").font(.headline)
                 Spacer(minLength: 0)
+                Button { confirmingClear = true } label: {
+                    Label("Delete all earlier chats", systemImage: "trash").labelStyle(.iconOnly)
+                }
+                .buttonStyle(RowIconButtonStyle())
+                .disabled(archives.isEmpty || questionJob != nil)
+                .help("Delete all earlier chats")
+                .padding(.trailing, 6)
                 Button(action: closeHistory) {
                     Label("Close", systemImage: "xmark").labelStyle(.iconOnly)
                 }
@@ -223,6 +234,12 @@ struct AIPanelView: View {
         .frame(maxHeight: .infinity, alignment: .top)
         .modifier(GlassCard(cornerRadius: 14, raised: true))
         .padding(8)
+        .alert("Delete all earlier chats?", isPresented: $confirmingClear) {
+            Button("Delete", role: .destructive) { model.clearChats(of: conversation) }
+            Button("Cancel", role: .cancel) {}
+        } message: {
+            Text("The open chat stays. This can't be undone.")
+        }
     }
 
     /// The open chat, first and highlighted: its title, else its first question; "New chat" while it is empty.
@@ -253,10 +270,32 @@ struct AIPanelView: View {
                     .foregroundStyle(.secondary)
             }
             .frame(maxWidth: .infinity, alignment: .leading)
-            .padding(.horizontal, 8)
+            .padding(.leading, 8)
+            // Room for the Remove button.
+            .padding(.trailing, 28)
             .padding(.vertical, 6)
         }
-        .buttonStyle(HistoryRowStyle())
+        .buttonStyle(HistoryRowStyle(hovered: hoveredEntry == entry.id))
+        .overlay(alignment: .trailing) {
+            if hoveredEntry == entry.id {
+                Button { model.deleteChat(entry.id, of: conversation) } label: {
+                    Label("Remove", systemImage: "trash").labelStyle(.iconOnly).font(.caption)
+                }
+                .buttonStyle(RowIconButtonStyle())
+                .help("Remove this chat")
+                .padding(.trailing, 10)
+                .transition(.opacity)
+            }
+        }
+        .onHover { hovering in
+            withAnimation(Motion.hover) {
+                if hovering {
+                    hoveredEntry = entry.id
+                } else if hoveredEntry == entry.id {
+                    hoveredEntry = nil
+                }
+            }
+        }
     }
 
     private func closeHistory() {
@@ -800,22 +839,27 @@ struct CapsuleButton: ViewModifier {
     }
 }
 
-/// A row of the History panel: lighter on hover, darker while pressed, dimmed when disabled.
+/// A row of the History panel: lighter on hover, darker while pressed, dimmed when disabled. `hovered`, when set, is
+/// the row's hover in place of the label's own, so a button over the row keeps it highlighted.
 struct HistoryRowStyle: ButtonStyle {
+    var hovered: Bool?
+
     func makeBody(configuration: Configuration) -> some View {
-        Highlight(configuration: configuration)
+        Highlight(configuration: configuration, rowHovered: hovered)
     }
 
     private struct Highlight: View {
         let configuration: ButtonStyleConfiguration
+        let rowHovered: Bool?
         @State private var hovered = false
         @Environment(\.isEnabled) private var isEnabled
 
         var body: some View {
             let shape = RoundedRectangle(cornerRadius: 8, style: .continuous)
+            let highlighted = (rowHovered ?? hovered) && isEnabled
             configuration.label
                 .background(shape.fill(
-                    configuration.isPressed ? Palette.pressedFill : hovered && isEnabled ? Palette.hoverFill : .clear))
+                    configuration.isPressed ? Palette.pressedFill : highlighted ? Palette.hoverFill : .clear))
                 .contentShape(shape)
                 .opacity(isEnabled ? 1 : 0.45)
                 .animation(Motion.hover, value: hovered)

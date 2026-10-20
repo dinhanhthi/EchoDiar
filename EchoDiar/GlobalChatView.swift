@@ -25,6 +25,10 @@ struct GlobalChatView: View {
     @State private var archives: [ChatArchive.Entry] = []
     /// The History panel is open.
     @State private var showingHistory = false
+    /// The alert confirming that every earlier chat is deleted is open.
+    @State private var confirmingClear = false
+    /// The earlier chat under the pointer, which shows its Remove button.
+    @State private var hoveredEntry: UUID?
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     private static let chatEnd = "chatEnd"
@@ -247,6 +251,13 @@ struct GlobalChatView: View {
             HStack {
                 Text("History").font(.headline)
                 Spacer(minLength: 0)
+                Button { confirmingClear = true } label: {
+                    Label("Delete all earlier chats", systemImage: "trash").labelStyle(.iconOnly)
+                }
+                .buttonStyle(RowIconButtonStyle())
+                .disabled(archives.isEmpty || libraryJob != nil)
+                .help("Delete all earlier chats")
+                .padding(.trailing, 6)
                 Button(action: closeHistory) {
                     Label("Close", systemImage: "xmark").labelStyle(.iconOnly)
                 }
@@ -276,6 +287,12 @@ struct GlobalChatView: View {
         .frame(maxHeight: .infinity, alignment: .top)
         .modifier(GlassCard(cornerRadius: 14, raised: true))
         .padding(8)
+        .alert("Delete all earlier chats?", isPresented: $confirmingClear) {
+            Button("Delete", role: .destructive) { model.clearLibraryChats() }
+            Button("Cancel", role: .cancel) {}
+        } message: {
+            Text("The open chat stays. This can't be undone.")
+        }
     }
 
     /// The open chat, first and highlighted: its title, else its first question; "New chat" while it is empty.
@@ -306,10 +323,32 @@ struct GlobalChatView: View {
                     .foregroundStyle(.secondary)
             }
             .frame(maxWidth: .infinity, alignment: .leading)
-            .padding(.horizontal, 8)
+            .padding(.leading, 8)
+            // Room for the Remove button.
+            .padding(.trailing, 28)
             .padding(.vertical, 6)
         }
-        .buttonStyle(HistoryRowStyle())
+        .buttonStyle(HistoryRowStyle(hovered: hoveredEntry == entry.id))
+        .overlay(alignment: .trailing) {
+            if hoveredEntry == entry.id {
+                Button { model.deleteLibraryChat(entry) } label: {
+                    Label("Remove", systemImage: "trash").labelStyle(.iconOnly).font(.caption)
+                }
+                .buttonStyle(RowIconButtonStyle())
+                .help("Remove this chat")
+                .padding(.trailing, 10)
+                .transition(.opacity)
+            }
+        }
+        .onHover { hovering in
+            withAnimation(Motion.hover) {
+                if hovering {
+                    hoveredEntry = entry.id
+                } else if hoveredEntry == entry.id {
+                    hoveredEntry = nil
+                }
+            }
+        }
     }
 
     private func closeHistory() {

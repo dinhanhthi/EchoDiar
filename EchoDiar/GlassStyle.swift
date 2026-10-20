@@ -31,8 +31,8 @@ enum Motion {
     static let hover = Animation.easeOut(duration: 0.12)
 }
 
-/// The icon buttons of a row: a round highlight on hover, darker and a bit smaller while pressed. The highlight
-/// reaches past the label without changing the row's layout.
+/// The icon buttons of a row: a round highlight on hover, darker and a bit smaller while pressed, dimmed when
+/// disabled. The highlight reaches past the label without changing the row's layout.
 struct RowIconButtonStyle: ButtonStyle {
     /// A capsule highlight, for a label wider than an icon (an icon and a menu chevron).
     var capsule = false
@@ -46,9 +46,10 @@ struct RowIconButtonStyle: ButtonStyle {
         let capsule: Bool
         @State private var hovered = false
         @Environment(\.accessibilityReduceMotion) private var reduceMotion
+        @Environment(\.isEnabled) private var isEnabled
 
         var body: some View {
-            let fill = configuration.isPressed ? Palette.pressedFill : hovered ? Palette.hoverFill : .clear
+            let fill = configuration.isPressed ? Palette.pressedFill : hovered && isEnabled ? Palette.hoverFill : .clear
             configuration.label
                 .background {
                     if capsule {
@@ -58,6 +59,7 @@ struct RowIconButtonStyle: ButtonStyle {
                     }
                 }
                 .contentShape(Rectangle())
+                .opacity(isEnabled ? 1 : 0.45)
                 .scaleEffect(configuration.isPressed && !reduceMotion ? 0.88 : 1)
                 .animation(reduceMotion ? nil : .snappy(duration: 0.12), value: configuration.isPressed)
                 .animation(Motion.hover, value: hovered)

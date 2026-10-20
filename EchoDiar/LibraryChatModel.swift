@@ -372,6 +372,24 @@ extension AppModel {
         changeChat(of: nil, in: folder) { try ChatArchive.resume(entry.id, in: folder) }
     }
 
+    /// Deletes the archived library chat `entry`, as `deleteChat` does.
+    func deleteLibraryChat(_ entry: ChatArchive.Entry) {
+        let folder = globalChatFolder
+        changeChat(of: nil, in: folder) {
+            try ChatArchive.delete(entry.id, in: folder)
+            return nil
+        }
+    }
+
+    /// Deletes every archived library chat, as `clearChats` does.
+    func clearLibraryChats() {
+        let folder = globalChatFolder
+        changeChat(of: nil, in: folder) {
+            try ChatArchive.deleteAll(in: folder)
+            return nil
+        }
+    }
+
     /// A reference of a library answer: the conversation at `seconds` in its transcript, or its summary; the library
     /// chat stays open beside it. Does nothing when the conversation is gone.
     func openReference(id: UUID, seconds: Double?) {

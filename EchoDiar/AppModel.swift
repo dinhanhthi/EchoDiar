@@ -1384,6 +1384,23 @@ extension AppModel {
         changeChat(of: conversation.id, in: conversation.folder) { try ChatArchive.resume(id, in: conversation.folder) }
     }
 
+    /// Deletes the conversation's archived chat `id`. Does nothing while a question runs for the conversation.
+    func deleteChat(_ id: UUID, of conversation: Conversation) {
+        changeChat(of: conversation.id, in: conversation.folder) {
+            try ChatArchive.delete(id, in: conversation.folder)
+            return nil
+        }
+    }
+
+    /// Deletes every archived chat of the conversation; its open chat stays. Does nothing while a question runs for
+    /// the conversation.
+    func clearChats(of conversation: Conversation) {
+        changeChat(of: conversation.id, in: conversation.folder) {
+            try ChatArchive.deleteAll(in: conversation.folder)
+            return nil
+        }
+    }
+
     /// Runs `change` on the chat in `folder` of conversation `id` (nil: the library chat) unless a question runs for
     /// it (its answer is appended to `chat.json`); a failure shows as its AI error.
     func changeChat(of id: UUID?, in folder: URL, _ change: () throws -> ChatArchive.Archived?) {

@@ -76,6 +76,22 @@ public enum ChatArchive {
         try writeIndex(all, in: folder)
     }
 
+    /// Deletes the archived chat `id`: the index first, so a crash leaves an unlisted file, never a listed chat that is
+    /// gone. An unknown `id` changes nothing.
+    public static func delete(_ id: UUID, in folder: URL) throws {
+        let all = try storedEntries(in: folder)
+        guard all.contains(where: { $0.id == id }) else { return }
+        try writeIndex(all.filter { $0.id != id }, in: folder)
+        try? FileManager.default.removeItem(at: fileURL(id, in: folder))
+    }
+
+    /// Deletes every archived chat; `chat.json` stays.
+    public static func deleteAll(in folder: URL) throws {
+        let url = chats(in: folder)
+        guard FileManager.default.fileExists(atPath: url.path) else { return }
+        try FileManager.default.removeItem(at: url)
+    }
+
     /// The first question on one line, at most 60 characters.
     private static func fallbackTitle(_ chat: ChatLog) -> String {
         let question = chat.messages.first { $0.role == .user }?.text ?? ""

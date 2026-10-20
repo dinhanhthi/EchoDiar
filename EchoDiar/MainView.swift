@@ -36,15 +36,17 @@ struct MainView: View {
         let size: Int64
         let jobsEnded: Int
         let edits: Int
+        let chatChanges: Int
         let document: ConversationSearch.Document
     }
 
-    /// Reloads the search documents while a query is typed: the conversations changed, an AI job ended, or a
-    /// speaker was renamed.
+    /// Reloads the search documents while a query is typed: the conversations changed, an AI job ended, a
+    /// speaker was renamed, or an earlier chat was deleted.
     private struct SearchLoadKey: Equatable {
         let conversations: [Conversation]
         let jobsEnded: Int
         let transcriptEdits: [UUID: Int]
+        let chatChanges: Int
     }
 
     /// The pages that slide, left to right; moving between two conversations stays on the same page.
@@ -127,7 +129,7 @@ struct MainView: View {
         // Settings search filters the settings, not the library: no documents to read there.
         .task(id: debouncedQuery.isEmpty || model.route == .settings
                 ? nil : SearchLoadKey(conversations: model.conversations, jobsEnded: model.aiJobsEnded,
-                                transcriptEdits: model.transcriptEdits)) {
+                                transcriptEdits: model.transcriptEdits, chatChanges: model.chatHistoryChanges)) {
             await loadSearchDocuments()
         }
         .onChange(of: model.searchPresented, initial: true) { _, presented in
@@ -660,17 +662,19 @@ struct MainView: View {
         }
     }
 
-    /// Reads the documents not read yet, or stale (size changed, an AI job ended or a speaker was renamed since);
+    /// Reads the documents not read yet, or stale (size changed, an AI job ended, a speaker was renamed or a chat
+    /// history changed since);
     /// titles match meanwhile.
     /// Missing transcript, summary or chat files leave their fields empty.
     private func loadSearchDocuments() async {
         let jobsEnded = model.aiJobsEnded
         let transcriptEdits = model.transcriptEdits
+        let chatChanges = model.chatHistoryChanges
         let stale = model.conversations.filter { conversation in
             guard conversation.hasTranscript else { return false }
             let cached = searchDocuments[conversation.id]
             return cached?.size != conversation.sizeBytes || cached?.jobsEnded != jobsEnded
-                || cached?.edits != transcriptEdits[conversation.id, default: 0]
+                || cached?.edits != transcriptEdits[conversation.id, default: 0] || cached?.chatChanges != chatChanges
         }
         guard !debouncedQuery.isEmpty, model.route != .settings, !stale.isEmpty else { return }
         let loaded = await Task.detached(priority: .utility) {
@@ -679,12 +683,13 @@ struct MainView: View {
                     title: conversation.title,
                     transcript: try? Transcript.read(from: conversation.folder),
                     summary: Conversation.readSummary(from: conversation.folder),
-                    // The open chat and the archived ones: archiving or resuming one changes no search result.
+                    // The open chat and the archived ones: archiving or resuming one changes no search result, deleting
+                    // one does.
                     chat: ChatLog(messages: ChatLog.read(from: conversation.folder).messages
                                   + ChatArchive.messages(in: conversation.folder)))
                 return (conversation.id, SearchDocument(size: conversation.sizeBytes, jobsEnded: jobsEnded,
                                                         edits: transcriptEdits[conversation.id, default: 0],
-                                                        document: document))
+                                                        chatChanges: chatChanges, document: document))
             }
         }.value
         guard !Task.isCancelled else { return }
