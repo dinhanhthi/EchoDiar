@@ -29,7 +29,7 @@ public enum CLIEvent: Equatable, Sendable {
 }
 
 /// Runs a user-installed subscription CLI as a text-only subprocess (docs/research/llm-providers.md C): no tools,
-/// no edits, no MCP, cwd = a fresh empty temp dir, env = PATH + HOME only. The prompt and transcript always go to
+/// no edits, no MCP, cwd = a fresh empty temp dir, env = PATH + HOME + USER only. The prompt and transcript always go to
 /// stdin (argv is visible in `ps` and capped by ARG_MAX); argv carries only the fixed `instructions`. What a CLI
 /// can still do despite its flags is in `containmentNote(for:)`.
 public struct CLIRunner: LLMProvider {
@@ -157,9 +157,10 @@ public struct CLIRunner: LLMProvider {
         }
     }
 
-    /// The child's whole environment: PATH + HOME (+ OpenCode's deny-all config). Nothing else from the app.
-    public static func environment(for preset: CLIPreset, path: String, home: String) -> [String: String] {
-        var environment = ["PATH": path, "HOME": home]
+    /// The child's whole environment: PATH + HOME + USER (+ OpenCode's deny-all config). Nothing else from the app.
+    /// Claude Code finds its login in the Keychain under `USER`; without it, it answers "Not logged in".
+    public static func environment(for preset: CLIPreset, path: String, home: String, user: String) -> [String: String] {
+        var environment = ["PATH": path, "HOME": home, "USER": user]
         if preset == .opencode {
             environment["OPENCODE_CONFIG_CONTENT"] = openCodeConfig
         }
@@ -241,7 +242,7 @@ public struct CLIRunner: LLMProvider {
         let process = Process()
         process.executableURL = executable
         process.arguments = command.arguments
-        process.environment = environment(for: preset, path: await shell.path(), home: ShellEnvironment.home)
+        process.environment = environment(for: preset, path: await shell.path(), home: ShellEnvironment.home, user: NSUserName())
         process.currentDirectoryURL = workDirectory
         let (stdin, stdout, stderr) = (Pipe(), Pipe(), Pipe())
         process.standardInput = stdin
@@ -328,10 +329,19 @@ public struct CLIRunner: LLMProvider {
         }
         if let failure { throw failure }
         guard status == 0 else {
-            let message = String(decoding: errorTail.withLock { $0 }, as: UTF8.self).trimmingCharacters(in: .whitespacesAndNewlines)
+            let message = stderrMessage(String(decoding: errorTail.withLock { $0 }, as: UTF8.self))
             throw LLMError.provider(message.isEmpty ? "\(preset.executableName) exited with status \(status)." : message)
         }
         if let answer { yield(answer) }
+    }
+
+    /// stderr without warnings and stack frames, so the cause comes first (Gemini CLI prints a 256-color warning
+    /// before its error). Pure, for tests.
+    public static func stderrMessage(_ stderr: String) -> String {
+        stderr.split(whereSeparator: \.isNewline)
+            .map { $0.trimmingCharacters(in: .whitespaces) }
+            .filter { !$0.isEmpty && !$0.hasPrefix("Warning:") && !$0.hasPrefix("at ") }
+            .joined(separator: "\n")
     }
 
     /// Writes stdin off the reading path (a long transcript exceeds the pipe buffer), then closes it.

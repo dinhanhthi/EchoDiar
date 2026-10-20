@@ -78,13 +78,14 @@ struct CLIArgumentsTests {
     }
 
     @Test(arguments: CLIPreset.allCases)
-    func environmentIsPathAndHomeOnlyWithOpenCodeDenyAllConfig(preset: CLIPreset) throws {
-        let environment = CLIRunner.environment(for: preset, path: "/usr/bin", home: "/Users/x")
+    func environmentIsPathHomeAndUserOnlyWithOpenCodeDenyAllConfig(preset: CLIPreset) throws {
+        let environment = CLIRunner.environment(for: preset, path: "/usr/bin", home: "/Users/x", user: "x")
 
         #expect(environment["PATH"] == "/usr/bin")
         #expect(environment["HOME"] == "/Users/x")
+        #expect(environment["USER"] == "x")
         guard preset == .opencode else {
-            #expect(environment.count == 2)
+            #expect(environment.count == 3)
             return
         }
         let config = try #require(environment["OPENCODE_CONFIG_CONTENT"])
@@ -140,6 +141,17 @@ struct CLIArgumentsTests {
             #"{"type":"result","status":"success","stats":{}}"#,
             "Loaded cached credentials.",
         ]) == [.skip, .skip, .delta("Sum"), .delta("mary."), .skip, .skip])
+    }
+
+    @Test func stderrMessageDropsWarningsAndStackFrames() {
+        let stderr = """
+            Warning: 256-color support not detected. Using a terminal with at least 256-color support is recommended.
+            Error authenticating: IneligibleTierError: This client is no longer supported.
+                at throwIneligibleOrProjectIdError (file:///gemini/bundle/chunk.js:307474:11)
+
+            """
+
+        #expect(CLIRunner.stderrMessage(stderr) == "Error authenticating: IneligibleTierError: This client is no longer supported.")
     }
 
     private func parse(_ preset: CLIPreset, _ lines: [String]) throws -> [CLIEvent] {
