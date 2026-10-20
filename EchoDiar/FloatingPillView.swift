@@ -23,6 +23,8 @@ struct FloatingPillView: View {
         content
             .padding(.horizontal, 12)
             .modifier(PillGlass())
+            // Clear room in the panel for the glass's edge and shadow, which the panel's bounds would cut off.
+            .padding(6)
             .fixedSize()
             .gesture(WindowDragGesture())
             .onGeometryChange(for: CGSize.self) { $0.size } action: { onSize($0) }

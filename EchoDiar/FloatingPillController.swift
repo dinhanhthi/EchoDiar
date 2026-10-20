@@ -46,7 +46,9 @@ final class FloatingPillController {
         panel.sharingType = .none
         panel.isOpaque = false
         panel.backgroundColor = .clear
-        panel.hasShadow = true
+        // The window server's shadow traces the clear panel's alpha, a jagged dark rim around the rounded pill; the
+        // glass draws its own edge.
+        panel.hasShadow = false
         panel.isReleasedWhenClosed = false
         let center = NotificationCenter.default
         observers.append(center.addObserver(forName: NSWindow.didMoveNotification, object: panel, queue: .main) {
