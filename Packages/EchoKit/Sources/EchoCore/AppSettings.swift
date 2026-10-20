@@ -27,6 +27,9 @@ public struct AppSettings: Codable, Equatable, Sendable {
     /// Catalog id of the ASR engine for new transcriptions, or a cloud engine id (`cloud:<provider id>`); nil = the
     /// catalog default.
     public var defaultASRModelID: String?
+    /// Default diarization model: a catalog diarization id or a cloud engine id (`cloud:<provider id>`); nil = the
+    /// catalog default.
+    public var defaultDiarizerModelID: String?
     /// Configured AI providers; their API keys are in the Keychain, never here.
     public var providers: [ProviderConfig]
     /// Destinations (`<provider id>@<scheme://host[:port]>`) whose one-time "audio leaves this Mac" confirmation for
@@ -108,6 +111,7 @@ public struct AppSettings: Codable, Equatable, Sendable {
         liveTranscriptEngine: String = AppSettings.defaultLiveTranscriptEngine,
         modelIdleMinutes: Int = 2,
         defaultASRModelID: String? = nil,
+        defaultDiarizerModelID: String? = nil,
         providers: [ProviderConfig] = [],
         cloudSTTConfirmed: [String] = [],
         defaultAIProviderID: String? = nil,
@@ -153,6 +157,7 @@ public struct AppSettings: Codable, Equatable, Sendable {
         self.liveTranscriptEngine = liveTranscriptEngine
         self.modelIdleMinutes = modelIdleMinutes
         self.defaultASRModelID = defaultASRModelID
+        self.defaultDiarizerModelID = defaultDiarizerModelID
         self.providers = providers
         self.cloudSTTConfirmed = cloudSTTConfirmed
         self.defaultAIProviderID = defaultAIProviderID
@@ -199,7 +204,7 @@ public struct AppSettings: Codable, Equatable, Sendable {
     private enum CodingKeys: String, CodingKey {
         case version, launchAtLogin, defaultLanguage, recentLanguages, compressionBitrateKbps, keepUncompressedAudio
         case playbackChannels, onboardingCompleted, liveTranscript, liveTranscriptEngine, modelIdleMinutes
-        case defaultASRModelID, providers
+        case defaultASRModelID, defaultDiarizerModelID, providers
         case cloudSTTConfirmed, defaultAIProviderID, defaultAIModel, summaryLanguage, chatContextMessages
         case ragEnabled, embeddingModelID, embeddingAPIModel, cloudEmbeddingConfirmed
         case micDeviceUID, meetingDetection, perAppBehavior, pillPositions, showPill, hidePillWhenAppActive
@@ -225,6 +230,7 @@ public struct AppSettings: Codable, Equatable, Sendable {
         modelIdleMinutes = Self.clamped(
             try container.decodeIfPresent(Int.self, forKey: .modelIdleMinutes) ?? 2, to: Self.modelIdleMinutesRange)
         defaultASRModelID = try container.decodeIfPresent(String.self, forKey: .defaultASRModelID)
+        defaultDiarizerModelID = try container.decodeIfPresent(String.self, forKey: .defaultDiarizerModelID)
         providers = try container.decodeIfPresent([ProviderConfig].self, forKey: .providers) ?? []
         cloudSTTConfirmed = try container.decodeIfPresent([String].self, forKey: .cloudSTTConfirmed) ?? []
         defaultAIProviderID = try container.decodeIfPresent(String.self, forKey: .defaultAIProviderID)

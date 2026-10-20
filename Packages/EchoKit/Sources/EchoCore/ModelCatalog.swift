@@ -358,6 +358,36 @@ public enum ModelCatalog {
                 fr: "Language-independent",
                 vi: "Language-independent"),
             license: "CC-BY-4.0", isDefault: true),
+        // Revision looked up on Hugging Face on 2026-10-20. Files = the preset's bundle plus the root `.bin`
+        // assets `Nemotron3Models.load` reads; `monolithic/v2/` leaves out the legacy `monolithic/` bundles.
+        ModelEntry(
+            id: "nemotron-3-diarization-c128", kind: .diarization, tier: .balanced,
+            displayName: "Nemotron 3 speaker diarization (c128, ANE)",
+            repo: "FluidInference/nemotron-3-diarization-coreml",
+            revision: "25a90f97f254428d4b30374b76af9c74fdee8327",
+            files: [
+                "split/Nemotron3Diarizer_c128_split_w8a8.mlmodelc", "learnable_sil_emb.bin", "pre_encode_proj_t.bin",
+            ],
+            runtime: .fluidAudio, diskMB: 97, ramMB: 300, ramIsEstimate: true,
+            languages: .multilingual,
+            qualityNotes: .init(
+                en: "Language-independent, up to 8 speakers (DER 9.63% AMI MHM, speaker count 100%)",
+                fr: "Language-independent",
+                vi: "Language-independent"),
+            license: "OpenMDW-1.1"),
+        ModelEntry(
+            id: "nemotron-3-diarization-fast128", kind: .diarization, tier: .quality,
+            displayName: "Nemotron 3 speaker diarization (fast128)",
+            repo: "FluidInference/nemotron-3-diarization-coreml",
+            revision: "25a90f97f254428d4b30374b76af9c74fdee8327",
+            files: ["monolithic/v2/Nemotron3Diarizer_fast128.mlmodelc", "learnable_sil_emb.bin"],
+            runtime: .fluidAudio, diskMB: 190, ramMB: 450, ramIsEstimate: true,
+            languages: .multilingual,
+            qualityNotes: .init(
+                en: "Language-independent, up to 8 speakers (DER 9.36% AMI MHM, speaker count 100%)",
+                fr: "Language-independent",
+                vi: "Language-independent"),
+            license: "OpenMDW-1.1"),
     ]
 
     // MARK: - LLM

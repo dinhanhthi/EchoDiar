@@ -414,6 +414,41 @@ struct CloudTranscriptionRequestTests {
         #expect(clean.map(\.end) == [2, 5, 10, 10, 0])
     }
 
+    // MARK: - Cloud diarizer
+
+    @Test func cloudSpeakerLabelsBecomeDiarizationTurns() {
+        // Out of order: labels are numbered in start order; the unlabeled segment is dropped.
+        let cloud = [
+            CloudSegment(start: 2, end: 4, text: "b", speaker: "B"),
+            CloudSegment(start: 0, end: 2, text: "a", speaker: "A"),
+            CloudSegment(start: 6, end: 7, text: "x"),
+            CloudSegment(start: 4, end: 6, text: "c", speaker: "A"),
+        ]
+        let turns = CloudTranscription.turns(from: cloud)
+        #expect(turns == [
+            DiarizationTurn(start: 0, end: 2, speakerIndex: 0),
+            DiarizationTurn(start: 2, end: 4, speakerIndex: 1),
+            DiarizationTurn(start: 4, end: 6, speakerIndex: 0),
+        ])
+
+        // The local ASR's label-less system segments take the overlapping turn's speaker.
+        let system = [
+            RawSegment(start: 0.5, end: 1.5, text: "Hello."),
+            RawSegment(start: 2.5, end: 3.5, text: "Hi."),
+            RawSegment(start: 4.5, end: 5.5, text: "Bye."),
+        ]
+        let merged = TranscriptMerger.merge(mic: [], system: system, turns: turns, languageMarkers: [])
+        #expect(merged.map(\.speaker) == ["s1", "s2", "s1"])
+    }
+
+    /// A model that does not diarize would bill a full transcription of the system channel and return no speakers.
+    @Test func onlyDiarizingModelsCountAsCloudDiarizers() throws {
+        let openai = try preset("openai")
+        #expect(!CloudTranscription.diarizes(openai, model: "gpt-4o-transcribe"))
+        #expect(CloudTranscription.diarizes(openai, model: CloudTranscription.defaultDiarizationModel(for: openai)))
+        #expect(!CloudTranscription.diarizes(try preset("groq"), model: "whisper-large-v3-turbo"))
+    }
+
     // MARK: - Helpers
 
     private func preset(_ id: String) throws -> ProviderConfig {

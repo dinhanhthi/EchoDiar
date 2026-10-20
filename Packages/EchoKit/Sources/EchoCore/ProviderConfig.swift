@@ -37,6 +37,8 @@ public struct ProviderConfig: Codable, Equatable, Sendable, Identifiable {
     public var shownModels: [String]
     /// Cloud transcription model for configs with a speech-to-text API; empty = the vendor default.
     public var transcriptionModel: String
+    /// The provider's diarization model id, used when it is the default cloud diarizer; empty = the provider default.
+    public var diarizationModel: String
     public var enabled: Bool
 
     public init(
@@ -50,6 +52,7 @@ public struct ProviderConfig: Codable, Equatable, Sendable, Identifiable {
         defaultModel: String = "",
         shownModels: [String] = [],
         transcriptionModel: String = "",
+        diarizationModel: String = "",
         enabled: Bool = false
     ) {
         self.id = id
@@ -62,6 +65,7 @@ public struct ProviderConfig: Codable, Equatable, Sendable, Identifiable {
         self.defaultModel = defaultModel
         self.shownModels = shownModels
         self.transcriptionModel = transcriptionModel
+        self.diarizationModel = diarizationModel
         self.enabled = enabled
     }
 
@@ -81,6 +85,7 @@ public struct ProviderConfig: Codable, Equatable, Sendable, Identifiable {
         defaultModel = value(.defaultModel) ?? ""
         shownModels = value(.shownModels) ?? []
         transcriptionModel = value(.transcriptionModel) ?? ""
+        diarizationModel = value(.diarizationModel) ?? ""
         enabled = value(.enabled) ?? false
     }
 

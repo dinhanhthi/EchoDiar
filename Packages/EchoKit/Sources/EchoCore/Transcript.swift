@@ -69,6 +69,8 @@ public struct Transcript: Codable, Equatable, Sendable {
 
     public static let fileName = "transcript.json"
     public static let diarizationMissingNote = "diarization model not installed"
+    /// Added when the cloud diarizer failed and the local diarizer ran instead.
+    public static let cloudDiarizationFailedNote = "cloud diarization failed"
 
     public var version = 1
     public var segments: [Segment]

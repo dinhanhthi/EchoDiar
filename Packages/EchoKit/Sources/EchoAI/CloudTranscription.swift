@@ -293,6 +293,50 @@ extension CloudTranscription {
         return model.isEmpty ? defaultModel(for: config) : model
     }
 
+    /// Presets that can be the default cloud diarizer. Mistral is left out until its model id is verified to diarize.
+    public static let diarizationPresets: Set<String> = ["openai", "elevenlabs", "deepgram", "assemblyai", "gemini"]
+
+    /// Whether `model` of `config` returns speaker labels (a non-diarizing model would still bill a transcription).
+    public static func diarizes(_ config: ProviderConfig, model: String) -> Bool {
+        let model = model.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        switch config.preset {
+        case "openai": return model.hasSuffix("-diarize")
+        case "elevenlabs": return model.hasPrefix("scribe")
+        case "deepgram": return model.hasPrefix("nova")
+        case "gemini": return model.contains("gemini")
+        case "assemblyai": return true
+        default: return false
+        }
+    }
+
+    /// The model used when `diarizationModel` is empty; "" when AssemblyAI picks it or the preset cannot diarize.
+    public static func defaultDiarizationModel(for config: ProviderConfig) -> String {
+        switch config.preset {
+        case "openai": OpenAICompatibleTranscriber.presetModels["openai"]?.first { $0.hasSuffix("-diarize") } ?? ""
+        case "gemini": GeminiAudioTranscriber.defaultModel
+        case "elevenlabs": ElevenLabsTranscriber.defaultModel
+        case "deepgram": DeepgramTranscriber.defaultModel
+        default: ""
+        }
+    }
+
+    public static func diarizationModel(for config: ProviderConfig) -> String {
+        let model = config.diarizationModel.trimmingCharacters(in: .whitespacesAndNewlines)
+        return model.isEmpty ? defaultDiarizationModel(for: config) : model
+    }
+
+    /// The speaker turns of a cloud diarizer's segments (their text is not kept): labels numbered 0, 1, ... by first
+    /// appearance in start order, unlabeled segments dropped, sorted by start. Pure, for tests.
+    public static func turns(from segments: [CloudSegment]) -> [DiarizationTurn] {
+        var indexes: [String: Int] = [:]
+        return segments.sorted { $0.start < $1.start }.compactMap { segment in
+            guard let label = segment.speaker else { return nil }
+            let index = indexes[label] ?? indexes.count
+            indexes[label] = index
+            return DiarizationTurn(start: segment.start, end: segment.end, speakerIndex: index)
+        }
+    }
+
     /// Whether `config` (enabled or not) has what a request needs besides its key: a model (AssemblyAI excepted)
     /// and a valid destination (the base URL, unless the preset has a native API).
     public static func isComplete(_ config: ProviderConfig) -> Bool {
@@ -307,8 +351,9 @@ extension CloudTranscription {
         config.kind == .speechToText || config.authStyle != .none
     }
 
-    public static func makeTranscriber(config: ProviderConfig, apiKey: String?) -> any CloudTranscriber {
-        let model = model(for: config)
+    /// `model`: nil for the transcription model (`model(for:)`); a cloud diarizer passes its diarization model.
+    public static func makeTranscriber(config: ProviderConfig, apiKey: String?, model: String? = nil) -> any CloudTranscriber {
+        let model = model ?? Self.model(for: config)
         let key = apiKey ?? ""
         switch config.preset {
         case "gemini": return GeminiAudioTranscriber(apiKey: key, model: model)

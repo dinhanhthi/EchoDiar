@@ -82,7 +82,7 @@ public final class ModelStore: Sendable {
         case .fluidAudio:
             guard let repo = fluidRepo(entry) else { return nil }
             switch repo {
-            case .diarizer: return base
+            case .diarizer, .nemotron3Diarization: return base
             case .nemotronMultilingual: return entry.subfolder.map { append($0, to: base) }
             default: return base.appendingPathComponent(repo.folderName, isDirectory: true)
             }
@@ -104,8 +104,9 @@ public final class ModelStore: Sendable {
             return Layout(base: [], strip: subfolder)
         case .fluidAudio:
             guard let repo = fluidRepo(entry) else { return nil }
-            // Nemotron keeps the HF layout (`multilingual/2240ms/`); the others go under `Repo.folderName`.
-            if repo == .nemotronMultilingual { return Layout(base: [], strip: []) }
+            // Nemotron keeps the HF layout (`multilingual/2240ms/`, `split/` + root `.bin` assets); the others go
+            // under `Repo.folderName`.
+            if repo == .nemotronMultilingual || repo == .nemotron3Diarization { return Layout(base: [], strip: []) }
             return Layout(base: components(repo.folderName) ?? [], strip: subfolder)
         case .appleSpeech, .foundationModels:
             return nil
@@ -175,6 +176,11 @@ public final class ModelStore: Sendable {
                 Names.tokenizer, Names.metadata,
             ]
             return names.map { name in entry.subfolder.map { "\($0)/\(name)" } ?? name }
+        case .nemotron3Diarization:
+            // Not `ModelNames.Nemotron3.requiredAssets`: only split-graph presets need the projection.
+            guard let config = SpeakerDiarizer.nemotronConfig(for: entry.id) else { return nil }
+            let projection = config.splitGraph ? [ModelNames.Nemotron3.preEncodeProjectionFile] : []
+            return [config.modelFileName, ModelNames.Nemotron3.silenceEmbeddingFile] + projection
         default:
             return nil
         }
