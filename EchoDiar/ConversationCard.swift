@@ -8,13 +8,13 @@ import SwiftUI
 /// status, then a bottom row with the AI, Summary, Reveal in Finder and Delete (audio or conversation) buttons and the transcription progress
 /// or its action. A click elsewhere opens the transcript. Compact (the wide layout's sidebar) drops the buttons, which
 /// stay in the context menu and the detail, and keeps the status, and a click keeps the detail's tab; selected adds an
-/// accent fill and stroke. On the list page ⌘-click and ⇧-click select cards instead of opening.
+/// accent fill and stroke. ⌘-click and ⇧-click select cards instead of opening.
 struct ConversationCard: View {
     let conversation: Conversation
     let model: AppModel
     var compact = false
     var selected = false
-    /// Set on the list page: ⌘-click toggles the card, ⇧-click (`extend`) adds the span from the anchor.
+    /// ⌘-click toggles the card, ⇧-click (`extend`) adds the span from the anchor.
     var select: ((_ extend: Bool) -> Void)? = nil
     @State private var editing = false
     @State private var draft = ""
@@ -76,6 +76,11 @@ struct ConversationCard: View {
         // Buttons take their own clicks; the title's double click is handled before this.
         .contentShape(Rectangle())
         .onTapGesture(perform: open)
+        // Before the title's taps, which wait out the double click: the modifiers are read when the click happens.
+        .highPriorityGesture(TapGesture().modifiers(.command).onEnded { select?(false) },
+                             including: select == nil ? .subviews : .all)
+        .highPriorityGesture(TapGesture().modifiers(.shift).onEnded { select?(true) },
+                             including: select == nil ? .subviews : .all)
         .contextMenu {
             Button("Rename", action: beginEditing)
             Button("Reveal in Finder", action: revealInFinder)
@@ -161,11 +166,6 @@ struct ConversationCard: View {
     /// The transcript; in the sidebar, the tab the detail shows.
     private func open() {
         guard !editing else { return }
-        let flags = NSEvent.modifierFlags.intersection([.command, .shift])
-        if let select, !flags.isEmpty {
-            select(flags.contains(.shift))
-            return
-        }
         model.open(conversation.id, tab: compact ? model.detailTab : .transcript)
     }
 

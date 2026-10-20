@@ -284,7 +284,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSMe
         else { return false }
         if let text = window.firstResponder as? NSTextView, text.isEditable { return false }
         switch event.keyCode {
-        case 53 where model.route != .list:  // kVK_Escape
+        case 53 where model.route != .list && !model.listSelectionActive:  // kVK_Escape
             model.goBack()
             return true
         case 49:  // kVK_Space

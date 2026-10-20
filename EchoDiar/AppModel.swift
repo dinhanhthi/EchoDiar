@@ -101,6 +101,8 @@ final class AppModel {
     private(set) var hotKeyError: String?
     /// ⌘F asks the main window's search field to take the focus; false again once it stops editing.
     var searchPresented = false
+    /// Cards are selected in the list: Esc cancels the selection instead of going back.
+    var listSelectionActive = false
 
     enum PillPrompt: Equatable {
         case meetingDetected(DetectedMeeting)

@@ -3,8 +3,8 @@ import SwiftUI
 
 /// The library as cards under pinned day headers, the recording's card above them while recording. Shows the groups
 /// it is given, so callers can filter them. Compact cards for the wide layout's sidebar, where the open entry is
-/// selected and scrolled into view. On the list page ⌘-click and ⇧-click select cards (not the recording's), and the
-/// selection bar shows at the top while any is selected.
+/// selected and scrolled into view. ⌘-click and ⇧-click select cards (not the recording's), from the open entry in the
+/// sidebar as in Mail, and the selection bar shows at the top while any is selected.
 struct ConversationListView: View {
     let model: AppModel
     let groups: [DayGroup]
@@ -26,8 +26,11 @@ struct ConversationListView: View {
                             ForEach(group.conversations) { conversation in
                                 ConversationCard(
                                     conversation: conversation, model: model, compact: compact,
-                                    selected: conversation.id == selectedID || selection.ids.contains(conversation.id),
-                                    select: compact ? nil : { extend in
+                                    selected: selection.isEmpty
+                                        ? conversation.id == selectedID : selection.ids.contains(conversation.id),
+                                    select: { extend in
+                                        // The sidebar's open entry is where the selection starts.
+                                        if selection.isEmpty, let selectedID { selection.toggle(selectedID) }
                                         extend
                                             ? selection.extend(to: conversation.id, in: order)
                                             : selection.toggle(conversation.id)
@@ -45,7 +48,7 @@ struct ConversationListView: View {
                 .animation(.snappy, value: model.isRecording)
             }
             .safeAreaInset(edge: .top, spacing: 0) {
-                if !compact && !selection.isEmpty {
+                if !selection.isEmpty {
                     SelectionBar(conversations: selectedConversations, model: model, onDelete: { audioOnly in
                         if DeleteMenuItems.delete(audioOnly: audioOnly, selectedConversations, model) { selection.clear() }
                     }, cancel: { selection.clear() })
@@ -59,13 +62,18 @@ struct ConversationListView: View {
             .animation(.snappy, value: selection.isEmpty)
             // Cards that left the list (search filter, deletion) are not selected.
             .onChange(of: groups) { selection.prune(keeping: order) }
+            // Esc cancels the selection instead of leaving the entry.
+            .onChange(of: selection.isEmpty) { model.listSelectionActive = !selection.isEmpty }
+            .onDisappear { model.listSelectionActive = false }
             // Centered when the sidebar appears; later only scrolled as far as needed, so a click on a visible
             // card does not move the list.
             .onAppear {
                 guard let selectedID else { return }
                 withAnimation(nil) { proxy.scrollTo(selectedID, anchor: .center) }
             }
+            // A plain click on another card opens it and ends the selection.
             .onChange(of: selectedID) {
+                selection.clear()
                 guard let selectedID else { return }
                 withAnimation(reduceMotion ? nil : .snappy) { proxy.scrollTo(selectedID) }
             }
@@ -95,6 +103,9 @@ private struct SelectionBar: View {
     let onDelete: (_ audioOnly: Bool) -> Void
     let cancel: () -> Void
 
+    /// Like the chat tab's bottom bar menus.
+    private static let buttonHeight: CGFloat = 28
+
     var body: some View {
         let asks = !model.settings.deleteWithoutConfirmation
         let deletable = conversations.filter { DeleteMenuItems.canDelete($0, model) }
@@ -102,18 +113,31 @@ private struct SelectionBar: View {
         HStack(spacing: 12) {
             Text("\(conversations.count) selected")
                 .font(.subheadline.weight(.semibold))
+                .lineLimit(1)
+                .fixedSize()
             Spacer()
             Menu {
                 Button(asks ? "Delete audio only…" : "Delete audio only") { onDelete(true) }
                     .disabled(!withAudio)
                 Button(asks ? "Delete conversations…" : "Delete conversations") { onDelete(false) }
             } label: {
-                Label("Delete", systemImage: "trash")
+                HStack(spacing: 4) {
+                    Image(systemName: "trash").accessibilityLabel("Delete")
+                    MenuChevron()
+                }
             }
+            .menuStyle(.button)
+            .buttonStyle(BottomBarButtonStyle(height: Self.buttonHeight, horizontalPadding: 10))
+            .menuIndicator(.hidden)
             .fixedSize()
             .disabled(deletable.isEmpty)
-            Button("Cancel", action: cancel)
-                .keyboardShortcut(.cancelAction)
+            .help("Delete the audio or the selected conversations")
+            Button(action: cancel) {
+                Label("Cancel", systemImage: "xmark").labelStyle(.iconOnly)
+            }
+            .buttonStyle(BottomBarButtonStyle(height: Self.buttonHeight, horizontalPadding: 0))
+            .keyboardShortcut(.cancelAction)
+            .help("Cancel the selection (Esc)")
         }
         .padding(.horizontal, 14)
         .padding(.vertical, 10)
