@@ -6,8 +6,9 @@ import SwiftUI
 /// The Summary or Chat tab of the open conversation (`AppModel.detailTab`): Chat (questions with streamed answers) or
 /// Summary (the kept summaries, the newest first with a menu for the earlier ones, Summarize / Re-summarize). The bar
 /// at the bottom has menus for the model (every usable provider with its models) and the output language with the "i"
-/// (where the data goes), then "Copy as prompt" and the tab's action; in Chat the menus sit above the question row.
-/// `[mm:ss]` citations open the transcript at that time.
+/// (where the data goes), then "Copy as prompt" and the tab's action; in Chat the menus sit above the question row,
+/// with History (the earlier chats, in a panel at the pane's trailing edge), and "Start a fresh chat" sits below the
+/// bar. `[mm:ss]` citations open the transcript at that time.
 struct AIPanelView: View {
     let conversation: Conversation
     let model: AppModel
@@ -29,6 +30,11 @@ struct AIPanelView: View {
     @State private var pendingLink: URL?
     /// The "i" popover about where the data goes is open.
     @State private var showingDataNotes = false
+    /// The conversation's earlier chats, newest first.
+    @State private var archives: [ChatArchive.Entry] = []
+    /// The History panel is open.
+    @State private var showingHistory = false
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     private static let chatEnd = "chatEnd"
     /// The height of a one-line question field, and of every control of the bottom bar but Chat's menu row.
@@ -52,7 +58,10 @@ struct AIPanelView: View {
             .frame(maxWidth: .infinity, maxHeight: .infinity)
             .clipped()
             errorText
-            bottomBar
+            VStack(spacing: 6) {
+                bottomBar
+                if model.detailTab == .chat { freshChatButton }
+            }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
         .overlay(alignment: .bottom) { toastView }
@@ -77,12 +86,23 @@ struct AIPanelView: View {
         }
         .task(id: LoadKey(id: conversation.id, hasTranscript: conversation.hasTranscript,
                           jobsEnded: model.aiJobsEnded)) { await load() }
+        // Start fresh, Resume and a new title: the chat and the history only (`load()` resets the shown version).
+        .task(id: HistoryKey(id: conversation.id, changes: model.chatHistoryChanges)) { await loadChat() }
+        // A new conversation rebuilds the view (`MainView` gives it the conversation's id), which closes the panel too.
+        .onChange(of: model.detailTab) { _, new in
+            if new != .chat { showingHistory = false }
+        }
     }
 
     private struct LoadKey: Equatable {
         let id: UUID
         let hasTranscript: Bool
         let jobsEnded: Int
+    }
+
+    private struct HistoryKey: Equatable {
+        let id: UUID
+        let changes: Int
     }
 
     // MARK: - Chat
@@ -102,6 +122,12 @@ struct AIPanelView: View {
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         .modifier(GlassCard(cornerRadius: 20))
+        .overlay(alignment: .trailing) {
+            if showingHistory {
+                historyPanel
+                    .transition(reduceMotion ? .opacity : .move(edge: .trailing).combined(with: .opacity))
+            }
+        }
     }
 
     private var messages: some View {
@@ -166,6 +192,67 @@ struct AIPanelView: View {
                 }
             }
         }
+    }
+
+    // MARK: - History
+
+    /// The earlier chats, newest first: a click makes one the open chat (the open one goes to the history), not while
+    /// an answer streams.
+    private var historyPanel: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            HStack {
+                Text("History").font(.headline)
+                Spacer(minLength: 0)
+                Button(action: closeHistory) {
+                    Label("Close", systemImage: "xmark").labelStyle(.iconOnly)
+                }
+                .buttonStyle(RowIconButtonStyle())
+                .keyboardShortcut(.cancelAction)
+                .help("Close the history")
+            }
+            .padding(.horizontal, 14)
+            .padding(.top, 12)
+            if archives.isEmpty {
+                Text("No earlier chats")
+                    .foregroundStyle(.secondary)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+            } else {
+                ScrollView {
+                    VStack(spacing: 2) {
+                        ForEach(archives) { entry in historyRow(entry) }
+                    }
+                    .padding(6)
+                }
+                .disabled(questionJob != nil)
+            }
+        }
+        .frame(width: 260)
+        .frame(maxHeight: .infinity, alignment: .top)
+        .modifier(GlassCard(cornerRadius: 14, raised: true))
+        .padding(8)
+    }
+
+    private func historyRow(_ entry: ChatArchive.Entry) -> some View {
+        Button {
+            model.resumeChat(entry.id, of: conversation)
+            closeHistory()
+        } label: {
+            VStack(alignment: .leading, spacing: 2) {
+                // The title may come from a model: plain text, never Markdown.
+                Text(entry.title).lineLimit(2)
+                Text("\(entry.archivedAt.formatted(date: .abbreviated, time: .shortened)) · \(entry.messageCount) messages")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(.horizontal, 8)
+            .padding(.vertical, 6)
+        }
+        .buttonStyle(HistoryRowStyle())
+    }
+
+    private func closeHistory() {
+        withAnimation(.snappy(duration: 0.25)) { showingHistory = false }
     }
 
     // MARK: - Summary
@@ -271,8 +358,8 @@ struct AIPanelView: View {
     // MARK: - Bottom bar
 
     /// Summary: one row with the model menu, the "i" (where the data goes) and the language menu, then "Copy as
-    /// prompt" and the tab's action. Chat: the menus and the "i" (smaller), then the question with "Copy as prompt"
-    /// and Send. Then the missing-model warning.
+    /// prompt" and the tab's action. Chat: the menus, the "i" and History (smaller), then the question with "Copy as
+    /// prompt" and Send. Then the missing-model warning.
     private var bottomBar: some View {
         VStack(alignment: .leading, spacing: 8) {
             busyElsewhere
@@ -281,6 +368,13 @@ struct AIPanelView: View {
                     modelMenu(height: Self.chatMenuHeight)
                     languageMenu(height: Self.chatMenuHeight)
                     dataNotesButton(height: Self.chatMenuHeight)
+                    Button {
+                        withAnimation(.snappy(duration: 0.25)) { showingHistory.toggle() }
+                    } label: {
+                        Label("History", systemImage: "clock.arrow.circlepath").labelStyle(.iconOnly)
+                    }
+                    .buttonStyle(BottomBarButtonStyle(height: Self.chatMenuHeight, horizontalPadding: 0))
+                    .help("Earlier chats of this conversation")
                     Spacer(minLength: 0)
                 }
                 questionRow
@@ -350,6 +444,17 @@ struct AIPanelView: View {
                     .disabled(!canRun || question.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
             }
         }
+    }
+
+    /// Archives the chat so the next question starts without history; not while it is empty or an answer streams.
+    private var freshChatButton: some View {
+        Button { model.startFreshChat(conversation) } label: {
+            Label("Start a fresh chat", systemImage: "plus.bubble")
+        }
+        .buttonStyle(.plain)
+        .font(.caption)
+        .foregroundStyle(.secondary)
+        .disabled(chat.isEmpty || questionJob != nil)
     }
 
     /// A job of another conversation or of the other tab: it blocks Ask and Generate until it ends, so it says what
@@ -558,6 +663,15 @@ struct AIPanelView: View {
         shownVersion = nil
     }
 
+    private func loadChat() async {
+        let folder = conversation.folder
+        let (messages, entries) = await Task.detached(priority: .utility) {
+            (ChatLog.read(from: folder).messages, ChatArchive.entries(in: folder))
+        }.value
+        guard !Task.isCancelled else { return }
+        (chat, archives) = (messages, entries)
+    }
+
     private func start(_ kind: AppModel.AIJob.Kind) {
         guard let transcript, let provider = model.currentAIProvider else { return }
         model.startAIJob(
@@ -625,6 +739,30 @@ private struct CapsuleButton: ViewModifier {
             .buttonStyle(.bordered)
             .buttonBorderShape(.capsule)
         .controlSize(.small)
+    }
+}
+
+/// A row of the History panel: lighter on hover, darker while pressed, dimmed when disabled.
+private struct HistoryRowStyle: ButtonStyle {
+    func makeBody(configuration: Configuration) -> some View {
+        Highlight(configuration: configuration)
+    }
+
+    private struct Highlight: View {
+        let configuration: ButtonStyleConfiguration
+        @State private var hovered = false
+        @Environment(\.isEnabled) private var isEnabled
+
+        var body: some View {
+            let shape = RoundedRectangle(cornerRadius: 8, style: .continuous)
+            configuration.label
+                .background(shape.fill(
+                    configuration.isPressed ? Palette.pressedFill : hovered && isEnabled ? Palette.hoverFill : .clear))
+                .contentShape(shape)
+                .opacity(isEnabled ? 1 : 0.45)
+                .animation(.easeOut(duration: 0.12), value: hovered)
+                .onHover { hovered = $0 }
+        }
     }
 }
 

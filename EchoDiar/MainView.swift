@@ -644,7 +644,9 @@ struct MainView: View {
                     title: conversation.title,
                     transcript: try? Transcript.read(from: conversation.folder),
                     summary: Conversation.readSummary(from: conversation.folder),
-                    chat: ChatLog.read(from: conversation.folder))
+                    // The open chat and the archived ones: archiving or resuming one changes no search result.
+                    chat: ChatLog(messages: ChatLog.read(from: conversation.folder).messages
+                                  + ChatArchive.messages(in: conversation.folder)))
                 return (conversation.id, SearchDocument(size: conversation.sizeBytes, jobsEnded: jobsEnded,
                                                         edits: transcriptEdits[conversation.id, default: 0],
                                                         document: document))

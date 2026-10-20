@@ -90,6 +90,8 @@ struct SettingsSearchItem: Identifiable {
         .init(title: "AI models (summaries and chat)",
               keywords: ["LLM", "MLX", "Apple Foundation Models", "local", "summary", "chat"],
               tab: .providers, subTab: "onThisMac"),
+        .init(title: "Chat context", keywords: ["chat", "history", "context", "messages", "memory"],
+              tab: .providers, subTab: "onThisMac"),
         .init(title: "Local hosts", keywords: ["scan", "custom URL", "server"] + presetNames(.local),
               tab: .providers, subTab: "onThisMac"),
         .init(title: "Cloud APIs", keywords: ["API key", "provider", "LLM"] + presetNames(.openAICompatible)

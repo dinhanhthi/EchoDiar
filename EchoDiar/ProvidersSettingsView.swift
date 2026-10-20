@@ -29,6 +29,7 @@ struct ProvidersSettingsView: View {
             switch tab {
             case .onThisMac:
                 llmSection
+                chatSection
                 localHosts
             case .cloudAPIs:
                 dataLeavesNotice
@@ -106,6 +107,20 @@ struct ProvidersSettingsView: View {
             ForEach(Self.mlxEntries) { ModelRow(entry: $0, model: model) }
         } header: {
             Text("AI models (summaries and chat)")
+        }
+    }
+
+    /// How many earlier messages each chat question carries, for every provider.
+    private var chatSection: some View {
+        Section {
+            Picker("Chat context", selection: model.setting(\.chatContextMessages)) {
+                ForEach(AppSettings.chatContextOptions, id: \.self) { Text("\($0) messages").tag($0) }
+                Text("Whole chat").tag(0)
+            }
+        } header: {
+            Text("Chat")
+        } footer: {
+            Text("Earlier messages sent with each question.")
         }
     }
 

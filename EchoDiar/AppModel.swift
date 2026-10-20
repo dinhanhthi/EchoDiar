@@ -78,10 +78,12 @@ final class AppModel {
     private(set) var appleSpeechReservedLocales: [String] = []
     /// The running summary or question; one at a time.
     private(set) var aiJob: AIJob?
-    /// Why the last AI job of a conversation failed.
+    /// Why the last AI job, or chat archive or resume, of a conversation failed.
     private(set) var aiError: (conversationID: UUID, message: String)?
     /// Bumped when an AI job ends, so the AI tab reloads `summary.md` and `chat.json`.
     private(set) var aiJobsEnded = 0
+    /// Bumped when a conversation's chat or archived chats change outside a question job, so the AI tab reloads them.
+    private(set) var chatHistoryChanges = 0
     /// Bumped per conversation when a speaker is renamed in `transcript.json`, so search rereads that document.
     private(set) var transcriptEdits: [UUID: Int] = [:]
     /// Recording time of the last clicked citation, for the opened transcript.
@@ -1212,9 +1214,7 @@ extension AppModel {
         aiError = nil
         let client: (any LLMProvider)?
         do {
-            client = provider.kind == .inApp
-                ? makeLocalProvider(entryID: provider.id)
-                : try providerConfigs.first { $0.id == provider.id }.flatMap(makeProvider(for:))
+            client = try llmClient(for: provider)
         } catch {
             aiError = (conversation.id, "\(provider.name): \(error.localizedDescription)")
             return
@@ -1258,6 +1258,65 @@ extension AppModel {
     /// Ends the job early; the answer or summary streamed until then is saved, then the job ends as usual.
     func stopAIJob() {
         aiService.stop()
+    }
+
+    /// Archives the conversation's chat so the next question starts without history; then asks the AI provider for
+    /// its title when it has none. Does nothing while a question runs for the conversation.
+    func startFreshChat(_ conversation: Conversation) {
+        changeChat(of: conversation) { try ChatArchive.archive(in: conversation.folder) }
+    }
+
+    /// Makes the archived chat `id` the conversation's chat, archiving the current one (titled like
+    /// `startFreshChat`). Does nothing while a question runs for the conversation.
+    func resumeChat(_ id: UUID, of conversation: Conversation) {
+        changeChat(of: conversation) { try ChatArchive.resume(id, in: conversation.folder) }
+    }
+
+    /// Runs `change` unless a question runs for `conversation` (its answer is appended to `chat.json`); a failure
+    /// shows as the conversation's AI error.
+    private func changeChat(of conversation: Conversation, _ change: () throws -> ChatArchive.Archived?) {
+        if let job = aiJob, job.conversationID == conversation.id, job.kind != .summary { return }
+        let archived: ChatArchive.Archived?
+        do {
+            archived = try change()
+        } catch {
+            aiError = (conversation.id, error.localizedDescription)
+            archived = nil
+        }
+        // Also after a failure: a resume may have archived the open chat first, so the pane reloads what is on disk.
+        chatHistoryChanges += 1
+        if let archived, archived.needsTitle { requestTitle(for: archived.entry, of: conversation) }
+    }
+
+    /// Names the archived chat `entry` with the current AI provider and model, outside `aiJob`. Without a provider,
+    /// when another one gave any of the chat's answers, with an in-app model, or on error its fallback title (the first
+    /// question) stays.
+    private func requestTitle(for entry: ChatArchive.Entry, of conversation: Conversation) {
+        Task { [weak self] in
+            // Only with the provider that gave every answer of the chat, so its questions reach no provider that never
+            // saw them, and never an in-app model, whose gate a hidden job would hold while the next question waits.
+            guard let self, let provider = currentAIProvider, provider.kind != .inApp,
+                  let chat = ChatArchive.log(entry.id, in: conversation.folder),
+                  chat.messages.allSatisfy({ $0.role != .assistant || $0.provider == provider.id }),
+                  let client = try? llmClient(for: provider) else { return }
+            var title = ""
+            do {
+                for try await update in aiService.title(
+                    chat: chat.messages, provider: client, model: aiModel(for: provider)) {
+                    if case .text(let text) = update { title += text }
+                }
+            } catch { return }
+            guard !title.isEmpty else { return }
+            try? ChatArchive.setTitle(title, for: entry.id, in: conversation.folder)
+            chatHistoryChanges += 1
+        }
+    }
+
+    /// The client for `provider`; nil when its in-app model or its config is gone.
+    private func llmClient(for provider: AIProvider) throws -> (any LLMProvider)? {
+        provider.kind == .inApp
+            ? makeLocalProvider(entryID: provider.id)
+            : try providerConfigs.first { $0.id == provider.id }.flatMap(makeProvider(for:))
     }
 }
 
