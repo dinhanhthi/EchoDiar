@@ -100,7 +100,7 @@ public struct MLXProvider: LocalLLMProvider {
     }
 
     /// Returns the freed buffers to the system and puts back the cache limit another MLX user may have set.
-    private static func unload(restoring priorCacheLimit: Int) {
+    static func unload(restoring priorCacheLimit: Int) {
         Memory.clearCache()
         Memory.cacheLimit = priorCacheLimit
     }
@@ -108,7 +108,7 @@ public struct MLXProvider: LocalLLMProvider {
 
 /// Loads `tokenizer.json` + `tokenizer_config.json` (and `chat_template.jinja`) from the model folder with
 /// swift-transformers; no network access.
-private struct TransformersTokenizerLoader: MLXLMCommon.TokenizerLoader {
+struct TransformersTokenizerLoader: MLXLMCommon.TokenizerLoader {
     func load(from directory: URL) async throws -> any MLXLMCommon.Tokenizer {
         TokenizerBridge(try await Tokenizers.AutoTokenizer.from(modelFolder: directory))
     }

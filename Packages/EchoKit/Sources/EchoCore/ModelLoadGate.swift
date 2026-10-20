@@ -9,6 +9,8 @@ import Foundation
 public actor ModelLoadGate {
     public enum Owner: String, Sendable {
         case liveTranscript, transcriptionJob, llm
+        /// A local text embedder building or querying the library index, held per batch.
+        case embedder
     }
 
     private struct Waiter {

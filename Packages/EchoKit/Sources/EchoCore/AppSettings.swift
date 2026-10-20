@@ -37,6 +37,15 @@ public struct AppSettings: Codable, Equatable, Sendable {
     public var summaryLanguage: String
     /// Earlier chat messages sent with each question; 0 = the whole chat.
     public var chatContextMessages: Int
+    /// Global chat over every transcribed conversation (opt-in); builds and keeps the embedding index.
+    public var ragEnabled: Bool
+    /// Embedder of the index: an embedding catalog id, `"apple-nl"`, or `"api:<provider id>"`.
+    public var embeddingModelID: String
+    /// Model name sent to an API embedder (`api:<provider id>`).
+    public var embeddingAPIModel: String
+    /// Destinations (`<provider id>@<scheme://host[:port]>`) whose one-time "transcripts leave this Mac" confirmation
+    /// for cloud embeddings was accepted; a changed base URL asks again.
+    public var cloudEmbeddingConfirmed: [String]
     /// Core Audio UID of the recording microphone; nil = the system default input (also used when it is gone).
     public var micDeviceUID: String?
     /// Watch known meeting apps' mic use and offer to record them.
@@ -77,6 +86,7 @@ public struct AppSettings: Codable, Equatable, Sendable {
     public var globalHotKeyEnabled: Bool
 
     public static let defaultLiveTranscriptEngine = "whisperkit-turbo-632"
+    public static let defaultEmbeddingModelID = "mlx-qwen3-embedding-0.6b"
 
     public init(
         launchAtLogin: Bool = false,
@@ -95,6 +105,10 @@ public struct AppSettings: Codable, Equatable, Sendable {
         defaultAIModel: String? = nil,
         summaryLanguage: String = "auto",
         chatContextMessages: Int = 10,
+        ragEnabled: Bool = false,
+        embeddingModelID: String = AppSettings.defaultEmbeddingModelID,
+        embeddingAPIModel: String = "",
+        cloudEmbeddingConfirmed: [String] = [],
         micDeviceUID: String? = nil,
         meetingDetection: Bool = true,
         perAppBehavior: [String: MeetingBehavior] = [:],
@@ -132,6 +146,10 @@ public struct AppSettings: Codable, Equatable, Sendable {
         self.defaultAIModel = defaultAIModel
         self.summaryLanguage = summaryLanguage
         self.chatContextMessages = chatContextMessages
+        self.ragEnabled = ragEnabled
+        self.embeddingModelID = embeddingModelID
+        self.embeddingAPIModel = embeddingAPIModel
+        self.cloudEmbeddingConfirmed = cloudEmbeddingConfirmed
         self.micDeviceUID = micDeviceUID
         self.meetingDetection = meetingDetection
         self.perAppBehavior = perAppBehavior
@@ -163,6 +181,7 @@ public struct AppSettings: Codable, Equatable, Sendable {
         case version, launchAtLogin, defaultLanguage, recentLanguages, compressionBitrateKbps, keepUncompressedAudio
         case playbackChannels, onboardingCompleted, liveTranscript, liveTranscriptEngine, defaultASRModelID, providers
         case cloudSTTConfirmed, defaultAIProviderID, defaultAIModel, summaryLanguage, chatContextMessages
+        case ragEnabled, embeddingModelID, embeddingAPIModel, cloudEmbeddingConfirmed
         case micDeviceUID, meetingDetection, perAppBehavior, pillPositions, showPill, hidePillWhenAppActive
         case attachPillToWindow, pillWindowOffset, endMonitor, routeChangeBehavior
         case autoTranscribe, speakerCountHint, deferTranscriptionWhenConstrained
@@ -190,6 +209,11 @@ public struct AppSettings: Codable, Equatable, Sendable {
         defaultAIModel = try container.decodeIfPresent(String.self, forKey: .defaultAIModel)
         summaryLanguage = try container.decodeIfPresent(String.self, forKey: .summaryLanguage) ?? "auto"
         chatContextMessages = try container.decodeIfPresent(Int.self, forKey: .chatContextMessages) ?? 10
+        ragEnabled = try container.decodeIfPresent(Bool.self, forKey: .ragEnabled) ?? false
+        embeddingModelID = try container.decodeIfPresent(String.self, forKey: .embeddingModelID)
+            ?? Self.defaultEmbeddingModelID
+        embeddingAPIModel = try container.decodeIfPresent(String.self, forKey: .embeddingAPIModel) ?? ""
+        cloudEmbeddingConfirmed = try container.decodeIfPresent([String].self, forKey: .cloudEmbeddingConfirmed) ?? []
         micDeviceUID = try container.decodeIfPresent(String.self, forKey: .micDeviceUID)
         meetingDetection = try container.decodeIfPresent(Bool.self, forKey: .meetingDetection) ?? true
         perAppBehavior = try container.decodeIfPresent([String: MeetingBehavior].self, forKey: .perAppBehavior) ?? [:]

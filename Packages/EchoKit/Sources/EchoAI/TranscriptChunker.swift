@@ -133,11 +133,15 @@ public enum TranscriptChunker {
 
     /// Indices of `documents`, best BM25 match for `query` first (k1 = 1.2, b = 0.75); ties keep document order.
     public static func bm25Rank(query: String, documents: [String]) -> [Int] {
-        let docs = documents.map(terms)
+        bm25Rank(queryTerms: terms(query), documents: documents.map(terms))
+    }
+
+    /// `bm25Rank(query:documents:)` over already tokenised (`terms`) query and documents.
+    static func bm25Rank(queryTerms: [String], documents docs: [[String]]) -> [Int] {
         let averageLength = max(Double(docs.reduce(0) { $0 + $1.count }) / Double(max(docs.count, 1)), 1)
         var frequency: [String: Int] = [:]
         for doc in docs { for term in Set(doc) { frequency[term, default: 0] += 1 } }
-        let queryTerms = Set(terms(query))
+        let queryTerms = Set(queryTerms)
         let count = Double(docs.count)
         let scores = docs.map { doc -> Double in
             var counts: [String: Int] = [:]

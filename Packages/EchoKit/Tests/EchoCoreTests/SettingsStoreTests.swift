@@ -19,6 +19,8 @@ struct SettingsStoreTests {
             try Data(json.utf8).write(to: store.fileURL)
             #expect(store.load() == AppSettings())
             #expect(store.load().chatContextMessages == 10)
+            #expect(store.load().ragEnabled == false)
+            #expect(store.load().embeddingModelID == "mlx-qwen3-embedding-0.6b")
             #expect(FileManager.default.fileExists(atPath: store.fileURL.path))
         }
     }

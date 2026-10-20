@@ -1,10 +1,10 @@
-import EchoAI
+@testable import EchoAI
 import EchoCore
 import Foundation
 import Testing
 
 /// Guards the API request contract and where secrets and transcript text may go. No network: only the pure
-/// `makeRequest` builders are exercised, with a fake key.
+/// `makeRequest` builders (and the embeddings decoder) are exercised, with a fake key.
 struct ProviderRequestTests {
     private let key = "sk-test-fake-0000"
     private let transcript = "Alice [00:05]: the launch moves to Friday"
@@ -52,6 +52,40 @@ struct ProviderRequestTests {
         #expect(body["system"] as? String == "Summarize the meeting.")
         #expect(body["messages"] as? [[String: String]] == [["role": "user", "content": transcript]])
         expectSecretsOnlyWhereAllowed(request)
+    }
+
+    @Test func openAICompatibleEmbeddingsRequestPostsModelAndInputs() throws {
+        let request = try OpenAICompatibleClient.makeEmbeddingsRequest(
+            config: try preset("openai"), apiKey: key, model: "e", inputs: [transcript, "b"])
+
+        #expect(request.httpMethod == "POST")
+        #expect(request.url?.absoluteString == "https://api.openai.com/v1/embeddings")
+        #expect(request.value(forHTTPHeaderField: "Authorization") == "Bearer \(key)")
+        let body = try json(request)
+        #expect(body["model"] as? String == "e")
+        #expect(body["input"] as? [String] == [transcript, "b"])
+        expectSecretsOnlyWhereAllowed(request)
+    }
+
+    @Test func ollamaEmbeddingsRequestUsesNativeEmbedAPI() throws {
+        let request = try OpenAICompatibleClient.makeEmbeddingsRequest(
+            config: try preset("ollama"), apiKey: nil, model: "nomic-embed-text", inputs: [transcript])
+
+        #expect(request.httpMethod == "POST")
+        #expect(request.url?.absoluteString == "http://127.0.0.1:11434/api/embed")
+        #expect(request.value(forHTTPHeaderField: "Authorization") == nil)
+        let body = try json(request)
+        #expect(body["model"] as? String == "nomic-embed-text")
+        #expect(body["input"] as? [String] == [transcript])
+        expectSecretsOnlyWhereAllowed(request)
+    }
+
+    @Test func embeddingsDecodeInInputOrderAndNormalised() throws {
+        let payload = #"{"data": [{"index": 1, "embedding": [0, 2]}, {"index": 0, "embedding": [3, 4]}]}"#
+        let response = try JSONDecoder().decode(EmbeddingsResponse.self, from: Data(payload.utf8))
+
+        #expect(try response.vectors(count: 2) == [[0.6, 0.8], [0, 1]])
+        #expect(throws: LLMError.self) { try response.vectors(count: 3) }
     }
 
     private func preset(_ id: String) throws -> ProviderConfig {

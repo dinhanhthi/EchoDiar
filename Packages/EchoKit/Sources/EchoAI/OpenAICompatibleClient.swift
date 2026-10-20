@@ -11,6 +11,8 @@ public struct OpenAICompatibleClient: LLMProvider {
     static let localContext = 8_192
     /// Every cloud model in docs/research/llm-providers.md D has at least this much.
     static let cloudContext = 128_000
+    /// Texts per embeddings request.
+    static let embeddingsBatch = 64
 
     public let config: ProviderConfig
     private let apiKey: String?
@@ -47,6 +49,18 @@ public struct OpenAICompatibleClient: LLMProvider {
         return config.kind == .local ? Self.localContext : Self.cloudContext
     }
 
+    /// One L2-normalised vector per text, in the order of `texts`, `embeddingsBatch` texts per request.
+    public func embed(_ texts: [String], model: String) async throws -> [[Float]] {
+        var vectors: [[Float]] = []
+        for start in stride(from: 0, to: texts.count, by: Self.embeddingsBatch) {
+            let batch = Array(texts[start..<min(start + Self.embeddingsBatch, texts.count)])
+            let request = try Self.makeEmbeddingsRequest(config: config, apiKey: apiKey, model: model, inputs: batch)
+            let response = try await ProviderHTTP.getJSON(EmbeddingsResponse.self, request, session: session)
+            vectors += try response.vectors(count: batch.count)
+        }
+        return vectors
+    }
+
     /// `POST {base}/chat/completions` (or Ollama `POST {base}/api/chat`), streaming. Pure, for tests.
     public static func makeRequest(
         config: ProviderConfig, apiKey: String?, messages: [LLMMessage], model: String, maxTokens: Int
@@ -76,6 +90,19 @@ public struct OpenAICompatibleClient: LLMProvider {
         let base = try ProviderHTTP.baseURL(config)
         let path = isOllama(config) ? "api/tags" : "models"
         return ProviderHTTP.request(base.appending(path: path), config: config, apiKey: apiKey, timeout: ProviderHTTP.listTimeout)
+    }
+
+    /// `POST {base}/embeddings` (Ollama: `POST {base}/api/embed`), both with `{"model", "input": [...]}`. Pure, for tests.
+    public static func makeEmbeddingsRequest(
+        config: ProviderConfig, apiKey: String?, model: String, inputs: [String]
+    ) throws -> URLRequest {
+        let base = try ProviderHTTP.baseURL(config)
+        let path = isOllama(config) ? "api/embed" : "embeddings"
+        // A local host may load the model before it answers, so the long timeout.
+        var request = ProviderHTTP.request(
+            base.appending(path: path), config: config, apiKey: apiKey, timeout: ProviderHTTP.streamTimeout)
+        try ProviderHTTP.setJSONBody(&request, EmbeddingsBody(model: model, input: inputs))
+        return request
     }
 
     /// Prompt estimate (UTF-8 bytes / 4, errs high for accented text) + the answer, rounded up to 4K steps
@@ -149,4 +176,39 @@ private struct OllamaChunk: Decodable {
 struct OllamaTags: Decodable {
     struct Model: Decodable { var name: String }
     var models: [Model]
+}
+
+private struct EmbeddingsBody: Encodable {
+    var model: String
+    var input: [String]
+}
+
+/// `{"data": [{"index", "embedding"}]}` (OpenAI-style, any order) or `{"embeddings": [[...]]}` (Ollama `/api/embed`).
+struct EmbeddingsResponse: Decodable {
+    struct Item: Decodable {
+        var index: Int
+        var embedding: [Float]
+    }
+
+    var data: [Item]?
+    var embeddings: [[Float]]?
+
+    /// The vectors in input order, L2-normalised; throws unless there is exactly one non-empty vector per input.
+    func vectors(count: Int) throws -> [[Float]] {
+        let vectors: [[Float]]
+        if let data {
+            let items = data.sorted { $0.index < $1.index }
+            guard items.map(\.index) == Array(0..<items.count) else {
+                throw LLMError.provider("The provider returned embeddings with missing or repeated indices.")
+            }
+            vectors = items.map(\.embedding)
+        } else {
+            vectors = embeddings ?? []
+        }
+        guard vectors.count == count else {
+            throw LLMError.provider("The provider returned \(vectors.count) embeddings for \(count) texts.")
+        }
+        guard !vectors.contains(where: \.isEmpty) else { throw LLMError.provider("The provider returned an empty embedding.") }
+        return vectors.map(EmbeddingMath.normalized)
+    }
 }

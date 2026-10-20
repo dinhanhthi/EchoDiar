@@ -3,7 +3,7 @@ import Foundation
 /// One downloadable (or system) model in the user-visible catalog.
 public struct ModelEntry: Sendable, Hashable, Identifiable {
     public enum Kind: String, Sendable, Hashable, CaseIterable {
-        case asr, diarization, llm
+        case asr, diarization, llm, embedding
     }
 
     public enum Tier: String, Sendable, Hashable, CaseIterable {
@@ -135,7 +135,7 @@ public struct ModelEntry: Sendable, Hashable, Identifiable {
 
 /// The named model catalog. Revisions were looked up on Hugging Face on 2026-10-18.
 public enum ModelCatalog {
-    public static let all: [ModelEntry] = asr + diarization + llm
+    public static let all: [ModelEntry] = asr + diarization + llm + embedding
 
     public static func entry(id: String) -> ModelEntry? {
         all.first { $0.id == id }
@@ -459,5 +459,49 @@ public enum ModelCatalog {
                 "model-00003-of-00003.safetensors", "model.safetensors.index.json",
             ], extra: ["generation_config.json"]),
             diskMB: 15330, ramMB: 19500, vi: "Very good"),
+    ]
+
+    // MARK: - Embedding
+
+    /// Text embedders for the library index (MLXEmbedders). Revisions looked up on Hugging Face on 2026-10-20.
+    private static func embedder(
+        _ id: String, _ displayName: String, tier: ModelEntry.Tier, repo: String, revision: String,
+        files: [String], diskMB: Int, ramMB: Int, vi: String, license: String, isDefault: Bool = false
+    ) -> ModelEntry {
+        ModelEntry(
+            id: id, kind: .embedding, tier: tier, displayName: displayName,
+            repo: repo, revision: revision, files: files,
+            runtime: .mlx, diskMB: diskMB, ramMB: ramMB, ramIsEstimate: true,
+            languages: .multilingual,
+            qualityNotes: .init(en: "Good", fr: "Good", vi: vi),
+            license: license, isDefault: isDefault)
+    }
+
+    public static let embedding: [ModelEntry] = [
+        embedder("mlx-qwen3-embedding-0.6b", "Qwen3 Embedding 0.6B", tier: .balanced,
+            repo: "mlx-community/Qwen3-Embedding-0.6B-4bit-DWQ",
+            revision: "6c3ae70858513f1a78e9cdca3cae330d9075cd2a",
+            files: [
+                "config.json", "model.safetensors", "model.safetensors.index.json",
+                "tokenizer.json", "tokenizer_config.json", "special_tokens_map.json",
+            ],
+            diskMB: 331, ramMB: 800, vi: "Good", license: "Apache-2.0", isDefault: true),
+        embedder("mlx-multilingual-e5-small", "Multilingual E5 Small", tier: .fast,
+            repo: "intfloat/multilingual-e5-small",
+            revision: "614241f622f53c4eeff9890bdc4f31cfecc418b3",
+            files: [
+                "config.json", "model.safetensors", "tokenizer.json", "tokenizer_config.json",
+                "special_tokens_map.json", "1_Pooling/config.json",
+            ],
+            diskMB: 465, ramMB: 600, vi: "Fair-Good", license: "MIT"),
+        // BAAI/bge-m3 ships only pytorch_model.bin on main; this is the fp16 safetensors conversion.
+        embedder("mlx-bge-m3", "BGE-M3", tier: .quality,
+            repo: "mlx-community/bge-m3-mlx-fp16",
+            revision: "a37eddded9a6a1273a87fb8b0da0d1cdbd98aeec",
+            files: [
+                "config.json", "model.safetensors", "model.safetensors.index.json",
+                "tokenizer.json", "tokenizer_config.json", "special_tokens_map.json",
+            ],
+            diskMB: 1099, ramMB: 1500, vi: "Good", license: "MIT"),
     ]
 }

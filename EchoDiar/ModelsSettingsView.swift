@@ -19,7 +19,7 @@ struct ModelsSettingsView: View {
 
     private static let entries = ModelCatalog.visibleEntries(
         registeredEngineRuntimes: TranscriptionPipeline.registeredRuntimes
-    ).filter { $0.kind != .llm }
+    ).filter { $0.kind == .asr || $0.kind == .diarization }
 
     var body: some View {
         VStack(spacing: 0) {
