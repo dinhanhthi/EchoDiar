@@ -12,7 +12,7 @@
 
 [Website](https://ed.dinhanhthi.com) · [Download](https://github.com/dinhanhthi/EchoDiar/releases/latest) · [Docs](https://ed.dinhanhthi.com/docs.html) · [Changelog](CHANGELOG.md)
 
-<img src="assets/poster.jpg" width="720" alt="EchoDiar: a transcript with speakers and an AI answer that cites timestamps">
+<img src="assets/poster.jpg" width="100%" alt="EchoDiar: a transcript with speakers and an AI answer that cites timestamps">
 
 </div>
 
