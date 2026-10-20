@@ -49,6 +49,7 @@ struct RecordingCard: View {
                         languageMenu
                         Spacer(minLength: 0)
                     }
+                    .padding(.top, 4)
                 }
             }
         }
