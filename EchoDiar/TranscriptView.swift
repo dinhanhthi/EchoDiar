@@ -125,6 +125,7 @@ struct TranscriptView: View {
             if transcript?.notes.contains(Transcript.diarizationMissingNote) == true {
                 diarizationMissingNotice
             }
+            if conversation.hasAudio { PlaybackScrubber(playback: playback) }
             // Up to three speaker chips, fewer when the row is short; "+N" lists the others.
             ViewThatFits(in: .horizontal) {
                 ForEach(chipCounts, id: \.self) { controlRow(chips: $0) }
@@ -496,6 +497,70 @@ private struct PlaybackTime: View {
         Text("\(TranscriptView.timestamp(playback.currentTime)) / \(TranscriptView.timestamp(playback.duration))")
             .font(.caption.monospacedDigit())
             .foregroundStyle(.secondary)
+    }
+}
+
+/// The play head on a track: a click or a drag moves it, and playback pauses during a drag and goes on after it.
+/// Reads `currentTime` itself, like `PlaybackTime`, so the 4 Hz updates redraw nothing else.
+private struct PlaybackScrubber: View {
+    let playback: PlaybackController
+    @State private var hovered = false
+    @State private var dragging = false
+    @State private var resumeAfterDrag = false
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
+    private static let knobSize: CGFloat = 12
+
+    var body: some View {
+        let active = playback.isReady && (hovered || dragging)
+        GeometryReader { geometry in
+            let width = geometry.size.width
+            let fraction = playback.duration > 0 ? min(max(playback.currentTime / playback.duration, 0), 1) : 0
+            ZStack(alignment: .leading) {
+                Capsule().fill(Palette.switchOffFill)
+                Capsule().fill(Color.accentColor).frame(width: width * fraction)
+            }
+            .frame(height: active ? 6 : 4)
+            .overlay(alignment: .leading) {
+                Circle()
+                    .fill(.white)
+                    .frame(width: Self.knobSize, height: Self.knobSize)
+                    .offset(x: width * fraction - Self.knobSize / 2)
+                    .opacity(active ? 1 : 0)
+            }
+            .frame(maxHeight: .infinity)
+            .contentShape(Rectangle())
+            .gesture(
+                DragGesture(minimumDistance: 0)
+                    .onChanged { value in
+                        guard playback.isReady, width > 0 else { return }
+                        if !dragging {
+                            dragging = true
+                            resumeAfterDrag = playback.isPlaying
+                            if resumeAfterDrag { playback.pause() }
+                        }
+                        playback.seek(to: min(max(value.location.x / width, 0), 1) * playback.duration)
+                    }
+                    .onEnded { _ in
+                        guard dragging else { return }
+                        dragging = false
+                        if resumeAfterDrag { playback.play() }
+                    }
+            )
+        }
+        .frame(height: 14)
+        .onHover { hovered = $0 }
+        .pointerStyle(playback.isReady ? .link : nil)
+        .animation(reduceMotion ? nil : .easeOut(duration: 0.15), value: active)
+        .accessibilityRepresentation {
+            Slider(
+                value: Binding(get: { playback.currentTime }, set: { playback.seek(to: $0) }),
+                in: 0...max(playback.duration, 0.01)
+            ) {
+                Text("Playback position")
+            }
+            .disabled(!playback.isReady)
+        }
     }
 }
 
