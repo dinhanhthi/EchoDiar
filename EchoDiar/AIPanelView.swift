@@ -28,6 +28,8 @@ struct AIPanelView: View {
     @State private var question = ""
     @FocusState private var questionFocused: Bool
     @State private var toast: String?
+    /// Hides the toast 2 s after it shows; replaced by each new toast.
+    @State private var toastTask: Task<Void, Never>?
     /// A web link from model output, opened only once its destination is confirmed.
     @State private var pendingLink: URL?
     /// The "i" popover about where the data goes is open.
@@ -540,7 +542,7 @@ struct AIPanelView: View {
                 .padding(.vertical, 8)
                 .modifier(GlassCard(cornerRadius: 14))
                 .padding(.bottom, 110)
-                .transition(.opacity)
+                .transition(reduceMotion ? .opacity : .offset(y: 8).combined(with: .opacity))
         }
     }
 
@@ -611,21 +613,24 @@ struct AIPanelView: View {
         pasteboard.addTypes([.string, transient], owner: nil)
         pasteboard.setString(prompt, forType: .string)
         pasteboard.setString("", forType: transient)
-        withAnimation { toast = "Copied — paste into any chat" }
-        Task {
+        showToast("Copied — paste into any chat")
+    }
+
+    /// Shows `text` for 2 s; a newer toast replaces it and gets its own 2 s.
+    private func showToast(_ text: String) {
+        toastTask?.cancel()
+        withAnimation(.snappy(duration: 0.2)) { toast = text }
+        toastTask = Task {
             try? await Task.sleep(for: .seconds(2))
-            withAnimation { toast = nil }
+            guard !Task.isCancelled else { return }
+            withAnimation(.snappy(duration: 0.2)) { toast = nil }
         }
     }
 
     private func copyAnswer(_ text: String) {
         NSPasteboard.general.clearContents()
         NSPasteboard.general.setString(text, forType: .string)
-        withAnimation { toast = "Copied" }
-        Task {
-            try? await Task.sleep(for: .seconds(2))
-            withAnimation { toast = nil }
-        }
+        showToast("Copied")
     }
 
     /// Citations open the transcript at their time (whole seconds, at most 24 h); web links open in the browser
