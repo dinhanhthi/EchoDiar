@@ -8,12 +8,14 @@ import SwiftUI
 /// status, then a bottom row with the AI, Summary, Reveal in Finder and Delete (audio or conversation) buttons and the transcription progress
 /// or its action. A click elsewhere opens the transcript. Compact (the wide layout's sidebar) drops the buttons, which
 /// stay in the context menu and the detail, and keeps the status, and a click keeps the detail's tab; selected adds an
-/// accent fill and stroke.
+/// accent fill and stroke. On the list page ⌘-click and ⇧-click select cards instead of opening.
 struct ConversationCard: View {
     let conversation: Conversation
     let model: AppModel
     var compact = false
     var selected = false
+    /// Set on the list page: ⌘-click toggles the card, ⇧-click (`extend`) adds the span from the anchor.
+    var select: ((_ extend: Bool) -> Void)? = nil
     @State private var editing = false
     @State private var draft = ""
     @FocusState private var titleFocused: Bool
@@ -159,6 +161,11 @@ struct ConversationCard: View {
     /// The transcript; in the sidebar, the tab the detail shows.
     private func open() {
         guard !editing else { return }
+        let flags = NSEvent.modifierFlags.intersection([.command, .shift])
+        if let select, !flags.isEmpty {
+            select(flags.contains(.shift))
+            return
+        }
         model.open(conversation.id, tab: compact ? model.detailTab : .transcript)
     }
 
@@ -170,7 +177,8 @@ struct ConversationCard: View {
 
 /// Delete's choices: the audio only (most of the size, often useless once transcribed) or the whole conversation,
 /// each asked first unless "Delete conversations without confirmation" is on. In the card's menu and context menu,
-/// the conversation's toolbar and Storage's largest conversations.
+/// the conversation's toolbar and Storage's largest conversations; the list page's selection bar uses the bulk
+/// `delete`.
 struct DeleteMenuItems: View {
     let conversation: Conversation
     let model: AppModel
@@ -193,7 +201,9 @@ struct DeleteMenuItems: View {
         }
     }
 
-    static func delete(audioOnly: Bool, _ conversation: Conversation, _ model: AppModel) {
+    /// Whether it was deleted (not cancelled).
+    @discardableResult
+    static func delete(audioOnly: Bool, _ conversation: Conversation, _ model: AppModel) -> Bool {
         if !model.settings.deleteWithoutConfirmation {
             let alert = NSAlert()
             if audioOnly {
@@ -205,13 +215,43 @@ struct DeleteMenuItems: View {
             }
             alert.addButton(withTitle: "Delete").hasDestructiveAction = true
             alert.addButton(withTitle: "Cancel")
-            guard alert.runModal() == .alertFirstButtonReturn else { return }
+            guard alert.runModal() == .alertFirstButtonReturn else { return false }
         }
         if audioOnly {
             Task { await model.deleteAudio(of: conversation.id) }
         } else {
             model.deleteConversation(conversation.id)
         }
+        return true
+    }
+
+    /// The list page's bulk delete: only the conversations that can be deleted now (and have audio, for the audio
+    /// only), asked once for all; one is asked by its title. Whether any was deleted (not cancelled, not none).
+    @discardableResult
+    static func delete(audioOnly: Bool, _ conversations: [Conversation], _ model: AppModel) -> Bool {
+        let eligible = conversations.filter { canDelete($0, model) && (!audioOnly || $0.hasAudio) }
+        if eligible.count <= 1 { return eligible.first.map { delete(audioOnly: audioOnly, $0, model) } ?? false }
+        if !model.settings.deleteWithoutConfirmation {
+            let alert = NSAlert()
+            if audioOnly {
+                alert.messageText = "Delete the audio of \(eligible.count) conversations?"
+                alert.informativeText = "The audio is moved to the Trash. The transcript, summary and chat stay; playback and re-transcribing are no longer possible."
+            } else {
+                alert.messageText = "Delete \(eligible.count) conversations?"
+                alert.informativeText = "The recordings and their files are moved to the Trash."
+            }
+            alert.addButton(withTitle: "Delete").hasDestructiveAction = true
+            alert.addButton(withTitle: "Cancel")
+            guard alert.runModal() == .alertFirstButtonReturn else { return false }
+        }
+        let ids = eligible.map(\.id)
+        if audioOnly {
+            // One by one, like the single delete: the list form skips conversations with an AI job.
+            Task { for id in ids { await model.deleteAudio(of: id) } }
+        } else {
+            for id in ids { model.deleteConversation(id) }
+        }
+        return true
     }
 }
 
