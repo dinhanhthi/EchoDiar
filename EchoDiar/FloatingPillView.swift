@@ -51,6 +51,7 @@ struct FloatingPillView: View {
         let paused = model.snapshot.state == .paused
         let tint: Color = paused ? .orange : .red
         return HStack(spacing: 8) {
+            PillLogo(size: 16)
             Image(systemName: "circle.fill")
                 .font(.system(size: 9))
                 .foregroundStyle(tint)
@@ -113,42 +114,48 @@ struct FloatingPillView: View {
     // MARK: - Prompts
 
     private func detectedPrompt(_ meeting: DetectedMeeting) -> some View {
-        VStack(alignment: .leading, spacing: 8) {
-            Text("\(meeting.name) call detected — Record?")
-                .font(.callout.weight(.semibold))
-            HStack(spacing: 8) {
-                Button("Record") { model.recordDetectedMeeting() }
-                    .buttonStyle(.borderedProminent)
-                    .tint(.red)
-                Button("Not now", action: model.dismissMeetingPrompt)
-                // Not for browsers: any web page using the mic would start a recording.
-                if !meeting.app.isBrowser {
-                    Button("Always for \(meeting.name)") { model.recordDetectedMeeting(always: true) }
+        HStack(spacing: 10) {
+            PillLogo(size: 32)
+            VStack(alignment: .leading, spacing: 8) {
+                Text("\(meeting.name) call detected — Record?")
+                    .font(.callout.weight(.semibold))
+                HStack(spacing: 8) {
+                    Button("Record") { model.recordDetectedMeeting() }
+                        .buttonStyle(.borderedProminent)
+                        .tint(.red)
+                    Button("Not now", action: model.dismissMeetingPrompt)
+                    // Not for browsers: any web page using the mic would start a recording.
+                    if !meeting.app.isBrowser {
+                        Button("Always for \(meeting.name)") { model.recordDetectedMeeting(always: true) }
+                    }
                 }
+                .controlSize(.small)
             }
-            .controlSize(.small)
         }
         .padding(.vertical, 10)
     }
 
     /// The default action is Stop: the recording stops when the countdown ends.
     private func endPrompt(reason: MeetingEndMonitor.Reason, deadline: Date) -> some View {
-        VStack(alignment: .leading, spacing: 8) {
-            Text(question(for: reason))
-                .font(.callout.weight(.semibold))
-            TimelineView(.periodic(from: .now, by: 1)) { context in
-                let left = max(0, Int(deadline.timeIntervalSince(context.date).rounded(.up)))
-                Text("Stopping in \(left) s")
-                    .font(.caption.monospacedDigit())
-                    .foregroundStyle(.secondary)
+        HStack(spacing: 10) {
+            PillLogo(size: 32)
+            VStack(alignment: .leading, spacing: 8) {
+                Text(question(for: reason))
+                    .font(.callout.weight(.semibold))
+                TimelineView(.periodic(from: .now, by: 1)) { context in
+                    let left = max(0, Int(deadline.timeIntervalSince(context.date).rounded(.up)))
+                    Text("Stopping in \(left) s")
+                        .font(.caption.monospacedDigit())
+                        .foregroundStyle(.secondary)
+                }
+                HStack(spacing: 8) {
+                    Button("Keep recording", action: model.keepRecording)
+                    Button("Stop now", action: model.stopFromEndPrompt)
+                        .buttonStyle(.borderedProminent)
+                        .tint(.red)
+                }
+                .controlSize(.small)
             }
-            HStack(spacing: 8) {
-                Button("Keep recording", action: model.keepRecording)
-                Button("Stop now", action: model.stopFromEndPrompt)
-                    .buttonStyle(.borderedProminent)
-                    .tint(.red)
-            }
-            .controlSize(.small)
         }
         .padding(.vertical, 10)
     }
@@ -163,6 +170,21 @@ struct FloatingPillView: View {
         case .screenLocked: return "Screen locked — stop recording?"
         case .inputRouteLost: return "Microphone disconnected — stop recording?"
         case .systemSleep, .diskFull, .maxDuration: return "Stop recording?"
+        }
+    }
+}
+
+/// The app logo, so the pill reads as EchoDiar's over other apps.
+private struct PillLogo: View {
+    let size: CGFloat
+
+    var body: some View {
+        if let logo = AboutInfo.logo {
+            Image(nsImage: logo)
+                .resizable()
+                .interpolation(.high)
+                .frame(width: size, height: size)
+                .accessibilityHidden(true)
         }
     }
 }
