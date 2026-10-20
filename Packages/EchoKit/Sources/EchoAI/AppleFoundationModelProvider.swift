@@ -3,7 +3,8 @@ import Foundation
 import FoundationModels
 
 /// Apple's on-device model (macOS 26, Apple Intelligence on). Create it only when `PlatformFeatures.foundationModels`.
-/// Every `generate` call gets a new `LanguageModelSession`, so each map call starts with a fresh context window.
+/// Every `generate` call gets a new `LanguageModelSession` (from the messages' transcript), so each map call starts
+/// with a fresh context window.
 @available(macOS 26, *)
 public struct AppleFoundationModelProvider: LocalLLMProvider {
     /// The only model; matches the catalog entry id.
@@ -46,11 +47,10 @@ public struct AppleFoundationModelProvider: LocalLLMProvider {
         func generate(
             messages: [LLMMessage], maxTokens: Int, onText: @escaping @Sendable (String) -> Void
         ) async throws -> String {
-            let instructions = messages.filter { $0.role == .system }.map(\.content).joined(separator: "\n\n")
-            let session = LanguageModelSession(instructions: instructions.isEmpty ? nil : instructions)
+            let (transcript, prompt) = AppleFoundationModelProvider.session(messages)
+            let session = LanguageModelSession(transcript: transcript)
             let response = session.streamResponse(
-                to: AppleFoundationModelProvider.prompt(messages),
-                options: GenerationOptions(maximumResponseTokens: maxTokens))
+                to: prompt, options: GenerationOptions(maximumResponseTokens: maxTokens))
             // Snapshots carry the whole answer so far; pass on only what is new. The last snapshot is the answer.
             var sent = ""
             for try await snapshot in response {
@@ -72,11 +72,26 @@ public struct AppleFoundationModelProvider: LocalLLMProvider {
         return size > 0 ? size : Self.fallbackContext
     }
 
-    /// The non-system messages: a single one as is, a conversation with role labels.
-    static func prompt(_ messages: [LLMMessage]) -> String {
+    /// The system messages as instructions and the earlier turns as prompt and response entries, so the model sees
+    /// a real conversation; the last message is the prompt. Earlier turns flattened into one "User: … Assistant: …"
+    /// prompt read as a document to continue: the model answered, then went on to summarize the meeting.
+    static func session(_ messages: [LLMMessage]) -> (FoundationModels.Transcript, prompt: String) {
+        func text(_ content: String) -> [FoundationModels.Transcript.Segment] {
+            [.text(FoundationModels.Transcript.TextSegment(content: content))]
+        }
+        var entries: [FoundationModels.Transcript.Entry] = []
+        let instructions = messages.filter { $0.role == .system }.map(\.content).joined(separator: "\n\n")
+        if !instructions.isEmpty {
+            entries.append(.instructions(FoundationModels.Transcript.Instructions(
+                segments: text(instructions), toolDefinitions: [])))
+        }
         let turns = messages.filter { $0.role != .system }
-        guard turns.count > 1 else { return turns.first?.content ?? "" }
-        return turns.map { "\($0.role == .user ? "User" : "Assistant"): \($0.content)" }.joined(separator: "\n\n")
+        for turn in turns.dropLast() {
+            entries.append(turn.role == .user
+                ? .prompt(FoundationModels.Transcript.Prompt(segments: text(turn.content)))
+                : .response(FoundationModels.Transcript.Response(assetIDs: [], segments: text(turn.content))))
+        }
+        return (FoundationModels.Transcript(entries: entries), turns.last?.content ?? "")
     }
 }
 
