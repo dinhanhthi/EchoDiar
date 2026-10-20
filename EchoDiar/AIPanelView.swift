@@ -144,7 +144,7 @@ struct AIPanelView: View {
                 .frame(maxWidth: .infinity, alignment: .trailing)
         } else {
             VStack(alignment: .leading, spacing: 6) {
-                MarkdownText(text: text, isStreaming: isStreaming)
+                MarkdownText(text: text)
                 HStack(spacing: 6) {
                     if let model, !model.isEmpty {
                         Text(model)
@@ -184,7 +184,7 @@ struct AIPanelView: View {
                             if let status = job.status {
                                 Text(status).foregroundStyle(.secondary)
                             }
-                            MarkdownText(text: job.text, isStreaming: true)
+                            MarkdownText(text: job.text)
                         } else if let summary {
                             MarkdownText(text: summary)
                         }
@@ -671,22 +671,13 @@ private struct WidthCap: Layout {
 
 /// Model Markdown, line by line: `#` headings, `-`/`*` bullets (indented by their leading spaces) and paragraphs,
 /// each with inline Markdown; `[mm:ss]` citations become `echodiar-time:<seconds>` links. No HTML, no web view.
-/// A streaming answer is plain text, parsed once it is saved.
+/// A streaming answer is parsed on every update, so it is formatted as it arrives.
 struct MarkdownText: View {
     let text: String
-    var isStreaming = false
 
     static let citationScheme = "echodiar-time"
 
     var body: some View {
-        if isStreaming {
-            Text(text).frame(maxWidth: .infinity, alignment: .leading)
-        } else {
-            markdown
-        }
-    }
-
-    private var markdown: some View {
         VStack(alignment: .leading, spacing: 4) {
             ForEach(Array(Self.lines(text).enumerated()), id: \.offset) { _, line in
                 switch line.kind {
