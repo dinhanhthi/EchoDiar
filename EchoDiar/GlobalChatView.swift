@@ -213,7 +213,7 @@ struct GlobalChatView: View {
     private func sourceRow(_ reference: ChatLog.Reference) -> some View {
         let conversation = model.conversations.first { $0.id == reference.conversationID }
         return Button {
-            withAnimation(.snappy) { model.openReference(id: reference.conversationID, seconds: nil) }
+            withAnimation(Motion.standard) { model.openReference(id: reference.conversationID, seconds: nil) }
         } label: {
             HStack(spacing: 0) {
                 // Titles may come from a model: plain text, never Markdown.
@@ -311,7 +311,7 @@ struct GlobalChatView: View {
     }
 
     private func closeHistory() {
-        withAnimation(.snappy(duration: 0.25)) { showingHistory = false }
+        withAnimation(Motion.standard) { showingHistory = false }
     }
 
     @ViewBuilder private var errorText: some View {
@@ -354,7 +354,7 @@ struct GlobalChatView: View {
     @ViewBuilder private var chatButtons: some View {
         freshChatButton
         Button {
-            withAnimation(.snappy(duration: 0.25)) { showingHistory.toggle() }
+            withAnimation(Motion.standard) { showingHistory.toggle() }
         } label: {
             Label("History", systemImage: "clock.arrow.circlepath").labelStyle(.iconOnly)
         }
@@ -520,7 +520,7 @@ struct GlobalChatView: View {
         if url.scheme?.lowercased() == LibraryCitation.scheme {
             guard let target = LibraryCitation.parse(url),
                   model.conversations.contains(where: { $0.id == target.id }) else { return .discarded }
-            withAnimation(.snappy) { model.openReference(id: target.id, seconds: target.seconds) }
+            withAnimation(Motion.standard) { model.openReference(id: target.id, seconds: target.seconds) }
             return .handled
         }
         guard ["http", "https"].contains(url.scheme?.lowercased() ?? "") else { return .discarded }

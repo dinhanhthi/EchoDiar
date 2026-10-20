@@ -66,7 +66,7 @@ struct TranscriptView: View {
         .onChange(of: model.detailTab) { old, new in
             forward = (Self.tabs.firstIndex(of: new) ?? 0) > (Self.tabs.firstIndex(of: old) ?? 0)
             // Also under Reduce Motion: `tabTransition` is then a fade.
-            withAnimation(.snappy(duration: 0.25)) { shownTab = new }
+            withAnimation(Motion.standard) { shownTab = new }
         }
         .onChange(of: model.pendingTranscriptTime) { showPendingTime() }
         .onChange(of: model.settings.playbackChannels) { playback.setChannels(model.settings.playbackChannels) }

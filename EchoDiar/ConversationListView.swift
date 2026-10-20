@@ -44,8 +44,8 @@ struct ConversationListView: View {
                     }
                 }
                 .padding(12)
-                .animation(.snappy, value: groups)
-                .animation(.snappy, value: model.isRecording)
+                .animation(Motion.standard, value: groups)
+                .animation(Motion.standard, value: model.isRecording)
             }
             .safeAreaInset(edge: .top, spacing: 0) {
                 if !selection.isEmpty {
@@ -59,7 +59,7 @@ struct ConversationListView: View {
                         .transition(cardTransition)
                 }
             }
-            .animation(.snappy, value: selection.isEmpty)
+            .animation(Motion.standard, value: selection.isEmpty)
             // Cards that left the list (search filter, deletion) are not selected.
             .onChange(of: groups) { selection.prune(keeping: order) }
             // Esc cancels the selection instead of leaving the entry.
@@ -75,7 +75,7 @@ struct ConversationListView: View {
             .onChange(of: selectedID) {
                 selection.clear()
                 guard let selectedID else { return }
-                withAnimation(reduceMotion ? nil : .snappy) { proxy.scrollTo(selectedID) }
+                withAnimation(reduceMotion ? nil : Motion.standard) { proxy.scrollTo(selectedID) }
             }
         }
     }

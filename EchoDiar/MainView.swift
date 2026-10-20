@@ -500,7 +500,7 @@ struct MainView: View {
     }
 
     /// The page switches.
-    private static let paneAnimation = Animation.snappy(duration: 0.25)
+    private static let paneAnimation = Motion.standard
 
     /// Pages slide in their order: a page further right comes in from the trailing edge. While the route is ahead of
     /// `shownRoute` the direction comes from both: the leaving page keeps the transition it last rendered with.
@@ -949,7 +949,7 @@ private struct SingleToolbarButton: View {
                             .frame(width: 28, height: 28)
                     }
                     .contentShape(Rectangle())
-                    .animation(.easeOut(duration: 0.12), value: hovered)
+                    .animation(Motion.hover, value: hovered)
                     .onHover { hovered = $0 }
             }
         }

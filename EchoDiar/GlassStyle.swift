@@ -23,6 +23,14 @@ enum Palette {
         startPoint: .top, endPoint: .bottom)
 }
 
+/// The app's shared animations.
+enum Motion {
+    /// Pages, tabs, panels, lists and the pill: a quick spring with no bounce.
+    static let standard = Animation.snappy(duration: 0.25)
+    /// Hover highlights.
+    static let hover = Animation.easeOut(duration: 0.12)
+}
+
 /// The icon buttons of a row: a round highlight on hover, darker and a bit smaller while pressed. The highlight
 /// reaches past the label without changing the row's layout.
 struct RowIconButtonStyle: ButtonStyle {
@@ -52,7 +60,7 @@ struct RowIconButtonStyle: ButtonStyle {
                 .contentShape(Rectangle())
                 .scaleEffect(configuration.isPressed && !reduceMotion ? 0.88 : 1)
                 .animation(reduceMotion ? nil : .snappy(duration: 0.12), value: configuration.isPressed)
-                .animation(.easeOut(duration: 0.12), value: hovered)
+                .animation(Motion.hover, value: hovered)
                 .onHover { hovered = $0 }
         }
     }
@@ -164,7 +172,7 @@ struct CapsuleTabs<Tab: Hashable>: View {
         .modifier(SurfaceTrack())
     }
 
-    private var animation: Animation? { reduceMotion ? nil : .snappy(duration: 0.25) }
+    private var animation: Animation? { reduceMotion ? nil : Motion.standard }
 
     /// Before macOS 26 the toolbar draws no capsule around its items.
     private struct SurfaceTrack: ViewModifier {

@@ -258,7 +258,7 @@ struct AIPanelView: View {
     }
 
     private func closeHistory() {
-        withAnimation(.snappy(duration: 0.25)) { showingHistory = false }
+        withAnimation(Motion.standard) { showingHistory = false }
     }
 
     // MARK: - Summary
@@ -378,7 +378,7 @@ struct AIPanelView: View {
                     dataNotesButton(height: Self.chatMenuHeight)
                     freshChatButton
                     Button {
-                        withAnimation(.snappy(duration: 0.25)) { showingHistory.toggle() }
+                        withAnimation(Motion.standard) { showingHistory.toggle() }
                     } label: {
                         Label("History", systemImage: "clock.arrow.circlepath").labelStyle(.iconOnly)
                     }
@@ -636,7 +636,7 @@ struct AIPanelView: View {
             let id = conversation.id
             guard let seconds = Int(url.absoluteString.dropFirst(MarkdownText.citationScheme.count + 1)),
                   (0...86_400).contains(seconds) else { return .discarded }
-            withAnimation(.snappy) { model.openTranscript(conversationID: id, at: Double(seconds)) }
+            withAnimation(Motion.standard) { model.openTranscript(conversationID: id, at: Double(seconds)) }
             return .handled
         }
         guard ["http", "https"].contains(url.scheme?.lowercased() ?? "") else { return .discarded }
@@ -813,7 +813,7 @@ struct HistoryRowStyle: ButtonStyle {
                     configuration.isPressed ? Palette.pressedFill : hovered && isEnabled ? Palette.hoverFill : .clear))
                 .contentShape(shape)
                 .opacity(isEnabled ? 1 : 0.45)
-                .animation(.easeOut(duration: 0.12), value: hovered)
+                .animation(Motion.hover, value: hovered)
                 .onHover { hovered = $0 }
         }
     }
@@ -856,7 +856,7 @@ struct BottomBarButtonStyle: ButtonStyle {
                                 : hovered && isEnabled ? Palette.hoverFill : .clear)))
                 .contentShape(Capsule())
                 .opacity(isEnabled ? 1 : 0.45)
-                .animation(.easeOut(duration: 0.12), value: hovered)
+                .animation(Motion.hover, value: hovered)
                 .onHover { hovered = $0 }
         }
     }

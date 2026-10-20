@@ -35,7 +35,7 @@ struct FloatingPillView: View {
                     try? await Task.sleep(for: .seconds(1))
                     guard !Task.isCancelled else { return }
                 }
-                withAnimation(reduceMotion ? nil : .snappy) { expanded = hovering }
+                withAnimation(reduceMotion ? nil : Motion.standard) { expanded = hovering }
             }
     }
 

@@ -451,7 +451,7 @@ private struct RowTextButtonStyle: ButtonStyle {
                         .overlay(Capsule().fill(
                             configuration.isPressed ? Color.black.opacity(0.2) : hovered ? Palette.hoverFill : .clear)))
                 .contentShape(Capsule())
-                .animation(.easeOut(duration: 0.12), value: hovered)
+                .animation(Motion.hover, value: hovered)
                 .onHover { hovered = $0 }
         }
     }
