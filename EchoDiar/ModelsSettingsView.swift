@@ -4,33 +4,18 @@ import EchoTranscribe
 import SwiftUI
 
 /// The Transcription tab, one inner tab per section: the default language with the live transcript switch and engine,
-/// the ASR and diarization catalog by tier (one tab each) with Download, Cancel, Delete and Set default, and the
-/// configured cloud engines. Rows that cannot transcribe the default language are disabled with a note.
+/// the transcription models (local by tier, then cloud: the configured engines and the speech-to-text APIs), and the
+/// diarization models by tier, with Download, Cancel, Delete and Set default. Rows that cannot transcribe the default
+/// language are disabled with a note.
 struct ModelsSettingsView: View {
     let model: AppModel
 
     /// Ids in `SettingsTab.transcription.subTabs`; picked in the toolbar.
-    private enum Tab: Hashable, CaseIterable {
-        case general, tier(ModelEntry.Tier), cloud
-
-        static let allCases: [Tab] = [.general] + ModelEntry.Tier.allCases.map(Tab.tier) + [.cloud]
-
-        /// The stable id deep links use: "general", "tier-<tier>", "cloud".
-        var id: String {
-            switch self {
-            case .general: "general"
-            case .tier(let tier): "tier-\(tier.rawValue)"
-            case .cloud: "cloud"
-            }
-        }
-
-        init?(id: String) {
-            guard let tab = Self.allCases.first(where: { $0.id == id }) else { return nil }
-            self = tab
-        }
+    private enum Tab: String {
+        case general, transcriptionModels, diarizationModels
     }
 
-    private var tab: Tab { model.settingsSubTab(.transcription).flatMap(Tab.init(id:)) ?? .general }
+    private var tab: Tab { model.settingsSubTab(.transcription).flatMap(Tab.init) ?? .general }
 
     private static let entries = ModelCatalog.visibleEntries(
         registeredEngineRuntimes: TranscriptionPipeline.registeredRuntimes
@@ -41,11 +26,11 @@ struct ModelsSettingsView: View {
             Form {
                 switch tab {
                 case .general: generalSection
-                case .tier(let tier):
-                    Section {
-                        ForEach(Self.entries.filter { $0.tier == tier }) { ModelRow(entry: $0, model: model) }
-                    }
-                case .cloud: cloudSection
+                case .transcriptionModels:
+                    tierSections(.asr)
+                    cloudSection
+                    speechToTextSection
+                case .diarizationModels: tierSections(.diarization)
                 }
             }
             .formStyle(.grouped)
@@ -79,23 +64,47 @@ struct ModelsSettingsView: View {
         }
     }
 
-    /// Configured cloud engines (AI & Cloud: enabled, with a key and a model) with Set default.
+    /// One section per tier that has `kind` entries, titled with the tier.
+    private func tierSections(_ kind: ModelEntry.Kind) -> some View {
+        ForEach(ModelEntry.Tier.allCases, id: \.self) { tier in
+            let entries = Self.entries.filter { $0.kind == kind && $0.tier == tier }
+            if !entries.isEmpty {
+                Section(tier.rawValue.capitalized) {
+                    ForEach(entries) { ModelRow(entry: $0, model: model) }
+                }
+            }
+        }
+    }
+
+    /// Configured cloud engines (enabled, with a key and a model) with Set default.
     private var cloudSection: some View {
         Section {
             Label("Audio leaves this Mac: cloud engines upload the recording to the provider.", systemImage: "exclamationmark.icloud")
                 .foregroundStyle(.orange)
             let configs = model.cloudEngineConfigs
             if configs.isEmpty {
-                HStack {
-                    Text("No cloud engine configured.").foregroundStyle(.secondary)
-                    Spacer()
-                    Button("Add an API key…") { model.settingsTab = .providers }
-                        .controlSize(.small)
-                }
+                Text("No cloud engine configured: turn on a speech-to-text API below.").foregroundStyle(.secondary)
             }
             ForEach(configs) { CloudEngineRow(config: $0, model: model) }
+        } header: {
+            Text("Cloud")
         } footer: {
             Text("Prices are approximate list prices per audio hour; the mic and system channels are sent and billed separately.")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+        }
+    }
+
+    /// The speech-to-text APIs' keys and models; the LLM APIs that transcribe too are set up in AI.
+    private var speechToTextSection: some View {
+        Section {
+            ForEach(model.providerConfigs.filter { $0.kind == .speechToText }) { config in
+                SpeechProviderRow(config: config, model: model)
+            }
+        } header: {
+            Text("Speech-to-text APIs")
+        } footer: {
+            Text("OpenAI, Groq, Mistral, Google Gemini and custom endpoints transcribe too, with their transcription model: set them up in Settings › AI.")
                 .font(.caption)
                 .foregroundStyle(.secondary)
         }

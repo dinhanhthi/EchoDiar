@@ -2,8 +2,9 @@ import EchoAI
 import EchoCore
 import SwiftUI
 
-/// The AI & Cloud tab, in inner tabs: on this Mac (the AI models for summaries and chat, local hosts scanned on demand),
-/// cloud API presets with custom OpenAI-compatible endpoints, speech-to-text APIs, and subscription CLIs. API keys go to the Keychain only; everything else is saved in `AppSettings.providers`.
+/// The AI tab, in inner tabs: on this Mac (the AI models for summaries and chat, local hosts scanned on demand),
+/// cloud API presets with custom OpenAI-compatible endpoints, and subscription CLIs (the speech-to-text APIs are in
+/// Transcription). API keys go to the Keychain only; everything else is saved in `AppSettings.providers`.
 struct ProvidersSettingsView: View {
     let model: AppModel
 
@@ -14,7 +15,7 @@ struct ProvidersSettingsView: View {
 
     /// Ids in `SettingsTab.providers.subTabs`; picked in the toolbar.
     private enum Tab: String {
-        case onThisMac, cloudAPIs, speechToText, cli
+        case onThisMac, cloudAPIs, cli
     }
 
     private var tab: Tab { model.settingsSubTab(.providers).flatMap(Tab.init) ?? .onThisMac }
@@ -44,17 +45,6 @@ struct ProvidersSettingsView: View {
                     .controlSize(.small)
                 } header: {
                     Text("Custom OpenAI-compatible endpoints")
-                }
-            case .speechToText:
-                dataLeavesNotice
-                Section {
-                    ForEach(configs { $0.kind == .speechToText }) { config in
-                        SpeechProviderRow(config: config, model: model)
-                    }
-                } footer: {
-                    Text("Cloud transcription engines for Settings > Transcription. OpenAI, Groq, Mistral, Google Gemini and custom endpoints transcribe too, with their transcription model.")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
                 }
             case .cli:
                 dataLeavesNotice
@@ -276,8 +266,9 @@ private struct APIProviderRow: View {
     }
 }
 
-/// A speech-to-text API: enable toggle; expanded, its key, transcription model and a key check.
-private struct SpeechProviderRow: View {
+/// A speech-to-text API (Transcription's models tab): enable toggle; expanded, its key, transcription model and a key
+/// check.
+struct SpeechProviderRow: View {
     let config: ProviderConfig
     let model: AppModel
 

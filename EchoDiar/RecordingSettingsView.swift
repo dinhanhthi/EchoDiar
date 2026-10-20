@@ -128,7 +128,7 @@ struct RecordingSettingsView: View {
                 if model.installedModelIDs.contains(ModelCatalog.defaultDiarizer.id) {
                     Text("A hint for telling the system audio's speakers apart.")
                 } else {
-                    Text("Needs the speaker model: download it in Transcription › Balanced.")
+                    Text("Needs the speaker model: download it in Transcription › Diarization model.")
                 }
             }
             Toggle(isOn: model.setting(\.deferTranscriptionWhenConstrained)) {

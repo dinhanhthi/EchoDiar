@@ -441,7 +441,7 @@ struct AIPanelView: View {
     /// Why no model can run: no provider set up, and why Foundation Models is unavailable.
     @ViewBuilder private var setupHints: some View {
         if model.currentAIProvider == nil {
-            Label("No AI model: set up a provider or download a model in Settings › AI & Cloud.",
+            Label("No AI model: set up a provider or download a model in Settings › AI.",
                   systemImage: "exclamationmark.triangle")
             if let reason = AppModel.foundationModelsUnavailableReason {
                 Label(reason, systemImage: "info.circle")

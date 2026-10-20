@@ -13,7 +13,7 @@ enum SettingsTab: CaseIterable, Identifiable {
         case .general: ("General", "gearshape")
         case .recording: ("Recording", "record.circle")
         case .transcription: ("Transcription", "waveform")
-        case .providers: ("AI & Cloud", "sparkles")
+        case .providers: ("AI", "sparkles")
         case .storage: ("Storage", "internaldrive")
         case .shortcuts: ("Shortcuts", "keyboard")
         case .about: ("About", "info.circle")
@@ -28,15 +28,11 @@ enum SettingsTab: CaseIterable, Identifiable {
             [.init(id: "microphone", title: "Microphone"), .init(id: "meetings", title: "Meetings"),
              .init(id: "autoStop", title: "Auto-stop"), .init(id: "afterRecording", title: "After recording")]
         case .transcription:
-            [.init(id: "general", title: "General")]
-                + ModelEntry.Tier.allCases.map {
-                    .init(id: "tier-\($0.rawValue)", title: LocalizedStringResource(
-                        String.LocalizationValue($0.rawValue.capitalized)))
-                }
-                + [.init(id: "cloud", title: "Cloud")]
+            [.init(id: "general", title: "General"), .init(id: "transcriptionModels", title: "Transcription model"),
+             .init(id: "diarizationModels", title: "Diarization model")]
         case .providers:
             [.init(id: "onThisMac", title: "On this Mac"), .init(id: "cloudAPIs", title: "Cloud APIs"),
-             .init(id: "speechToText", title: "Speech to text"), .init(id: "cli", title: "CLIs")]
+             .init(id: "cli", title: "CLIs")]
         case .storage:
             [.init(id: "usage", title: "Usage"), .init(id: "audio", title: "Audio"),
              .init(id: "autoDelete", title: "Auto-delete")]
@@ -59,7 +55,7 @@ struct SettingsView: View {
     /// The toolbar's search query on this page: while not empty, the sidebar lists the sections with hits and the
     /// detail shows the matching settings.
     @Binding var query: String
-    /// Sections opened so far: kept alive like TabView's tabs, so leaving AI & Cloud does not rerun its scans.
+    /// Sections opened so far: kept alive like TabView's tabs, so leaving AI does not rerun its scans.
     @State private var opened: Set<SettingsTab> = []
     @FocusState private var sidebarFocused: Bool
 

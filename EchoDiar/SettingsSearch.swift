@@ -73,16 +73,16 @@ struct SettingsSearchItem: Identifiable {
               tab: .transcription, subTab: "general"),
         .init(title: "Live transcript engine", keywords: ["captions", "real-time", "Whisper", "Nemotron"],
               tab: .transcription, subTab: "general"),
-        .init(title: "Transcription models", keywords: ["download", "Whisper", "speaker model", "small", "quick"],
-              tab: .transcription, subTab: "tier-fast"),
-        .init(title: "Transcription models", keywords: ["download", "Whisper", "speaker model", "diarization"],
-              tab: .transcription, subTab: "tier-balanced"),
-        .init(title: "Transcription models", keywords: ["download", "Whisper", "speaker model", "accurate", "large"],
-              tab: .transcription, subTab: "tier-quality"),
+        .init(title: "Transcription models", keywords: ["download", "Whisper", "fast", "balanced", "quality"],
+              tab: .transcription, subTab: "transcriptionModels"),
         .init(title: "Cloud transcription engines", keywords: ["upload", "API", "default engine"]
-              + speechToTextNames, tab: .transcription, subTab: "cloud"),
+              + speechToTextNames, tab: .transcription, subTab: "transcriptionModels"),
+        .init(title: "Speech-to-text APIs", keywords: ["API key", "cloud transcription"] + speechToTextNames,
+              tab: .transcription, subTab: "transcriptionModels"),
+        .init(title: "Diarization models", keywords: ["speaker model", "speakers", "pyannote", "download"],
+              tab: .transcription, subTab: "diarizationModels"),
 
-        // AI & Cloud
+        // AI
         .init(title: "AI models (summaries and chat)",
               keywords: ["LLM", "MLX", "Apple Foundation Models", "local", "summary", "chat"],
               tab: .providers, subTab: "onThisMac"),
@@ -92,8 +92,6 @@ struct SettingsSearchItem: Identifiable {
               + presetNames(.anthropic), tab: .providers, subTab: "cloudAPIs"),
         .init(title: "Custom OpenAI-compatible endpoints", keywords: ["add endpoint", "base URL", "API key"],
               tab: .providers, subTab: "cloudAPIs"),
-        .init(title: "Speech to text", keywords: ["API key", "cloud transcription"] + speechToTextNames,
-              tab: .providers, subTab: "speechToText"),
         .init(title: "CLIs", keywords: ["subscription", "command line", "terminal"] + presetNames(.cli),
               tab: .providers, subTab: "cli"),
 

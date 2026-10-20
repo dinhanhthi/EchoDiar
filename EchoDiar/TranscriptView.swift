@@ -148,7 +148,7 @@ struct TranscriptView: View {
                 if installed {
                     Text("Speakers were not told apart. The speaker model is installed now: re-transcribe.")
                 } else {
-                    Text("Speakers were not told apart: the speaker model is not installed (Transcription › Balanced).")
+                    Text("Speakers were not told apart: the speaker model is not installed (Transcription › Diarization model).")
                 }
             }
             .foregroundStyle(.secondary)
