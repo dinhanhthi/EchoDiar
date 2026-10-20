@@ -18,7 +18,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Optional cloud transcription with OpenAI-compatible services, ElevenLabs, Gemini, Deepgram and AssemblyAI. Audio is sent only after you agree for each destination, and API keys are stored in the Keychain.
 - AI summaries and chat about a conversation, with Apple's on-device Foundation Models, local MLX models, local servers (LM Studio, Ollama, Jan, ...), cloud providers (OpenAI, Anthropic, Gemini, Mistral, OpenRouter, ...) or coding CLIs (Claude, Codex, OpenCode, Gemini). Answers cite timestamps that jump to that moment in the recording.
 - Copy as prompt: copies the transcript and your question, ready to paste into any AI tool.
-- Meeting detection that offers to record when a call starts (or starts on its own for the apps you choose), a floating recording indicator that can follow the meeting window, and auto-stop when the meeting ends.
+- Meeting detection that offers to record when a call starts (or starts on its own for the apps you choose), a floating recording indicator (small, medium or large) that can follow the meeting window, and auto-stop when the meeting ends.
 - Storage settings that delete old recordings automatically (the whole conversation or only its audio).
 - Global shortcuts to start and stop recording (⌥⌘R by default) and to pause and resume it (⌥⌘P by default).
 - First-run onboarding with a consent reminder, the microphone prompt and a system audio test.

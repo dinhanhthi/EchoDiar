@@ -45,6 +45,18 @@ struct SettingsStoreTests {
         #expect(try JSONDecoder().decode(AppSettings.self, from: data).playbackChannels == .split)
     }
 
+    /// The floating pill is medium unless the user picked another size.
+    @Test(arguments: [#"{}"#, #"{"pillSize":"huge"}"#])
+    func pillSizeDefaultsToMedium(json: String) throws {
+        let settings = try JSONDecoder().decode(AppSettings.self, from: Data(json.utf8))
+        #expect(settings.pillSize == .medium)
+    }
+
+    @Test func pillSizeLargeRoundTrips() throws {
+        let data = try JSONEncoder().encode(AppSettings(pillSize: .large))
+        #expect(try JSONDecoder().decode(AppSettings.self, from: data).pillSize == .large)
+    }
+
     @Test func corruptFileFallsBackToDefaultsAndIsMovedAside() throws {
         try withTemporaryStore { store in
             let corrupt = Data("not json {".utf8)

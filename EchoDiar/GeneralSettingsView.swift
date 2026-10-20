@@ -29,6 +29,11 @@ struct GeneralSettingsView: View {
                 }
                 Toggle("Hide it while an EchoDiar window is in front", isOn: model.setting(\.hidePillWhenAppActive))
                     .disabled(!model.settings.showPill)
+                Picker("Indicator size", selection: model.setting(\.pillSize)) {
+                    Text("Small").tag(PillSize.small)
+                    Text("Medium").tag(PillSize.medium)
+                    Text("Large").tag(PillSize.large)
+                }
             }
             Section("Library") {
                 Toggle(isOn: model.setting(\.deleteWithoutConfirmation)) {

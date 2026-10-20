@@ -65,6 +65,8 @@ public struct AppSettings: Codable, Equatable, Sendable {
     public var attachPillToWindow: Bool
     /// Where the attached pill was dragged, from the meeting window's top-right corner; nil = just inside it.
     public var pillWindowOffset: PillPosition?
+    /// Size of the recording pill.
+    public var pillSize: PillSize
     /// Auto-stop thresholds.
     public var endMonitor: MeetingEndMonitor.Configuration
     /// What losing the recording microphone does.
@@ -124,6 +126,7 @@ public struct AppSettings: Codable, Equatable, Sendable {
         hidePillWhenAppActive: Bool = false,
         attachPillToWindow: Bool = false,
         pillWindowOffset: PillPosition? = nil,
+        pillSize: PillSize = .medium,
         endMonitor: MeetingEndMonitor.Configuration = MeetingEndMonitor.Configuration(),
         routeChangeBehavior: RouteChangeBehavior = .ask,
         autoTranscribe: Bool = true,
@@ -168,6 +171,7 @@ public struct AppSettings: Codable, Equatable, Sendable {
         self.hidePillWhenAppActive = hidePillWhenAppActive
         self.attachPillToWindow = attachPillToWindow
         self.pillWindowOffset = pillWindowOffset
+        self.pillSize = pillSize
         self.endMonitor = endMonitor
         self.routeChangeBehavior = routeChangeBehavior
         self.autoTranscribe = autoTranscribe
@@ -199,7 +203,7 @@ public struct AppSettings: Codable, Equatable, Sendable {
         case cloudSTTConfirmed, defaultAIProviderID, defaultAIModel, summaryLanguage, chatContextMessages
         case ragEnabled, embeddingModelID, embeddingAPIModel, cloudEmbeddingConfirmed
         case micDeviceUID, meetingDetection, perAppBehavior, pillPositions, showPill, hidePillWhenAppActive
-        case attachPillToWindow, pillWindowOffset, endMonitor, routeChangeBehavior
+        case attachPillToWindow, pillWindowOffset, pillSize, endMonitor, routeChangeBehavior
         case autoTranscribe, speakerCountHint, deferTranscriptionWhenConstrained
         case autoDeleteEnabled, autoDeleteAfterDays, autoDeleteMode, deleteAudioAfterTranscription
         case deleteWithoutConfirmation, globalHotKey, globalHotKeyEnabled, globalPauseHotKey, globalPauseHotKeyEnabled
@@ -240,6 +244,7 @@ public struct AppSettings: Codable, Equatable, Sendable {
         hidePillWhenAppActive = try container.decodeIfPresent(Bool.self, forKey: .hidePillWhenAppActive) ?? false
         attachPillToWindow = try container.decodeIfPresent(Bool.self, forKey: .attachPillToWindow) ?? false
         pillWindowOffset = try container.decodeIfPresent(PillPosition.self, forKey: .pillWindowOffset)
+        pillSize = try container.decodeIfPresent(PillSize.self, forKey: .pillSize) ?? .medium
         endMonitor = try container.decodeIfPresent(MeetingEndMonitor.Configuration.self, forKey: .endMonitor)
             ?? MeetingEndMonitor.Configuration()
         routeChangeBehavior = try container.decodeIfPresent(RouteChangeBehavior.self, forKey: .routeChangeBehavior) ?? .ask
@@ -332,6 +337,18 @@ public struct HotKey: Codable, Equatable, Sendable {
     /// Has ⌘, ⌥ or ⌃: a shortcut with ⇧ alone (or none) would take a key away from typing everywhere.
     public var hasCommandModifier: Bool {
         modifiers & (1 << 8 | 1 << 11 | 1 << 12) != 0
+    }
+}
+
+/// How large the recording pill is drawn; `small` is the original size.
+public enum PillSize: String, Codable, Sendable {
+    case small
+    case medium
+    case large
+
+    /// An unrecognized raw value (written by another build) falls back to `medium`.
+    public init(from decoder: Decoder) throws {
+        self = PillSize(rawValue: try decoder.singleValueContainer().decode(String.self)) ?? .medium
     }
 }
 

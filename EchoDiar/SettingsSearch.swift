@@ -39,6 +39,8 @@ struct SettingsSearchItem: Identifiable {
         .init(title: "Show floating indicator while recording", keywords: ["pill", "overlay", "floating"], tab: .general),
         .init(title: "Hide it while an EchoDiar window is in front",
               keywords: ["floating indicator", "pill", "hide"], tab: .general),
+        .init(title: "Indicator size", keywords: ["floating indicator", "pill", "small", "medium", "large"],
+              tab: .general),
         .init(title: "Delete conversations without confirmation", keywords: ["confirm", "trash", "library"], tab: .general),
         .init(title: "Copy consent message", keywords: ["consent", "privacy", "tell people"], tab: .general),
         .init(title: "Show onboarding again", keywords: ["permissions", "welcome", "setup"], tab: .general),

@@ -19,10 +19,13 @@ struct FloatingPillView: View {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var expanded = false
 
+    /// The recording indicator's size from Settings; prompts keep one size.
+    private var scale: CGFloat { model.pillPrompt == nil ? model.settings.pillSize.scale : 1 }
+
     var body: some View {
         content
-            .padding(.horizontal, 12)
-            .modifier(PillGlass())
+            .padding(.horizontal, 12 * scale)
+            .modifier(PillGlass(cornerRadius: 14 * scale))
             // Clear room in the panel for the glass's edge and shadow, which the panel's bounds would cut off.
             .padding(6)
             .fixedSize()
@@ -52,40 +55,40 @@ struct FloatingPillView: View {
     private var indicator: some View {
         let paused = model.snapshot.state == .paused
         let tint: Color = paused ? .orange : .red
-        return HStack(spacing: 8) {
-            PillLogo(size: 16)
+        return HStack(spacing: 8 * scale) {
+            PillLogo(size: 16 * scale)
             Image(systemName: "circle.fill")
-                .font(.system(size: 9))
+                .font(.system(size: 9 * scale))
                 .foregroundStyle(tint)
                 .modifier(RecordingBlink(isActive: !paused && !reduceMotion))
                 .accessibilityLabel(paused ? "Paused" : "Recording")
             if let name = model.autoStartedAppName {
                 Text("Recording \(name)")
-                    .font(.callout.weight(.semibold))
+                    .font(.system(size: 12 * scale, weight: .semibold))
             }
             if paused {
                 elapsed.foregroundStyle(tint)
             } else {
                 TimelineView(.periodic(from: .now, by: 1)) { _ in elapsed }
-                PillMeter(feed: model.levels)
+                PillMeter(feed: model.levels, scale: scale)
             }
             if expanded {
                 controls(paused: paused)
                     .transition(.opacity)
             }
         }
-        .frame(height: 28)
+        .frame(height: 28 * scale)
     }
 
     private var elapsed: some View {
         let seconds = model.engine.currentSnapshot().elapsed
         let pattern: Duration.TimeFormatStyle.Pattern = seconds >= 3_600 ? .hourMinuteSecond : .minuteSecond
         return Text(Duration.seconds(seconds).formatted(.time(pattern: pattern)))
-            .font(.callout.monospacedDigit().weight(.semibold))
+            .font(.system(size: 12 * scale, weight: .semibold).monospacedDigit())
     }
 
     private func controls(paused: Bool) -> some View {
-        HStack(spacing: 12) {
+        HStack(spacing: 12 * scale) {
             Button(action: model.togglePause) {
                 Label(paused ? "Resume" : "Pause", systemImage: paused ? "play.fill" : "pause.fill")
             }
@@ -102,7 +105,15 @@ struct FloatingPillView: View {
                     .pickerStyle(.inline)
                     .labelsHidden()
             } label: {
-                Label("Language", systemImage: "globe")
+                // AppKit draws this menu's label and ignores `.font`, so the symbol comes sized.
+                Label {
+                    Text("Language")
+                } icon: {
+                    if let globe = NSImage(systemSymbolName: "globe", accessibilityDescription: nil)?
+                        .withSymbolConfiguration(.init(pointSize: 13 * scale, weight: .regular)) {
+                        Image(nsImage: globe)
+                    }
+                }
             }
             .menuStyle(.borderlessButton)
             .menuIndicator(.hidden)
@@ -110,6 +121,7 @@ struct FloatingPillView: View {
             .help("Language from now on")
         }
         .labelStyle(.iconOnly)
+        .font(.system(size: 13 * scale))
         .buttonStyle(RowIconButtonStyle())
     }
 
@@ -194,15 +206,16 @@ private struct PillLogo: View {
 /// The louder channel's peak, from the shared `LevelFeed` (15 Hz while shown).
 private struct PillMeter: View {
     let feed: LevelFeed
+    let scale: CGFloat
 
     var body: some View {
         let level = LevelFeed.fraction(max(feed.mic, feed.system))
         Capsule()
             .fill(Palette.hoverFill)
             .overlay(alignment: .leading) {
-                Capsule().fill(Color.green).frame(width: 28 * level)
+                Capsule().fill(Color.green).frame(width: 28 * scale * level)
             }
-            .frame(width: 28, height: 4)
+            .frame(width: 28 * scale, height: 4 * scale)
             .accessibilityHidden(true)
             .task { await feed.attach() }
     }
@@ -211,11 +224,24 @@ private struct PillMeter: View {
 /// The pill floats over other apps in a clear panel: Liquid Glass on macOS 26+ (unless `--force-fallbacks`), a
 /// material otherwise. Not `GlassCard`, whose solid surface is for the main window.
 private struct PillGlass: ViewModifier {
+    let cornerRadius: CGFloat
+
     func body(content: Content) -> some View {
         if #available(macOS 26, *), PlatformFeatures.liquidGlass {
-            content.glassEffect(.regular, in: .rect(cornerRadius: 14))
+            content.glassEffect(.regular, in: .rect(cornerRadius: cornerRadius))
         } else {
-            content.background(.regularMaterial, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+            content.background(.regularMaterial, in: RoundedRectangle(cornerRadius: cornerRadius, style: .continuous))
+        }
+    }
+}
+
+private extension PillSize {
+    /// Multiplies the indicator's metrics; `small` is the original look.
+    var scale: CGFloat {
+        switch self {
+        case .small: 1
+        case .medium: 1.25
+        case .large: 1.5
         }
     }
 }
