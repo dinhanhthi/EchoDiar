@@ -228,6 +228,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSMe
 
     @objc private func showLibrary() {
         model.route = .list
+        model.globalChatOpen = false
         showMainWindow()
     }
 
@@ -260,7 +261,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSMe
             if case .conversation = model.route { return true }
             return false
         case #selector(goBack):
-            return model.route != .list
+            return model.route != .list || model.globalChatOpen
         default:
             return true
         }
@@ -268,9 +269,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSMe
 
     // MARK: - Esc and Space
 
-    /// One local monitor for the main window: Esc goes back (not on the list) and Space plays or pauses the open
-    /// transcript. Keys pass through with ⌘, ⌥ or ⌃, in other windows, while the Shortcuts tab records a shortcut
-    /// and while a text field or text view is edited (search, title, speaker name, chat).
+    /// One local monitor for the main window: Esc goes back (not on the list without the library chat) and Space
+    /// plays or pauses the open transcript. Keys pass through with ⌘, ⌥ or ⌃, in other windows, while the Shortcuts
+    /// tab records a shortcut and while a text field or text view is edited (search, title, speaker name, chat).
     private func installKeyMonitor() {
         keyMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak self] event in
             let handled = MainActor.assumeIsolated { self?.handleKey(event) ?? false }
@@ -284,7 +285,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSMe
         else { return false }
         if let text = window.firstResponder as? NSTextView, text.isEditable { return false }
         switch event.keyCode {
-        case 53 where model.route != .list && !model.listSelectionActive:  // kVK_Escape
+        case 53 where (model.route != .list || model.globalChatOpen) && !model.listSelectionActive:  // kVK_Escape
             model.goBack()
             return true
         case 49:  // kVK_Space

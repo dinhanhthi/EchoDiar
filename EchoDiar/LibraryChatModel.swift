@@ -18,32 +18,37 @@ extension AppModel {
     /// The embedder picked in Settings › RAG; nil (with `ragStatus.message` saying why) when its model is not
     /// downloaded, or its provider is not enabled or misses a model or key.
     func makeEmbedder() -> (any TextEmbedder)? {
+        resolveEmbedder { ragStatus.message = $0 }
+    }
+
+    /// `makeEmbedder()` without touching `ragStatus`: `problem` gets why there is none.
+    private func resolveEmbedder(problem: (String) -> Void = { _ in }) -> (any TextEmbedder)? {
         let id = settings.embeddingModelID
         if id == "apple-nl" { return AppleTextEmbedder() }
         if id.hasPrefix(Self.apiEmbedderPrefix) {
             guard let config = embeddingProviderConfig else {
-                ragStatus.message = "Pick an enabled provider in Settings › RAG"
+                problem("Pick an enabled provider in Settings › RAG")
                 return nil
             }
             let model = settings.embeddingAPIModel.trimmingCharacters(in: .whitespacesAndNewlines)
             guard !model.isEmpty else {
-                ragStatus.message = "Enter the embedding model of \(config.displayName) in Settings › RAG"
+                problem("Enter the embedding model of \(config.displayName) in Settings › RAG")
                 return nil
             }
             let apiKey = config.authStyle == .none ? nil : try? KeychainStore.apiKey(forProvider: config.id)
             // As `makeProvider(for:)`: sent without a key, a preset only answers HTTP 401.
             if config.preset != nil, config.authStyle != .none, apiKey?.isEmpty ?? true {
-                ragStatus.message = "Save a key for \(config.displayName) in Settings › AI"
+                problem("Save a key for \(config.displayName) in Settings › AI")
                 return nil
             }
             return APITextEmbedder(config: config, apiKey: apiKey, model: model)
         }
         guard let entry = ModelCatalog.entry(id: id), entry.kind == .embedding, entry.runtime == .mlx else {
-            ragStatus.message = "Pick an embedding model in Settings › RAG"
+            problem("Pick an embedding model in Settings › RAG")
             return nil
         }
         guard modelStore.isInstalled(id), let folder = modelStore.folder(for: id) else {
-            ragStatus.message = "Download the embedding model in Settings › RAG"
+            problem("Download the embedding model in Settings › RAG")
             return nil
         }
         return MLXEmbedder(entryID: id, folder: folder)
@@ -223,5 +228,165 @@ extension AppModel {
             if indexingPaused || Task.isCancelled || start.duration(to: .now) >= .seconds(20) { break }
         }
         return (handled, false)
+    }
+}
+
+// MARK: - Library chat
+
+extension AppModel {
+    /// Asks `question` across the library as the AI job (`conversationID` nil) with the current AI provider and model:
+    /// searches the index, then streams the answer, saved with its references in `globalChatFolder`'s `chat.json`.
+    /// The job is set before the search so indexing yields. With no source found the question is still asked: the
+    /// prompt has the model say the sources hold no answer.
+    func askLibrary(_ question: String) {
+        guard aiJob == nil, settings.ragEnabled, let provider = currentAIProvider else { return }
+        let model = aiModel(for: provider).trimmingCharacters(in: .whitespacesAndNewlines)
+        aiError = nil
+        let client: (any LLMProvider)?
+        do {
+            client = try llmClient(for: provider)
+        } catch {
+            aiError = (nil, "\(provider.name): \(error.localizedDescription)")
+            return
+        }
+        guard let client else {
+            aiError = (nil, "\(provider.name) is not available.")
+            return
+        }
+        let task = Task { [weak self] in
+            let stream = await self?.libraryAnswer(question, client: client, providerID: provider.id, model: model)
+            if let stream {
+                do {
+                    for try await update in stream {
+                        switch update {
+                        case .status(let status): self?.aiJob?.status = status
+                        case .text(let text):
+                            self?.aiJob?.status = nil
+                            self?.aiJob?.text += text
+                        }
+                    }
+                } catch where !Task.isCancelled {
+                    self?.aiError = (nil, error.localizedDescription)
+                } catch {}
+            }
+            guard let self else { return }
+            aiJob = nil
+            aiJobsEnded += 1
+            syncLibraryIndex()
+        }
+        aiJob = AIJob(conversationID: nil, kind: .question(question), status: "Searching your conversations…", task: task)
+    }
+
+    /// The search and the answer stream of `askLibrary`; nil when the job was stopped during the search.
+    private func libraryAnswer(
+        _ question: String, client: any LLMProvider, providerID: String, model: String
+    ) async -> AsyncThrowingStream<AIService.Update, Error>? {
+        let vector = await queryVector(question)
+        let context = await client.contextWindow(model: model)
+        let folder = globalChatFolder
+        let history = ChatLog.read(from: folder).messages.map { message in
+            guard message.role == .assistant else { return message }
+            var plain = message
+            plain.text = Self.withoutCitations(message.text)
+            return plain
+        }
+        let limit = settings.chatContextMessages
+        // What the prompt holds besides the sources: its instructions (about 600 tokens), the history and the question.
+        let promptTokens = (limit > 0 ? history.suffix(limit) : history[...])
+            .reduce(600 + TranscriptChunker.estimateTokens(question)) { $0 + TranscriptChunker.estimateTokens($1.text) }
+        let hits = await libraryIndex.search(question: question, vector: vector, limit: 40)
+        let (sources, references) = librarySources(
+            hits, budget: TranscriptChunker.budget(contextWindow: context, instructionTokens: promptTokens))
+        guard !Task.isCancelled else { return nil }
+        aiJob?.status = nil
+        return aiService.askLibrary(
+            question: question, sources: sources, references: references, history: history, historyLimit: limit,
+            provider: client, providerID: providerID, model: model, language: settings.summaryLanguage, folder: folder)
+    }
+
+    /// The question's embedding; nil (BM25 only) without a usable embedder, while the API embedder's destination is
+    /// not confirmed (the confirmation covers questions too), or on error. Loads the embedder's index when another
+    /// one is loaded. In-process models load inside `modelGate`, for this one query.
+    private func queryVector(_ question: String) async -> [Float]? {
+        guard let embedder = resolveEmbedder() else { return nil }
+        if !embedder.isLocal && embedderNeedsConsent { return nil }
+        let key = embedder.key
+        if libraryIndexKey != key {
+            await libraryIndex.load(key: key)
+            libraryIndexKey = key
+        }
+        if !(embedder is APITextEmbedder) && modelGateBusy { return nil }
+        let work: @Sendable () async throws -> [Float]? = {
+            try await embedder.withLoaded { try await $0.embed([question], query: true).first }
+        }
+        do {
+            return embedder is APITextEmbedder
+                ? try await work() : try await modelGate.withExclusiveModel(owner: .embedder, work)
+        } catch {
+            if !Task.isCancelled { NSLog("EchoDiar: could not embed the question: \(error)") }
+            return nil
+        }
+    }
+
+    /// The best `hits` of conversations still in the library, at most 12 passages fitting `budget` estimated tokens,
+    /// grouped per conversation in first-hit order and numbered from 1; with the answer's references.
+    private func librarySources(
+        _ hits: [LibraryIndex.Hit], budget: Int
+    ) -> ([PromptBuilder.LibrarySource], [ChatLog.Reference]) {
+        let byID = Dictionary(conversations.map { ($0.id, $0) }, uniquingKeysWith: { first, _ in first })
+        var order: [UUID] = []
+        var passages: [UUID: [String]] = [:]
+        var used = 0
+        for hit in hits where passages.values.reduce(0, { $0 + $1.count }) < 12 {
+            guard let conversation = byID[hit.conversationID] else { continue }
+            let isNew = passages[hit.conversationID] == nil
+            // A new source adds its tags and its line "Conversation n: title, date"; a passage its separator.
+            let cost = TranscriptChunker.estimateTokens(hit.chunk.text) + 2
+                + (isNew ? TranscriptChunker.estimateTokens(conversation.title) + 20 : 0)
+            guard used + cost <= budget else { continue }
+            used += cost
+            if isNew { order.append(hit.conversationID) }
+            passages[hit.conversationID, default: []].append(hit.chunk.text)
+        }
+        var sources: [PromptBuilder.LibrarySource] = []
+        var references: [ChatLog.Reference] = []
+        for (index, id) in order.enumerated() {
+            guard let conversation = byID[id] else { continue }
+            sources.append(PromptBuilder.LibrarySource(
+                number: index + 1, title: conversation.title, date: conversation.createdAt, passages: passages[id] ?? []))
+            references.append(ChatLog.Reference(number: index + 1, conversationID: id, title: conversation.title))
+        }
+        return (sources, references)
+    }
+
+    /// `text` without source citations: `echodiar-ref` links become their text and `[n]` / `[n mm:ss]` markers go, so
+    /// an earlier answer's numbers never point at the next question's sources.
+    static func withoutCitations(_ text: String) -> String {
+        text.replacing(#/\[((?:[^\[\]\n]|\[[^\[\]\n]*\])*)\]\(echodiar-ref:[^)\s]*\)/#) { String($0.output.1) }
+            .replacing(#/[ \t]*\[\d{1,3}(?:,? +\d{1,3}:\d{2}(?::\d{2})?)?\](?!\()/#, with: "")
+    }
+
+    /// Archives the library chat so the next question starts without history, titled as `startFreshChat` does.
+    func startFreshLibraryChat() {
+        let folder = globalChatFolder
+        changeChat(of: nil, in: folder) { try ChatArchive.archive(in: folder) }
+    }
+
+    /// Makes the archived library chat `entry` the open one, as `resumeChat` does.
+    func resumeLibraryChat(_ entry: ChatArchive.Entry) {
+        let folder = globalChatFolder
+        changeChat(of: nil, in: folder) { try ChatArchive.resume(entry.id, in: folder) }
+    }
+
+    /// A reference of a library answer: the conversation at `seconds` in its transcript, or its summary; the library
+    /// chat stays open beside it. Does nothing when the conversation is gone.
+    func openReference(id: UUID, seconds: Double?) {
+        guard conversations.contains(where: { $0.id == id }) else { return }
+        globalChatOpen = true
+        if let seconds {
+            openTranscript(conversationID: id, at: seconds)
+        } else {
+            open(id, tab: .summary)
+        }
     }
 }

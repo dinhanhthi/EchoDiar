@@ -5,7 +5,8 @@ import SwiftUI
 
 /// The main window, one page per `AppModel.Route`: the cards, a conversation, the open recording (while recording)
 /// or Settings. Back, Record (or Stop and Pause) and a conversation's title on the leading side; a conversation's
-/// Reveal in Finder, Settings and Search, then the conversation's tabs on the trailing side.
+/// Reveal in Finder, Settings, the library chat and Search, then the conversation's tabs on the trailing side. The
+/// library chat takes the cards' place on the list, or the sidebar's beside a conversation.
 struct MainView: View {
     let model: AppModel
     let updater: Updater
@@ -73,7 +74,7 @@ struct MainView: View {
             // Rendered from `shownRoute`, so the leaving page keeps its content while it slides out.
             ZStack {
                 switch Page(shownRoute) {
-                case .list: cardsPane.transition(pageTransition)
+                case .list: listPane.transition(pageTransition)
                 case .entry: entryPane.transition(pageTransition)
                 case .settings: SettingsView(model: model, query: $query).transition(pageTransition)
                 }
@@ -130,7 +131,11 @@ struct MainView: View {
             await loadSearchDocuments()
         }
         .onChange(of: model.searchPresented, initial: true) { _, presented in
-            if presented { searchExpanded = true }
+            guard presented else { return }
+            searchExpanded = true
+            // Search filters the cards: they come back in place of the library chat. Settings search keeps it, for
+            // the page Settings returns to.
+            if model.route != .settings { model.globalChatOpen = false }
         }
         .toolbar {
             // The compact window's search bar replaces every button; a wide one keeps Back, the title, Record,
@@ -158,6 +163,20 @@ struct MainView: View {
                         Label("Settings", systemImage: "slider.horizontal.3")
                     }
                     .help("Settings")
+                    Toggle(isOn: Binding(
+                        get: { model.globalChatOpen && model.route != .settings },
+                        set: { open in
+                            if model.route == .settings { model.goBack() }
+                            model.globalChatOpen = open
+                            guard open else { return }
+                            query = ""
+                            searchExpanded = false
+                            model.searchPresented = false
+                        }
+                    )) {
+                        Label("Ask across conversations", systemImage: "sparkles")
+                    }
+                    .help("Ask across conversations")
                     Button(action: model.showSearch) {
                         Label("Search", systemImage: "magnifyingglass")
                     }
@@ -191,12 +210,12 @@ struct MainView: View {
         }
     }
 
-    /// Back in its own capsule (not on the list), the record capsule, then a conversation's title. The record capsule:
-    /// while idle Record and a chevron menu that picks the target and the language; while recording, Stop (red,
-    /// pulsing unless paused or Reduce Motion) and Pause/Resume. ⌘R and ⇧⌘P come from the main menu. In a narrow
-    /// window the other buttons go to the overflow menu first.
+    /// Back in its own capsule (not on the list without the library chat), the record capsule, then a conversation's
+    /// title. The record capsule: while idle Record and a chevron menu that picks the target and the language; while
+    /// recording, Stop (red, pulsing unless paused or Reduce Motion) and Pause/Resume. ⌘R and ⇧⌘P come from the main
+    /// menu. In a narrow window the other buttons go to the overflow menu first.
     @ToolbarContentBuilder private var leadingItems: some ToolbarContent {
-        if model.route != .list {
+        if model.route != .list || model.globalChatOpen {
             ToolbarItem(placement: leadingPlacement) {
                 SingleToolbarButton(title: "Back", systemImage: "chevron.left", action: model.goBack)
                     .help("Back (Esc)")
@@ -350,10 +369,10 @@ struct MainView: View {
     private static let titleMaxWidth: CGFloat = 360
     private static let titleMinWidth: CGFloat = 120
     /// Approximate widths of the other items: the traffic lights, Back and the record capsule; the tabs; Reveal in
-    /// Finder with Delete, Settings and Search.
+    /// Finder with Delete, Settings, the library chat and Search.
     private static let leadingWidth: CGFloat = 250
     private static let tabsWidth: CGFloat = 240
-    private static let trailingButtonsWidth: CGFloat = 200
+    private static let trailingButtonsWidth: CGFloat = 240
 
     private var updateWidth: CGFloat { updater.updateAvailable ? 52 : 0 }
 
@@ -495,19 +514,35 @@ struct MainView: View {
             removal: .move(edge: removal).combined(with: .opacity))
     }
 
-    /// The wide layout: the compact cards as a sidebar, then the shown conversation (its state and playback reset per
-    /// conversation) or the recording. The sidebar stays while the entry changes. The cards when the conversation is
-    /// gone or the recording has ended.
+    /// The wide layout: the compact cards (or the library chat) as a sidebar, then the shown conversation (its state
+    /// and playback reset per conversation) or the recording. The sidebar stays while the entry changes. The list page
+    /// when the conversation is gone or the recording has ended.
     @ViewBuilder private var entryPane: some View {
         if entryShown {
             HStack(spacing: 0) {
-                libraryPane(compact: true, selectedID: selectedID)
+                chatOr(libraryPane(compact: true, selectedID: selectedID))
                     .frame(width: 300)
                 entryDetail
             }
         } else {
-            cardsPane
+            listPane
         }
+    }
+
+    /// The list page: the cards, or the library chat in their place.
+    private var listPane: some View { chatOr(cardsPane) }
+
+    /// The library chat in place of `list` while it is open; the two cross-fade, whoever toggles it (toolbar, Back,
+    /// Esc, Search).
+    private func chatOr(_ list: some View) -> some View {
+        ZStack {
+            if model.globalChatOpen {
+                GlobalChatView(model: model).transition(.opacity)
+            } else {
+                list.transition(.opacity)
+            }
+        }
+        .animation(reduceMotion ? nil : Self.paneAnimation, value: model.globalChatOpen)
     }
 
     /// The conversation still exists, or the recording still runs.

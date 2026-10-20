@@ -76,12 +76,12 @@ final class AppModel {
     private(set) var liveTranscript: LiveTranscriber.Snapshot?
     /// Apple Speech locales reserved by EchoDiar (BCP-47), read with the installed models.
     private(set) var appleSpeechReservedLocales: [String] = []
-    /// The running summary or question; one at a time.
-    private(set) var aiJob: AIJob?
-    /// Why the last AI job, or chat archive or resume, of a conversation failed.
-    private(set) var aiError: (conversationID: UUID, message: String)?
+    /// The running summary or question; one at a time. Also set by the library chat (LibraryChatModel.swift).
+    var aiJob: AIJob?
+    /// Why the last AI job, or chat archive or resume, of a conversation (nil: the library chat) failed.
+    var aiError: (conversationID: UUID?, message: String)?
     /// Bumped when an AI job ends, so the AI tab reloads `summary.md` and `chat.json`.
-    private(set) var aiJobsEnded = 0
+    var aiJobsEnded = 0
     /// Bumped when a conversation's chat or archived chats change outside a question job, so the AI tab reloads them.
     private(set) var chatHistoryChanges = 0
     /// Bumped per conversation when a speaker is renamed in `transcript.json`, so search rereads that document.
@@ -103,6 +103,8 @@ final class AppModel {
     var searchPresented = false
     /// Cards are selected in the list: Esc cancels the selection instead of going back.
     var listSelectionActive = false
+    /// The library chat is shown: in place of the cards on the list, or of the sidebar beside a conversation.
+    var globalChatOpen = false
     /// What the library index (RAG) is doing, for Settings › RAG.
     var ragStatus = RAGStatus()
 
@@ -131,7 +133,8 @@ final class AppModel {
 
     struct AIJob {
         enum Kind: Equatable { case summary, question(String) }
-        let conversationID: UUID
+        /// nil for a question across the library.
+        let conversationID: UUID?
         let kind: Kind
         /// What a long summary is doing before its text starts.
         var status: String?
@@ -200,6 +203,10 @@ final class AppModel {
 
     /// Library indexing waits while any of these runs, so it never competes with them for the model gate or the CPU.
     var indexingPaused: Bool { isRecording || compressionJobs > 0 || transcriptionJobs > 0 || aiJob != nil }
+
+    /// Live captions hold the model gate for a whole recording and a transcription job until it ends: a library
+    /// question then skips an in-app embedder (keyword search only) instead of waiting for the gate.
+    var modelGateBusy: Bool { isRecording || transcriptionJobs > 0 }
 
     /// Its `currentLevels()` has a single consumer: `levels`.
     @ObservationIgnored let engine: RecordingEngine
@@ -1070,11 +1077,12 @@ final class AppModel {
         route = .conversation(id)
     }
 
-    /// Esc, ⌘[ and the toolbar's Back: a conversation or the recording goes to the list; Settings goes to the page
-    /// it was opened from, or the list when that conversation is gone or that recording has ended.
+    /// Esc, ⌘[ and the toolbar's Back: a conversation or the recording goes to the list (the library chat stays
+    /// open), the list closes the library chat; Settings goes to the page it was opened from, or the list when that
+    /// conversation is gone or that recording has ended.
     func goBack() {
         switch route {
-        case .list: break
+        case .list: globalChatOpen = false
         case .conversation, .recording: route = .list
         case .settings:
             switch settingsReturnRoute {
@@ -1305,48 +1313,50 @@ extension AppModel {
         aiJob = AIJob(conversationID: conversation.id, kind: kind, task: task)
     }
 
-    /// Ends the job early; the answer or summary streamed until then is saved, then the job ends as usual.
+    /// Ends the job early; the answer or summary streamed until then is saved, then the job ends as usual. A library
+    /// question still looking for its sources (nothing streamed yet) is cancelled.
     func stopAIJob() {
+        if let job = aiJob, job.conversationID == nil, job.text.isEmpty { job.task?.cancel() }
         aiService.stop()
     }
 
     /// Archives the conversation's chat so the next question starts without history; then asks the AI provider for
     /// its title when it has none. Does nothing while a question runs for the conversation.
     func startFreshChat(_ conversation: Conversation) {
-        changeChat(of: conversation) { try ChatArchive.archive(in: conversation.folder) }
+        changeChat(of: conversation.id, in: conversation.folder) { try ChatArchive.archive(in: conversation.folder) }
     }
 
     /// Makes the archived chat `id` the conversation's chat, archiving the current one (titled like
     /// `startFreshChat`). Does nothing while a question runs for the conversation.
     func resumeChat(_ id: UUID, of conversation: Conversation) {
-        changeChat(of: conversation) { try ChatArchive.resume(id, in: conversation.folder) }
+        changeChat(of: conversation.id, in: conversation.folder) { try ChatArchive.resume(id, in: conversation.folder) }
     }
 
-    /// Runs `change` unless a question runs for `conversation` (its answer is appended to `chat.json`); a failure
-    /// shows as the conversation's AI error.
-    private func changeChat(of conversation: Conversation, _ change: () throws -> ChatArchive.Archived?) {
-        if let job = aiJob, job.conversationID == conversation.id, job.kind != .summary { return }
+    /// Runs `change` on the chat in `folder` of conversation `id` (nil: the library chat) unless a question runs for
+    /// it (its answer is appended to `chat.json`); a failure shows as its AI error.
+    func changeChat(of id: UUID?, in folder: URL, _ change: () throws -> ChatArchive.Archived?) {
+        if let job = aiJob, job.conversationID == id, job.kind != .summary { return }
         let archived: ChatArchive.Archived?
         do {
             archived = try change()
         } catch {
-            aiError = (conversation.id, error.localizedDescription)
+            aiError = (id, error.localizedDescription)
             archived = nil
         }
         // Also after a failure: a resume may have archived the open chat first, so the pane reloads what is on disk.
         chatHistoryChanges += 1
-        if let archived, archived.needsTitle { requestTitle(for: archived.entry, of: conversation) }
+        if let archived, archived.needsTitle { requestTitle(for: archived.entry, in: folder) }
     }
 
     /// Names the archived chat `entry` with the current AI provider and model, outside `aiJob`. Without a provider,
     /// when another one gave any of the chat's answers, with an in-app model, or on error its fallback title (the first
     /// question) stays.
-    private func requestTitle(for entry: ChatArchive.Entry, of conversation: Conversation) {
+    private func requestTitle(for entry: ChatArchive.Entry, in folder: URL) {
         Task { [weak self] in
             // Only with the provider that gave every answer of the chat, so its questions reach no provider that never
             // saw them, and never an in-app model, whose gate a hidden job would hold while the next question waits.
             guard let self, let provider = currentAIProvider, provider.kind != .inApp,
-                  let chat = ChatArchive.log(entry.id, in: conversation.folder),
+                  let chat = ChatArchive.log(entry.id, in: folder),
                   chat.messages.allSatisfy({ $0.role != .assistant || $0.provider == provider.id }),
                   let client = try? llmClient(for: provider) else { return }
             var title = ""
@@ -1357,13 +1367,13 @@ extension AppModel {
                 }
             } catch { return }
             guard !title.isEmpty else { return }
-            try? ChatArchive.setTitle(title, for: entry.id, in: conversation.folder)
+            try? ChatArchive.setTitle(title, for: entry.id, in: folder)
             chatHistoryChanges += 1
         }
     }
 
     /// The client for `provider`; nil when its in-app model or its config is gone.
-    private func llmClient(for provider: AIProvider) throws -> (any LLMProvider)? {
+    func llmClient(for provider: AIProvider) throws -> (any LLMProvider)? {
         provider.kind == .inApp
             ? makeLocalProvider(entryID: provider.id)
             : try providerConfigs.first { $0.id == provider.id }.flatMap(makeProvider(for:))

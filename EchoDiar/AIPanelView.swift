@@ -65,16 +65,7 @@ struct AIPanelView: View {
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
         .overlay(alignment: .bottom) { toastView }
         .environment(\.openURL, OpenURLAction(handler: openLink))
-        .alert(
-            "Open \(pendingLink?.host() ?? "this link")?",
-            isPresented: Binding(get: { pendingLink != nil }, set: { if !$0 { pendingLink = nil } }),
-            presenting: pendingLink
-        ) { url in
-            Button("Open") { NSWorkspace.shared.open(url) }
-            Button("Cancel", role: .cancel) {}
-        } message: { url in
-            Text(url.absoluteString)
-        }
+        .modifier(WebLinkConfirmation(link: $pendingLink))
         .task { model.refreshInstalledModels() }
         // Opening Chat (a card's Ask AI, a tab switch) puts the cursor in the question, once the tab's slide has put
         // the field in the window.
@@ -336,7 +327,7 @@ struct AIPanelView: View {
                 }
             }
         } label: {
-            menuLabel(([String(localized: "Version \(shown.number)")] + [versionModel(shown)].compactMap { $0 })
+            AIMenuLabel(title: ([String(localized: "Version \(shown.number)")] + [versionModel(shown)].compactMap { $0 })
                 .joined(separator: " · "), systemImage: "clock.arrow.circlepath")
         }
         .modifier(CompactMenu(maxWidth: 260, height: Self.chatMenuHeight))
@@ -382,8 +373,8 @@ struct AIPanelView: View {
             busyElsewhere
             if model.detailTab == .chat {
                 HStack(spacing: 8) {
-                    modelMenu(height: Self.chatMenuHeight)
-                    languageMenu(height: Self.chatMenuHeight)
+                    AIModelMenu(model: model, height: Self.chatMenuHeight)
+                    AILanguageMenu(model: model, height: Self.chatMenuHeight)
                     dataNotesButton(height: Self.chatMenuHeight)
                     freshChatButton
                     Button {
@@ -398,9 +389,9 @@ struct AIPanelView: View {
                 questionRow
             } else {
                 HStack(spacing: 8) {
-                    modelMenu(height: Self.inputHeight)
+                    AIModelMenu(model: model, height: Self.inputHeight)
                     dataNotesButton(height: Self.inputHeight)
-                    languageMenu(height: Self.inputHeight)
+                    AILanguageMenu(model: model, height: Self.inputHeight)
                     Spacer(minLength: 0)
                     copyButton
                     if summaryJob != nil {
@@ -421,7 +412,7 @@ struct AIPanelView: View {
                     }
                 }
             }
-            setupHints
+            AISetupHints(model: model)
                 .font(.caption)
                 .foregroundStyle(.secondary)
         }
@@ -481,7 +472,8 @@ struct AIPanelView: View {
             let title = model.conversations.first { $0.id == job.conversationID }?.title ?? "another conversation"
             HStack(spacing: 6) {
                 ProgressView().controlSize(.small)
-                Text(job.kind == .summary ? "Summarizing \(title)…" : "Answering about \(title)…")
+                (job.conversationID == nil ? Text("Answering a question about your conversations…")
+                    : Text(job.kind == .summary ? "Summarizing \(title)…" : "Answering about \(title)…"))
                     .lineLimit(1)
                     .truncationMode(.middle)
                 Spacer(minLength: 0)
@@ -522,98 +514,6 @@ struct AIPanelView: View {
                   : "Copy the transcript as a summary prompt for any chat app")
     }
 
-    /// Every provider with the models it offers, on this Mac first; Foundation Models shows why it cannot run.
-    private func modelMenu(height: CGFloat) -> some View {
-        let providers = model.aiProviders
-        let inApp = providers.filter { $0.kind == .inApp }
-        let hosts = providers.filter { $0.kind != .inApp && !$0.leavesMac } + providers.filter(\.leavesMac)
-        return Menu {
-            if !inApp.isEmpty {
-                Section("On this Mac") {
-                    ForEach(inApp) { provider in modelItem(provider, provider.defaultModel, title: provider.name) }
-                }
-            }
-            ForEach(hosts) { provider in
-                Section(provider.leavesMac ? "\(provider.name) (leaves this Mac)" : provider.name) {
-                    if provider.models.isEmpty {
-                        Text("No model: choose one in Settings")
-                    }
-                    ForEach(provider.models, id: \.self) { id in
-                        modelItem(provider, id, title: id.isEmpty ? "Default" : id)
-                    }
-                }
-            }
-            Divider()
-            Button("Choose Models…") { model.openSettings(tab: .providers) }
-        } label: {
-            menuLabel(modelTitle, systemImage: "cpu")
-        }
-        .modifier(CompactMenu(maxWidth: 180, height: height))
-        .layoutPriority(1)
-        .help("Model for summaries and questions")
-    }
-
-    private func modelItem(_ provider: AppModel.AIProvider, _ id: String, title: String) -> some View {
-        Toggle(isOn: Binding(
-            get: { model.currentAIProvider?.id == provider.id && currentModel == id },
-            set: { if $0 { model.setAIModel(id, of: provider) } }
-        )) {
-            Text(title)
-            if let reason = provider.unavailableReason { Text(reason) }
-        }
-        .disabled(provider.unavailableReason != nil)
-    }
-
-    private var modelTitle: String {
-        guard let provider = model.currentAIProvider else { return "No AI model" }
-        guard provider.kind != .inApp else { return provider.name }
-        let id = currentModel ?? ""
-        return id.isEmpty ? provider.name : id
-    }
-
-    private func languageMenu(height: CGFloat) -> some View {
-        Menu {
-            Picker("Language", selection: languageBinding) {
-                Text("Auto").tag("auto")
-                Text("English").tag("en")
-                Text("French").tag("fr")
-                Text("Vietnamese").tag("vi")
-                if !["auto", "en", "fr", "vi"].contains(model.settings.summaryLanguage) {
-                    Text(model.settings.summaryLanguage).tag(model.settings.summaryLanguage)
-                }
-            }
-            .pickerStyle(.inline)
-            .labelsHidden()
-        } label: {
-            menuLabel(LanguageOptions.shortCode(model.settings.summaryLanguage), systemImage: "globe")
-        }
-        .modifier(CompactMenu(maxWidth: nil, height: height))
-        .help("Language of summaries and answers (Auto = the transcript's language for summaries, the question's for answers)")
-    }
-
-    /// The bar's style draws no menu arrow: the chevron says it opens a menu.
-    private func menuLabel(_ title: String, systemImage: String) -> some View {
-        HStack(spacing: 6) {
-            Label {
-                Text(title).lineLimit(1).truncationMode(.tail)
-            } icon: {
-                Image(systemName: systemImage)
-            }
-            MenuChevron()
-        }
-    }
-
-    /// Why no model can run: no provider set up, and why Foundation Models is unavailable.
-    @ViewBuilder private var setupHints: some View {
-        if model.currentAIProvider == nil {
-            Label("No AI model: set up a provider or download a model in Settings › AI.",
-                  systemImage: "exclamationmark.triangle")
-            if let reason = AppModel.foundationModelsUnavailableReason {
-                Label(reason, systemImage: "info.circle")
-            }
-        }
-    }
-
     /// Where the data goes with the current provider: off this Mac, and how far a CLI agent is contained.
     @ViewBuilder private var dataNotes: some View {
         let provider = model.currentAIProvider
@@ -645,10 +545,6 @@ struct AIPanelView: View {
     }
 
     // MARK: - State
-
-    private var languageBinding: Binding<String> {
-        Binding(get: { model.settings.summaryLanguage }, set: { value in model.updateSettings { $0.summaryLanguage = value } })
-    }
 
     /// The current provider's picked model ("" = a CLI's own default).
     private var currentModel: String? {
@@ -749,8 +645,148 @@ struct AIPanelView: View {
     }
 }
 
+/// Every provider with the models it offers, on this Mac first; Foundation Models shows why it cannot run (the AI
+/// pane's bottom bar and the global chat's).
+struct AIModelMenu: View {
+    let model: AppModel
+    let height: CGFloat
+
+    var body: some View {
+        let providers = model.aiProviders
+        let inApp = providers.filter { $0.kind == .inApp }
+        let hosts = providers.filter { $0.kind != .inApp && !$0.leavesMac } + providers.filter(\.leavesMac)
+        Menu {
+            if !inApp.isEmpty {
+                Section("On this Mac") {
+                    ForEach(inApp) { provider in modelItem(provider, provider.defaultModel, title: provider.name) }
+                }
+            }
+            ForEach(hosts) { provider in
+                Section(provider.leavesMac ? "\(provider.name) (leaves this Mac)" : provider.name) {
+                    if provider.models.isEmpty {
+                        Text("No model: choose one in Settings")
+                    }
+                    ForEach(provider.models, id: \.self) { id in
+                        modelItem(provider, id, title: id.isEmpty ? "Default" : id)
+                    }
+                }
+            }
+            Divider()
+            Button("Choose Models…") { model.openSettings(tab: .providers) }
+        } label: {
+            AIMenuLabel(title: modelTitle, systemImage: "cpu")
+        }
+        .modifier(CompactMenu(maxWidth: 180, height: height))
+        .layoutPriority(1)
+        .help("Model for summaries and questions")
+    }
+
+    private func modelItem(_ provider: AppModel.AIProvider, _ id: String, title: String) -> some View {
+        Toggle(isOn: Binding(
+            get: { model.currentAIProvider?.id == provider.id && currentModel == id },
+            set: { if $0 { model.setAIModel(id, of: provider) } }
+        )) {
+            Text(title)
+            if let reason = provider.unavailableReason { Text(reason) }
+        }
+        .disabled(provider.unavailableReason != nil)
+    }
+
+    private var modelTitle: String {
+        guard let provider = model.currentAIProvider else { return "No AI model" }
+        guard provider.kind != .inApp else { return provider.name }
+        let id = currentModel ?? ""
+        return id.isEmpty ? provider.name : id
+    }
+
+    /// The current provider's picked model ("" = a CLI's own default).
+    private var currentModel: String? {
+        model.currentAIProvider.map(model.aiModel(for:))
+    }
+}
+
+/// The output language of summaries and answers (the AI pane's bottom bar and the global chat's).
+struct AILanguageMenu: View {
+    let model: AppModel
+    let height: CGFloat
+
+    var body: some View {
+        Menu {
+            Picker("Language", selection: languageBinding) {
+                Text("Auto").tag("auto")
+                Text("English").tag("en")
+                Text("French").tag("fr")
+                Text("Vietnamese").tag("vi")
+                if !["auto", "en", "fr", "vi"].contains(model.settings.summaryLanguage) {
+                    Text(model.settings.summaryLanguage).tag(model.settings.summaryLanguage)
+                }
+            }
+            .pickerStyle(.inline)
+            .labelsHidden()
+        } label: {
+            AIMenuLabel(title: LanguageOptions.shortCode(model.settings.summaryLanguage), systemImage: "globe")
+        }
+        .modifier(CompactMenu(maxWidth: nil, height: height))
+        .help("Language of summaries and answers (Auto = the transcript's language for summaries, the question's for answers)")
+    }
+
+    private var languageBinding: Binding<String> {
+        Binding(get: { model.settings.summaryLanguage }, set: { value in model.updateSettings { $0.summaryLanguage = value } })
+    }
+}
+
+/// The label of a bottom bar's menu: the bar's style draws no menu arrow, so the chevron says it opens a menu.
+struct AIMenuLabel: View {
+    let title: String
+    let systemImage: String
+
+    var body: some View {
+        HStack(spacing: 6) {
+            Label {
+                Text(title).lineLimit(1).truncationMode(.tail)
+            } icon: {
+                Image(systemName: systemImage)
+            }
+            MenuChevron()
+        }
+    }
+}
+
+/// Why no model can run: no provider set up, and why Foundation Models is unavailable.
+struct AISetupHints: View {
+    let model: AppModel
+
+    var body: some View {
+        if model.currentAIProvider == nil {
+            Label("No AI model: set up a provider or download a model in Settings › AI.",
+                  systemImage: "exclamationmark.triangle")
+            if let reason = AppModel.foundationModelsUnavailableReason {
+                Label(reason, systemImage: "info.circle")
+            }
+        }
+    }
+}
+
+/// Opens a web link from model output once the alert showing its destination is confirmed; `link` is the one asked.
+struct WebLinkConfirmation: ViewModifier {
+    @Binding var link: URL?
+
+    func body(content: Content) -> some View {
+        content.alert(
+            "Open \(link?.host() ?? "this link")?",
+            isPresented: Binding(get: { link != nil }, set: { if !$0 { link = nil } }),
+            presenting: link
+        ) { url in
+            Button("Open") { NSWorkspace.shared.open(url) }
+            Button("Cancel", role: .cancel) {}
+        } message: { url in
+            Text(url.absoluteString)
+        }
+    }
+}
+
 /// A small capsule button of the AI pane's busy line.
-private struct CapsuleButton: ViewModifier {
+struct CapsuleButton: ViewModifier {
     func body(content: Content) -> some View {
         content
             .buttonStyle(.bordered)
@@ -760,7 +796,7 @@ private struct CapsuleButton: ViewModifier {
 }
 
 /// A row of the History panel: lighter on hover, darker while pressed, dimmed when disabled.
-private struct HistoryRowStyle: ButtonStyle {
+struct HistoryRowStyle: ButtonStyle {
     func makeBody(configuration: Configuration) -> some View {
         Highlight(configuration: configuration)
     }
@@ -837,7 +873,7 @@ struct MenuChevron: View {
 
 /// A capsule menu of the AI pane's bottom bar, `height` tall like the buttons beside it: its title's width, a long one
 /// cut to `maxWidth` with an ellipsis (never cut without one).
-private struct CompactMenu: ViewModifier {
+struct CompactMenu: ViewModifier {
     let maxWidth: CGFloat?
     let height: CGFloat
 
@@ -855,7 +891,7 @@ private struct CompactMenu: ViewModifier {
 
 /// Its content at the proposed width, at most `maxWidth`, and no wider than the content: unlike
 /// `frame(maxWidth:)`, a short title leaves no gap after it.
-private struct WidthCap: Layout {
+struct WidthCap: Layout {
     let maxWidth: CGFloat
 
     func sizeThatFits(proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) -> CGSize {
@@ -870,10 +906,14 @@ private struct WidthCap: Layout {
 }
 
 /// Model Markdown, line by line: `#` headings, `-`/`*` bullets (indented by their leading spaces) and paragraphs,
-/// each with inline Markdown; `[mm:ss]` citations become `echodiar-time:<seconds>` links. No HTML, no web view.
-/// A streaming answer is parsed on every update, so it is formatted as it arrives.
+/// each with inline Markdown; `[mm:ss]` citations become `echodiar-time:<seconds>` links, or with `references` (a
+/// library-chat answer) `[n mm:ss]` / `[n]` citations become `echodiar-ref:` links. No HTML, no web view; images
+/// (`![alt](url)`) show their alt text only, nothing is fetched. A streaming answer is parsed on every update, so it is
+/// formatted as it arrives.
 struct MarkdownText: View {
     let text: String
+    /// The sources of a library-chat answer; nil for an answer about one conversation.
+    var references: [ChatLog.Reference]? = nil
 
     static let citationScheme = "echodiar-time"
 
@@ -882,15 +922,15 @@ struct MarkdownText: View {
             ForEach(Array(Self.lines(text).enumerated()), id: \.offset) { _, line in
                 switch line.kind {
                 case .heading:
-                    Text(Self.inline(line.text)).font(.headline).padding(.top, 4)
+                    Text(Self.inline(line.text, references: references)).font(.headline).padding(.top, 4)
                 case .bullet:
                     HStack(alignment: .firstTextBaseline, spacing: 6) {
                         Text("•")
-                        Text(Self.inline(line.text))
+                        Text(Self.inline(line.text, references: references))
                     }
                     .padding(.leading, CGFloat(line.indent) * 14)
                 case .paragraph:
-                    Text(Self.inline(line.text))
+                    Text(Self.inline(line.text, references: references))
                 }
             }
         }
@@ -915,8 +955,9 @@ struct MarkdownText: View {
         }
     }
 
-    static func inline(_ text: String) -> AttributedString {
-        let linked = TranscriptCitation.linked(text, scheme: citationScheme)
+    static func inline(_ text: String, references: [ChatLog.Reference]? = nil) -> AttributedString {
+        let linked = references.map { LibraryCitation.linked(text, references: $0) }
+            ?? TranscriptCitation.linked(text, scheme: citationScheme)
         return (try? AttributedString(
             markdown: linked, options: .init(interpretedSyntax: .inlineOnlyPreservingWhitespace))) ?? AttributedString(text)
     }
