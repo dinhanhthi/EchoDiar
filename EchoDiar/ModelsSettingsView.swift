@@ -27,10 +27,13 @@ struct ModelsSettingsView: View {
                 switch tab {
                 case .general: generalSection
                 case .transcriptionModels:
+                    intro("Transcription turns speech into text. The transcription model listens to the recording and writes what was said, with timestamps.")
                     tierSections(.asr)
                     cloudSection
                     speechToTextSection
-                case .diarizationModels: tierSections(.diarization)
+                case .diarizationModels:
+                    intro("Diarization finds who spoke when. The diarization model tells the voices apart and labels each part of the transcript with its speaker.")
+                    tierSections(.diarization)
                 }
             }
             .formStyle(.grouped)
@@ -61,6 +64,13 @@ struct ModelsSettingsView: View {
                 Text("Live transcript engine")
                 Text("Nemotron is recommended for Vietnamese live captions (Vietnamese is experimental). Without the picked model installed, another installed live model is used.")
             }
+        }
+    }
+
+    /// What the page's models do, above their sections.
+    private func intro(_ text: LocalizedStringKey) -> some View {
+        Section {
+            Text(text).foregroundStyle(.secondary)
         }
     }
 
@@ -142,7 +152,7 @@ struct ModelRow: View {
                 actions
             }
             HStack(spacing: 4) {
-                Badge(text: entry.tier.rawValue.capitalized)
+                Badge(text: entry.tier.rawValue.capitalized, color: Self.tierColor(entry.tier))
                 if entry.kind == .diarization { Badge(text: "Speakers") }
                 if entry.liveOnly { Badge(text: "Live only") }
                 if entry.repo == nil {
@@ -278,6 +288,15 @@ struct ModelRow: View {
         return groups
             .map { "\(ListFormatter.localizedString(byJoining: $0.languages)): \($0.note)" }
             .joined(separator: " · ")
+    }
+
+    /// Fast is orange (speed), balanced teal, quality purple (best output); none is the accent blue of Default.
+    private static func tierColor(_ tier: ModelEntry.Tier) -> Color {
+        switch tier {
+        case .fast: .orange
+        case .balanced: .teal
+        case .quality: .purple.mix(with: .white, by: 0.35)  // plain purple is hard to read on the dark cards
+        }
     }
 
     private static func sizeText(_ mib: Int) -> String {
