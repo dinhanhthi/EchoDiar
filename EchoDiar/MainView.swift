@@ -607,8 +607,6 @@ struct MainView: View {
                 .foregroundStyle(.secondary)
                 .multilineTextAlignment(.center)
                 .padding(.horizontal, 20)
-                .padding(.vertical, 16)
-                .modifier(GlassCard(cornerRadius: 20))
                 .padding(12)
             .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
