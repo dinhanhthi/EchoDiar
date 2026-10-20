@@ -102,6 +102,13 @@ struct LibraryIndexTests {
         try await index.index(kept, transcript: keptTranscript, summary: "Travel is booked.", embedder: KeywordEmbedder())
         try await index.index(gone, transcript: goneTranscript, summary: nil, embedder: KeywordEmbedder())
         #expect(await index.stale([kept, gone]).isEmpty)
+        // A shard of another key, not loaded: only `prune` reaches it, without an embedder.
+        let otherKey = root.appendingPathComponent("RAG").appendingPathComponent("other")
+        try FileManager.default.createDirectory(at: otherKey, withIntermediateDirectories: true)
+        let orphan = otherKey.appendingPathComponent("\(UUID().uuidString).json")
+        try Data("{}".utf8).write(to: orphan)
+        await index.prune([kept, gone])
+        #expect(!FileManager.default.fileExists(atPath: orphan.path))
 
         var edited = keptTranscript
         edited.segments[0].text += " The hiring plan was moved to next week."
@@ -113,5 +120,8 @@ struct LibraryIndexTests {
         #expect(!FileManager.default.fileExists(atPath: shards.appendingPathComponent("\(gone.id.uuidString).json").path))
         #expect(FileManager.default.fileExists(atPath: shards.appendingPathComponent("\(kept.id.uuidString).json").path))
         #expect(await index.count == 1)
+
+        await index.removeAll()
+        #expect(!FileManager.default.fileExists(atPath: shards.path))
     }
 }

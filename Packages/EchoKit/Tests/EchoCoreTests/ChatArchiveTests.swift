@@ -20,7 +20,11 @@ struct ChatArchiveTests {
     @Test func resumeRestoresTheArchivedChatAndArchivesTheOpenOne() throws {
         let folder = try makeFolder()
         defer { try? FileManager.default.removeItem(at: folder) }
-        try writeChat(["What was decided?", "Ship on Friday."], in: folder)
+        let reference = ChatLog.Reference(number: 1, conversationID: UUID(), title: "Planning")
+        try ChatLog(messages: [
+            ChatLog.Message(role: .user, text: "What was decided?"),
+            ChatLog.Message(role: .assistant, text: "Ship on Friday.", references: [reference]),
+        ]).write(to: folder)
         let first = try #require(try ChatArchive.archive(in: folder))
         #expect(first.needsTitle)
         #expect(first.entry.title == "What was decided?")
@@ -30,6 +34,7 @@ struct ChatArchiveTests {
         let open = try #require(try ChatArchive.resume(first.entry.id, in: folder))
 
         #expect(ChatLog.read(from: folder).messages.map(\.text) == ["What was decided?", "Ship on Friday."])
+        #expect(ChatLog.read(from: folder).messages.map(\.references) == [nil, [reference]])
         #expect(ChatArchive.entries(in: folder) == [open.entry])
         #expect(open.entry.title == "Who owns the budget?")
         let archived = folder.appendingPathComponent(ChatArchive.folderName)

@@ -4,7 +4,7 @@ import SwiftUI
 
 /// A sidebar section. Adding one: a case, its row in `label`, its view in `SettingsView.content`.
 enum SettingsTab: CaseIterable, Identifiable {
-    case general, recording, transcription, providers, storage, shortcuts, about
+    case general, recording, transcription, providers, rag, storage, shortcuts, about
 
     var id: Self { self }
 
@@ -14,6 +14,7 @@ enum SettingsTab: CaseIterable, Identifiable {
         case .recording: ("Recording", "record.circle")
         case .transcription: ("Transcription", "waveform")
         case .providers: ("AI", "sparkles")
+        case .rag: ("RAG", "sparkle.magnifyingglass")
         case .storage: ("Storage", "internaldrive")
         case .shortcuts: ("Shortcuts", "keyboard")
         case .about: ("About", "info.circle")
@@ -36,7 +37,7 @@ enum SettingsTab: CaseIterable, Identifiable {
         case .storage:
             [.init(id: "usage", title: "Usage"), .init(id: "audio", title: "Audio"),
              .init(id: "autoDelete", title: "Auto-delete")]
-        case .general, .shortcuts, .about:
+        case .general, .rag, .shortcuts, .about:
             []
         }
     }
@@ -120,6 +121,7 @@ struct SettingsView: View {
         case .recording: RecordingSettingsView(model: model)
         case .transcription: ModelsSettingsView(model: model)
         case .providers: ProvidersSettingsView(model: model)
+        case .rag: RAGSettingsView(model: model)
         case .storage: StorageSettingsView(model: model)
         case .shortcuts: ShortcutsSettingsView(model: model)
         case .about: AboutSettingsView()

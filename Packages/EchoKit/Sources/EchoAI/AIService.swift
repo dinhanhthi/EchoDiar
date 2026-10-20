@@ -83,16 +83,8 @@ public actor AIService {
     ) -> AsyncThrowingStream<Update, Error> {
         let asked = Date()
         return job(provider: provider, model: model) { [self] backend, yield, isStopped in
-            // Starts with a question: some APIs reject a conversation whose first turn is an answer.
-            let recent = historyLimit > 0 ? history.suffix(historyLimit) : history[...]
-            let turns = recent.drop { $0.role != .user }.map {
-                LLMMessage(role: $0.role == .user ? .user : .assistant, content: $0.text)
-            }
-            var language = OutputLanguage.answer(setting: language)
-            if #available(macOS 26, *), let foundation = provider as? AppleFoundationModelProvider,
-               let asked = language, !foundation.supports(language: asked.code) {
-                language = asked.englishFallback()
-            }
+            let turns = Self.turns(history, limit: historyLimit)
+            let language = Self.answerLanguage(setting: language, provider: provider)
             let context = await provider.contextWindow(model: model)
             let excerpts = TranscriptChunker.questionExcerpts(
                 conversation: conversation, transcript: transcript, question: question, summary: summary,
@@ -112,6 +104,56 @@ public actor AIService {
                 ChatLog.Message(role: .assistant, text: answer, provider: providerID, model: model),
             ], folder: conversation.folder)
         }
+    }
+
+    /// Streams the answer to a question across the library, sent with the numbered `sources` and the last
+    /// `historyLimit` messages of `history` (0 or less = all of them); then appends the question and the answer, with
+    /// its `references`, to `folder`'s `chat.json`. `providerID` and `language` as in `ask`.
+    public nonisolated func askLibrary(
+        question: String, sources: [PromptBuilder.LibrarySource], references: [ChatLog.Reference],
+        history: [ChatLog.Message], historyLimit: Int, provider: any LLMProvider, providerID: String, model: String,
+        language: String, folder: URL
+    ) -> AsyncThrowingStream<Update, Error> {
+        let asked = Date()
+        return job(provider: provider, model: model) { [self] backend, yield, isStopped in
+            let messages = PromptBuilder.libraryQuestionMessages(
+                question: question, sources: sources, history: Self.turns(history, limit: historyLimit),
+                language: Self.answerLanguage(setting: language, provider: provider))
+            let context = await provider.contextWindow(model: model)
+            let answer: String
+            do {
+                answer = try await Self.answer(messages, backend: backend, model: model, context: context, yield: yield)
+            } catch let interrupted as Interrupted where isStopped() && !interrupted.text.isEmpty {
+                answer = interrupted.text
+            }
+            if Task.isCancelled && !isStopped() { throw CancellationError() }
+            // The global chat's folder does not exist before its first question.
+            try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+            try await appendChat([
+                ChatLog.Message(role: .user, text: question, timestamp: asked),
+                ChatLog.Message(
+                    role: .assistant, text: answer, provider: providerID, model: model, references: references),
+            ], folder: folder)
+        }
+    }
+
+    /// The last `limit` messages of `history` (0 or less = all of them), starting with a question: some APIs reject a
+    /// conversation whose first turn is an answer.
+    private static func turns(_ history: [ChatLog.Message], limit: Int) -> [LLMMessage] {
+        let recent = limit > 0 ? history.suffix(limit) : history[...]
+        return recent.drop { $0.role != .user }.map {
+            LLMMessage(role: $0.role == .user ? .user : .assistant, content: $0.text)
+        }
+    }
+
+    /// The response-language `setting`, English when Foundation Models cannot write it.
+    private static func answerLanguage(setting: String, provider: any LLMProvider) -> OutputLanguage? {
+        var language = OutputLanguage.answer(setting: setting)
+        if #available(macOS 26, *), let foundation = provider as? AppleFoundationModelProvider,
+           let asked = language, !foundation.supports(language: asked.code) {
+            language = asked.englishFallback()
+        }
+        return language
     }
 
     /// A short title for `chat`, from its questions: one `.text` update with the whole cleaned title (none when the
@@ -327,5 +369,44 @@ public enum TranscriptCitation {
         }
         guard b < 60 else { return nil }
         return Double(a * 60 + b)
+    }
+}
+
+/// `[n mm:ss]`, `[n h:mm:ss]` (also `[n, mm:ss]`) and `[n]` source citations in library-chat answers, `n` being a
+/// `ChatLog.Reference` number.
+public enum LibraryCitation {
+    public static let scheme = "echodiar-ref"
+
+    /// An existing Markdown link (kept whole), or a citation not followed by a link target.
+    static var pattern: Regex<(Substring, Substring?, Substring?, Substring?)> {
+        /(\[(?:[^\[\]\n]|\[[^\[\]\n]*\])*\]\([^)\s]*\))|\[(\d{1,3})(?:,? +(\d{1,3}:\d{2}(?::\d{2})?))?\](?!\()/
+    }
+
+    /// `text` with every citation of a known source turned into a Markdown link to `echodiar-ref:<uuid>:<seconds>`
+    /// (`echodiar-ref:<uuid>` for `[n]`), as `TranscriptCitation.linked` does; citations of an unknown source and
+    /// text inside Markdown links are left alone.
+    public static func linked(_ text: String, references: [ChatLog.Reference]) -> String {
+        text.replacing(pattern) { match in
+            let (whole, link, number, time) = match.output
+            guard link == nil, let number, let n = Int(number),
+                  let reference = references.first(where: { $0.number == n }) else { return String(whole) }
+            var target = "\(scheme):\(reference.conversationID.uuidString)"
+            if let time {
+                guard let seconds = TranscriptCitation.seconds("[\(time)]") else { return String(whole) }
+                target += ":\(Int(seconds))"
+            }
+            return "\(whole)(\(target))"
+        }
+    }
+
+    /// The conversation and the moment (nil for a summary citation) of an `echodiar-ref:<uuid>[:<seconds>]` link; nil
+    /// when it is not one, or its seconds are not within 0...86 400.
+    public static func parse(_ url: URL) -> (id: UUID, seconds: Double?)? {
+        guard url.scheme?.lowercased() == scheme else { return nil }
+        let parts = url.absoluteString.dropFirst(scheme.count + 1).split(separator: ":", omittingEmptySubsequences: false)
+        guard (1...2).contains(parts.count), let id = UUID(uuidString: String(parts[0])) else { return nil }
+        guard parts.count == 2 else { return (id, nil) }
+        guard let seconds = Double(parts[1]), seconds.isFinite, (0...86_400).contains(seconds) else { return nil }
+        return (id, seconds)
     }
 }

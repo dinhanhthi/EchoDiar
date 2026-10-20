@@ -264,13 +264,32 @@ public struct ChatLog: Codable, Equatable, Sendable {
         public var provider: String?
         public var model: String?
         public var timestamp: Date?
+        /// The numbered conversation sources of a library-chat answer; nil elsewhere.
+        public var references: [Reference]?
 
-        public init(role: Role, text: String, provider: String? = nil, model: String? = nil, timestamp: Date? = Date()) {
+        public init(
+            role: Role, text: String, provider: String? = nil, model: String? = nil, timestamp: Date? = Date(),
+            references: [Reference]? = nil
+        ) {
             self.role = role
             self.text = text
             self.provider = provider
             self.model = model
             self.timestamp = timestamp
+            self.references = references
+        }
+    }
+
+    /// A conversation source of a library-chat answer: `number` is the `n` its citations use.
+    public struct Reference: Codable, Equatable, Sendable {
+        public var number: Int
+        public var conversationID: UUID
+        public var title: String
+
+        public init(number: Int, conversationID: UUID, title: String) {
+            self.number = number
+            self.conversationID = conversationID
+            self.title = title
         }
     }
 

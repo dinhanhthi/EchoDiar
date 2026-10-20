@@ -103,6 +103,8 @@ final class AppModel {
     var searchPresented = false
     /// Cards are selected in the list: Esc cancels the selection instead of going back.
     var listSelectionActive = false
+    /// What the library index (RAG) is doing, for Settings › RAG.
+    var ragStatus = RAGStatus()
 
     enum PillPrompt: Equatable {
         case meetingDetected(DetectedMeeting)
@@ -173,6 +175,19 @@ final class AppModel {
         let task: Task<Void, any Error>
     }
 
+    /// Conversations indexed out of those with a transcript, and why indexing waits or stopped.
+    struct RAGStatus: Equatable {
+        var indexed = 0
+        var total = 0
+        var running = false
+        /// Waiting for a recording, compression, transcription or AI job to end.
+        var paused = false
+        /// Why the last pass could not run or stopped (missing model, error).
+        var message: String?
+        /// A cloud embedder waits for its one-time confirmation; nothing is sent meanwhile.
+        var needsConsent = false
+    }
+
     var indicatorState: IndicatorState {
         switch snapshot.state {
         case .recording: .recording
@@ -182,6 +197,9 @@ final class AppModel {
     }
 
     var isRecording: Bool { snapshot.state != .idle }
+
+    /// Library indexing waits while any of these runs, so it never competes with them for the model gate or the CPU.
+    var indexingPaused: Bool { isRecording || compressionJobs > 0 || transcriptionJobs > 0 || aiJob != nil }
 
     /// Its `currentLevels()` has a single consumer: `levels`.
     @ObservationIgnored let engine: RecordingEngine
@@ -193,6 +211,18 @@ final class AppModel {
     @ObservationIgnored let modelGate = ModelLoadGate()
     @ObservationIgnored let pipeline: TranscriptionPipeline
     @ObservationIgnored let aiService: AIService
+    /// The RAG index, in a folder of its own beside the conversations: it deletes the other folders inside it.
+    @ObservationIgnored let libraryIndex = LibraryIndex(
+        root: RecordingSession.conversationsRoot.deletingLastPathComponent().appendingPathComponent("RAG", isDirectory: true))
+    /// The running `syncLibraryIndex()` pass; another pass asked for meanwhile runs once it ends.
+    @ObservationIgnored var libraryIndexTask: Task<Void, Never>?
+    @ObservationIgnored var libraryIndexPending = false
+    /// The embedder key last loaded into `libraryIndex`.
+    @ObservationIgnored var libraryIndexKey: String?
+    /// The next pass deletes the current key's shards first (Rebuild).
+    @ObservationIgnored var libraryIndexRebuild = false
+    /// `library.changes()` emitted once: an empty `conversations` is then an empty library, not one still loading.
+    @ObservationIgnored var libraryLoaded = false
     @ObservationIgnored private let compressor = AudioCompressor()
     @ObservationIgnored private let store: SettingsStore
     @ObservationIgnored private var recovery: Task<[RecoveredResult], Never>?
@@ -276,6 +306,8 @@ final class AppModel {
             Task {
                 for await conversations in changes {
                     self.conversations = conversations
+                    libraryLoaded = true
+                    syncLibraryIndex()
                     guard let pending = pendingOpenFolder else { continue }
                     if route != .list {
                         pendingOpenFolder = nil
@@ -716,6 +748,8 @@ final class AppModel {
     func keychainChanged() {
         savedKeys = [:]
         keychainVersion += 1
+        // A running pass would keep sending with the old key.
+        if settings.embeddingModelID.hasPrefix(Self.apiEmbedderPrefix) { syncLibraryIndex(restart: true) }
     }
 
     /// Whether provider `id` has a key in the Keychain; cached until `keychainChanged()`, since the AI tab asks on
@@ -766,6 +800,8 @@ final class AppModel {
             case .success:
                 // Any installed WhisperKit entry can stand in for the missing default, so every card offers Transcribe.
                 transcriptionProgress = transcriptionProgress.filter { $0.value.step != .needsModel }
+                // The embedding model may be the one indexing waited for.
+                if ModelCatalog.entry(id: id)?.kind == .embedding { syncLibraryIndex() }
             case .failure(let error) where error is CancellationError:
                 break
             case .failure(let error):
@@ -790,6 +826,8 @@ final class AppModel {
             }
             // Otherwise every new recording would stop at "Needs model".
             if settings.defaultASRModelID == id { updateSettings { $0.defaultASRModelID = nil } }
+            // Indexing then says the embedding model is missing.
+            if ModelCatalog.entry(id: id)?.kind == .embedding { syncLibraryIndex() }
             refreshInstalledModels()
         }
     }
@@ -847,6 +885,7 @@ final class AppModel {
 
     func transcriptEdited(_ id: UUID) {
         transcriptEdits[id, default: 0] += 1
+        syncLibraryIndex()
     }
 
     func renameConversation(_ id: UUID, to title: String) {
@@ -994,6 +1033,10 @@ final class AppModel {
         let retentionChanged = updated.autoDeleteEnabled != settings.autoDeleteEnabled
         let hotKeyChanged = updated.globalHotKey != settings.globalHotKey
             || updated.globalHotKeyEnabled != settings.globalHotKeyEnabled
+        let ragChanged = updated.ragEnabled != settings.ragEnabled
+            || updated.embeddingModelID != settings.embeddingModelID
+            || updated.embeddingAPIModel != settings.embeddingAPIModel
+            || (updated.embeddingModelID.hasPrefix(Self.apiEmbedderPrefix) && updated.providers != settings.providers)
         settings = updated
         do {
             try store.save(updated)
@@ -1003,6 +1046,8 @@ final class AppModel {
         if detectionChanged { syncMeetingDetection() }
         if retentionChanged { syncRetention() }
         if hotKeyChanged { syncHotKey() }
+        // A pass still running would keep embedding with the old choice.
+        if ragChanged { syncLibraryIndex(restart: true) }
     }
 
     /// "Show onboarding again" in General: the first-run window from its first step.
@@ -1082,6 +1127,8 @@ final class AppModel {
         updateSettings { $0.providers.removeAll { $0.id == id } }
         try? KeychainStore.deleteAPIKey(forProvider: id)
         savedKeys[id] = nil
+        // An untouched preset leaves `providers` as is, so the key's removal alone must stop a running pass.
+        if settings.embeddingModelID.hasPrefix(Self.apiEmbedderPrefix) { syncLibraryIndex(restart: true) }
     }
 
     /// The client for `config`, with its Keychain key; nil for an unknown CLI preset. Throws when the Keychain
@@ -1252,6 +1299,7 @@ extension AppModel {
             guard let self else { return }
             aiJob = nil
             aiJobsEnded += 1
+            syncLibraryIndex()
             await library.refresh()
         }
         aiJob = AIJob(conversationID: conversation.id, kind: kind, task: task)

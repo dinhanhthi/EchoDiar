@@ -223,6 +223,61 @@ struct AIServiceTests {
     }
 
     @Test
+    func libraryQuestionSendsTheNumberedSourcesAndSavesTheReferences() async throws {
+        // Not created yet, as the global chat's folder on the first question.
+        let folder = FileManager.default.temporaryDirectory.appendingPathComponent("AIServiceTests-\(UUID().uuidString)")
+        defer { try? FileManager.default.removeItem(at: folder) }
+        let provider = FakeProvider(reply: "Friday [1 00:07].", context: 128_000)
+        let date = Date(timeIntervalSince1970: 1_800_000_000)
+        let sources = [
+            PromptBuilder.LibrarySource(number: 1, title: "Weekly sync", date: date, passages: ["Me [00:07]: Friday."]),
+            PromptBuilder.LibrarySource(number: 2, title: "Retro", date: date, passages: ["The launch slipped."]),
+        ]
+        let references = [
+            ChatLog.Reference(number: 1, conversationID: UUID(), title: "Weekly sync"),
+            ChatLog.Reference(number: 2, conversationID: UUID(), title: "Retro"),
+        ]
+
+        for try await _ in AIService(gate: ModelLoadGate()).askLibrary(
+            question: "When is the launch?", sources: sources, references: references,
+            history: [ChatLog.Message(role: .user, text: "Hi"), ChatLog.Message(role: .assistant, text: "Hello")],
+            historyLimit: 10, provider: provider, providerID: "fake", model: "fake", language: "en",
+            folder: folder) {}
+
+        let sent = try #require(provider.received.withLock { $0.last })
+        #expect(sent.map(\.role) == [.system, .user, .assistant, .user])
+        let user = try #require(sent.last).content
+        #expect(user.hasPrefix("<sources>\n<source n=\"1\">\nConversation 1: Weekly sync, "))
+        #expect(user.contains("<source n=\"2\">\nConversation 2: Retro, "))
+        #expect(user.hasSuffix("Question: When is the launch?"))
+        let messages = ChatLog.read(from: folder).messages
+        #expect(messages.map(\.role) == [.user, .assistant])
+        #expect(messages.map(\.text) == ["When is the launch?", "Friday [1 00:07]."])
+        #expect(messages.map(\.references) == [nil, references])
+        #expect(messages.last?.provider == "fake")
+    }
+
+    @Test
+    func libraryCitationsLinkKnownSourcesOnly() throws {
+        let id = UUID()
+        let references = [ChatLog.Reference(number: 1, conversationID: id, title: "Weekly sync")]
+        let text = "Friday [1 01:05], see [1] and [1, 1:02:03]; not [2 00:07] nor [1 00:07](https://x.org) or [ok [1]](https://y.org)."
+
+        let linked = LibraryCitation.linked(text, references: references)
+
+        #expect(linked == "Friday [1 01:05](echodiar-ref:\(id.uuidString):65), see [1](echodiar-ref:\(id.uuidString))"
+            + " and [1, 1:02:03](echodiar-ref:\(id.uuidString):3723); not [2 00:07] nor [1 00:07](https://x.org)"
+            + " or [ok [1]](https://y.org).")
+        #expect(LibraryCitation.linked(linked, references: references) == linked)
+        let url = try #require(URL(string: "echodiar-ref:\(id.uuidString):65"))
+        #expect(LibraryCitation.parse(url)?.id == id)
+        #expect(LibraryCitation.parse(url)?.seconds == 65)
+        #expect(LibraryCitation.parse(try #require(URL(string: "echodiar-ref:\(id.uuidString)")))?.seconds == nil)
+        #expect(LibraryCitation.parse(try #require(URL(string: "echodiar-ref:\(id.uuidString):90000"))) == nil)
+        #expect(LibraryCitation.parse(try #require(URL(string: "echodiar-ref:not-a-uuid"))) == nil)
+    }
+
+    @Test
     func stoppedSummarySavesAStoppedVersion() async throws {
         let conversation = try makeConversation()
         defer { try? FileManager.default.removeItem(at: conversation.folder) }

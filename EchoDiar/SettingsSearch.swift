@@ -101,6 +101,13 @@ struct SettingsSearchItem: Identifiable {
         .init(title: "CLIs", keywords: ["subscription", "command line", "terminal"] + presetNames(.cli),
               tab: .providers, subTab: "cli"),
 
+        // RAG
+        .init(title: "Ask across conversations", keywords: ["RAG", "global chat", "library", "search", "index"],
+              tab: .rag),
+        .init(title: "Embedding model", keywords: ["embedder", "Qwen3", "E5", "BGE-M3", "Apple", "API", "download"],
+              tab: .rag),
+        .init(title: "Rebuild index", keywords: ["reindex", "index status", "indexed conversations"], tab: .rag),
+
         // Storage
         .init(title: "Total", keywords: ["disk space", "usage", "size", "storage used"], tab: .storage, subTab: "usage"),
         .init(title: "Largest conversations", keywords: ["biggest", "size"], tab: .storage, subTab: "usage"),

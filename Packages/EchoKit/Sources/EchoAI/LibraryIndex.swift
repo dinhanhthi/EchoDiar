@@ -196,6 +196,19 @@ public actor LibraryIndex {
         return transcribed.filter { entries[$0.id]?.fingerprint != Self.fingerprint(folder: $0.folder) }
     }
 
+    /// Deletes, in every key's folder, the shards of conversations not in `conversations` or without a transcript,
+    /// and drops them from memory. Needs no loaded key, so trashed conversations lose their text without an embedder.
+    public func prune(_ conversations: [Conversation]) {
+        let keep = Set(conversations.filter(\.hasTranscript).map(\.id))
+        for name in (try? FileManager.default.contentsOfDirectory(atPath: root.path)) ?? [] {
+            for (id, url) in shardFiles(in: root.appendingPathComponent(name, isDirectory: true))
+            where !keep.contains(id) {
+                try? FileManager.default.removeItem(at: url)
+            }
+        }
+        entries = entries.filter { keep.contains($0.key) }
+    }
+
     /// Chunks the conversation, embeds every chunk as a passage in one call, and writes its shard. When another key
     /// is loaded meanwhile, nothing is written.
     public func index(
@@ -235,6 +248,18 @@ public actor LibraryIndex {
             entries = [:]
             dimension = nil
         }
+    }
+
+    /// Deletes the index folders of every key (RAG turned off, or an empty library) and empties memory; no key is
+    /// loaded after it.
+    public func removeAll() {
+        let fm = FileManager.default
+        for name in (try? fm.contentsOfDirectory(atPath: root.path)) ?? [] {
+            try? fm.removeItem(at: root.appendingPathComponent(name, isDirectory: true))
+        }
+        key = nil
+        entries = [:]
+        dimension = nil
     }
 
     /// Deletes the index folder of `key` (Rebuild); when it is loaded, memory is emptied and the key stays loaded.
