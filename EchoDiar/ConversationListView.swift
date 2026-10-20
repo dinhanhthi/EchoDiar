@@ -44,8 +44,8 @@ struct ConversationListView: View {
                     }
                 }
                 .padding(12)
-                .animation(Motion.standard, value: groups)
-                .animation(Motion.standard, value: model.isRecording)
+                .animation(reduceMotion ? nil : Motion.standard, value: groups)
+                .animation(reduceMotion ? nil : Motion.standard, value: model.isRecording)
             }
             .safeAreaInset(edge: .top, spacing: 0) {
                 if !selection.isEmpty {
@@ -59,7 +59,7 @@ struct ConversationListView: View {
                         .transition(cardTransition)
                 }
             }
-            .animation(Motion.standard, value: selection.isEmpty)
+            .animation(reduceMotion ? nil : Motion.standard, value: selection.isEmpty)
             // Cards that left the list (search filter, deletion) are not selected.
             .onChange(of: groups) { selection.prune(keeping: order) }
             // Esc cancels the selection instead of leaving the entry.
