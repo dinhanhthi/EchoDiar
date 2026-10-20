@@ -115,6 +115,28 @@
           </ul>
         </section>
 
+        <section id="performance">
+          <h2>Light on your Mac</h2>
+          <p>EchoDiar stays out of the way of your meeting. Measured with the release build on an M4 Pro Mac, recording a call:</p>
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr><th>While EchoDiar is</th><th>Memory</th><th>CPU</th></tr>
+              </thead>
+              <tbody>
+                <tr><td>Waiting in the menu bar</td><td>16 MB</td><td>0%</td></tr>
+                <tr><td>Recording, with the floating indicator</td><td>30 MB</td><td>3.5%</td></tr>
+                <tr><td>Recording, with the main window open</td><td>53 MB</td><td>8.5%</td></tr>
+              </tbody>
+            </table>
+          </div>
+          <ul class="list">
+            <li><strong>Models load only while they work</strong>: transcription, speaker and AI models are freed as soon as their job ends, and their memory goes back to macOS.</li>
+            <li><strong>Live captions</strong> keep a Whisper model (about 1 GB) in memory while you record, and free it while a recording stays paused.</li>
+          </ul>
+          <p class="note">CPU is a share of one core, averaged over 30 seconds. Numbers vary with the Mac and the meeting.</p>
+        </section>
+
         <section id="transcription">
           <h2>Transcription</h2>
           <ul class="list">
