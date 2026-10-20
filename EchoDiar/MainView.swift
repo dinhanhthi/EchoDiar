@@ -502,16 +502,16 @@ struct MainView: View {
     /// The page switches.
     private static let paneAnimation = Motion.standard
 
-    /// Pages slide in their order: a page further right comes in from the trailing edge. While the route is ahead of
-    /// `shownRoute` the direction comes from both: the leaving page keeps the transition it last rendered with.
+    /// Pages slide a little in their order: a page further right comes in from the trailing side. While the route is
+    /// ahead of `shownRoute` the direction comes from both: the leaving page keeps the transition it last rendered with.
     private var pageTransition: AnyTransition {
         if reduceMotion { return .opacity }
         let page = Page(model.route), shown = Page(shownRoute)
         let forward = page == shown ? forward : page.rawValue >= shown.rawValue
-        let (insertion, removal): (Edge, Edge) = forward ? (.trailing, .leading) : (.leading, .trailing)
+        let travel: CGFloat = forward ? 24 : -24
         return .asymmetric(
-            insertion: .move(edge: insertion).combined(with: .opacity),
-            removal: .move(edge: removal).combined(with: .opacity))
+            insertion: .offset(x: travel).combined(with: .opacity),
+            removal: .offset(x: -travel).combined(with: .opacity))
     }
 
     /// The wide layout: the compact cards (or the library chat) as a sidebar, then the shown conversation (its state

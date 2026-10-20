@@ -110,6 +110,7 @@ final class MainWindowSizer {
         animating = true
         NSAnimationContext.runAnimationGroup { context in
             context.duration = 0.25
+            context.timingFunction = CAMediaTimingFunction(controlPoints: 0.23, 1, 0.32, 1)
             window.animator().setFrame(target, display: true)
         } completionHandler: { [weak self, weak window] in
             MainActor.assumeIsolated {

@@ -80,13 +80,14 @@ struct TranscriptView: View {
 
     static let tabs: [AppModel.DetailTab] = [.transcript, .summary, .chat]
 
-    /// Moving right, the new body comes in from the trailing edge and the old one leaves by the leading edge; the
-    /// other way round moving left. Only a fade under Reduce Motion.
+    /// Moving right, the new body comes in a little from the trailing side and the old one leaves toward the leading
+    /// side; the other way round moving left. Only a fade under Reduce Motion.
     private var tabTransition: AnyTransition {
         if reduceMotion { return .opacity }
+        let travel: CGFloat = slidesForward ? 24 : -24
         return .asymmetric(
-            insertion: .move(edge: slidesForward ? .trailing : .leading),
-            removal: .move(edge: slidesForward ? .leading : .trailing)
+            insertion: .offset(x: travel),
+            removal: .offset(x: -travel)
         )
         .combined(with: .opacity)
     }
