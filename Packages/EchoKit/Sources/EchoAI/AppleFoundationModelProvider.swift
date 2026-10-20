@@ -23,7 +23,7 @@ public struct AppleFoundationModelProvider: LocalLLMProvider {
         case .unavailable(.appleIntelligenceNotEnabled):
             "Apple Intelligence is turned off (System Settings › Apple Intelligence & Siri)."
         case .unavailable(.modelNotReady):
-            "The Apple Intelligence model is still downloading. Try again later."
+            "The Apple Intelligence model is still downloading. Check its progress in System Settings › Apple Intelligence & Siri."
         case .unavailable:
             "Apple Foundation Models are not available on this Mac."
         }

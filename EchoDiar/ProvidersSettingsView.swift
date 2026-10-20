@@ -12,6 +12,8 @@ struct ProvidersSettingsView: View {
     @State private var scanning = false
     @State private var customLocalURL = ""
     @State private var cliStatus: [CLIPreset: CLIStatus] = [:]
+    /// Bumped by "Check Again" so the Foundation Models row reads its availability again.
+    @State private var foundationModelsCheck = 0
 
     /// Ids in `SettingsTab.providers.subTabs`; picked in the toolbar.
     private enum Tab: String {
@@ -81,18 +83,26 @@ struct ProvidersSettingsView: View {
 
     // MARK: - AI models
 
-    /// Models for summaries and chat: Apple Foundation Models' status (macOS 26), then the MLX downloads.
+    /// Models for summaries and chat: Apple Foundation Models' status (macOS 26) in its own box, then the MLX downloads.
+    @ViewBuilder
     private var llmSection: some View {
-        Section {
-            if #available(macOS 26, *), PlatformFeatures.foundationModels {
+        if #available(macOS 26, *), PlatformFeatures.foundationModels {
+            Section {
                 LabeledContent("Apple Foundation Models (system)") {
                     if let reason = AppleFoundationModelProvider.unavailableReason {
-                        Text(reason).foregroundStyle(.secondary)
+                        HStack {
+                            Text(reason).foregroundStyle(.secondary)
+                            Button("Check Again") { foundationModelsCheck += 1 }
+                                .controlSize(.small)
+                        }
                     } else {
                         Label("Available", systemImage: "checkmark.circle.fill").foregroundStyle(.green)
                     }
                 }
+                .id(foundationModelsCheck)
             }
+        }
+        Section {
             ForEach(Self.mlxEntries) { ModelRow(entry: $0, model: model) }
         } header: {
             Text("AI models (summaries and chat)")
