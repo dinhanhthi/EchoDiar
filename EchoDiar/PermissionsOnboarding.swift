@@ -181,6 +181,10 @@ private struct OnboardingView: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
+            Image(nsImage: NSApp.applicationIconImage)
+                .resizable()
+                .frame(width: 64, height: 64)
+                .frame(maxWidth: .infinity)
             HStack {
                 Text(Self.titles[step])
                     .font(.title2.weight(.semibold))
@@ -218,7 +222,7 @@ private struct OnboardingView: View {
         // Under the title bar's safe area: about as far below the traffic lights as Continue is above the bottom edge.
         .padding(.top, 12)
         .padding(.bottom, 20)
-        .frame(width: 520, height: 376)
+        .frame(width: 520, height: 456)
         .background(WindowGlass().ignoresSafeArea())
     }
 }
