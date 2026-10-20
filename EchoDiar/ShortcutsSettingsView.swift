@@ -39,13 +39,22 @@ struct ShortcutsSettingsView: View {
             Section("In EchoDiar") {
                 ForEach(Self.inAppShortcuts, id: \.action) { shortcut in
                     LabeledContent(shortcut.action) {
-                        Text(shortcut.keys).monospaced()
+                        keysText(shortcut.keys).monospaced()
                     }
                 }
             }
         }
         .formStyle(.grouped)
     }
+}
+
+/// The keys with a small gap after each modifier symbol, so "⇧⌘P" does not read as one glyph.
+private func keysText(_ keys: String) -> Text {
+    var text = AttributedString(keys)
+    for index in text.characters.indices where "⌃⌥⇧⌘".contains(text.characters[index]) {
+        text[index..<text.characters.index(after: index)].kern = 3
+    }
+    return Text(text)
 }
 
 /// Click, then press the new shortcut; Esc cancels. The registered shortcut is off while recording, so pressing it
@@ -59,8 +68,10 @@ private struct HotKeyRecorder: View {
         VStack(alignment: .trailing, spacing: 4) {
             HStack(spacing: 6) {
                 Button(action: toggle) {
-                    Text(monitor == nil ? model.settings.globalHotKey.displayString : "Press a shortcut…")
-                        .monospaced()
+                    Group {
+                        if monitor == nil { keysText(model.settings.globalHotKey.displayString) } else { Text("Press a shortcut…") }
+                    }
+                    .monospaced()
                         .frame(minWidth: 120)
                 }
                 .help(monitor == nil ? "Click to record a new shortcut" : "Press Esc to cancel")
