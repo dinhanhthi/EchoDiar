@@ -348,10 +348,10 @@ struct MainView: View {
     private static let titleMaxWidth: CGFloat = 360
     private static let titleMinWidth: CGFloat = 120
     /// Approximate widths of the other items: the traffic lights, Back and the record capsule; the tabs; Reveal in
-    /// Finder, Settings and Search.
+    /// Finder with Delete, Settings and Search.
     private static let leadingWidth: CGFloat = 250
     private static let tabsWidth: CGFloat = 240
-    private static let trailingButtonsWidth: CGFloat = 150
+    private static let trailingButtonsWidth: CGFloat = 200
 
     private var updateWidth: CGFloat { updater.updateAvailable ? 52 : 0 }
 
@@ -373,14 +373,24 @@ struct MainView: View {
     /// Too short a title is left out, also while the window grows into the wide layout.
     private var titleFits: Bool { titleWidth >= Self.titleMinWidth }
 
-    /// A conversation's Reveal in Finder, before Settings and Search; hidden with them while the search bar is open.
+    /// A conversation's Reveal in Finder and Delete menu (the audio or the whole conversation) in one capsule, before
+    /// Settings and Search; hidden with them while the search bar is open.
     @ToolbarContentBuilder private var revealItem: some ToolbarContent {
         if let conversation = toolbarConversation {
-            ToolbarItem {
-                SingleToolbarButton(title: "Reveal in Finder", systemImage: "folder") {
+            ToolbarItemGroup {
+                Button {
                     NSWorkspace.shared.activateFileViewerSelecting([conversation.folder])
+                } label: {
+                    Label("Reveal in Finder", systemImage: "folder")
                 }
                 .help("Reveal in Finder")
+                Menu {
+                    DeleteMenuItems(conversation: conversation, model: model)
+                } label: {
+                    Label("Delete", systemImage: "trash")
+                }
+                .disabled(!DeleteMenuItems.canDelete(conversation, model))
+                .help("Delete the audio or the whole conversation")
             }
             fixedSpacer
         }

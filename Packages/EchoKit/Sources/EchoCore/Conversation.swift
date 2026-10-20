@@ -34,6 +34,8 @@ public struct Conversation: Codable, Equatable, Identifiable, Sendable {
     public var sizeBytes: Int64
     /// The recording folder; not stored in the file.
     public var folder: URL
+    /// The folder still has audio files; not stored in the file, set by `LibraryStore`.
+    public var hasAudio = true
 
     public init(
         id: UUID,

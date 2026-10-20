@@ -5,7 +5,7 @@ import EchoTranscribe
 import SwiftUI
 
 /// One conversation of the library: source app icon, title (double-click to rename), time, duration, size and
-/// status, then a bottom row with the AI, Summary, Reveal in Finder and Delete buttons and the transcription progress
+/// status, then a bottom row with the AI, Summary, Reveal in Finder and Delete (audio or conversation) buttons and the transcription progress
 /// or its action. A click elsewhere opens the transcript. Compact (the wide layout's sidebar) drops the buttons, which
 /// stay in the context menu and the detail, and keeps the status, and a click keeps the detail's tab; selected adds an
 /// accent fill and stroke.
@@ -38,9 +38,21 @@ struct ConversationCard: View {
                         }
                         rowButton("Reveal in Finder", systemImage: "folder", action: revealInFinder)
                             .help("Reveal in Finder")
-                        rowButton("Delete", systemImage: "trash", action: delete)
-                            .disabled(!canDelete)
-                            .help("Move this conversation to the Trash")
+                        Menu {
+                            DeleteMenuItems(conversation: conversation, model: model)
+                        } label: {
+                            HStack(spacing: 3) {
+                                Image(systemName: "trash").font(.system(size: 15))
+                                MenuChevron()
+                            }
+                        }
+                        .menuStyle(.button)
+                        .buttonStyle(RowIconButtonStyle(capsule: true))
+                        .menuIndicator(.hidden)
+                        .foregroundStyle(.secondary)
+                        .fixedSize()
+                        .disabled(!DeleteMenuItems.canDelete(conversation, model))
+                        .help("Delete the audio or the whole conversation")
                     }
                     TranscriptionStatus(conversation: conversation, model: model)
                     Spacer(minLength: 0)
@@ -66,8 +78,8 @@ struct ConversationCard: View {
             Button("Rename", action: beginEditing)
             Button("Reveal in Finder", action: revealInFinder)
             Divider()
-            Button(model.settings.deleteWithoutConfirmation ? "Delete" : "Delete…", action: delete)
-                .disabled(!canDelete)
+            DeleteMenuItems(conversation: conversation, model: model)
+                .disabled(!DeleteMenuItems.canDelete(conversation, model))
         }
     }
 
@@ -82,12 +94,6 @@ struct ConversationCard: View {
         }
         .buttonStyle(RowIconButtonStyle())
         .foregroundStyle(.secondary)
-    }
-
-    /// Not while it is recorded, compressed or transcribed.
-    private var canDelete: Bool {
-        conversation.status != .recording && conversation.status != .compressing
-            && !model.isTranscribing(conversation.id)
     }
 
     @ViewBuilder private var title: some View {
@@ -126,6 +132,12 @@ struct ConversationCard: View {
                 Text(ByteCountFormatter.string(fromByteCount: conversation.sizeBytes, countStyle: .file))
             }
             if let badge = StatusBadge(status: conversation.status) { badge }
+            // A failed recording may never have had audio: its badge says so.
+            if !conversation.hasAudio && conversation.status != .recording && conversation.status != .failed {
+                Image(systemName: "speaker.slash")
+                    .help("Audio has been removed")
+                    .accessibilityLabel("Audio has been removed")
+            }
         }
         .font(.caption)
         .foregroundStyle(.secondary)
@@ -154,23 +166,52 @@ struct ConversationCard: View {
         NSWorkspace.shared.activateFileViewerSelecting([conversation.folder])
     }
 
-    /// Asks first unless "Delete conversations without confirmation" is on.
-    private func delete() {
-        if model.settings.deleteWithoutConfirmation {
-            model.deleteConversation(conversation.id)
+}
+
+/// Delete's choices: the audio only (most of the size, often useless once transcribed) or the whole conversation,
+/// each asked first unless "Delete conversations without confirmation" is on. In the card's menu and context menu,
+/// the conversation's toolbar and Storage's largest conversations.
+struct DeleteMenuItems: View {
+    let conversation: Conversation
+    let model: AppModel
+
+    /// Not while it is recorded, compressed or transcribed.
+    static func canDelete(_ conversation: Conversation, _ model: AppModel) -> Bool {
+        conversation.status != .recording && conversation.status != .compressing
+            && !model.isTranscribing(conversation.id)
+    }
+
+    var body: some View {
+        let asks = !model.settings.deleteWithoutConfirmation
+        if conversation.hasAudio {
+            Button(asks ? "Delete audio only…" : "Delete audio only") { Self.delete(audioOnly: true, conversation, model) }
         } else {
-            confirmDelete()
+            Button("Audio has been removed") {}.disabled(true)
+        }
+        Button(asks ? "Delete conversation…" : "Delete conversation") {
+            Self.delete(audioOnly: false, conversation, model)
         }
     }
 
-    private func confirmDelete() {
-        let alert = NSAlert()
-        alert.messageText = "Delete \"\(conversation.title)\"?"
-        alert.informativeText = "The recording and its files are moved to the Trash."
-        alert.addButton(withTitle: "Delete").hasDestructiveAction = true
-        alert.addButton(withTitle: "Cancel")
-        guard alert.runModal() == .alertFirstButtonReturn else { return }
-        model.deleteConversation(conversation.id)
+    static func delete(audioOnly: Bool, _ conversation: Conversation, _ model: AppModel) {
+        if !model.settings.deleteWithoutConfirmation {
+            let alert = NSAlert()
+            if audioOnly {
+                alert.messageText = "Delete the audio of \"\(conversation.title)\"?"
+                alert.informativeText = "The audio is moved to the Trash. The transcript, summary and chat stay; playback and re-transcribing are no longer possible."
+            } else {
+                alert.messageText = "Delete \"\(conversation.title)\"?"
+                alert.informativeText = "The recording and its files are moved to the Trash."
+            }
+            alert.addButton(withTitle: "Delete").hasDestructiveAction = true
+            alert.addButton(withTitle: "Cancel")
+            guard alert.runModal() == .alertFirstButtonReturn else { return }
+        }
+        if audioOnly {
+            Task { await model.deleteAudio(of: conversation.id) }
+        } else {
+            model.deleteConversation(conversation.id)
+        }
     }
 }
 
@@ -218,7 +259,9 @@ struct TranscriptionStatus: View {
                     .buttonStyle(RowTextButtonStyle())
                     .foregroundStyle(.red)
                     .lineLimit(1)
-                    .help("Transcription failed — transcribe this conversation again")
+                    .disabled(!conversation.hasAudio)
+                    .help(conversation.hasAudio
+                          ? "Transcription failed — transcribe this conversation again" : "Audio has been removed")
                 Menu {
                     EngineMenuItems(title: "Retry with another engine", model: model) {
                         model.transcribe(conversation.id, engineID: $0)
@@ -231,7 +274,8 @@ struct TranscriptionStatus: View {
                 .menuIndicator(.hidden)
                 .fixedSize()
                 .foregroundStyle(.secondary)
-                .help("Retry with another engine")
+                .disabled(!conversation.hasAudio)
+                .help(conversation.hasAudio ? "Retry with another engine" : "Audio has been removed")
             }
             .fixedSize()
         } else if conversation.status == .ready || conversation.status == .transcribing, !conversation.hasTranscript {
@@ -239,7 +283,8 @@ struct TranscriptionStatus: View {
                 .buttonStyle(RowTextButtonStyle())
                 .fixedSize()
                 .foregroundStyle(.secondary)
-                .help("Transcribe this conversation")
+                .disabled(!conversation.hasAudio)
+                .help(conversation.hasAudio ? "Transcribe this conversation" : "Audio has been removed")
         }
     }
 

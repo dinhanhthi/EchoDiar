@@ -26,21 +26,28 @@ enum Palette {
 /// The icon buttons of a row: a round highlight on hover, darker and a bit smaller while pressed. The highlight
 /// reaches past the label without changing the row's layout.
 struct RowIconButtonStyle: ButtonStyle {
+    /// A capsule highlight, for a label wider than an icon (an icon and a menu chevron).
+    var capsule = false
+
     func makeBody(configuration: Configuration) -> some View {
-        Highlight(configuration: configuration)
+        Highlight(configuration: configuration, capsule: capsule)
     }
 
     private struct Highlight: View {
         let configuration: ButtonStyleConfiguration
+        let capsule: Bool
         @State private var hovered = false
         @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
         var body: some View {
+            let fill = configuration.isPressed ? Palette.pressedFill : hovered ? Palette.hoverFill : .clear
             configuration.label
                 .background {
-                    Circle()
-                        .fill(configuration.isPressed ? Palette.pressedFill : hovered ? Palette.hoverFill : .clear)
-                        .padding(-5)
+                    if capsule {
+                        Capsule().fill(fill).padding(-5)
+                    } else {
+                        Circle().fill(fill).padding(-5)
+                    }
                 }
                 .contentShape(Rectangle())
                 .scaleEffect(configuration.isPressed && !reduceMotion ? 0.88 : 1)

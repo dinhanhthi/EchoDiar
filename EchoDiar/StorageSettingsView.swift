@@ -2,8 +2,9 @@ import AppKit
 import EchoCore
 import SwiftUI
 
-/// The Storage tab, one inner tab per section: disk usage by kind and the largest conversations with the data folder,
-/// deleting the audio of transcribed conversations and compression, and auto-delete with a preview.
+/// The Storage tab, one inner tab per section: disk usage by kind (each deleted at once after a confirmation) and the
+/// largest conversations (their audio or the whole) with the data folder, deleting the audio of transcribed
+/// conversations and compression, and auto-delete with a preview.
 struct StorageSettingsView: View {
     let model: AppModel
     @State private var usage: LibraryStore.Usage?
@@ -14,6 +15,12 @@ struct StorageSettingsView: View {
     @State private var pendingChange: PendingChange?
     @State private var confirmingAudioDelete = false
     @State private var deleting = false
+    /// A usage row's Delete, waiting for its confirmation.
+    @State private var bulkDeletion: BulkDeletion?
+
+    private enum BulkDeletion {
+        case audio, transcriptsAndAI, models
+    }
 
     /// Ids in `SettingsTab.storage.subTabs`; picked in the toolbar.
     private enum Tab: String {
@@ -56,6 +63,15 @@ struct StorageSettingsView: View {
         } message: {
             Text("The audio files are moved to the Trash. Transcripts, summaries and chats stay.")
         }
+        .alert(bulkTitle, isPresented: Binding(
+            get: { bulkDeletion != nil },
+            set: { if !$0 { bulkDeletion = nil } }
+        ), presenting: bulkDeletion) { deletion in
+            Button("Delete", role: .destructive) { deleteAll(deletion) }
+            Button("Cancel", role: .cancel) {}
+        } message: { deletion in
+            Text(bulkMessage(deletion))
+        }
         .alert("Turn on auto-delete?", isPresented: $confirmingAutoDelete) {
             Button(preview.isEmpty ? "Turn On" : "Turn On and Delete", role: .destructive) {
                 model.updateSettings { $0.autoDeleteEnabled = true }
@@ -89,23 +105,30 @@ struct StorageSettingsView: View {
         Section {
             if let usage {
                 UsageBar(usage: usage)
-                usageRow("Audio", usage.audio, color: .blue)
-                usageRow("Transcripts and AI", usage.transcriptsAndAI, color: .green)
-                usageRow("Models", usage.models, color: .orange)
+                usageRow("Audio", usage.audio, color: .blue, delete: .audio, disabled: audioCandidates.isEmpty)
+                usageRow("Transcripts and AI", usage.transcriptsAndAI, color: .green, delete: .transcriptsAndAI,
+                         disabled: transcriptCandidates.isEmpty)
+                usageRow("Models", usage.models, color: .orange, delete: .models,
+                         disabled: model.deletableModelIDs.isEmpty || model.isRecording || model.aiJob != nil
+                            || model.transcriptionProgress.keys.contains(where: model.isTranscribing))
                 LabeledContent("Total") {
-                    Text(Self.bytes(usage.total)).monospacedDigit().fontWeight(.semibold)
+                    HStack(spacing: 10) {
+                        Text(Self.bytes(usage.total)).monospacedDigit().fontWeight(.semibold)
+                        Color.clear.frame(width: Self.trashWidth, height: 1)
+                    }
                 }
                 if !usage.conversations.isEmpty {
                     DisclosureGroup("Largest conversations") {
-                        VStack(alignment: .leading, spacing: 8) {
-                            ForEach(usage.conversations.prefix(Self.largestCount)) { conversation in
-                                LabeledContent(conversation.title) {
-                                    Text(Self.bytes(conversation.total)).monospacedDigit()
-                                }
-                                .lineLimit(1)
+                        let largest = usage.conversations.prefix(Self.largestCount)
+                        VStack(alignment: .leading, spacing: 12) {
+                            ForEach(largest) { usage in
+                                LargestConversationRow(
+                                    usage: usage, largest: largest.first?.total ?? 0,
+                                    conversation: model.conversations.first { $0.id == usage.id }, model: model)
                             }
                         }
                         .padding(.leading, TitleChevronDisclosureStyle.indent)
+                        .padding(.top, 6)
                     }
                     .disclosureGroupStyle(TitleChevronDisclosureStyle())
                 }
@@ -115,9 +138,24 @@ struct StorageSettingsView: View {
         }
     }
 
-    private func usageRow(_ title: String, _ bytes: Int64, color: Color) -> some View {
+    /// The trash button's width; the Total row leaves it empty so the sizes line up.
+    private static let trashWidth: CGFloat = 16
+
+    private func usageRow(
+        _ title: String, _ bytes: Int64, color: Color, delete: BulkDeletion, disabled: Bool
+    ) -> some View {
         LabeledContent {
-            Text(Self.bytes(bytes)).monospacedDigit()
+            HStack(spacing: 10) {
+                Text(Self.bytes(bytes)).monospacedDigit()
+                Button { bulkDeletion = delete } label: {
+                    Image(systemName: "trash")
+                }
+                .buttonStyle(.borderless)
+                .frame(width: Self.trashWidth)
+                .disabled(disabled || deleting)
+                .help(Self.deleteHelp(delete))
+                .accessibilityLabel(Self.deleteHelp(delete))
+            }
         } label: {
             Label {
                 Text(title)
@@ -177,6 +215,77 @@ struct StorageSettingsView: View {
                 Text("Keep uncompressed audio")
                 Text("Keeps the original CAF next to the compressed file (about 10 times larger).")
             }
+        }
+    }
+
+    // MARK: - Delete by kind
+
+    /// Conversations with audio that can lose it now (not recorded, compressed or transcribed).
+    private var audioCandidates: [Conversation] {
+        model.conversations.filter { $0.hasAudio && DeleteMenuItems.canDelete($0, model) }
+    }
+
+    /// Conversations with a transcript, summary or chat to delete, or without audio (deleted whole).
+    private var transcriptCandidates: [Conversation] {
+        model.conversations.filter {
+            DeleteMenuItems.canDelete($0, model) && ($0.hasTranscript || $0.hasSummary || !$0.hasAudio)
+        }
+    }
+
+    private static func deleteHelp(_ deletion: BulkDeletion) -> String {
+        switch deletion {
+        case .audio: "Delete the audio of every conversation"
+        case .transcriptsAndAI: "Delete every transcript, summary and chat"
+        case .models: "Delete every downloaded model"
+        }
+    }
+
+    private var bulkTitle: String {
+        switch bulkDeletion {
+        case .audio?: "Delete the audio of \(countText(audioCandidates.count))?"
+        case .transcriptsAndAI?: "Delete the transcripts, summaries and chats of \(countText(transcriptCandidates.count))?"
+        case .models?:
+            model.deletableModelIDs.count == 1 ? "Delete 1 downloaded model?"
+                : "Delete \(model.deletableModelIDs.count) downloaded models?"
+        case nil: ""
+        }
+    }
+
+    private func bulkMessage(_ deletion: BulkDeletion) -> String {
+        switch deletion {
+        case .audio:
+            let untranscribed = audioCandidates.filter { !$0.hasTranscript }.count
+            let note = untranscribed == 0 ? ""
+                : "\n\n\(untranscribed == 1 ? "1 of them has" : "\(untranscribed) of them have") no transcript yet: nothing of it will be left to read."
+            return "The audio files are moved to the Trash. Transcripts, summaries and chats stay; playback and re-transcribing are no longer possible." + note
+        case .transcriptsAndAI:
+            let withoutAudio = transcriptCandidates.filter { !$0.hasAudio }.count
+            let note = withoutAudio == 0 ? ""
+                : "\n\n\(countText(withoutAudio)) without audio would be left empty: \(withoutAudio == 1 ? "it is" : "they are") moved to the Trash entirely."
+            return "They are moved to the Trash. The audio stays, so the conversations can be transcribed again." + note
+        case .models:
+            return "The transcription, speaker and AI models are removed from this Mac (not moved to the Trash). Download them again in Settings › Transcription and Settings › AI."
+        }
+    }
+
+    private func deleteAll(_ deletion: BulkDeletion) {
+        switch deletion {
+        case .audio:
+            let ids = audioCandidates.map(\.id)
+            deleting = true
+            Task {
+                await model.deleteAudio(of: ids)
+                deleting = false
+            }
+        case .transcriptsAndAI:
+            let ids = transcriptCandidates.map(\.id)
+            deleting = true
+            Task {
+                await model.deleteTranscriptsAndAI(of: ids)
+                deleting = false
+            }
+        case .models:
+            model.deleteAllModels()
         }
     }
 
@@ -329,7 +438,7 @@ struct StorageSettingsView: View {
     /// its files do (audio deleted, summary written).
     private var libraryKey: [LibraryEntry] {
         model.conversations.map {
-            LibraryEntry(id: $0.id, status: $0.status, hasTranscript: $0.hasTranscript,
+            LibraryEntry(id: $0.id, status: $0.status, hasTranscript: $0.hasTranscript, hasAudio: $0.hasAudio,
                          size: $0.status == .transcribed ? $0.sizeBytes : nil)
         }
     }
@@ -338,6 +447,7 @@ struct StorageSettingsView: View {
         let id: UUID
         let status: Conversation.Status
         let hasTranscript: Bool
+        let hasAudio: Bool
         let size: Int64?
     }
 
@@ -352,6 +462,52 @@ struct StorageSettingsView: View {
         let days: Int
         let mode: RetentionMode
         let library: [LibraryEntry]
+    }
+}
+
+/// One of the largest conversations: its title and size over a bar as long as its share of the largest one, audio
+/// and the rest in the usage bar's colors, with a Delete menu (its audio or the whole conversation).
+private struct LargestConversationRow: View {
+    let usage: LibraryStore.ConversationUsage
+    let largest: Int64
+    /// Nil once it left the library, until the usage is measured again.
+    let conversation: Conversation?
+    let model: AppModel
+
+    var body: some View {
+        HStack(spacing: 10) {
+            VStack(alignment: .leading, spacing: 5) {
+                HStack(alignment: .firstTextBaseline) {
+                    Text(usage.title).lineLimit(1).truncationMode(.middle)
+                    Spacer(minLength: 8)
+                    Text(StorageSettingsView.bytes(usage.total))
+                        .monospacedDigit()
+                        .foregroundStyle(.secondary)
+                }
+                GeometryReader { proxy in
+                    let width = largest > 0 ? proxy.size.width * CGFloat(usage.total) / CGFloat(largest) : 0
+                    let audio = usage.total > 0 ? width * CGFloat(usage.audio) / CGFloat(usage.total) : 0
+                    HStack(spacing: 0) {
+                        Rectangle().fill(.blue).frame(width: audio)
+                        Rectangle().fill(.green).frame(width: max(0, width - audio))
+                    }
+                    .clipShape(Capsule())
+                }
+                .frame(height: 4)
+                .background(Palette.hoverFill, in: Capsule())
+                .accessibilityHidden(true)
+            }
+            Menu {
+                if let conversation { DeleteMenuItems(conversation: conversation, model: model) }
+            } label: {
+                Image(systemName: "trash")
+            }
+            .menuStyle(.borderlessButton)
+            .fixedSize()
+            .disabled(conversation.map { !DeleteMenuItems.canDelete($0, model) } ?? true)
+            .help("Delete the audio or the whole conversation")
+            .accessibilityLabel("Delete \(usage.title)")
+        }
     }
 }
 

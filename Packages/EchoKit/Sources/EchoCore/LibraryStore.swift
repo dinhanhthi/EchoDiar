@@ -55,6 +55,7 @@ public actor LibraryStore {
         conversation.customTitle = true
         try conversation.write()
         conversation.sizeBytes = current.sizeBytes
+        conversation.hasAudio = current.hasAudio
         conversations[index] = conversation
         emit()
     }
@@ -76,7 +77,34 @@ public actor LibraryStore {
         }
         var conversation = (try? Conversation.read(from: current.folder)) ?? current
         conversation.sizeBytes = Self.sizeOnDisk(of: current.folder)
+        conversation.hasAudio = false
         if FileManager.default.fileExists(atPath: current.folder.appendingPathComponent(Conversation.fileName).path) {
+            try conversation.write()
+        }
+        conversations[index] = conversation
+        emit()
+    }
+
+    /// Moves the transcript, summary and chat to the Trash; the conversation is ready to transcribe again. Without
+    /// audio nothing would be left, so the whole conversation goes to the Trash instead.
+    public func deleteTranscriptsAndAI(id: UUID) throws {
+        guard let index = conversations.firstIndex(where: { $0.id == id }) else { throw LibraryError.notFound(id) }
+        let current = conversations[index]
+        guard current.hasAudio else { return try delete(id: id) }
+        let fm = FileManager.default
+        for name in [Transcript.fileName, Conversation.summaryFileName, ChatLog.fileName] {
+            let url = current.folder.appendingPathComponent(name)
+            if fm.fileExists(atPath: url.path) { try fm.trashItem(at: url, resultingItemURL: nil) }
+        }
+        var conversation = (try? Conversation.read(from: current.folder)) ?? current
+        conversation.hasTranscript = false
+        conversation.hasSummary = false
+        if conversation.status == .transcribed || conversation.status == .transcriptionFailed {
+            conversation.status = .ready
+        }
+        conversation.sizeBytes = Self.sizeOnDisk(of: current.folder)
+        conversation.hasAudio = current.hasAudio
+        if fm.fileExists(atPath: current.folder.appendingPathComponent(Conversation.fileName).path) {
             try conversation.write()
         }
         conversations[index] = conversation
@@ -226,6 +254,7 @@ public actor LibraryStore {
             return nil
         }
         conversation.sizeBytes = sizeOnDisk(of: folder)
+        conversation.hasAudio = !audioFiles(in: folder).isEmpty
         return conversation
     }
 

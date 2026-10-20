@@ -575,7 +575,8 @@ final class AppModel {
     /// engine id, nil = the default resolution; `language` replaces the recording's language markers, nil keeps them): queues the
     /// conversation unless a job for it is already active.
     func transcribe(_ id: UUID, engineID: String? = nil, language: String? = nil) {
-        guard !isTranscribing(id), let conversation = conversations.first(where: { $0.id == id }) else { return }
+        guard !isTranscribing(id), let conversation = conversations.first(where: { $0.id == id }),
+              conversation.hasAudio else { return }
         if let language { rememberLanguage(language) }
         submitTranscription(folder: conversation.folder, engineID: engineID, language: language)
     }
@@ -931,6 +932,32 @@ final class AppModel {
     /// Storage tab: moves the audio of these conversations to the Trash, skipping any that got a job meanwhile.
     func deleteAudio(of ids: [UUID]) async {
         for id in ids where !isBusy(id) { await deleteAudio(of: id) }
+    }
+
+    /// Storage tab: moves the transcripts, summaries and chats of these conversations to the Trash (the whole
+    /// conversation when its audio is gone), skipping any that got a job meanwhile.
+    func deleteTranscriptsAndAI(of ids: [UUID]) async {
+        for id in ids where !isBusy(id) {
+            let whole = conversations.first { $0.id == id }?.hasAudio == false
+            if whole, route == .conversation(id) { route = .list }
+            do {
+                try await library.deleteTranscriptsAndAI(id: id)
+            } catch {
+                NSLog("EchoDiar: could not delete the transcript of conversation \(id): \(error)")
+            }
+        }
+    }
+
+    /// Storage tab: the downloaded models (not the built-in ones, nor one still downloading), which "Delete all"
+    /// removes.
+    var deletableModelIDs: [String] {
+        ModelCatalog.all.filter { $0.repo != nil && installedModelIDs.contains($0.id) && downloads[$0.id] == nil }
+            .map(\.id)
+    }
+
+    /// Storage tab: removes every downloaded model.
+    func deleteAllModels() {
+        for id in deletableModelIDs { deleteModel(id) }
     }
 
     // MARK: - Settings

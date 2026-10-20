@@ -30,8 +30,6 @@ struct TranscriptView: View {
     @State private var retranscribeLanguage = ""
     /// The segment the list scrolls to, set by an AI citation; cleared once scrolled.
     @State private var scrollTarget: UUID?
-    /// The folder still has audio: false once Storage or auto-delete moved it to the Trash (no Play, no Re-transcribe).
-    @State private var hasAudio = true
     /// The tab whose body is shown: follows `model.detailTab` one update later, so `forward` is set before the bodies
     /// swap and both the outgoing and the incoming body slide the same way.
     @State private var shownTab: AppModel.DetailTab
@@ -171,7 +169,7 @@ struct TranscriptView: View {
             }
             Spacer(minLength: 8)
             actions
-            if hasAudio { transport }
+            if conversation.hasAudio { transport } else { audioRemovedNote }
         }
     }
 
@@ -230,13 +228,22 @@ struct TranscriptView: View {
         .buttonStyle(BottomBarButtonStyle(prominent: true))
         .fixedSize()
         .disabled(!canTranscribe)
-        .help("Re-transcribe with another model or language")
+        .help(conversation.hasAudio ? "Re-transcribe with another model or language" : "Audio has been removed")
     }
 
     /// Not while a job runs, the audio is still being recorded or compressed, or it was deleted.
     private var canTranscribe: Bool {
-        hasAudio && !model.isTranscribing(conversation.id) && conversation.status != .recording
+        conversation.hasAudio && !model.isTranscribing(conversation.id) && conversation.status != .recording
             && conversation.status != .compressing && conversation.status != .failed
+    }
+
+    /// In place of the transport once the audio was moved to the Trash (from a Delete menu, Storage or auto-delete).
+    private var audioRemovedNote: some View {
+        Label("Audio has been removed", systemImage: "speaker.slash")
+            .font(.caption)
+            .foregroundStyle(.secondary)
+            .fixedSize()
+            .help("Playback and re-transcribing are no longer possible. The transcript, summary and chat stay.")
     }
 
     private var transport: some View {
@@ -428,22 +435,22 @@ struct TranscriptView: View {
     // MARK: - Actions
 
     /// Reads the transcript and resolves the audio file off the main thread; runs again when the conversation
-    /// changes (e.g. a re-transcription finished). No playback while the audio is being recorded or compressed.
+    /// changes (e.g. a re-transcription finished). No playback while the audio is being recorded or compressed, or
+    /// once it was deleted (which stops it).
     private func load() async {
         let folder = conversation.folder
         let wantsTranscript = conversation.hasTranscript
-        let playable = conversation.status != .recording && conversation.status != .compressing
-        let (loaded, audio, hasAudio) = await Task.detached(priority: .utility) {
+        let playable = conversation.hasAudio && conversation.status != .recording && conversation.status != .compressing
+        let (loaded, audio) = await Task.detached(priority: .utility) {
             let transcript = wantsTranscript ? try? Transcript.read(from: folder) : nil
             let audio = playable
                 ? (try? RecordingSession.read(from: folder)).flatMap {
                     ConversationFiles.audioURL(in: folder, fileName: $0.audioFileName)
                 }
                 : nil
-            return (transcript, audio, !LibraryStore.audioFiles(in: folder).isEmpty)
+            return (transcript, audio)
         }.value
         guard !Task.isCancelled else { return }
-        self.hasAudio = hasAudio
         transcript = loaded
         speakers = loaded.map(Self.speakers) ?? []
         loadFailed = wantsTranscript && loaded == nil

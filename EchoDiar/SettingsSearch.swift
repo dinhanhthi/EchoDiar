@@ -73,6 +73,8 @@ struct SettingsSearchItem: Identifiable {
               tab: .transcription, subTab: "general"),
         .init(title: "Live transcript engine", keywords: ["captions", "real-time", "Whisper", "Nemotron"],
               tab: .transcription, subTab: "general"),
+        .init(title: "Delete audio after transcription", keywords: ["remove audio", "trash", "save space"],
+              tab: .transcription, subTab: "general"),
         .init(title: "Transcription models", keywords: ["download", "Whisper", "fast", "balanced", "quality"],
               tab: .transcription, subTab: "transcriptionModels"),
         .init(title: "Cloud transcription engines", keywords: ["upload", "API", "default engine"]

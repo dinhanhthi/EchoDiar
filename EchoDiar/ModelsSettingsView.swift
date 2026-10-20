@@ -3,10 +3,10 @@ import EchoCore
 import EchoTranscribe
 import SwiftUI
 
-/// The Transcription tab, one inner tab per section: the default language with the live transcript switch and engine,
-/// the transcription models (local by tier, then cloud: the configured engines and the speech-to-text APIs), and the
-/// diarization models by tier, with Download, Cancel, Delete and Set default. Rows that cannot transcribe the default
-/// language are disabled with a note.
+/// The Transcription tab, one inner tab per section: the default language with the live transcript switch and engine
+/// and deleting the audio after transcription, the transcription models (local by tier, then cloud: the configured
+/// engines and the speech-to-text APIs), and the diarization models by tier, with Download, Cancel, Delete and Set
+/// default. Rows that cannot transcribe the default language are disabled with a note.
 struct ModelsSettingsView: View {
     let model: AppModel
 
@@ -64,6 +64,11 @@ struct ModelsSettingsView: View {
             } label: {
                 Text("Live transcript engine")
                 Text("Nemotron is recommended for Vietnamese live captions (Vietnamese is experimental). Without the picked model installed, another installed live model is used.")
+            }
+            // Also in Storage › Audio: the same setting.
+            Toggle(isOn: model.setting(\.deleteAudioAfterTranscription)) {
+                Text("Delete audio after transcription")
+                Text("Moves the audio to the Trash once a transcription succeeds.")
             }
         }
     }
