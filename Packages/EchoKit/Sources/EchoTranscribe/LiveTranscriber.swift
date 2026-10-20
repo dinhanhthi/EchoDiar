@@ -44,8 +44,11 @@ public actor LiveTranscriber {
     public static let preferredModelID = AppSettings.defaultLiveTranscriptEngine
     static let maxLines = 200
     static let defaultWindowSeconds = 10
-    /// The end of a window is decoded again at the start of the next, so a word cut at the boundary is not lost.
+    /// WhisperKit decodes at least the last second of a window again at the start of the next, so a word cut at the
+    /// boundary is not lost; a sentence still running there is held back from its start (see `cut`).
     static let overlapSeconds = 1
+    /// The most a sentence running into the window end is held back; a longer one is shown as decoded.
+    static let maxKeepSeconds = 5
 
     /// Every change, for a single consumer; finished by `stop()`.
     public nonisolated let updates: AsyncStream<Snapshot>
@@ -128,7 +131,7 @@ public actor LiveTranscriber {
         if entry.id == NemotronStreamingEngine.entryID {
             let engine = try await NemotronStreamingEngine.load(folder: folder, channels: 2)
             buffer.withLock { $0.resize(windowSamples: engine.windowSamples) }
-            await listen(overlap: 0) { await transcribe($0, with: engine) }
+            await listen(overlap: 0) { Decoded(lines: await transcribe($0, with: engine)) }
             await engine.unload()
         } else {
             let whisper = try await WhisperKitEngine.load(entry: entry, folder: folder)
@@ -137,23 +140,29 @@ public actor LiveTranscriber {
         }
     }
 
-    /// Decodes every full window until `stop()`.
-    private nonisolated func listen(overlap: Int, _ transcribe: (Window) async -> [(Speaker, String)]) async {
+    /// Decodes every full window until `stop()`, then puts its tail back for the next one. When the tail no longer
+    /// fits, the held lines are shown at once and only `overlap` samples (or what fits) go back.
+    private nonisolated func listen(overlap: Int, _ transcribe: (Window) async -> Decoded) async {
         await publish(.listening)
         for await _ in wake {
-            while let window = buffer.withLock({ $0.take(keeping: overlap) }) {
-                let lines = await transcribe(window)
+            while let window = buffer.withLock({ $0.take() }) {
+                let decoded = await transcribe(window)
+                var lines = decoded.lines
+                if !buffer.withLock({ $0.restore(window, keep: decoded.keep, overlap: overlap) }) {
+                    lines += decoded.held
+                }
                 if !lines.isEmpty { await add(lines) }
             }
         }
     }
 
-    /// Speech of each non-silent channel, in start order across both.
-    private nonisolated func transcribe(_ window: Window, with whisper: WhisperKit) async -> [(Speaker, String)] {
+    /// Speech of each non-silent channel, in start order across both; segments from the cut on are held back and
+    /// the window is kept from there, so they are decoded again whole with the next audio.
+    private nonisolated func transcribe(_ window: Window, with whisper: WhisperKit) async -> Decoded {
         let code = language().flatMap { $0.isEmpty || $0.lowercased() == "auto" ? nil : WhisperKitEngine.whisperLanguage($0) }
         let options = DecodingOptions(
             language: code, detectLanguage: code == nil, skipSpecialTokens: true, wordTimestamps: false)
-        var found: [(start: Float, speaker: Speaker, text: String)] = []
+        var found: [(start: Float, end: Float, speaker: Speaker, text: String)] = []
         for (speaker, samples) in [(Speaker.me, window.mic), (.others, window.system)]
         where Self.peak(samples) >= TranscriptionPipeline.silencePeak {
             guard let results = try? await whisper.transcribe(audioArray: samples, decodeOptions: options) else {
@@ -161,10 +170,29 @@ public actor LiveTranscriber {
             }
             for segment in results.flatMap(\.segments) {
                 let text = WhisperKitEngine.speechText(segment.text)
-                if !text.isEmpty { found.append((segment.start, speaker, text)) }
+                guard !text.isEmpty, !WhisperKitEngine.isSilent(samples, from: segment.start, to: segment.end) else {
+                    continue
+                }
+                found.append((segment.start, segment.end, speaker, text))
             }
         }
-        return found.sorted { $0.start < $1.start }.map { ($0.speaker, $0.text) }
+        found.sort { $0.start < $1.start }
+        let rate = Float(WhisperKit.sampleRate)
+        let seconds = Float(window.mic.count) / rate
+        let cut = Self.cut(found.map { (start: $0.start, end: $0.end) }, window: seconds)
+        return Decoded(
+            lines: found.filter { $0.start < cut }.map { ($0.speaker, $0.text) },
+            held: found.filter { $0.start >= cut }.map { ($0.speaker, $0.text) },
+            keep: Int(((seconds - cut) * rate).rounded()))
+    }
+
+    /// Where a window's shown text ends (seconds): `overlapSeconds` before its end, moved back to the start of any
+    /// span still running there, unless that holds back more than `maxKeepSeconds` (non-stop speech).
+    static func cut(_ spans: [(start: Float, end: Float)], window: Float) -> Float {
+        let overlap = window - Float(overlapSeconds)
+        var cut = overlap
+        while let span = spans.first(where: { $0.start < cut && cut < $0.end }) { cut = span.start }
+        return cut < window - Float(maxKeepSeconds) ? overlap : cut
     }
 
     /// Text of each non-silent channel's stream, mic first.
@@ -238,6 +266,13 @@ public actor LiveTranscriber {
         var system: [Float]
     }
 
+    /// Lines to show now, lines held back (decoded again from the kept tail), and the samples kept from the end.
+    private struct Decoded {
+        var lines: [(Speaker, String)]
+        var held: [(Speaker, String)] = []
+        var keep = 0
+    }
+
     /// Both channels grow in step (the writer writes equal frames per channel).
     private struct Buffer {
         var mic: [Float] = []
@@ -262,13 +297,26 @@ public actor LiveTranscriber {
             system.removeFirst(max(0, system.count - windowSamples))
         }
 
-        /// The full window, leaving its last `overlap` samples for the next one.
-        mutating func take(keeping overlap: Int) -> Window? {
+        /// The full window, leaving nothing: `restore` puts back the tail to decode again once it is decoded.
+        mutating func take() -> Window? {
             guard !closed, mic.count >= windowSamples else { return nil }
             let window = Window(mic: mic, system: system)
-            mic = Array(mic.suffix(overlap))
-            system = Array(system.suffix(overlap))
+            mic = []
+            system = []
             return window
+        }
+
+        /// Puts the last `keep` samples of `window` back in front of what arrived while it was decoded. False when
+        /// they no longer fit (`append` would drop them first): then only its last `overlap` samples, or what fits.
+        /// Also false once closed, so held lines are still shown when `stop()` lands mid-decode.
+        mutating func restore(_ window: Window, keep: Int, overlap: Int) -> Bool {
+            guard !closed else { return false }
+            let room = max(0, windowSamples - mic.count)
+            let fits = keep <= room
+            let count = fits ? keep : min(overlap, room)
+            mic = window.mic.suffix(count) + mic
+            system = window.system.suffix(count) + system
+            return fits
         }
 
         mutating func close() {

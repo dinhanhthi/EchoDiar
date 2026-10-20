@@ -1,3 +1,4 @@
+import Accelerate
 import EchoCore
 import Foundation
 import WhisperKit
@@ -10,6 +11,9 @@ public struct WhisperKitEngine: TranscriptionEngine {
     public static let supportedLanguages = Array(Constants.languageCodes)
     /// Audio read into memory at once: 10 min of 16 kHz Float32 is about 38 MB.
     static let slabSeconds = 600.0
+    /// RMS (about −50 dBFS) that some 100 ms frame of a segment's audio must reach for the segment to be kept, see
+    /// `isSilent`. WhisperKit 1.1.1 never computes `noSpeechProb`, so near silence still decodes to "Thank you.".
+    static let speechRMS: Float = 0.003
 
     public let entry: ModelEntry
     public let folder: URL
@@ -93,7 +97,10 @@ public struct WhisperKitEngine: TranscriptionEngine {
                         let detected = language == nil ? result.language : nil
                         for segment in result.segments {
                             let text = Self.speechText(segment.text)
-                            guard !text.isEmpty else { continue }
+                            guard !text.isEmpty,
+                                  !Self.isSilent(chunk.audioSamples, from: segment.start, to: segment.end) else {
+                                continue
+                            }
                             segments.append(RawSegment(
                                 start: offset + Double(segment.start), end: offset + Double(segment.end),
                                 text: text, detectedLanguage: detected))
@@ -128,6 +135,24 @@ public struct WhisperKitEngine: TranscriptionEngine {
             text = text[..<match.range.lowerBound].trimmingCharacters(in: .whitespacesAndNewlines)
         }
         return text
+    }
+
+    /// True when no 100 ms frame of `samples` from `start` to `end` (seconds) reaches `speechRMS`: Whisper made the
+    /// segment up from silence. The range is clamped to the buffer, as Whisper's timestamps can run past the audio.
+    static func isSilent(
+        _ samples: [Float], from start: Float, to end: Float, sampleRate: Int = WhisperKit.sampleRate
+    ) -> Bool {
+        let rate = Float(sampleRate)
+        let lower = min(samples.count, max(0, Int(start * rate)))
+        let upper = min(samples.count, max(lower, Int((end * rate).rounded(.up))))
+        let frame = sampleRate / 10
+        return samples.withUnsafeBufferPointer { buffer in
+            stride(from: lower, to: upper, by: frame).allSatisfy { first in
+                var rms: Float = 0
+                vDSP_rmsqv(buffer.baseAddress! + first, 1, &rms, vDSP_Length(min(frame, upper - first)))
+                return rms < speechRMS
+            }
+        }
     }
 
     /// Whisper takes the primary subtag: "en-US" → "en".

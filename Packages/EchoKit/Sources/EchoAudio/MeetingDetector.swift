@@ -15,8 +15,10 @@ public struct DetectedMeeting: Sendable, Hashable {
 }
 
 /// Watches known meeting apps' mic use through Core Audio property listeners: the process object list, and
-/// `IsRunningInput`/`IsRunningOutput` of each known app's processes. Nothing polls; events within 500 ms are
-/// coalesced into one refresh, and an app whose input turns on is confirmed by a one-shot 3 s timer.
+/// `IsRunningInput`/`IsRunningOutput` of each known app's processes. Listeners stay primary; a 2 s poll of the
+/// process object list is the fallback, because the flag notifications proved unreliable (macOS 27, in a VM).
+/// Events within 500 ms are coalesced into one refresh, and an app whose input turns on is confirmed by a
+/// one-shot 3 s timer.
 ///
 /// `@unchecked Sendable`: state is owned by a private serial queue; `start`/`stop` hop onto it.
 public final class MeetingDetector: @unchecked Sendable {
@@ -31,6 +33,7 @@ public final class MeetingDetector: @unchecked Sendable {
 
     private static let debounce = DispatchTimeInterval.milliseconds(500)
     private static let confirmDelay = DispatchTimeInterval.seconds(3)
+    private static let pollInterval = DispatchTimeInterval.seconds(2)
     private static let processSelectors = [kAudioProcessPropertyIsRunningInput, kAudioProcessPropertyIsRunningOutput]
 
     private let apps: [MeetingApp]
@@ -44,6 +47,9 @@ public final class MeetingDetector: @unchecked Sendable {
     private var listListener: AudioObjectPropertyListenerBlock?
     private var processListeners: [AudioObjectID: AudioObjectPropertyListenerBlock] = [:]
     private var listChanged = false
+    /// The process object list of the last regroup or poll tick.
+    private var objectIDs: [AudioObjectID] = []
+    private var poll: DispatchSourceTimer?
     private var pendingRefresh: DispatchWorkItem?
     /// Known apps' process groups, by group bundle ID, with the flags of the last refresh.
     private var groups: [String: AudioProcessGroup] = [:]
@@ -87,6 +93,11 @@ public final class MeetingDetector: @unchecked Sendable {
         if AudioObjectAddPropertyListenerBlock(AudioObjectID(kAudioObjectSystemObject), &address, listenerQueue, listener) == noErr {
             listListener = listener
         }
+        let timer = DispatchSource.makeTimerSource(queue: queue)
+        timer.schedule(deadline: .now() + Self.pollInterval, repeating: Self.pollInterval, leeway: .milliseconds(500))
+        timer.setEventHandler { [weak self] in self?.pollTick() }
+        timer.resume()
+        poll = timer
         listChanged = true
         refresh()
     }
@@ -101,6 +112,8 @@ public final class MeetingDetector: @unchecked Sendable {
             listListener = nil
         }
         syncProcessListeners([])
+        poll?.cancel()
+        poll = nil
         pendingRefresh?.cancel()
         pendingRefresh = nil
         confirming.values.forEach { $0.cancel() }
@@ -129,13 +142,25 @@ public final class MeetingDetector: @unchecked Sendable {
         queue.asyncAfter(deadline: .now() + Self.debounce, execute: item)
     }
 
+    /// A changed object list regroups; an unchanged one still re-reads the tracked flags (missed notifications).
+    private func pollTick() {
+        guard isRunning else { return }
+        let ids = AudioProcessList.objectIDs()
+        if ids != objectIDs {
+            objectIDs = ids
+            listChanged = true
+        }
+        scheduleRefresh()
+    }
+
     /// Regroups processes only when the list changed; otherwise re-reads the tracked processes' flags.
     private func refresh() {
         pendingRefresh = nil
         guard isRunning else { return }
         if listChanged {
             listChanged = false
-            let known = AudioProcessList.groups().filter { app(for: $0.bundleID) != nil }
+            objectIDs = AudioProcessList.objectIDs()
+            let known = AudioProcessList.groups(objectIDs.compactMap(AudioProcessList.process(for:))).filter { app(for: $0.bundleID) != nil }
             groups = Dictionary(known.map { ($0.bundleID, $0) }, uniquingKeysWith: { first, _ in first })
             syncProcessListeners(Set(known.flatMap(\.objectIDs)))
         } else {

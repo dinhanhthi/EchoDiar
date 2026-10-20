@@ -34,7 +34,9 @@ struct RecordingSettingsView: View {
         }
         .formStyle(.grouped)
         .task {
-            microphones = await Task.detached(priority: .utility) { InputDevice.all() }.value
+            for await _ in InputDevice.changes() {
+                microphones = await Task.detached(priority: .utility) { InputDevice.all() }.value
+            }
         }
         .task { model.refreshInstalledModels() }
         .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in
@@ -58,7 +60,11 @@ struct RecordingSettingsView: View {
                 Text("Stop recording").tag(RouteChangeBehavior.stop)
             } label: {
                 Text("When the microphone disconnects")
-                Text("Recording continues with the default input until then.")
+                switch model.settings.routeChangeBehavior {
+                case .ask: Text("Recording continues with the default input until then.")
+                case .continue: Text("Recording switches to the default input.")
+                case .stop: Text("Recording stops at once.")
+                }
             }
         }
     }
@@ -111,7 +117,7 @@ struct RecordingSettingsView: View {
                 value: model.setting(\.endMonitor.maxDurationMinutes),
                 range: MeetingEndMonitor.Configuration.maxDurationRange)
         } footer: {
-            Text("The indicator asks before stopping, with a 15 s countdown.")
+            Text("The indicator asks before stopping, with a 15 s countdown. Reaching the length limit stops at once.")
                 .font(.caption)
                 .foregroundStyle(.secondary)
         }
@@ -190,22 +196,62 @@ private struct InputDevice: Identifiable, Sendable {
     let id: String
     let name: String
 
-    /// Read once when the tab opens; nothing listens for changes.
+    private static let system = AudioObjectID(kAudioObjectSystemObject)
+    private static let devicesAddress = AudioObjectPropertyAddress(
+        mSelector: kAudioHardwarePropertyDevices, mScope: kAudioObjectPropertyScopeGlobal,
+        mElement: kAudioObjectPropertyElementMain)
+    /// Core Audio's per-process aggregate for the default devices ("CADefaultDeviceAggregate-<pid>-<n>").
+    private static let defaultAggregatePrefix = "CADefaultDeviceAggregate-"
+
+    /// Read again on each `changes()` value. Private aggregates (another app's or EchoDiar's own tap) are skipped;
+    /// aggregates the user made in Audio MIDI Setup stay.
     static func all() -> [InputDevice] {
-        let system = AudioObjectID(kAudioObjectSystemObject)
-        var address = AudioObjectPropertyAddress(
-            mSelector: kAudioHardwarePropertyDevices, mScope: kAudioObjectPropertyScopeGlobal,
-            mElement: kAudioObjectPropertyElementMain)
+        var address = devicesAddress
         var size: UInt32 = 0
         guard AudioObjectGetPropertyDataSize(system, &address, 0, nil, &size) == noErr else { return [] }
         var ids = [AudioDeviceID](repeating: 0, count: Int(size) / MemoryLayout<AudioDeviceID>.size)
         guard AudioObjectGetPropertyData(system, &address, 0, nil, &size, &ids) == noErr else { return [] }
         return ids.compactMap { id in
-            guard hasInput(id), let uid = string(id, kAudioDevicePropertyDeviceUID),
+            guard hasInput(id), !isPrivateAggregate(id), let uid = string(id, kAudioDevicePropertyDeviceUID),
+                  !uid.hasPrefix(defaultAggregatePrefix),
                   let name = string(id, kAudioObjectPropertyName) else { return nil }
             return InputDevice(id: uid, name: name)
         }
         .sorted { $0.name.localizedStandardCompare($1.name) == .orderedAscending }
+    }
+
+    /// Yields once at start, then each time the device list changes (plugged, unplugged, aggregate made or removed).
+    /// The listener is removed when the stream ends (the consuming task is cancelled).
+    static func changes() -> AsyncStream<Void> {
+        AsyncStream(bufferingPolicy: .bufferingNewest(1)) { continuation in
+            continuation.yield()
+            // `@Sendable` so `onTermination` can capture it; the same block must be passed to remove it.
+            let listener: @convention(block) @Sendable (UInt32, UnsafePointer<AudioObjectPropertyAddress>) -> Void = {
+                _, _ in continuation.yield()
+            }
+            var address = devicesAddress
+            guard AudioObjectAddPropertyListenerBlock(system, &address, nil, listener) == noErr else {
+                continuation.finish()
+                return
+            }
+            continuation.onTermination = { _ in
+                var address = devicesAddress
+                AudioObjectRemovePropertyListenerBlock(system, &address, nil, listener)
+            }
+        }
+    }
+
+    /// `kAudioAggregateDeviceIsPrivateKey` in the composition, which only aggregate devices have.
+    private static func isPrivateAggregate(_ device: AudioDeviceID) -> Bool {
+        var address = AudioObjectPropertyAddress(
+            mSelector: kAudioAggregateDevicePropertyComposition, mScope: kAudioObjectPropertyScopeGlobal,
+            mElement: kAudioObjectPropertyElementMain)
+        guard AudioObjectHasProperty(device, &address) else { return false }
+        var value: Unmanaged<CFDictionary>?
+        var size = UInt32(MemoryLayout<Unmanaged<CFDictionary>?>.size)
+        guard AudioObjectGetPropertyData(device, &address, 0, nil, &size, &value) == noErr,
+              let composition = value?.takeRetainedValue() as? [String: Any] else { return false }
+        return (composition[kAudioAggregateDeviceIsPrivateKey] as? NSNumber)?.boolValue == true
     }
 
     private static func hasInput(_ device: AudioDeviceID) -> Bool {

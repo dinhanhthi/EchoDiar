@@ -2,9 +2,10 @@ import CoreAudio
 import Foundation
 
 /// Whether any process of a group runs audio input or output, from `IsRunningInput`/`IsRunningOutput` listeners on
-/// their process objects; nothing polls. Feeds the end monitor's "source inactive" trigger while recording an app.
+/// their process objects, with a 2 s poll as the fallback because those notifications proved unreliable (often missing
+/// on macOS 27, in a VM). Feeds the end monitor's "source inactive" trigger while recording an app.
 ///
-/// `@unchecked Sendable`: state is owned by a private serial queue; `stop` hops onto it.
+/// `@unchecked Sendable`: state is owned by a private serial queue (the poll fires on it too); `stop` hops onto it.
 public final class ProcessActivityWatch: @unchecked Sendable {
     private static let selectors = [kAudioProcessPropertyIsRunningInput, kAudioProcessPropertyIsRunningOutput]
 
@@ -15,6 +16,7 @@ public final class ProcessActivityWatch: @unchecked Sendable {
     /// Listener blocks run here and only hop onto `queue`, so removing them inside `queue.sync` cannot deadlock.
     private let listenerQueue = DispatchQueue(label: "EchoDiar.ProcessActivityWatch.listener", qos: .utility)
     private var listener: AudioObjectPropertyListenerBlock?
+    private var poll: DispatchSourceTimer?
     private var active: Bool?
 
     /// `handler` runs on a private queue: once with the current state, then on every change.
@@ -33,6 +35,11 @@ public final class ProcessActivityWatch: @unchecked Sendable {
                 _ = AudioObjectAddPropertyListenerBlock(id, &address, listenerQueue, listener)
             }
         }
+        let poll = DispatchSource.makeTimerSource(queue: queue)
+        poll.schedule(deadline: .now() + 2, repeating: 2, leeway: .milliseconds(500))
+        poll.setEventHandler { [weak self] in self?.update() }
+        poll.resume()
+        self.poll = poll
         queue.async { [weak self] in self?.update() }
     }
 
@@ -40,7 +47,7 @@ public final class ProcessActivityWatch: @unchecked Sendable {
         stop()
     }
 
-    /// Removes the listeners; the handler is not called afterwards. Safe to call repeatedly.
+    /// Removes the listeners and the poll; the handler is not called afterwards. Safe to call repeatedly.
     public func stop() {
         onQueue {
             guard let listener else { return }
@@ -52,6 +59,8 @@ public final class ProcessActivityWatch: @unchecked Sendable {
                 }
             }
             self.listener = nil
+            poll?.cancel()
+            poll = nil
         }
     }
 

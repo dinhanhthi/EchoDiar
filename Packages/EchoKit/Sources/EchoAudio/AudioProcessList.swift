@@ -32,6 +32,11 @@ public enum AudioProcessList {
     public static let safariBundleID = "com.apple.Safari"
 
     public static func processes() -> [AudioProcess] {
+        objectIDs().compactMap(process(for:))
+    }
+
+    /// The process object list alone, without reading any process's properties.
+    public static func objectIDs() -> [AudioObjectID] {
         var address = globalAddress(kAudioHardwarePropertyProcessObjectList)
         let system = AudioObjectID(kAudioObjectSystemObject)
         var size: UInt32 = 0
@@ -39,7 +44,7 @@ public enum AudioProcessList {
         var ids = [AudioObjectID](repeating: kAudioObjectUnknown, count: Int(size) / MemoryLayout<AudioObjectID>.size)
         guard AudioObjectGetPropertyData(system, &address, 0, nil, &size, &ids) == noErr else { return [] }
         ids.removeSubrange(min(ids.count, Int(size) / MemoryLayout<AudioObjectID>.size)...)
-        return ids.compactMap(process(for:))
+        return ids
     }
 
     public static func process(for objectID: AudioObjectID) -> AudioProcess? {

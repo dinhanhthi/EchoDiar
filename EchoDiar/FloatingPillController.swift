@@ -66,6 +66,17 @@ final class FloatingPillController {
         ) { [weak self] _ in
             MainActor.assumeIsolated { self?.place() }
         })
+        // The anchored app quitting changes nothing observed, so the anchor is stopped here.
+        observers.append(NSWorkspace.shared.notificationCenter.addObserver(
+            forName: NSWorkspace.didTerminateApplicationNotification, object: nil, queue: .main
+        ) { [weak self] notification in
+            let pid = (notification.userInfo?[NSWorkspace.applicationUserInfoKey] as? NSRunningApplication)?
+                .processIdentifier
+            MainActor.assumeIsolated {
+                guard let self, pid == self.anchor?.pid else { return }
+                self.syncAnchor(bundleID: nil)
+            }
+        })
         observeModel()
     }
 
