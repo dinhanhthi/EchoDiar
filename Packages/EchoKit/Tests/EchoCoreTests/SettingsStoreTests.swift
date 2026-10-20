@@ -23,6 +23,7 @@ struct SettingsStoreTests {
             #expect(store.load().ragEnabled == false)
             #expect(store.load().embeddingModelID == "mlx-qwen3-embedding-0.6b")
             #expect(store.load().modelIdleMinutes == 2)
+            #expect(!store.load().diarization)
             #expect(FileManager.default.fileExists(atPath: store.fileURL.path))
         }
     }

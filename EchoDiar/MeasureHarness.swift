@@ -5,8 +5,10 @@ import EchoTranscribe
 import Foundation
 
 /// What one `--measure` run records for `result.json` (see `AppModel.runMeasureHarness`). Times are seconds after
-/// Stop. Phases: `recording` until Stop, `compressing` until the pipeline's first event, then one per pipeline step
-/// (a step seen twice adds up); each keeps its max `phys_footprint` (1 s sampler plus a sample at every change) and
+/// Stop. Phases: `recording` until Stop, then in `finishRecording`'s order: compress first (`compressing` until the
+/// pipeline's first event, then one per pipeline step), or transcribe first (`submitting` until the pipeline's first
+/// event, one per pipeline step, `compressing` from `finished` until the `compressed` milestone, then `done`). A step
+/// seen twice adds up; each phase keeps its max `phys_footprint` (1 s sampler plus a sample at every change) and
 /// this process's CPU time from `getrusage` (work done in other processes, such as CoreML's, is not counted).
 @MainActor
 final class MeasureRun {
@@ -49,9 +51,10 @@ final class MeasureRun {
     /// Seconds since Stop; 0 before it.
     private var elapsed: Double { stop.map { Date().timeIntervalSince($0) } ?? 0 }
 
-    func markStop() {
+    /// `transcribesFirst`: `finishRecording` transcribes the CAF before compressing it.
+    func markStop(transcribesFirst: Bool) {
         stop = Date()
-        enter("compressing")
+        enter(transcribesFirst ? "submitting" : "compressing")
     }
 
     func progress(_ progress: JobProgress) {
@@ -59,7 +62,8 @@ final class MeasureRun {
             step = progress.step
             stepFraction = progress.fraction
             steps.append(["step": progress.step.rawValue, "t": elapsed, "fraction": progress.fraction])
-            enter(progress.step.rawValue)
+            // Transcribe first: the compression follows the transcription.
+            enter(progress.step == .finished && stopToCompressed == nil ? "compressing" : progress.step.rawValue)
             switch progress.step {
             case .finished: stopToTranscript = elapsed
             case .failed, .needsModel: failureDetail = progress.detail ?? progress.step.rawValue
@@ -76,6 +80,7 @@ final class MeasureRun {
         switch milestone {
         case .compressed(let result):
             stopToCompressed = elapsed
+            if stopToTranscript != nil { enter("done") }
             milestones.append([
                 "milestone": "compressed", "t": elapsed, "outputFileNames": result.outputFileNames,
                 "failure": result.failure.map { String(describing: $0) } ?? NSNull(),

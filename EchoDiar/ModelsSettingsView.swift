@@ -46,7 +46,10 @@ struct ModelsSettingsView: View {
                     cloudSection(diarization: false)
                     speechToTextSection
                 case .diarizationModels:
-                    Section { SpeakerCountPicker(model: model) }
+                    Section {
+                        SpeakerSeparationToggle(model: model)
+                        if model.settings.diarization { SpeakerCountPicker(model: model) }
+                    }
                     intro("Diarization finds who spoke when. The diarization model tells the voices apart and labels each part of the transcript with its speaker.")
                     tierSections(.diarization)
                     cloudSection(diarization: true)

@@ -71,10 +71,14 @@ public struct TranscriptionJob: Codable, Equatable, Sendable {
     /// `TranscriptionPipeline.transcribe`); the local diarizer comes from `TranscriptionPipeline.localDiarizerID`.
     /// nil = catalog order.
     public var diarizerID: String?
+    /// "Tell speakers apart": false runs no diarizer (local or cloud) and asks cloud ASR for no speaker labels, so the
+    /// whole system channel is one speaker (`s1`).
+    public var diarize: Bool
 
     public init(
         conversationID: UUID, folder: URL, systemFileName: String? = nil, engineID: String? = nil,
-        language: String? = nil, processNow: Bool = false, speakerCountHint: Int? = nil, diarizerID: String? = nil
+        language: String? = nil, processNow: Bool = false, speakerCountHint: Int? = nil, diarizerID: String? = nil,
+        diarize: Bool = true
     ) {
         self.conversationID = conversationID
         self.folder = folder
@@ -84,6 +88,7 @@ public struct TranscriptionJob: Codable, Equatable, Sendable {
         self.processNow = processNow
         self.speakerCountHint = speakerCountHint
         self.diarizerID = diarizerID
+        self.diarize = diarize
     }
 }
 

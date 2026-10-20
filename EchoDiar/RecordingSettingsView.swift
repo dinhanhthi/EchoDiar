@@ -127,7 +127,8 @@ struct RecordingSettingsView: View {
     private var afterRecordingSection: some View {
         Section {
             Toggle("Transcribe automatically", isOn: model.setting(\.autoTranscribe))
-            SpeakerCountPicker(model: model)
+            SpeakerSeparationToggle(model: model)
+            if model.settings.diarization { SpeakerCountPicker(model: model) }
             Toggle(isOn: model.setting(\.deferTranscriptionWhenConstrained)) {
                 Text("Wait when the Mac is hot or in Low Power Mode")
                 Text("Transcription starts once the Mac is ready.")
@@ -140,6 +141,19 @@ struct RecordingSettingsView: View {
         Binding(
             get: { model.settings.perAppBehavior[app.appBundleID] ?? .ask },
             set: { value in model.updateSettings { $0.perAppBehavior[app.appBundleID] = value == .ask ? nil : value } })
+    }
+}
+
+/// Whether transcription tells the meeting audio's speakers apart, shown in Recording › After recording and in
+/// Transcription › Diarization model.
+struct SpeakerSeparationToggle: View {
+    let model: AppModel
+
+    var body: some View {
+        Toggle(isOn: model.setting(\.diarization)) {
+            Text("Tell speakers apart")
+            Text("Labels each voice in the meeting audio: Speaker 1, 2, … Off: the meeting audio is one speaker.")
+        }
     }
 }
 

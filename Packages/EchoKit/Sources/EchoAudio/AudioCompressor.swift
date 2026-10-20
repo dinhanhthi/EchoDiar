@@ -29,7 +29,7 @@ public struct CompressionResult: Sendable, Equatable {
     public let failure: AudioCompressorError?
 }
 
-/// Compresses a recording folder's 2-channel CAF to AAC-LC m4a, one job at a time at `.background` QoS.
+/// Compresses a recording folder's 2-channel CAF to AAC-LC m4a, one job at a time, each at its own QoS.
 ///
 /// The CAF is deleted only after the decoded output matches its duration and `session.json` points to the new
 /// file; on any failure the CAF stays and `conversation.json` is marked `compressionFailed`.
@@ -49,7 +49,8 @@ public final class AudioCompressor: Sendable {
 
     private static let chunkFrames: AVAudioFrameCount = 8_192
 
-    private let queue = DispatchQueue(label: "EchoDiar.AudioCompressor", qos: .background)
+    /// No QoS of its own: each job runs at the one `compress` is given.
+    private let queue = DispatchQueue(label: "EchoDiar.AudioCompressor")
     private let encoder: Encoder
 
     /// `encoder` is injectable so tests can force failures.
@@ -58,12 +59,14 @@ public final class AudioCompressor: Sendable {
     }
 
     /// Queued behind earlier jobs; returns when this one is done. `started` runs on the compressor's queue right
-    /// after `conversation.json` is marked `compressing`, before the encode.
+    /// after `conversation.json` is marked `compressing`, before the encode. `qos` is the job's (`.background` keeps
+    /// it off the P-cores, e.g. while a recording runs).
     public func compress(
-        folder: URL, bitrateKbps: Int = 64, keepCAF: Bool = false, started: (@Sendable () -> Void)? = nil
+        folder: URL, bitrateKbps: Int = 64, keepCAF: Bool = false, qos: DispatchQoS = .background,
+        started: (@Sendable () -> Void)? = nil
     ) async -> CompressionResult {
         await withCheckedContinuation { continuation in
-            queue.async {
+            queue.async(qos: qos, flags: .enforceQoS) {
                 let result = self.run(folder: folder, bitrateKbps: bitrateKbps, keepCAF: keepCAF, started: started)
                 // The decoders and the encoder are gone; their freed pages would stay with the process.
                 MemoryRelief.trim()
@@ -91,10 +94,12 @@ public final class AudioCompressor: Sendable {
         }
 
         var sourceDuration = 0.0
+        var before: Conversation.Status?
         let outputs: [String]
         do {
             sourceDuration = try Self.decodedDuration(of: source, channels: nil, error: AudioCompressorError.sourceUnreadable)
             guard sourceDuration > 0 else { throw AudioCompressorError.sourceUnreadable(noErr) }
+            before = (try? Conversation.read(from: folder))?.status
             try Self.updateConversation(in: folder, session: session, duration: sourceDuration) { $0.status = .compressing }
             started?()
             outputs = try encodeAndVerify(source: source, folder: folder, bitRate: bitrateKbps * 1_000, sourceDuration: sourceDuration)
@@ -114,7 +119,7 @@ public final class AudioCompressor: Sendable {
         if !keepCAF { Self.removeCAF(named: sourceName, in: folder) }
         do {
             try Self.updateConversation(in: folder, session: session, duration: sourceDuration) {
-                $0.status = .ready
+                $0.status = Self.doneStatus(before: before, hasTranscript: $0.hasTranscript)
                 $0.duration = sourceDuration
                 $0.sizeBytes = LibraryStore.sizeOnDisk(of: folder)
             }
@@ -137,7 +142,7 @@ public final class AudioCompressor: Sendable {
         if let conversation = try? Conversation.read(from: folder),
            conversation.status == .compressing || conversation.status == .compressionFailed {
             try? Self.updateConversation(in: folder, session: session, duration: conversation.duration) {
-                $0.status = .ready
+                $0.status = Self.doneStatus(before: conversation.status, hasTranscript: $0.hasTranscript)
                 $0.sizeBytes = LibraryStore.sizeOnDisk(of: folder)
             }
         }
@@ -204,6 +209,11 @@ public final class AudioCompressor: Sendable {
             : Conversation(session: session, folder: folder, duration: duration)
         change(&conversation)
         try conversation.write()
+    }
+
+    /// Compression runs after transcription, so it keeps a transcription outcome instead of resetting it to `ready`.
+    private static func doneStatus(before: Conversation.Status?, hasTranscript: Bool) -> Conversation.Status {
+        before == .transcriptionFailed ? .transcriptionFailed : (hasTranscript ? .transcribed : .ready)
     }
 
     private static func typed(_ error: any Error) -> AudioCompressorError {

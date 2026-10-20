@@ -78,6 +78,8 @@ public struct AppSettings: Codable, Equatable, Sendable {
     public var autoTranscribe: Bool
     /// Expected number of speakers on the system channel for diarization, 1...20; nil = detect.
     public var speakerCountHint: Int?
+    /// "Tell speakers apart": diarize the system channel; off = one "Speaker 1" for the meeting audio.
+    public var diarization: Bool
     /// Wait while the Mac is hot or in Low Power Mode before a transcription job starts.
     public var deferTranscriptionWhenConstrained: Bool
     /// Move old transcribed conversations (or their audio) to the Trash daily, see `RetentionPolicy`.
@@ -135,6 +137,7 @@ public struct AppSettings: Codable, Equatable, Sendable {
         routeChangeBehavior: RouteChangeBehavior = .ask,
         autoTranscribe: Bool = true,
         speakerCountHint: Int? = nil,
+        diarization: Bool = false,
         deferTranscriptionWhenConstrained: Bool = true,
         autoDeleteEnabled: Bool = false,
         autoDeleteAfterDays: Int = 90,
@@ -181,6 +184,7 @@ public struct AppSettings: Codable, Equatable, Sendable {
         self.routeChangeBehavior = routeChangeBehavior
         self.autoTranscribe = autoTranscribe
         self.speakerCountHint = speakerCountHint
+        self.diarization = diarization
         self.deferTranscriptionWhenConstrained = deferTranscriptionWhenConstrained
         self.autoDeleteEnabled = autoDeleteEnabled
         self.autoDeleteAfterDays = autoDeleteAfterDays
@@ -209,7 +213,7 @@ public struct AppSettings: Codable, Equatable, Sendable {
         case ragEnabled, embeddingModelID, embeddingAPIModel, cloudEmbeddingConfirmed
         case micDeviceUID, meetingDetection, perAppBehavior, pillPositions, showPill, hidePillWhenAppActive
         case attachPillToWindow, pillWindowOffset, pillSize, endMonitor, routeChangeBehavior
-        case autoTranscribe, speakerCountHint, deferTranscriptionWhenConstrained
+        case autoTranscribe, speakerCountHint, diarization, deferTranscriptionWhenConstrained
         case autoDeleteEnabled, autoDeleteAfterDays, autoDeleteMode, deleteAudioAfterTranscription
         case deleteWithoutConfirmation, globalHotKey, globalHotKeyEnabled, globalPauseHotKey, globalPauseHotKeyEnabled
     }
@@ -257,6 +261,7 @@ public struct AppSettings: Codable, Equatable, Sendable {
         autoTranscribe = try container.decodeIfPresent(Bool.self, forKey: .autoTranscribe) ?? true
         speakerCountHint = try container.decodeIfPresent(Int.self, forKey: .speakerCountHint)
             .map { Self.clamped($0, to: Self.speakerCountHintRange) }
+        diarization = try container.decodeIfPresent(Bool.self, forKey: .diarization) ?? false
         deferTranscriptionWhenConstrained = try container.decodeIfPresent(
             Bool.self, forKey: .deferTranscriptionWhenConstrained) ?? true
         autoDeleteEnabled = try container.decodeIfPresent(Bool.self, forKey: .autoDeleteEnabled) ?? false

@@ -2,6 +2,7 @@ import AVFoundation
 import Darwin
 import EchoCore
 import Foundation
+import Synchronization
 import Testing
 @testable import EchoAudio
 
@@ -29,6 +30,34 @@ struct AudioCompressorTests {
         }
     }
 
+    /// Compression runs after transcription, so it must not turn a transcribed (or failed) recording back into
+    /// `ready`; `.compressing` is the launch retry of a compression interrupted after transcription.
+    @Test("compressor keeps the transcription status", arguments: [
+        (Conversation.Status.transcribed, true, Conversation.Status.transcribed),
+        (.compressing, true, .transcribed),
+        (.transcriptionFailed, false, .transcriptionFailed),
+    ])
+    func compressorKeepsTranscriptionStatus(before: Conversation.Status, hasTranscript: Bool, after: Conversation.Status) async throws {
+        try await withTemporaryRoot { root in
+            let folder = try writeStoppedSession(in: root, frames: 32_000)
+            var conversation = Conversation(session: try RecordingSession.read(from: folder), folder: folder, duration: 2)
+            conversation.status = before
+            conversation.hasTranscript = hasTranscript
+            try conversation.write()
+            let compressor = AudioCompressor { source, destination, channel, bitRate in
+                try AudioCompressor.encodeAAC(source: source, destination: destination, channel: channel, bitRate: bitRate)
+            }
+
+            let result = await compressor.compress(folder: folder, bitrateKbps: 64)
+
+            #expect(result.failure == nil)
+            let written = try Conversation.read(from: folder)
+            #expect(written.status == after)
+            #expect(written.hasTranscript == hasTranscript)
+            #expect(try RecordingSession.read(from: folder).audioFileName.hasSuffix(".m4a"))
+        }
+    }
+
     /// The injected encoder leaves a partial file behind before failing, so cleanup is checked too.
     @Test func failedEncodeKeepsCAF() async throws {
         try await withTemporaryRoot { root in
@@ -49,6 +78,27 @@ struct AudioCompressorTests {
             }
             #expect(try RecordingSession.read(from: folder).audioFileName == "audio.caf")
             #expect(try Conversation.read(from: folder).status == .compressionFailed)
+        }
+    }
+
+    /// The post-Stop compression runs at `.utility` when no recording is active (`.background` ran it on E-cores
+    /// only, several times slower), and keeps `.background` otherwise.
+    @Test("compressor encodes at the job's QoS", arguments: [
+        (DispatchQoS.background, QOS_CLASS_BACKGROUND),
+        (.utility, QOS_CLASS_UTILITY),
+    ])
+    func encodesAtJobQoS(qos: DispatchQoS, expected: qos_class_t) async throws {
+        try await withTemporaryRoot { root in
+            let folder = try writeStoppedSession(in: root, frames: 32_000)
+            let seen = Mutex<qos_class_t?>(nil)
+            let compressor = AudioCompressor { _, _, _, _ in
+                seen.withLock { $0 = qos_class_self() }
+                throw AudioCompressorError.encode(-1)
+            }
+
+            _ = await compressor.compress(folder: folder, bitrateKbps: 64, qos: qos)
+
+            #expect(seen.withLock { $0 } == expected)
         }
     }
 

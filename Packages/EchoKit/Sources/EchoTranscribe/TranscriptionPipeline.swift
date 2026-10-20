@@ -78,7 +78,8 @@ public actor TranscriptionPipeline {
 
     /// Runs after every job queued before it; returns the `transcript.json` URL. `cloud`: the job's cloud engine
     /// (resolved by the app from settings and the Keychain), which replaces `job.engineID`'s resolution.
-    /// `cloudDiarizer`: labels the system channel's speakers when the ASR does not (its text is dropped).
+    /// `cloudDiarizer`: labels the system channel's speakers when the ASR does not (its text is dropped); unused
+    /// when `job.diarize` is false.
     public func transcribe(
         _ job: TranscriptionJob, cloud: CloudEngine? = nil, cloudDiarizer: CloudEngine? = nil
     ) async throws -> URL {
@@ -107,34 +108,39 @@ public actor TranscriptionPipeline {
 
     private func run(_ job: TranscriptionJob, cloud: CloudEngine?, cloudDiarizer: CloudEngine?) async throws -> URL {
         var started = false
+        // Creates `conversation.json` when missing (transcribed before compression); nil while unreadable.
+        var stored: RecordingSession?
         do {
             if deferWhenConstrained && !job.processNow { await waitWhileConstrained(job) }
             guard var session = try? RecordingSession.read(from: job.folder) else {
                 throw TranscriptionError.sessionUnreadable
             }
+            stored = session
             // Never written back: the override only applies to this run.
             if let language = job.language { session.languageMarkers = [.init(fileTime: 0, language: language)] }
             let sources = try channelSources(session: session, job: job)
             let ranges = LanguageRange.ranges(from: session.languageMarkers)
             let hint = job.speakerCountHint ?? speakerCountHint
-            let diarizerID = Self.localDiarizerID(
-                preferred: job.diarizerID, speakerCountHint: hint, isInstalled: { modelStore.isInstalled($0) })
+            let diarizerID = job.diarize ? Self.localDiarizerID(
+                preferred: job.diarizerID, speakerCountHint: hint, isInstalled: { modelStore.isInstalled($0) }) : nil
             let diarizer = diarizerID.flatMap { id in
                 modelStore.folder(for: id).map { SpeakerDiarizer(entryID: id, folder: $0, speakerCountHint: hint) }
             }
+            let cloudDiarizer = job.diarize ? cloudDiarizer : nil
 
             let url: URL
             if let cloud {
                 // No local ASR model: only a local diarization takes the gate (inside `process`).
                 started = true
-                Self.updateConversation(in: job.folder) { $0.status = .transcribing }
+                Self.updateConversation(in: job.folder, session: session) { $0.status = .transcribing }
                 let language = Self.cloudLanguage(ranges)
                 url = try await process(
                     job, session: session, sources: sources, engineID: cloud.engineID,
                     modelID: cloud.model.isEmpty ? nil : cloud.model, engineFallback: nil, diarizer: diarizer,
                     cloudDiarizer: cloudDiarizer, gateDiarization: true
                 ) { _, source, channel, _ in
-                    try await Self.cloudSegments(cloud, source: source, language: language, diarize: channel == .system)
+                    try await Self.cloudSegments(
+                        cloud, source: source, language: language, diarize: job.diarize && channel == .system)
                 }
             } else {
                 let firstLanguage = session.languageMarkers.min { $0.fileTime < $1.fileTime }?.language ?? "auto"
@@ -149,7 +155,7 @@ public actor TranscriptionPipeline {
                 started = true
                 let engine = factory(entry, modelFolder)
                 url = try await gate.withExclusiveModel(owner: .transcriptionJob) { [self, session] in
-                    Self.updateConversation(in: job.folder) { $0.status = .transcribing }
+                    Self.updateConversation(in: job.folder, session: session) { $0.status = .transcribing }
                     return try await process(
                         job, session: session, sources: sources, engineID: entry.id,
                         modelID: [entry.repo, entry.subfolder].compactMap { $0 }.joined(separator: "/"),
@@ -160,7 +166,7 @@ public actor TranscriptionPipeline {
                     }
                 }
             }
-            Self.updateConversation(in: job.folder) {
+            Self.updateConversation(in: job.folder, session: session) {
                 $0.status = .transcribed
                 $0.hasTranscript = true
                 $0.sizeBytes = LibraryStore.sizeOnDisk(of: job.folder)
@@ -168,12 +174,12 @@ public actor TranscriptionPipeline {
             emit(job, .finished, 1)
             return url
         } catch TranscriptionError.needsModel(let id) {
-            if started { Self.updateConversation(in: job.folder) { $0.status = .ready } }
+            if started { Self.updateConversation(in: job.folder, session: stored) { $0.status = .ready } }
             emit(job, .needsModel, 0, detail: id)
             throw TranscriptionError.needsModel(id)
         } catch {
             // Also before `started`, so an unreadable session or audio shows "Failed — Retry" on the card.
-            Self.updateConversation(in: job.folder) { $0.status = .transcriptionFailed }
+            Self.updateConversation(in: job.folder, session: stored) { $0.status = .transcriptionFailed }
             emit(job, .failed, 0, detail: error.localizedDescription)
             throw error
         }
@@ -251,7 +257,7 @@ public actor TranscriptionPipeline {
 
         emit(job, .merging, 0.95)
         let providerSpeakers = system.contains { $0.speaker != nil }
-        if diarizer == nil && turns.isEmpty && !system.isEmpty && !providerSpeakers {
+        if job.diarize && diarizer == nil && turns.isEmpty && !system.isEmpty && !providerSpeakers {
             notes.append(Transcript.diarizationMissingNote)
         }
         let transcript = Transcript(
@@ -275,7 +281,9 @@ public actor TranscriptionPipeline {
             let segments = try await CloudTranscription.transcribe(
                 source: source.url, channel: source.channel, with: cloud.transcriber, language: language, diarize: diarize)
             return segments.map {
-                RawSegment(start: $0.start, end: $0.end, text: $0.text, detectedLanguage: $0.language, speaker: $0.speaker)
+                RawSegment(
+                    start: $0.start, end: $0.end, text: $0.text, detectedLanguage: $0.language,
+                    speaker: diarize ? $0.speaker : nil)
             }
         } catch let error as CancellationError {
             throw error
@@ -433,7 +441,8 @@ public actor TranscriptionPipeline {
 
     // MARK: - Deferral
 
-    private static var isConstrained: Bool {
+    /// The Mac is hot or in Low Power Mode: jobs wait unless "Process now" (or deferral is off).
+    public static var isConstrained: Bool {
         let info = ProcessInfo.processInfo
         return info.thermalState.rawValue >= ProcessInfo.ThermalState.serious.rawValue || info.isLowPowerModeEnabled
     }
@@ -462,9 +471,22 @@ public actor TranscriptionPipeline {
         continuation.yield(JobProgress(conversationID: job.conversationID, step: step, fraction: fraction, detail: detail))
     }
 
-    /// Read-modify-write of `conversation.json` when the folder has one (the DEBUG harness folder does not).
-    private static func updateConversation(in folder: URL, _ change: (inout Conversation) -> Void) {
-        guard var conversation = try? Conversation.read(from: folder) else { return }
+    /// Read-modify-write of `conversation.json`. A missing one (transcribed before compression, or the DEBUG harness
+    /// folder) is created from `session` with the session audio's duration, as `AudioCompressor` does; nothing is
+    /// written without a session, or when the existing file is unreadable.
+    private static func updateConversation(
+        in folder: URL, session: RecordingSession?, _ change: (inout Conversation) -> Void
+    ) {
+        var conversation: Conversation
+        if FileManager.default.fileExists(atPath: folder.appendingPathComponent(Conversation.fileName).path) {
+            guard let existing = try? Conversation.read(from: folder) else { return }
+            conversation = existing
+        } else {
+            guard let session else { return }
+            let audio = ConversationFiles.audioURL(in: folder, fileName: session.audioFileName)
+            let duration = audio.flatMap { try? MonoAudio.duration(of: $0) } ?? 0
+            conversation = Conversation(session: session, folder: folder, duration: duration)
+        }
         change(&conversation)
         try? conversation.write()
     }

@@ -353,7 +353,8 @@ for folder in dirs:
     cpu = sum(p.get("cpuSeconds", 0) for p in result.get("phases") or [] if p.get("phase") != "recording")
     first = result.get("loadAndFirstChunk") or {}
     cells = [
-        label, where, number, result.get("tag") or "", result.get("engine") or "", result.get("diarizer") or "",
+        label, where, number, result.get("tag") or "", result.get("engine") or "",
+        result.get("diarizer") or ("off" if options.get("diarization") == "off" else ""),
         seconds(result.get("stopToTranscript")), seconds(result.get("stopToCompressed")), seconds(first.get("t")),
         step_durations(result.get("steps") or [], result.get("stopToTranscript")),
         seconds(result.get("maxFootprintMB")), seconds(cpu), *wer, "; ".join(notes).replace("|", "/"),
