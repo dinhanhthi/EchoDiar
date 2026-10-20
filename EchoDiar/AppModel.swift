@@ -1231,8 +1231,8 @@ extension AppModel {
         case .question(let question):
             aiService.ask(
                 question: question, conversation: conversation, transcript: transcript, summary: summary,
-                history: history, provider: client, providerID: provider.id, model: model,
-                language: settings.summaryLanguage)
+                history: history, historyLimit: settings.chatContextMessages, provider: client,
+                providerID: provider.id, model: model, language: settings.summaryLanguage)
         }
         let task = Task { [weak self] in
             do {

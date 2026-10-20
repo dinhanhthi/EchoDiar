@@ -18,6 +18,7 @@ struct SettingsStoreTests {
         try withTemporaryStore { store in
             try Data(json.utf8).write(to: store.fileURL)
             #expect(store.load() == AppSettings())
+            #expect(store.load().chatContextMessages == 10)
             #expect(FileManager.default.fileExists(atPath: store.fileURL.path))
         }
     }

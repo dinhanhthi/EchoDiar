@@ -249,8 +249,9 @@ struct SummaryIndex: Codable {
     }
 }
 
-/// The `chat.json` file format, version 1: the AI tab's questions and answers about one conversation, oldest first.
-/// Dates are ISO 8601. Only `role` and `text` are required in a message.
+/// The `chat.json` file format, version 1: the AI tab's questions and answers about one conversation, oldest first,
+/// and an optional `title` (kept when an archived chat is resumed). Dates are ISO 8601. Only `role` and `text` are
+/// required in a message.
 public struct ChatLog: Codable, Equatable, Sendable {
     public struct Message: Codable, Equatable, Sendable {
         public enum Role: String, Codable, Sendable {
@@ -276,19 +277,22 @@ public struct ChatLog: Codable, Equatable, Sendable {
     public static let fileName = "chat.json"
 
     public var version = 1
+    public var title: String?
     public var messages: [Message]
 
-    public init(messages: [Message] = []) {
+    public init(title: String? = nil, messages: [Message] = []) {
+        self.title = title
         self.messages = messages
     }
 
     private enum CodingKeys: String, CodingKey {
-        case version, messages
+        case version, title, messages
     }
 
     public init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
         version = try c.decodeIfPresent(Int.self, forKey: .version) ?? 1
+        title = try c.decodeIfPresent(String.self, forKey: .title)
         messages = try c.decodeIfPresent([Message].self, forKey: .messages) ?? []
     }
 

@@ -35,6 +35,8 @@ public struct AppSettings: Codable, Equatable, Sendable {
     public var defaultAIModel: String?
     /// Summary language: "auto" (the transcript's dominant language), "en", "fr", "vi" or another BCP-47 code.
     public var summaryLanguage: String
+    /// Earlier chat messages sent with each question; 0 = the whole chat.
+    public var chatContextMessages: Int
     /// Core Audio UID of the recording microphone; nil = the system default input (also used when it is gone).
     public var micDeviceUID: String?
     /// Watch known meeting apps' mic use and offer to record them.
@@ -92,6 +94,7 @@ public struct AppSettings: Codable, Equatable, Sendable {
         defaultAIProviderID: String? = nil,
         defaultAIModel: String? = nil,
         summaryLanguage: String = "auto",
+        chatContextMessages: Int = 10,
         micDeviceUID: String? = nil,
         meetingDetection: Bool = true,
         perAppBehavior: [String: MeetingBehavior] = [:],
@@ -128,6 +131,7 @@ public struct AppSettings: Codable, Equatable, Sendable {
         self.defaultAIProviderID = defaultAIProviderID
         self.defaultAIModel = defaultAIModel
         self.summaryLanguage = summaryLanguage
+        self.chatContextMessages = chatContextMessages
         self.micDeviceUID = micDeviceUID
         self.meetingDetection = meetingDetection
         self.perAppBehavior = perAppBehavior
@@ -152,11 +156,13 @@ public struct AppSettings: Codable, Equatable, Sendable {
 
     public static let autoDeleteDaysRange = 1...3650
     public static let speakerCountHintRange = 1...20
+    /// Chat context sizes offered in Settings, besides 0 (the whole chat).
+    public static let chatContextOptions = [4, 10, 20, 50]
 
     private enum CodingKeys: String, CodingKey {
         case version, launchAtLogin, defaultLanguage, recentLanguages, compressionBitrateKbps, keepUncompressedAudio
         case playbackChannels, onboardingCompleted, liveTranscript, liveTranscriptEngine, defaultASRModelID, providers
-        case cloudSTTConfirmed, defaultAIProviderID, defaultAIModel, summaryLanguage
+        case cloudSTTConfirmed, defaultAIProviderID, defaultAIModel, summaryLanguage, chatContextMessages
         case micDeviceUID, meetingDetection, perAppBehavior, pillPositions, showPill, hidePillWhenAppActive
         case attachPillToWindow, pillWindowOffset, endMonitor, routeChangeBehavior
         case autoTranscribe, speakerCountHint, deferTranscriptionWhenConstrained
@@ -183,6 +189,7 @@ public struct AppSettings: Codable, Equatable, Sendable {
         defaultAIProviderID = try container.decodeIfPresent(String.self, forKey: .defaultAIProviderID)
         defaultAIModel = try container.decodeIfPresent(String.self, forKey: .defaultAIModel)
         summaryLanguage = try container.decodeIfPresent(String.self, forKey: .summaryLanguage) ?? "auto"
+        chatContextMessages = try container.decodeIfPresent(Int.self, forKey: .chatContextMessages) ?? 10
         micDeviceUID = try container.decodeIfPresent(String.self, forKey: .micDeviceUID)
         meetingDetection = try container.decodeIfPresent(Bool.self, forKey: .meetingDetection) ?? true
         perAppBehavior = try container.decodeIfPresent([String: MeetingBehavior].self, forKey: .perAppBehavior) ?? [:]

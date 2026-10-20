@@ -5,7 +5,8 @@ import Synchronization
 /// Summaries and questions about one conversation (docs/research/llm-providers.md F). Each job streams its answer,
 /// saves it in the conversation folder when it completes (a new summary version + `hasSummary`, or two more
 /// `chat.json` messages) and saves nothing when cancelled or failed. `stop()` ends a job early and saves the answer
-/// streamed until then (a summary marked stopped); nothing when no text was streamed yet. In-app models
+/// streamed until then (a summary marked stopped); nothing when no text was streamed yet. A title job names an
+/// archived chat and saves nothing. In-app models
 /// (`LocalLLMProvider`: Foundation Models, MLX) run the whole job inside `ModelLoadGate` (owner `.llm`), loaded once and unloaded before the gate is released.
 public actor AIService {
     public enum Update: Equatable, Sendable {
@@ -15,8 +16,6 @@ public actor AIService {
         case text(String)
     }
 
-    /// Earlier chat messages sent with a question.
-    static let historyLimit = 4
     static let waitingStatus = "Waiting for live captions or transcription to finish…"
     static let loadingStatus = "Loading the model…"
 
@@ -74,16 +73,19 @@ public actor AIService {
     }
 
     /// Streams the answer to `question`, sent with the transcript (or its BM25 excerpts on small contexts), the saved
-    /// `summary` and the last messages of `history`; then appends the question and the answer to `chat.json`.
-    /// `providerID` is saved with the answer. `language` is the response-language setting (`"auto"` = the question's).
+    /// `summary` and the last `historyLimit` messages of `history` (0 or less = all of them); then appends the
+    /// question and the answer to `chat.json`. `providerID` is saved with the answer. `language` is the
+    /// response-language setting (`"auto"` = the question's).
     public nonisolated func ask(
         question: String, conversation: Conversation, transcript: Transcript, summary: String?,
-        history: [ChatLog.Message], provider: any LLMProvider, providerID: String, model: String, language: String
+        history: [ChatLog.Message], historyLimit: Int, provider: any LLMProvider, providerID: String, model: String,
+        language: String
     ) -> AsyncThrowingStream<Update, Error> {
         let asked = Date()
         return job(provider: provider, model: model) { [self] backend, yield, isStopped in
             // Starts with a question: some APIs reject a conversation whose first turn is an answer.
-            let turns = history.suffix(Self.historyLimit).drop { $0.role != .user }.map {
+            let recent = historyLimit > 0 ? history.suffix(historyLimit) : history[...]
+            let turns = recent.drop { $0.role != .user }.map {
                 LLMMessage(role: $0.role == .user ? .user : .assistant, content: $0.text)
             }
             var language = OutputLanguage.answer(setting: language)
@@ -110,6 +112,28 @@ public actor AIService {
                 ChatLog.Message(role: .assistant, text: answer, provider: providerID, model: model),
             ], folder: conversation.folder)
         }
+    }
+
+    /// A short title for `chat`, from its questions: one `.text` update with the whole cleaned title (none when the
+    /// model gave nothing usable), no text streamed before it; an in-app model's job sends its status lines first.
+    public nonisolated func title(
+        chat: [ChatLog.Message], provider: any LLMProvider, model: String
+    ) -> AsyncThrowingStream<Update, Error> {
+        job(provider: provider, model: model) { backend, yield, _ in
+            let context = await provider.contextWindow(model: model)
+            let answer = try await Self.answer(
+                PromptBuilder.titleMessages(chat: chat), backend: backend, model: model, context: context)
+            let title = Self.titleLine(answer)
+            if !title.isEmpty { yield(.text(title)) }
+        }
+    }
+
+    /// The first non-empty line of a title answer, without surrounding quotes or Markdown marks; at most 60 characters.
+    static func titleLine(_ answer: String) -> String {
+        let marks = CharacterSet(charactersIn: "*#\"'“”‘’").union(.whitespacesAndNewlines)
+        let line = answer.split(whereSeparator: \.isNewline).lazy
+            .map { $0.trimmingCharacters(in: marks) }.first { !$0.isEmpty } ?? ""
+        return String(line.prefix(60)).trimmingCharacters(in: .whitespaces)
     }
 
     /// Serialized here so two answers finishing together cannot drop each other's messages.

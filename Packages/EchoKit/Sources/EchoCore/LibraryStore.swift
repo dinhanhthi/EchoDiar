@@ -85,14 +85,15 @@ public actor LibraryStore {
         emit()
     }
 
-    /// Moves the transcript, summary and chat to the Trash; the conversation is ready to transcribe again. Without
-    /// audio nothing would be left, so the whole conversation goes to the Trash instead.
+    /// Moves the transcript, summary, chat and archived chats to the Trash; the conversation is ready to transcribe
+    /// again. Without audio nothing would be left, so the whole conversation goes to the Trash instead.
     public func deleteTranscriptsAndAI(id: UUID) throws {
         guard let index = conversations.firstIndex(where: { $0.id == id }) else { throw LibraryError.notFound(id) }
         let current = conversations[index]
         guard current.hasAudio else { return try delete(id: id) }
         let fm = FileManager.default
-        for name in [Transcript.fileName, Conversation.summaryFileName, Conversation.summariesFolderName, ChatLog.fileName] {
+        for name in [Transcript.fileName, Conversation.summaryFileName, Conversation.summariesFolderName, ChatLog.fileName,
+                     ChatArchive.folderName] {
             let url = current.folder.appendingPathComponent(name)
             if fm.fileExists(atPath: url.path) { try fm.trashItem(at: url, resultingItemURL: nil) }
         }

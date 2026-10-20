@@ -6,13 +6,14 @@ import Testing
 
 /// Guards the summary job: map-reduce sends status lines and streams only the final reduce, the result is saved as a
 /// version, a cancelled job saves nothing, a stopped job saves what it streamed, and an in-app model is unloaded
-/// before the gate is released.
+/// before the gate is released. Also guards how many earlier chat messages a question sends.
 struct AIServiceTests {
     /// Answers every request with `reply`, in two pieces, and reports a small context to force map-reduce.
     final class FakeProvider: LLMProvider {
         let reply: String
         let context: Int
         let calls = Mutex(0)
+        let received = Mutex<[[LLMMessage]]>([])
 
         init(reply: String, context: Int) {
             self.reply = reply
@@ -21,6 +22,7 @@ struct AIServiceTests {
 
         func stream(messages: [LLMMessage], model: String, maxTokens: Int) -> AsyncThrowingStream<String, Error> {
             calls.withLock { $0 += 1 }
+            received.withLock { $0.append(messages) }
             let middle = reply.index(reply.startIndex, offsetBy: reply.count / 2)
             return AsyncThrowingStream { continuation in
                 continuation.yield(String(reply[..<middle]))
@@ -182,8 +184,8 @@ struct AIServiceTests {
         var streamed = ""
         for try await update in service.ask(
             question: "What was decided?", conversation: conversation, transcript: transcript(turns: 3), summary: nil,
-            history: [], provider: StallingProvider(piece: "Ship on Friday "), providerID: "fake", model: "fake",
-            language: "en") {
+            history: [], historyLimit: 10, provider: StallingProvider(piece: "Ship on Friday "), providerID: "fake",
+            model: "fake", language: "en") {
             if case .text(let text) = update {
                 streamed += text
                 service.stop()
@@ -195,6 +197,29 @@ struct AIServiceTests {
         #expect(messages.map(\.role) == [.user, .assistant])
         #expect(messages.map(\.text) == ["What was decided?", "Ship on Friday"])
         #expect(messages.last?.provider == "fake")
+    }
+
+    @Test(arguments: [
+        (3, ["History Q3", "History A3"]),
+        (0, ["History Q1", "History A1", "History Q2", "History A2", "History Q3", "History A3"]),
+    ])
+    func questionSendsTheLastHistoryMessagesFromAUserTurn(limit: Int, expected: [String]) async throws {
+        let conversation = try makeConversation()
+        defer { try? FileManager.default.removeItem(at: conversation.folder) }
+        let provider = FakeProvider(reply: "Friday.", context: 128_000)
+        let history = (1...3).flatMap { index in
+            [ChatLog.Message(role: .user, text: "History Q\(index)"),
+             ChatLog.Message(role: .assistant, text: "History A\(index)")]
+        }
+
+        for try await _ in AIService(gate: ModelLoadGate()).ask(
+            question: "What was decided?", conversation: conversation, transcript: transcript(turns: 3), summary: nil,
+            history: history, historyLimit: limit, provider: provider, providerID: "fake", model: "fake",
+            language: "en") {}
+
+        let sent = try #require(provider.received.withLock { $0.last }).filter { $0.content.hasPrefix("History ") }
+        #expect(sent.map(\.content) == expected)
+        #expect(sent.first?.role == .user)
     }
 
     @Test
