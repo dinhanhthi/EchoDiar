@@ -213,16 +213,20 @@ private struct APIProviderRow: View {
 
     var body: some View {
         DisclosureGroup(isExpanded: $expanded) {
-            VStack(alignment: .leading, spacing: 8) {
+            VStack(alignment: .leading, spacing: 12) {
                 if isCustom && config.kind == .openAICompatible {
                     FieldRow("Name") {
                         TextField("Name", text: binding(\.displayName)).labelsHidden()
                     }
-                    Picker("Authentication", selection: binding(\.authStyle)) {
-                        Text("Bearer token").tag(ProviderConfig.AuthStyle.bearer)
-                        Text("api-key header").tag(ProviderConfig.AuthStyle.apiKeyHeader)
-                        Text("x-api-key header").tag(ProviderConfig.AuthStyle.xApiKey)
-                        Text("None").tag(ProviderConfig.AuthStyle.none)
+                    FieldRow("Authentication") {
+                        Picker("Authentication", selection: binding(\.authStyle)) {
+                            Text("Bearer token").tag(ProviderConfig.AuthStyle.bearer)
+                            Text("api-key header").tag(ProviderConfig.AuthStyle.apiKeyHeader)
+                            Text("x-api-key header").tag(ProviderConfig.AuthStyle.xApiKey)
+                            Text("None").tag(ProviderConfig.AuthStyle.none)
+                        }
+                        .labelsHidden()
+                        .fixedSize()
                     }
                 }
                 if config.authStyle != .none { APIKeyField(providerID: config.id, model: model, key: $pendingKey) }
@@ -234,22 +238,26 @@ private struct APIProviderRow: View {
                     Text("Required: your resource's https://<resource>.openai.azure.com/openai/v1 URL.")
                         .font(.caption)
                         .foregroundStyle(.secondary)
+                        .inputColumn()
                 }
+                Divider()
                 ModelField(config: config, model: model, prompt: config.id == "azure" ? "Deployment name" : "Model id") {
                     try await model.makeProvider(for: config)?.listModels() ?? []
                 }
                 if CloudTranscription.supports(config) { TranscriptionModelField(config: config, model: model) }
+                Divider()
                 HStack(alignment: .top) {
                     TestButton(title: "Test", config: config, model: model,
                                pendingKey: config.authStyle != .none ? $pendingKey : nil)
                     Spacer()
                     if config.kind == .local || isCustom {
                         Button("Remove", role: .destructive) { model.removeProvider(id: config.id) }
-                            .controlSize(.small)
                     }
                 }
+                .inputColumn()
             }
-            .padding(.vertical, 4)
+            .padding(.top, 6)
+            .padding(.bottom, 4)
             .padding(.leading, disclosureIndent)
         } label: {
             Toggle(isOn: binding(\.enabled)) {
@@ -277,15 +285,20 @@ struct SpeechProviderRow: View {
 
     var body: some View {
         DisclosureGroup(isExpanded: $expanded) {
-            VStack(alignment: .leading, spacing: 8) {
+            VStack(alignment: .leading, spacing: 12) {
                 APIKeyField(providerID: config.id, model: model, key: $pendingKey)
                 if config.preset == "assemblyai" {
                     Text("AssemblyAI picks its model for the language (Universal).")
                         .font(.caption)
                         .foregroundStyle(.secondary)
+                        .inputColumn()
                 } else {
                     TranscriptionModelField(config: config, model: model)
                 }
+                if let url = providerLinks[config.id]?.models {
+                    ExternalLink("Browse models", url: url).inputColumn()
+                }
+                Divider()
                 // A free GET that needs a valid key; no audio is uploaded.
                 TestButton(title: "Test", config: config, model: model, pendingKey: $pendingKey) {
                     guard let key = try KeychainStore.apiKey(forProvider: config.id) else {
@@ -297,8 +310,10 @@ struct SpeechProviderRow: View {
                         throw LLMError.provider(CloudTranscription.failureReason(error))
                     }
                 }
+                .inputColumn()
             }
-            .padding(.vertical, 4)
+            .padding(.top, 6)
+            .padding(.bottom, 4)
             .padding(.leading, disclosureIndent)
         } label: {
             Toggle(isOn: Binding(get: { config.enabled },
@@ -322,7 +337,7 @@ private struct CLIProviderRow: View {
 
     var body: some View {
         DisclosureGroup(isExpanded: $expanded) {
-            VStack(alignment: .leading, spacing: 8) {
+            VStack(alignment: .leading, spacing: 12) {
                 FieldRow("Path override") {
                     TextField("Path override", text: binding(\.baseURL), prompt: Text("Search PATH"))
                         .labelsHidden()
@@ -335,11 +350,15 @@ private struct CLIProviderRow: View {
                     Label(note, systemImage: "exclamationmark.shield")
                         .font(.caption)
                         .foregroundStyle(.secondary)
+                        .inputColumn()
                 }
+                Divider()
                 TestButton(title: "Test (uses your subscription)", config: config, model: model)
                     .disabled(!isInstalled)
+                    .inputColumn()
             }
-            .padding(.vertical, 4)
+            .padding(.top, 6)
+            .padding(.bottom, 4)
             .padding(.leading, disclosureIndent)
         } label: {
             Toggle(isOn: binding(\.enabled)) {
@@ -385,8 +404,65 @@ private struct CLIProviderRow: View {
 /// Leading inset of an expanded row's content, so it lines up with the row's title after the disclosure chevron.
 private let disclosureIndent = TitleChevronDisclosureStyle.indent
 
-/// A label, a gap, then the input stretched over the rest of the row, followed by its buttons. Plain labeled fields
-/// in the grouped form right-align their text or butt against the label.
+/// Width of the label column of an expanded row: every input starts at the same x.
+private let fieldLabelWidth: CGFloat = 136
+private let fieldGap: CGFloat = 12
+
+/// Where to get a preset's API key and look up its model ids; custom endpoints, local hosts and CLIs have none.
+private let providerLinks: [String: (keys: URL, models: URL)] = [
+    "openai": (URL(string: "https://platform.openai.com/api-keys")!,
+               URL(string: "https://developers.openai.com/api/docs/models")!),
+    "anthropic": (URL(string: "https://platform.claude.com/settings/keys")!,
+                  URL(string: "https://platform.claude.com/docs/en/models/overview")!),
+    "xai": (URL(string: "https://console.x.ai")!, URL(string: "https://docs.x.ai/developers/models")!),
+    "gemini": (URL(string: "https://aistudio.google.com/apikey")!,
+               URL(string: "https://ai.google.dev/gemini-api/docs/models")!),
+    "mistral": (URL(string: "https://console.mistral.ai/api-keys")!, URL(string: "https://docs.mistral.ai/models")!),
+    "azure": (URL(string: "https://ai.azure.com")!,
+              URL(string: "https://learn.microsoft.com/azure/ai-foundry/openai/concepts/models")!),
+    "openrouter": (URL(string: "https://openrouter.ai/settings/keys")!, URL(string: "https://openrouter.ai/models")!),
+    "groq": (URL(string: "https://console.groq.com/keys")!, URL(string: "https://console.groq.com/docs/models")!),
+    "deepseek": (URL(string: "https://platform.deepseek.com/api_keys")!,
+                 URL(string: "https://api-docs.deepseek.com/quick_start/pricing")!),
+    "elevenlabs": (URL(string: "https://elevenlabs.io/app/developers/api-keys")!,
+                   URL(string: "https://elevenlabs.io/docs/overview/models")!),
+    "deepgram": (URL(string: "https://console.deepgram.com")!,
+                 URL(string: "https://developers.deepgram.com/docs/models-languages-overview")!),
+    "assemblyai": (URL(string: "https://www.assemblyai.com/dashboard/api-keys")!,
+                   URL(string: "https://www.assemblyai.com/docs/getting-started/models")!),
+]
+
+private extension View {
+    /// Lines a note, error or button row up with the inputs, past the label column.
+    func inputColumn() -> some View {
+        padding(.leading, fieldLabelWidth + fieldGap)
+    }
+}
+
+/// A link that opens in the browser, with an arrow saying so.
+private struct ExternalLink: View {
+    let title: LocalizedStringKey
+    let url: URL
+
+    init(_ title: LocalizedStringKey, url: URL) {
+        self.title = title
+        self.url = url
+    }
+
+    var body: some View {
+        Link(destination: url) {
+            HStack(spacing: 2) {
+                Text(title)
+                Image(systemName: "arrow.up.right").imageScale(.small)
+            }
+        }
+        .font(.callout)
+        .fixedSize()
+    }
+}
+
+/// A secondary label in a fixed-width column, then the input stretched over the rest of the row, followed by its
+/// buttons. Plain labeled fields in the grouped form right-align their text or butt against the label.
 private struct FieldRow<Input: View>: View {
     let label: LocalizedStringKey
     @ViewBuilder let input: Input
@@ -397,8 +473,10 @@ private struct FieldRow<Input: View>: View {
     }
 
     var body: some View {
-        HStack(spacing: 12) {
+        HStack(alignment: .firstTextBaseline, spacing: fieldGap) {
             Text(label)
+                .foregroundStyle(.secondary)
+                .frame(width: fieldLabelWidth, alignment: .leading)
             input.textFieldStyle(.roundedBorder)
         }
     }
@@ -429,11 +507,12 @@ private struct APIKeyField: View {
                         .font(.caption)
                         .foregroundStyle(.green)
                     Button("Remove") { perform { try KeychainStore.deleteAPIKey(forProvider: providerID) } }
-                        .controlSize(.small)
+                } else if let url = providerLinks[providerID]?.keys {
+                    ExternalLink("Get an API key", url: url)
                 }
             }
             if let error {
-                Text(error).font(.caption).foregroundStyle(.red)
+                Text(error).font(.caption).foregroundStyle(.red).inputColumn()
             }
         }
         .onAppear(perform: refresh)
@@ -482,7 +561,6 @@ private struct TranscriptionModelField: View {
                     }
                 }
                 .fixedSize()
-                .controlSize(.small)
             }
         }
     }
@@ -506,7 +584,7 @@ private struct ModelField: View {
     private static let longList = 8
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 4) {
+        VStack(alignment: .leading, spacing: 8) {
             FieldRow("Model") {
                 TextField("Model", text: modelBinding, prompt: Text(prompt)).labelsHidden()
                 if let models, !models.isEmpty {
@@ -516,17 +594,18 @@ private struct ModelField: View {
                         }
                     }
                     .fixedSize()
-                    .controlSize(.small)
                 }
                 Button("Load models") { Task { await loadModels() } }
-                    .controlSize(.small)
                     .disabled(loading)
                 if loading { ProgressView().controlSize(.small) }
             }
+            if let url = providerLinks[config.id]?.models {
+                ExternalLink("Browse models", url: url).inputColumn()
+            }
             if let error {
-                Text(error).font(.caption).foregroundStyle(.red).lineLimit(2)
+                Text(error).font(.caption).foregroundStyle(.red).lineLimit(2).inputColumn()
             } else if models?.isEmpty == true {
-                Text("No models listed; type the model id.").font(.caption).foregroundStyle(.secondary)
+                Text("No models listed; type the model id.").font(.caption).foregroundStyle(.secondary).inputColumn()
             }
             shownModels
         }
@@ -539,13 +618,15 @@ private struct ModelField: View {
         // Only while its field is shown: a filter left over from a longer list would hide checkboxes for good.
         let term = choices.count > Self.longList ? filter.trimmingCharacters(in: .whitespaces) : ""
         let shown = term.isEmpty ? choices : choices.filter { $0.localizedStandardContains(term) }
-        VStack(alignment: .leading, spacing: 4) {
+        let box = RoundedRectangle(cornerRadius: 8, style: .continuous)
+        VStack(alignment: .leading, spacing: 8) {
             Text("In the AI pane's model menu")
+                .font(.caption)
+                .foregroundStyle(.secondary)
             if choices.count > Self.longList {
                 TextField("Filter", text: $filter, prompt: Text("Filter models"))
                     .labelsHidden()
                     .textFieldStyle(.roundedBorder)
-                    .controlSize(.small)
                 ScrollView {
                     checklist(shown, defaultID: defaultID)
                 }
@@ -556,8 +637,7 @@ private struct ModelField: View {
             TextField("Add a model", text: $addedModel, prompt: Text("Add a model id"))
                 .labelsHidden()
                 .textFieldStyle(.roundedBorder)
-                .controlSize(.small)
-                .frame(maxWidth: 220)
+                .frame(maxWidth: 260)
                 .onSubmit(addModel)
             if models == nil {
                 Text("Type a model id and press Return, or load the models to pick from.")
@@ -565,6 +645,11 @@ private struct ModelField: View {
                     .foregroundStyle(.secondary)
             }
         }
+        .padding(12)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(box.fill(Color.black.opacity(0.15)))
+        .overlay(box.strokeBorder(Palette.surfaceBorder, lineWidth: 1).allowsHitTesting(false))
+        .inputColumn()
     }
 
     private func addModel() {
@@ -584,7 +669,7 @@ private struct ModelField: View {
     }
 
     private func checklist(_ ids: [String], defaultID: String) -> some View {
-        VStack(alignment: .leading, spacing: 2) {
+        VStack(alignment: .leading, spacing: 6) {
             ForEach(ids, id: \.self) { id in
                 Toggle(isOn: shownBinding(id, defaultID: defaultID)) {
                     Text(id == defaultID ? "\(id) (default)" : id)
@@ -639,14 +724,12 @@ private struct TestButton: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 4) {
-            HStack(spacing: 6) {
+            HStack(spacing: 8) {
                 Button(task == nil ? title : "Cancel") {
                     if let task { task.cancel() } else { run() }
                 }
-                .controlSize(.small)
                 if let pendingKey {
                     Button("Save") { _ = save(pendingKey) }
-                        .controlSize(.small)
                         .disabled(task != nil || pendingKey.wrappedValue.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
                 }
                 if task != nil {
