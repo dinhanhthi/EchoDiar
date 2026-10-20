@@ -236,7 +236,7 @@ struct TranscriptionStatus: View {
                 if progress.step == .queued || progress.step == .deferred {
                     ProgressView().controlSize(.mini)
                 } else {
-                    ProgressView(value: progress.fraction).progressViewStyle(.circular).controlSize(.mini)
+                    ProgressRing(fraction: progress.fraction)
                 }
                 Text(Self.stepText(progress.step))
             }
@@ -434,5 +434,23 @@ private enum AppIconCache {
             .map { NSWorkspace.shared.icon(forFile: $0.path) }
         icons[bundleID] = icon
         return icon
+    }
+}
+
+/// A mini circular progress, drawn here: AppKit's determinate circular indicator paints a square behind itself.
+private struct ProgressRing: View {
+    let fraction: Double
+
+    var body: some View {
+        ZStack {
+            Circle().stroke(Palette.hoverFill, lineWidth: 2)
+            Circle()
+                .trim(from: 0, to: fraction)
+                .stroke(Color.accentColor, style: StrokeStyle(lineWidth: 2, lineCap: .round))
+                .rotationEffect(.degrees(-90))
+        }
+        .frame(width: 10, height: 10)
+        .accessibilityElement()
+        .accessibilityValue(fraction.formatted(.percent.precision(.fractionLength(0))))
     }
 }
