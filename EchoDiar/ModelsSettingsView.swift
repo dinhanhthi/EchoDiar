@@ -80,7 +80,7 @@ struct ModelsSettingsView: View {
                 Text("Nemotron is recommended for Vietnamese live captions (Vietnamese is experimental). Without the picked model installed, another installed live model is used.")
             }
             Picker(selection: model.setting(\.modelIdleMinutes)) {
-                ForEach(AppSettings.modelIdleMinutesOptions, id: \.self) { Text("\($0) min").tag($0) }
+                ForEach(idleMinutesOptions, id: \.self) { Text("\($0) min").tag($0) }
             } label: {
                 Text("Free unused models after")
                 Text("While a recording stays paused this long, the live transcript model is freed; it loads again when you resume. Other models are freed as soon as their job ends.")
@@ -173,6 +173,13 @@ struct ModelsSettingsView: View {
     private var liveTranscriptEngine: Binding<String> {
         Binding(get: { model.settings.liveTranscriptEngine },
                 set: { id in model.updateSettings { $0.liveTranscriptEngine = id } })
+    }
+
+    /// The offered idle times, plus a hand-edited one, so the picker never shows an empty selection.
+    private var idleMinutesOptions: [Int] {
+        let current = model.settings.modelIdleMinutes
+        let options = AppSettings.modelIdleMinutesOptions
+        return options.contains(current) ? options : (options + [current]).sorted()
     }
 
     private var defaultLanguage: Binding<String> {
@@ -277,7 +284,9 @@ struct ModelRow: View {
                 .foregroundStyle(.green)
             Button("Delete") { model.deleteModel(entry.id) }
                 .controlSize(.small)
-                .disabled(model.transcriptionProgress.keys.contains(where: model.isTranscribing))
+                // Live captions load their model again after a long pause: deleting it meanwhile would end them.
+                .disabled(model.transcriptionProgress.keys.contains(where: model.isTranscribing)
+                          || model.liveTranscript != nil)
         } else {
             Button("Download") { model.downloadModel(entry.id) }
                 .controlSize(.small)

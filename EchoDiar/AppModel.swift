@@ -1349,6 +1349,8 @@ extension AppModel {
             guard aiTextFlush == nil else { return }
             aiTextFlush = Task { [weak self] in
                 try? await Task.sleep(for: .milliseconds(50))
+                // Cancelled by an earlier flush: the next job's scheduled flush is not this one's to clear.
+                guard !Task.isCancelled else { return }
                 self?.flushAIText()
             }
         }
