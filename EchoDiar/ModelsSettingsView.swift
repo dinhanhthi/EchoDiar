@@ -186,7 +186,7 @@ struct ModelRow: View {
                     .lineLimit(1)
                     .truncationMode(.tail)
                     .help(entry.displayName)
-                if isDefault { Badge(text: "Default", color: .accentColor) }
+                if isDefault { Badge(text: "Default", color: .accentColor, filled: true) }
                 Spacer(minLength: 8)
                 actions
             }
@@ -378,7 +378,7 @@ private struct CloudEngineRow: View {
                 Text(configured ? model.cloudEngineName(config) : config.displayName)
                     .lineLimit(1)
                     .truncationMode(.tail)
-                if configured && model.defaultASRModelID == engineID { Badge(text: "Default", color: .accentColor) }
+                if configured && model.defaultASRModelID == engineID { Badge(text: "Default", color: .accentColor, filled: true) }
                 Spacer(minLength: 8)
                 if !configured {
                     Button("Set Up…", action: setUp)
@@ -501,14 +501,16 @@ private struct CloudModelField: View {
 private struct Badge: View {
     let text: String
     var color: Color = .secondary
+    /// White on a solid fill, for the one badge that must stand out ("Default"); else tinted text on a light fill.
+    var filled = false
 
     var body: some View {
         Text(text)
-            .font(.caption2.weight(.medium))
-            .foregroundStyle(color)
+            .font(.caption2.weight(filled ? .semibold : .medium))
+            .foregroundStyle(filled ? Color.white : color)
             .lineLimit(1)
             .padding(.horizontal, 6)
             .padding(.vertical, 2)
-            .background(color.opacity(0.18), in: Capsule())
+            .background(filled ? color : color.opacity(0.18), in: Capsule())
     }
 }
