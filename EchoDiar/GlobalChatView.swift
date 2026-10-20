@@ -6,8 +6,8 @@ import SwiftUI
 /// The chat across the library (`AppModel.globalChatOpen`): questions answered from the indexed conversations, each
 /// answer with its numbered sources under it. `[n mm:ss]` / `[n]` citations and the sources open the conversation at
 /// that moment or its summary, the chat staying beside it. Laid out like the Chat tab (`AIPanelView`): the messages in
-/// a card, then a bar with the menus, "Start a fresh chat", History and the question; the menus take two rows when the
-/// pane is narrow (the 300 pt sidebar of the wide layout). With RAG off, an intro and the way to Settings › RAG.
+/// a card, then a bar with the menus, "Start a fresh chat" and History in one row, and the question; in a narrow pane
+/// (the 360 pt sidebar of the wide layout) the model name truncates. With RAG off, an intro and the way to Settings › RAG.
 /// Padded like `TranscriptView`'s panes, so it fills its slot as it is.
 struct GlobalChatView: View {
     let model: AppModel
@@ -269,7 +269,7 @@ struct GlobalChatView: View {
             }
             .disabled(libraryJob != nil)
         }
-        // At most the Chat tab's width: the 300 pt sidebar leaves it less.
+        // At most the Chat tab's width: the 360 pt sidebar leaves it less.
         .frame(maxWidth: 260)
         .frame(maxHeight: .infinity, alignment: .top)
         .modifier(GlassCard(cornerRadius: 14, raised: true))
@@ -326,28 +326,20 @@ struct GlobalChatView: View {
 
     // MARK: - Bottom bar
 
-    /// A job of a conversation and the index's progress, the menus, "Start a fresh chat" and History (one row, or two
-    /// when narrow), the question with Send, then the missing-model warning.
+    /// A job of a conversation and the index's progress, the menus, "Start a fresh chat" and History (one row), the
+    /// question with Send, then the missing-model warning.
     private var bottomBar: some View {
         VStack(alignment: .leading, spacing: 8) {
             busyElsewhere
             indexingLine
-            ViewThatFits(in: .horizontal) {
-                HStack(spacing: 8) {
-                    menus
-                    chatButtons
-                    Spacer(minLength: 0)
-                }
-                VStack(alignment: .leading, spacing: 8) {
-                    HStack(spacing: 8) {
-                        menus
-                        Spacer(minLength: 0)
-                    }
-                    HStack(spacing: 8) {
-                        chatButtons
-                        Spacer(minLength: 0)
-                    }
-                }
+            // One row at any width: only the model menu shrinks (its name truncates), the rest keep their size.
+            HStack(spacing: 8) {
+                AIModelMenu(model: model, height: Self.chatMenuHeight)
+                AILanguageMenu(model: model, height: Self.chatMenuHeight)
+                    .fixedSize()
+                chatButtons
+                    .fixedSize()
+                Spacer(minLength: 0)
             }
             questionRow
             AISetupHints(model: model)
@@ -357,11 +349,6 @@ struct GlobalChatView: View {
         .padding(.horizontal, 14)
         .padding(.vertical, 10)
         .modifier(GlassCard(cornerRadius: 20))
-    }
-
-    @ViewBuilder private var menus: some View {
-        AIModelMenu(model: model, height: Self.chatMenuHeight)
-        AILanguageMenu(model: model, height: Self.chatMenuHeight)
     }
 
     @ViewBuilder private var chatButtons: some View {
@@ -379,7 +366,7 @@ struct GlobalChatView: View {
     /// the bottom of the field: centered with it while it has one line.
     private var questionRow: some View {
         HStack(alignment: .bottom, spacing: 8) {
-            TextField("Ask about your conversations", text: $question, axis: .vertical)
+            TextField("Ask anything…", text: $question, axis: .vertical)
                 .textFieldStyle(.plain)
                 .focused($questionFocused)
                 .lineLimit(1...6)

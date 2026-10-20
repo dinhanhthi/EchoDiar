@@ -519,9 +519,10 @@ struct MainView: View {
     /// when the conversation is gone or the recording has ended.
     @ViewBuilder private var entryPane: some View {
         if entryShown {
-            HStack(spacing: 0) {
+            // Both panes pad 12 pt on every side; overlapping those paddings by 6 pt leaves an 18 pt gap between them.
+            HStack(spacing: -6) {
                 chatOr(libraryPane(compact: true, selectedID: selectedID))
-                    .frame(width: 300)
+                    .frame(width: 360)
                 entryDetail
             }
         } else {

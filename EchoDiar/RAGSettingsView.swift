@@ -2,9 +2,9 @@ import EchoAI
 import EchoCore
 import SwiftUI
 
-/// The RAG tab: the opt-in switch of the library chat, the embedder of its index (the catalog's MLX models with their
-/// downloads, Apple's built-in one, or an enabled OpenAI-compatible or local-host provider with its model) and the
-/// index's status with Rebuild. Picking a cloud embedder asks once per provider and destination
+/// The RAG tab: the opt-in switch of the library chat, the index's status with Rebuild, then the embedder of the index
+/// (the catalog's MLX models with their downloads, Apple's built-in one, or an enabled OpenAI-compatible or local-host
+/// provider with its model). Picking a cloud embedder asks once per provider and destination
 /// (`AppSettings.cloudEmbeddingConfirmed`).
 struct RAGSettingsView: View {
     let model: AppModel
@@ -19,9 +19,9 @@ struct RAGSettingsView: View {
     var body: some View {
         Form {
             enableSection
+            statusSection
             localSection
             apiSection
-            statusSection
         }
         .formStyle(.grouped)
         .task { model.refreshInstalledModels() }
