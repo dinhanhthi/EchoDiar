@@ -208,7 +208,7 @@ struct CapsuleTabs<Tab: Hashable>: View {
 /// on the header row toggles it, not only on the chevron; the row's own controls (its switch) keep their clicks.
 struct TitleChevronDisclosureStyle: DisclosureGroupStyle {
     /// The chevron's width: content inset by it lines up with the title.
-    static let indent: CGFloat = 18
+    nonisolated static let indent: CGFloat = 18
 
     func makeBody(configuration: Configuration) -> some View {
         TitleChevronDisclosure(configuration: configuration)
