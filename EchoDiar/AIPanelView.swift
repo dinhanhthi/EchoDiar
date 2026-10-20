@@ -7,8 +7,8 @@ import SwiftUI
 /// Summary (the kept summaries, the newest first with a menu for the earlier ones, Summarize / Re-summarize). The bar
 /// at the bottom has menus for the model (every usable provider with its models) and the output language with the "i"
 /// (where the data goes), then "Copy as prompt" and the tab's action; in Chat the menus sit above the question row,
-/// with History (the earlier chats, in a panel at the pane's trailing edge), and "Start a fresh chat" sits below the
-/// bar. `[mm:ss]` citations open the transcript at that time.
+/// with "Start a fresh chat" and History (the earlier chats, in a panel at the pane's trailing edge). `[mm:ss]`
+/// citations open the transcript at that time.
 struct AIPanelView: View {
     let conversation: Conversation
     let model: AppModel
@@ -23,6 +23,8 @@ struct AIPanelView: View {
     /// The summary version shown; nil = the newest.
     @State private var shownVersion: Int?
     @State private var chat: [ChatLog.Message] = []
+    /// The open chat's title, when it was resumed from the history with one.
+    @State private var chatTitle: String?
     @State private var question = ""
     @FocusState private var questionFocused: Bool
     @State private var toast: String?
@@ -58,10 +60,7 @@ struct AIPanelView: View {
             .frame(maxWidth: .infinity, maxHeight: .infinity)
             .clipped()
             errorText
-            VStack(spacing: 6) {
-                bottomBar
-                if model.detailTab == .chat { freshChatButton }
-            }
+            bottomBar
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
         .overlay(alignment: .bottom) { toastView }
@@ -196,8 +195,8 @@ struct AIPanelView: View {
 
     // MARK: - History
 
-    /// The earlier chats, newest first: a click makes one the open chat (the open one goes to the history), not while
-    /// an answer streams.
+    /// The open chat, then the earlier ones, newest first: a click makes one the open chat (the open one goes to the
+    /// history), not while an answer streams.
     private var historyPanel: some View {
         VStack(alignment: .leading, spacing: 4) {
             HStack {
@@ -212,24 +211,40 @@ struct AIPanelView: View {
             }
             .padding(.horizontal, 14)
             .padding(.top, 12)
-            if archives.isEmpty {
-                Text("No earlier chats")
-                    .foregroundStyle(.secondary)
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
-            } else {
-                ScrollView {
-                    VStack(spacing: 2) {
-                        ForEach(archives) { entry in historyRow(entry) }
+            ScrollView {
+                VStack(spacing: 2) {
+                    currentChatRow
+                    ForEach(archives) { entry in historyRow(entry) }
+                    if archives.isEmpty {
+                        Text("No earlier chats")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                            .padding(.top, 8)
                     }
-                    .padding(6)
                 }
-                .disabled(questionJob != nil)
+                .padding(6)
             }
+            .disabled(questionJob != nil)
         }
         .frame(width: 260)
         .frame(maxHeight: .infinity, alignment: .top)
         .modifier(GlassCard(cornerRadius: 14, raised: true))
         .padding(8)
+    }
+
+    /// The open chat, first and highlighted: its title, else its first question; "New chat" while it is empty.
+    private var currentChatRow: some View {
+        VStack(alignment: .leading, spacing: 2) {
+            // The title may come from a model: plain text, never Markdown.
+            Text(chatTitle ?? chat.first { $0.role == .user }?.text ?? String(localized: "New chat")).lineLimit(2)
+            (chat.isEmpty ? Text("Current") : Text("Current") + Text(verbatim: " · ") + Text("\(chat.count) messages"))
+                .font(.caption)
+                .foregroundStyle(.secondary)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(.horizontal, 8)
+        .padding(.vertical, 6)
+        .background(RoundedRectangle(cornerRadius: 8, style: .continuous).fill(Palette.hoverFill))
     }
 
     private func historyRow(_ entry: ChatArchive.Entry) -> some View {
@@ -358,8 +373,8 @@ struct AIPanelView: View {
     // MARK: - Bottom bar
 
     /// Summary: one row with the model menu, the "i" (where the data goes) and the language menu, then "Copy as
-    /// prompt" and the tab's action. Chat: the menus, the "i" and History (smaller), then the question with "Copy as
-    /// prompt" and Send. Then the missing-model warning.
+    /// prompt" and the tab's action. Chat: the menus, the "i", "Start a fresh chat" and History (smaller), then the
+    /// question with "Copy as prompt" and Send. Then the missing-model warning.
     private var bottomBar: some View {
         VStack(alignment: .leading, spacing: 8) {
             busyElsewhere
@@ -368,6 +383,7 @@ struct AIPanelView: View {
                     modelMenu(height: Self.chatMenuHeight)
                     languageMenu(height: Self.chatMenuHeight)
                     dataNotesButton(height: Self.chatMenuHeight)
+                    freshChatButton
                     Button {
                         withAnimation(.snappy(duration: 0.25)) { showingHistory.toggle() }
                     } label: {
@@ -449,11 +465,10 @@ struct AIPanelView: View {
     /// Archives the chat so the next question starts without history; not while it is empty or an answer streams.
     private var freshChatButton: some View {
         Button { model.startFreshChat(conversation) } label: {
-            Label("Start a fresh chat", systemImage: "plus.bubble")
+            Label("Start a fresh chat", systemImage: "plus.bubble").labelStyle(.iconOnly)
         }
-        .buttonStyle(.plain)
-        .font(.caption)
-        .foregroundStyle(.secondary)
+        .buttonStyle(BottomBarButtonStyle(height: Self.chatMenuHeight, horizontalPadding: 0))
+        .help("Start a fresh chat")
         .disabled(chat.isEmpty || questionJob != nil)
     }
 
@@ -665,11 +680,11 @@ struct AIPanelView: View {
 
     private func loadChat() async {
         let folder = conversation.folder
-        let (messages, entries) = await Task.detached(priority: .utility) {
-            (ChatLog.read(from: folder).messages, ChatArchive.entries(in: folder))
+        let (log, entries) = await Task.detached(priority: .utility) {
+            (ChatLog.read(from: folder), ChatArchive.entries(in: folder))
         }.value
         guard !Task.isCancelled else { return }
-        (chat, archives) = (messages, entries)
+        (chat, chatTitle, archives) = (log.messages, log.title, entries)
     }
 
     private func start(_ kind: AppModel.AIJob.Kind) {
