@@ -1,8 +1,6 @@
 import AppKit
-import CoreAudio
-#if DEBUG
 import AVFoundation
-#endif
+import CoreAudio
 import EchoAI
 import EchoAudio
 import EchoCore
