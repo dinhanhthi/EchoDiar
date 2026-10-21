@@ -11,7 +11,7 @@
 	<key>SUFeedURL</key>
 	<string>https://ed.dinhanhthi.com/appcast.xml</string>
 	<key>SUPublicEDKey</key>
-	<string></string>
+	<string>u0wUSj99mzOTnuiK+2eOpy2zFu3eCuV82kjjPRVpXdU=</string>
 	<key>SUEnableAutomaticChecks</key>
 	<true/>
 	<key>SUVerifyUpdateBeforeExtraction</key>
