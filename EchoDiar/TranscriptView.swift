@@ -731,8 +731,8 @@ private struct SegmentList: View {
     }
 }
 
-/// Timestamp, speaker dot and name, selectable text. A click anywhere on the row, the text included, plays from
-/// the segment start; a drag still selects the text.
+/// Timestamp, speaker dot and name, text. A click anywhere on the row, the text included, plays from the segment
+/// start. The text is not selectable: selectable text shows an I-beam over the row's pointer.
 private struct SegmentRow: View {
     let segment: Transcript.Segment
     let name: String
@@ -766,9 +766,6 @@ private struct SegmentRow: View {
                     Text(name).font(.caption.weight(.semibold))
                 }
                 Text(segment.text)
-                    .textSelection(.enabled)
-                    // The selectable text takes the click for itself; a tap here plays alongside it.
-                    .simultaneousGesture(TapGesture().onEnded(play))
                     .frame(maxWidth: .infinity, alignment: .leading)
             }
         }
