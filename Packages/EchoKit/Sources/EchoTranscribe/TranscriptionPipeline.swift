@@ -8,7 +8,7 @@ import Foundation
 /// Batch transcription of recording folders, one job at a time: extract each channel to 16 kHz mono, skip silent
 /// channels, ASR mic, ASR system, diarize system (the cloud diarizer when given, else or after its failure the
 /// local one), merge, write `transcript.json`. Models are loaded inside each step and unloaded before the next,
-/// while the job holds the `ModelLoadGate` (it waits while live captions hold it). A job with a usable `prior` keeps
+/// while the job holds the `ModelLoadGate` (it waits while a recording transcriber holds it). A job with a usable `prior` keeps
 /// its segments and transcribes only its gaps, taking the gate only for gap fill or diarization. Never touches
 /// EchoAudio: `AppModel` runs compression first.
 public actor TranscriptionPipeline {
@@ -19,7 +19,7 @@ public actor TranscriptionPipeline {
     public static let engines: [ModelEntry.Runtime: EngineFactory] = {
         var engines: [ModelEntry.Runtime: EngineFactory] = [
             .whisperKit: { WhisperKitEngine(entry: $0, folder: $1) },
-            // Parakeet v3 / Ultra; Nemotron is live only and the diarizer is not an ASR entry, so neither resolves here.
+            // Parakeet v3 / Ultra; the diarizer is not an ASR entry, so it never resolves here.
             .fluidAudio: { ParakeetEngine(entry: $0, folder: $1) },
             .speechSwift: { Qwen3ASREngine(entry: $0, folder: $1) },
         ]
@@ -488,7 +488,7 @@ public actor TranscriptionPipeline {
     /// Explicit engine, else `defaultEngine(language:isUsable:)`, else "Needs model" (the default).
     private func resolveEngine(_ requested: String?, language: String) throws -> ModelEntry {
         if let requested {
-            guard let entry = ModelCatalog.entry(id: requested), entry.kind == .asr, !entry.liveOnly,
+            guard let entry = ModelCatalog.entry(id: requested), entry.kind == .asr,
                   Self.engines[entry.runtime] != nil else {
                 throw TranscriptionError.unknownEngine(requested)
             }
@@ -504,7 +504,7 @@ public actor TranscriptionPipeline {
     /// With no engine chosen: the catalog default if usable → the smallest usable WhisperKit entry selectable for
     /// `language` → the first usable batch entry that `supports` `language`, then selectable for it, in catalog order.
     static func defaultEngine(language: String, isUsable: (ModelEntry) -> Bool) -> ModelEntry? {
-        let installed = ModelCatalog.asr.filter { !$0.liveOnly && engines[$0.runtime] != nil && isUsable($0) }
+        let installed = ModelCatalog.asr.filter { engines[$0.runtime] != nil && isUsable($0) }
         if let entry = installed.first(where: \.isDefault) { return entry }
         return installed
             .filter { $0.runtime == .whisperKit && $0.isSelectable(for: language) }
@@ -516,7 +516,7 @@ public actor TranscriptionPipeline {
     /// The Models tab's default `id` when it is a usable batch entry that `supports` `language`, else nil for
     /// `defaultEngine(language:isUsable:)`: a stored default is a preference, not an explicit choice.
     public static func preferredEngineID(_ id: String?, language: String, isUsable: (ModelEntry) -> Bool) -> String? {
-        guard let id, let entry = ModelCatalog.entry(id: id), entry.kind == .asr, !entry.liveOnly,
+        guard let id, let entry = ModelCatalog.entry(id: id), entry.kind == .asr,
               engines[entry.runtime] != nil, isUsable(entry), supports(entry, language: language) else { return nil }
         return id
     }
@@ -530,7 +530,7 @@ public actor TranscriptionPipeline {
         let selected: ModelEntry?
         if let engineID {
             selected = ModelCatalog.entry(id: engineID).flatMap { entry in
-                entry.kind == .asr && !entry.liveOnly && engines[entry.runtime] != nil && isUsable(entry) ? entry : nil
+                entry.kind == .asr && engines[entry.runtime] != nil && isUsable(entry) ? entry : nil
             }
         } else {
             selected = defaultEngine(language: language, isUsable: isUsable)
@@ -544,9 +544,9 @@ public actor TranscriptionPipeline {
         return resolved.engineFallback == nil ? entry : nil
     }
 
-    /// A batch ASR entry that also loads as a `TranscriptionSession`: WhisperKit or Parakeet (Nemotron is live only).
+    /// A batch ASR entry that also loads as a `TranscriptionSession`: WhisperKit or Parakeet.
     static func transcribesChunks(_ entry: ModelEntry) -> Bool {
-        entry.kind == .asr && !entry.liveOnly && (entry.runtime == .whisperKit || entry.runtime == .fluidAudio)
+        entry.kind == .asr && (entry.runtime == .whisperKit || entry.runtime == .fluidAudio)
     }
 
     /// Selectable for `language` and, for a code, listed in `supportedLanguages(for:)` by its primary code. An

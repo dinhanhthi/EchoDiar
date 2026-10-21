@@ -43,11 +43,15 @@ public actor RecordingTranscriber {
         public var lines: [Line]
         /// Seconds of speech waiting to be decoded, both channels summed.
         public var pendingSeconds: Double
+        /// Decoding is held back while the Mac is hot or in Low Power Mode (`deferWhenConstrained`); read at each
+        /// publish, so within a tick.
+        public var deferred: Bool
 
-        public init(state: State, lines: [Line] = [], pendingSeconds: Double = 0) {
+        public init(state: State, lines: [Line] = [], pendingSeconds: Double = 0, deferred: Bool = false) {
             self.state = state
             self.lines = lines
             self.pendingSeconds = pendingSeconds
+            self.deferred = deferred
         }
     }
 
@@ -246,6 +250,7 @@ public actor RecordingTranscriber {
     private func publish(_ state: State) {
         snapshot.state = state
         snapshot.pendingSeconds = buffer.withLock { $0.pendingSeconds }
+        snapshot.deferred = deferWhenConstrained && TranscriptionPipeline.isConstrained
         guard snapshot != published else { return }
         published = snapshot
         updatesContinuation.yield(snapshot)

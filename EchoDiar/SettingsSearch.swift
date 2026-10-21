@@ -19,7 +19,7 @@ struct SettingsSearchItem: Identifiable {
         return texts.contains { $0.localizedStandardContains(term) }
     }
 
-    /// "Recording › Live transcript", with the inner tab in between when there is one and it is not the title itself.
+    /// "Transcription › General › Default language", with the inner tab in between when there is one and it is not the title itself.
     var path: String {
         let title = String(localized: title)
         let subTab = subTabTitle == title ? nil : subTabTitle
@@ -73,9 +73,8 @@ struct SettingsSearchItem: Identifiable {
         // Transcription
         .init(title: "Default language", keywords: ["language", "English", "French", "Vietnamese"],
               tab: .transcription, subTab: "general"),
-        .init(title: "Live transcript", keywords: ["captions", "real-time", "subtitles"],
-              tab: .transcription, subTab: "general"),
-        .init(title: "Live transcript engine", keywords: ["captions", "real-time", "Whisper", "Nemotron"],
+        .init(title: "Transcribe while recording",
+              keywords: ["live transcript", "captions", "real-time", "subtitles", "WhisperKit", "Parakeet"],
               tab: .transcription, subTab: "general"),
         .init(title: "Free unused models after", keywords: ["memory", "RAM", "idle", "unload", "pause"],
               tab: .transcription, subTab: "general"),

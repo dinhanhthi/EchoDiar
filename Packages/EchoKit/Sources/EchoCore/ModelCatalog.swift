@@ -65,8 +65,6 @@ public struct ModelEntry: Sendable, Hashable, Identifiable {
     /// Minimum macOS major version.
     public var minimumMacOS: Int
     public var streaming: Bool
-    /// Only used for live captions; batch routing never selects it.
-    public var liveOnly: Bool
     /// Catalog default for its kind (one per kind).
     public var isDefault: Bool
     /// Vietnamese-only model: hidden from the engine picker unless the language is `vi`.
@@ -94,7 +92,6 @@ public struct ModelEntry: Sendable, Hashable, Identifiable {
         license: String,
         minimumMacOS: Int = 15,
         streaming: Bool = false,
-        liveOnly: Bool = false,
         isDefault: Bool = false,
         vietnameseOnly: Bool = false,
         windowSeconds: Int? = nil
@@ -118,7 +115,6 @@ public struct ModelEntry: Sendable, Hashable, Identifiable {
         self.license = license
         self.minimumMacOS = minimumMacOS
         self.streaming = streaming
-        self.liveOnly = liveOnly
         self.isDefault = isDefault
         self.vietnameseOnly = vietnameseOnly
         self.windowSeconds = windowSeconds
@@ -277,20 +273,6 @@ public enum ModelCatalog {
                 fr: "Good (FLEURS 24-language mean 11.67%)",
                 vi: "Not supported"),
             license: "CC-BY-4.0"),
-        ModelEntry(
-            id: "nemotron-3.5-streaming", kind: .asr, tier: .balanced,
-            displayName: "Nemotron 3.5 ASR Streaming (live captions)",
-            repo: "FluidInference/Nemotron-3.5-ASR-Streaming-Multilingual-0.6b-CoreML",
-            subfolder: "multilingual/2240ms",
-            revision: "1a41b75758b0337ff67db7d5408280aaaf23074e",
-            files: ["multilingual/2240ms"],
-            runtime: .fluidAudio, diskMB: 634, ramMB: 1000, ramIsEstimate: true,
-            languages: .multilingual,
-            qualityNotes: .init(
-                en: "Fair (Open ASR avg 10.51%)",
-                fr: "Documented by FluidAudio",
-                vi: "Experimental, untested in FluidAudio (FLEURS vi 11.2-14.0%)"),
-            license: "OpenMDW-1.1", streaming: true, liveOnly: true),
         ModelEntry(
             id: "apple-speech", kind: .asr, tier: .fast,
             displayName: "Apple Speech (system)",

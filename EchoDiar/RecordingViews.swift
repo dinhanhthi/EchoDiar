@@ -114,24 +114,25 @@ struct RecordingCard: View {
     }
 }
 
-/// The recording page (layout_1's detail): the header, then the live transcript, or the wave and how to turn the
-/// live transcript on.
+/// The recording page (layout_1's detail): the header, then the live transcript, or the wave and why there is none
+/// (the conditions of `AppModel.startRecordingTranscriber`, read from the settings), with the Settings page that
+/// changes it.
 struct RecordingDetailView: View {
     let model: AppModel
 
     var body: some View {
         VStack(spacing: 12) {
             RecordingHeader(model: model)
-            if let live = model.liveTranscript {
-                LiveTranscriptView(snapshot: live)
+            if let captions = model.recordingCaptions {
+                LiveTranscriptView(snapshot: captions)
             } else {
                 VStack(spacing: 16) {
                     RecordingWave(model: model)
-                    Text("Live transcript is off. Turn it on in Settings › Transcription.")
+                    Text(noCaptionsReason)
                         .font(.callout)
                         .foregroundStyle(.secondary)
                         .multilineTextAlignment(.center)
-                    Button("Open Settings") { model.openSettings(tab: .transcription) }
+                    Button("Open Settings") { openReasonSettings() }
                         .buttonStyle(.link)
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -139,6 +140,26 @@ struct RecordingDetailView: View {
         }
         .padding(12)
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+    }
+
+    private var noCaptionsReason: LocalizedStringKey {
+        if !model.settings.autoTranscribe {
+            "Transcription is off. Turn on Transcribe automatically in Settings › Recording."
+        } else if !model.settings.transcribeWhileRecording {
+            "Transcribe while recording is off. Turn it on in Settings › Transcription."
+        } else {
+            "This engine transcribes after Stop. WhisperKit and Parakeet models also transcribe while recording."
+        }
+    }
+
+    private func openReasonSettings() {
+        if !model.settings.autoTranscribe {
+            model.openSettings(tab: .recording, subTab: "afterRecording")
+        } else if !model.settings.transcribeWhileRecording {
+            model.openSettings(tab: .transcription, subTab: "general")
+        } else {
+            model.openSettings(tab: .transcription, subTab: "transcriptionModels")
+        }
     }
 }
 

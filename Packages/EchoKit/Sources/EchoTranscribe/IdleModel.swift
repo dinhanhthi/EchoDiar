@@ -1,5 +1,5 @@
-/// The live captions model, loaded on demand: `releaseIfIdle` frees it once it went unused for `idle` (no window
-/// comes while a recording is paused), and the next `get` loads it again. Used by one decode task only.
+/// The recording transcriber's model, loaded on demand: `releaseIfIdle` frees it once it went unused for `idle` (no
+/// chunk comes while a recording is paused), and the next `get` loads it again. Used by one decode task only.
 final class IdleModel<Model> {
     private let idle: Duration?
     private let load: () async throws -> Model

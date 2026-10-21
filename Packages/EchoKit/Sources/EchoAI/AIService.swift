@@ -206,7 +206,7 @@ public actor AIService {
                     do {
                         let yield: @Sendable (Update) -> Void = { continuation.yield($0) }
                         if let local = provider as? any LocalLLMProvider {
-                            // Live captions hold the gate for the whole recording; a transcription for its run.
+                            // A recording transcriber holds the gate for the whole recording; a transcription for its run.
                             yield(.status(Self.waitingStatus))
                             try await gate.withExclusiveModel(owner: .llm) {
                                 yield(.status(Self.loadingStatus))

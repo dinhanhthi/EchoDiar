@@ -31,7 +31,7 @@ struct EngineRoutingTests {
         #expect(resolve(["parakeet-v3", "qwen3-asr-0.6b"], "vi") == "qwen3-asr-0.6b")
         #expect(resolve(["phowhisper-medium"], "en") == nil)
         #expect(resolve(["phowhisper-medium"], "vi") == "phowhisper-medium")
-        #expect(resolve(["nemotron-3.5-streaming", "pyannote-community-1"], "auto") == nil)
+        #expect(resolve(["pyannote-community-1"], "auto") == nil)
         #expect(resolve([], "auto") == nil)
     }
 
@@ -46,7 +46,6 @@ struct EngineRoutingTests {
         #expect(prefer("parakeet-v3", installed, "auto") == "parakeet-v3")
         #expect(prefer("parakeet-v3", installed, "vi") == nil)
         #expect(prefer("parakeet-v3", [], "auto") == nil)
-        #expect(prefer("nemotron-3.5-streaming", ["nemotron-3.5-streaming"], "auto") == nil)
         #expect(prefer(nil, installed, "auto") == nil)
     }
 
@@ -62,7 +61,6 @@ struct EngineRoutingTests {
         #expect(resolve("parakeet-v3", "vi", ["parakeet-v3", "whisperkit-large-v3-turbo-626"]) == nil)
         #expect(resolve("parakeet-v3", "auto", []) == nil)
         #expect(resolve(nil, "vi", ["qwen3-asr-0.6b"]) == nil)
-        #expect(resolve("nemotron-3.5-streaming", "auto", ["nemotron-3.5-streaming"]) == nil)
         #expect(resolve(nil, "auto", []) == nil)
     }
 

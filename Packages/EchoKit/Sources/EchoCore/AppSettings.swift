@@ -17,12 +17,8 @@ public struct AppSettings: Codable, Equatable, Sendable {
     public var playbackChannels: PlaybackChannels
     /// Set by "Done" in the first-run onboarding window.
     public var onboardingCompleted: Bool
-    /// Live captions while recording (opt-in); the batch transcript after Stop stays the source of truth.
-    public var liveTranscript: Bool
-    /// Catalog id of the live captions engine: a WhisperKit entry or the Nemotron streaming entry.
-    public var liveTranscriptEngine: String
-    /// Minutes a loaded on-device model may go unused before it is freed: the live captions model while a recording
-    /// stays paused. Every other model is freed as soon as its job ends.
+    /// Minutes a loaded on-device model may go unused before it is freed: the recording transcriber's model while a
+    /// recording stays paused. Every other model is freed as soon as its job ends.
     public var modelIdleMinutes: Int
     /// Catalog id of the ASR engine for new transcriptions, or a cloud engine id (`cloud:<provider id>`); nil = the
     /// catalog default.
@@ -100,7 +96,6 @@ public struct AppSettings: Codable, Equatable, Sendable {
     public var globalPauseHotKey: HotKey
     public var globalPauseHotKeyEnabled: Bool
 
-    public static let defaultLiveTranscriptEngine = "whisperkit-turbo-632"
     public static let defaultEmbeddingModelID = "mlx-qwen3-embedding-0.6b"
 
     public init(
@@ -111,8 +106,6 @@ public struct AppSettings: Codable, Equatable, Sendable {
         keepUncompressedAudio: Bool = false,
         playbackChannels: PlaybackChannels = .mixed,
         onboardingCompleted: Bool = false,
-        liveTranscript: Bool = false,
-        liveTranscriptEngine: String = AppSettings.defaultLiveTranscriptEngine,
         modelIdleMinutes: Int = 2,
         defaultASRModelID: String? = nil,
         defaultDiarizerModelID: String? = nil,
@@ -159,8 +152,6 @@ public struct AppSettings: Codable, Equatable, Sendable {
         self.keepUncompressedAudio = keepUncompressedAudio
         self.playbackChannels = playbackChannels
         self.onboardingCompleted = onboardingCompleted
-        self.liveTranscript = liveTranscript
-        self.liveTranscriptEngine = liveTranscriptEngine
         self.modelIdleMinutes = modelIdleMinutes
         self.defaultASRModelID = defaultASRModelID
         self.defaultDiarizerModelID = defaultDiarizerModelID
@@ -211,7 +202,7 @@ public struct AppSettings: Codable, Equatable, Sendable {
 
     private enum CodingKeys: String, CodingKey {
         case version, launchAtLogin, defaultLanguage, recentLanguages, compressionBitrateKbps, keepUncompressedAudio
-        case playbackChannels, onboardingCompleted, liveTranscript, liveTranscriptEngine, modelIdleMinutes
+        case playbackChannels, onboardingCompleted, modelIdleMinutes
         case defaultASRModelID, defaultDiarizerModelID, providers
         case cloudSTTConfirmed, defaultAIProviderID, defaultAIModel, summaryLanguage, chatContextMessages
         case ragEnabled, embeddingModelID, embeddingAPIModel, cloudEmbeddingConfirmed
@@ -232,9 +223,6 @@ public struct AppSettings: Codable, Equatable, Sendable {
         keepUncompressedAudio = try container.decodeIfPresent(Bool.self, forKey: .keepUncompressedAudio) ?? false
         playbackChannels = try container.decodeIfPresent(PlaybackChannels.self, forKey: .playbackChannels) ?? .mixed
         onboardingCompleted = try container.decodeIfPresent(Bool.self, forKey: .onboardingCompleted) ?? false
-        liveTranscript = try container.decodeIfPresent(Bool.self, forKey: .liveTranscript) ?? false
-        liveTranscriptEngine = try container.decodeIfPresent(String.self, forKey: .liveTranscriptEngine)
-            ?? Self.defaultLiveTranscriptEngine
         modelIdleMinutes = Self.clamped(
             try container.decodeIfPresent(Int.self, forKey: .modelIdleMinutes) ?? 2, to: Self.modelIdleMinutesRange)
         defaultASRModelID = try container.decodeIfPresent(String.self, forKey: .defaultASRModelID)

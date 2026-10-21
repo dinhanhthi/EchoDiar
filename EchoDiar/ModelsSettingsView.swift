@@ -3,7 +3,7 @@ import EchoCore
 import EchoTranscribe
 import SwiftUI
 
-/// The Transcription tab, one inner tab per section: the default language with the live transcript switch and engine
+/// The Transcription tab, one inner tab per section: the default language with the transcribe-while-recording switch
 /// and deleting the audio after transcription, the transcription models (local by tier, then cloud: the configured
 /// engines and the speech-to-text APIs), and the diarization models (local by tier, then the cloud diarizers), with
 /// Download, Cancel, Delete and Set default. Rows that cannot transcribe the default language are disabled with a note.
@@ -72,22 +72,15 @@ struct ModelsSettingsView: View {
     private var generalSection: some View {
         Section {
             LanguagePicker(title: "Default language", selection: defaultLanguage, model: model)
-            Toggle(isOn: liveTranscript) {
-                Text("Live transcript")
-                Text("Shows text while recording with the live engine below (more CPU). The transcript made after Stop stays the one that is saved.")
-            }
-            Picker(selection: liveTranscriptEngine) {
-                Text("Whisper Large v3 Turbo").tag(AppSettings.defaultLiveTranscriptEngine)
-                Text("Nemotron 3.5 streaming").tag(NemotronStreamingEngine.entryID)
-            } label: {
-                Text("Live transcript engine")
-                Text("Nemotron is recommended for Vietnamese live captions (Vietnamese is experimental). Without the picked model installed, another installed live model is used.")
+            Toggle(isOn: model.setting(\.transcribeWhileRecording)) {
+                Text("Transcribe while recording")
+                Text("Shows the transcript during the recording and keeps it, so it is ready within seconds of Stop. Uses more CPU and memory while recording. WhisperKit and Parakeet models only; other engines transcribe after Stop.")
             }
             Picker(selection: model.setting(\.modelIdleMinutes)) {
                 ForEach(idleMinutesOptions, id: \.self) { Text("\($0) min").tag($0) }
             } label: {
                 Text("Free unused models after")
-                Text("While a recording stays paused this long, the live transcript model is freed; it loads again when you resume. Other models are freed as soon as their job ends.")
+                Text("While a recording stays paused this long, the model that transcribes it is freed; it loads again when you resume. Other models are freed as soon as their job ends.")
             }
             // Also in Storage › Audio: the same setting.
             Toggle(isOn: model.setting(\.deleteAudioAfterTranscription)) {
@@ -182,16 +175,6 @@ struct ModelsSettingsView: View {
         }
     }
 
-    private var liveTranscript: Binding<Bool> {
-        Binding(get: { model.settings.liveTranscript },
-                set: { isOn in model.updateSettings { $0.liveTranscript = isOn } })
-    }
-
-    private var liveTranscriptEngine: Binding<String> {
-        Binding(get: { model.settings.liveTranscriptEngine },
-                set: { id in model.updateSettings { $0.liveTranscriptEngine = id } })
-    }
-
     /// The offered idle times, plus a hand-edited one, so the picker never shows an empty selection.
     private var idleMinutesOptions: [Int] {
         let current = model.settings.modelIdleMinutes
@@ -223,7 +206,6 @@ struct ModelRow: View {
             HStack(spacing: 4) {
                 Badge(text: entry.tier.rawValue.capitalized, color: Self.tierColor(entry.tier))
                 if entry.kind == .diarization { Badge(text: "Speakers") }
-                if entry.liveOnly { Badge(text: "Live only") }
                 if entry.repo == nil {
                     Badge(text: "System")
                 } else {
@@ -277,7 +259,7 @@ struct ModelRow: View {
     }
 
     @ViewBuilder private var actions: some View {
-        if entry.kind == .asr || entry.kind == .diarization, !entry.liveOnly, !isDefault,
+        if entry.kind == .asr || entry.kind == .diarization, !isDefault,
            model.installedModelIDs.contains(entry.id) {
             Button("Set default") {
                 if entry.kind == .asr { model.setDefaultASRModel(entry.id) } else { model.setDefaultDiarizer(entry.id) }
@@ -308,9 +290,10 @@ struct ModelRow: View {
                 .foregroundStyle(.green)
             Button("Delete") { model.deleteModel(entry.id) }
                 .controlSize(.small)
-                // Live captions load their model again after a long pause: deleting it meanwhile would end them.
+                // The recording's transcriber loads its model again after a long pause: deleting it meanwhile
+                // would end it.
                 .disabled(model.transcriptionProgress.keys.contains(where: model.isTranscribing)
-                          || model.liveTranscript != nil)
+                          || model.recordingCaptions != nil)
         } else {
             Button("Download") { model.downloadModel(entry.id) }
                 .controlSize(.small)

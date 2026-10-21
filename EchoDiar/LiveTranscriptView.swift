@@ -1,16 +1,17 @@
 import EchoTranscribe
 import SwiftUI
 
-/// Live captions on the recording page, under its header (setting "Live transcript"): the model state, then the newest
-/// lines, scrolled to the bottom as they arrive, filling the page.
+/// Live captions on the recording page, under its header (setting "Transcribe while recording"): the transcriber's
+/// state, then the newest lines, scrolled to the bottom as they arrive, filling the page.
 struct LiveTranscriptView: View {
-    let snapshot: LiveTranscriber.Snapshot
+    let snapshot: RecordingTranscriber.Snapshot
 
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
             Label(statusText, systemImage: "captions.bubble")
                 .font(.caption)
                 .foregroundStyle(statusIsError ? AnyShapeStyle(.orange) : AnyShapeStyle(.secondary))
+                .help(failureMessage ?? "")
             if !snapshot.lines.isEmpty {
                 ScrollViewReader { proxy in
                     ScrollView {
@@ -37,21 +38,28 @@ struct LiveTranscriptView: View {
     private var statusText: String {
         switch snapshot.state {
         case .loading: "Live transcript: loading the model…"
+        case .paused: "Live transcript: paused"
+        case .listening where snapshot.deferred:
+            "Paused while the Mac is hot or in Low Power Mode. The rest is transcribed after Stop."
         case .listening: snapshot.lines.isEmpty ? "Live transcript: listening…" : "Live transcript"
-        case .noModel: "No live model installed — download a Whisper or Nemotron model in Settings › Transcription."
-        case .failed(let message): "Live transcript stopped: \(message)"
+        case .failed: "Live transcript stopped. The transcript is made after Stop."
         }
+    }
+
+    /// Why the transcriber stopped, as a tooltip on the status.
+    private var failureMessage: String? {
+        if case .failed(let message) = snapshot.state { message } else { nil }
     }
 
     private var statusIsError: Bool {
         switch snapshot.state {
-        case .noModel, .failed: true
-        case .loading, .listening: false
+        case .failed: true
+        case .loading, .listening, .paused: false
         }
     }
 
     /// Same colors as the transcript: Me in the accent color.
-    private static func color(_ speaker: LiveTranscriber.Speaker) -> Color {
+    private static func color(_ speaker: RecordingTranscriber.Speaker) -> Color {
         speaker == .me ? .accentColor : .orange
     }
 

@@ -3,9 +3,10 @@ import Foundation
 /// The app-wide "one heavy model at a time" lock, owned by `AppModel` and shared by every module that loads an ML
 /// model. A holder loads, uses and unloads its model inside `withExclusiveModel`.
 ///
-/// Policy: live captions have priority. A waiting live transcriber is served before any waiting batch job, and a
-/// batch job waits for the gate while live captions hold it (the whole recording). A holder is never interrupted: a
-/// batch job already running finishes first, so live captions started during it wait for its end.
+/// Policy: the recording transcriber has priority. A waiting recording transcriber (owner `.liveTranscript`) is
+/// served before any waiting batch job, and a batch job waits for the gate while the recording transcriber holds it
+/// (the whole recording). A holder is never interrupted: a batch job already running finishes first, so a recording
+/// transcriber started during it waits for its end.
 public actor ModelLoadGate {
     public enum Owner: String, Sendable {
         case liveTranscript, transcriptionJob, llm

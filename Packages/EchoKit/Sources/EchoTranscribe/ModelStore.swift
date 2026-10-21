@@ -83,7 +83,6 @@ public final class ModelStore: Sendable {
             guard let repo = fluidRepo(entry) else { return nil }
             switch repo {
             case .diarizer, .nemotron3Diarization: return base
-            case .nemotronMultilingual: return entry.subfolder.map { append($0, to: base) }
             default: return base.appendingPathComponent(repo.folderName, isDirectory: true)
             }
         case .appleSpeech, .foundationModels:
@@ -104,9 +103,9 @@ public final class ModelStore: Sendable {
             return Layout(base: [], strip: subfolder)
         case .fluidAudio:
             guard let repo = fluidRepo(entry) else { return nil }
-            // Nemotron keeps the HF layout (`multilingual/2240ms/`, `split/` + root `.bin` assets); the others go
-            // under `Repo.folderName`.
-            if repo == .nemotronMultilingual || repo == .nemotron3Diarization { return Layout(base: [], strip: []) }
+            // Nemotron 3 diarization keeps the HF layout (`split/` + root `.bin` assets); the others go under
+            // `Repo.folderName`.
+            if repo == .nemotron3Diarization { return Layout(base: [], strip: []) }
             return Layout(base: components(repo.folderName) ?? [], strip: subfolder)
         case .appleSpeech, .foundationModels:
             return nil
@@ -131,10 +130,6 @@ public final class ModelStore: Sendable {
         let parts = path.split(separator: "/", omittingEmptySubsequences: false).map(String.init)
         guard parts.allSatisfy({ !$0.isEmpty && $0 != "." && $0 != ".." && !$0.contains("\0") }) else { return nil }
         return parts
-    }
-
-    private func append(_ path: String, to base: URL) -> URL {
-        (components(path) ?? []).reduce(base) { $0.appendingPathComponent($1) }
     }
 
     /// `base/components`, or nil when it resolves outside `base` or crosses a symlink.
@@ -169,13 +164,6 @@ public final class ModelStore: Sendable {
             return Array(ModelNames.ASR.requiredModelsV3(precision: .int8)) + [ModelNames.ASR.vocabularyFile]
         case .parakeetUltra:
             return Array(ModelNames.ASR.requiredModelsV3()) + [ModelNames.ASR.vocabularyFile]
-        case .nemotronMultilingual:
-            typealias Names = ModelNames.NemotronMultilingualStreaming
-            let names = [
-                Names.preprocessorFile, Names.encoderFile, Names.decoderFile, Names.jointFile,
-                Names.tokenizer, Names.metadata,
-            ]
-            return names.map { name in entry.subfolder.map { "\($0)/\(name)" } ?? name }
         case .nemotron3Diarization:
             // Not `ModelNames.Nemotron3.requiredAssets`: only split-graph presets need the projection.
             guard let config = SpeakerDiarizer.nemotronConfig(for: entry.id) else { return nil }

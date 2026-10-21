@@ -26,7 +26,7 @@ final class AppModel {
 
     /// DEBUG harness launch args handled here; they skip onboarding and auto-queued work.
     static let harnessArguments: Set<String> = [
-        "--transcribe", "--download-model", "--delete-model", "--live-transcribe", "--measure",
+        "--transcribe", "--download-model", "--delete-model", "--measure",
     ]
 
     private(set) var settings = AppSettings()
@@ -81,8 +81,9 @@ final class AppModel {
     /// Downloaded models, plus Apple Speech when the system provides it.
     private(set) var installedModelIDs: Set<String> = []
     private(set) var installedModelsBytes: Int64 = 0
-    /// Live captions of the current recording; nil when the setting was off at its start, or when not recording.
-    private(set) var liveTranscript: LiveTranscriber.Snapshot?
+    /// Captions of the current recording's transcriber (see `startRecordingTranscriber`), kept until its Stop
+    /// sequence ends; nil when no transcriber runs.
+    private(set) var recordingCaptions: RecordingTranscriber.Snapshot?
     /// Apple Speech locales reserved by EchoDiar (BCP-47), read with the installed models.
     private(set) var appleSpeechReservedLocales: [String] = []
     /// The running summary or question; one at a time. Also set by the library chat (LibraryChatModel.swift).
@@ -217,9 +218,10 @@ final class AppModel {
     /// Library indexing waits while any of these runs, so it never competes with them for the model gate or the CPU.
     var indexingPaused: Bool { isRecording || compressionJobs > 0 || transcriptionJobs > 0 || aiJob != nil }
 
-    /// Live captions hold the model gate for a whole recording and a transcription job until it ends: a library
-    /// question then skips an in-app embedder (keyword search only) instead of waiting for the gate.
-    var modelGateBusy: Bool { isRecording || transcriptionJobs > 0 }
+    /// The recording transcriber holds the model gate for a whole recording (and its drain after Stop) and a
+    /// transcription job until it ends: a library question then skips an in-app embedder (keyword search only)
+    /// instead of waiting for the gate.
+    var modelGateBusy: Bool { isRecording || recordingCaptions != nil || transcriptionJobs > 0 }
 
     /// Its `currentLevels()` has a single consumer: `levels`.
     @ObservationIgnored let engine: RecordingEngine
@@ -227,7 +229,7 @@ final class AppModel {
     @ObservationIgnored let library = LibraryStore()
     /// Created with the model so FluidAudio's offline mode is set before any model load.
     @ObservationIgnored let modelStore: ModelStore
-    /// The single "one heavy model at a time" lock, shared by the pipeline and live captions.
+    /// The single "one heavy model at a time" lock, shared by the pipeline and the recording transcriber.
     @ObservationIgnored let modelGate = ModelLoadGate()
     @ObservationIgnored let pipeline: TranscriptionPipeline
     @ObservationIgnored let aiService: AIService
@@ -253,7 +255,8 @@ final class AppModel {
     @ObservationIgnored private var terminateObserver: (any NSObjectProtocol)?
     /// `supportedLanguages(engineID:)` by catalog id, sorted by name once.
     @ObservationIgnored private var languageCache: [String: [String]] = [:]
-    @ObservationIgnored private var liveTranscriber: LiveTranscriber?
+    /// The current recording's transcriber, from its start until the `.idle` snapshot; one per recording.
+    @ObservationIgnored private var recordingTranscriber: RecordingTranscriber?
     /// Streamed AI text not in `aiJob.text` yet, and its scheduled flush (see `applyAIUpdate`).
     @ObservationIgnored private var pendingAIText = ""
     @ObservationIgnored private var aiTextFlush: Task<Void, Never>?
@@ -315,7 +318,7 @@ final class AppModel {
             stopAskingForDetectedApp: { [weak self] in self?.stopAskingForDetectedApp() })
 
         #if DEBUG
-        if runMeasureHarness() || runTranscribeHarness() || runLiveTranscribeHarness() || runModelHarness() { return }
+        if runMeasureHarness() || runTranscribeHarness() || runModelHarness() { return }
         DebugLibrarySeed.run()
         #endif
         guard ProcessInfo.processInfo.arguments.allSatisfy({ !Self.harnessArguments.contains($0) }) else { return }
@@ -370,8 +373,14 @@ final class AppModel {
         let language = recordingLanguage
         Task {
             _ = await recovery?.value
-            // Before the engine starts: it reads the sink at start, and the model loads meanwhile.
-            if settings.liveTranscript { startLiveTranscript() }
+            // Before the engine starts: it reads the sink once at start, and the model loads meanwhile. Same
+            // `language` as the engine's first marker, so the prior's engine is the one the Stop job resolves to.
+            // A previous recording's captions, kept while its Stop sequence runs, are not this one's.
+            if let transcriber = startRecordingTranscriber(language: language) {
+                attach(transcriber)
+            } else {
+                recordingCaptions = nil
+            }
             do {
                 let (folder, resolved) = try await Task.detached(priority: .userInitiated) {
                     [engine, uid = settings.micDeviceUID] in
@@ -381,9 +390,11 @@ final class AppModel {
                 activeFolder = folder
                 beginEndWatch(target: resolved)
             } catch {
-                // Not awaited: a first model load can take long, and no batch job follows a failed start.
-                let live = detachLiveTranscript()
-                Task { await live?.stop() }
+                let transcriber = recordingTranscriber
+                recordingTranscriber = nil
+                engine.liveSink = nil
+                recordingCaptions = nil
+                Task { await transcriber?.cancel() }
                 NSLog("EchoDiar: could not start recording: \(error)")
                 autoStartedAppName = nil
                 recordingError = Self.captureFailureMessage(error, action: "start")
@@ -392,23 +403,18 @@ final class AppModel {
         }
     }
 
-    /// Connects a new transcriber to the engine's sink, publishes its updates until `detachLiveTranscript` and loads
-    /// its model.
-    private func startLiveTranscript() {
-        let live = LiveTranscriber(
-            modelStore: modelStore, gate: modelGate, engineID: settings.liveTranscriptEngine,
-            idleRelease: .seconds(settings.modelIdleMinutes * 60)
-        ) { [engine] in engine.currentLanguage() }
-        engine.liveSink = { live.append(interleaved: $0, frames: $1, channels: $2) }
-        liveTranscriber = live
-        liveTranscript = LiveTranscriber.Snapshot(state: .loading)
+    /// Connects the recording's transcriber to the engine's sink and publishes its updates to `recordingCaptions`
+    /// while it is `recordingTranscriber` (the Stop sequence clears it first, so a late snapshot is dropped).
+    private func attach(_ transcriber: RecordingTranscriber) {
+        engine.liveSink = { transcriber.append(interleaved: $0, frames: $1, channels: $2) }
+        recordingTranscriber = transcriber
+        recordingCaptions = RecordingTranscriber.Snapshot(state: .loading)
         Task { [weak self] in
-            for await snapshot in live.updates {
-                guard let self, liveTranscriber === live else { return }
-                liveTranscript = snapshot
+            for await snapshot in transcriber.updates {
+                guard let self, recordingTranscriber === transcriber else { return }
+                recordingCaptions = snapshot
             }
         }
-        Task { await live.start() }
     }
 
     /// A started transcriber for a recording in `language` ("auto" or a code; the language markers once the engine
@@ -433,15 +439,6 @@ final class AppModel {
         return transcriber
     }
 
-    /// Disconnects and hides the current transcriber; the caller awaits its `stop()`, which unloads the model.
-    private func detachLiveTranscript() -> LiveTranscriber? {
-        engine.liveSink = nil
-        let live = liveTranscriber
-        liveTranscriber = nil
-        liveTranscript = nil
-        return live
-    }
-
     func stopRecording() {
         guard isRecording else { return }
         Task.detached(priority: .userInitiated) { [engine] in
@@ -452,10 +449,13 @@ final class AppModel {
     func togglePause() {
         let state = snapshot.state
         guard state != .idle else { return }
+        let transcriber = recordingTranscriber
         Task {
             let failure: (any Error)? = await Task.detached(priority: .userInitiated) { [engine] in
                 if state == .recording {
                     engine.pause()
+                    // The writer flushed its last frames through the sink before `pause()` returned.
+                    await transcriber?.flush()
                     return nil
                 }
                 do {
@@ -552,11 +552,23 @@ final class AppModel {
                     if let message = Self.stopMessage(reason) { recordingError = message }
                     let folder = activeFolder
                     activeFolder = nil
-                    let live = detachLiveTranscript()
+                    // Bookkeeping only: the writer copied the sink at start and flushed its last frames before `.idle`.
+                    engine.liveSink = nil
+                    let transcriber = recordingTranscriber
+                    recordingTranscriber = nil
                     Task {
-                        // The live model is unloaded first, so the batch model is never loaded next to it.
-                        await live?.stop()
-                        if let folder { await self.finishRecording(folder) }
+                        if let transcriber {
+                            // The drain counts as processing; `finishRecording` keeps its own count.
+                            self.compressionJobs += 1
+                            defer { self.compressionJobs -= 1 }
+                            // Unloads its model before the job may load one, so two never sit side by side.
+                            let prior = await transcriber.finish()
+                            if let folder { await self.finishRecording(folder, prior: prior) }
+                        } else if let folder {
+                            await self.finishRecording(folder)
+                        }
+                        // Unless a new recording's transcriber publishes them meanwhile.
+                        if self.recordingTranscriber == nil { self.recordingCaptions = nil }
                     }
                 }
             }
@@ -645,8 +657,9 @@ final class AppModel {
     }
 
     /// The post-Stop sequence for one folder. A recording auto-transcribed now (its CAF has frames, the Mac is not
-    /// held back by "wait", and the default engine is local or a cloud one already confirmed) is transcribed from the
-    /// CAF first; then its audio goes to the Trash (success with "Delete audio after transcription") or is compressed.
+    /// held back by "wait" or `prior` needs no model, and the default engine is local or a cloud one already
+    /// confirmed) is transcribed from the CAF first; then its audio goes to the Trash (success with "Delete audio
+    /// after transcription") or is compressed.
     /// Otherwise it is compressed first, then queued as `compress(_:)` does (a cloud confirmation may hold it), and
     /// waited for. `prior` (what the recording transcriber transcribed) goes to the job either way. `milestone` sees
     /// each step end.
@@ -659,15 +672,18 @@ final class AppModel {
         // Before the transcription, so the indicator never drops to idle between the two steps.
         compressionJobs += 1
         await library.refresh()
-        if transcribesFirst(folder),
-           let job = submitTranscription(folder: folder, deleteAudioAfter: false, prior: prior) {
+        if transcribesFirst(folder, prior: prior),
+           let job = submitTranscription(
+               folder: folder, deleteAudioAfter: false, processNow: needsNoModel(prior), prior: prior) {
             let succeeded = await job.value
             milestone?(.transcribed(succeeded: succeeded))
             if succeeded, settings.deleteAudioAfterTranscription,
                let id {
                 await deleteAudio(of: id)
             } else {
-                milestone?(.compressed(await compressFinished(folder)))
+                // Not inside `milestone?(...)`: a nil milestone would skip evaluating, and so the compression.
+                let result = await compressFinished(folder)
+                milestone?(.compressed(result))
             }
             compressionJobs -= 1
             await library.refresh()
@@ -700,9 +716,10 @@ final class AppModel {
     }
 
     /// Whether `finishRecording` transcribes the CAF before compressing it: auto-transcribe is on, the recording is
-    /// usable and not transcribed (or failed) yet, its CAF has frames, the Mac is not constrained while "wait" is on,
+    /// usable and not transcribed (or failed) yet, its CAF has frames, the Mac is not constrained while "wait" is on
+    /// (unless `prior` needs no model: the transcript watched during the recording is saved before compression),
     /// and no cloud confirmation is pending (an alert can hold the run for long; the CAF should not wait for it).
-    private func transcribesFirst(_ folder: URL) -> Bool {
+    private func transcribesFirst(_ folder: URL, prior: PriorTranscription?) -> Bool {
         guard settings.autoTranscribe,
               let session = try? RecordingSession.read(from: folder), !session.probe, session.state != .failed
         else { return false }
@@ -712,8 +729,17 @@ final class AppModel {
               let caf = ConversationFiles.audioURL(in: folder, fileName: session.audioFileName),
               let file = try? AVAudioFile(forReading: caf), file.length > 0,
               !(settings.deferTranscriptionWhenConstrained && TranscriptionPipeline.isConstrained)
+                  || needsNoModel(prior)
         else { return false }
         return autoEngine() != .consentPending
+    }
+
+    /// The job writes `prior` without loading a model: no gaps to fill and speakers not told apart. It then runs
+    /// now even on a constrained Mac; should the pipeline find the prior unusable, its full batch runs now too
+    /// rather than holding the compression behind a wait.
+    private func needsNoModel(_ prior: PriorTranscription?) -> Bool {
+        guard let prior else { return false }
+        return prior.micGaps.isEmpty && prior.systemGaps.isEmpty && !settings.diarization
     }
 
     /// What the default engines of an automatic transcription resolve to, as `submitTranscription` decides it.
@@ -792,12 +818,13 @@ final class AppModel {
     /// The default cloud diarizer runs when configured with a diarizing model and the cloud ASR (if any) labels no
     /// speakers; its destination is confirmed the same way, after the ASR's, before anything is uploaded. With "Tell
     /// speakers apart" off, no diarizer runs. `deleteAudioAfter` nil = "Delete audio after transcription", read when
-    /// the job succeeds. `prior` goes to the job (see `TranscriptionJob.prior`). Returns the job (true when it
-    /// succeeded), nil when none was submitted.
+    /// the job succeeds. `processNow` runs it now even when "wait" would defer it on a constrained Mac. `prior` goes
+    /// to the job (see `TranscriptionJob.prior`). Returns the job (true when it succeeded), nil when none was
+    /// submitted.
     @discardableResult
     private func submitTranscription(
         folder: URL, engineID: String? = nil, language: String? = nil, deleteAudioAfter: Bool? = nil,
-        prior: PriorTranscription? = nil
+        processNow: Bool = false, prior: PriorTranscription? = nil
     ) -> Task<Bool, Never>? {
         guard let session = try? RecordingSession.read(from: folder), !session.probe, session.state != .failed else {
             return nil
@@ -840,7 +867,8 @@ final class AppModel {
             systemFileName: session.audioFileName == AudioCompressor.micFileName ? AudioCompressor.systemFileName : nil,
             engineID: engineID ?? preferred, language: language,
             // Per job rather than a re-created pipeline: the pipeline and its progress stream live as long as the app.
-            processNow: !settings.deferTranscriptionWhenConstrained, speakerCountHint: settings.speakerCountHint,
+            processNow: processNow || !settings.deferTranscriptionWhenConstrained,
+            speakerCountHint: settings.speakerCountHint,
             diarizerID: settings.defaultDiarizerModelID, diarize: settings.diarization, prior: prior)
         transcriptionErrors[session.id] = nil
         // Set now so the card leaves its button before the pipeline's first event arrives.
@@ -945,7 +973,7 @@ final class AppModel {
     /// Installed batch ASR models, in catalog order.
     var installedBatchEngines: [ModelEntry] {
         ModelCatalog.asr.filter {
-            !$0.liveOnly && TranscriptionPipeline.registeredRuntimes.contains($0.runtime) && installedModelIDs.contains($0.id)
+            TranscriptionPipeline.registeredRuntimes.contains($0.runtime) && installedModelIDs.contains($0.id)
         }
     }
 
@@ -1853,7 +1881,7 @@ extension AppModel {
                 }
                 run.markStopFinishing()
                 prior = await transcriber.finish()
-                run.markPriorReady(transcribesFirst: transcribesFirst(folder))
+                run.markPriorReady(transcribesFirst: transcribesFirst(folder, prior: prior))
                 let watched = await watch.value
                 let stats = await transcriber.stats
                 let gaps = prior.map { ($0.micGaps + $0.systemGaps).reduce(0) { $0 + $1.end - $1.start } }
@@ -1871,7 +1899,7 @@ extension AppModel {
                 ] as [String: Any]
             } else {
                 // Recording: with `--incremental off` nothing runs during a recording, so Stop follows the setup.
-                run.markStop(transcribesFirst: transcribesFirst(folder))
+                run.markStop(transcribesFirst: transcribesFirst(folder, prior: nil))
             }
             await finishRecording(folder, prior: prior) { run.milestone($0) }
             ProcessInfo.processInfo.endActivity(activity)
@@ -1947,92 +1975,6 @@ extension AppModel {
             try? await Task.sleep(until: start + .seconds(Double(index) * 0.1 / pace), clock: clock)
             transcriber.append(interleaved: samples, frames: Int(buffer.frameLength), channels: channels)
         }
-    }
-
-    /// `--live-transcribe <audio file> [--engine <catalog id>] [--language <code>]`: once the live model listens,
-    /// streams the file (system channel, mic silent) through a `LiveTranscriber` at real-time pace, then 12 s of
-    /// silence so its last window is decoded, prints every line and exits 0; exit 1 when no live model is installed
-    /// or loading fails. `--engine` defaults to the settings' live engine, `--language` to Auto.
-    private func runLiveTranscribeHarness() -> Bool {
-        guard ProcessInfo.processInfo.arguments.contains("--live-transcribe") else { return false }
-        guard let path = Self.harnessValue(after: "--live-transcribe") else {
-            Self.finish(1, "usage: --live-transcribe <audio file> [--engine <catalog id>] [--language <code>]")
-        }
-        let samples: [Float]
-        do {
-            samples = try Self.monoSamples(of: URL(fileURLWithPath: path))
-        } catch {
-            Self.finish(1, "error: \(error.localizedDescription)")
-        }
-        let engineID = Self.harnessValue(after: "--engine") ?? settings.liveTranscriptEngine
-        let language = Self.harnessValue(after: "--language")
-        let live = LiveTranscriber(modelStore: modelStore, gate: modelGate, engineID: engineID) { language }
-        Task {
-            await live.start()
-            var printed = 0
-            var feeder: Task<Void, Never>?
-            let started = Date()
-            for await snapshot in live.updates {
-                for line in snapshot.lines where line.id >= printed {
-                    Self.write(String(format: "%5.1fs %@: %@", -started.timeIntervalSinceNow, line.speaker.rawValue, line.text))
-                    printed = line.id + 1
-                }
-                switch snapshot.state {
-                case .noModel: Self.finish(1, "error: no live model installed")
-                case .failed(let message): Self.finish(1, "error: \(message)")
-                case .listening where feeder == nil:
-                    Self.write(String(format: "listening after %.1fs", -started.timeIntervalSinceNow))
-                    feeder = Task.detached(priority: .utility) { await Self.feed(samples + [Float](repeating: 0, count: 12 * 16_000), to: live) }
-                default: break
-                }
-            }
-            Self.finish(0, String(format: "done after %.1fs: %d lines", -started.timeIntervalSinceNow, printed))
-        }
-        return true
-    }
-
-    /// 100 ms interleaved Int16 stereo blocks (mic silent) every 100 ms, then a short wait for the last decode.
-    nonisolated private static func feed(_ samples: [Float], to live: LiveTranscriber) async {
-        let block = 1_600
-        for start in stride(from: 0, to: samples.count, by: block) {
-            let frames = min(block, samples.count - start)
-            var interleaved = [Int16](repeating: 0, count: frames * 2)
-            for frame in 0..<frames {
-                let value = max(-1, min(1, samples[start + frame])) * Float(Int16.max)
-                interleaved[frame * 2 + RecordingSession.Channel.system] = Int16(value)
-            }
-            interleaved.withUnsafeBufferPointer { live.append(interleaved: $0.baseAddress!, frames: frames, channels: 2) }
-            try? await Task.sleep(for: .milliseconds(100))
-        }
-        try? await Task.sleep(for: .seconds(5))
-        await live.stop()
-    }
-
-    /// The file as 16 kHz mono Float32.
-    nonisolated private static func monoSamples(of url: URL) throws -> [Float] {
-        let file = try AVAudioFile(forReading: url)
-        guard let format = AVAudioFormat(commonFormat: .pcmFormatFloat32, sampleRate: 16_000, channels: 1, interleaved: false),
-              let converter = AVAudioConverter(from: file.processingFormat, to: format),
-              let input = AVAudioPCMBuffer(pcmFormat: file.processingFormat, frameCapacity: AVAudioFrameCount(file.length)),
-              let output = AVAudioPCMBuffer(
-                  pcmFormat: format,
-                  frameCapacity: AVAudioFrameCount(Double(file.length) * 16_000 / file.processingFormat.sampleRate) + 4_096)
-        else { throw CocoaError(.fileReadCorruptFile) }
-        try file.read(into: input)
-        converter.downmix = true
-        var consumed = false
-        var conversionError: NSError?
-        converter.convert(to: output, error: &conversionError) { _, status in
-            guard !consumed else {
-                status.pointee = .endOfStream
-                return nil
-            }
-            consumed = true
-            status.pointee = .haveData
-            return input
-        }
-        if let conversionError { throw conversionError }
-        return Array(UnsafeBufferPointer(start: output.floatChannelData![0], count: Int(output.frameLength)))
     }
 
     private static func harnessValue(after flag: String) -> String? {
