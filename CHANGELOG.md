@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.0.1] - 2026-10-21
+
+### Added
+
+- Settings > General > Floating indicator > "Show it in screenshots and screen recordings": lets screenshots, screen recordings and screen sharing capture the floating indicator. Off by default, so the indicator stays out of them as before.
+
 ## [1.0.0] - 2026-10-21
 
 ### Added
