@@ -22,7 +22,9 @@
 #   scripts/measure-transcribe.sh report <result dir>...
 #       One Markdown table row per run: Stop -> transcript, Stop -> compressed, step durations, max footprint, CPU
 #       after Stop, and word error rate (lowercase, punctuation stripped, word-level Levenshtein) for mic (ch0),
-#       system (ch1) and overall (both channels' errors over both channels' reference words).
+#       system (ch1) and overall (both channels' errors over both channels' reference words). With
+#       --incremental on, the notes add the recording transcriber's gaps, chunks, max pending, finish and load
+#       seconds, and the footprint and CPU while recording.
 #
 #   Defaults: --label run, --minutes 15, --runs 1. <n> is the first free number for <L>-host / <L>-vm.
 #   Everything after -- goes to the harness (e.g. --engine <catalog id>, --diarizer <catalog id>).
@@ -326,6 +328,20 @@ for folder in dirs:
     for key, default in (("diarization", "on"), ("incremental", "off"), ("pace", 1), ("language", "en")):
         if options.get(key, default) != default:
             notes.append(f"{key} {options[key]}")
+    transcriber = result.get("transcriber")
+    if transcriber:
+        chunks = transcriber.get("chunks") or {}
+        counts = "/".join(str(chunks.get(k, "?")) for k in ("transcribed", "dropped", "failed"))
+        notes.append(f"gaps {seconds(transcriber.get('gapSeconds'))} s; chunks done/dropped/failed {counts}; "
+                     f"max pending {seconds(transcriber.get('maxPendingSeconds'))} s; "
+                     f"finish {seconds(transcriber.get('finishSeconds'))} s; "
+                     f"load {seconds(transcriber.get('loadSeconds'))} s")
+        if transcriber.get("failure"):
+            notes.append(f"transcriber failed: {transcriber['failure']}")
+        recording = next((p for p in result.get("phases") or [] if p.get("phase") == "recording"), None)
+        if recording:
+            notes.append(f"recording {seconds(recording.get('maxFootprintMB'))} MB, "
+                         f"{seconds(recording.get('cpuSeconds'))} s CPU")
 
     # WER against the reference made with the fixture (found by the fixture's file name: VM runs record a VM path).
     wer = ["n/a"] * 3

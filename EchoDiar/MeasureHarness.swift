@@ -5,11 +5,13 @@ import EchoTranscribe
 import Foundation
 
 /// What one `--measure` run records for `result.json` (see `AppModel.runMeasureHarness`). Times are seconds after
-/// Stop. Phases: `recording` until Stop, then in `finishRecording`'s order: compress first (`compressing` until the
-/// pipeline's first event, then one per pipeline step), or transcribe first (`submitting` until the pipeline's first
-/// event, one per pipeline step, `compressing` from `finished` until the `compressed` milestone, then `done`). A step
-/// seen twice adds up; each phase keeps its max `phys_footprint` (1 s sampler plus a sample at every change) and
-/// this process's CPU time from `getrusage` (work done in other processes, such as CoreML's, is not counted).
+/// Stop. Phases: `recording` until Stop (the feed with `--incremental on`), `finishing` while the recording
+/// transcriber's `finish()` runs (incremental only), then in `finishRecording`'s order: compress first (`compressing`
+/// until the pipeline's first event, then one per pipeline step), or transcribe first (`submitting` until the
+/// pipeline's first event, one per pipeline step, `compressing` from `finished` until the `compressed` milestone, then
+/// `done`). A step seen twice adds up; each phase keeps its max `phys_footprint` (1 s sampler plus a sample at every
+/// change) and this process's CPU time from `getrusage` (work done in other processes, such as CoreML's, is not
+/// counted).
 @MainActor
 final class MeasureRun {
     private struct Phase {
@@ -35,6 +37,8 @@ final class MeasureRun {
     private(set) var failureDetail: String?
     private(set) var stopToCompressed: Double?
     private(set) var stopToTranscript: Double?
+    /// Stop until the recording transcriber's `finish()` returned (incremental only).
+    private(set) var stopToPrior: Double?
 
     init(out: URL) {
         self.out = out
@@ -54,6 +58,18 @@ final class MeasureRun {
     /// `transcribesFirst`: `finishRecording` transcribes the CAF before compressing it.
     func markStop(transcribesFirst: Bool) {
         stop = Date()
+        enter(transcribesFirst ? "submitting" : "compressing")
+    }
+
+    /// Stop with a recording transcriber: `finishing` until `markPriorReady(transcribesFirst:)`.
+    func markStopFinishing() {
+        stop = Date()
+        enter("finishing")
+    }
+
+    /// The recording transcriber's `finish()` returned; `transcribesFirst` as in `markStop(transcribesFirst:)`.
+    func markPriorReady(transcribesFirst: Bool) {
+        stopToPrior = elapsed
         enter(transcribesFirst ? "submitting" : "compressing")
     }
 

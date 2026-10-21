@@ -76,6 +76,8 @@ public struct AppSettings: Codable, Equatable, Sendable {
     public var routeChangeBehavior: RouteChangeBehavior
     /// Queue the batch transcription when a recording stops (after compression).
     public var autoTranscribe: Bool
+    /// Transcribe speech chunks during the recording with the local engine, so only what was missed is left at Stop.
+    public var transcribeWhileRecording: Bool
     /// Expected number of speakers on the system channel for diarization, 1...20; nil = detect.
     public var speakerCountHint: Int?
     /// "Tell speakers apart": diarize the system channel; off = one "Speaker 1" for the meeting audio.
@@ -136,6 +138,7 @@ public struct AppSettings: Codable, Equatable, Sendable {
         endMonitor: MeetingEndMonitor.Configuration = MeetingEndMonitor.Configuration(),
         routeChangeBehavior: RouteChangeBehavior = .ask,
         autoTranscribe: Bool = true,
+        transcribeWhileRecording: Bool = true,
         speakerCountHint: Int? = nil,
         diarization: Bool = false,
         deferTranscriptionWhenConstrained: Bool = true,
@@ -183,6 +186,7 @@ public struct AppSettings: Codable, Equatable, Sendable {
         self.endMonitor = endMonitor
         self.routeChangeBehavior = routeChangeBehavior
         self.autoTranscribe = autoTranscribe
+        self.transcribeWhileRecording = transcribeWhileRecording
         self.speakerCountHint = speakerCountHint
         self.diarization = diarization
         self.deferTranscriptionWhenConstrained = deferTranscriptionWhenConstrained
@@ -213,7 +217,7 @@ public struct AppSettings: Codable, Equatable, Sendable {
         case ragEnabled, embeddingModelID, embeddingAPIModel, cloudEmbeddingConfirmed
         case micDeviceUID, meetingDetection, perAppBehavior, pillPositions, showPill, hidePillWhenAppActive
         case attachPillToWindow, pillWindowOffset, pillSize, endMonitor, routeChangeBehavior
-        case autoTranscribe, speakerCountHint, diarization, deferTranscriptionWhenConstrained
+        case autoTranscribe, transcribeWhileRecording, speakerCountHint, diarization, deferTranscriptionWhenConstrained
         case autoDeleteEnabled, autoDeleteAfterDays, autoDeleteMode, deleteAudioAfterTranscription
         case deleteWithoutConfirmation, globalHotKey, globalHotKeyEnabled, globalPauseHotKey, globalPauseHotKeyEnabled
     }
@@ -259,6 +263,7 @@ public struct AppSettings: Codable, Equatable, Sendable {
             ?? MeetingEndMonitor.Configuration()
         routeChangeBehavior = try container.decodeIfPresent(RouteChangeBehavior.self, forKey: .routeChangeBehavior) ?? .ask
         autoTranscribe = try container.decodeIfPresent(Bool.self, forKey: .autoTranscribe) ?? true
+        transcribeWhileRecording = try container.decodeIfPresent(Bool.self, forKey: .transcribeWhileRecording) ?? true
         speakerCountHint = try container.decodeIfPresent(Int.self, forKey: .speakerCountHint)
             .map { Self.clamped($0, to: Self.speakerCountHintRange) }
         diarization = try container.decodeIfPresent(Bool.self, forKey: .diarization) ?? false

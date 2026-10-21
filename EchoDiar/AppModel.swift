@@ -411,6 +411,28 @@ final class AppModel {
         Task { await live.start() }
     }
 
+    /// A started transcriber for a recording in `language` ("auto" or a code; the language markers once the engine
+    /// runs), its model loading meanwhile; nil unless auto-transcribe and "Transcribe while recording" are on, the
+    /// default engines are local and the engine the Stop job resolves to (as `submitTranscription` does) is an
+    /// installed WhisperKit or Parakeet entry. The caller sets `engine.liveSink` to its `append` before `engine.start`
+    /// (the writer reads the sink once), calls `flush()` after a pause and `finish()` after the `.idle` snapshot.
+    func startRecordingTranscriber(language: String) -> RecordingTranscriber? {
+        guard settings.autoTranscribe, settings.transcribeWhileRecording, autoEngine() == .local else { return nil }
+        let isUsable = { [modelStore] (entry: ModelEntry) in TranscriptionPipeline.isUsable(entry, in: modelStore) }
+        let preferred = TranscriptionPipeline.preferredEngineID(
+            settings.defaultASRModelID, language: language, isUsable: isUsable)
+        guard let entry = TranscriptionPipeline.incrementalEntry(
+                  engineID: preferred, language: language, isUsable: isUsable),
+              let folder = modelStore.folder(for: entry.id) ?? (entry.repo == nil ? modelStore.root : nil)
+        else { return nil }
+        let transcriber = RecordingTranscriber(
+            entry: entry, folder: folder, gate: modelGate, idleRelease: .seconds(settings.modelIdleMinutes * 60),
+            deferWhenConstrained: settings.deferTranscriptionWhenConstrained
+        ) { [engine] in engine.currentLanguage() ?? language }
+        Task { await transcriber.start() }
+        return transcriber
+    }
+
     /// Disconnects and hides the current transcriber; the caller awaits its `stop()`, which unloads the model.
     private func detachLiveTranscript() -> LiveTranscriber? {
         engine.liveSink = nil
@@ -626,15 +648,19 @@ final class AppModel {
     /// held back by "wait", and the default engine is local or a cloud one already confirmed) is transcribed from the
     /// CAF first; then its audio goes to the Trash (success with "Delete audio after transcription") or is compressed.
     /// Otherwise it is compressed first, then queued as `compress(_:)` does (a cloud confirmation may hold it), and
-    /// waited for. `milestone` sees each step end.
-    func finishRecording(_ folder: URL, milestone: (@MainActor (FinishMilestone) -> Void)? = nil) async {
+    /// waited for. `prior` (what the recording transcriber transcribed) goes to the job either way. `milestone` sees
+    /// each step end.
+    func finishRecording(
+        _ folder: URL, prior: PriorTranscription? = nil, milestone: (@MainActor (FinishMilestone) -> Void)? = nil
+    ) async {
         let id = (try? RecordingSession.read(from: folder))?.id
         if let id { finishingIDs.insert(id) }
         defer { if let id { finishingIDs.remove(id) } }
         // Before the transcription, so the indicator never drops to idle between the two steps.
         compressionJobs += 1
         await library.refresh()
-        if transcribesFirst(folder), let job = submitTranscription(folder: folder, deleteAudioAfter: false) {
+        if transcribesFirst(folder),
+           let job = submitTranscription(folder: folder, deleteAudioAfter: false, prior: prior) {
             let succeeded = await job.value
             milestone?(.transcribed(succeeded: succeeded))
             if succeeded, settings.deleteAudioAfterTranscription,
@@ -649,7 +675,7 @@ final class AppModel {
         }
         let result = await compressFinished(folder)
         milestone?(.compressed(result))
-        let job = transcribe(after: result)
+        let job = transcribe(after: result, prior: prior)
         compressionJobs -= 1
         await library.refresh()
         if let job {
@@ -731,7 +757,7 @@ final class AppModel {
     /// failed (a compression that keeps failing is retried at every launch; the card's "Failed — Retry" retries).
     /// Returns the submitted job, nil when none was.
     @discardableResult
-    private func transcribe(after result: CompressionResult) -> Task<Bool, Never>? {
+    private func transcribe(after result: CompressionResult, prior: PriorTranscription? = nil) -> Task<Bool, Never>? {
         guard settings.autoTranscribe else { return nil }
         switch result.failure {
         case .sessionUnreadable?, .stillRecording?, .unsafeAudioFileName?, .sourceUnreadable?: return nil
@@ -739,7 +765,7 @@ final class AppModel {
         }
         let conversation = try? Conversation.read(from: result.folder)
         guard conversation?.hasTranscript != true, conversation?.status != .transcriptionFailed else { return nil }
-        return submitTranscription(folder: result.folder)
+        return submitTranscription(folder: result.folder, prior: prior)
     }
 
     /// The card's "Transcribe" and "Retry", and the transcript's "Re-transcribe" (`engineID` = a catalog id or a cloud
@@ -766,10 +792,12 @@ final class AppModel {
     /// The default cloud diarizer runs when configured with a diarizing model and the cloud ASR (if any) labels no
     /// speakers; its destination is confirmed the same way, after the ASR's, before anything is uploaded. With "Tell
     /// speakers apart" off, no diarizer runs. `deleteAudioAfter` nil = "Delete audio after transcription", read when
-    /// the job succeeds. Returns the job (true when it succeeded), nil when none was submitted.
+    /// the job succeeds. `prior` goes to the job (see `TranscriptionJob.prior`). Returns the job (true when it
+    /// succeeded), nil when none was submitted.
     @discardableResult
     private func submitTranscription(
-        folder: URL, engineID: String? = nil, language: String? = nil, deleteAudioAfter: Bool? = nil
+        folder: URL, engineID: String? = nil, language: String? = nil, deleteAudioAfter: Bool? = nil,
+        prior: PriorTranscription? = nil
     ) -> Task<Bool, Never>? {
         guard let session = try? RecordingSession.read(from: folder), !session.probe, session.state != .failed else {
             return nil
@@ -813,7 +841,7 @@ final class AppModel {
             engineID: engineID ?? preferred, language: language,
             // Per job rather than a re-created pipeline: the pipeline and its progress stream live as long as the app.
             processNow: !settings.deferTranscriptionWhenConstrained, speakerCountHint: settings.speakerCountHint,
-            diarizerID: settings.defaultDiarizerModelID, diarize: settings.diarization)
+            diarizerID: settings.defaultDiarizerModelID, diarize: settings.diarization, prior: prior)
         transcriptionErrors[session.id] = nil
         // Set now so the card leaves its button before the pipeline's first event arrives.
         transcriptionProgress[session.id] = JobProgress(conversationID: session.id, step: .queued, fraction: 0)
@@ -1680,22 +1708,27 @@ extension AppModel {
     }
 
     /// `--measure <2-channel 16 kHz Int16 CAF> --out <dir> [--engine <catalog id>] [--diarizer <catalog id>]
-    /// [--language <code>] [--pace <x>] [--diarization on|off] [--tag <git sha>]`: copies the fixture into a temp
-    /// session folder (`EchoDiar-measure-<uuid>`, stopped, one language marker at 0), runs `finishRecording` on it
-    /// with in-memory settings (never saved; the host's are not read: local engines only, auto-transcribe, 64 kbps,
-    /// nothing deleted, never deferred), and writes `result.json` (see `MeasureRun`) plus a copy of `transcript.json` to
-    /// `--out`. Exit 0 when every post-condition holds, else 1 with the message on stderr (and in `result.json` once
-    /// `--out` exists). The library is only read (`LibraryStore` never writes; the AppDelegate skips launch crash
-    /// recovery); the pipeline and the compressor only touch the temp folder, which is removed after a successful
-    /// run. Defaults: the catalog's default ASR, the first installed diarizer (pyannote), English, pace 1.
-    /// `--diarization on|off` (on, never the saved setting) sets "Tell speakers apart"; `--incremental on|off` (off) is
-    /// parsed for a later phase, and `on` is refused until then. Other flags are ignored.
+    /// [--language <code>] [--pace <x>] [--diarization on|off] [--incremental on|off] [--tag <git sha>]`: copies the
+    /// fixture into a temp session folder (`EchoDiar-measure-<uuid>`, stopped, one language marker at 0), runs
+    /// `finishRecording` on it with in-memory settings (never saved; the host's are not read: local engines only,
+    /// auto-transcribe, 64 kbps, nothing deleted, never deferred), and writes `result.json` (see `MeasureRun`) plus a
+    /// copy of `transcript.json` to `--out`. Exit 0 when every post-condition holds, else 1 with the message on
+    /// stderr (and in `result.json` once `--out` exists). The library is only read (`LibraryStore` never writes; the
+    /// AppDelegate skips launch crash recovery); the pipeline and the compressor only touch the temp folder, which is
+    /// removed after a successful run. Defaults: the catalog's default ASR, the first installed diarizer (pyannote),
+    /// English, pace 1.
+    /// `--diarization on|off` (on, never the saved setting) sets "Tell speakers apart"; `--incremental on|off` (off,
+    /// never the saved setting) sets "Transcribe while recording": `on` starts the transcriber that
+    /// `startRecordingTranscriber` gives, feeds it the fixture in 100 ms blocks at `--pace` (absolute deadlines,
+    /// `duration / pace` in all), then at Stop awaits its `finish()` and passes the prior to `finishRecording`
+    /// (`result.json` gains `transcriber`). Other flags are ignored.
     private func runMeasureHarness() -> Bool {
         guard ProcessInfo.processInfo.arguments.contains("--measure") else { return false }
         guard let fixturePath = Self.harnessValue(after: "--measure"), let outPath = Self.harnessValue(after: "--out")
         else {
             Self.fail("usage: --measure <2-channel 16 kHz CAF> --out <dir> [--engine <catalog id>] "
-                + "[--diarizer <catalog id>] [--language <code>] [--pace <x>] [--diarization on|off] [--tag <git sha>]")
+                + "[--diarizer <catalog id>] [--language <code>] [--pace <x>] [--diarization on|off] "
+                + "[--incremental on|off] [--tag <git sha>]")
         }
         let out = URL(fileURLWithPath: outPath, isDirectory: true)
         do {
@@ -1727,7 +1760,6 @@ extension AppModel {
         guard ["on", "off"].contains(diarization), ["on", "off"].contains(incremental) else {
             fail("error: --diarization and --incremental take on or off")
         }
-        guard incremental == "off" else { fail("error: --incremental on is not supported yet") }
 
         // The fixture: what the recorder writes.
         let duration: Double
@@ -1752,6 +1784,7 @@ extension AppModel {
         measured.defaultDiarizerModelID = diarizerFlag
         measured.speakerCountHint = nil
         measured.diarization = diarization == "on"
+        measured.transcribeWhileRecording = incremental == "on"
         measured.compressionBitrateKbps = 64
         measured.deleteAudioAfterTranscription = false
         measured.keepUncompressedAudio = false
@@ -1795,12 +1828,52 @@ extension AppModel {
         Task {
             for await progress in pipeline.progress { run.progress(progress) }
         }
+        // The recording transcriber, as a recording in `language` starts it.
+        var transcriber: RecordingTranscriber?
+        if incremental == "on" {
+            guard let started = startRecordingTranscriber(language: language) else {
+                fail("error: \(engine) does not transcribe while recording (not an installed WhisperKit or Parakeet "
+                    + "model usable for \(language) without a fallback)")
+            }
+            transcriber = started
+        }
         // A windowless process gets App Napped, which the app at Stop (its recording page on screen) is not.
         let activity = ProcessInfo.processInfo.beginActivity(options: .userInitiated, reason: "--measure")
         Task {
-            // Recording: with `--incremental off` nothing runs during a recording, so Stop follows the setup.
-            run.markStop(transcribesFirst: transcribesFirst(folder))
-            await finishRecording(folder) { run.milestone($0) }
+            var prior: PriorTranscription?
+            if let transcriber {
+                // Recording: the fixture in real-time blocks while the transcriber loads and decodes; then Stop.
+                let watch = Self.watch(transcriber, from: ContinuousClock.now)
+                do {
+                    try await Task.detached(priority: .userInitiated) {
+                        try await Self.feed(fixture, to: transcriber, pace: pace)
+                    }.value
+                } catch {
+                    fail("error: cannot read the fixture: \(error.localizedDescription)")
+                }
+                run.markStopFinishing()
+                prior = await transcriber.finish()
+                run.markPriorReady(transcribesFirst: transcribesFirst(folder))
+                let watched = await watch.value
+                let stats = await transcriber.stats
+                let gaps = prior.map { ($0.micGaps + $0.systemGaps).reduce(0) { $0 + $1.end - $1.start } }
+                run.fields["transcriber"] = [
+                    "loadSeconds": watched.loadSeconds ?? NSNull(),
+                    "finishSeconds": run.stopToPrior ?? NSNull(),
+                    "priorReturned": prior != nil,
+                    "gapSeconds": gaps ?? NSNull(),
+                    "maxPendingSeconds": watched.maxPendingSeconds,
+                    "failure": watched.failure ?? NSNull(),
+                    "chunks": stats.map {
+                        ["transcribed": $0.transcribed, "silence": $0.silence, "dropped": $0.dropped,
+                         "failed": $0.failed, "pending": $0.pending]
+                    } ?? NSNull(),
+                ] as [String: Any]
+            } else {
+                // Recording: with `--incremental off` nothing runs during a recording, so Stop follows the setup.
+                run.markStop(transcribesFirst: transcribesFirst(folder))
+            }
+            await finishRecording(folder, prior: prior) { run.milestone($0) }
             ProcessInfo.processInfo.endActivity(activity)
 
             let fm = FileManager.default
@@ -1829,6 +1902,51 @@ extension AppModel {
             Self.finish(0, out.appendingPathComponent("result.json").path)
         }
         return true
+    }
+
+    /// What `--measure` sees of a recording transcriber's `updates` until they finish: seconds from `start` to the
+    /// first snapshot past `loading` (nil if none), the largest `pendingSeconds` seen (the stream keeps the newest
+    /// snapshot only, and nothing is published while the transcriber waits for the gate, so this can under-report)
+    /// and the `failed` message.
+    private static func watch(_ transcriber: RecordingTranscriber, from start: ContinuousClock.Instant)
+        -> Task<(loadSeconds: Double?, maxPendingSeconds: Double, failure: String?), Never>
+    {
+        Task {
+            var loadSeconds: Double?
+            var maxPending = 0.0
+            var failure: String?
+            for await snapshot in transcriber.updates {
+                maxPending = max(maxPending, snapshot.pendingSeconds)
+                if case .failed(let message) = snapshot.state { failure = message }
+                if loadSeconds == nil, snapshot.state != .loading {
+                    loadSeconds = (ContinuousClock.now - start) / .seconds(1)
+                }
+            }
+            return (loadSeconds, maxPending, failure)
+        }
+    }
+
+    /// The 2-channel Int16 `fixture` into `transcriber.append` as the recorder would: 100 ms interleaved blocks (1600
+    /// frames), block n at n × 0.1 s / `pace` after the start (absolute deadlines), the last partial block included,
+    /// read one block at a time so the file never sits in memory.
+    nonisolated private static func feed(_ fixture: URL, to transcriber: RecordingTranscriber, pace: Double)
+        async throws
+    {
+        let file = try AVAudioFile(forReading: fixture, commonFormat: .pcmFormatInt16, interleaved: true)
+        let block: AVAudioFrameCount = 1_600
+        guard let buffer = AVAudioPCMBuffer(pcmFormat: file.processingFormat, frameCapacity: block),
+              let samples = buffer.int16ChannelData?[0] else { throw CocoaError(.fileReadCorruptFile) }
+        let channels = Int(file.processingFormat.channelCount)
+        let clock = ContinuousClock()
+        let start = clock.now
+        var index = 0
+        while file.framePosition < file.length {
+            try file.read(into: buffer, frameCount: block)
+            guard buffer.frameLength > 0 else { break }
+            index += 1
+            try? await Task.sleep(until: start + .seconds(Double(index) * 0.1 / pace), clock: clock)
+            transcriber.append(interleaved: samples, frames: Int(buffer.frameLength), channels: channels)
+        }
     }
 
     /// `--live-transcribe <audio file> [--engine <catalog id>] [--language <code>]`: once the live model listens,

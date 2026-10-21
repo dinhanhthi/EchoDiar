@@ -37,7 +37,7 @@ public struct WhisperKitEngine: TranscriptionEngine {
         }
     }
 
-    /// Loads the model from `folder`; the caller unloads it. Also used by `LiveTranscriber`.
+    /// Loads the model from `folder`; the caller unloads it. Also used by `Session`.
     static func load(entry: ModelEntry, folder: URL) async throws -> WhisperKit {
         guard FileManager.default.fileExists(atPath: folder.appendingPathComponent("tokenizer.json").path) else {
             throw TranscriptionError.needsModel(entry.id)
@@ -68,12 +68,7 @@ public struct WhisperKitEngine: TranscriptionEngine {
         var segments: [RawSegment] = []
         for range in ranges {
             let language = range.language.map(Self.whisperLanguage)
-            let options = DecodingOptions(
-                language: language,
-                detectLanguage: language == nil,
-                skipSpecialTokens: true,
-                wordTimestamps: false
-            )
+            let options = Self.decodingOptions(language: language)
             let rangeEnd = min(range.end ?? duration, duration)
             var slabStart = range.start
             while slabStart < rangeEnd {
@@ -93,19 +88,8 @@ public struct WhisperKitEngine: TranscriptionEngine {
                     try Task.checkCancellation()
                     let offset = slabStart + Double(chunk.seekOffsetIndex) / sampleRate
                     let results = try await whisper.transcribe(audioArray: chunk.audioSamples, decodeOptions: options)
-                    for result in results {
-                        let detected = language == nil ? result.language : nil
-                        for segment in result.segments {
-                            let text = Self.speechText(segment.text)
-                            guard !text.isEmpty,
-                                  !Self.isSilent(chunk.audioSamples, from: segment.start, to: segment.end) else {
-                                continue
-                            }
-                            segments.append(RawSegment(
-                                start: offset + Double(segment.start), end: offset + Double(segment.end),
-                                text: text, detectedLanguage: detected))
-                        }
-                    }
+                    segments += Self.speechSegments(
+                        results, in: chunk.audioSamples, offset: offset, detectLanguage: language == nil)
                     let done = offset + Double(chunk.audioSamples.count) / sampleRate
                     progress(min(1, done / total))
                 }
@@ -113,6 +97,35 @@ public struct WhisperKitEngine: TranscriptionEngine {
             }
         }
         progress(1)
+        return segments
+    }
+
+    /// Whisper's options for a window: `language` is a Whisper code, nil detects it per window.
+    static func decodingOptions(language: String?) -> DecodingOptions {
+        DecodingOptions(
+            language: language,
+            detectLanguage: language == nil,
+            skipSpecialTokens: true,
+            wordTimestamps: false
+        )
+    }
+
+    /// The speech segments of one window's results, `offset` seconds into the audio: segments whose `speechText` is
+    /// empty or whose audio `isSilent` are dropped. `detectLanguage` keeps each result's detected language.
+    static func speechSegments(
+        _ results: [TranscriptionResult], in samples: [Float], offset: Double, detectLanguage: Bool
+    ) -> [RawSegment] {
+        var segments: [RawSegment] = []
+        for result in results {
+            let detected = detectLanguage ? result.language : nil
+            for segment in result.segments {
+                let text = speechText(segment.text)
+                guard !text.isEmpty, !isSilent(samples, from: segment.start, to: segment.end) else { continue }
+                segments.append(RawSegment(
+                    start: offset + Double(segment.start), end: offset + Double(segment.end),
+                    text: text, detectedLanguage: detected))
+            }
+        }
         return segments
     }
 
@@ -158,5 +171,48 @@ public struct WhisperKitEngine: TranscriptionEngine {
     /// Whisper takes the primary subtag: "en-US" → "en".
     static func whisperLanguage(_ code: String) -> String {
         String(code.lowercased().split(whereSeparator: { $0 == "-" || $0 == "_" }).first ?? "")
+    }
+}
+
+extension WhisperKitEngine {
+    /// Loads the model for a `Session`, which the caller unloads.
+    func session() async throws -> Session {
+        Session(whisper: try await Self.load(entry: entry, folder: folder),
+                windowSamples: (entry.windowSeconds ?? Self.defaultWindowSeconds) * WhisperKit.sampleRate)
+    }
+
+    /// One loaded model for many chunks, decoded like the batch windows: a chunk longer than `windowSamples` is
+    /// split at silences, and each window gets the batch's options and `speechSegments` filtering.
+    final class Session: TranscriptionSession {
+        private let whisper: WhisperKit
+        private let windowSamples: Int
+
+        init(whisper: WhisperKit, windowSamples: Int) {
+            self.whisper = whisper
+            self.windowSamples = windowSamples
+        }
+
+        /// `language` is a BCP-47 code; nil, empty or `auto` detects it per window, as in `LanguageRange`.
+        func transcribe(_ samples: [Float], language: String?) async throws -> [RawSegment] {
+            let trimmed = language?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+            let code = trimmed.isEmpty || trimmed.lowercased() == "auto"
+                ? nil : WhisperKitEngine.whisperLanguage(trimmed)
+            let options = WhisperKitEngine.decodingOptions(language: code)
+            let sampleRate = Double(WhisperKit.sampleRate)
+            var segments: [RawSegment] = []
+            for chunk in try await VADAudioChunker().chunkAll(
+                audioArray: samples, maxChunkLength: windowSamples, decodeOptions: options) {
+                try Task.checkCancellation()
+                let results = try await whisper.transcribe(audioArray: chunk.audioSamples, decodeOptions: options)
+                segments += WhisperKitEngine.speechSegments(
+                    results, in: chunk.audioSamples, offset: Double(chunk.seekOffsetIndex) / sampleRate,
+                    detectLanguage: code == nil)
+            }
+            return segments
+        }
+
+        func unload() async {
+            await whisper.unloadModels()
+        }
     }
 }

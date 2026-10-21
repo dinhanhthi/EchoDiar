@@ -50,6 +50,22 @@ struct EngineRoutingTests {
         #expect(prefer(nil, installed, "auto") == nil)
     }
 
+    /// The transcribe-while-recording entry: the batch resolution when it is a usable WhisperKit or Parakeet entry
+    /// that needs no language fallback, else nil (the pipeline then transcribes the whole recording at Stop).
+    @Test func incrementalEntryIsTheBatchEngineWhenItCanTranscribeChunks() {
+        let resolve = { (id: String?, language: String, ids: Set<String>) in
+            TranscriptionPipeline.incrementalEntry(engineID: id, language: language, isUsable: Self.usable(ids))?.id
+        }
+        #expect(resolve(nil, "auto", ["parakeet-v3"]) == "parakeet-v3")
+        #expect(resolve(nil, "auto", ["parakeet-v3", "whisperkit-small"]) == "whisperkit-small")
+        #expect(resolve("parakeet-v3", "en", ["parakeet-v3", "whisperkit-small"]) == "parakeet-v3")
+        #expect(resolve("parakeet-v3", "vi", ["parakeet-v3", "whisperkit-large-v3-turbo-626"]) == nil)
+        #expect(resolve("parakeet-v3", "auto", []) == nil)
+        #expect(resolve(nil, "vi", ["qwen3-asr-0.6b"]) == nil)
+        #expect(resolve("nemotron-3.5-streaming", "auto", ["nemotron-3.5-streaming"]) == nil)
+        #expect(resolve(nil, "auto", []) == nil)
+    }
+
     // MARK: - Local diarizer
 
     /// The default diarizer when installed, except a Nemotron pick above its speaker limit with pyannote installed;

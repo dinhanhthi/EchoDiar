@@ -117,3 +117,42 @@ public struct ParakeetEngine: TranscriptionEngine {
         return segments
     }
 }
+
+extension ParakeetEngine {
+    /// Loads the model for a `Session`, which the caller unloads.
+    func session() async throws -> Session {
+        let manager = AsrManager(config: .default, models: try await load())
+        return Session(manager: manager, decoderLayers: await manager.decoderLayerCount)
+    }
+
+    /// One `AsrManager` for many chunks, each decoded from a fresh decoder state like a batch slab.
+    final class Session: TranscriptionSession {
+        private let manager: AsrManager
+        private let decoderLayers: Int
+
+        init(manager: AsrManager, decoderLayers: Int) {
+            self.manager = manager
+            self.decoderLayers = decoderLayers
+        }
+
+        /// `language` is a BCP-47 code; nil, or one Parakeet does not know, detects it. A chunk shorter than
+        /// FluidAudio accepts (300 ms) is padded with silence.
+        func transcribe(_ samples: [Float], language: String?) async throws -> [RawSegment] {
+            let minimumSamples = ASRConstants.minimumRequiredSamples(forSampleRate: Int(MonoAudio.sampleRate))
+            let padded = samples + [Float](repeating: 0, count: max(0, minimumSamples - samples.count))
+            var state = TdtDecoderState.make(decoderLayers: decoderLayers)
+            let result = try await manager.transcribe(
+                padded, decoderState: &state,
+                language: language.flatMap { Language(rawValue: WhisperKitEngine.whisperLanguage($0)) })
+            let words = buildWordTimings(from: result.tokenTimings ?? [])
+            guard words.isEmpty else { return ParakeetEngine.segments(words, offset: 0) }
+            let text = result.text.trimmingCharacters(in: .whitespacesAndNewlines)
+            guard !text.isEmpty else { return [] }
+            return [RawSegment(start: 0, end: Double(samples.count) / MonoAudio.sampleRate, text: text)]
+        }
+
+        func unload() async {
+            await manager.cleanup()
+        }
+    }
+}

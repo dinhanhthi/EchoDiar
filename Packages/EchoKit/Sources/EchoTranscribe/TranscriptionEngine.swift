@@ -74,11 +74,14 @@ public struct TranscriptionJob: Codable, Equatable, Sendable {
     /// "Tell speakers apart": false runs no diarizer (local or cloud) and asks cloud ASR for no speaker labels, so the
     /// whole system channel is one speaker (`s1`).
     public var diarize: Bool
+    /// What the recording transcriber transcribed while recording: when `isUsable` for this run, the pipeline keeps
+    /// its segments and transcribes only its gaps; nil or not usable = the whole recording.
+    public var prior: PriorTranscription?
 
     public init(
         conversationID: UUID, folder: URL, systemFileName: String? = nil, engineID: String? = nil,
         language: String? = nil, processNow: Bool = false, speakerCountHint: Int? = nil, diarizerID: String? = nil,
-        diarize: Bool = true
+        diarize: Bool = true, prior: PriorTranscription? = nil
     ) {
         self.conversationID = conversationID
         self.folder = folder
@@ -89,6 +92,84 @@ public struct TranscriptionJob: Codable, Equatable, Sendable {
         self.speakerCountHint = speakerCountHint
         self.diarizerID = diarizerID
         self.diarize = diarize
+        self.prior = prior
+    }
+}
+
+/// A stretch of the audio file, in seconds from its start.
+public struct Span: Codable, Equatable, Sendable {
+    public var start: Double
+    public var end: Double
+
+    public init(start: Double, end: Double) {
+        self.start = start
+        self.end = end
+    }
+}
+
+/// What the recording transcriber transcribed while recording, in file time: the pipeline keeps these segments and
+/// transcribes only the gaps at Stop.
+public struct PriorTranscription: Codable, Equatable, Sendable {
+    /// How one speech chunk of a channel ended.
+    public enum ChunkOutcome: Sendable {
+        case transcribed
+        /// Peak below `TranscriptionPipeline.silencePeak`: covered, not decoded.
+        case silence
+        /// Over the queue cap.
+        case dropped
+        /// The ASR threw.
+        case failed
+        /// Not decoded by Stop (e.g. while the Mac was constrained).
+        case pending
+    }
+
+    /// Catalog id of the engine that transcribed the segments.
+    public var engineID: String
+    public var mic: [RawSegment]
+    public var system: [RawSegment]
+    /// Spans not transcribed, to transcribe at Stop.
+    public var micGaps: [Span]
+    public var systemGaps: [Span]
+    /// Seconds of audio the transcriber saw (= the file's duration when every frame reached it).
+    public var duration: Double
+
+    public init(
+        engineID: String, mic: [RawSegment], system: [RawSegment], micGaps: [Span], systemGaps: [Span],
+        duration: Double
+    ) {
+        self.engineID = engineID
+        self.mic = mic
+        self.system = system
+        self.micGaps = micGaps
+        self.systemGaps = systemGaps
+        self.duration = duration
+    }
+
+    /// One channel's chunks in file order → the spans of the dropped, failed and pending ones, touching or
+    /// overlapping spans merged. Transcribed and silence chunks, and the pauses between chunks, are covered.
+    public static func gaps(_ chunks: [(span: Span, outcome: ChunkOutcome)]) -> [Span] {
+        var gaps: [Span] = []
+        for (span, outcome) in chunks {
+            switch outcome {
+            case .transcribed, .silence: continue
+            case .dropped, .failed, .pending: break
+            }
+            if let last = gaps.last, last.end >= span.start {
+                gaps[gaps.count - 1].end = max(last.end, span.end)
+            } else {
+                gaps.append(span)
+            }
+        }
+        return gaps
+    }
+
+    /// False when the run would not reproduce these segments: another engine, a language fallback, a language
+    /// override (re-transcribe), or audio whose duration differs by more than 0.1 s.
+    public func isUsable(engineID: String, engineFallback: String?, languageOverride: String?, audioDuration: Double)
+        -> Bool
+    {
+        engineID == self.engineID && engineFallback == nil && languageOverride == nil
+            && abs(duration - audioDuration) <= 0.1
     }
 }
 

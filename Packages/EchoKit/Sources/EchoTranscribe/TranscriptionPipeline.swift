@@ -8,8 +8,9 @@ import Foundation
 /// Batch transcription of recording folders, one job at a time: extract each channel to 16 kHz mono, skip silent
 /// channels, ASR mic, ASR system, diarize system (the cloud diarizer when given, else or after its failure the
 /// local one), merge, write `transcript.json`. Models are loaded inside each step and unloaded before the next,
-/// while the job holds the `ModelLoadGate` (it waits while live captions hold it). Never touches EchoAudio:
-/// `AppModel` runs compression first.
+/// while the job holds the `ModelLoadGate` (it waits while live captions hold it). A job with a usable `prior` keeps
+/// its segments and transcribes only its gaps, taking the gate only for gap fill or diarization. Never touches
+/// EchoAudio: `AppModel` runs compression first.
 public actor TranscriptionPipeline {
     public typealias EngineFactory = @Sendable (_ entry: ModelEntry, _ folder: URL) -> any TranscriptionEngine
 
@@ -100,8 +101,9 @@ public actor TranscriptionPipeline {
         var channel: Int
     }
 
-    /// Transcribes one channel: the 16 kHz extract, its source channel, which channel it is, and progress 0...1.
-    private typealias ChannelASR = @Sendable (
+    /// Transcribes one channel: the 16 kHz extract, its source channel, which channel it is, and progress 0...1. Not
+    /// `@Sendable`: the gap fill's closure owns a non-Sendable session for the whole job.
+    private typealias ChannelASR = (
         _ extracted: URL, _ source: ChannelSource, _ channel: Transcript.Channel,
         _ progress: @escaping @Sendable (Double) -> Void
     ) async throws -> [RawSegment]
@@ -111,6 +113,34 @@ public actor TranscriptionPipeline {
         // Creates `conversation.json` when missing (transcribed before compression); nil while unreadable.
         var stored: RecordingSession?
         do {
+            if cloud == nil, let prior = job.prior, let session = try? RecordingSession.read(from: job.folder),
+               let sources = try? channelSources(session: session, job: job), sources.mic != nil,
+               let entry = await usableEntry(for: prior, job: job, session: session) {
+                // Only gap fill and diarization need a model, so only they take the gate or wait for a cool Mac.
+                stored = session
+                let (diarizer, cloudDiarizer) = diarizers(for: job, cloud: cloudDiarizer)
+                let fillsGaps = !prior.micGaps.isEmpty || (sources.system != nil && !prior.systemGaps.isEmpty)
+                let diarizes = sources.system != nil && !prior.system.isEmpty && (diarizer != nil || cloudDiarizer != nil)
+                var modelFolder: URL?
+                if fillsGaps {
+                    guard Self.isUsable(entry, in: modelStore), let folder = modelStore.folder(for: entry.id) else {
+                        throw TranscriptionError.needsModel(entry.id)
+                    }
+                    modelFolder = folder
+                }
+                if (fillsGaps || diarizes) && deferWhenConstrained && !job.processNow { await waitWhileConstrained(job) }
+                started = true
+                let url = try await transcribePrior(
+                    job, prior: prior, session: session, sources: sources, entry: entry, modelFolder: modelFolder,
+                    diarizer: diarizer, cloudDiarizer: cloudDiarizer)
+                Self.updateConversation(in: job.folder, session: session) {
+                    $0.status = .transcribed
+                    $0.hasTranscript = true
+                    $0.sizeBytes = LibraryStore.sizeOnDisk(of: job.folder)
+                }
+                emit(job, .finished, 1)
+                return url
+            }
             if deferWhenConstrained && !job.processNow { await waitWhileConstrained(job) }
             guard var session = try? RecordingSession.read(from: job.folder) else {
                 throw TranscriptionError.sessionUnreadable
@@ -120,13 +150,7 @@ public actor TranscriptionPipeline {
             if let language = job.language { session.languageMarkers = [.init(fileTime: 0, language: language)] }
             let sources = try channelSources(session: session, job: job)
             let ranges = LanguageRange.ranges(from: session.languageMarkers)
-            let hint = job.speakerCountHint ?? speakerCountHint
-            let diarizerID = job.diarize ? Self.localDiarizerID(
-                preferred: job.diarizerID, speakerCountHint: hint, isInstalled: { modelStore.isInstalled($0) }) : nil
-            let diarizer = diarizerID.flatMap { id in
-                modelStore.folder(for: id).map { SpeakerDiarizer(entryID: id, folder: $0, speakerCountHint: hint) }
-            }
-            let cloudDiarizer = job.diarize ? cloudDiarizer : nil
+            let (diarizer, cloudDiarizer) = diarizers(for: job, cloud: cloudDiarizer)
 
             let url: URL
             if let cloud {
@@ -138,7 +162,7 @@ public actor TranscriptionPipeline {
                     job, session: session, sources: sources, engineID: cloud.engineID,
                     modelID: cloud.model.isEmpty ? nil : cloud.model, engineFallback: nil, diarizer: diarizer,
                     cloudDiarizer: cloudDiarizer, gateDiarization: true
-                ) { _, source, channel, _ in
+                ) { @Sendable _, source, channel, _ in
                     try await Self.cloudSegments(
                         cloud, source: source, language: language, diarize: job.diarize && channel == .system)
                 }
@@ -189,38 +213,44 @@ public actor TranscriptionPipeline {
     /// returned provider speaker labels, merges and writes `transcript.json`. Diarization: `cloudDiarizer` first
     /// (never takes the gate itself); `diarizer` when there is none, or after it failed or labeled no speaker
     /// (`Transcript.cloudDiarizationFailedNote`). `gateDiarization`: the caller does not hold the `ModelLoadGate`
-    /// (cloud ASR), so the local diarizer takes it.
-    private func process(
+    /// (cloud ASR), so the local diarizer takes it. With `prior`, each channel is its segments plus `asr` of its gaps:
+    /// a channel is extracted only when it has gaps, or for the system channel's diarization. Nonisolated, so `asr`
+    /// may hold a non-Sendable session across both channels.
+    private nonisolated func process(
         _ job: TranscriptionJob, session: RecordingSession, sources: (mic: ChannelSource?, system: ChannelSource?),
         engineID: String, modelID: String?, engineFallback: String?, diarizer: SpeakerDiarizer?,
-        cloudDiarizer: CloudEngine?, gateDiarization: Bool, asr: ChannelASR
+        cloudDiarizer: CloudEngine?, gateDiarization: Bool, prior: PriorTranscription? = nil, asr: ChannelASR
     ) async throws -> URL {
         let fm = FileManager.default
         let work = fm.temporaryDirectory.appendingPathComponent("EchoDiar-transcribe-\(UUID().uuidString)")
         try fm.createDirectory(at: work, withIntermediateDirectories: true)
         defer { try? fm.removeItem(at: work) }
 
-        var mic: [RawSegment] = []
-        if let source = sources.mic {
+        var mic = prior?.mic ?? []
+        if let source = sources.mic, prior.map({ !$0.micGaps.isEmpty }) ?? true {
             emit(job, .extracting, 0)
             if let url = try await extract(source, to: work.appendingPathComponent("mic.caf")) {
                 emit(job, .transcribingMic, 0.05)
-                mic = try await asr(url, source, .mic) { [self] fraction in
+                mic += try await asr(url, source, .mic) { [self] fraction in
                     emit(job, .transcribingMic, 0.05 + 0.35 * fraction)
                 }
                 try? fm.removeItem(at: url)
             }
         }
 
-        var system: [RawSegment] = []
+        var system = prior?.system ?? []
         var turns: [DiarizationTurn] = []
         var notes: [String] = []
-        if let source = sources.system {
+        let fillsSystem = prior.map { !$0.systemGaps.isEmpty } ?? true
+        let diarizes = !system.isEmpty && (diarizer != nil || cloudDiarizer != nil)
+        if let source = sources.system, fillsSystem || diarizes {
             emit(job, .extracting, 0.4)
             if let url = try await extract(source, to: work.appendingPathComponent("system.caf")) {
-                emit(job, .transcribingSystem, 0.45)
-                system = try await asr(url, source, .system) { [self] fraction in
-                    emit(job, .transcribingSystem, 0.45 + 0.35 * fraction)
+                if fillsSystem {
+                    emit(job, .transcribingSystem, 0.45)
+                    system += try await asr(url, source, .system) { [self] fraction in
+                        emit(job, .transcribingSystem, 0.45 + 0.35 * fraction)
+                    }
                 }
                 if !system.isEmpty, !system.contains(where: { $0.speaker != nil }) {
                     if let cloudDiarizer {
@@ -255,6 +285,10 @@ public actor TranscriptionPipeline {
             }
         }
 
+        if prior != nil {
+            mic.sort { $0.start < $1.start }
+            system.sort { $0.start < $1.start }
+        }
         emit(job, .merging, 0.95)
         let providerSpeakers = system.contains { $0.speaker != nil }
         if job.diarize && diarizer == nil && turns.isEmpty && !system.isEmpty && !providerSpeakers {
@@ -270,6 +304,125 @@ public actor TranscriptionPipeline {
         )
         try transcript.write(to: job.folder)
         return job.folder.appendingPathComponent(Transcript.fileName)
+    }
+
+    /// `prior`'s segments plus its gaps, transcribed with one session of `entry` loaded on the first chunk of speech
+    /// and unloaded before the gate is released; `modelFolder` nil = no gaps, so no ASR model and no gate (a local
+    /// diarizer takes it itself).
+    private func transcribePrior(
+        _ job: TranscriptionJob, prior: PriorTranscription, session: RecordingSession,
+        sources: (mic: ChannelSource?, system: ChannelSource?), entry: ModelEntry, modelFolder: URL?,
+        diarizer: SpeakerDiarizer?, cloudDiarizer: CloudEngine?
+    ) async throws -> URL {
+        let modelID = [entry.repo, entry.subfolder].compactMap { $0 }.joined(separator: "/")
+        Self.updateConversation(in: job.folder, session: session) { $0.status = .transcribing }
+        guard let modelFolder else {
+            return try await process(
+                job, session: session, sources: sources, engineID: entry.id, modelID: modelID, engineFallback: nil,
+                diarizer: diarizer, cloudDiarizer: cloudDiarizer, gateDiarization: true, prior: prior
+            ) { _, _, _, _ in [] }
+        }
+        return try await gate.withExclusiveModel(owner: .transcriptionJob) { [self] in
+            let ranges = LanguageRange.ranges(from: session.languageMarkers)
+            // Created, used and unloaded here only.
+            var model: (any TranscriptionSession)?
+            do {
+                let url = try await process(
+                    job, session: session, sources: sources, engineID: entry.id, modelID: modelID,
+                    engineFallback: nil, diarizer: diarizer, cloudDiarizer: cloudDiarizer, gateDiarization: false,
+                    prior: prior
+                ) { extracted, _, channel, progress in
+                    try await Self.fillGaps(
+                        channel == .mic ? prior.micGaps : prior.systemGaps, of: extracted, entry: entry,
+                        folder: modelFolder, ranges: ranges, session: &model, progress: progress)
+                }
+                await model?.unload()
+                return url
+            } catch {
+                await model?.unload()
+                throw error
+            }
+        }
+    }
+
+    /// The gaps of one channel's 16 kHz extract, in file time: each read in slabs of at most `slabSeconds` and cut
+    /// into speech chunks (`SpeechChunker`), so silence is not decoded; a chunk below `silencePeak` is skipped, and
+    /// each chunk gets the language of `ranges` at its start. `session` is loaded on the first chunk to decode.
+    static func fillGaps(
+        _ gaps: [Span], of extract: URL, entry: ModelEntry, folder: URL, ranges: [LanguageRange],
+        session: inout (any TranscriptionSession)?, progress: @Sendable (Double) -> Void
+    ) async throws -> [RawSegment] {
+        let duration = try MonoAudio.duration(of: extract)
+        let total = max(1, gaps.reduce(0) { $0 + max(0, min($1.end, duration) - $1.start) })
+        var done = 0.0
+        var segments: [RawSegment] = []
+        for gap in gaps {
+            var slabStart = max(0, gap.start)
+            let gapEnd = min(gap.end, duration)
+            while slabStart < gapEnd {
+                try Task.checkCancellation()
+                let slabEnd = min(slabStart + slabSeconds, gapEnd)
+                var chunker = SpeechChunker(maxChunkSeconds: entry.windowSeconds ?? 30)
+                var chunks = chunker.append(try MonoAudio.read(extract, from: slabStart, to: slabEnd), language: nil)
+                chunks += chunker.flush()
+                for chunk in chunks where peak(chunk.samples) >= silencePeak {
+                    let start = slabStart + Double(chunk.startSample) / MonoAudio.sampleRate
+                    if session == nil {
+                        guard let loaded = try await TranscriptionSessions.load(entry: entry, folder: folder) else {
+                            throw TranscriptionError.unknownEngine(entry.id)
+                        }
+                        session = loaded
+                    }
+                    let language = ranges.last { $0.start <= start }?.language
+                    segments += try await session!.transcribe(chunk.samples, language: language).map {
+                        RawSegment(start: $0.start + start, end: $0.end + start, text: $0.text,
+                                   detectedLanguage: $0.detectedLanguage, speaker: $0.speaker)
+                    }
+                }
+                done += slabEnd - slabStart
+                progress(min(1, done / total))
+                slabStart = slabEnd
+            }
+        }
+        return segments
+    }
+
+    /// Audio read into memory at once by the gap fill, like the batch engines' slabs (10 min is about 38 MB).
+    static let slabSeconds = 600.0
+
+    private static func peak(_ samples: [Float]) -> Float {
+        var peak: Float = 0
+        vDSP_maxmgv(samples, 1, &peak, vDSP_Length(samples.count))
+        return peak
+    }
+
+    /// The entry that keeps `prior`: `job`'s engine, else the prior's (the one resolved when the recording started),
+    /// when `prior.isUsable` for it, the session's language fallback, `job.language` and the session audio's
+    /// duration; nil runs the whole batch.
+    private func usableEntry(
+        for prior: PriorTranscription, job: TranscriptionJob, session: RecordingSession
+    ) async -> ModelEntry? {
+        guard let entry = ModelCatalog.entry(id: job.engineID ?? prior.engineID), Self.transcribesChunks(entry),
+              let audio = ConversationFiles.audioURL(in: job.folder, fileName: session.audioFileName),
+              let duration = try? MonoAudio.duration(of: audio) else { return nil }
+        let firstLanguage = session.languageMarkers.min { $0.fileTime < $1.fileTime }?.language ?? "auto"
+        let (resolved, engineFallback) = await fallback(
+            for: entry, markers: session.languageMarkers, language: firstLanguage)
+        let usable = prior.isUsable(
+            engineID: resolved.id, engineFallback: engineFallback, languageOverride: job.language,
+            audioDuration: duration)
+        return usable ? resolved : nil
+    }
+
+    /// The job's local and cloud diarizers; both nil when `job.diarize` is false.
+    private func diarizers(for job: TranscriptionJob, cloud: CloudEngine?) -> (SpeakerDiarizer?, CloudEngine?) {
+        let hint = job.speakerCountHint ?? speakerCountHint
+        let diarizerID = job.diarize ? Self.localDiarizerID(
+            preferred: job.diarizerID, speakerCountHint: hint, isInstalled: { modelStore.isInstalled($0) }) : nil
+        let diarizer = diarizerID.flatMap { id in
+            modelStore.folder(for: id).map { SpeakerDiarizer(entryID: id, folder: $0, speakerCountHint: hint) }
+        }
+        return (diarizer, job.diarize ? cloud : nil)
     }
 
     /// One channel through a cloud API, from the compressed source (not the 16 kHz extract); errors other than a
@@ -366,6 +519,34 @@ public actor TranscriptionPipeline {
         guard let id, let entry = ModelCatalog.entry(id: id), entry.kind == .asr, !entry.liveOnly,
               engines[entry.runtime] != nil, isUsable(entry), supports(entry, language: language) else { return nil }
         return id
+    }
+
+    /// The entry a recording transcriber runs so that the pipeline keeps its segments at Stop: the batch resolution
+    /// for `engineID` (explicit, else `defaultEngine(language:isUsable:)`) and the recording's `language` ("auto" or a
+    /// code), when it is a usable WhisperKit or Parakeet entry that needs no language fallback; nil otherwise.
+    public static func incrementalEntry(
+        engineID: String?, language: String, isUsable: (ModelEntry) -> Bool
+    ) -> ModelEntry? {
+        let selected: ModelEntry?
+        if let engineID {
+            selected = ModelCatalog.entry(id: engineID).flatMap { entry in
+                entry.kind == .asr && !entry.liveOnly && engines[entry.runtime] != nil && isUsable(entry) ? entry : nil
+            }
+        } else {
+            selected = defaultEngine(language: language, isUsable: isUsable)
+        }
+        guard let entry = selected, transcribesChunks(entry) else { return nil }
+        let markers = LanguageRange.ranges(from: [.init(fileTime: 0, language: language)])
+            .compactMap(\.language).map(WhisperKitEngine.whisperLanguage)
+        let resolved = languageFallback(
+            for: entry, supported: supportedLanguages(for: entry), markerLanguages: markers, language: language,
+            isInstalled: { ModelCatalog.entry(id: $0).map(isUsable) ?? false })
+        return resolved.engineFallback == nil ? entry : nil
+    }
+
+    /// A batch ASR entry that also loads as a `TranscriptionSession`: WhisperKit or Parakeet (Nemotron is live only).
+    static func transcribesChunks(_ entry: ModelEntry) -> Bool {
+        entry.kind == .asr && !entry.liveOnly && (entry.runtime == .whisperKit || entry.runtime == .fluidAudio)
     }
 
     /// Selectable for `language` and, for a code, listed in `supportedLanguages(for:)` by its primary code. An
