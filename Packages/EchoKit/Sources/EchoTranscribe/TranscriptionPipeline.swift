@@ -302,7 +302,8 @@ public actor TranscriptionPipeline {
             engineFallback: engineFallback,
             notes: notes
         )
-        try transcript.write(to: job.folder)
+        // A re-transcription keeps the transcript it replaces as a numbered version.
+        try transcript.write(to: job.folder, keepingPrevious: true)
         return job.folder.appendingPathComponent(Transcript.fileName)
     }
 

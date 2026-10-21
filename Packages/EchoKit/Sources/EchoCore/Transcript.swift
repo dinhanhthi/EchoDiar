@@ -67,7 +67,15 @@ public struct Transcript: Codable, Equatable, Sendable {
         }
     }
 
+    /// One kept transcript: its number (1, 2, …) and its content.
+    public struct Version: Sendable {
+        public let number: Int
+        public let transcript: Transcript
+    }
+
     public static let fileName = "transcript.json"
+    /// Transcripts replaced by a re-transcription, `v<number>.json`; `transcript.json` stays the newest.
+    public static let versionsFolderName = "transcripts"
     public static let diarizationMissingNote = "diarization model not installed"
     /// Added when the cloud diarizer failed or returned no speaker turns; the local diarizer ran instead when one was
     /// installed, else `diarizationMissingNote` is added too.
@@ -133,16 +141,55 @@ public struct Transcript: Codable, Equatable, Sendable {
         createdAt = try c.decode(Date.self, forKey: .createdAt)
     }
 
-    /// Writes `transcript.json` atomically into `folder`, creating it.
-    public func write(to folder: URL) throws {
+    /// Writes `transcript.json` atomically into `folder`, creating it. `keepingPrevious` first copies the one it
+    /// replaces to the next `transcripts/v<number>.json`; the copy is removed again when the write fails.
+    public func write(to folder: URL, keepingPrevious: Bool = false) throws {
         let encoder = JSONEncoder()
         encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
         let data = try encoder.encode(self)
         try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
-        try data.write(to: folder.appendingPathComponent(Self.fileName), options: .atomic)
+        let file = folder.appendingPathComponent(Self.fileName)
+        var kept: URL?
+        if keepingPrevious, FileManager.default.fileExists(atPath: file.path) {
+            let versions = folder.appendingPathComponent(Self.versionsFolderName, isDirectory: true)
+            try FileManager.default.createDirectory(at: versions, withIntermediateDirectories: true)
+            let copy = versions.appendingPathComponent("v\((Self.keptFiles(in: folder).last?.number ?? 0) + 1).json")
+            try FileManager.default.copyItem(at: file, to: copy)
+            kept = copy
+        }
+        do {
+            try data.write(to: file, options: .atomic)
+        } catch {
+            if let kept { try? FileManager.default.removeItem(at: kept) }
+            throw error
+        }
     }
 
     public static func read(from folder: URL) throws -> Transcript {
         try JSONDecoder().decode(Transcript.self, from: Data(contentsOf: folder.appendingPathComponent(fileName)))
+    }
+
+    /// Every kept transcript, oldest first, then `transcript.json` as the newest. A `transcript.json` saved before
+    /// versions existed is version 1. Empty when there is no transcript.
+    public static func readVersions(from folder: URL) -> [Version] {
+        guard let newest = try? read(from: folder) else { return [] }
+        let files = keptFiles(in: folder)
+        let kept = files.compactMap { file in
+            (try? JSONDecoder().decode(Transcript.self, from: Data(contentsOf: file.url)))
+                .map { Version(number: file.number, transcript: $0) }
+        }
+        return kept + [Version(number: (files.last?.number ?? 0) + 1, transcript: newest)]
+    }
+
+    /// The `transcripts/v<number>.json` files, by number. An unreadable one still holds its number.
+    private static func keptFiles(in folder: URL) -> [(number: Int, url: URL)] {
+        let versions = folder.appendingPathComponent(versionsFolderName, isDirectory: true)
+        let names = (try? FileManager.default.contentsOfDirectory(atPath: versions.path)) ?? []
+        return names.compactMap { name -> (number: Int, url: URL)? in
+            guard name.hasPrefix("v"), name.hasSuffix(".json"),
+                  let number = Int(name.dropFirst().dropLast(5)), number > 0, name == "v\(number).json" else { return nil }
+            return (number, versions.appendingPathComponent(name))
+        }
+        .sorted { $0.number < $1.number }
     }
 }

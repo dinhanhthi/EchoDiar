@@ -15,8 +15,16 @@ extension Notification.Name {
 struct TranscriptView: View {
     let conversation: Conversation
     let model: AppModel
+    /// The newest transcript (`transcript.json`): rename writes it and AI citations point into it; the list, Copy,
+    /// notices and chips show `shownTranscript`.
     @State private var transcript: Transcript?
-    /// Speaker ids of `transcript`: me first, then s1, s2…
+    /// Kept transcripts, oldest first, the newest last; the version menu shows when there are two or more.
+    @State private var versions: [Transcript.Version] = []
+    /// The version picked in the version menu; nil is the newest. Older ones are view-only.
+    @State private var shownVersion: Int?
+    /// The audio file `playback` opened, to reload its segments when another version is shown.
+    @State private var audioURL: URL?
+    /// Speaker ids of `shownTranscript`: me first, then s1, s2…
     @State private var speakers: [String] = []
     /// `transcript.json` exists but could not be read.
     @State private var loadFailed = false
@@ -69,6 +77,7 @@ struct TranscriptView: View {
             withAnimation(Motion.standard) { shownTab = new }
         }
         .onChange(of: model.pendingTranscriptTime) { showPendingTime() }
+        .onChange(of: shownVersion) { applyShownVersion() }
         .onChange(of: model.settings.playbackChannels) { playback.setChannels(model.settings.playbackChannels) }
         // Not while a speaker name is edited: the text field takes Space.
         .onReceive(NotificationCenter.default.publisher(for: .togglePlayback)) { _ in
@@ -124,9 +133,9 @@ struct TranscriptView: View {
                     TranscriptionStatus(conversation: conversation, model: model)
                 }
             }
-            if transcript?.notes.contains(Transcript.cloudDiarizationFailedNote) == true {
+            if shownTranscript?.notes.contains(Transcript.cloudDiarizationFailedNote) == true {
                 cloudDiarizationFailedNotice
-            } else if transcript?.notes.contains(Transcript.diarizationMissingNote) == true {
+            } else if shownTranscript?.notes.contains(Transcript.diarizationMissingNote) == true {
                 diarizationMissingNotice
             }
             if conversation.hasAudio { PlaybackScrubber(playback: playback) }
@@ -165,7 +174,7 @@ struct TranscriptView: View {
 
     /// The cloud diarizer failed, so a model on this Mac told the speakers apart, when one was installed.
     private var cloudDiarizationFailedNotice: some View {
-        let localMissing = transcript?.notes.contains(Transcript.diarizationMissingNote) == true
+        let localMissing = shownTranscript?.notes.contains(Transcript.diarizationMissingNote) == true
         return HStack(alignment: .firstTextBaseline, spacing: 8) {
             Group {
                 Image(systemName: "exclamationmark.icloud")
@@ -185,7 +194,7 @@ struct TranscriptView: View {
     /// Speaker chips, then the actions and the transport at the trailing edge.
     private func controlRow(chips: Int) -> some View {
         HStack(spacing: 8) {
-            if transcript != nil && !speakers.isEmpty {
+            if shownTranscript != nil && !speakers.isEmpty {
                 HStack(spacing: 6) {
                     ForEach(speakers.prefix(chips), id: \.self, content: speakerChip)
                     if chips < speakers.count { moreSpeakersChip(Array(speakers.dropFirst(chips))) }
@@ -214,7 +223,7 @@ struct TranscriptView: View {
             }
             .buttonStyle(BottomBarButtonStyle(horizontalPadding: 0))
             .help("Copy transcript")
-            .disabled(transcript?.segments.isEmpty ?? true)
+            .disabled(shownTranscript?.segments.isEmpty ?? true)
             if model.isTranscribing(conversation.id) {
                 Button {} label: {
                     HStack(spacing: 8) {
@@ -297,7 +306,8 @@ struct TranscriptView: View {
         .buttonStyle(.plain)
         // Its own width: the row tries fewer chips instead of truncating names.
         .fixedSize()
-        .disabled(model.isTranscribing(conversation.id))
+        // Older versions are view-only: a rename edits the newest.
+        .disabled(model.isTranscribing(conversation.id) || shownVersion != nil)
         .help("Rename this speaker")
         .popover(isPresented: Binding(
             get: { renaming == speaker && !showingMoreSpeakers },
@@ -310,7 +320,7 @@ struct TranscriptView: View {
     private func speakerLabel(_ speaker: String) -> some View {
         HStack(spacing: 5) {
             Circle().fill(Self.color(for: speaker)).frame(width: 7, height: 7)
-            Text(transcript?.displayName(for: speaker) ?? speaker)
+            Text(shownTranscript?.displayName(for: speaker) ?? speaker)
         }
     }
 
@@ -325,7 +335,7 @@ struct TranscriptView: View {
         }
         .buttonStyle(.plain)
         .fixedSize()
-        .disabled(model.isTranscribing(conversation.id))
+        .disabled(model.isTranscribing(conversation.id) || shownVersion != nil)
         .help("Show the other speakers")
         .popover(isPresented: Binding(
             get: { showingMoreSpeakers },
@@ -420,34 +430,81 @@ struct TranscriptView: View {
 
     // MARK: - Segments
 
-    /// The segments in a card like Summary's and Chat's, or a note in its middle while there are none.
+    /// The segments in a card like Summary's and Chat's, or a note in its middle while there are none; the version
+    /// menu is pinned above them, as in Summary.
     private var content: some View {
-        Group {
-            if let transcript, !transcript.segments.isEmpty {
-                SegmentList(transcript: transcript, playback: playback, scrollTarget: $scrollTarget)
-            } else if loading {
-                ProgressView()
-            } else {
-                VStack(spacing: 10) {
-                    Text(emptyText).foregroundStyle(.secondary)
-                    if !conversation.hasTranscript {
-                        TranscriptionFailureReason(conversation: conversation, model: model)
-                            .multilineTextAlignment(.center)
-                        TranscriptionStatus(conversation: conversation, model: model)
-                    }
-                }
-                .padding(20)
+        VStack(alignment: .leading, spacing: 0) {
+            if showsVersionMenu {
+                versionMenu
+                    .padding(.horizontal, 14)
+                    .padding(.top, 16)
             }
+            Group {
+                if let shown = shownTranscript, !shown.segments.isEmpty {
+                    SegmentList(transcript: shown, playback: playback, scrollTarget: $scrollTarget)
+                } else if loading {
+                    ProgressView()
+                } else {
+                    VStack(spacing: 10) {
+                        Text(emptyText).foregroundStyle(.secondary)
+                        if !conversation.hasTranscript {
+                            TranscriptionFailureReason(conversation: conversation, model: model)
+                                .multilineTextAlignment(.center)
+                            TranscriptionStatus(conversation: conversation, model: model)
+                        }
+                    }
+                    .padding(20)
+                }
+            }
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
         .modifier(GlassCard(cornerRadius: 20))
+    }
+
+    /// The picked older version's transcript, else the newest.
+    private var shownTranscript: Transcript? {
+        versions.first { $0.number == shownVersion }?.transcript ?? transcript
+    }
+
+    private var showsVersionMenu: Bool { versions.count >= 2 && !model.isTranscribing(conversation.id) }
+
+    /// The kept transcripts, newest first, each with its engine and date. Picking the newest sets `shownVersion` to
+    /// nil, so it shows `transcript` with its renamed speakers.
+    private var versionMenu: some View {
+        let shown = shownVersion ?? versions.last?.number ?? 0
+        return Menu {
+            ForEach(versions.reversed(), id: \.number) { version in
+                Toggle(isOn: Binding(
+                    get: { version.number == shown },
+                    set: { if $0 { shownVersion = version.number == versions.last?.number ? nil : version.number } }
+                )) {
+                    Text("Version \(version.number)")
+                    Text(versionDetails(version.transcript))
+                }
+            }
+        } label: {
+            let engine = shownTranscript.flatMap { model.transcriptEngineName($0) }
+            AIMenuLabel(title: ([String(localized: "Version \(shown)")] + [engine].compactMap { $0 })
+                .joined(separator: " · "), systemImage: "clock.arrow.circlepath")
+        }
+        .modifier(CompactMenu(maxWidth: 260, height: Self.versionMenuHeight))
+        .help("Earlier transcripts of this conversation")
+    }
+
+    /// As tall as the Summary tab's version menu.
+    private static let versionMenuHeight: CGFloat = 28
+
+    private func versionDetails(_ transcript: Transcript) -> String {
+        [model.transcriptEngineName(transcript), transcript.createdAt.formatted(date: .abbreviated, time: .shortened)]
+            .compactMap { $0 }
+            .joined(separator: " · ")
     }
 
     private var loading: Bool { conversation.hasTranscript && transcript == nil && !loadFailed }
 
     private var emptyText: String {
         if loadFailed { return "The transcript could not be read." }
-        if transcript != nil { return "No speech was found in this recording." }
+        if shownTranscript != nil { return "No speech was found in this recording." }
         switch conversation.status {
         case .recording: return "Recording in progress."
         case .compressing: return "Compressing the audio…"
@@ -466,20 +523,35 @@ struct TranscriptView: View {
         let wantsTranscript = conversation.hasTranscript
         let playable = conversation.hasAudio && conversation.status != .recording && conversation.status != .compressing
         let (loaded, audio) = await Task.detached(priority: .utility) {
-            let transcript = wantsTranscript ? try? Transcript.read(from: folder) : nil
+            // The newest version is transcript.json itself.
+            let versions = wantsTranscript ? Transcript.readVersions(from: folder) : []
             let audio = playable
                 ? (try? RecordingSession.read(from: folder)).flatMap {
                     ConversationFiles.audioURL(in: folder, fileName: $0.audioFileName)
                 }
                 : nil
-            return (transcript, audio)
+            return (versions, audio)
         }.value
         guard !Task.isCancelled else { return }
-        transcript = loaded
-        speakers = loaded.map(Self.speakers) ?? []
-        loadFailed = wantsTranscript && loaded == nil
-        playback.load(url: audio, segments: loaded?.segments ?? [], channels: model.settings.playbackChannels)
+        versions = loaded
+        transcript = loaded.last?.transcript
+        shownVersion = nil
+        audioURL = audio
+        loadFailed = wantsTranscript && loaded.isEmpty
+        applyShownVersion()
         showPendingTime()
+    }
+
+    /// The speakers and the playback highlight of `shownTranscript` (same audio, so only the segments change); closes
+    /// a rename popover when an older, view-only version shows.
+    private func applyShownVersion() {
+        speakers = shownTranscript.map(Self.speakers) ?? []
+        playback.load(url: audioURL, segments: shownTranscript?.segments ?? [],
+                      channels: model.settings.playbackChannels)
+        if shownVersion != nil {
+            renaming = nil
+            showingMoreSpeakers = false
+        }
     }
 
     /// Takes the time of a clicked AI citation (`AppModel.pendingTranscriptTime`) once the transcript is loaded:
@@ -489,6 +561,11 @@ struct TranscriptView: View {
     private func showPendingTime() {
         guard let time = model.pendingTranscriptTime, !loading else { return }
         model.pendingTranscriptTime = nil
+        // Citations point into the newest transcript; applied now, so the seek highlights its segment.
+        if shownVersion != nil {
+            shownVersion = nil
+            applyShownVersion()
+        }
         guard let segments = transcript?.segments,
               let segment = segments.last(where: { $0.start <= time }) ?? segments.first
         else { return }
@@ -498,7 +575,7 @@ struct TranscriptView: View {
 
     /// One "Name [mm:ss]: text" line per segment, with the renamed names.
     private func copyTranscript() {
-        guard let transcript else { return }
+        guard let transcript = shownTranscript else { return }
         let text = transcript.segments
             .map { "\(transcript.displayName(for: $0.speaker)) [\(Self.timestamp($0.start))]: \($0.text)" }
             .joined(separator: "\n")

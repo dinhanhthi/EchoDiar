@@ -1017,6 +1017,18 @@ final class AppModel {
         return model.isEmpty ? config.displayName : "\(config.displayName) (\(model))"
     }
 
+    /// The engine that made `transcript`, for its version label: "OpenAI (whisper-1)" with the stored model, or the
+    /// catalog name; the raw id when the provider or entry is gone, nil when unknown.
+    func transcriptEngineName(_ transcript: Transcript) -> String? {
+        guard let engineID = transcript.engineID, !engineID.isEmpty else { return nil }
+        guard let providerID = CloudTranscription.providerID(engineID: engineID) else {
+            return ModelCatalog.entry(id: engineID)?.displayName ?? engineID
+        }
+        let name = providerConfigs.first { $0.id == providerID }?.displayName ?? providerID
+        guard let model = transcript.modelID, !model.isEmpty else { return name }
+        return "\(name) (\(model))"
+    }
+
     /// `model`: a cloud diarizer's diarization model; nil = the transcription model.
     private func makeCloudEngine(_ config: ProviderConfig, model: String? = nil) -> CloudEngine {
         let apiKey = CloudTranscription.needsKey(config) ? try? KeychainStore.apiKey(forProvider: config.id) : nil
