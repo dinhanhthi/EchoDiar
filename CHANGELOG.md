@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.0.0] - 2026-10-21
+
 ### Added
 
 - Record one meeting app (Google Meet in a browser, Teams, Zoom, ...) or all system audio, together with your microphone, on separate channels of the same file. Pause and resume, live level meters, and a menu bar icon that shows the recording state.
