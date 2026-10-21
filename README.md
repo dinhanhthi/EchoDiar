@@ -19,7 +19,7 @@
 ## Features
 
 - Record one meeting app (Google Meet in a browser, Teams, Zoom, ...) or all system audio, plus your microphone, on separate channels. Pause, resume, live level meters and a menu bar status.
-- On-device transcription (WhisperKit, Parakeet, Qwen3-ASR or Apple Speech) with speaker separation, optional live captions, and a transcript you can click to hear each line.
+- On-device transcription (WhisperKit, Parakeet, Qwen3-ASR or Apple Speech) with optional speaker separation and a transcript you can click to hear each line. WhisperKit and Parakeet transcribe while you record, with live captions, so the transcript is ready seconds after Stop.
 - Optional cloud transcription: OpenAI-compatible services, ElevenLabs, Gemini, Deepgram and AssemblyAI.
 - AI summaries and chat with on-device Foundation Models, local MLX models, local servers (LM Studio, Ollama, ...), cloud APIs (OpenAI, Anthropic, Gemini, ...) or coding CLIs (Claude Code, Codex, OpenCode, Gemini CLI). Answers cite timestamps that jump to that moment. "Copy as prompt" for any other AI tool.
 - Meeting detection that offers to record, a floating indicator that can follow the meeting window, and auto-stop when the call ends.

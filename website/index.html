@@ -107,7 +107,7 @@
             <li><strong>Private</strong>: transcription and AI can run fully on your Mac. Audio goes to the cloud only if you choose a cloud engine.</li>
             <li><strong>Any meeting app, any AI</strong>: record Zoom, Teams, Meet in a browser or all system audio. Ask local models, cloud APIs or your Claude Code or Codex subscription.</li>
             <li><strong>Who said what</strong>: your mic and the meeting audio on separate channels, the other speakers told apart and renamable.</li>
-            <li><strong>On-device transcription</strong>: WhisperKit, Parakeet, Qwen3-ASR or Apple Speech (macOS 26), with optional live captions.</li>
+            <li><strong>On-device transcription</strong>: WhisperKit, Parakeet, Qwen3-ASR or Apple Speech (macOS 26). WhisperKit and Parakeet transcribe while you record, with live captions, so the transcript is ready seconds after you stop.</li>
             <li><strong>AI summaries and chat</strong>: answers cite timestamps that jump to that moment in the recording.</li>
             <li><strong>Copy as prompt</strong>: the transcript and your question, ready to paste into any chat app.</li>
             <li><strong>Meeting detection</strong>: offers to record when a call starts, shows a floating indicator and offers to stop when the meeting ends.</li>
@@ -132,7 +132,7 @@
           </div>
           <ul class="list">
             <li><strong>Models load only while they work</strong>: transcription, speaker and AI models are freed as soon as their job ends, and their memory goes back to macOS.</li>
-            <li><strong>Live captions</strong> keep a Whisper model (about 1 GB) in memory while you record, and free it while a recording stays paused.</li>
+            <li><strong>Transcribing while you record</strong> (on by default) keeps the speech model loaded: on top of the costs above, it takes about 190 MB more memory and about 2% more of one core (debug build, averaged over a 15-minute meeting), freed while a recording stays paused.</li>
           </ul>
           <p class="note">CPU is a share of one core, averaged over 30 seconds. Numbers vary with the Mac and the meeting.</p>
         </section>
@@ -141,8 +141,8 @@
           <h2>Transcription</h2>
           <ul class="list">
             <li><strong>On your Mac</strong>: WhisperKit, Parakeet, Qwen3-ASR, and Apple Speech on macOS 26.</li>
-            <li><strong>Speakers</strong>: FluidAudio diarization of the meeting audio.</li>
-            <li><strong>Live captions</strong>: WhisperKit or Nemotron streaming, while you record.</li>
+            <li><strong>Speakers</strong>: FluidAudio diarization of the meeting audio, when "Tell speakers apart" is on (off by default).</li>
+            <li><strong>Transcribe while recording</strong>: WhisperKit or Parakeet transcribes each channel as you speak, and the live captions come from it. For a 15-minute call, the transcript is ready 0.8 seconds after Stop (about 10 seconds with speakers told apart) instead of about a minute and a half. Other engines transcribe the whole recording after Stop.</li>
             <li><strong>Cloud</strong> (optional): OpenAI, Groq, Mistral, Gemini, ElevenLabs, Deepgram, AssemblyAI or an OpenAI-compatible endpoint. Asks once before audio goes to each one.</li>
           </ul>
         </section>

@@ -80,6 +80,7 @@
               <li><a href="#recording">Recording</a></li>
               <li><a href="#meetings">Meeting detection</a></li>
               <li><a href="#transcription">Transcription</a></li>
+              <li><a href="#how-it-works">How it works</a></li>
               <li><a href="#cloud-transcription">Cloud transcription</a></li>
               <li><a href="#transcript">Transcript &amp; playback</a></li>
               <li><a href="#ai">AI summaries &amp; chat</a></li>
@@ -116,9 +117,9 @@
             <li>Record one app's audio or all system audio, plus your mic. Mic and system audio go to separate channels of one file.</li>
             <li>When an app's audio cannot be isolated, EchoDiar records all system audio and says so.</li>
             <li>Start or stop with <kbd>Cmd+R</kbd> in the app, or <kbd>Cmd+Option+R</kbd> from any app. Pause with <kbd>Cmd+Shift+P</kbd>.</li>
-            <li>Live level meters while recording. The menu bar icon shows idle, recording, paused and processing.</li>
+            <li>Live level meters while recording, and live captions with <strong>Transcribe while recording</strong>. The menu bar icon shows idle, recording, paused and processing.</li>
             <li>Pick the microphone, and what happens when it disconnects, in <strong>Settings &gt; Recording</strong>.</li>
-            <li>Each recording is compressed to AAC (64 kbps by default). A recording cut short by a crash is recovered.</li>
+            <li>Each recording is compressed to AAC (64 kbps by default) once it is transcribed. A recording cut short by a crash is recovered and transcribed at next launch.</li>
 </ul>
           </section>
 
@@ -135,13 +136,132 @@
           <section id="transcription" class="doc">
             <h2>Transcription</h2>
 <ul class="list">
-            <li>Starts on its own after Stop. Turn it off in <strong>Settings &gt; Recording</strong>.</li>
+            <li>Starts on its own: while you record with <strong>Transcribe while recording</strong>, otherwise after Stop. Turn it off with <strong>Transcribe automatically</strong> in <strong>Settings &gt; Recording</strong>.</li>
             <li>Engines: WhisperKit, Parakeet, Qwen3-ASR, and Apple Speech on macOS 26. WhisperKit, Parakeet and Qwen3-ASR models are downloaded only when you click <strong>Download</strong> in <strong>Settings &gt; Transcription</strong>; macOS installs Apple Speech language assets the first time you use a language.</li>
             <li>Speakers: your mic is <strong>Me</strong>. Turn on <strong>Tell speakers apart</strong> in <strong>Settings &gt; Recording</strong> (or <strong>Settings &gt; Transcription &gt; Diarization model</strong>) to label each voice in the meeting audio: Speaker 1, Speaker 2… Set the number of other speakers there as a hint. Off (the default), the meeting audio is one speaker, Speaker 1, and cloud transcription is asked for no speaker labels.</li>
-            <li>Live captions (optional): WhisperKit or Nemotron streaming while you record. The transcript made after Stop is the one saved. While a recording stays paused, the live model is freed after the time set in Free unused models after (2 minutes by default).</li>
+            <li><strong>Transcribe while recording</strong> (on by default, WhisperKit and Parakeet): transcribes during the recording and shows live captions, so the transcript is ready seconds after Stop. Uses more CPU and memory while recording. Turn it off in <strong>Settings &gt; Transcription &gt; General</strong>. See <a href="#how-it-works">How it works</a>.</li>
             <li>Re-transcribe a conversation with another engine or language.</li>
-            <li>Can wait while the Mac is hot or in Low Power Mode.</li>
+            <li>Can wait while the Mac is hot or in Low Power Mode: what is left after Stop is done once the Mac cools down or leaves Low Power Mode.</li>
 </ul>
+          </section>
+
+          <section id="how-it-works" class="doc">
+            <h2>How it works</h2>
+<ul class="list">
+            <li>With <strong>Transcribe while recording</strong> on (the default), the recording is transcribed while it happens. Each channel, your mic and the meeting audio, is cut into chunks at pauses in speech, at most the model's window (30 s for Whisper); with no pause, the cut falls on the quietest moment.</li>
+            <li>Chunks wait in a queue that keeps up to about 10 minutes of audio, and one speech model, loaded once for the recording, transcribes them. Its lines are the live captions, <strong>Me</strong> and <strong>Others</strong>, and they become the saved transcript. WhisperKit and Parakeet only.</li>
+            <li>Nothing is lost: chunks held while the Mac is hot or in Low Power Mode (with <strong>Wait when the Mac is hot or in Low Power Mode</strong> on) stay in the queue and are transcribed once the Mac recovers. Chunks beyond the queue, chunks that fail, and chunks still held at Stop become gaps, transcribed from the recording after Stop.</li>
+</ul>
+<pre class="diagram">+-----------+   +------------------------+   +-------------------------+
+| Recording |--&gt;| channel writer, 16 kHz |--&gt;| audio.caf               |
+| mic +     |   +------------------------+   | ch0 = mic, ch1 = system |
+| system    |               |                +-------------------------+
++-----------+               v
+             +-----------------------------+
+             | speech chunker, per channel |
+             | ends on a pause, 30 s max   |
+             +-----------------------------+
+                            |
+                            v
+             +-----------------------------+
+             | chunk queue, 10 min max     |--&gt; queue full, still held
+             +-----------------------------+    at Stop (Mac hot), or a
+                            |                   chunk failed: gap,
+                            v                   transcribed from
+             +-----------------------------+    audio.caf after Stop
+             | speech model, loaded once   |
+             | WhisperKit or Parakeet      |
+             +-----------------------------+
+                            |
+                            v
+             segments --&gt; live captions (Me, Others)</pre>
+<ul class="list">
+            <li>At Stop, the same model transcribes the last chunk and what is left in the queue, then fills the gaps. The transcript is written before the audio is compressed.</li>
+            <li>Speakers: with <strong>Tell speakers apart</strong> off (the default), the meeting audio is Speaker 1 and the transcript is ready about 1 s after Stop: 0.8 s for a 15-minute meeting, against about 95 s when the whole recording is transcribed after Stop. On, the speaker model runs after Stop and labels Speaker 1, Speaker 2…: about 10 s for the same meeting.</li>
+            <li>The transcript is made from the uncompressed audio, which is slightly more accurate: 0.0 % word error rate on the same meeting, against about 1 % from the compressed file.</li>
+</ul>
+<pre class="diagram"> Stop
+   |
+   v
+ +------------------------------------------------+
+ | last chunk + queue, with the same model        |
+ +------------------------------------------------+
+   |
+   v
+ +------------------------------------------------+
+ | gaps, transcribed from audio.caf               |
+ +------------------------------------------------+
+   |
+   v
+ +------------------------------------------------+
+ | speakers, only if "Tell speakers apart" is on  |
+ +------------------------------------------------+
+   |
+   v
+ +------------------------------------------------+
+ | merge: mic = Me, system = Speaker 1            |
+ |        (Speaker 1, 2, ... with speakers on)    |
+ +------------------------------------------------+
+   |
+   v
+ +------------------------------------------------+
+ | transcript.json                                |&lt;-- transcript ready
+ +------------------------------------------------+
+   |
+   v
+ +------------------------------------------------+
+ | compress to audio.m4a, audio.caf deleted       |
+ | (moved to the Trash, not compressed, with      |
+ | "Delete audio after transcription")            |
+ +------------------------------------------------+</pre>
+<ul class="list">
+            <li>Extra cost while recording, on top of recording alone: about 190 MB more memory for EchoDiar and about 20 s more CPU time per 15 minutes, about 2 % more of one core (debug build, averaged over a 15-minute meeting, MacBook Pro, M4 Pro). In a macOS virtual machine, which has no Neural Engine, the transcript is ready 3.1 s after Stop instead of 282 s.</li>
+            <li>While a recording stays paused longer than <strong>Free unused models after</strong>, its model is freed; it loads again when you resume.</li>
+            <li>Local AI (summaries, chat and semantic search on this Mac) waits until Stop while a recording holds the speech model.</li>
+            <li>Other cases take the slower path:</li>
+</ul>
+<pre class="diagram"> Fallbacks
+  |
+  +-- "Transcribe automatically" off
+  |     --&gt; compress only
+  |
+  +-- "Transcribe while recording" off
+  |     --&gt; whole recording after Stop, still before compression
+  |
+  +-- cloud engine, its destination already confirmed
+  |     --&gt; transcribe from audio.caf, then compress
+  |
+  +-- cloud engine or cloud speaker model waiting for your OK
+  |     --&gt; compress, ask, then upload
+  |
+  +-- Qwen3-ASR or Apple Speech
+  |     --&gt; whole recording after Stop
+  |
+  +-- engine changed, a language the engine cannot transcribe,
+  |   or the model failed to load
+  |     --&gt; whole recording after Stop
+  |         (switching between supported languages keeps the fast
+  |         path: each chunk carries its own language)
+  |
+  +-- Mac hot or in Low Power Mode, with "Wait when the Mac
+  |   is hot or in Low Power Mode" on
+  |     |
+  |     +-- no gaps, speakers off
+  |     |     --&gt; transcript built while recording saved at once,
+  |     |         then compressed
+  |     |
+  |     +-- gaps from chunks held while hot, speakers on,
+  |           or no transcript built while recording
+  |           --&gt; compress first; gaps, speakers and the transcript
+  |               wait until the Mac cools down or leaves Low
+  |               Power Mode
+  |
+  +-- crash
+  |     --&gt; the recovered audio.caf is compressed, then the
+  |         whole file is transcribed at next launch
+  |
+  +-- re-transcribe
+        --&gt; whole file with the chosen engine</pre>
           </section>
 
           <section id="cloud-transcription" class="doc">
@@ -190,7 +310,7 @@
 <ul class="list">
             <li>Data lives in <code>~/Library/Application Support/EchoDiar</code>. <strong>Settings &gt; Storage</strong> shows the space used.</li>
             <li>Auto-delete: once a day, moves transcribed conversations older than an age you set to the Trash, whole or audio only.</li>
-            <li>The uncompressed audio is kept until the transcript is written, then compressed. If transcription can't start right away, the audio is compressed first.</li>
+            <li>The uncompressed audio (<code>audio.caf</code>) is kept until the transcript is written, then compressed to <code>audio.m4a</code> and deleted. If transcription can't start right away, the audio is compressed first.</li>
             <li>Optionally delete the audio once a transcription succeeds: with <strong>Delete audio after transcription</strong>, a new recording's uncompressed audio is moved to the Trash instead of being compressed. The transcript, summary and chat stay.</li>
             <li>Choose the compression bitrate, or keep the uncompressed audio too.</li>
 </ul>
@@ -202,6 +322,7 @@
             <li>Open with <kbd>Cmd+,</kbd>. Sections: General, Recording, Transcription, AI, Storage, Shortcuts, About.</li>
             <li>Change the global record shortcut, and view the app's shortcuts, in <strong>Settings &gt; Shortcuts</strong>.</li>
             <li>Launch at login and the floating indicator are in <strong>Settings &gt; General</strong>.</li>
+            <li>Default language, <strong>Transcribe while recording</strong> and <strong>Free unused models after</strong> are in <strong>Settings &gt; Transcription &gt; General</strong>. <strong>Tell speakers apart</strong> is in both <strong>Settings &gt; Recording</strong> and <strong>Settings &gt; Transcription &gt; Diarization model</strong>.</li>
 </ul>
           </section>
           </div>

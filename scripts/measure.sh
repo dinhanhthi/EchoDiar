@@ -10,12 +10,21 @@
 #
 # Usage:
 #   scripts/measure.sh idle [seconds]          # default 30 samples after warm-up
-#   scripts/measure.sh recording [seconds]     # during a recording, live transcript off
+#   scripts/measure.sh recording [seconds]     # during a recording, Transcribe while recording off
+#   scripts/measure.sh recording-transcribing [seconds]  # during a recording, Transcribe while recording on
 #   scripts/measure.sh transcribing [seconds]  # [seconds] = idle baseline length, default 10
 #
 # Targets (initial, tune after the first run; never loosen them silently):
 #   idle          avg MEM <= 40 MB and avg %CPU <= 0.5
-#   recording     avg MEM <= 60 MB and avg %CPU <= 3   (live transcript off)
+#   recording     avg MEM <= 60 MB and avg %CPU <= 3   (Transcribe while recording off)
+#   recording-transcribing  avg MEM <= 286 MB and avg %CPU <= 5.9   (Transcribe while recording on)
+#                 Provisional until checked on a Release arm64 build: the recording target plus the
+#                 transcriber's own cost x 1.2, from the Debug harness (scripts/measure-transcribe.sh,
+#                 headless, fixture fed, no capture or UI; 15-min fixture, recording phase max over 3 runs:
+#                 203.0 MB vs 14.7 MB with the feature off, 2.38 % vs 0.0 % of one core):
+#                 MEM 60 + (203 - 14.7) x 1.2 ~ 286, CPU 3 + 2.38 x 1.2 ~ 5.9 (rounded). The harness 2.38 % is a
+#                 15-minute average (CPU s / wall s); top's %CPU here, % of one core, is averaged over the
+#                 samples (30 s by default) and catches decode bursts, so expect it to swing more.
 #   transcribing  MEM back to <= baseline + 15 MB within 120 s after the job (peak reported)
 #
 # transcribing: start the script with the app idle. After warm-up it averages MEM over
@@ -35,13 +44,13 @@ set -euo pipefail
 WARMUP=10
 
 usage() {
-  echo "usage: $0 idle|recording|transcribing [seconds]   (seconds: positive integer)" >&2
+  echo "usage: $0 idle|recording|recording-transcribing|transcribing [seconds]   (seconds: positive integer)" >&2
   exit 64
 }
 
 MODE="${1:-}"
 case "$MODE" in
-  idle|recording) SAMPLES="${2:-30}" ;;
+  idle|recording|recording-transcribing) SAMPLES="${2:-30}" ;;
   transcribing) SAMPLES="${2:-10}" ;;
   *) usage ;;
 esac
@@ -80,7 +89,9 @@ AWK_LIB='
 '
 
 if [[ "$MODE" != "transcribing" ]]; then
-  if [[ "$MODE" == "idle" ]]; then MAX_MEM=40; MAX_CPU=0.5; else MAX_MEM=60; MAX_CPU=3; fi
+  if [[ "$MODE" == "idle" ]]; then MAX_MEM=40; MAX_CPU=0.5
+  elif [[ "$MODE" == "recording-transcribing" ]]; then MAX_MEM=286; MAX_CPU=5.9
+  else MAX_MEM=60; MAX_CPU=3; fi
 
   echo "==> $MODE: sampling $NAME ($PID) for $((SAMPLES + WARMUP + 1)) s (first sample + $WARMUP warm-up ignored)..."
   TOP_OUT="$(top -l "$((SAMPLES + WARMUP + 1))" -s 1 -stats pid,command,mem,cpu -pid "$PID")"
