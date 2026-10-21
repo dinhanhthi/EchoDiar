@@ -14,9 +14,9 @@ Open http://localhost:8080.
 
 - `index.html`: landing page. `docs.html`: documentation. `privacy.html`: privacy statement.
 - `tokens.css`: design tokens (OKLCH colors, Geist fonts, spacing). `styles.css`: layout and components.
-- `site.js`: theme toggle, docs scroll-spy, header version, screenshot lightbox.
+- `site.js`: theme toggle, docs scroll-spy, header version, screenshot lightbox (the poster and the thumbnails open one carousel).
 - The app version in each page header (`.version-badge`) is read at runtime from the same-origin `appcast.xml` (highest build number) by `site.js`; the static `v0.1.0` in each page is only a fallback, so no hand edit is needed on release.
-- `logo.png`, `poster.jpg`: images. `CNAME`: custom domain. `.nojekyll`: disables Jekyll. `llms.txt`: summary for LLM crawlers.
+- `logo.png`, `poster.jpg`, `screenshots/`: images. The screenshots are made from local, untracked sources in `docs/showcase/source/screenshots/` (demo library, clean captures, `label-shots.py` for the ribbons; its README says how). `CNAME`: custom domain. `.nojekyll`: disables Jekyll. `llms.txt`: summary for LLM crawlers.
 
 ## Deploy
 
