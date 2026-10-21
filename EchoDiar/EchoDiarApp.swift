@@ -244,6 +244,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSMe
 
     @objc private func goBack() { model.goBack() }
 
+    @objc private func checkForUpdates() { updater.checkForUpdates() }
+
     /// Focuses the toolbar search of the current page (conversations, or settings on the Settings page).
     @objc private func showSearch() {
         showMainWindow()
@@ -266,6 +268,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSMe
             return false
         case #selector(goBack):
             return model.route != .list || model.globalChatOpen
+        case #selector(checkForUpdates):
+            // Disabled while the updater is off (no SUPublicEDKey yet).
+            item.title = updater.updateAvailable ? "Update Available…" : "Check for Updates…"
+            return updater.canCheck
         default:
             return true
         }
@@ -301,10 +307,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSMe
         }
     }
 
-    /// App menu (About, Settings, Hide, Quit), File (recording), Edit, View (pages, back, search) and Window menus.
+    /// App menu (About, Check for Updates, Settings, Hide, Quit), File (recording), Edit, View (pages, back, search) and Window menus.
     private func makeMainMenu() -> NSMenu {
         let appMenu = NSMenu()
         appMenu.addItem(withTitle: "About EchoDiar", action: #selector(showAbout), keyEquivalent: "").target = self
+        appMenu.addItem(withTitle: "Check for Updates…", action: #selector(checkForUpdates), keyEquivalent: "").target = self
         appMenu.addItem(.separator())
         appMenu.addItem(withTitle: "Settings…", action: #selector(showSettings), keyEquivalent: ",").target = self
         appMenu.addItem(.separator())
