@@ -269,9 +269,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSMe
         case #selector(goBack):
             return model.route != .list || model.globalChatOpen
         case #selector(checkForUpdates):
-            // Disabled while the updater is off (no SUPublicEDKey yet).
-            item.title = updater.updateAvailable ? "Update Available…" : "Check for Updates…"
-            return updater.canCheck
+            // Disabled while the updater is off (no SUPublicEDKey yet), and while recording: an update relaunches.
+            item.title = updater.menuTitle
+            return updater.canCheck && !model.isRecording && !model.isStarting
         default:
             return true
         }

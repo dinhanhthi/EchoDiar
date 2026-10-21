@@ -290,16 +290,22 @@ struct MainView: View {
         }
     }
 
-    /// Its own capsule, before Settings and Search, while Sparkle found an update.
+    /// Its own capsule, green, before Settings and Search (or a conversation's Reveal in Finder), while Sparkle has an
+    /// update. Hidden while recording: installing relaunches the app.
     @ToolbarContentBuilder private var updateItem: some ToolbarContent {
-        if updater.updateAvailable {
+        if showsUpdate {
             ToolbarItem {
-                SingleToolbarButton(title: "Update", systemImage: "arrow.down.circle") { updater.checkForUpdates() }
-                    .help("Install the available update")
+                SingleToolbarButton(title: "Update", systemImage: "arrow.down.circle.fill", iconColor: .green,
+                                    iconFont: .title2) {
+                    updater.checkForUpdates()
+                }
+                .help("Install the available update")
             }
             fixedSpacer
         }
     }
+
+    private var showsUpdate: Bool { updater.updateAvailable && !model.isRecording && !model.isStarting }
 
     /// The shown conversation's title, left-aligned after the record capsule, with its date, duration and size under
     /// it; double-click to rename it in a popover (Return saves, Esc or a click elsewhere cancels), drag to move the
@@ -376,7 +382,7 @@ struct MainView: View {
     private static let tabsWidth: CGFloat = 240
     private static let trailingButtonsWidth: CGFloat = 240
 
-    private var updateWidth: CGFloat { updater.updateAvailable ? 52 : 0 }
+    private var updateWidth: CGFloat { showsUpdate ? 52 : 0 }
 
     /// What the toolbar's other items leave of the window (the search bar in place of the trailing buttons), at most
     /// `titleMaxWidth`: the title truncates instead of pushing buttons into the overflow menu.
@@ -919,19 +925,35 @@ private struct WindowOriginReader: NSViewRepresentable {
 private struct SingleToolbarButton: View {
     let title: LocalizedStringKey
     let systemImage: String
+    /// The icon's color, like Stop's red; the toolbar's own when nil.
+    var iconColor: Color?
+    /// On macOS 26: a bigger font for an icon that should stand out (Update).
+    var iconFont: Font = .body
     let action: () -> Void
 
     var body: some View {
         if #available(macOS 26, *) {
             Button(action: action) {
-                Label(title, systemImage: systemImage)
+                label
                     .labelStyle(.iconOnly)
-                    .font(.body)
+                    .font(iconFont)
                     .imageScale(.large)
             }
             .buttonStyle(Highlight())
         } else {
-            Button(action: action) { Label(title, systemImage: systemImage) }
+            Button(action: action) { label }
+        }
+    }
+
+    private var label: some View {
+        Label {
+            Text(title)
+        } icon: {
+            if let iconColor {
+                Image(systemName: systemImage).foregroundStyle(iconColor)
+            } else {
+                Image(systemName: systemImage)
+            }
         }
     }
 

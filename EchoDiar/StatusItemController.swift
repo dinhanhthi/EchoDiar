@@ -166,9 +166,9 @@ final class StatusItemController: NSObject, NSMenuDelegate {
         menu.addItem(simulate)
         #endif
         menu.addItem(.separator())
-        // Disabled while the updater is off (no SUPublicEDKey yet).
-        let update = item(updater.updateAvailable ? "Update Available…" : "Check for Updates…", #selector(checkForUpdates))
-        update.isEnabled = updater.canCheck
+        // Disabled while the updater is off (no SUPublicEDKey yet), and while recording: an update relaunches.
+        let update = item(updater.menuTitle, #selector(checkForUpdates))
+        update.isEnabled = updater.canCheck && !active
         menu.addItem(update)
         menu.addItem(item("About EchoDiar", #selector(about)))
         menu.addItem(.separator())
