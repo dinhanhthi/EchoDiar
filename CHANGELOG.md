@@ -7,6 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.0.2] - 2026-10-21
+
+### Added
+
+- Transcribing a conversation again keeps the earlier transcripts as versions, which you can switch between from the transcript's versions menu.
+- One-click update: once an update has downloaded in the background, a green Update button in the toolbar and an "Install Update and Relaunch" menu item install it and relaunch the app without any dialog. Both are hidden or disabled while recording.
+- Check for Updates in the app menu.
+
+### Fixed
+
+- The pointer cursor now shows over the whole transcript line, not only its text.
+- A bottom bar menu keeps its hover look while it is open.
+
 ## [1.0.1] - 2026-10-21
 
 ### Added
