@@ -878,9 +878,12 @@ struct BottomBarButtonStyle: ButtonStyle {
     var height = Self.height
     var prominent = false
     var horizontalPadding: CGFloat = 14
+    /// A menu's trigger: it stays pressed while its menu is open, and shows the hover look then, not the darker one.
+    var menu = false
 
     func makeBody(configuration: Configuration) -> some View {
-        Highlight(configuration: configuration, height: height, prominent: prominent, horizontalPadding: horizontalPadding)
+        Highlight(configuration: configuration, height: height, prominent: prominent,
+                  horizontalPadding: horizontalPadding, menu: menu)
     }
 
     private struct Highlight: View {
@@ -888,6 +891,7 @@ struct BottomBarButtonStyle: ButtonStyle {
         let height: CGFloat
         let prominent: Bool
         let horizontalPadding: CGFloat
+        let menu: Bool
         @State private var hovered = false
         @Environment(\.isEnabled) private var isEnabled
 
@@ -901,8 +905,8 @@ struct BottomBarButtonStyle: ButtonStyle {
                     Capsule()
                         .fill(prominent ? AnyShapeStyle(Color.accentColor) : AnyShapeStyle(Palette.inputSurface))
                         .overlay(Capsule().fill(
-                            configuration.isPressed ? Color.black.opacity(0.2)
-                                : hovered && isEnabled ? Palette.hoverFill : .clear)))
+                            configuration.isPressed && !menu ? Color.black.opacity(0.2)
+                                : (hovered || configuration.isPressed) && isEnabled ? Palette.hoverFill : .clear)))
                 .contentShape(Capsule())
                 .opacity(isEnabled ? 1 : 0.45)
                 .animation(Motion.hover, value: hovered)
@@ -929,7 +933,8 @@ struct CompactMenu: ViewModifier {
     func body(content: Content) -> some View {
         let menu = content
             .menuStyle(.button)
-            .buttonStyle(BottomBarButtonStyle(height: height, horizontalPadding: height < BottomBarButtonStyle.height ? 12 : 14))
+            .buttonStyle(BottomBarButtonStyle(height: height, horizontalPadding: height < BottomBarButtonStyle.height ? 12 : 14,
+                                              menu: true))
         if let maxWidth {
             WidthCap(maxWidth: maxWidth) { menu }
         } else {
