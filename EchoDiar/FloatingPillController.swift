@@ -2,7 +2,8 @@ import AppKit
 import EchoCore
 import SwiftUI
 
-/// The floating pill: a non-activating panel above other apps and full-screen spaces, kept out of screen sharing.
+/// The floating pill: a non-activating panel above other apps and full-screen spaces, kept out of screen sharing
+/// unless "Show in screenshots and screen recordings" is on.
 /// Shows while recording (unless "Show floating indicator" is off, or an EchoDiar window is key and
 /// `hidePillWhenAppActive` is on) and for every prompt, which must stay answerable. Its top-right corner stays put
 /// while its content grows or shrinks. Dragged positions are saved per display (default: the top-right edge); with
@@ -42,8 +43,6 @@ final class FloatingPillController {
         panel.isFloatingPanel = true
         panel.hidesOnDeactivate = false
         panel.becomesKeyOnlyIfNeeded = true
-        // Kept out of screenshots and screen sharing (to verify per sharing app, V6).
-        panel.sharingType = .none
         panel.isOpaque = false
         panel.backgroundColor = .clear
         // The window server's shadow traces the clear panel's alpha, a jagged dark rim around the rounded pill; the
@@ -103,6 +102,9 @@ final class FloatingPillController {
     }
 
     private func apply(_ wanted: (show: Bool, anchorBundleID: String?)) {
+        // Off = kept out of screenshots and screen sharing (to verify per sharing app, V6). Any settings change
+        // re-runs `apply`, as `wanted` reads them.
+        panel.sharingType = model.settings.showPillInScreenCaptures ? .readOnly : .none
         if wanted.show {
             show()
             syncAnchor(bundleID: wanted.anchorBundleID)

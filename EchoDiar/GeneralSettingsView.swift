@@ -29,6 +29,10 @@ struct GeneralSettingsView: View {
                 }
                 Toggle("Hide it while an EchoDiar window is in front", isOn: model.setting(\.hidePillWhenAppActive))
                     .disabled(!model.settings.showPill)
+                Toggle(isOn: model.setting(\.showPillInScreenCaptures)) {
+                    Text("Show it in screenshots and screen recordings")
+                    Text("Screen sharing in meeting apps shows it too.")
+                }
                 Picker("Indicator size", selection: model.setting(\.pillSize)) {
                     Text("Small").tag(PillSize.small)
                     Text("Medium").tag(PillSize.medium)

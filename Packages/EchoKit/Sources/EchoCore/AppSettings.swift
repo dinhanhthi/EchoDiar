@@ -60,6 +60,8 @@ public struct AppSettings: Codable, Equatable, Sendable {
     public var showPill: Bool
     /// Hide the recording pill while an EchoDiar window is key.
     public var hidePillWhenAppActive: Bool
+    /// Let screenshots, screen recordings and screen sharing capture the pill; off keeps it out of all of them.
+    public var showPillInScreenCaptures: Bool
     /// Keep the pill at the meeting window's top-right corner (needs Accessibility).
     public var attachPillToWindow: Bool
     /// Where the attached pill was dragged, from the meeting window's top-right corner; nil = just inside it.
@@ -125,6 +127,7 @@ public struct AppSettings: Codable, Equatable, Sendable {
         pillPositions: [String: PillPosition] = [:],
         showPill: Bool = true,
         hidePillWhenAppActive: Bool = false,
+        showPillInScreenCaptures: Bool = false,
         attachPillToWindow: Bool = false,
         pillWindowOffset: PillPosition? = nil,
         pillSize: PillSize = .medium,
@@ -171,6 +174,7 @@ public struct AppSettings: Codable, Equatable, Sendable {
         self.pillPositions = pillPositions
         self.showPill = showPill
         self.hidePillWhenAppActive = hidePillWhenAppActive
+        self.showPillInScreenCaptures = showPillInScreenCaptures
         self.attachPillToWindow = attachPillToWindow
         self.pillWindowOffset = pillWindowOffset
         self.pillSize = pillSize
@@ -207,7 +211,7 @@ public struct AppSettings: Codable, Equatable, Sendable {
         case cloudSTTConfirmed, defaultAIProviderID, defaultAIModel, summaryLanguage, chatContextMessages
         case ragEnabled, embeddingModelID, embeddingAPIModel, cloudEmbeddingConfirmed
         case micDeviceUID, meetingDetection, perAppBehavior, pillPositions, showPill, hidePillWhenAppActive
-        case attachPillToWindow, pillWindowOffset, pillSize, endMonitor, routeChangeBehavior
+        case showPillInScreenCaptures, attachPillToWindow, pillWindowOffset, pillSize, endMonitor, routeChangeBehavior
         case autoTranscribe, transcribeWhileRecording, speakerCountHint, diarization, deferTranscriptionWhenConstrained
         case autoDeleteEnabled, autoDeleteAfterDays, autoDeleteMode, deleteAudioAfterTranscription
         case deleteWithoutConfirmation, globalHotKey, globalHotKeyEnabled, globalPauseHotKey, globalPauseHotKeyEnabled
@@ -244,6 +248,7 @@ public struct AppSettings: Codable, Equatable, Sendable {
         pillPositions = try container.decodeIfPresent([String: PillPosition].self, forKey: .pillPositions) ?? [:]
         showPill = try container.decodeIfPresent(Bool.self, forKey: .showPill) ?? true
         hidePillWhenAppActive = try container.decodeIfPresent(Bool.self, forKey: .hidePillWhenAppActive) ?? false
+        showPillInScreenCaptures = try container.decodeIfPresent(Bool.self, forKey: .showPillInScreenCaptures) ?? false
         attachPillToWindow = try container.decodeIfPresent(Bool.self, forKey: .attachPillToWindow) ?? false
         pillWindowOffset = try container.decodeIfPresent(PillPosition.self, forKey: .pillWindowOffset)
         pillSize = try container.decodeIfPresent(PillSize.self, forKey: .pillSize) ?? .medium
