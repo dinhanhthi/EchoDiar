@@ -1,5 +1,6 @@
 using EchoDiar.Core.Audio;
 using EchoDiar.Core.Model;
+using EchoDiar.Core.Settings;
 
 namespace EchoDiar.Tests.Core;
 
@@ -12,6 +13,8 @@ public sealed class RecordingEngineTests : IDisposable
     private readonly string _root = Path.Combine(Path.GetTempPath(), "EchoDiarTests-" + Guid.NewGuid().ToString("N"));
     private readonly List<FakeSource> _systems = [];
     private readonly List<FakeSource> _mics = [];
+    private readonly HashSet<string> _goneMics = [];
+    private readonly FakeRoutes _routes = new();
     private long _now = 1_000_000_000;
     private RecordingEngine? _engine;
 
@@ -27,9 +30,14 @@ public sealed class RecordingEngineTests : IDisposable
     {
         _engine = new RecordingEngine(
             _ => Add(_systems, system?.Invoke() ?? new FakeSource()),
-            _ => Add(_mics, new FakeSource()),
+            id => Add(_mics, new FakeSource
+            {
+                EndpointId = id,
+                StartError = id is not null && _goneMics.Contains(id) ? new InvalidOperationException("gone") : null,
+            }),
             availableFreeSpace: _ => 10_000_000_000,
-            clock: () => _now);
+            clock: () => _now,
+            routes: _routes);
         return _engine;
     }
 
@@ -90,10 +98,106 @@ public sealed class RecordingEngineTests : IDisposable
         Assert.Equal(RecordingEngine.State.Idle, engine.CurrentSnapshot().State);
     }
 
+    [Fact]
+    public void InputLostMovesTheMicToTheDefaultInput()
+    {
+        var engine = Engine();
+        var behaviors = new List<RouteChangeBehavior>();
+        engine.MicRouteLost += behaviors.Add;
+        engine.RouteBehavior = () => RouteChangeBehavior.Stop;
+        engine.Start(CaptureTarget.Global, "auto", micEndpointId: "mic-1", _root);
+        Assert.Equal(["mic-1"], _routes.Starts);
+
+        _goneMics.Add("mic-1");
+        _routes.InputLost?.Invoke();
+
+        Assert.Equal(2, _mics.Count);
+        Assert.True(_mics[0].Disposed);
+        Assert.Null(_mics[1].EndpointId); // the gone id cannot reopen
+        Assert.False(_mics[1].Disposed);
+        Assert.Equal(1, engine.CurrentSnapshot().MicRoutesLost);
+        Assert.Equal([RouteChangeBehavior.Stop], behaviors);
+        Assert.Equal(RecordingEngine.State.Recording, engine.CurrentSnapshot().State); // the App applies the behavior
+    }
+
+    [Fact]
+    public void InputLostWhilePausedOpensTheDefaultInputOnResume()
+    {
+        var engine = Engine();
+        engine.Start(CaptureTarget.Global, "auto", micEndpointId: "mic-1", _root);
+        engine.Pause();
+
+        _goneMics.Add("mic-1");
+        _routes.InputLost?.Invoke();
+        Assert.Single(_mics);
+        Assert.Equal(1, engine.CurrentSnapshot().MicRoutesLost);
+
+        engine.Resume();
+        Assert.Equal(["mic-1", "mic-1", null], _mics.Select(mic => mic.EndpointId));
+        Assert.False(_mics[^1].Disposed);
+    }
+
+    [Fact]
+    public void OutputChangedRebuildsTheGlobalSystemSource()
+    {
+        var engine = Engine();
+        engine.Start(CaptureTarget.Global, "auto", null, _root);
+
+        _routes.OutputChanged?.Invoke();
+
+        Assert.Equal(2, _systems.Count);
+        Assert.True(_systems[0].Disposed);
+        Assert.False(_systems[1].Disposed);
+        Assert.Single(_mics);
+    }
+
+    [Fact]
+    public void RouteEventAfterStopIsIgnored()
+    {
+        var engine = Engine();
+        engine.Start(CaptureTarget.Global, "auto", null, _root);
+        // Handlers already read by a route source that raises just after the engine unsubscribes.
+        var (output, lost) = (_routes.OutputChanged, _routes.InputLost);
+        engine.Stop();
+        Assert.Equal(1, _routes.Stops);
+        Assert.Null(_routes.InputLost);
+
+        output?.Invoke();
+        lost?.Invoke();
+
+        Assert.Single(_systems);
+        Assert.Single(_mics);
+        Assert.Equal(0, engine.CurrentSnapshot().MicRoutesLost);
+    }
+
+    private sealed class FakeRoutes : IAudioRouteSource
+    {
+        public Action? OutputChanged;
+        public Action? InputChanged;
+        public Action? InputLost;
+
+        public List<string?> Starts { get; } = [];
+        public int Stops { get; private set; }
+
+        event Action? IAudioRouteSource.OutputChanged { add => OutputChanged += value; remove => OutputChanged -= value; }
+        event Action? IAudioRouteSource.InputChanged { add => InputChanged += value; remove => InputChanged -= value; }
+        event Action? IAudioRouteSource.InputLost { add => InputLost += value; remove => InputLost -= value; }
+
+        public bool Start(string? inputEndpointId)
+        {
+            Starts.Add(inputEndpointId);
+            return true;
+        }
+
+        public void Stop() => Stops++;
+    }
+
     private sealed class FakeSource : ICaptureSource
     {
         private Action<ReadOnlySpan<float>, long, int>? _onSamples;
 
+        public string? EndpointId { get; init; }
+        public bool Disposed { get; private set; }
         public Exception? StartError { get; init; }
         public string Name => "Fake";
         public int SampleRate => 16_000;
@@ -110,6 +214,10 @@ public sealed class RecordingEngineTests : IDisposable
 
         public void Stop() => _onSamples = null;
 
-        public void Dispose() => Stop();
+        public void Dispose()
+        {
+            Stop();
+            Disposed = true;
+        }
     }
 }

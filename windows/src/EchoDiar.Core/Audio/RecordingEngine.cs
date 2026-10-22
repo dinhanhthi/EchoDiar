@@ -1,5 +1,6 @@
 using System.Diagnostics;
 using EchoDiar.Core.Model;
+using EchoDiar.Core.Settings;
 
 namespace EchoDiar.Core.Audio;
 
@@ -28,6 +29,29 @@ public interface ICaptureSource : IDisposable
     void Start(Action<ReadOnlySpan<float>, long, int> onSamples);
 
     /// <summary>Stops capturing and waits for the capture thread.</summary>
+    void Stop();
+}
+
+/// <summary>
+/// Route changes during a recording (the Platform's AudioRouteMonitor). The engine starts it with the picked mic when a
+/// recording starts and stops it when the recording ends, never inside its own lock. Events come on a thread-pool
+/// thread, outside the source's locks; one can still arrive just after <see cref="Stop"/>.
+/// </summary>
+public interface IAudioRouteSource
+{
+    /// <summary>The default output endpoint, or its format, changed.</summary>
+    event Action? OutputChanged;
+
+    /// <summary>The input in use was replaced (a new default, or the picked endpoint is back) or its format changed.</summary>
+    event Action? InputChanged;
+
+    /// <summary>The input in use was removed, unplugged or disabled; input now follows the default.</summary>
+    event Action? InputLost;
+
+    /// <summary>Starts listening, after stopping any previous run. <paramref name="inputEndpointId"/>: the picked mic,
+    /// null for the default input. False when it cannot listen.</summary>
+    bool Start(string? inputEndpointId);
+
     void Stop();
 }
 
@@ -95,6 +119,9 @@ public sealed class RecordingEngine : IDisposable
         public double MicSilentSeconds { get; init; }
         public double SystemSilentSeconds { get; init; }
 
+        /// <summary>Times the mic device in use disappeared during this recording (the mic moved to the default input).</summary>
+        public int MicRoutesLost { get; init; }
+
         /// <summary>Set on the snapshot published when a recording ends.</summary>
         public EndReason? EndReason { get; init; }
 
@@ -118,10 +145,12 @@ public sealed class RecordingEngine : IDisposable
 
     private readonly object _gate = new();
     private readonly object _shared = new();
+    private readonly object _routeLock = new();
     private readonly Func<CaptureTarget, ICaptureSource> _openSystem;
     private readonly Func<string?, ICaptureSource> _openMic;
     private readonly Func<string, long?> _availableFreeSpace;
     private readonly Func<long> _clock;
+    private readonly IAudioRouteSource? _routes;
 
     // Behind _gate.
     private State _state = State.Idle;
@@ -136,8 +165,14 @@ public sealed class RecordingEngine : IDisposable
     private Timer? _monitorTimer;
     private int _ticks;
     private long _micGeneration;
+    private long _sessionGeneration;
     private bool _lowDisk;
     private bool _silentTapSuspected;
+    private int _micRoutesLost;
+
+    // Behind _routeLock: the session the route source runs for (0: none) and the handlers subscribed for it.
+    private long _routesGeneration;
+    private (Action Output, Action Input, Action Lost)? _routeHandlers;
 
     // Behind _shared.
     private Snapshot _snapshot = new();
@@ -151,20 +186,33 @@ public sealed class RecordingEngine : IDisposable
     /// <param name="availableFreeSpace">Free bytes on the volume of a path, null when unknown (the check is skipped).
     /// Defaults to <see cref="DriveInfo.AvailableFreeSpace"/>.</param>
     /// <param name="clock">The capture sources' clock: QPC in 100 ns units. Defaults to <see cref="Stopwatch"/>.</param>
+    /// <param name="routes">Route changes to follow while recording; null follows none.</param>
     public RecordingEngine(
         Func<CaptureTarget, ICaptureSource> openSystem,
         Func<string?, ICaptureSource> openMic,
         Func<string, long?>? availableFreeSpace = null,
-        Func<long>? clock = null)
+        Func<long>? clock = null,
+        IAudioRouteSource? routes = null)
     {
         _openSystem = openSystem;
         _openMic = openMic;
         _availableFreeSpace = availableFreeSpace ?? DriveFreeSpace;
         _clock = clock ?? (static () => Stopwatch.GetElapsedTime(0).Ticks);
+        _routes = routes;
     }
 
     /// <summary>Published on state changes and flag flips only, inside the engine's lock: handlers must dispatch, never block.</summary>
     public event Action<Snapshot>? SnapshotChanged;
+
+    /// <summary>
+    /// The mic in use was lost and the recording moved to the default input (<see cref="Snapshot.MicRoutesLost"/> was
+    /// incremented), with <see cref="RouteChangeBehavior"/>'s value: the App asks to stop, stops, or carries on. Raised
+    /// inside the engine's lock on a thread-pool thread: handlers must dispatch, never block.
+    /// </summary>
+    public event Action<RouteChangeBehavior>? MicRouteLost;
+
+    /// <summary>The <c>routeChangeBehavior</c> setting, read when the mic is lost. Null: <see cref="RouteChangeBehavior.Ask"/>.</summary>
+    public Func<RouteChangeBehavior>? RouteBehavior { get; set; }
 
     /// <summary>Gets each written block (see <see cref="ChannelWriter.LiveSink"/>). Read at <see cref="Start"/>.</summary>
     public ChannelWriter.LiveSinkHandler? LiveSink { get; set; }
@@ -182,9 +230,16 @@ public sealed class RecordingEngine : IDisposable
     /// <summary>
     /// Writes <c>session.json</c> before any IO, then starts the system source, the mic (silence if unavailable) and
     /// the writer. Returns the session folder. Throws if the disk is nearly full or the system source cannot start; the
-    /// folder is then removed. <paramref name="micEndpointId"/> null records the default input.
+    /// folder is then removed. <paramref name="micEndpointId"/> null (or an input that is gone) records the default input.
     /// </summary>
     public string Start(CaptureTarget target, string language, string? micEndpointId, string root)
+    {
+        var folder = StartRecording(target, language, micEndpointId, root);
+        SyncRoutes();
+        return folder;
+    }
+
+    private string StartRecording(CaptureTarget target, string language, string? micEndpointId, string root)
     {
         lock (_gate)
         {
@@ -194,6 +249,7 @@ public sealed class RecordingEngine : IDisposable
             if (available < MinimumFreeBytes) throw new RecordingDiskFullException(available.Value);
             _lowDisk = available < LowDiskBytes;
             _silentTapSuspected = false;
+            _micRoutesLost = 0;
             _target = target;
             _micEndpointId = micEndpointId;
 
@@ -218,7 +274,7 @@ public sealed class RecordingEngine : IDisposable
                 Discard(folder);
                 throw;
             }
-            var mic = OpenMic();
+            var mic = OpenMic(micEndpointId);
 
             ChannelWriter? writer = null;
             try
@@ -241,6 +297,7 @@ public sealed class RecordingEngine : IDisposable
 
             session.MicDeviceName = mic.Source?.Name;
             session.OutputDeviceName = system.Source?.Name;
+            _sessionGeneration++;
             _state = State.Recording;
             _session = session;
             _folder = folder;
@@ -286,7 +343,7 @@ public sealed class RecordingEngine : IDisposable
         {
             if (_state != State.Paused || _writer is null || _session is null) return;
             var system = OpenSystem();
-            var mic = OpenMic();
+            var mic = OpenMic(_micEndpointId);
             try
             {
                 _writer.ReplaceRing(ChannelWriter.Channel.System, system.Ring);
@@ -319,7 +376,10 @@ public sealed class RecordingEngine : IDisposable
     /// <summary>Returns the final session, or null when idle.</summary>
     public RecordingSession? Stop(EndReason reason = EndReason.User)
     {
-        lock (_gate) return StopLocked(reason);
+        RecordingSession? session;
+        lock (_gate) session = StopLocked(reason);
+        SyncRoutes();
+        return session;
     }
 
     /// <summary>Appends a language marker ("auto" or BCP-47) at the current file time.</summary>
@@ -382,6 +442,7 @@ public sealed class RecordingEngine : IDisposable
         Save();
 
         var stats = _writer?.Stats;
+        _sessionGeneration++;
         _state = State.Idle;
         _session = null;
         _folder = null;
@@ -398,22 +459,40 @@ public sealed class RecordingEngine : IDisposable
     }
 
     /// <summary>Throws if the source cannot be created or started. A failure after start leaves the system channel
-    /// padding silence while the mic keeps recording (rebuilding it on route changes is Phase 10).</summary>
+    /// padding silence while the mic keeps recording, until an output change rebuilds it.</summary>
     private Capture OpenSystem() => Open(_openSystem(_target), static _ => { });
 
-    /// <summary>Falls back to a stand-in ring nothing writes to, which the writer fills with silence; never throws.</summary>
-    private Capture OpenMic()
+    /// <summary>
+    /// The input <paramref name="endpointId"/> (null: the default), else the default input when that one is gone (as
+    /// on macOS), else a stand-in ring nothing writes to, which the writer fills with silence; never throws.
+    /// </summary>
+    private Capture OpenMic(string? endpointId)
     {
         var generation = ++_micGeneration;
+        Action<Exception> onFailed = _ => ThreadPool.QueueUserWorkItem(_ => MicFailed(generation));
         try
         {
-            return Open(_openMic(_micEndpointId), _ => ThreadPool.QueueUserWorkItem(_ => MicFailed(generation)));
+            return Open(_openMic(endpointId), onFailed);
+        }
+        catch when (endpointId is not null)
+        {
+            // The picked input cannot open (unplugged): try the default input.
         }
         catch
         {
-            return new Capture(null, new RingBuffer(StandInFrames, ChannelWriter.SampleRate));
+            return StandInMic();
+        }
+        try
+        {
+            return Open(_openMic(null), onFailed);
+        }
+        catch
+        {
+            return StandInMic();
         }
     }
+
+    private static Capture StandInMic() => new(null, new RingBuffer(StandInFrames, ChannelWriter.SampleRate));
 
     /// <summary>The mic stopped mid-recording: its channel continues as silence. Runs on the thread pool, since
     /// <see cref="ICaptureSource.Failed"/> is raised on the capture thread that closing the source joins.</summary>
@@ -424,13 +503,155 @@ public sealed class RecordingEngine : IDisposable
             if (generation != _micGeneration || _state != State.Recording || _writer is null || _session is null) return;
             _mic?.Source?.Dispose();
             _micGeneration++;
-            var standIn = new Capture(null, new RingBuffer(StandInFrames, ChannelWriter.SampleRate));
+            var standIn = StandInMic();
             _writer.ReplaceRing(ChannelWriter.Channel.Mic, standIn.Ring);
             _mic = standIn;
             _session.MicDeviceName = null;
             Save();
             lock (_shared) _micRing = standIn.Ring;
         }
+    }
+
+    // Routes
+
+    private enum RouteEvent { OutputChanged, InputChanged, InputLost }
+
+    /// <summary>
+    /// Starts the route source for the current session, or stops it once idle, with handlers bound to that session.
+    /// Never called inside <c>_gate</c>: stopping the source may wait for a handler, which waits on <c>_gate</c>.
+    /// </summary>
+    private void SyncRoutes()
+    {
+        if (_routes is null) return;
+        lock (_routeLock)
+        {
+            long generation;
+            string? endpointId;
+            lock (_gate) (generation, endpointId) = (_state == State.Idle ? 0 : _sessionGeneration, _micEndpointId);
+            if (generation == _routesGeneration) return;
+            try
+            {
+                if (_routeHandlers is { } old)
+                {
+                    _routeHandlers = null;
+                    _routes.OutputChanged -= old.Output;
+                    _routes.InputChanged -= old.Input;
+                    _routes.InputLost -= old.Lost;
+                    _routes.Stop();
+                }
+                _routesGeneration = generation;
+                if (generation == 0) return;
+                var handlers = (
+                    Output: (Action)(() => RouteChanged(RouteEvent.OutputChanged, generation)),
+                    Input: (Action)(() => RouteChanged(RouteEvent.InputChanged, generation)),
+                    Lost: (Action)(() => RouteChanged(RouteEvent.InputLost, generation)));
+                _routeHandlers = handlers;
+                _routes.OutputChanged += handlers.Output;
+                _routes.InputChanged += handlers.Input;
+                _routes.InputLost += handlers.Lost;
+                _routes.Start(endpointId);
+            }
+            catch (Exception e)
+            {
+                // The recording goes on without following route changes.
+                Debug.WriteLine($"EchoDiar: could not sync the route monitor: {e}");
+            }
+        }
+    }
+
+    /// <summary>
+    /// A route change for session <paramref name="generation"/> (ignored once that session has ended), as on macOS: an
+    /// output change rebuilds the global system source; a lost input is counted, moves the mic to the default input and
+    /// raises <see cref="MicRouteLost"/>; a changed input reopens the picked mic (else the default). While paused only
+    /// the count changes: resume opens the sources anew. Runs on the route source's thread-pool thread: never throws.
+    /// </summary>
+    private void RouteChanged(RouteEvent route, long generation)
+    {
+        try
+        {
+            lock (_gate)
+            {
+                if (generation != _sessionGeneration || _state == State.Idle) return;
+                switch (route)
+                {
+                    case RouteEvent.OutputChanged:
+                        RebuildSystem();
+                        break;
+                    case RouteEvent.InputChanged:
+                        ReopenMic(_micEndpointId);
+                        break;
+                    case RouteEvent.InputLost:
+                        _micRoutesLost++;
+                        Publish();
+                        ReopenMic(null); // the lost id cannot reopen: the default input
+                        MicRouteLost?.Invoke(RouteBehavior?.Invoke() ?? RouteChangeBehavior.Ask);
+                        break;
+                }
+            }
+        }
+        catch (Exception e)
+        {
+            Debug.WriteLine($"EchoDiar: route change {route} failed: {e}");
+        }
+    }
+
+    /// <summary>
+    /// The "all" (or endpoint) loopback follows the new default output; per-app process loopback is left as is. On
+    /// failure the system channel pads silence while the mic keeps recording.
+    /// </summary>
+    private void RebuildSystem()
+    {
+        if (_target.TapMode != TapMode.Global || _state != State.Recording || _writer is null || _session is null) return;
+        _system?.Source?.Dispose();
+        _system = null;
+        Capture system;
+        try
+        {
+            system = OpenSystem();
+        }
+        catch (Exception e)
+        {
+            Debug.WriteLine($"EchoDiar: could not rebuild the system audio source: {e}");
+            return;
+        }
+        try
+        {
+            _writer.ReplaceRing(ChannelWriter.Channel.System, system.Ring);
+        }
+        catch
+        {
+            system.Source?.Dispose();
+            throw;
+        }
+        _system = system;
+        _session.OutputDeviceName = system.Source?.Name;
+        Save();
+        lock (_shared) _systemRing = system.Ring;
+    }
+
+    /// <summary>Replaces the open mic with <paramref name="endpointId"/> (see <see cref="OpenMic"/>) while recording.</summary>
+    private void ReopenMic(string? endpointId)
+    {
+        if (_state != State.Recording || _writer is null || _session is null) return;
+        _mic?.Source?.Dispose();
+        _mic = null;
+        var mic = OpenMic(endpointId);
+        try
+        {
+            _writer.ReplaceRing(ChannelWriter.Channel.Mic, mic.Ring);
+        }
+        catch
+        {
+            // Not left open on a ring nothing reads: the mic channel pads silence.
+            mic.Source?.Dispose();
+            _session.MicDeviceName = null;
+            Save();
+            throw;
+        }
+        _mic = mic;
+        _session.MicDeviceName = mic.Source?.Name;
+        Save();
+        lock (_shared) _micRing = mic.Ring;
     }
 
     private void CloseSources()
@@ -444,34 +665,37 @@ public sealed class RecordingEngine : IDisposable
 
     private void Tick(object? owner)
     {
-        lock (_gate)
+        lock (_gate) TickLocked(owner);
+        SyncRoutes(); // after a disk-full or write-failed stop
+    }
+
+    private void TickLocked(object? owner)
+    {
+        if (owner != _writer || _state == State.Idle || _writer is null || _folder is null) return;
+        _ticks++;
+        if (_ticks % DiskCheckTicks == 0 && _availableFreeSpace(_folder) is { } available)
         {
-            if (owner != _writer || _state == State.Idle || _writer is null || _folder is null) return;
-            _ticks++;
-            if (_ticks % DiskCheckTicks == 0 && _availableFreeSpace(_folder) is { } available)
+            if (available < MinimumFreeBytes)
             {
-                if (available < MinimumFreeBytes)
-                {
-                    StopLocked(EndReason.DiskFull);
-                    return;
-                }
-                if (available < LowDiskBytes != _lowDisk)
-                {
-                    _lowDisk = !_lowDisk;
-                    Publish();
-                }
+                StopLocked(EndReason.DiskFull);
+                return;
             }
-            if (_state != State.Recording) return;
-            var stats = _writer.Stats;
-            if (stats.Failure is not null)
+            if (available < LowDiskBytes != _lowDisk)
             {
-                StopLocked(EndReason.WriteFailed);
+                _lowDisk = !_lowDisk;
+                Publish();
             }
-            else if (stats.SilentTapSuspected != _silentTapSuspected)
-            {
-                _silentTapSuspected = stats.SilentTapSuspected;
-                Publish(stats);
-            }
+        }
+        if (_state != State.Recording) return;
+        var stats = _writer.Stats;
+        if (stats.Failure is not null)
+        {
+            StopLocked(EndReason.WriteFailed);
+        }
+        else if (stats.SilentTapSuspected != _silentTapSuspected)
+        {
+            _silentTapSuspected = stats.SilentTapSuspected;
+            Publish(stats);
         }
     }
 
@@ -482,6 +706,7 @@ public sealed class RecordingEngine : IDisposable
             State = _state,
             GlobalTapFallback = _target.GlobalTapFallback,
             LowDisk = _lowDisk,
+            MicRoutesLost = _micRoutesLost,
             EndReason = endReason,
         };
         if ((stats ?? _writer?.Stats) is { } current) snapshot = snapshot.Applying(current);
