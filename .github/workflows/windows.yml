@@ -82,6 +82,49 @@ jobs:
         working-directory: windows
         run: dotnet test tests/EchoDiar.Tests/EchoDiar.Tests.csproj --filter "Category!=Native&Category!=NativeLLM"
 
+  # Platform tests on the real Windows APIs (Media Foundation AAC). A Windows 11 client image: Windows Server
+  # images may lack the Media Foundation AAC encoder.
+  test-platform:
+    runs-on: windows-11-arm
+    steps:
+      - name: Check AAC encoder
+        run: |
+          Add-Type -TypeDefinition @'
+          using System;
+          using System.Runtime.InteropServices;
+          public static class MftProbe {
+            [StructLayout(LayoutKind.Sequential)] public struct TypeInfo { public Guid Major; public Guid Sub; }
+            [DllImport("mfplat.dll")] static extern int MFStartup(uint version, uint flags);
+            [DllImport("mfplat.dll")] static extern int MFTEnumEx(Guid category, uint flags, IntPtr input, ref TypeInfo output, out IntPtr activates, out uint count);
+            public static uint AacEncoders() {
+              Marshal.ThrowExceptionForHR(MFStartup(0x20070, 0));
+              var aac = new TypeInfo { Major = new Guid("73647561-0000-0010-8000-00AA00389B71"), Sub = new Guid("00001610-0000-0010-8000-00AA00389B71") };
+              // MFT_CATEGORY_AUDIO_ENCODER; MFT_ENUM_FLAG_SYNCMFT | LOCALMFT | TRANSCODE_ONLY | SORTANDFILTER.
+              Marshal.ThrowExceptionForHR(MFTEnumEx(new Guid("91c64bd0-f91e-4d8c-9276-db248279d975"), 0x71, IntPtr.Zero, ref aac, out var activates, out var count));
+              for (var i = 0; i < count; i++) Marshal.Release(Marshal.ReadIntPtr(activates, i * IntPtr.Size));
+              Marshal.FreeCoTaskMem(activates);
+              return count;
+            }
+          }
+          '@
+          $count = [MftProbe]::AacEncoders()
+          "Runner: $env:RUNNER_ARCH, $((Get-CimInstance Win32_OperatingSystem).Caption); AAC encoder MFTs: $count"
+          if ($count -eq 0) {
+            throw 'MFTEnumEx found no Media Foundation AAC encoder MFT on this runner: the Platform tests need a Windows 11 client image with Media Foundation (not Windows Server or an N edition without the Media Feature Pack).'
+          }
+
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6.0.0
+        with:
+          global-json-file: windows/global.json
+
+      - name: Platform tests
+        working-directory: windows
+        run: dotnet test tests/EchoDiar.Platform.Tests/EchoDiar.Platform.Tests.csproj --logger "console;verbosity=detailed"
+
   # The real engines on their native libraries (Whisper.net, sherpa-onnx) on x64 and ARM64. The tests download
   # their pinned, SHA-256 checked models from Hugging Face into ECHODIAR_TEST_MODELS, cached between runs.
   native-smoke:

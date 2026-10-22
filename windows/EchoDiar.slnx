@@ -12,6 +12,7 @@
     <Project Path="src/EchoDiar.Transcribe/EchoDiar.Transcribe.csproj" />
   </Folder>
   <Folder Name="/tests/">
+    <Project Path="tests/EchoDiar.Platform.Tests/EchoDiar.Platform.Tests.csproj" />
     <Project Path="tests/EchoDiar.Tests/EchoDiar.Tests.csproj" />
   </Folder>
 </Solution>
