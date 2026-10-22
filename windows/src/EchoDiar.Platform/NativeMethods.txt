@@ -43,3 +43,5 @@ QueryFullProcessImageNameW
 SHOpenFolderAndSelectItems
 ILCreateFromPathW
 ILFree
+IMMNotificationClient
+PKEY_AudioEngine_DeviceFormat

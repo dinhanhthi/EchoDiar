@@ -200,7 +200,7 @@ internal sealed class CaptureLoop : IDisposable
     }
 
     /// <summary>The endpoint's display name (PKEY_Device_FriendlyName), or null when it cannot be read.</summary>
-    private static unsafe string? FriendlyName(IMMDevice device)
+    internal static unsafe string? FriendlyName(IMMDevice device)
     {
         IPropertyStore? store = null;
         var value = default(PROPVARIANT);
