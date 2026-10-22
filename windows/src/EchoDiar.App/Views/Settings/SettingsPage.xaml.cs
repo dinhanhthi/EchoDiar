@@ -1,4 +1,5 @@
 using System.ComponentModel;
+using CommunityToolkit.WinUI.Controls;
 using EchoDiar.App.Services;
 using EchoDiar.App.ViewModels;
 using EchoDiar.Core;
@@ -8,12 +9,6 @@ using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Media;
 
 namespace EchoDiar.App.Views;
-
-/// <summary>A search result row: the matching setting and its section's icon.</summary>
-public sealed record SettingsResultRow(SettingsSearchItem Item, string Glyph)
-{
-    public string Path => Item.Path;
-}
 
 /// <summary>
 /// The Settings route (macOS SettingsWindow.swift <c>SettingsView</c> and SettingsSearch.swift
@@ -129,13 +124,12 @@ public sealed partial class SettingsPage : UserControl
     {
         if (term == _listedTerm) return;
         _listedTerm = term;
-        var rows = SettingsSearch.Matching(term)
-            .Select(item => new SettingsResultRow(item, SettingsSearch.Section(item.Section)?.Glyph ?? ""))
-            .ToList();
-        ResultsList.ItemsSource = rows;
+        var items = SettingsSearch.Matching(term).ToList();
+        ResultsList.Children.Clear();
+        foreach (var item in items) ResultsList.Children.Add(ResultRow(item));
         ResultsScroller.ChangeView(null, 0, null, disableAnimation: true);
-        ResultsScroller.Visibility = rows.Count > 0 ? Visibility.Visible : Visibility.Collapsed;
-        NoResultsText.Visibility = rows.Count > 0 ? Visibility.Collapsed : Visibility.Visible;
+        ResultsScroller.Visibility = items.Count > 0 ? Visibility.Visible : Visibility.Collapsed;
+        NoResultsText.Visibility = items.Count > 0 ? Visibility.Collapsed : Visibility.Visible;
         NoResultsText.Text = Loc.Format("No settings match \"%@\"", term);
     }
 
@@ -146,12 +140,32 @@ public sealed partial class SettingsPage : UserControl
         Open(id, null);
     }
 
-    /// <summary>A result opens its section on its inner tab, clears the search and points at its row.</summary>
-    private void OnResultClick(object sender, RoutedEventArgs e)
+    /// <summary>
+    /// A result's row, "Section › Tab › Row" with its section's icon. Made in code with its item: an ItemsRepeater does
+    /// not set the DataContext of an x:Bind template's element, so a click could not tell which item it was.
+    /// </summary>
+    private SettingsCard ResultRow(SettingsSearchItem item)
     {
-        if ((sender as FrameworkElement)?.DataContext is not SettingsResultRow row) return;
-        Open(row.Item.Section, row.Item.SubTab);
-        if (SectionHost.Content is FrameworkElement page) ShowRow(page, row.Item.Title);
+        var card = new SettingsCard
+        {
+            Header = item.Path,
+            HeaderIcon = new FontIcon
+            {
+                FontFamily = (FontFamily)Application.Current.Resources["SymbolThemeFontFamily"],
+                Glyph = SettingsSearch.Section(item.Section)?.Glyph ?? "",
+            },
+            IsClickEnabled = true,
+        };
+        card.Click += (_, _) => OpenResult(item);
+        return card;
+    }
+
+    /// <summary>A result opens its section on its inner tab, clears the search and points at its row.</summary>
+    private void OpenResult(SettingsSearchItem item)
+    {
+        StartupTrace.Write($"settings result opened {item.Section}/{item.Title}");
+        Open(item.Section, item.SubTab);
+        if (SectionHost.Content is FrameworkElement page) ShowRow(page, item.Title);
     }
 
     /// <summary>
