@@ -96,6 +96,19 @@ public sealed partial class AppViewModel
         {
             RecentLanguages = [.. Settings.RecentLanguages.Where(l => l != language).Prepend(language).Take(LanguageOptions.MaxRecent)],
         };
+        SaveSettings(settings);
+    }
+
+    /// <summary>How transcripts play (macOS Settings › Storage "Playback"): both voices in both ears, or as recorded.</summary>
+    public void SetPlaybackChannels(PlaybackChannels channels)
+    {
+        if (channels == Settings.PlaybackChannels) return;
+        SaveSettings(Settings with { PlaybackChannels = channels });
+    }
+
+    /// <summary>Applies <paramref name="settings"/> now and saves them off the UI thread, in call order.</summary>
+    private void SaveSettings(AppSettings settings)
+    {
         Settings = settings;
         _settingsWrite = _settingsWrite.ContinueWith(_ =>
         {

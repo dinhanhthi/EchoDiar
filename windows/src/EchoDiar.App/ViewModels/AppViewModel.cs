@@ -16,6 +16,9 @@ namespace EchoDiar.App.ViewModels;
 
 public enum RouteKind { List, Conversation, Recording }
 
+/// <summary>The conversation page's tab (macOS <c>AppModel.DetailTab</c>).</summary>
+public enum DetailTab { Transcript, Summary, Chat }
+
 /// <summary>What the main window shows: the library list, one conversation, or the recording page.</summary>
 public sealed record Route(RouteKind Kind, Guid? ConversationId = null)
 {
@@ -63,6 +66,7 @@ public sealed partial class AppViewModel : ObservableObject
     private string? _activeFolder;
 
     private Route _route = Route.List;
+    private DetailTab _detailTab = DetailTab.Transcript;
     private AppSettings _settings = new();
     private IReadOnlyList<Conversation> _conversations = [];
     private RecordingEngine.Snapshot _recordingSnapshot = new();
@@ -92,6 +96,13 @@ public sealed partial class AppViewModel : ObservableObject
     {
         get => _route;
         private set => SetProperty(ref _route, value);
+    }
+
+    /// <summary>The conversation page's tab: kept while another conversation opens from the sidebar.</summary>
+    public DetailTab DetailTab
+    {
+        get => _detailTab;
+        set => SetProperty(ref _detailTab, value);
     }
 
     public AppSettings Settings
@@ -323,7 +334,15 @@ public sealed partial class AppViewModel : ObservableObject
 
     // Navigation
 
-    public void Open(Guid id) => Route = Route.ForConversation(id);
+    /// <summary>
+    /// Shows the conversation: on its Transcript tab from the library list, on the shown tab from the sidebar (macOS
+    /// ConversationCard <c>open</c>).
+    /// </summary>
+    public void Open(Guid id)
+    {
+        if (Route.Kind == RouteKind.List) DetailTab = DetailTab.Transcript;
+        Route = Route.ForConversation(id);
+    }
 
     public void ShowRecording() => Route = Route.Recording;
 

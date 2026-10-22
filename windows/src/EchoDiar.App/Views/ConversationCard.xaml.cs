@@ -195,7 +195,7 @@ public sealed partial class ConversationCard : UserControl
         }
     }
 
-    private static string StepTitle(JobStep step) => step switch
+    internal static string StepTitle(JobStep step) => step switch
     {
         JobStep.Queued => Loc.T("Queued"),
         JobStep.Deferred => Loc.T("Waiting…"),

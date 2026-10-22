@@ -1,0 +1,350 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    The Transcript tab (macOS TranscriptView.swift): the segments in a card, with the version menu pinned above them,
+    then a bar with the transcription's state, the speaker notes, playback, the speaker chips (click to rename), Copy
+    and Re-transcribe.
+-->
+<UserControl
+    x:Class="EchoDiar.App.Views.TranscriptView"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:local="using:EchoDiar.App"
+    xmlns:views="using:EchoDiar.App.Views"
+    xmlns:vm="using:EchoDiar.App.ViewModels">
+
+    <UserControl.Resources>
+        <!--
+            The speakers' colors (TranscriptViewModel.ColorIndex): me in the accent color, the others from the theme's
+            caution, success and critical colors, a lighter accent and the secondary text color; the last three repeat the
+            first three, since the theme has no more hues. Each follows Light, Dark and contrast themes.
+        -->
+        <Style x:Key="SpeakerNameBase" BasedOn="{StaticResource CaptionTextBlockStyle}" TargetType="TextBlock">
+            <Setter Property="FontWeight" Value="SemiBold" />
+            <Setter Property="TextWrapping" Value="NoWrap" />
+        </Style>
+        <Style x:Key="SpeakerMe" BasedOn="{StaticResource SpeakerNameBase}" TargetType="TextBlock">
+            <Setter Property="Foreground" Value="{ThemeResource AccentTextFillColorPrimaryBrush}" />
+        </Style>
+        <Style x:Key="Speaker0" BasedOn="{StaticResource SpeakerNameBase}" TargetType="TextBlock">
+            <Setter Property="Foreground" Value="{ThemeResource SystemFillColorCautionBrush}" />
+        </Style>
+        <Style x:Key="Speaker1" BasedOn="{StaticResource SpeakerNameBase}" TargetType="TextBlock">
+            <Setter Property="Foreground" Value="{ThemeResource SystemFillColorSuccessBrush}" />
+        </Style>
+        <Style x:Key="Speaker2" BasedOn="{StaticResource SpeakerNameBase}" TargetType="TextBlock">
+            <Setter Property="Foreground" Value="{ThemeResource SystemFillColorCriticalBrush}" />
+        </Style>
+        <Style x:Key="Speaker3" BasedOn="{StaticResource SpeakerNameBase}" TargetType="TextBlock">
+            <Setter Property="Foreground" Value="{ThemeResource AccentTextFillColorTertiaryBrush}" />
+        </Style>
+        <Style x:Key="Speaker4" BasedOn="{StaticResource SpeakerNameBase}" TargetType="TextBlock">
+            <Setter Property="Foreground" Value="{ThemeResource TextFillColorSecondaryBrush}" />
+        </Style>
+        <Style x:Key="Speaker5" BasedOn="{StaticResource Speaker0}" TargetType="TextBlock" />
+        <Style x:Key="Speaker6" BasedOn="{StaticResource Speaker1}" TargetType="TextBlock" />
+        <Style x:Key="Speaker7" BasedOn="{StaticResource Speaker2}" TargetType="TextBlock" />
+    </UserControl.Resources>
+
+    <Grid RowSpacing="12">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="*" />
+            <RowDefinition Height="Auto" />
+        </Grid.RowDefinitions>
+
+        <!-- The segments, or a note in the card's middle while there are none. -->
+        <Border
+            Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
+            BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
+            BorderThickness="1"
+            CornerRadius="{StaticResource OverlayCornerRadius}">
+            <Grid>
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="*" />
+                </Grid.RowDefinitions>
+
+                <!-- From two kept transcripts: the shown one's number and engine; the others are view-only. -->
+                <DropDownButton
+                    x:Name="VersionButton"
+                    MaxWidth="320"
+                    Margin="14,16,14,0"
+                    HorizontalAlignment="Left"
+                    ToolTipService.ToolTip="{local:T Text='Earlier transcripts of this conversation'}"
+                    Visibility="Collapsed">
+                    <StackPanel Orientation="Horizontal" Spacing="8">
+                        <FontIcon FontFamily="{ThemeResource SymbolThemeFontFamily}" FontSize="14" Glyph="&#xE81C;" />
+                        <TextBlock x:Name="VersionText" TextTrimming="CharacterEllipsis" TextWrapping="NoWrap" />
+                    </StackPanel>
+                    <DropDownButton.Flyout>
+                        <MenuFlyout x:Name="VersionMenu" Placement="BottomEdgeAlignedLeft" />
+                    </DropDownButton.Flyout>
+                </DropDownButton>
+
+                <!--
+                    One row per segment: the start (and a speaker icon while it plays), the speaker, the text. A click
+                    plays from the segment's start; the segment under the play head is the selected row.
+                -->
+                <ListView
+                    x:Name="LineList"
+                    Grid.Row="1"
+                    Padding="4,10"
+                    IsItemClickEnabled="True"
+                    SelectionMode="Single"
+                    SingleSelectionFollowsFocus="False">
+                    <ListView.ItemTemplate>
+                        <DataTemplate x:DataType="vm:TranscriptLineItem">
+                            <Grid Padding="0,6" ColumnSpacing="10">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="Auto" />
+                                    <ColumnDefinition Width="*" />
+                                </Grid.ColumnDefinitions>
+                                <StackPanel Spacing="4">
+                                    <TextBlock
+                                        Style="{StaticResource CaptionTextBlockStyle}"
+                                        Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                                        Text="{x:Bind Time}"
+                                        TextWrapping="NoWrap"
+                                        ToolTipService.ToolTip="{local:T Text='Play from here'}" />
+                                    <FontIcon
+                                        x:Name="SpeakingIcon"
+                                        HorizontalAlignment="Left"
+                                        AutomationProperties.AccessibilityView="Raw"
+                                        FontFamily="{ThemeResource SymbolThemeFontFamily}"
+                                        FontSize="12"
+                                        Glyph="&#xE767;"
+                                        Visibility="Collapsed" />
+                                </StackPanel>
+                                <StackPanel Grid.Column="1" Spacing="2">
+                                    <TextBlock x:Name="NameText" Style="{StaticResource SpeakerNameBase}">
+                                        <Run Text="&#x25CF; " /><Run Text="{x:Bind Name}" />
+                                    </TextBlock>
+                                    <TextBlock
+                                        Style="{StaticResource BodyTextBlockStyle}"
+                                        Text="{x:Bind Text}"
+                                        TextWrapping="Wrap" />
+                                </StackPanel>
+                            </Grid>
+                        </DataTemplate>
+                    </ListView.ItemTemplate>
+                </ListView>
+
+                <ProgressRing
+                    x:Name="LoadingRing"
+                    Grid.Row="1"
+                    HorizontalAlignment="Center"
+                    VerticalAlignment="Center"
+                    IsActive="False"
+                    Visibility="Collapsed" />
+
+                <StackPanel
+                    x:Name="EmptyPanel"
+                    Grid.Row="1"
+                    MaxWidth="480"
+                    Padding="20"
+                    HorizontalAlignment="Center"
+                    VerticalAlignment="Center"
+                    Spacing="10"
+                    Visibility="Collapsed">
+                    <TextBlock
+                        x:Name="EmptyText"
+                        HorizontalAlignment="Center"
+                        Style="{StaticResource BodyTextBlockStyle}"
+                        Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                        TextAlignment="Center" />
+                    <!-- The transcription's state while there is no transcript. -->
+                    <Border x:Name="EmptyStatusHost" HorizontalAlignment="Center" />
+                </StackPanel>
+            </Grid>
+        </Border>
+
+        <Border
+            Grid.Row="1"
+            Padding="14,10"
+            Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
+            BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
+            BorderThickness="1"
+            CornerRadius="{StaticResource OverlayCornerRadius}">
+            <StackPanel Spacing="10">
+                <!-- The transcription's state with a transcript: why it failed and Retry, or Needs model. -->
+                <Border x:Name="BarStatusHost">
+                    <StackPanel
+                        x:Name="StatusPanel"
+                        Orientation="Horizontal"
+                        Spacing="8">
+                        <TextBlock
+                            x:Name="FailureText"
+                            MaxWidth="480"
+                            VerticalAlignment="Center"
+                            Style="{StaticResource CaptionTextBlockStyle}"
+                            Foreground="{ThemeResource SystemFillColorCriticalBrush}"
+                            MaxLines="2"
+                            TextTrimming="CharacterEllipsis"
+                            Visibility="Collapsed" />
+                        <StackPanel
+                            x:Name="ProgressPanel"
+                            Orientation="Horizontal"
+                            Spacing="6"
+                            Visibility="Collapsed">
+                            <ProgressRing
+                                x:Name="JobRing"
+                                Width="16"
+                                Height="16"
+                                IsActive="True"
+                                IsIndeterminate="False"
+                                Maximum="1" />
+                            <TextBlock
+                                x:Name="StepText"
+                                VerticalAlignment="Center"
+                                Style="{StaticResource CaptionTextBlockStyle}"
+                                Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                        </StackPanel>
+                        <!-- macOS opens Settings > Transcription; Settings comes with a later phase. -->
+                        <Border
+                            x:Name="NeedsModelBadge"
+                            Padding="8,1"
+                            VerticalAlignment="Center"
+                            Background="{ThemeResource SystemFillColorCautionBackgroundBrush}"
+                            CornerRadius="9"
+                            ToolTipService.ToolTip="{local:T Text='Download a transcription model in Settings'}"
+                            Visibility="Collapsed">
+                            <TextBlock
+                                VerticalAlignment="Center"
+                                Style="{StaticResource CaptionTextBlockStyle}"
+                                FontWeight="SemiBold"
+                                Foreground="{ThemeResource SystemFillColorCautionBrush}"
+                                Text="{local:T Text='Needs model'}" />
+                        </Border>
+                        <SplitButton
+                            x:Name="RetryButton"
+                            VerticalAlignment="Center"
+                            Visibility="Collapsed">
+                            <TextBlock Foreground="{ThemeResource SystemFillColorCriticalBrush}" Text="{local:T Text='Retry'}" />
+                            <SplitButton.Flyout>
+                                <MenuFlyout x:Name="RetryMenu" Placement="BottomEdgeAlignedLeft" />
+                            </SplitButton.Flyout>
+                        </SplitButton>
+                        <Button
+                            x:Name="TranscribeButton"
+                            VerticalAlignment="Center"
+                            Content="{local:T Text='Transcribe'}"
+                            Visibility="Collapsed" />
+                    </StackPanel>
+                </Border>
+
+                <!-- Why the speakers were not told apart (the transcript's notes). -->
+                <StackPanel x:Name="NoticePanel" Orientation="Horizontal" Spacing="8" Visibility="Collapsed">
+                    <FontIcon
+                        x:Name="NoticeIcon"
+                        VerticalAlignment="Center"
+                        FontFamily="{ThemeResource SymbolThemeFontFamily}"
+                        FontSize="12"
+                        Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                    <TextBlock
+                        x:Name="NoticeText"
+                        VerticalAlignment="Center"
+                        Style="{StaticResource CaptionTextBlockStyle}"
+                        Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                    <!-- macOS opens Settings > Transcription; Settings comes with a later phase. -->
+                    <HyperlinkButton
+                        x:Name="NoticeDownloadButton"
+                        Padding="0"
+                        VerticalAlignment="Center"
+                        Content="{local:T Text='Download…'}"
+                        FontSize="12"
+                        IsEnabled="False" />
+                </StackPanel>
+
+                <views:PlaybackBar x:Name="Player" />
+
+                <!-- Speaker chips, then Copy and Re-transcribe, then the note in place of playback once the audio is gone. -->
+                <Grid x:Name="ControlRow" ColumnSpacing="8">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
+
+                    <StackPanel x:Name="ChipsPanel" Orientation="Horizontal" Spacing="6">
+                        <!-- The rename field of a chip: Enter saves, Esc or a click elsewhere cancels. -->
+                        <FlyoutBase.AttachedFlyout>
+                            <Flyout x:Name="RenameFlyout" Placement="Top">
+                                <StackPanel Width="220" Spacing="8">
+                                    <TextBlock
+                                        x:Name="RenameTitle"
+                                        Style="{StaticResource CaptionTextBlockStyle}"
+                                        Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                                    <TextBox x:Name="RenameBox" />
+                                </StackPanel>
+                            </Flyout>
+                        </FlyoutBase.AttachedFlyout>
+                    </StackPanel>
+
+                    <StackPanel
+                        Grid.Column="1"
+                        Orientation="Horizontal"
+                        Spacing="6"
+                        VerticalAlignment="Center">
+                        <!-- The speakers without a chip; a click on one renames it. -->
+                        <FlyoutBase.AttachedFlyout>
+                            <Flyout x:Name="MoreSpeakersFlyout" Placement="Top">
+                                <StackPanel x:Name="MoreSpeakersList" MinWidth="180" Spacing="2" />
+                            </Flyout>
+                        </FlyoutBase.AttachedFlyout>
+                        <Button
+                            x:Name="CopyButton"
+                            Width="32"
+                            Height="32"
+                            Padding="0"
+                            Style="{StaticResource SubtleButtonStyle}"
+                            AutomationProperties.Name="{local:T Text='Copy transcript'}"
+                            IsEnabled="False"
+                            ToolTipService.ToolTip="{local:T Text='Copy transcript'}">
+                            <FontIcon FontFamily="{ThemeResource SymbolThemeFontFamily}" FontSize="16" Glyph="&#xE8C8;" />
+                        </Button>
+                        <!-- In place of Re-transcribe while a job is queued or runs. -->
+                        <StackPanel
+                            x:Name="TranscribingPanel"
+                            Orientation="Horizontal"
+                            Spacing="8"
+                            VerticalAlignment="Center"
+                            Visibility="Collapsed">
+                            <ProgressRing
+                                Width="16"
+                                Height="16"
+                                IsActive="True" />
+                            <TextBlock VerticalAlignment="Center" Text="{local:T Text='Transcribing…'}" />
+                        </StackPanel>
+                        <DropDownButton
+                            x:Name="RetranscribeButton"
+                            Content="{local:T Text='Re-transcribe'}">
+                            <DropDownButton.Flyout>
+                                <MenuFlyout x:Name="RetranscribeMenu" Placement="TopEdgeAlignedRight" />
+                            </DropDownButton.Flyout>
+                        </DropDownButton>
+                    </StackPanel>
+
+                    <!-- In place of playback once the audio was moved to the Recycle Bin. -->
+                    <StackPanel
+                        x:Name="AudioRemovedNote"
+                        Grid.Column="2"
+                        Orientation="Horizontal"
+                        Spacing="6"
+                        VerticalAlignment="Center"
+                        ToolTipService.ToolTip="{local:T Text='Playback and re-transcribing are no longer possible. The transcript, summary and chat stay.'}"
+                        Visibility="Collapsed">
+                        <FontIcon
+                            FontFamily="{ThemeResource SymbolThemeFontFamily}"
+                            FontSize="12"
+                            Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                            Glyph="&#xE74F;" />
+                        <TextBlock
+                            VerticalAlignment="Center"
+                            Style="{StaticResource CaptionTextBlockStyle}"
+                            Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                            Text="{local:T Text='Audio has been removed'}" />
+                    </StackPanel>
+                </Grid>
+            </StackPanel>
+        </Border>
+    </Grid>
+</UserControl>

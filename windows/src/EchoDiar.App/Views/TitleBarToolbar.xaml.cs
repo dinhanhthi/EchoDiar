@@ -108,8 +108,8 @@ public sealed partial class TitleBarToolbar : UserControl
         SearchBox.LostFocus += (_, _) => OnSearchLostFocus();
         SearchButton.Click += (_, _) => OpenSearch();
         LayoutUpdated += (_, _) => UpdateSearchMode();
-        // Summary and Chat stay disabled until their phases.
         TabsBar.SelectedItem = TranscriptTab;
+        TabsBar.SelectionChanged += (_, _) => OnTabSelected();
         // A start that failed before the window was shown still gets its dialog.
         Loaded += (_, _) => ShowNextDialog();
     }
@@ -197,6 +197,9 @@ public sealed partial class TitleBarToolbar : UserControl
             case nameof(AppViewModel.RecordingError):
                 ShowNextDialog();
                 break;
+            case nameof(AppViewModel.DetailTab):
+                UpdateTabs();
+                break;
             case nameof(AppViewModel.RecordTargets):
                 // Apps that started playing since the menu opened show up in it.
                 if (TargetMenu.IsOpen) BuildTargetMenu();
@@ -248,6 +251,7 @@ public sealed partial class TitleBarToolbar : UserControl
         TitlePanel.Visibility = Shown(onConversation);
         FileGroup.Visibility = Shown(onConversation);
         TabsBar.Visibility = Shown(onConversation);
+        UpdateTabs();
         if (conversation is null) return;
         TitleText.Text = conversation.Title;
         DetailText.Text = ConversationText.Detail(conversation, _model);
@@ -261,6 +265,30 @@ public sealed partial class TitleBarToolbar : UserControl
             : null;
 
     private static Visibility Shown(bool visible) => visible ? Visibility.Visible : Visibility.Collapsed;
+
+    // Tabs
+
+    /// <summary>Selects the model's tab.</summary>
+    private void UpdateTabs()
+    {
+        if (_model is null) return;
+        var item = _model.DetailTab switch
+        {
+            DetailTab.Summary => SummaryTab,
+            DetailTab.Chat => ChatTab,
+            _ => TranscriptTab,
+        };
+        if (TabsBar.SelectedItem != item) TabsBar.SelectedItem = item;
+    }
+
+    /// <summary>A picked tab shows on the conversation page.</summary>
+    private void OnTabSelected()
+    {
+        if (_model is null) return;
+        _model.DetailTab = TabsBar.SelectedItem == SummaryTab ? DetailTab.Summary
+            : TabsBar.SelectedItem == ChatTab ? DetailTab.Chat
+            : DetailTab.Transcript;
+    }
 
     // Record menu
 

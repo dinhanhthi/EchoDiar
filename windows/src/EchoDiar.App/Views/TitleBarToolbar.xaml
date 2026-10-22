@@ -222,7 +222,7 @@
             <FontIcon FontFamily="{ThemeResource SymbolThemeFontFamily}" FontSize="16" Glyph="&#xE721;" />
         </Button>
 
-        <!-- Only Transcript for now: Phase 13 adds the tab pages, Phase 23 Summary and Chat. -->
+        <!-- The conversation page's tab (AppViewModel.DetailTab); Summary and Chat say how to set up AI until Phase 24. -->
         <SelectorBar
             x:Name="TabsBar"
             Grid.Column="4"
@@ -231,8 +231,8 @@
             VerticalAlignment="Center"
             Visibility="Collapsed">
             <SelectorBarItem x:Name="TranscriptTab" Text="{local:T Text='Transcript'}" />
-            <SelectorBarItem x:Name="SummaryTab" IsEnabled="False" Text="{local:T Text='Summary'}" />
-            <SelectorBarItem x:Name="ChatTab" IsEnabled="False" Text="{local:T Text='Chat'}" />
+            <SelectorBarItem x:Name="SummaryTab" Text="{local:T Text='Summary'}" />
+            <SelectorBarItem x:Name="ChatTab" Text="{local:T Text='Chat'}" />
         </SelectorBar>
     </Grid>
 </UserControl>

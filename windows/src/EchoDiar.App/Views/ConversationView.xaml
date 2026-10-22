@@ -1,96 +1,79 @@
 <?xml version="1.0" encoding="utf-8"?>
+<!--
+    One conversation beside the wide layout's sidebar: its title (double-click to rename) and details, then the
+    toolbar's tab. Transcript is TranscriptView with playback; Summary and Chat say how to set up AI until Phase 24.
+-->
 <UserControl
     x:Class="EchoDiar.App.Views.ConversationView"
     xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:local="using:EchoDiar.App"
     xmlns:views="using:EchoDiar.App.Views">
 
-    <!-- The page on a Fluent card beside the wide layout's sidebar; Phase 13 completes the transcript view. -->
-    <Border
-        Margin="0,8,12,12"
-        Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
-        BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
-        BorderThickness="1"
-        CornerRadius="{StaticResource OverlayCornerRadius}">
-        <Grid Padding="16" RowSpacing="12">
-            <Grid.RowDefinitions>
-                <RowDefinition Height="Auto" />
-                <RowDefinition Height="Auto" />
-                <RowDefinition Height="Auto" />
-                <RowDefinition Height="*" />
-            </Grid.RowDefinitions>
+    <Grid Margin="0,8,12,12" RowSpacing="12">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+        </Grid.RowDefinitions>
 
-            <TextBlock x:Name="TitleText" Style="{StaticResource TitleTextBlockStyle}" TextWrapping="Wrap" />
-
-            <StackPanel Grid.Row="1" Orientation="Horizontal" Spacing="12">
-                <Button
-                    x:Name="PlayButton"
-                    Click="OnPlayClick"
-                    Content="Play"
-                    IsEnabled="False" />
+        <StackPanel Padding="4,0" Spacing="2">
+            <Grid>
                 <TextBlock
-                    x:Name="TimeText"
-                    VerticalAlignment="Center"
-                    Style="{StaticResource BodyTextBlockStyle}"
+                    x:Name="TitleText"
+                    Style="{StaticResource SubtitleTextBlockStyle}"
+                    MaxLines="1"
+                    TextTrimming="CharacterEllipsis"
                     TextWrapping="NoWrap" />
-                <Button
-                    x:Name="TranscribeButton"
-                    Click="OnTranscribeClick"
-                    Content="Transcribe"
+                <!-- Enter saves a changed title; Esc or a click elsewhere cancels. -->
+                <TextBox
+                    x:Name="TitleBox"
+                    AutomationProperties.Name="{local:T Text='Title'}"
+                    PlaceholderText="{local:T Text='Title'}"
                     Visibility="Collapsed" />
-                <TextBlock
-                    x:Name="StatusText"
-                    VerticalAlignment="Center"
-                    Style="{StaticResource BodyTextBlockStyle}"
-                    Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
-            </StackPanel>
-
-            <StackPanel Grid.Row="2" Spacing="8">
-                <ProgressBar x:Name="JobBar" Maximum="1" Visibility="Collapsed" />
-                <InfoBar
-                    x:Name="ErrorBar"
-                    IsClosable="False"
-                    IsOpen="False"
-                    Severity="Error" />
-            </StackPanel>
-
+            </Grid>
             <TextBlock
-                x:Name="EmptyText"
-                Grid.Row="3"
-                Style="{StaticResource BodyTextBlockStyle}"
+                x:Name="DetailText"
+                Style="{StaticResource CaptionTextBlockStyle}"
                 Foreground="{ThemeResource TextFillColorSecondaryBrush}"
-                Visibility="Collapsed" />
+                MaxLines="1"
+                TextTrimming="CharacterEllipsis"
+                TextWrapping="NoWrap" />
+        </StackPanel>
 
-            <!--
-                One line per segment (the speaker, the time, the text); clicking a line plays from it, the line under the
-                play head is selected (the ListView's subtle fill and accent bar).
-            -->
-            <ListView
-                x:Name="LineList"
-                Grid.Row="3"
-                IsItemClickEnabled="True"
-                ItemClick="OnLineClick"
-                SelectionMode="Single">
-                <ListView.ItemTemplate>
-                    <DataTemplate x:DataType="views:TranscriptLine">
-                        <StackPanel Padding="0,6" Spacing="2">
-                            <StackPanel Orientation="Horizontal" Spacing="8">
-                                <TextBlock
-                                    Style="{StaticResource BodyStrongTextBlockStyle}"
-                                    Text="{x:Bind Speaker}"
-                                    TextWrapping="NoWrap" />
-                                <TextBlock
-                                    VerticalAlignment="Center"
-                                    Style="{StaticResource CaptionTextBlockStyle}"
-                                    Foreground="{ThemeResource TextFillColorSecondaryBrush}"
-                                    Text="{x:Bind Time}"
-                                    TextWrapping="NoWrap" />
-                            </StackPanel>
-                            <TextBlock Style="{StaticResource BodyTextBlockStyle}" Text="{x:Bind Text}" />
-                        </StackPanel>
-                    </DataTemplate>
-                </ListView.ItemTemplate>
-            </ListView>
-        </Grid>
-    </Border>
+        <views:TranscriptView x:Name="TranscriptPane" Grid.Row="1" />
+
+        <!-- Summary and Chat: Phase 24 brings the AI panel. -->
+        <Border
+            x:Name="AIPane"
+            Grid.Row="1"
+            Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
+            BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
+            BorderThickness="1"
+            CornerRadius="{StaticResource OverlayCornerRadius}"
+            Visibility="Collapsed">
+            <Grid
+                MaxWidth="480"
+                Padding="20"
+                HorizontalAlignment="Center"
+                VerticalAlignment="Center"
+                ColumnSpacing="8">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="*" />
+                </Grid.ColumnDefinitions>
+                <FontIcon
+                    Margin="0,3,0,0"
+                    VerticalAlignment="Top"
+                    FontFamily="{ThemeResource SymbolThemeFontFamily}"
+                    FontSize="14"
+                    Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                    Glyph="&#xE7BA;" />
+                <TextBlock
+                    Grid.Column="1"
+                    Style="{StaticResource BodyTextBlockStyle}"
+                    Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                    Text="{local:T Text='No AI model: set up a provider or download a model in Settings › AI.'}" />
+            </Grid>
+        </Border>
+    </Grid>
 </UserControl>

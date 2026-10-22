@@ -19,6 +19,7 @@ public sealed partial class PlaybackController : ObservableObject, IDisposable
     private readonly DispatcherQueueTimer _ticker;
     private AudioPlayer? _player;
     private string? _path;
+    private PlaybackChannels _channels = PlaybackChannels.Mixed;
 
     /// <summary>Sorted by start.</summary>
     private (Guid Id, double Start, double End)[] _segments = [];
@@ -83,7 +84,7 @@ public sealed partial class PlaybackController : ObservableObject, IDisposable
 
     /// <summary>
     /// Opens <paramref name="audioPath"/> (a CAF file) unless it is already open (null closes the player), and sets
-    /// the segments to highlight. <paramref name="channels"/> applies when a file opens.
+    /// the segments to highlight and how the channels play.
     /// </summary>
     public void Load(string? audioPath, IReadOnlyList<Transcript.Segment> segments, PlaybackChannels channels)
     {
@@ -92,9 +93,35 @@ public sealed partial class PlaybackController : ObservableObject, IDisposable
         {
             Close();
             _path = audioPath;
+            _channels = channels;
             if (audioPath is not null) Open(audioPath, channels);
         }
+        else
+        {
+            SetChannels(channels);
+        }
         if (IsPlaying || CurrentTime > 0) UpdateActiveSegment();
+    }
+
+    /// <summary>
+    /// Plays both voices in both ears, or as recorded (mic left, system right), keeping the play head and whether it
+    /// plays. Until Task 13.3 switches the open player live, the file is opened again at the play head.
+    /// </summary>
+    public void SetChannels(PlaybackChannels channels)
+    {
+        if (channels == _channels) return;
+        _channels = channels;
+        if (_path is not { } path || _player is null) return;
+        // The exact play head, not the last 4 Hz reading.
+        Tick();
+        var time = CurrentTime;
+        var wasPlaying = IsPlaying;
+        Close();
+        _path = path;
+        Open(path, channels);
+        if (!IsReady) return;
+        Seek(time);
+        if (wasPlaying) Play();
     }
 
     public void TogglePlay()
