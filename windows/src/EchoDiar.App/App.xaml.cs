@@ -24,6 +24,12 @@ public partial class App : Application
     public App()
     {
         InitializeComponent();
+        // Logged, not handled: the app still ends as it would.
+        UnhandledException += (_, e) => CrashLog.Write(Paths.Root, $"Application.UnhandledException: {e.Message}", e.Exception);
+        AppDomain.CurrentDomain.UnhandledException += (_, e) =>
+            CrashLog.Write(Paths.Root, "AppDomain.UnhandledException", e.ExceptionObject);
+        TaskScheduler.UnobservedTaskException += (_, e) =>
+            CrashLog.Write(Paths.Root, "TaskScheduler.UnobservedTaskException", e.Exception);
     }
 
     protected override async void OnLaunched(Microsoft.UI.Xaml.LaunchActivatedEventArgs args)
@@ -56,7 +62,12 @@ public partial class App : Application
         _services = new AppServices(Paths);
         _model = new AppViewModel(_services, dispatcher);
         _window = new MainWindow(_model);
-        _window.Closed += (_, _) => Shutdown();
+        _window.Closed += (_, _) =>
+        {
+            // A closed window fails every call: a redirected launch queued meanwhile finds none.
+            _window = null;
+            Shutdown();
+        };
         _window.Activate();
         try
         {

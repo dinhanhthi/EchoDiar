@@ -110,6 +110,9 @@ internal sealed partial class WindowFrames
             string.Create(CultureInfo.InvariantCulture, $"{position.X},{position.Y},{width},{height}");
     }
 
+    /// <summary>On close: a pending switch must not resize a window that is going away.</summary>
+    public void Detach() => _window.Changed -= OnChanged;
+
     /// <summary>
     /// Sets the presenter's minimum and maximum (cleared on wide) in physical pixels at the window's DPI; again after a
     /// move to a display of another DPI.

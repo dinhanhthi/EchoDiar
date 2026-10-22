@@ -20,6 +20,14 @@ public sealed partial class MainWindow : Window
     private readonly ConversationListView _library;
     private IReadOnlyList<RectInt32> _passthrough = [];
 
+    /// <summary>
+    /// Set first in <see cref="Window.Closed"/>: the window then puts its content to null and fails every call on its
+    /// properties (0x800710DD) while layout and rendering events still fire, so no handler touches it after this.
+    /// </summary>
+    private bool _closing;
+
+    private XamlRoot? _xamlRoot;
+
     public MainWindow(AppViewModel model)
     {
         _model = model;
@@ -42,8 +50,8 @@ public sealed partial class MainWindow : Window
         titleBar.ButtonHoverBackgroundColor = Color.FromArgb(0x1A, 0xFF, 0xFF, 0xFF);
         titleBar.ButtonPressedBackgroundColor = Color.FromArgb(0x33, 0xFF, 0xFF, 0xFF);
 
-        TitleBarGrid.SizeChanged += (_, _) => UpdateTitleBarRegions();
-        TitleBarGrid.LayoutUpdated += (_, _) => UpdateTitleBarRegions();
+        TitleBarGrid.SizeChanged += OnTitleBarSizeChanged;
+        TitleBarGrid.LayoutUpdated += OnTitleBarLayoutUpdated;
 
         Toolbar.Attach(_model);
         // One library for both layouts: the whole page on compact, the sidebar on wide.
@@ -53,56 +61,73 @@ public sealed partial class MainWindow : Window
         _frames = new WindowFrames(AppWindow);
         _frames.Place(WindowFrames.For(_model.Route));
         // A move to a display of another DPI changes the presenter's bounds in physical pixels.
-        RootGrid.Loaded += (_, _) =>
-        {
-            if (RootGrid.XamlRoot is { } root) root.Changed += (_, _) => _frames.ApplyBounds();
-        };
-        Closed += (_, _) => _frames.Save();
+        RootGrid.Loaded += OnRootLoaded;
+        Closed += OnClosed;
         Activated += OnFirstActivated;
 
         _model.PropertyChanged += OnModelChanged;
         ShowRoute();
     }
 
+    private void OnRootLoaded(object sender, RoutedEventArgs e)
+    {
+        if (_xamlRoot is not null || RootGrid.XamlRoot is not { } root) return;
+        _xamlRoot = root;
+        root.Changed += OnXamlRootChanged;
+    }
+
+    private void OnXamlRootChanged(XamlRoot sender, XamlRootChangedEventArgs args)
+    {
+        if (!_closing) _frames.ApplyBounds();
+    }
+
+    /// <summary>Saves the frame while the window still answers, then lets go of everything that would call it.</summary>
+    private void OnClosed(object sender, WindowEventArgs args)
+    {
+        _closing = true;
+        TitleBarGrid.SizeChanged -= OnTitleBarSizeChanged;
+        TitleBarGrid.LayoutUpdated -= OnTitleBarLayoutUpdated;
+        if (_xamlRoot is not null) _xamlRoot.Changed -= OnXamlRootChanged;
+        _model.PropertyChanged -= OnModelChanged;
+        _frames.Save();
+        _frames.Detach();
+    }
+
     /// <summary>
-    /// The first frame's content can be lost while the window is first shown (seen in a VM: the title bar and the
-    /// library header stayed blank, while what changed later drew). WinUI then redraws only the elements that change,
-    /// and has no API to redraw everything; a resize does. So once shown and after one drawn frame, the window is
-    /// resized by 1 px and back after the next frame.
+    /// The text of the first frame can be lost while the window is first shown (seen in a VM on warm launches: the
+    /// toolbar's icons and labels and the library header stayed blank, while backgrounds and later text drew). A text
+    /// element makes its glyphs again only when it leaves the tree and enters it again, so once shown and after one
+    /// drawn frame, the toolbar's and the library's content are taken out and put back.
     /// </summary>
     private void OnFirstActivated(object sender, WindowActivatedEventArgs args)
     {
         if (args.WindowActivationState == WindowActivationState.Deactivated) return;
         Activated -= OnFirstActivated;
-        AfterNextFrame(NudgeSize);
-    }
-
-    private void NudgeSize()
-    {
-        if (AppWindow.Presenter is not OverlappedPresenter { State: OverlappedPresenterState.Restored } presenter) return;
-        var size = AppWindow.Size;
-        // Inside the presenter's bounds, or it clamps the nudge away.
-        var width = size.Width - 1 >= (presenter.PreferredMinimumWidth ?? 0) ? size.Width - 1 : size.Width + 1;
-        if (presenter.PreferredMaximumWidth is { } maxWidth && width > maxWidth) return;
-        var nudged = new SizeInt32(width, size.Height);
-        AppWindow.Resize(nudged);
         AfterNextFrame(() =>
         {
-            // Unless the user resized it meanwhile.
-            if (AppWindow.Size.Equals(nudged)) AppWindow.Resize(size);
+            Reattach(Toolbar);
+            Reattach(_library);
         });
     }
 
-    /// <summary>Runs <paramref name="action"/> once a frame has been drawn.</summary>
-    private static void AfterNextFrame(Action action)
+    /// <summary>In the same tick, so no layout pass sees it out; the control's own Loaded and Unloaded do not fire.</summary>
+    private static void Reattach(UserControl control)
+    {
+        var content = control.Content;
+        control.Content = null;
+        control.Content = content;
+    }
+
+    /// <summary>Runs <paramref name="action"/> once a frame has been drawn, unless the window closed meanwhile.</summary>
+    private void AfterNextFrame(Action action)
     {
         var frames = 0;
         void OnRendering(object? sender, object e)
         {
             // Rendering comes before its frame is drawn: the second one follows a drawn frame.
-            if (++frames < 2) return;
+            if (++frames < 2 && !_closing) return;
             CompositionTarget.Rendering -= OnRendering;
-            action();
+            if (!_closing) action();
         }
         CompositionTarget.Rendering += OnRendering;
     }
@@ -131,10 +156,15 @@ public sealed partial class MainWindow : Window
         _frames.SwitchTo(layout);
     }
 
+    private void OnTitleBarSizeChanged(object sender, SizeChangedEventArgs e) => UpdateTitleBarRegions();
+
+    private void OnTitleBarLayoutUpdated(object? sender, object e) => UpdateTitleBarRegions();
+
     // Keeps the toolbar's controls clickable: everything else in the title bar row drags the window.
     private void UpdateTitleBarRegions()
     {
-        if (Content?.XamlRoot is not { } root)
+        // RootGrid's, not Content's: Window.Content throws once the window is closed.
+        if (_closing || RootGrid.XamlRoot is not { } root)
         {
             return;
         }
