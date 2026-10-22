@@ -7,5 +7,9 @@
     <Project Path="src/EchoDiar.App/EchoDiar.App.csproj">
       <Deploy />
     </Project>
+    <Project Path="src/EchoDiar.Core/EchoDiar.Core.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/EchoDiar.Tests/EchoDiar.Tests.csproj" />
   </Folder>
 </Solution>

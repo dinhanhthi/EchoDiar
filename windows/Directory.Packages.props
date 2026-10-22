@@ -1,0 +1,37 @@
+<Project>
+  <PropertyGroup>
+    <ManagePackageVersionsCentrally>true</ManagePackageVersionsCentrally>
+  </PropertyGroup>
+
+  <!-- Windows App SDK: the metapackage, plus the component packages it pins (2.5.1 nuspec), which App switches to in 2.3. -->
+  <ItemGroup>
+    <PackageVersion Include="Microsoft.WindowsAppSDK" Version="2.5.1" />
+    <PackageVersion Include="Microsoft.WindowsAppSDK.Base" Version="2.0.4" />
+    <PackageVersion Include="Microsoft.WindowsAppSDK.Foundation" Version="2.3.12" />
+    <PackageVersion Include="Microsoft.WindowsAppSDK.WinUI" Version="2.3.9" />
+    <PackageVersion Include="Microsoft.WindowsAppSDK.InteractiveExperiences" Version="2.1.9" />
+    <PackageVersion Include="Microsoft.WindowsAppSDK.DWrite" Version="2.1.0" />
+    <PackageVersion Include="Microsoft.Windows.SDK.BuildTools" Version="10.0.26100.9169" />
+    <PackageVersion Include="CommunityToolkit.Mvvm" Version="8.4.2" />
+    <PackageVersion Include="Microsoft.Windows.CsWin32" Version="0.3.366" />
+  </ItemGroup>
+
+  <!-- Audio and native engines. -->
+  <ItemGroup>
+    <PackageVersion Include="NAudio.Core" Version="3.3.0" />
+    <PackageVersion Include="NAudio.Wasapi" Version="3.3.0" />
+    <PackageVersion Include="Whisper.net" Version="1.9.1" />
+    <PackageVersion Include="Whisper.net.Runtime" Version="1.9.1" />
+    <PackageVersion Include="org.k2fsa.sherpa.onnx" Version="1.13.8" />
+    <PackageVersion Include="LLamaSharp" Version="0.30.0" />
+    <PackageVersion Include="LLamaSharp.Backend.Cpu" Version="0.30.0" />
+  </ItemGroup>
+
+  <!-- Tests. -->
+  <ItemGroup>
+    <!-- xunit.v3 without Microsoft Testing Platform: the .NET 10 SDK runs it through VSTest, so the dotnet test filter syntax keeps working. -->
+    <PackageVersion Include="xunit.v3.mtp-off" Version="4.0.2" />
+    <PackageVersion Include="Microsoft.NET.Test.Sdk" Version="18.11.0" />
+    <PackageVersion Include="xunit.runner.visualstudio" Version="4.0.1" />
+  </ItemGroup>
+</Project>
