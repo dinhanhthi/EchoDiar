@@ -21,8 +21,15 @@ public partial class App : Application
     private AppServices? _services;
     private AppViewModel? _model;
 
+#if DEBUG
+    /// <summary>DEBUG <c>--no-backdrop</c>: the window paints its tint solid instead of setting a system backdrop (A/B in a VM).</summary>
+    internal static bool NoBackdrop { get; } = Environment.GetCommandLineArgs().Contains("--no-backdrop");
+#endif
+
     public App()
     {
+        StartupTrace.Start(Paths.Root);
+        StartupTrace.Write("App ctor");
         InitializeComponent();
         // Logged, not handled: the app still ends as it would.
         UnhandledException += (_, e) => CrashLog.Write(Paths.Root, $"Application.UnhandledException: {e.Message}", e.Exception);
@@ -34,15 +41,19 @@ public partial class App : Application
 
     protected override async void OnLaunched(Microsoft.UI.Xaml.LaunchActivatedEventArgs args)
     {
+        StartupTrace.Write("OnLaunched");
 #if DEBUG
-        WriteLaunchProbe();
+        // Off the UI thread: no file work runs there while the window is first shown.
+        _ = Task.Run(WriteLaunchProbe);
         // Headless harnesses (--capture-probe, --native-probe): no window, exit when done. They run before the
         // single-instance key, so they also work while the app is open. The alias echodiar.exe passes its arguments on
         // the process command line.
         if (CaptureProbe.TryRun(Environment.GetCommandLineArgs(), Exit)) return;
 #endif
         // Single instance: a second launch activates the running app's window, then exits.
+        StartupTrace.Write("begin FindOrRegisterForKey");
         var main = AppInstance.FindOrRegisterForKey("main");
+        StartupTrace.Write($"end FindOrRegisterForKey (current {main.IsCurrent})");
         if (!main.IsCurrent)
         {
             try
@@ -59,7 +70,9 @@ public partial class App : Application
 
         var dispatcher = DispatcherQueue.GetForCurrentThread();
         AppInstance.GetCurrent().Activated += (_, _) => dispatcher.TryEnqueue(ShowWindow);
+        StartupTrace.Write("begin AppServices");
         _services = new AppServices(Paths);
+        StartupTrace.Write("end AppServices");
         _model = new AppViewModel(_services, dispatcher);
         _window = new MainWindow(_model);
         _window.Closed += (_, _) =>
@@ -68,14 +81,18 @@ public partial class App : Application
             _window = null;
             Shutdown();
         };
+        StartupTrace.Write("begin Activate");
         _window.Activate();
+        StartupTrace.Write("end Activate");
         try
         {
             await _model.StartAsync();
+            StartupTrace.Write("StartAsync done");
         }
         catch (Exception e)
         {
             Debug.WriteLine($"EchoDiar: launch failed: {e}");
+            StartupTrace.Write($"StartAsync failed: {e.GetType().Name} {e.Message}");
         }
     }
 

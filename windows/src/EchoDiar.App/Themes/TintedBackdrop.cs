@@ -27,11 +27,13 @@ internal sealed partial class TintedBackdrop : SystemBackdrop
         var config = new SystemBackdropConfiguration { Theme = SystemBackdropTheme.Dark, IsInputActive = true };
         _controller = CreateController(config);
         _controller?.AddSystemBackdropTarget(connectedTarget);
+        Services.StartupTrace.Write($"backdrop connected: {_controller?.GetType().Name ?? "none"}");
     }
 
     protected override void OnTargetDisconnected(ICompositionSupportsSystemBackdrop disconnectedTarget)
     {
         base.OnTargetDisconnected(disconnectedTarget);
+        Services.StartupTrace.Write("backdrop disconnected");
         _controller?.RemoveSystemBackdropTarget(disconnectedTarget);
         _controller?.Dispose();
         _controller = null;

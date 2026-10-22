@@ -205,19 +205,38 @@ public sealed partial class AppViewModel : ObservableObject
     /// <summary>Loads the settings, recovers sessions a crash left open, then lists the library and the models.</summary>
     public async Task StartAsync()
     {
-        _services.Library.Changed += list => Post(() => Conversations = list);
+        _services.Library.Changed += list =>
+        {
+            StartupTrace.Write($"Library.Changed raised ({list.Count} conversations)");
+            Post(() =>
+            {
+                StartupTrace.Write($"begin Conversations = {list.Count}");
+                Conversations = list;
+                StartupTrace.Write("end Conversations");
+            });
+        };
         _services.Pipeline.Progress += progress => Post(() => ApplyProgress(progress));
         _services.Engine.SnapshotChanged += snapshot => Post(() => ApplySnapshot(snapshot));
         _recovery = LoadAndRecoverAsync();
         await _recovery;
-        await _services.Library.RefreshAsync();
+        StartupTrace.Write("begin library load");
+        var list = await _services.Library.RefreshAsync();
+        StartupTrace.Write($"end library load ({list.Count} conversations)");
         await RefreshInstalledModelsAsync();
+        StartupTrace.Write($"installed models: {InstalledModelIds.Count}");
     }
 
     private async Task LoadAndRecoverAsync()
     {
-        Settings = await Task.Run(() => _services.Settings.Load());
+        Settings = await Task.Run(() =>
+        {
+            StartupTrace.Write("begin settings load");
+            var settings = _services.Settings.Load();
+            StartupTrace.Write("end settings load");
+            return settings;
+        });
         OnPropertyChanged(nameof(NeedsDiarizer));
+        StartupTrace.Write("settings applied");
         await Task.Run(Recover);
     }
 
@@ -289,8 +308,10 @@ public sealed partial class AppViewModel : ObservableObject
         {
             // Without a start time every session with this pid counts as this process's own.
         }
+        StartupTrace.Write("begin recovery");
         var recovered = SessionRecovery.Recover(_services.Paths.Conversations, ProcessInfo.IsAlive, Environment.ProcessId, startedAt);
         foreach (var result in recovered) Debug.WriteLine($"EchoDiar: {result.State} {result.Folder} ({result.Duration:0.0} s)");
+        StartupTrace.Write($"end recovery ({recovered.Count} recovered)");
     }
 
     // Navigation
@@ -666,7 +687,12 @@ public sealed partial class AppViewModel : ObservableObject
         try
         {
             InstalledModelIds = await Task.Run(() =>
-                (IReadOnlySet<string>)ModelCatalog.All.Where(_services.Models.IsInstalled).Select(e => e.Id).ToHashSet());
+            {
+                StartupTrace.Write("begin installed models scan");
+                var ids = (IReadOnlySet<string>)ModelCatalog.All.Where(_services.Models.IsInstalled).Select(e => e.Id).ToHashSet();
+                StartupTrace.Write("end installed models scan");
+                return ids;
+            });
         }
         catch (Exception e) when (e is IOException or UnauthorizedAccessException)
         {

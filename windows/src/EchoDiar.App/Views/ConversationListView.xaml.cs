@@ -1,6 +1,7 @@
 using System.Collections.ObjectModel;
 using System.ComponentModel;
 using System.Globalization;
+using EchoDiar.App.Services;
 using EchoDiar.App.ViewModels;
 using EchoDiar.Core.Model;
 using EchoDiar.Core.Models;
@@ -32,6 +33,7 @@ public sealed partial class ConversationListView : UserControl
         ConversationList.ItemsSource = _rows;
         Loaded += (_, _) =>
         {
+            StartupTrace.Write("library view Loaded");
             _model.PropertyChanged += OnModelChanged;
             UpdateRows();
             UpdateBanner();
@@ -76,6 +78,7 @@ public sealed partial class ConversationListView : UserControl
             foreach (var row in rows) _rows.Add(row);
         }
         EmptyText.Visibility = rows.Count == 0 ? Visibility.Visible : Visibility.Collapsed;
+        StartupTrace.Write($"library rows updated ({rows.Count} rows)");
         // Replaced rows lose the selection.
         UpdateSelection();
     }

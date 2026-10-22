@@ -28,11 +28,24 @@ public sealed partial class MainWindow : Window
 
     private XamlRoot? _xamlRoot;
 
+    /// <summary>A re-realization after lost surface contents waits for its frame: more losses meanwhile add none.</summary>
+    private bool _reattachQueued;
+
     public MainWindow(AppViewModel model)
     {
+        StartupTrace.Write("begin MainWindow ctor");
         _model = model;
         InitializeComponent();
-        if (TintedBackdrop.IsSupported)
+        StartupTrace.Write("MainWindow InitializeComponent done");
+#if DEBUG
+        TraceWindowEvents();
+#endif
+        var backdrop = TintedBackdrop.IsSupported;
+#if DEBUG
+        if (App.NoBackdrop) backdrop = false;
+#endif
+        StartupTrace.Write($"backdrop: supported {TintedBackdrop.IsSupported}, used {backdrop}");
+        if (backdrop)
         {
             SystemBackdrop = new TintedBackdrop();
         }
@@ -59,18 +72,23 @@ public sealed partial class MainWindow : Window
         ListHost.Content = _library;
 
         _frames = new WindowFrames(AppWindow);
+        StartupTrace.Write("begin Place");
         _frames.Place(WindowFrames.For(_model.Route));
+        StartupTrace.Write("end Place");
         // A move to a display of another DPI changes the presenter's bounds in physical pixels.
         RootGrid.Loaded += OnRootLoaded;
         Closed += OnClosed;
         Activated += OnFirstActivated;
+        CompositionTarget.SurfaceContentsLost += OnSurfaceContentsLost;
 
         _model.PropertyChanged += OnModelChanged;
         ShowRoute();
+        StartupTrace.Write("end MainWindow ctor");
     }
 
     private void OnRootLoaded(object sender, RoutedEventArgs e)
     {
+        StartupTrace.Write("RootGrid.Loaded");
         if (_xamlRoot is not null || RootGrid.XamlRoot is not { } root) return;
         _xamlRoot = root;
         root.Changed += OnXamlRootChanged;
@@ -78,13 +96,20 @@ public sealed partial class MainWindow : Window
 
     private void OnXamlRootChanged(XamlRoot sender, XamlRootChangedEventArgs args)
     {
-        if (!_closing) _frames.ApplyBounds();
+        if (_closing) return;
+        StartupTrace.Write($"XamlRoot.Changed scale {sender.RasterizationScale}, size {sender.Size.Width}x{sender.Size.Height}, host visible {sender.IsHostVisible}");
+        _frames.ApplyBounds();
     }
 
     /// <summary>Saves the frame while the window still answers, then lets go of everything that would call it.</summary>
     private void OnClosed(object sender, WindowEventArgs args)
     {
         _closing = true;
+        StartupTrace.Write("Closed");
+        CompositionTarget.SurfaceContentsLost -= OnSurfaceContentsLost;
+#if DEBUG
+        UntraceWindowEvents();
+#endif
         TitleBarGrid.SizeChanged -= OnTitleBarSizeChanged;
         TitleBarGrid.LayoutUpdated -= OnTitleBarLayoutUpdated;
         if (_xamlRoot is not null) _xamlRoot.Changed -= OnXamlRootChanged;
@@ -104,11 +129,31 @@ public sealed partial class MainWindow : Window
     {
         if (args.WindowActivationState == WindowActivationState.Deactivated) return;
         Activated -= OnFirstActivated;
+        AfterNextFrame(() => ReattachChrome("after the first frame"));
+    }
+
+    /// <summary>
+    /// Lost surface contents (the graphics device was lost or its surfaces were trimmed) leave the same blank text: the
+    /// toolbar and the library are put back once the next frame is drawn.
+    /// </summary>
+    private void OnSurfaceContentsLost(object? sender, object e)
+    {
+        StartupTrace.Write($"SurfaceContentsLost (closing {_closing}, queued {_reattachQueued})");
+        if (_closing || _reattachQueued) return;
+        _reattachQueued = true;
         AfterNextFrame(() =>
         {
-            Reattach(Toolbar);
-            Reattach(_library);
+            _reattachQueued = false;
+            ReattachChrome("after lost surface contents");
         });
+    }
+
+    private void ReattachChrome(string reason)
+    {
+        StartupTrace.Write($"begin reattach {reason}");
+        Reattach(Toolbar);
+        Reattach(_library);
+        StartupTrace.Write("end reattach");
     }
 
     /// <summary>In the same tick, so no layout pass sees it out; the control's own Loaded and Unloaded do not fire.</summary>
@@ -182,6 +227,7 @@ public sealed partial class MainWindow : Window
         }
 
         _passthrough = rects;
+        StartupTrace.Write($"SetRegionRects ({rects.Count} rects)");
         InputNonClientPointerSource.GetForWindowId(AppWindow.Id)
             .SetRegionRects(NonClientRegionKind.Passthrough, [.. rects]);
     }
@@ -194,4 +240,48 @@ public sealed partial class MainWindow : Window
             column.Width = length;
         }
     }
+
+#if DEBUG
+    private int _renderingTicks;
+
+    /// <summary>The window's events for <see cref="StartupTrace"/>; the first ten frames only, so the trace keeps few frames forced.</summary>
+    private void TraceWindowEvents()
+    {
+        CompositionTarget.Rendering += OnTraceRendering;
+        Activated += OnTraceActivated;
+        VisibilityChanged += OnTraceVisibilityChanged;
+        AppWindow.Changed += OnTraceAppWindowChanged;
+    }
+
+    private void UntraceWindowEvents()
+    {
+        CompositionTarget.Rendering -= OnTraceRendering;
+        Activated -= OnTraceActivated;
+        VisibilityChanged -= OnTraceVisibilityChanged;
+        AppWindow.Changed -= OnTraceAppWindowChanged;
+    }
+
+    private void OnTraceRendering(object? sender, object e)
+    {
+        var time = e is RenderingEventArgs args ? args.RenderingTime.TotalMilliseconds : -1;
+        StartupTrace.Write($"Rendering tick {++_renderingTicks} (rendering time {time:0.0} ms)");
+        if (_renderingTicks >= 10) CompositionTarget.Rendering -= OnTraceRendering;
+    }
+
+    private void OnTraceActivated(object sender, WindowActivatedEventArgs args) =>
+        StartupTrace.Write($"Activated {args.WindowActivationState}");
+
+    private void OnTraceVisibilityChanged(object sender, WindowVisibilityChangedEventArgs args) =>
+        StartupTrace.Write($"VisibilityChanged visible {args.Visible}");
+
+    private void OnTraceAppWindowChanged(AppWindow sender, AppWindowChangedEventArgs args)
+    {
+        if (_closing) return;
+        var state = sender.Presenter is OverlappedPresenter presenter ? presenter.State.ToString() : sender.Presenter.Kind.ToString();
+        StartupTrace.Write(
+            $"AppWindow.Changed size {args.DidSizeChange} position {args.DidPositionChange} presenter {args.DidPresenterChange} " +
+            $"visibility {args.DidVisibilityChange}: {sender.Position.X},{sender.Position.Y} {sender.Size.Width}x{sender.Size.Height} " +
+            $"{state} visible {sender.IsVisible}");
+    }
+#endif
 }

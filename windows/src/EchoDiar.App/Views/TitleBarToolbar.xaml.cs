@@ -1,5 +1,6 @@
 using System.ComponentModel;
 using System.Diagnostics;
+using EchoDiar.App.Services;
 using EchoDiar.App.ViewModels;
 using EchoDiar.Core.Audio;
 using EchoDiar.Core.Model;
@@ -86,8 +87,11 @@ public sealed partial class TitleBarToolbar : UserControl
     {
         switch (e.PropertyName)
         {
-            case nameof(AppViewModel.Route):
             case nameof(AppViewModel.Conversations):
+                StartupTrace.Write($"toolbar update ({_model?.Conversations.Count} conversations)");
+                Update();
+                break;
+            case nameof(AppViewModel.Route):
             case nameof(AppViewModel.RecordingSnapshot):
             case nameof(AppViewModel.IsStarting):
             case nameof(AppViewModel.TranscriptionProgress):
