@@ -345,9 +345,21 @@ public sealed partial class MainWindow : Window
             return;
         }
 
+        // The scale and the caption insets can be briefly invalid while the window switches layout (0 or NaN scale,
+        // negative insets): that pass is skipped or clamped, the next LayoutUpdated has the settled values.
         var scale = root.RasterizationScale;
-        SetWidth(LeftInsetColumn, AppWindow.TitleBar.LeftInset / scale);
-        SetWidth(RightInsetColumn, AppWindow.TitleBar.RightInset / scale);
+        var titleBar = AppWindow.TitleBar;
+        if (!double.IsFinite(scale) || scale <= 0)
+        {
+            StartupTrace.Write($"title bar regions skipped: scale {scale}, insets {titleBar.LeftInset},{titleBar.RightInset}");
+            return;
+        }
+        if (titleBar.LeftInset < 0 || titleBar.RightInset < 0)
+        {
+            StartupTrace.Write($"title bar insets {titleBar.LeftInset},{titleBar.RightInset} clamped (scale {scale})");
+        }
+        SetWidth(LeftInsetColumn, titleBar.LeftInset / scale);
+        SetWidth(RightInsetColumn, titleBar.RightInset / scale);
 
         // LayoutUpdated fires often: only a change of the rects goes to the window.
         var rects = Toolbar.PassthroughRects(scale);
@@ -362,9 +374,10 @@ public sealed partial class MainWindow : Window
             .SetRegionRects(NonClientRegionKind.Passthrough, [.. rects]);
     }
 
+    /// <summary>GridLength throws on a negative, NaN or infinite width: those set 0, so LayoutUpdated never throws.</summary>
     private static void SetWidth(ColumnDefinition column, double width)
     {
-        var length = new GridLength(width);
+        var length = new GridLength(double.IsFinite(width) && width > 0 ? width : 0);
         if (!column.Width.Equals(length))
         {
             column.Width = length;
