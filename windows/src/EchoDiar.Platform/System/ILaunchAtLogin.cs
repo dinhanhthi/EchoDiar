@@ -24,8 +24,8 @@ public enum LaunchAtLoginState
 }
 
 /// <summary>
-/// The app's startup task (macOS GeneralSettingsView.swift: <c>SMAppService.mainApp</c>). Implemented in task 14.3
-/// by <c>LaunchAtLogin</c> over <c>StartupTask</c> (TaskId <c>EchoDiarStartup</c>); App uses a stand-in until then.
+/// The app's startup task (macOS GeneralSettingsView.swift: <c>SMAppService.mainApp</c>), implemented by
+/// <see cref="LaunchAtLogin"/> over <c>StartupTask</c> (TaskId <c>EchoDiarStartup</c>).
 /// Every call may throw (no package identity, no startup task in the manifest); Settings shows the message.
 /// </summary>
 public interface ILaunchAtLogin

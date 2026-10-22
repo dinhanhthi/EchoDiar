@@ -58,7 +58,7 @@ internal sealed class AppServices : IDisposable
     public RecordingEngine Engine { get; }
 
     /// <summary>Launch at login: a stand-in until task 14.3 adds the startup task.</summary>
-    public ILaunchAtLogin LaunchAtLogin { get; } = new LaunchAtLoginStub();
+    public ILaunchAtLogin LaunchAtLogin { get; } = new LaunchAtLogin();
 
     /// <summary>Stops a running recording (its CAF is finished), then releases the route monitor and the HTTP client.</summary>
     public void Dispose()

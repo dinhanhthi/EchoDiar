@@ -68,6 +68,16 @@
             <uap5:ExecutionAlias Alias="echodiar.exe" />
           </uap5:AppExecutionAlias>
         </uap5:Extension>
+        <!-- Launch at login (Settings > General, Platform LaunchAtLogin); off until the user turns it on. -->
+        <uap5:Extension
+          Category="windows.startupTask"
+          Executable="EchoDiar.App.exe"
+          EntryPoint="Windows.FullTrustApplication">
+          <uap5:StartupTask
+            TaskId="EchoDiarStartup"
+            Enabled="false"
+            DisplayName="EchoDiar" />
+        </uap5:Extension>
       </Extensions>
     </Application>
   </Applications>
