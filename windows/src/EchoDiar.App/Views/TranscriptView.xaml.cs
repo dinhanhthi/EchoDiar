@@ -47,6 +47,10 @@ public sealed partial class TranscriptView : UserControl
     /// <summary>The speaker whose rename field is open.</summary>
     private SpeakerChip? _renaming;
 
+    /// <summary>What the chips were last built from: they are rebuilt only when it changes, not on every job update.</summary>
+    private IReadOnlyList<SpeakerChip>? _chipSpeakers;
+    private bool _chipsEnabled;
+
     private string? _retranscribeTip;
     private string? _stepTip;
     private string? _failureTip;
@@ -87,6 +91,7 @@ public sealed partial class TranscriptView : UserControl
         playback.PropertyChanged += OnPlaybackChanged;
         Player.Attach(model, playback);
         UpdateLines();
+        _chipSpeakers = null;
         UpdateChips();
         Update();
     }
@@ -512,9 +517,12 @@ public sealed partial class TranscriptView : UserControl
     private void UpdateChips()
     {
         if (_transcript is null) return;
-        ChipsPanel.Children.Clear();
         var speakers = _transcript.Speakers;
         var enabled = _transcript.CanRename;
+        if (ReferenceEquals(speakers, _chipSpeakers) && enabled == _chipsEnabled) return;
+        _chipSpeakers = speakers;
+        _chipsEnabled = enabled;
+        ChipsPanel.Children.Clear();
         foreach (var chip in speakers.Take(MaxSpeakerChips))
         {
             var button = new Button { Content = SpeakerLabel(chip), IsEnabled = enabled };

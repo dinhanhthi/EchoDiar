@@ -542,6 +542,7 @@ public sealed partial class AppViewModel : ObservableObject
             if (_closing) return;
             if (Route.Kind == RouteKind.Recording)
             {
+                DetailTab = DetailTab.Transcript;
                 Route = session is not null && list.Any(c => c.Id == session.Id) ? Route.ForConversation(session.Id) : Route.List;
             }
             if (session is not null && Settings.AutoTranscribe) SubmitTranscription(folder, session);
