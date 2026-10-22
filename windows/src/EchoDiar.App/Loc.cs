@@ -12,13 +12,13 @@ namespace EchoDiar.App;
 /// all): <c>Loc.T("Delete conversation")</c>, <c>Loc.Format("Step %lld of %lld", step, total)</c>.
 /// <para>
 /// The resource name is <see cref="Slug"/> of that text. When two source texts share a slug the generator
-/// names the later ones (sorted by source text) <c>_2</c>, <c>_3</c>…, which <see cref="T"/> cannot know, so
-/// it would return the first one's string: look a colliding text up by its explicit name with
-/// <see cref="Key"/> (e.g. <c>Loc.Key("Delete_2")</c> for "Delete %@"). The generator prints the collision
-/// groups, and each resw entry carries its source text as the comment.
+/// names the later ones (sorted by source text) <c>_2</c>, <c>_3</c>…, and writes every member of such a group,
+/// by exact source text, to <c>CollisionKeys</c> in the generated Strings/LocKeys.g.cs, which <see cref="T"/>
+/// and <see cref="Format"/> look up before the slug: callers never need the suffixes. <see cref="Key"/> stays
+/// for an explicit resource name. Each resw entry carries its source text as the comment.
 /// </para>
 /// </summary>
-public static class Loc
+public static partial class Loc
 {
     private const int MaxSlug = 60;
     private const string Prefix = "S_";
@@ -41,7 +41,7 @@ public static class Loc
     });
 
     /// <summary>The localized string for a macOS source text, or the text itself when it is not found.</summary>
-    public static string T(string text) => Lookup(Slug(text)) ?? text;
+    public static string T(string text) => Lookup(KeyOf(text)) ?? text;
 
     /// <summary>The localized string for an explicit resource name, or the name itself when it is not found.</summary>
     public static string Key(string key) => Lookup(key) ?? key;
@@ -51,7 +51,10 @@ public static class Loc
     /// found its printf placeholders are converted the same way, so the fallback is formatted too.
     /// </summary>
     public static string Format(string text, params object[] args) =>
-        string.Format(CultureInfo.CurrentCulture, Lookup(Slug(text)) ?? ToNetFormat(text), args);
+        string.Format(CultureInfo.CurrentCulture, Lookup(KeyOf(text)) ?? ToNetFormat(text), args);
+
+    /// <summary>The resource name of a source text: its entry in the generated CollisionKeys, else its <see cref="Slug"/>.</summary>
+    internal static string KeyOf(string text) => CollisionKeys.TryGetValue(text, out var key) ? key : Slug(text);
 
     /// <summary>
     /// The resource name of a source text: PascalCase of its ASCII alphanumeric runs, cut to 60 characters, with
