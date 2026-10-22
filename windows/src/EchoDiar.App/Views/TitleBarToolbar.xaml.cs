@@ -69,8 +69,14 @@ public sealed partial class TitleBarToolbar : UserControl
     /// <summary>The search box does not fit next to the other columns: Search shows as an icon button.</summary>
     private bool _searchAsIcon;
 
-    /// <summary>The icon button opened the box, which takes the trailing buttons' place until it is left empty.</summary>
+    /// <summary>
+    /// The icon button (or narrowing with text in the box) opened the box, which takes the trailing buttons' place until
+    /// it is left empty.
+    /// </summary>
     private bool _searchOpened;
+
+    /// <summary>The trailing buttons' width when last shown, which the opened box takes over.</summary>
+    private double _trailingWidth;
 
     /// <summary>
     /// The width the title bar gives the toolbar: ActualWidth is never less than the desired width (an overflowing
@@ -423,16 +429,30 @@ public sealed partial class TitleBarToolbar : UserControl
 
     /// <summary>
     /// Search is an icon button where the box would get less than <see cref="SearchMinWidth"/> next to the other columns
-    /// (the compact minimum, if the caption buttons take more than expected), and the box again once it fits. Not while
-    /// the opened box hides the trailing buttons, whose width it needs.
+    /// (the compact minimum, if the caption buttons take more than expected), and the box again once it fits. A box with
+    /// text stays shown, opened in the trailing buttons' place; once the normal box fits again it goes back to it.
     /// </summary>
     private void UpdateSearchMode()
     {
-        if (_model is null || _searchOpened || double.IsInfinity(_availableWidth) || ToolbarGrid.ActualWidth <= 0) return;
-        var others = ToolbarGrid.Padding.Left + LeadingColumn.ActualWidth + TrailingColumn.ActualWidth
+        if (_model is null || double.IsInfinity(_availableWidth) || ToolbarGrid.ActualWidth <= 0) return;
+        if (!_searchOpened) _trailingWidth = TrailingColumn.ActualWidth;
+        var others = ToolbarGrid.Padding.Left + LeadingColumn.ActualWidth + _trailingWidth
             + TabsColumn.ActualWidth + DragColumn.ActualWidth;
         var asIcon = _availableWidth - others < SearchMinWidth;
-        if (asIcon == _searchAsIcon) return;
+        if (_searchOpened)
+        {
+            if (asIcon) return;
+            _searchOpened = false;
+        }
+        else if (asIcon == _searchAsIcon)
+        {
+            return;
+        }
+        else if (asIcon && SearchBox.Text.Length > 0)
+        {
+            // The filter stays visible; LostFocus and Esc close the box once it is empty.
+            _searchOpened = true;
+        }
         _searchAsIcon = asIcon;
         StartupTrace.Write($"search as icon {asIcon} (available {_availableWidth:0}, other columns {others:0})");
         ApplySearchMode();
