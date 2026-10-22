@@ -153,8 +153,9 @@ public static class CafFile
         public Reader(string path)
         {
             if (!BitConverter.IsLittleEndian) throw new PlatformNotSupportedException("CafFile needs a little-endian CPU.");
-            // FileShare.ReadWrite: the file may still be open in a Writer.
-            _stream = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.ReadWrite);
+            // FileShare.ReadWrite: the file may still be open in a Writer. FileShare.Delete: an open player never blocks
+            // the compressor's delete or a move to the Recycle Bin.
+            _stream = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.ReadWrite | FileShare.Delete);
             try
             {
                 var length = _stream.Length;

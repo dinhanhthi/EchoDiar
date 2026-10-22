@@ -293,7 +293,7 @@ public sealed class AudioCompressor(AudioCompressor.Encoder? encoder = null, IAu
         }
         catch (Exception e) when (IsFileError(e))
         {
-            // Left behind, as Swift's `try?`: an open player holds it, say. The next run removes the outputs first.
+            // Left behind, as Swift's `try?`. A partial output is removed by the next run; a CAF stays.
         }
     }
 
