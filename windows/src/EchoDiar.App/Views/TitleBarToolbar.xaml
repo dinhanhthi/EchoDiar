@@ -11,11 +11,19 @@
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
     xmlns:local="using:EchoDiar.App">
 
-    <Grid Padding="12,0,8,0" ColumnSpacing="12">
+    <!--
+        The title and Search share the free space; Search shrinks from 160 to 90. The last column stays empty: a drag
+        strip before the caption buttons on every route. Margins space the columns, since a collapsed group's column
+        would keep a ColumnSpacing.
+    -->
+    <Grid Padding="12,0,0,0">
         <Grid.ColumnDefinitions>
             <ColumnDefinition Width="Auto" />
             <ColumnDefinition Width="*" />
             <ColumnDefinition Width="Auto" />
+            <ColumnDefinition Width="*" MinWidth="90" MaxWidth="160" />
+            <ColumnDefinition Width="Auto" />
+            <ColumnDefinition Width="40" />
         </Grid.ColumnDefinitions>
 
         <StackPanel Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
@@ -68,6 +76,7 @@
         <StackPanel
             x:Name="TitlePanel"
             Grid.Column="1"
+            Margin="12,0,0,0"
             VerticalAlignment="Center"
             Visibility="Collapsed">
             <TextBlock
@@ -87,6 +96,7 @@
 
         <StackPanel
             Grid.Column="2"
+            Margin="12,0,8,0"
             Orientation="Horizontal"
             Spacing="8"
             VerticalAlignment="Center">
@@ -150,39 +160,45 @@
                     </Button>
                 </StackPanel>
             </Border>
-
-            <!-- Phase 11 makes it filter the library. -->
-            <TextBox
-                x:Name="SearchBox"
-                Style="{StaticResource SolidInput}"
-                Width="160"
-                Height="32"
-                VerticalAlignment="Center"
-                AutomationProperties.Name="{local:T Text='Search conversations'}"
-                CornerRadius="16"
-                IsEnabled="False"
-                PlaceholderText="{local:T Text='Search'}" />
-
-            <!-- Only Transcript for now: Phase 12 adds the tab pages, Phase 23 Summary and Chat. -->
-            <Border x:Name="TabsCapsule" Style="{StaticResource CapsuleGroup}" Visibility="Collapsed">
-                <StackPanel Orientation="Horizontal">
-                    <Button
-                        x:Name="TranscriptTab"
-                        Style="{StaticResource CapsuleButton}"
-                        Background="{StaticResource PalettePressedFillBrush}"
-                        Content="{local:T Text='Transcript'}" />
-                    <Button
-                        x:Name="SummaryTab"
-                        Style="{StaticResource CapsuleButton}"
-                        Content="{local:T Text='Summary'}"
-                        IsEnabled="False" />
-                    <Button
-                        x:Name="ChatTab"
-                        Style="{StaticResource CapsuleButton}"
-                        Content="{local:T Text='Chat'}"
-                        IsEnabled="False" />
-                </StackPanel>
-            </Border>
         </StackPanel>
+
+        <!-- Phase 11 makes it filter the library. -->
+        <TextBox
+            x:Name="SearchBox"
+            Grid.Column="3"
+            Style="{StaticResource SolidInput}"
+            Height="32"
+            HorizontalAlignment="Stretch"
+            VerticalAlignment="Center"
+            AutomationProperties.Name="{local:T Text='Search conversations'}"
+            CornerRadius="16"
+            IsEnabled="False"
+            PlaceholderText="{local:T Text='Search'}" />
+
+        <!-- Only Transcript for now: Phase 12 adds the tab pages, Phase 23 Summary and Chat. -->
+        <Border
+            x:Name="TabsCapsule"
+            Grid.Column="4"
+            Margin="8,0,0,0"
+            Style="{StaticResource CapsuleGroup}"
+            Visibility="Collapsed">
+            <StackPanel Orientation="Horizontal">
+                <Button
+                    x:Name="TranscriptTab"
+                    Style="{StaticResource CapsuleButton}"
+                    Background="{StaticResource PalettePressedFillBrush}"
+                    Content="{local:T Text='Transcript'}" />
+                <Button
+                    x:Name="SummaryTab"
+                    Style="{StaticResource CapsuleButton}"
+                    Content="{local:T Text='Summary'}"
+                    IsEnabled="False" />
+                <Button
+                    x:Name="ChatTab"
+                    Style="{StaticResource CapsuleButton}"
+                    Content="{local:T Text='Chat'}"
+                    IsEnabled="False" />
+            </StackPanel>
+        </Border>
     </Grid>
 </UserControl>

@@ -58,9 +58,53 @@ public sealed partial class MainWindow : Window
             if (RootGrid.XamlRoot is { } root) root.Changed += (_, _) => _frames.ApplyBounds();
         };
         Closed += (_, _) => _frames.Save();
+        Activated += OnFirstActivated;
 
         _model.PropertyChanged += OnModelChanged;
         ShowRoute();
+    }
+
+    /// <summary>
+    /// The first frame's content can be lost while the window is first shown (seen in a VM: the title bar and the
+    /// library header stayed blank, while what changed later drew). WinUI then redraws only the elements that change,
+    /// and has no API to redraw everything; a resize does. So once shown and after one drawn frame, the window is
+    /// resized by 1 px and back after the next frame.
+    /// </summary>
+    private void OnFirstActivated(object sender, WindowActivatedEventArgs args)
+    {
+        if (args.WindowActivationState == WindowActivationState.Deactivated) return;
+        Activated -= OnFirstActivated;
+        AfterNextFrame(NudgeSize);
+    }
+
+    private void NudgeSize()
+    {
+        if (AppWindow.Presenter is not OverlappedPresenter { State: OverlappedPresenterState.Restored } presenter) return;
+        var size = AppWindow.Size;
+        // Inside the presenter's bounds, or it clamps the nudge away.
+        var width = size.Width - 1 >= (presenter.PreferredMinimumWidth ?? 0) ? size.Width - 1 : size.Width + 1;
+        if (presenter.PreferredMaximumWidth is { } maxWidth && width > maxWidth) return;
+        var nudged = new SizeInt32(width, size.Height);
+        AppWindow.Resize(nudged);
+        AfterNextFrame(() =>
+        {
+            // Unless the user resized it meanwhile.
+            if (AppWindow.Size.Equals(nudged)) AppWindow.Resize(size);
+        });
+    }
+
+    /// <summary>Runs <paramref name="action"/> once a frame has been drawn.</summary>
+    private static void AfterNextFrame(Action action)
+    {
+        var frames = 0;
+        void OnRendering(object? sender, object e)
+        {
+            // Rendering comes before its frame is drawn: the second one follows a drawn frame.
+            if (++frames < 2) return;
+            CompositionTarget.Rendering -= OnRendering;
+            action();
+        }
+        CompositionTarget.Rendering += OnRendering;
     }
 
     private void OnModelChanged(object? sender, PropertyChangedEventArgs e)
