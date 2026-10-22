@@ -17,9 +17,24 @@
   </ItemGroup>
 
   <ItemGroup>
-    <PackageReference Include="Microsoft.WindowsAppSDK" />
+    <!-- WASDK component packages, not the metapackage: its ML component ships its own onnxruntime.dll,
+         which would collide with sherpa-onnx's next to the exe. -->
+    <PackageReference Include="Microsoft.WindowsAppSDK.Base" />
+    <PackageReference Include="Microsoft.WindowsAppSDK.Foundation" />
+    <PackageReference Include="Microsoft.WindowsAppSDK.WinUI" />
+    <PackageReference Include="Microsoft.WindowsAppSDK.InteractiveExperiences" />
+    <PackageReference Include="Microsoft.WindowsAppSDK.DWrite" />
     <PackageReference Include="Microsoft.Windows.SDK.BuildTools" />
     <PackageReference Include="CommunityToolkit.Mvvm" />
+    <PackageReference Include="Whisper.net" />
+    <PackageReference Include="Whisper.net.Runtime" />
+    <PackageReference Include="org.k2fsa.sherpa.onnx" />
+    <PackageReference Include="LLamaSharp" />
+    <PackageReference Include="LLamaSharp.Backend.Cpu" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\EchoDiar.Platform\EchoDiar.Platform.csproj" />
   </ItemGroup>
 
   <!-- Single-project MSIX: lets Visual Studio show Package and Publish for this project. -->

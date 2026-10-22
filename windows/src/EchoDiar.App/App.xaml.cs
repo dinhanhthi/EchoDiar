@@ -19,6 +19,9 @@ public partial class App : Application
     {
 #if DEBUG
         WriteLaunchProbe();
+        // Headless harnesses (--capture-probe, --native-probe): no window, exit when done.
+        // The alias echodiar.exe passes its arguments on the process command line.
+        if (CaptureProbe.TryRun(Environment.GetCommandLineArgs(), Exit)) return;
 #endif
         _window = new MainWindow();
         _window.Activate();

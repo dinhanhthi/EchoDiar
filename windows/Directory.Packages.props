@@ -3,9 +3,9 @@
     <ManagePackageVersionsCentrally>true</ManagePackageVersionsCentrally>
   </PropertyGroup>
 
-  <!-- Windows App SDK: the metapackage, plus the component packages it pins (2.5.1 nuspec), which App switches to in 2.3. -->
+  <!-- Windows App SDK component packages at the versions the 2.5.1 metapackage pins. App does not use the
+       metapackage: its ML component ships an onnxruntime.dll that collides with sherpa-onnx's. -->
   <ItemGroup>
-    <PackageVersion Include="Microsoft.WindowsAppSDK" Version="2.5.1" />
     <PackageVersion Include="Microsoft.WindowsAppSDK.Base" Version="2.0.4" />
     <PackageVersion Include="Microsoft.WindowsAppSDK.Foundation" Version="2.3.12" />
     <PackageVersion Include="Microsoft.WindowsAppSDK.WinUI" Version="2.3.9" />
