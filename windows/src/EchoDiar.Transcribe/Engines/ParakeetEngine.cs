@@ -29,6 +29,9 @@ public sealed class ParakeetEngine(ModelEntry entry, string folder) : ITranscrip
 
     private const int SampleRate = (int)MonoAudio.SampleRate;
 
+    /// <summary>A shorter slab (the tail of a range or file) is skipped.</summary>
+    private const double MinSlabSeconds = 0.3;
+
     private sealed record Word(string Text, double Start, double End);
 
     /// <summary>A <see cref="TranscriptionPipeline.EngineFactory"/>.</summary>
@@ -89,7 +92,8 @@ public sealed class ParakeetEngine(ModelEntry entry, string folder) : ITranscrip
                 cancellationToken.ThrowIfCancellationRequested();
                 var slabEnd = Math.Min(slabStart + SlabSeconds, rangeEnd);
                 var samples = MonoAudio.Read(channelPath, slabStart, slabEnd);
-                if (samples.Length == 0) break;
+                // As Swift: a slab under 300 ms is not decoded (sherpa-onnx may abort the process on too few frames).
+                if (samples.Length < MinSlabSeconds * SampleRate) break;
                 using var stream = recognizer.CreateStream();
                 stream.AcceptWaveform(SampleRate, samples);
                 recognizer.Decode(stream);

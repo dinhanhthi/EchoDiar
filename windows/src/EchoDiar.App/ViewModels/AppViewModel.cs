@@ -1,0 +1,590 @@
+using System.Diagnostics;
+using CommunityToolkit.Mvvm.ComponentModel;
+using EchoDiar.App.Services;
+using EchoDiar.Core.Audio;
+using EchoDiar.Core.Model;
+using EchoDiar.Core.Models;
+using EchoDiar.Core.Settings;
+using EchoDiar.Platform.Audio;
+using EchoDiar.Platform.SystemServices;
+using EchoDiar.Transcribe;
+using Microsoft.UI.Dispatching;
+
+namespace EchoDiar.App.ViewModels;
+
+public enum RouteKind { List, Conversation, Recording }
+
+/// <summary>What the main window shows: the library list, one conversation, or the recording page.</summary>
+public sealed record Route(RouteKind Kind, Guid? ConversationId = null)
+{
+    public static Route List { get; } = new(RouteKind.List);
+
+    public static Route Recording { get; } = new(RouteKind.Recording);
+
+    public static Route ForConversation(Guid id) => new(RouteKind.Conversation, id);
+}
+
+/// <summary>
+/// The app state the screens show (the Windows counterpart of the macOS <c>AppModel</c>, MVP subset): navigation, the
+/// library, recording, transcription jobs and model downloads. Lives on the UI thread; every service event is
+/// dispatched to it.
+/// </summary>
+public sealed partial class AppViewModel : ObservableObject
+{
+    /// <summary>15 Hz: the elapsed time and level meters while recording.</summary>
+    private static readonly TimeSpan PollInterval = TimeSpan.FromMilliseconds(67);
+
+    private readonly AppServices _services;
+    private readonly DispatcherQueue _dispatcher;
+    private readonly DispatcherQueueTimer _pollTimer;
+    private readonly Dictionary<string, CancellationTokenSource> _downloadTokens = [];
+
+    /// <summary>Launch recovery; a recording starts only after it, so it never marks the new session.</summary>
+    private Task _recovery = Task.CompletedTask;
+
+    /// <summary>The running recording's folder, for the steps after it ends.</summary>
+    private string? _activeFolder;
+
+    private Route _route = Route.List;
+    private AppSettings _settings = new();
+    private IReadOnlyList<Conversation> _conversations = [];
+    private RecordingEngine.Snapshot _recordingSnapshot = new();
+    private double _micLevel;
+    private double _systemLevel;
+    private bool _isStarting;
+    private string? _recordingError;
+    private IReadOnlyDictionary<Guid, JobProgress> _transcriptionProgress = new Dictionary<Guid, JobProgress>();
+    private IReadOnlyDictionary<Guid, string> _transcriptionErrors = new Dictionary<Guid, string>();
+    private IReadOnlyDictionary<string, double> _downloads = new Dictionary<string, double>();
+    private IReadOnlyDictionary<string, string> _downloadErrors = new Dictionary<string, string>();
+    private IReadOnlySet<string> _installedModelIds = new HashSet<string>();
+    private IReadOnlyList<AudioProcessGroup> _recordTargets = [];
+
+    internal AppViewModel(AppServices services, DispatcherQueue dispatcher)
+    {
+        _services = services;
+        _dispatcher = dispatcher;
+        _pollTimer = dispatcher.CreateTimer();
+        _pollTimer.Interval = PollInterval;
+        _pollTimer.Tick += (_, _) => PollRecording();
+    }
+
+    // State
+
+    public Route Route
+    {
+        get => _route;
+        private set => SetProperty(ref _route, value);
+    }
+
+    public AppSettings Settings
+    {
+        get => _settings;
+        private set => SetProperty(ref _settings, value);
+    }
+
+    /// <summary>The library, newest first.</summary>
+    public IReadOnlyList<Conversation> Conversations
+    {
+        get => _conversations;
+        private set => SetProperty(ref _conversations, value);
+    }
+
+    /// <summary>The recording state, with the elapsed time read at 15 Hz while recording.</summary>
+    public RecordingEngine.Snapshot RecordingSnapshot
+    {
+        get => _recordingSnapshot;
+        private set
+        {
+            if (SetProperty(ref _recordingSnapshot, value)) OnPropertyChanged(nameof(IsRecording));
+        }
+    }
+
+    public bool IsRecording => RecordingSnapshot.State != RecordingEngine.State.Idle;
+
+    /// <summary>The mic's peak level on a -60...0 dBFS scale (0...1), while recording.</summary>
+    public double MicLevel
+    {
+        get => _micLevel;
+        private set => SetProperty(ref _micLevel, value);
+    }
+
+    /// <summary>The system audio's peak level on a -60...0 dBFS scale (0...1), while recording.</summary>
+    public double SystemLevel
+    {
+        get => _systemLevel;
+        private set => SetProperty(ref _systemLevel, value);
+    }
+
+    /// <summary>A start is under way (waiting for recovery or opening the devices).</summary>
+    public bool IsStarting
+    {
+        get => _isStarting;
+        private set => SetProperty(ref _isStarting, value);
+    }
+
+    /// <summary>Why the last start or resume failed, or why the engine stopped on its own.</summary>
+    public string? RecordingError
+    {
+        get => _recordingError;
+        private set => SetProperty(ref _recordingError, value);
+    }
+
+    /// <summary>Queued and running jobs by conversation id, and "needs model" results.</summary>
+    public IReadOnlyDictionary<Guid, JobProgress> TranscriptionProgress
+    {
+        get => _transcriptionProgress;
+        private set => SetProperty(ref _transcriptionProgress, value);
+    }
+
+    /// <summary>The last failed job's error by conversation id.</summary>
+    public IReadOnlyDictionary<Guid, string> TranscriptionErrors
+    {
+        get => _transcriptionErrors;
+        private set => SetProperty(ref _transcriptionErrors, value);
+    }
+
+    /// <summary>Running model downloads: catalog id to fraction (0...1).</summary>
+    public IReadOnlyDictionary<string, double> Downloads
+    {
+        get => _downloads;
+        private set => SetProperty(ref _downloads, value);
+    }
+
+    /// <summary>The last failed download's error by catalog id.</summary>
+    public IReadOnlyDictionary<string, string> DownloadErrors
+    {
+        get => _downloadErrors;
+        private set => SetProperty(ref _downloadErrors, value);
+    }
+
+    /// <summary>Catalog ids of the installed models.</summary>
+    public IReadOnlySet<string> InstalledModelIds
+    {
+        get => _installedModelIds;
+        private set
+        {
+            if (!SetProperty(ref _installedModelIds, value)) return;
+            OnPropertyChanged(nameof(HasTranscriptionModel));
+            OnPropertyChanged(nameof(NeedsDiarizer));
+        }
+    }
+
+    /// <summary>At least one speech recognition model is installed.</summary>
+    public bool HasTranscriptionModel => ModelCatalog.Asr.Any(e => InstalledModelIds.Contains(e.Id));
+
+    /// <summary>"Tell speakers apart" is on but no diarization model is installed.</summary>
+    public bool NeedsDiarizer => Settings.Diarization && !ModelCatalog.Diarization.Any(e => InstalledModelIds.Contains(e.Id));
+
+    /// <summary>The apps that can be recorded on their own, from the last refresh.</summary>
+    public IReadOnlyList<AudioProcessGroup> RecordTargets
+    {
+        get => _recordTargets;
+        private set => SetProperty(ref _recordTargets, value);
+    }
+
+    // Launch
+
+    /// <summary>Loads the settings, recovers sessions a crash left open, then lists the library and the models.</summary>
+    public async Task StartAsync()
+    {
+        Settings = await Task.Run(() => _services.Settings.Load());
+        OnPropertyChanged(nameof(NeedsDiarizer));
+        _services.Library.Changed += list => _dispatcher.TryEnqueue(() => Conversations = list);
+        _services.Pipeline.Progress += progress => _dispatcher.TryEnqueue(() => ApplyProgress(progress));
+        _services.Engine.SnapshotChanged += snapshot => _dispatcher.TryEnqueue(() => ApplySnapshot(snapshot));
+        _recovery = Task.Run(Recover);
+        await _recovery;
+        await _services.Library.RefreshAsync();
+        await RefreshInstalledModelsAsync();
+    }
+
+    /// <summary>Stops a running recording before the app quits, so its audio file is finished.</summary>
+    public void Shutdown()
+    {
+        _pollTimer.Stop();
+        foreach (var token in _downloadTokens.Values) token.Cancel();
+        _services.Engine.Stop();
+    }
+
+    private void Recover()
+    {
+        DateTimeOffset? startedAt = null;
+        try
+        {
+            using var process = Process.GetCurrentProcess();
+            startedAt = process.StartTime;
+        }
+        catch (Exception e) when (e is InvalidOperationException or NotSupportedException or System.ComponentModel.Win32Exception)
+        {
+            // Without a start time every session with this pid counts as this process's own.
+        }
+        var recovered = SessionRecovery.Recover(_services.Paths.Conversations, ProcessInfo.IsAlive, Environment.ProcessId, startedAt);
+        foreach (var result in recovered) Debug.WriteLine($"EchoDiar: {result.State} {result.Folder} ({result.Duration:0.0} s)");
+    }
+
+    // Navigation
+
+    public void Open(Guid id) => Route = Route.ForConversation(id);
+
+    public void ShowRecording() => Route = Route.Recording;
+
+    public void GoBack() => Route = Route.List;
+
+    // Recording
+
+    /// <summary>Records <paramref name="app"/>'s audio (null: all system audio) and the mic, after launch recovery.</summary>
+    public async Task StartRecordingAsync(AudioProcessGroup? app)
+    {
+        if (IsRecording || IsStarting) return;
+        IsStarting = true;
+        RecordingError = null;
+        var language = Settings.DefaultLanguage;
+        var micEndpointId = Settings.MicDeviceUID;
+        var root = _services.Paths.Conversations;
+        try
+        {
+            await _recovery;
+            _activeFolder = await Task.Run(() => _services.Engine.Start(Resolved(app), language, micEndpointId, root));
+            _pollTimer.Start();
+        }
+        catch (Exception e)
+        {
+            Debug.WriteLine($"EchoDiar: could not start recording: {e}");
+            RecordingError = e is RecordingDiskFullException
+                ? "There is not enough free disk space to record."
+                : $"The recording could not start ({e.Message}).";
+        }
+        finally
+        {
+            IsStarting = false;
+        }
+    }
+
+    /// <summary>Pauses (both devices closed) or resumes the recording.</summary>
+    public async Task TogglePauseAsync()
+    {
+        var state = RecordingSnapshot.State;
+        if (state == RecordingEngine.State.Idle) return;
+        try
+        {
+            await Task.Run(() =>
+            {
+                if (state == RecordingEngine.State.Recording) _services.Engine.Pause();
+                else _services.Engine.Resume();
+            });
+        }
+        catch (Exception e)
+        {
+            Debug.WriteLine($"EchoDiar: could not resume recording: {e}");
+            RecordingError = $"The recording could not resume ({e.Message}).";
+        }
+    }
+
+    /// <summary>Stops the recording; the end snapshot runs the steps after it.</summary>
+    public Task StopRecordingAsync() => Task.Run(() => _services.Engine.Stop());
+
+    /// <summary>Reloads the apps for the target picker, off the UI thread.</summary>
+    public async Task RefreshRecordTargetsAsync()
+    {
+        try
+        {
+            RecordTargets = await Task.Run(() => AudioSessions.Groups());
+        }
+        catch (Exception e)
+        {
+            Debug.WriteLine($"EchoDiar: could not list audio apps: {e}");
+        }
+    }
+
+    /// <summary>A picked app gets its current processes (they may have changed since the picker was filled).</summary>
+    private static CaptureTarget Resolved(AudioProcessGroup? app)
+    {
+        if (app is null) return CaptureTarget.Global;
+        var fresh = AudioSessions.Groups().FirstOrDefault(g => g.Exe == app.Exe);
+        return CaptureTarget.ForApp(fresh ?? app);
+    }
+
+    private void PollRecording()
+    {
+        var snapshot = _services.Engine.CurrentSnapshot();
+        if (snapshot.State == RecordingEngine.State.Idle)
+        {
+            StopPolling();
+            return;
+        }
+        RecordingSnapshot = snapshot;
+        var (mic, system) = _services.Engine.CurrentLevels();
+        MicLevel = Fraction(mic);
+        SystemLevel = Fraction(system);
+    }
+
+    private void StopPolling()
+    {
+        _pollTimer.Stop();
+        MicLevel = 0;
+        SystemLevel = 0;
+    }
+
+    /// <summary>The single consumer of the engine's snapshots: an end snapshot, user stop or not, finishes the recording.</summary>
+    private void ApplySnapshot(RecordingEngine.Snapshot snapshot)
+    {
+        RecordingSnapshot = snapshot;
+        if (snapshot.State != RecordingEngine.State.Idle)
+        {
+            if (!_pollTimer.IsRunning) _pollTimer.Start();
+            return;
+        }
+        StopPolling();
+        if (snapshot.EndReason is not { } reason) return;
+        if (StopMessage(reason) is { } message) RecordingError = message;
+        var folder = _activeFolder;
+        _activeFolder = null;
+        if (folder is not null) _ = FinishRecordingAsync(folder);
+    }
+
+    /// <summary>Lists the recording, opens it when the recording page is showing, and queues its transcription.</summary>
+    private async Task FinishRecordingAsync(string folder)
+    {
+        try
+        {
+            var list = await _services.Library.RefreshAsync();
+            var session = await Task.Run(() => ReadSession(folder));
+            if (Route.Kind == RouteKind.Recording)
+            {
+                Route = session is not null && list.Any(c => c.Id == session.Id) ? Route.ForConversation(session.Id) : Route.List;
+            }
+            if (session is not null && Settings.AutoTranscribe) SubmitTranscription(folder, session);
+        }
+        catch (Exception e)
+        {
+            Debug.WriteLine($"EchoDiar: could not finish {folder}: {e}");
+        }
+    }
+
+    private static string? StopMessage(RecordingEngine.EndReason reason) => reason switch
+    {
+        RecordingEngine.EndReason.DiskFull => "Recording stopped: disk is full.",
+        RecordingEngine.EndReason.WriteFailed => "Recording stopped: could not write audio.",
+        RecordingEngine.EndReason.CaptureFailed => "Recording stopped: audio capture failed.",
+        _ => null,
+    };
+
+    /// <summary>A peak level (0...1) on a -60...0 dBFS scale.</summary>
+    private static double Fraction(float level) =>
+        level > 0 ? Math.Clamp((20 * Math.Log10(level) + 60) / 60, 0, 1) : 0;
+
+    // Transcription
+
+    /// <summary>Queued or running; a "needs model" result is not.</summary>
+    public bool IsTranscribing(Guid id) =>
+        TranscriptionProgress.TryGetValue(id, out var progress) && progress.Step != JobStep.NeedsModel;
+
+    /// <summary>The conversation's Transcribe and Retry: queues it unless a job for it is active or it has no audio.</summary>
+    public async Task TranscribeAsync(Guid id)
+    {
+        if (IsTranscribing(id) || Conversations.FirstOrDefault(c => c.Id == id) is not { HasAudio: true } conversation) return;
+        var session = await Task.Run(() => ReadSession(conversation.Folder));
+        if (session is not null) SubmitTranscription(conversation.Folder, session);
+    }
+
+    /// <summary>
+    /// Queues a job with the default engine when it is installed and handles the recording's first language (else the
+    /// pipeline's default resolution), and the speaker settings. A failed or probe recording is never transcribed.
+    /// </summary>
+    private void SubmitTranscription(string folder, RecordingSession session)
+    {
+        var id = session.Id;
+        if (session.Probe || session.State == SessionState.Failed || IsTranscribing(id)) return;
+        var language = session.LanguageMarkers.MinBy(m => m.FileTime)?.Language ?? "auto";
+        var job = new TranscriptionJob
+        {
+            ConversationID = id,
+            Folder = folder,
+            EngineID = PreferredEngine(language),
+            SpeakerCountHint = Settings.SpeakerCountHint,
+            DiarizerID = Settings.DefaultDiarizerModelID,
+            Diarize = Settings.Diarization,
+        };
+        TranscriptionErrors = Without(TranscriptionErrors, id);
+        // Set now so the screens show the job before the pipeline's first event arrives.
+        TranscriptionProgress = With(TranscriptionProgress, id, new JobProgress(id, JobStep.Queued, 0));
+        _ = RunTranscriptionAsync(job);
+    }
+
+    private async Task RunTranscriptionAsync(TranscriptionJob job)
+    {
+        try
+        {
+            await Task.Run(() => _services.Pipeline.TranscribeAsync(job));
+        }
+        catch (Exception e)
+        {
+            // The pipeline's Failed or NeedsModel event carries it to the screens.
+            Debug.WriteLine($"EchoDiar: transcription failed for {job.Folder}: {e}");
+        }
+        try
+        {
+            await _services.Library.ReloadAsync(job.ConversationID);
+        }
+        catch (Exception e)
+        {
+            Debug.WriteLine($"EchoDiar: could not reload {job.Folder}: {e}");
+        }
+    }
+
+    /// <summary>The default ASR model from the settings when it is installed and handles <paramref name="language"/>; else null.</summary>
+    private string? PreferredEngine(string language) =>
+        Settings.DefaultASRModelID is { } id
+        && ModelCatalog.Entry(id) is { Kind: ModelKind.Asr } entry
+        && _services.Models.IsInstalled(entry)
+        && TranscriptionPipeline.Supports(entry, language)
+            ? id
+            : null;
+
+    /// <summary>Keeps one entry per job; the conversation is reloaded at each step change (the pipeline writes its status).</summary>
+    private void ApplyProgress(JobProgress progress)
+    {
+        var id = progress.ConversationID;
+        TranscriptionProgress.TryGetValue(id, out var previous);
+        switch (progress.Step)
+        {
+            case JobStep.Finished:
+                TranscriptionProgress = Without(TranscriptionProgress, id);
+                break;
+            case JobStep.Failed:
+                TranscriptionProgress = Without(TranscriptionProgress, id);
+                TranscriptionErrors = With(TranscriptionErrors, id, progress.Detail ?? "Transcription failed.");
+                break;
+            default:
+                // Whole percents only: the screens redraw at most 100 times per job step.
+                if (previous is null || previous.Step != progress.Step || Percent(previous) != Percent(progress))
+                {
+                    TranscriptionProgress = With(TranscriptionProgress, id, progress);
+                }
+                break;
+        }
+        if (previous?.Step != progress.Step) _ = ReloadAsync(id);
+    }
+
+    private async Task ReloadAsync(Guid id)
+    {
+        try
+        {
+            await _services.Library.ReloadAsync(id);
+        }
+        catch (Exception e)
+        {
+            Debug.WriteLine($"EchoDiar: could not reload {id}: {e}");
+        }
+    }
+
+    private static int Percent(JobProgress progress) => (int)(progress.Fraction * 100);
+
+    private static RecordingSession? ReadSession(string folder)
+    {
+        try
+        {
+            return RecordingSession.Read(folder);
+        }
+        catch (Exception e) when (e is IOException or UnauthorizedAccessException or System.Text.Json.JsonException)
+        {
+            return null;
+        }
+    }
+
+    // Models
+
+    /// <summary>Downloads a catalog model into <c>Models\&lt;id&gt;\</c>, with its progress in <see cref="Downloads"/>.</summary>
+    public void DownloadModel(string id)
+    {
+        if (Downloads.ContainsKey(id) || ModelCatalog.Entry(id) is not { } entry) return;
+        var cancellation = new CancellationTokenSource();
+        _downloadTokens[id] = cancellation;
+        DownloadErrors = Without(DownloadErrors, id);
+        Downloads = With(Downloads, id, 0.0);
+        _ = RunDownloadAsync(entry, cancellation);
+    }
+
+    public void CancelDownload(string id)
+    {
+        if (_downloadTokens.TryGetValue(id, out var cancellation)) cancellation.Cancel();
+    }
+
+    private async Task RunDownloadAsync(ModelEntry entry, CancellationTokenSource cancellation)
+    {
+        var progress = new DownloadProgress(fraction => _dispatcher.TryEnqueue(() =>
+        {
+            if (Downloads.ContainsKey(entry.Id)) Downloads = With(Downloads, entry.Id, fraction);
+        }));
+        try
+        {
+            await Task.Run(() => _services.Models.DownloadAsync(entry, progress, cancellation.Token));
+            // Any installed model can stand in for a missing default: jobs that needed one can run now.
+            TranscriptionProgress = TranscriptionProgress
+                .Where(p => p.Value.Step != JobStep.NeedsModel)
+                .ToDictionary(p => p.Key, p => p.Value);
+        }
+        catch (OperationCanceledException)
+        {
+        }
+        catch (Exception e)
+        {
+            Debug.WriteLine($"EchoDiar: model download failed for {entry.Id}: {e}");
+            DownloadErrors = With(DownloadErrors, entry.Id, e.Message);
+        }
+        finally
+        {
+            _downloadTokens.Remove(entry.Id);
+            cancellation.Dispose();
+            Downloads = Without(Downloads, entry.Id);
+        }
+        await RefreshInstalledModelsAsync();
+    }
+
+    private async Task RefreshInstalledModelsAsync()
+    {
+        try
+        {
+            InstalledModelIds = await Task.Run(() =>
+                (IReadOnlySet<string>)ModelCatalog.All.Where(_services.Models.IsInstalled).Select(e => e.Id).ToHashSet());
+        }
+        catch (Exception e) when (e is IOException or UnauthorizedAccessException)
+        {
+            Debug.WriteLine($"EchoDiar: could not read the installed models: {e}");
+        }
+    }
+
+    /// <summary>Reports a download's fraction at most every half percent, from any thread.</summary>
+    private sealed class DownloadProgress(Action<double> report) : IProgress<ModelDownloadProgress>
+    {
+        private int _step = -1;
+
+        public void Report(ModelDownloadProgress value)
+        {
+            var step = (int)(value.Fraction * 200);
+            int last;
+            do
+            {
+                last = Volatile.Read(ref _step);
+                if (step <= last) return;
+            }
+            while (Interlocked.CompareExchange(ref _step, step, last) != last);
+            report(value.Fraction);
+        }
+    }
+
+    // Immutable dictionary updates: every change is a new instance, so bindings see it.
+
+    private static Dictionary<TKey, TValue> With<TKey, TValue>(IReadOnlyDictionary<TKey, TValue> source, TKey key, TValue value)
+        where TKey : notnull => new(source) { [key] = value };
+
+    private static IReadOnlyDictionary<TKey, TValue> Without<TKey, TValue>(IReadOnlyDictionary<TKey, TValue> source, TKey key)
+        where TKey : notnull
+    {
+        if (!source.ContainsKey(key)) return source;
+        var copy = new Dictionary<TKey, TValue>(source);
+        copy.Remove(key);
+        return copy;
+    }
+}
