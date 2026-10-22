@@ -55,26 +55,13 @@ public sealed class LoopbackCapture : IDisposable
 
     public void Dispose() => _loop.Dispose();
 
-    private static unsafe LoopbackCapture ProcessLoopback(int pid, PROCESS_LOOPBACK_MODE mode) => new(
+    private static LoopbackCapture ProcessLoopback(int pid, PROCESS_LOOPBACK_MODE mode) => new(
         "EchoDiar process loopback",
         () => ActivateProcessLoopback(pid, mode),
-        client =>
-        {
-            // Process loopback has no mix format (GetMixFormat fails): ask for 48 kHz Float32 stereo.
-            var format = new WAVEFORMATEX
-            {
-                wFormatTag = (ushort)PInvoke.WAVE_FORMAT_IEEE_FLOAT,
-                nChannels = 2,
-                nSamplesPerSec = 48_000,
-                wBitsPerSample = 32,
-                nBlockAlign = 2 * 4,
-                nAvgBytesPerSec = 48_000 * 2 * 4,
-            };
-            return CaptureLoop.Initialize(
-                client,
-                PInvoke.AUDCLNT_STREAMFLAGS_LOOPBACK | PInvoke.AUDCLNT_STREAMFLAGS_AUTOCONVERTPCM,
-                &format);
-        });
+        // Process loopback has no mix format (GetMixFormat fails): ask for 48 kHz Float32 stereo.
+        client => CaptureLoop.InitializeFloat48kStereo(
+            client,
+            PInvoke.AUDCLNT_STREAMFLAGS_LOOPBACK | PInvoke.AUDCLNT_STREAMFLAGS_AUTOCONVERTPCM));
 
     private static unsafe IAudioClient ActivateProcessLoopback(int pid, PROCESS_LOOPBACK_MODE mode)
     {

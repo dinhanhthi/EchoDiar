@@ -25,7 +25,10 @@ public sealed class MicCapture : IDisposable
         _loop = new CaptureLoop(
             "EchoDiar mic capture",
             () => CaptureLoop.ActivateEndpoint(endpointId, EDataFlow.eCapture),
-            client => CaptureLoop.InitializeWithMixFormat(client, 0));
+            client => CaptureLoop.InitializeWithMixFormat(client, 0),
+            client => CaptureLoop.InitializeFloat48kStereo(
+                client,
+                PInvoke.AUDCLNT_STREAMFLAGS_AUTOCONVERTPCM | PInvoke.AUDCLNT_STREAMFLAGS_SRC_DEFAULT_QUALITY));
     }
 
     /// <inheritdoc cref="CaptureLoop.Failed"/>
@@ -37,6 +40,9 @@ public sealed class MicCapture : IDisposable
 
     /// <summary>The device rate in Hz, known once <see cref="Start"/> returns.</summary>
     public int SampleRate => _loop.SampleRate;
+
+    /// <inheritdoc cref="CaptureLoop.Format"/>
+    public string? Format => _loop.Format;
 
     /// <inheritdoc cref="CaptureLoop.Start"/>
     public void Start(Action<ReadOnlySpan<float>, long, int> onSamples) => _loop.Start(onSamples);
@@ -82,20 +88,30 @@ internal sealed class CaptureLoop : IDisposable
 {
     private const long BufferDuration100ns = 1_000_000; // 100 ms engine buffer
     private const uint WaitTimeoutMs = 200; // endpoint loopback signals nothing while no app plays
+    private const int AudclntEUnsupportedFormat = unchecked((int)0x88890008); // AUDCLNT_E_UNSUPPORTED_FORMAT
 
     private readonly string _name;
     private readonly Func<IAudioClient> _activate;
     private readonly Func<IAudioClient, CaptureFormat> _initialize;
+    private readonly Func<IAudioClient, CaptureFormat>? _fallbackInitialize;
     private Action<ReadOnlySpan<float>, long, int>? _onSamples;
     private Thread? _thread;
     private volatile bool _stopRequested;
     private bool _disposed;
 
-    public CaptureLoop(string name, Func<IAudioClient> activate, Func<IAudioClient, CaptureFormat> initialize)
+    /// <param name="fallbackInitialize">
+    /// Run on a newly activated client when <paramref name="initialize"/> fails with AUDCLNT_E_UNSUPPORTED_FORMAT.
+    /// </param>
+    public CaptureLoop(
+        string name,
+        Func<IAudioClient> activate,
+        Func<IAudioClient, CaptureFormat> initialize,
+        Func<IAudioClient, CaptureFormat>? fallbackInitialize = null)
     {
         _name = name;
         _activate = activate;
         _initialize = initialize;
+        _fallbackInitialize = fallbackInitialize;
     }
 
     /// <summary>
@@ -106,6 +122,12 @@ internal sealed class CaptureLoop : IDisposable
     public event Action<Exception>? Failed;
 
     public int SampleRate { get; private set; }
+
+    /// <summary>
+    /// The stream format, known once <see cref="Start"/> returns: "primary" (the mix format for
+    /// endpoints) or "fallback" for the initialize that succeeded, then rate, channels and sample type.
+    /// </summary>
+    public string? Format { get; private set; }
 
     /// <summary>
     /// Opens the device and starts capturing; opening errors are thrown here. <c>onSamples</c> runs on
@@ -180,6 +202,21 @@ internal sealed class CaptureLoop : IDisposable
         }
     }
 
+    /// <summary>Initializes a 48 kHz Float32 stereo stream (with AUTOCONVERTPCM the engine converts to it).</summary>
+    internal static unsafe CaptureFormat InitializeFloat48kStereo(IAudioClient client, uint streamFlags)
+    {
+        var format = new WAVEFORMATEX
+        {
+            wFormatTag = (ushort)PInvoke.WAVE_FORMAT_IEEE_FLOAT,
+            nChannels = 2,
+            nSamplesPerSec = 48_000,
+            wBitsPerSample = 32,
+            nBlockAlign = 2 * 4,
+            nAvgBytesPerSec = 48_000 * 2 * 4,
+        };
+        return Initialize(client, streamFlags, &format);
+    }
+
     /// <summary>Initializes a shared-mode, event-driven stream (EVENTCALLBACK is added here).</summary>
     internal static unsafe CaptureFormat Initialize(IAudioClient client, uint streamFlags, WAVEFORMATEX* format)
     {
@@ -194,6 +231,29 @@ internal sealed class CaptureLoop : IDisposable
         return captureFormat;
     }
 
+    /// <summary>
+    /// Gets the client's IAudioCaptureClient as a built-in COM wrapper. Not CsWin32's generic
+    /// <c>GetService&lt;T&gt;</c>: it hands any object that answers QueryInterface for IInspectable to
+    /// C#/WinRT, whose WinRT.IInspectable does not cast to [ComImport] interfaces, and the capture
+    /// client of a microphone endpoint does answer it.
+    /// </summary>
+    private static unsafe IAudioCaptureClient GetCaptureClient(IAudioClient client)
+    {
+        var iid = typeof(IAudioCaptureClient).GUID;
+        client.GetService(&iid, out var pointer);
+        try
+        {
+            return (IAudioCaptureClient)Marshal.GetObjectForIUnknown((nint)pointer);
+        }
+        finally
+        {
+            Marshal.Release((nint)pointer); // the wrapper holds its own reference
+        }
+    }
+
+    private static string Describe(string source, CaptureFormat format) =>
+        $"{source} {format.SampleRate} Hz {format.Channels} ch {(format.IsFloat ? "float32" : $"int{format.BytesPerSample * 8}")}";
+
     private void Run(TaskCompletionSource started)
     {
         // MMCSS only raises the thread priority; capture still works when it fails (service off).
@@ -207,19 +267,35 @@ internal sealed class CaptureLoop : IDisposable
         try
         {
             client = _activate();
-            var format = _initialize(client);
+            CaptureFormat format;
+            string source;
+            try
+            {
+                format = _initialize(client);
+                source = "primary";
+            }
+            catch (COMException error) when (error.HResult == AudclntEUnsupportedFormat && _fallbackInitialize is not null)
+            {
+                // A client whose Initialize failed is not reused: activate a new one for the fallback format.
+                Marshal.FinalReleaseComObject(client);
+                client = null;
+                client = _activate();
+                format = _fallbackInitialize(client);
+                source = "fallback";
+            }
+
             audioEvent = PInvoke.CreateEvent(null, false, false, null);
             if (audioEvent.IsInvalid) throw new Win32Exception();
             client.SetEventHandle(audioEvent);
             client.GetBufferSize(out var bufferFrames);
-            client.GetService(out IAudioCaptureClient service);
-            captureClient = service;
+            captureClient = GetCaptureClient(client);
             client.Start();
             SampleRate = format.SampleRate;
+            Format = Describe(source, format);
             running = true;
             started.SetResult();
 
-            Pump(service, audioEvent, format, new float[bufferFrames]);
+            Pump(captureClient, audioEvent, format, new float[bufferFrames]);
             client.Stop();
         }
         catch (Exception error)

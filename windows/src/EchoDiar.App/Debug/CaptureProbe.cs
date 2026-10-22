@@ -88,6 +88,7 @@ internal static class CaptureProbe
             var result = new
             {
                 micRate = mic.Rate,
+                micFormat = mic.Format,
                 systemRate = system.Rate,
                 micFrames = mic.Frames,
                 systemFrames = system.Frames,
@@ -110,6 +111,7 @@ internal static class CaptureProbe
             capture.Failed += ex => errors.Add(Describe("mic failed", ex));
             capture.Start(channel.OnSamples);
             channel.Rate = capture.SampleRate;
+            channel.Format = capture.Format;
             return capture;
         }
         catch (Exception ex)
@@ -237,6 +239,7 @@ internal static class CaptureProbe
         private CafFile.Writer? _writer;
 
         public int? Rate { get; set; }
+        public string? Format { get; set; }
         public long Frames { get; private set; }
         public float Peak { get; private set; }
         public long? FirstQpc { get; private set; }
