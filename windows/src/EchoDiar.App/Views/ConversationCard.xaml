@@ -2,7 +2,8 @@
 <!--
     One conversation of the library (macOS ConversationCard.swift): the source icon, the title (double-click to rename),
     the date, duration, size, status badge and "Audio has been removed" marker, the reason of a failed transcription,
-    then a row with Reveal in Explorer, the Delete menu and the transcription progress or its action. Compact (the
+    then a row with Reveal in Explorer, the Delete menu and the transcription progress or its action. Fluent default
+    controls and theme resources (Light and Dark). Compact (the
     wide layout's sidebar) drops the buttons, which stay in the context menu. Selected adds the accent fill and edge.
     The AI and Summary buttons come with Phase 23.
 -->
@@ -23,12 +24,16 @@
             </MenuFlyout>
         </Grid.ContextFlyout>
 
-        <Border Style="{StaticResource SolidCard}" CornerRadius="{StaticResource CornerRadiusXLarge}" />
+        <Border
+            Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
+            BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
+            BorderThickness="1"
+            CornerRadius="{StaticResource OverlayCornerRadius}" />
         <Border
             x:Name="SelectionFill"
             Background="{ThemeResource AccentFillColorDefaultBrush}"
-            CornerRadius="{StaticResource CornerRadiusXLarge}"
-            Opacity="0.18"
+            CornerRadius="{StaticResource OverlayCornerRadius}"
+            Opacity="0.12"
             Visibility="Collapsed" />
 
         <Grid x:Name="ContentGrid" Padding="14,10" ColumnSpacing="12">
@@ -83,14 +88,46 @@
                         VerticalAlignment="Center"
                         Style="{StaticResource CaptionTextBlockStyle}"
                         Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
-                    <Grid x:Name="StatusBadge" VerticalAlignment="Center" Visibility="Collapsed">
-                        <Border x:Name="StatusBadgeFill" CornerRadius="9" Opacity="0.18" />
+                    <!-- The statuses that need attention: one badge per severity, in the theme's status colors. -->
+                    <Border
+                        x:Name="CriticalBadge"
+                        Padding="6,1"
+                        VerticalAlignment="Center"
+                        Background="{ThemeResource SystemFillColorCriticalBackgroundBrush}"
+                        CornerRadius="{StaticResource ControlCornerRadius}"
+                        Visibility="Collapsed">
                         <TextBlock
-                            x:Name="StatusBadgeText"
-                            Margin="6,1"
-                            FontSize="11"
-                            FontWeight="SemiBold" />
-                    </Grid>
+                            x:Name="CriticalBadgeText"
+                            Style="{StaticResource CaptionTextBlockStyle}"
+                            FontWeight="SemiBold"
+                            Foreground="{ThemeResource SystemFillColorCriticalBrush}" />
+                    </Border>
+                    <Border
+                        x:Name="CautionBadge"
+                        Padding="6,1"
+                        VerticalAlignment="Center"
+                        Background="{ThemeResource SystemFillColorCautionBackgroundBrush}"
+                        CornerRadius="{StaticResource ControlCornerRadius}"
+                        Visibility="Collapsed">
+                        <TextBlock
+                            x:Name="CautionBadgeText"
+                            Style="{StaticResource CaptionTextBlockStyle}"
+                            FontWeight="SemiBold"
+                            Foreground="{ThemeResource SystemFillColorCautionBrush}" />
+                    </Border>
+                    <Border
+                        x:Name="AttentionBadge"
+                        Padding="6,1"
+                        VerticalAlignment="Center"
+                        Background="{ThemeResource SystemFillColorAttentionBackgroundBrush}"
+                        CornerRadius="{StaticResource ControlCornerRadius}"
+                        Visibility="Collapsed">
+                        <TextBlock
+                            x:Name="AttentionBadgeText"
+                            Style="{StaticResource CaptionTextBlockStyle}"
+                            FontWeight="SemiBold"
+                            Foreground="{ThemeResource SystemFillColorAttentionBrush}" />
+                    </Border>
                     <FontIcon
                         x:Name="NoAudioIcon"
                         VerticalAlignment="Center"
@@ -118,25 +155,21 @@
                     Orientation="Horizontal"
                     Spacing="12">
                     <StackPanel x:Name="ButtonsPanel" Orientation="Horizontal" Spacing="4">
-                        <Button x:Name="RevealButton" Style="{StaticResource CapsuleButton}">
-                            <FontIcon FontFamily="{ThemeResource SymbolThemeFontFamily}" FontSize="15" Glyph="&#xE8B7;" />
+                        <Button x:Name="RevealButton">
+                            <FontIcon FontFamily="{ThemeResource SymbolThemeFontFamily}" FontSize="14" Glyph="&#xE8B7;" />
                         </Button>
-                        <Button
+                        <DropDownButton
                             x:Name="DeleteButton"
-                            Style="{StaticResource CapsuleButton}"
                             AutomationProperties.Name="{local:T Text='Delete'}"
                             ToolTipService.ToolTip="{local:T Text='Delete the audio or the whole conversation'}">
-                            <StackPanel Orientation="Horizontal" Spacing="3">
-                                <FontIcon FontFamily="{ThemeResource SymbolThemeFontFamily}" FontSize="15" Glyph="&#xE74D;" />
-                                <FontIcon FontFamily="{ThemeResource SymbolThemeFontFamily}" FontSize="8" Glyph="&#xE70D;" />
-                            </StackPanel>
-                            <Button.Flyout>
+                            <FontIcon FontFamily="{ThemeResource SymbolThemeFontFamily}" FontSize="14" Glyph="&#xE74D;" />
+                            <DropDownButton.Flyout>
                                 <MenuFlyout x:Name="DeleteMenu" Placement="BottomEdgeAlignedLeft">
                                     <MenuFlyoutItem x:Name="DeleteAudioItem" />
                                     <MenuFlyoutItem x:Name="DeleteConversationItem" />
                                 </MenuFlyout>
-                            </Button.Flyout>
-                        </Button>
+                            </DropDownButton.Flyout>
+                        </DropDownButton>
                     </StackPanel>
 
                     <!-- A job's ring (or a spinner while queued), its step; the percent on hover. -->
@@ -161,14 +194,13 @@
                             Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
                     </StackPanel>
 
-                    <!-- macOS opens Settings > Transcription; Settings comes with Phase 13. -->
+                    <!-- macOS opens Settings > Transcription; Settings comes with a later phase. -->
                     <Border
                         x:Name="NeedsModelBadge"
-                        Height="24"
-                        Padding="8,0"
+                        Padding="8,2"
                         VerticalAlignment="Center"
-                        Background="{StaticResource PaletteInputSurfaceBrush}"
-                        CornerRadius="12"
+                        Background="{ThemeResource SystemFillColorCautionBackgroundBrush}"
+                        CornerRadius="{StaticResource ControlCornerRadius}"
                         ToolTipService.ToolTip="{local:T Text='Download a transcription model in Settings'}"
                         Visibility="Collapsed">
                         <TextBlock
@@ -178,46 +210,20 @@
                             Text="{local:T Text='Needs model'}" />
                     </Border>
 
-                    <StackPanel
-                        x:Name="RetryPanel"
+                    <!-- Retry, and its menu of the other engines ("Retry with another engine"). -->
+                    <SplitButton
+                        x:Name="RetryButton"
                         VerticalAlignment="Center"
-                        Orientation="Horizontal"
-                        Spacing="2"
                         Visibility="Collapsed">
-                        <Button
-                            x:Name="RetryButton"
-                            Style="{StaticResource CapsuleButton}"
-                            Height="24"
-                            MinWidth="0"
-                            Background="{StaticResource PaletteInputSurfaceBrush}"
-                            CornerRadius="12"
-                            FontSize="12"
-                            Foreground="{ThemeResource SystemFillColorCriticalBrush}"
-                            Content="{local:T Text='Retry'}" />
-                        <Button
-                            x:Name="RetryEngineButton"
-                            Style="{StaticResource CapsuleButton}"
-                            Height="24"
-                            MinWidth="24"
-                            Padding="4,0"
-                            AutomationProperties.Name="{local:T Text='Retry with another engine'}">
-                            <FontIcon FontFamily="{ThemeResource SymbolThemeFontFamily}" FontSize="8" Glyph="&#xE70D;" />
-                            <Button.Flyout>
-                                <MenuFlyout x:Name="EngineMenu" Placement="BottomEdgeAlignedLeft" />
-                            </Button.Flyout>
-                        </Button>
-                    </StackPanel>
+                        <TextBlock Foreground="{ThemeResource SystemFillColorCriticalBrush}" Text="{local:T Text='Retry'}" />
+                        <SplitButton.Flyout>
+                            <MenuFlyout x:Name="EngineMenu" Placement="BottomEdgeAlignedLeft" />
+                        </SplitButton.Flyout>
+                    </SplitButton>
 
                     <Button
                         x:Name="TranscribeButton"
-                        Style="{StaticResource CapsuleButton}"
-                        Height="24"
-                        MinWidth="0"
                         VerticalAlignment="Center"
-                        Background="{StaticResource PaletteInputSurfaceBrush}"
-                        CornerRadius="12"
-                        FontSize="12"
-                        Foreground="{ThemeResource TextFillColorSecondaryBrush}"
                         Content="{local:T Text='Transcribe'}"
                         Visibility="Collapsed" />
                 </StackPanel>
@@ -228,7 +234,7 @@
             x:Name="SelectionStroke"
             BorderBrush="{ThemeResource AccentFillColorDefaultBrush}"
             BorderThickness="1.5"
-            CornerRadius="{StaticResource CornerRadiusXLarge}"
+            CornerRadius="{StaticResource OverlayCornerRadius}"
             IsHitTestVisible="False"
             Visibility="Collapsed" />
     </Grid>

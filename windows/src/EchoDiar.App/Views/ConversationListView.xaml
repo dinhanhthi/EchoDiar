@@ -61,9 +61,11 @@
             <Border
                 x:Name="SelectionBar"
                 Margin="0,0,0,8"
-                Padding="14,4"
-                Style="{StaticResource SolidCard}"
-                CornerRadius="{StaticResource CornerRadiusXLarge}"
+                Padding="12,6"
+                Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
+                BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
+                BorderThickness="1"
+                CornerRadius="{StaticResource OverlayCornerRadius}"
                 Visibility="Collapsed">
                 <Grid ColumnSpacing="8">
                     <Grid.ColumnDefinitions>
@@ -77,27 +79,22 @@
                         Style="{StaticResource BodyStrongTextBlockStyle}"
                         MaxLines="1"
                         TextTrimming="CharacterEllipsis" />
-                    <Button
+                    <DropDownButton
                         x:Name="SelectionDeleteButton"
                         Grid.Column="1"
-                        Style="{StaticResource CapsuleButton}"
                         AutomationProperties.Name="{local:T Text='Delete'}"
                         ToolTipService.ToolTip="{local:T Text='Delete the audio or the selected conversations'}">
-                        <StackPanel Orientation="Horizontal" Spacing="4">
-                            <FontIcon FontFamily="{ThemeResource SymbolThemeFontFamily}" FontSize="14" Glyph="&#xE74D;" />
-                            <FontIcon FontFamily="{ThemeResource SymbolThemeFontFamily}" FontSize="8" Glyph="&#xE70D;" />
-                        </StackPanel>
-                        <Button.Flyout>
+                        <FontIcon FontFamily="{ThemeResource SymbolThemeFontFamily}" FontSize="14" Glyph="&#xE74D;" />
+                        <DropDownButton.Flyout>
                             <MenuFlyout x:Name="SelectionDeleteMenu" Placement="BottomEdgeAlignedRight">
                                 <MenuFlyoutItem x:Name="SelectionDeleteAudioItem" />
                                 <MenuFlyoutItem x:Name="SelectionDeleteConversationsItem" />
                             </MenuFlyout>
-                        </Button.Flyout>
-                    </Button>
+                        </DropDownButton.Flyout>
+                    </DropDownButton>
                     <Button
                         x:Name="SelectionCancelButton"
                         Grid.Column="2"
-                        Style="{StaticResource CapsuleButton}"
                         AutomationProperties.Name="{local:T Text='Cancel'}"
                         ToolTipService.ToolTip="{local:T Text='Cancel the selection (Esc)'}">
                         <FontIcon FontFamily="{ThemeResource SymbolThemeFontFamily}" FontSize="12" Glyph="&#xE711;" />
@@ -114,12 +111,7 @@
                 x:Name="ConversationList"
                 Grid.Row="1"
                 IsItemClickEnabled="False"
-                SelectionMode="None">
-                <ListView.Resources>
-                    <SolidColorBrush x:Key="ListViewItemBackgroundPointerOver" Color="Transparent" />
-                    <SolidColorBrush x:Key="ListViewItemBackgroundPressed" Color="Transparent" />
-                </ListView.Resources>
-            </ListView>
+                SelectionMode="None" />
 
             <!-- Why there are no cards: an empty library, or a search without results. -->
             <TextBlock

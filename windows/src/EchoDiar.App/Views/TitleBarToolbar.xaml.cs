@@ -80,7 +80,8 @@ public sealed partial class TitleBarToolbar : UserControl
         DeleteAudioItem.Click += async (_, _) => await DeleteShownAsync(audioOnly: true);
         DeleteConversationItem.Click += async (_, _) => await DeleteShownAsync(audioOnly: false);
         SearchBox.TextChanged += (_, _) => OnSearchTextChanged();
-        SearchBox.KeyDown += OnSearchKeyDown;
+        // The inner text field handles Esc first.
+        SearchBox.AddHandler(KeyDownEvent, new KeyEventHandler(OnSearchKeyDown), handledEventsToo: true);
         // A start that failed before the window was shown still gets its dialog.
         Loaded += (_, _) => ShowNextDialog();
     }

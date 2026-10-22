@@ -10,7 +10,6 @@ using Microsoft.UI.Xaml.Controls.Primitives;
 using Microsoft.UI.Xaml.Input;
 using Microsoft.UI.Xaml.Media;
 using VirtualKey = Windows.System.VirtualKey;
-using Windows.UI;
 using Windows.UI.ViewManagement;
 
 namespace EchoDiar.App.Views;
@@ -23,11 +22,6 @@ namespace EchoDiar.App.Views;
 /// </summary>
 public sealed partial class ConversationCard : UserControl
 {
-    /// <summary>The macOS system colors of the badges (the app is dark only).</summary>
-    private static readonly Color Red = Color.FromArgb(0xFF, 0xFF, 0x45, 0x3A);
-    private static readonly Color Orange = Color.FromArgb(0xFF, 0xFF, 0x9F, 0x0A);
-    private static readonly Color Blue = Color.FromArgb(0xFF, 0x0A, 0x84, 0xFF);
-
     private static readonly UISettings UISettings = new();
 
     private readonly AppViewModel _model;
@@ -46,7 +40,6 @@ public sealed partial class ConversationCard : UserControl
     private string? _failureTip;
     private string? _stepTip;
     private string? _retryTip;
-    private string? _retryEngineTip;
     private string? _transcribeTip;
 
     internal ConversationCard(AppViewModel model, ConversationListView list, Conversation conversation)
@@ -115,7 +108,7 @@ public sealed partial class ConversationCard : UserControl
         UpdateStatus(conversation);
         // Compact cards have no buttons: an empty row would only add space.
         ActionRow.Visibility = Shown(!compact || ProgressPanel.Visibility == Visibility.Visible
-            || NeedsModelBadge.Visibility == Visibility.Visible || RetryPanel.Visibility == Visibility.Visible
+            || NeedsModelBadge.Visibility == Visibility.Visible || RetryButton.Visibility == Visibility.Visible
             || TranscribeButton.Visibility == Visibility.Visible);
     }
 
@@ -128,25 +121,21 @@ public sealed partial class ConversationCard : UserControl
         SizeText.Visibility = Shown(c.SizeBytes > 0);
         RecordingCard.SetText(SizeText, FileSize(c.SizeBytes));
 
-        (string Text, Color Color)? badge = c.Status switch
+        // macOS StatusBadge: red, orange or blue, here the theme's critical, caution and attention colors.
+        (string Text, Border Badge, TextBlock Label)? badge = c.Status switch
         {
-            ConversationStatus.Recording => (Loc.T("Recording"), Red),
-            ConversationStatus.Recovered => (Loc.T("Recovered"), Orange),
-            ConversationStatus.Compressing => (Loc.T("Compressing…"), Blue),
-            ConversationStatus.CompressionFailed => (Loc.T("Compression failed"), Red),
-            ConversationStatus.Failed => (Loc.T("Failed"), Red),
+            ConversationStatus.Recording => (Loc.T("Recording"), CriticalBadge, CriticalBadgeText),
+            ConversationStatus.Recovered => (Loc.T("Recovered"), CautionBadge, CautionBadgeText),
+            ConversationStatus.Compressing => (Loc.T("Compressing…"), AttentionBadge, AttentionBadgeText),
+            ConversationStatus.CompressionFailed => (Loc.T("Compression failed"), CriticalBadge, CriticalBadgeText),
+            ConversationStatus.Failed => (Loc.T("Failed"), CriticalBadge, CriticalBadgeText),
             _ => null,
         };
-        StatusBadge.Visibility = Shown(badge is not null);
-        if (badge is { } shown)
+        foreach (var each in new[] { CriticalBadge, CautionBadge, AttentionBadge })
         {
-            RecordingCard.SetText(StatusBadgeText, shown.Text);
-            if (StatusBadgeText.Foreground is not SolidColorBrush { } brush || brush.Color != shown.Color)
-            {
-                StatusBadgeText.Foreground = new SolidColorBrush(shown.Color);
-                StatusBadgeFill.Background = new SolidColorBrush(shown.Color);
-            }
+            each.Visibility = Shown(badge is { } b && b.Badge == each);
         }
+        if (badge is { } shown) RecordingCard.SetText(shown.Label, shown.Text);
 
         // A failed recording may never have had audio: its badge says so.
         var removed = !c.HasAudio && c.Status is not (ConversationStatus.Recording or ConversationStatus.Failed);
@@ -174,7 +163,7 @@ public sealed partial class ConversationCard : UserControl
 
         ProgressPanel.Visibility = Shown(running);
         NeedsModelBadge.Visibility = Shown(progress is not null && !running);
-        RetryPanel.Visibility = Shown(failed);
+        RetryButton.Visibility = Shown(failed);
         TranscribeButton.Visibility = Shown(transcribe);
         FailureText.Visibility = Shown(failed);
 
@@ -192,9 +181,7 @@ public sealed partial class ConversationCard : UserControl
             RecordingCard.SetText(FailureText, reason);
             SetTip(FailureText, reason, ref _failureTip);
             RetryButton.IsEnabled = c.HasAudio;
-            RetryEngineButton.IsEnabled = c.HasAudio;
             SetTip(RetryButton, Loc.T(c.HasAudio ? "Transcription failed — transcribe this conversation again" : "Audio has been removed"), ref _retryTip);
-            SetTip(RetryEngineButton, Loc.T(c.HasAudio ? "Retry with another engine" : "Audio has been removed"), ref _retryEngineTip);
         }
         if (transcribe)
         {
@@ -262,7 +249,7 @@ public sealed partial class ConversationCard : UserControl
     {
         for (var element = e.OriginalSource as DependencyObject; element is not null && element != this; element = VisualTreeHelper.GetParent(element))
         {
-            if (element is ButtonBase or TextBox) return;
+            if (element is ButtonBase or SplitButton or TextBox) return;
         }
         if (ConversationListView.IsKeyDown(VirtualKey.Control) || ConversationListView.IsKeyDown(VirtualKey.Shift))
         {
