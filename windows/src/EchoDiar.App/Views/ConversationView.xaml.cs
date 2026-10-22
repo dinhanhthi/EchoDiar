@@ -119,7 +119,7 @@ public sealed partial class ConversationView : UserControl
         foreach (var segment in segments)
         {
             var name = transcript!.DisplayName(segment.Speaker);
-            _lines.Add(new TranscriptLine(segment, $"{name} [{ConversationText.Clock(segment.Start)}]: {segment.Text.Trim()}"));
+            _lines.Add(new TranscriptLine(segment, $"{name} [{ConversationText.Timestamp(segment.Start)}]: {segment.Text.Trim()}"));
         }
         EmptyText.Text = hasTranscript && transcript is null
             ? "The transcript could not be read."
@@ -135,7 +135,7 @@ public sealed partial class ConversationView : UserControl
         PlayButton.IsEnabled = _playback.IsReady;
         PlayButton.Content = _playback.IsPlaying ? "Pause" : "Play";
         TimeText.Text = _playback.IsReady
-            ? $"{ConversationText.Clock(_playback.CurrentTime)} / {ConversationText.Clock(_playback.Duration)}"
+            ? $"{ConversationText.Timestamp(_playback.CurrentTime)} / {ConversationText.Timestamp(_playback.Duration)}"
             : _playback.Error ?? "";
 
         var active = _playback.ActiveSegmentId is { } id ? _lines.FirstOrDefault(l => l.Segment.Id == id) : null;

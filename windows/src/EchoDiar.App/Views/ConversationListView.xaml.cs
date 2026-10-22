@@ -141,6 +141,13 @@ internal static class ConversationText
         return time.ToString(time.TotalHours >= 1 ? @"h\:mm\:ss" : @"m\:ss", CultureInfo.InvariantCulture);
     }
 
+    /// <summary>"mm:ss" as the macOS transcript: minutes go past 59 in recordings longer than an hour.</summary>
+    public static string Timestamp(double seconds)
+    {
+        var whole = (long)Math.Max(0, Math.Floor(seconds));
+        return string.Create(CultureInfo.InvariantCulture, $"{whole / 60:00}:{whole % 60:00}");
+    }
+
     /// <summary>The date, the duration and the status.</summary>
     public static string Detail(Conversation conversation, AppViewModel model)
     {
