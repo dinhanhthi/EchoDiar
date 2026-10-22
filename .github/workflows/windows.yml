@@ -84,8 +84,9 @@ jobs:
         run: |
           $path = 'windows/src/EchoDiar.App/Package.appxmanifest'
           $xml = Get-Content -Raw $path
-          $patched = [regex]::Replace($xml, '(<Identity\b[^>]*?\bVersion=")[^"]*(")', "`${1}0.0.$env:RUN_NUMBER.0`${2}")
-          if ($patched -eq $xml) { throw "Identity Version not found in $path" }
+          $pattern = '(<Identity\b[^>]*?\bVersion=")[^"]*(")'
+          if ($xml -notmatch $pattern) { throw "Identity Version not found in $path" }
+          $patched = [regex]::Replace($xml, $pattern, "`${1}0.0.$env:RUN_NUMBER.0`${2}")
           Set-Content -Path $path -Value $patched -NoNewline -Encoding utf8
           Select-String -Path $path -Pattern 'Version="0\.0\.' | ForEach-Object { $_.Line.Trim() }
 
