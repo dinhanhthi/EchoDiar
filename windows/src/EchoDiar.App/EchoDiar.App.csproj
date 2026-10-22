@@ -15,6 +15,8 @@
   <ItemGroup>
     <Content Include="Assets\**\*.png" />
     <Content Include="Assets\EchoDiar.ico" />
+    <!-- Settings › Acknowledgements reads each component's license from it and opens it whole. -->
+    <Content Include="Licenses\ThirdPartyNotices.txt" />
   </ItemGroup>
 
   <ItemGroup>

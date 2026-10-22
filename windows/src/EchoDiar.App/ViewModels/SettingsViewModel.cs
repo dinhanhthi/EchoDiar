@@ -1,6 +1,8 @@
 using System.ComponentModel;
+using System.Diagnostics;
 using CommunityToolkit.Mvvm.ComponentModel;
 using EchoDiar.Core.Settings;
+using EchoDiar.Platform.SystemServices;
 
 namespace EchoDiar.App.ViewModels;
 
@@ -13,10 +15,14 @@ namespace EchoDiar.App.ViewModels;
 public sealed partial class SettingsViewModel : ObservableObject
 {
     private readonly AppViewModel _app;
+    private readonly ILaunchAtLogin _launchAtLogin;
+    private LaunchAtLoginState? _launchAtLoginState;
+    private string? _launchAtLoginNote;
 
-    internal SettingsViewModel(AppViewModel app)
+    internal SettingsViewModel(AppViewModel app, ILaunchAtLogin launchAtLogin)
     {
         _app = app;
+        _launchAtLogin = launchAtLogin;
         app.PropertyChanged += OnAppChanged;
     }
 
@@ -27,6 +33,79 @@ public sealed partial class SettingsViewModel : ObservableObject
     public void Update(Func<AppSettings, AppSettings> change) => _app.ApplySettings(change(_app.Settings));
 
     // General
+
+    /// <summary>"Launch at login": the startup task's real state, read by <see cref="SyncLaunchAtLoginAsync"/>.</summary>
+    public bool LaunchAtLogin => Settings.LaunchAtLogin;
+
+    /// <summary>False while a policy decides launch at login.</summary>
+    public bool CanChangeLaunchAtLogin =>
+        _launchAtLoginState is not (LaunchAtLoginState.DisabledByPolicy or LaunchAtLoginState.EnabledByPolicy);
+
+    /// <summary>Why launch at login is not as asked (turned off in Windows, a policy, an error); null when it is.</summary>
+    public string? LaunchAtLoginNote
+    {
+        get => _launchAtLoginNote;
+        private set => SetProperty(ref _launchAtLoginNote, value);
+    }
+
+    /// <summary>
+    /// Turns launch at login on or off, then shows its real state (macOS <c>setLaunchAtLogin</c>). Turned off by the
+    /// user, it opens Windows' Startup apps, where only they can turn it on (macOS opens Login Items for an approval).
+    /// </summary>
+    public async Task SetLaunchAtLoginAsync(bool enabled)
+    {
+        string? error = null;
+        try
+        {
+            if (enabled)
+            {
+                if (await _launchAtLogin.RequestEnableAsync() == LaunchAtLoginState.DisabledByUser)
+                {
+                    _ = Windows.System.Launcher.LaunchUriAsync(new Uri("ms-settings:startupapps"));
+                }
+            }
+            else
+            {
+                await _launchAtLogin.DisableAsync();
+            }
+        }
+        catch (Exception e)
+        {
+            Debug.WriteLine($"EchoDiar: could not change launch at login: {e}");
+            error = e.Message;
+        }
+        await SyncLaunchAtLoginAsync(error);
+    }
+
+    /// <summary>
+    /// The toggle follows the startup task's real state, which Windows' Startup apps can change too (macOS
+    /// <c>syncLaunchAtLogin</c>, on appear); <paramref name="error"/> is shown instead of the state's note.
+    /// </summary>
+    public async Task SyncLaunchAtLoginAsync(string? error = null)
+    {
+        try
+        {
+            var state = await _launchAtLogin.GetStateAsync();
+            _launchAtLoginState = state;
+            Update(s => s with { LaunchAtLogin = state is LaunchAtLoginState.Enabled or LaunchAtLoginState.EnabledByPolicy });
+            LaunchAtLoginNote = error ?? NoteFor(state);
+        }
+        catch (Exception e)
+        {
+            Debug.WriteLine($"EchoDiar: could not read launch at login: {e}");
+            LaunchAtLoginNote = error ?? e.Message;
+        }
+        OnPropertyChanged(nameof(CanChangeLaunchAtLogin));
+        OnPropertyChanged(nameof(LaunchAtLogin));
+    }
+
+    private static string? NoteFor(LaunchAtLoginState state) => state switch
+    {
+        LaunchAtLoginState.DisabledByUser => Loc.T("Turned off in Windows Settings > Apps > Startup. Turn EchoDiar on there."),
+        LaunchAtLoginState.DisabledByPolicy => Loc.T("Turned off by your organization."),
+        LaunchAtLoginState.EnabledByPolicy => Loc.T("Turned on by your organization."),
+        _ => null,
+    };
 
     /// <summary>The language new recordings are transcribed in ("auto" or a Whisper code).</summary>
     public string DefaultLanguage
@@ -54,6 +133,13 @@ public sealed partial class SettingsViewModel : ObservableObject
     {
         get => Settings.HidePillWhenAppActive;
         set => Update(s => s with { HidePillWhenAppActive = value });
+    }
+
+    /// <summary>"Show it in screenshots and screen recordings".</summary>
+    public bool ShowPillInScreenCaptures
+    {
+        get => Settings.ShowPillInScreenCaptures;
+        set => Update(s => s with { ShowPillInScreenCaptures = value });
     }
 
     /// <summary>"Indicator size".</summary>

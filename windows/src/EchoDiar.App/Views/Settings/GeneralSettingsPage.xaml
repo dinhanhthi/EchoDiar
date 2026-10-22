@@ -1,0 +1,137 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    Settings › General (macOS GeneralSettingsView.swift): launch at login, the floating indicator, deleting without
+    confirmation and the consent message, as Windows 11 Settings cards under section headers. Default language and
+    Playback are here too until the Transcription and Storage sections exist (macOS has them there). The "Permissions
+    and consent" section's "Show onboarding again" comes with the onboarding (task 19.4). Each searchable card's Tag is
+    its search entry's title (SearchEntries), so a search result can bring it into view.
+-->
+<UserControl
+    x:Class="EchoDiar.App.Views.GeneralSettingsPage"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:controls="using:CommunityToolkit.WinUI.Controls"
+    xmlns:local="using:EchoDiar.App">
+
+    <UserControl.Resources>
+        <Style x:Key="SectionHeaderStyle" TargetType="StackPanel">
+            <Setter Property="Margin" Value="1,24,0,4" />
+            <Setter Property="Spacing" Value="2" />
+        </Style>
+    </UserControl.Resources>
+
+    <ScrollViewer>
+        <StackPanel
+            MaxWidth="1000"
+            Margin="24,12,24,24"
+            Spacing="4">
+
+            <controls:SettingsCard
+                x:Name="LaunchCard"
+                Header="{local:T Text='Launch at login'}"
+                Tag="Launch at login">
+                <ToggleSwitch x:Name="LaunchToggle" AutomationProperties.Name="{local:T Text='Launch at login'}" />
+            </controls:SettingsCard>
+
+            <controls:SettingsCard
+                Header="{local:T Text='Default language'}"
+                Tag="Default language">
+                <ComboBox
+                    x:Name="LanguageCombo"
+                    MinWidth="200"
+                    AutomationProperties.Name="{local:T Text='Default language'}" />
+            </controls:SettingsCard>
+
+            <!-- Description in code: the text has an apostrophe. -->
+            <controls:SettingsCard
+                x:Name="PlaybackCard"
+                Header="{local:T Text='Playback'}"
+                Tag="Playback">
+                <ComboBox
+                    x:Name="PlaybackCombo"
+                    MinWidth="200"
+                    AutomationProperties.Name="{local:T Text='Playback'}">
+                    <ComboBoxItem Content="{local:T Text='Both voices in both ears'}" />
+                    <ComboBoxItem Content="{local:T Text='My voice left, others right'}" />
+                </ComboBox>
+            </controls:SettingsCard>
+
+            <StackPanel Style="{StaticResource SectionHeaderStyle}">
+                <TextBlock Style="{StaticResource BodyStrongTextBlockStyle}" Text="{local:T Text='Floating indicator'}" />
+            </StackPanel>
+
+            <controls:SettingsCard
+                Description="{local:T Text='Meeting prompts show either way.'}"
+                Header="{local:T Text='Show floating indicator while recording'}"
+                Tag="Show floating indicator while recording">
+                <ToggleSwitch x:Name="ShowPillToggle" AutomationProperties.Name="{local:T Text='Show floating indicator while recording'}" />
+            </controls:SettingsCard>
+
+            <controls:SettingsCard
+                x:Name="HidePillCard"
+                Header="{local:T Text='Hide it while an EchoDiar window is in front'}"
+                Tag="Hide it while an EchoDiar window is in front">
+                <ToggleSwitch x:Name="HidePillToggle" AutomationProperties.Name="{local:T Text='Hide it while an EchoDiar window is in front'}" />
+            </controls:SettingsCard>
+
+            <controls:SettingsCard
+                Description="{local:T Text='Screen sharing in meeting apps shows it too.'}"
+                Header="{local:T Text='Show it in screenshots and screen recordings'}"
+                Tag="Show it in screenshots and screen recordings">
+                <ToggleSwitch x:Name="CapturesToggle" AutomationProperties.Name="{local:T Text='Show it in screenshots and screen recordings'}" />
+            </controls:SettingsCard>
+
+            <controls:SettingsCard
+                Header="{local:T Text='Indicator size'}"
+                Tag="Indicator size">
+                <ComboBox
+                    x:Name="PillSizeCombo"
+                    MinWidth="200"
+                    AutomationProperties.Name="{local:T Text='Indicator size'}">
+                    <ComboBoxItem Content="{local:T Text='Small'}" />
+                    <ComboBoxItem Content="{local:T Text='Medium'}" />
+                    <ComboBoxItem Content="{local:T Text='Large'}" />
+                </ComboBox>
+            </controls:SettingsCard>
+
+            <StackPanel Style="{StaticResource SectionHeaderStyle}">
+                <TextBlock Style="{StaticResource BodyStrongTextBlockStyle}" Text="{local:T Text='Library'}" />
+            </StackPanel>
+
+            <controls:SettingsCard
+                Description="{local:T Text='They still go to the Recycle Bin.'}"
+                Header="{local:T Text='Delete conversations without confirmation'}"
+                Tag="Delete conversations without confirmation">
+                <ToggleSwitch x:Name="DeleteToggle" AutomationProperties.Name="{local:T Text='Delete conversations without confirmation'}" />
+            </controls:SettingsCard>
+
+            <StackPanel Style="{StaticResource SectionHeaderStyle}">
+                <TextBlock Style="{StaticResource BodyStrongTextBlockStyle}" Text="{local:T Text='Consent'}" />
+                <TextBlock
+                    Style="{StaticResource CaptionTextBlockStyle}"
+                    Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                    Text="{local:T Text='Tell the people you record. You are responsible for their consent.'}"
+                    TextWrapping="Wrap" />
+            </StackPanel>
+
+            <controls:SettingsCard Tag="Copy consent message">
+                <controls:SettingsCard.Header>
+                    <TextBlock
+                        x:Name="ConsentText"
+                        IsTextSelectionEnabled="True"
+                        TextWrapping="Wrap" />
+                </controls:SettingsCard.Header>
+                <Button x:Name="CopyConsentButton">
+                    <StackPanel Orientation="Horizontal" Spacing="8">
+                        <FontIcon
+                            x:Name="CopyConsentIcon"
+                            FontFamily="{ThemeResource SymbolThemeFontFamily}"
+                            FontSize="14"
+                            Glyph="&#xE8C8;" />
+                        <TextBlock x:Name="CopyConsentText" Text="{local:T Text='Copy consent message'}" />
+                    </StackPanel>
+                </Button>
+            </controls:SettingsCard>
+        </StackPanel>
+    </ScrollViewer>
+</UserControl>

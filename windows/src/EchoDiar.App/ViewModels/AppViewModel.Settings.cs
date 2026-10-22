@@ -27,7 +27,10 @@ public sealed partial class AppViewModel
     private SettingsViewModel? _settingsModel;
 
     /// <summary>What the Settings pages bind to; one for the app's lifetime.</summary>
-    public SettingsViewModel SettingsModel => _settingsModel ??= new SettingsViewModel(this);
+    public SettingsViewModel SettingsModel => _settingsModel ??= new SettingsViewModel(this, _services.LaunchAtLogin);
+
+    /// <summary>The folder of every recording (macOS <c>RecordingSession.conversationsRoot</c>), Settings' data folder.</summary>
+    public string ConversationsFolder => _services.Paths.Conversations;
 
     /// <summary>The id of the Settings section shown (<see cref="SettingsSearch.Sections"/>).</summary>
     public string SettingsSection

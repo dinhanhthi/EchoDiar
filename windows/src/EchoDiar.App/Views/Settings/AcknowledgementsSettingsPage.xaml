@@ -1,0 +1,62 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    Settings › Acknowledgements (macOS AcknowledgementsSettingsView.swift): the open-source software and the models
+    EchoDiar uses. Each row is an expander: its name, version, what EchoDiar uses it for and its license, a link to its
+    home page, and its license text when expanded (macOS shows it in a sheet). Every text is in
+    Licenses/ThirdPartyNotices.txt, which "Open full notices" opens.
+-->
+<UserControl
+    x:Class="EchoDiar.App.Views.AcknowledgementsSettingsPage"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:controls="using:CommunityToolkit.WinUI.Controls"
+    xmlns:local="using:EchoDiar.App">
+
+    <UserControl.Resources>
+        <Style x:Key="SectionHeaderStyle" TargetType="StackPanel">
+            <Setter Property="Margin" Value="1,24,0,4" />
+            <Setter Property="Spacing" Value="2" />
+        </Style>
+    </UserControl.Resources>
+
+    <ScrollViewer>
+        <StackPanel
+            MaxWidth="1000"
+            Margin="24,12,24,24"
+            Spacing="4">
+
+            <StackPanel
+                Margin="1,0,0,4"
+                Style="{StaticResource SectionHeaderStyle}"
+                Tag="Open-source software">
+                <TextBlock Style="{StaticResource BodyStrongTextBlockStyle}" Text="{local:T Text='Open-source software'}" />
+                <TextBlock
+                    Style="{StaticResource CaptionTextBlockStyle}"
+                    Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                    Text="{local:T Text='EchoDiar includes this open-source software. Choose one to read its license.'}"
+                    TextWrapping="Wrap" />
+            </StackPanel>
+            <StackPanel x:Name="SoftwareList" Spacing="4" />
+
+            <StackPanel Style="{StaticResource SectionHeaderStyle}">
+                <TextBlock Style="{StaticResource BodyStrongTextBlockStyle}" Text="{local:T Text='Models'}" />
+                <TextBlock
+                    Style="{StaticResource CaptionTextBlockStyle}"
+                    Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                    Text="{local:T Text='Models EchoDiar downloads when you choose them. Choose one to read its license.'}"
+                    TextWrapping="Wrap" />
+            </StackPanel>
+            <StackPanel x:Name="ModelList" Spacing="4" />
+
+            <controls:SettingsCard
+                Margin="0,24,0,0"
+                Description="{local:T Text='Every license above in one text file.'}"
+                Header="{local:T Text='Third-party notices'}">
+                <controls:SettingsCard.HeaderIcon>
+                    <FontIcon FontFamily="{ThemeResource SymbolThemeFontFamily}" Glyph="&#xE8A5;" />
+                </controls:SettingsCard.HeaderIcon>
+                <Button x:Name="OpenNoticesButton" Content="{local:T Text='Open full notices'}" />
+            </controls:SettingsCard>
+        </StackPanel>
+    </ScrollViewer>
+</UserControl>

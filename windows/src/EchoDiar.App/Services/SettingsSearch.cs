@@ -48,28 +48,9 @@ public static class SettingsSearch
     public static IReadOnlyList<SettingsSection> Sections { get; } =
     [
         // Default language and Playback are in General on Windows until the Transcription and Storage sections exist.
-        new(General, "General", "", [],
-        [
-            new("Launch at login", ["startup", "startup apps", "login item", "open at login", "sign in"]),
-            new("Default language", ["language", "English", "French", "Vietnamese"]),
-            new("Playback", ["stereo", "mono", "left", "right", "ear", "headphones", "channels"]),
-            new("Show floating indicator while recording", ["pill", "overlay", "floating"]),
-            new("Hide it while an EchoDiar window is in front", ["floating indicator", "pill", "hide"]),
-            new("Indicator size", ["floating indicator", "pill", "small", "medium", "large"]),
-            new("Delete conversations without confirmation", ["confirm", "Recycle Bin", "trash", "library"]),
-            new("Copy consent message", ["consent", "privacy", "tell people"]),
-        ], SettingsPage.Placeholder("General")),
-        new(About, "About", "", [],
-        [
-            new("Version", ["about", "build", "update"]),
-            new("Licensed under AGPL-3.0", ["license", "open source"]),
-            new("github.com/dinhanhthi/EchoDiar", ["GitHub", "source code", "repository"]),
-            new("Data folder", ["File Explorer", "location", "path", "open in File Explorer"]),
-        ], SettingsPage.Placeholder("About")),
-        new(Acknowledgements, "Acknowledgements", "", [],
-        [
-            new("Open-source software", ["acknowledgements", "credits", "licenses", "libraries"]),
-        ], SettingsPage.Placeholder("Acknowledgements")),
+        new(General, "General", "\uE713", [], GeneralSettingsPage.SearchEntries, model => new GeneralSettingsPage(model)),
+        new(About, "About", "\uE946", [], AboutSettingsPage.SearchEntries, model => new AboutSettingsPage(model)),
+        new(Acknowledgements, "Acknowledgements", "\uE8A5", [], AcknowledgementsSettingsPage.SearchEntries, _ => new AcknowledgementsSettingsPage()),
     ];
 
     private static readonly Lazy<IReadOnlyList<SettingsSearchItem>> AllItems = new(() =>
