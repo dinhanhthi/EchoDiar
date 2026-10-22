@@ -5,38 +5,54 @@ using EchoDiar.App.ViewModels;
 using EchoDiar.Core.Audio;
 using EchoDiar.Core.Model;
 using EchoDiar.Platform.SystemServices;
+using Microsoft.UI.Dispatching;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Automation;
 using Microsoft.UI.Xaml.Controls;
 using Windows.Foundation;
 using Windows.Graphics;
+using Windows.UI.ViewManagement;
 
 namespace EchoDiar.App.Views;
 
 /// <summary>
 /// The title bar's capsules (macOS MainView.swift toolbar), shown by route: Back off the list; Record with its menu of
-/// targets (Stop and Pause or Resume while recording); on a conversation its title, Reveal, Delete and the tabs;
-/// Settings and Search everywhere (placeholders until Phases 13 and 11). Update and Ask across conversations stay
-/// collapsed until Phases 27 and 26.
+/// targets (Stop, blinking, and Pause or Resume while recording); on a conversation its title, Reveal, Delete and the
+/// tabs; Settings and Search everywhere (placeholders until Phases 13 and 11). Update and Ask across conversations
+/// stay collapsed until Phases 27 and 26. It also hosts the window's dialogs (it lives as long as the window): the
+/// delete confirmation, "Recording problem" and the lost-mic prompt, one at a time.
 /// </summary>
 public sealed partial class TitleBarToolbar : UserControl
 {
     private const string PauseGlyph = "";
     private const string ResumeGlyph = "";
 
+    /// <summary>The recording indicator dims every other second (macOS RecordingBlink).</summary>
+    private static readonly TimeSpan BlinkInterval = TimeSpan.FromSeconds(1);
+
+    private static readonly UISettings UISettings = new();
+
     private AppViewModel? _model;
 
-    /// <summary>What Record records: null for all system audio, else an app picked in the menu.</summary>
-    private AudioProcessGroup? _target;
+    /// <summary>The open dialog: WinUI shows one at a time per window.</summary>
+    private ContentDialog? _dialog;
 
-    /// <summary>A delete confirmation is open: only one dialog at a time.</summary>
-    private bool _confirming;
+    /// <summary>The lost-mic prompt is open.</summary>
+    private ContentDialog? _routePrompt;
+
+    /// <summary>The mic was lost while another dialog was open: asked once that one closes.</summary>
+    private bool _routePromptPending;
+
+    private DispatcherQueueTimer? _blinkTimer;
+
+    /// <summary>Record's tooltip, "Record" and the target; set again only when the target changes.</summary>
+    private string? _recordTip;
 
     public TitleBarToolbar()
     {
         InitializeComponent();
         BackButton.Click += (_, _) => _model?.GoBack();
-        RecordSplitButton.Click += (_, _) => _ = _model?.StartRecordingAsync(_target);
+        RecordSplitButton.Click += (_, _) => _ = _model?.StartRecordingAsync(_model.SelectedTarget);
         TargetMenu.Opening += (_, _) => OnTargetMenuOpening();
         StopButton.Click += (_, _) => _ = _model?.StopRecordingAsync();
         PauseButton.Click += (_, _) => _ = _model?.TogglePauseAsync();
@@ -44,6 +60,8 @@ public sealed partial class TitleBarToolbar : UserControl
         DeleteMenu.Opening += (_, _) => UpdateDeleteMenu();
         DeleteAudioItem.Click += async (_, _) => await DeleteAsync(audioOnly: true);
         DeleteConversationItem.Click += async (_, _) => await DeleteAsync(audioOnly: false);
+        // A start that failed before the window was shown still gets its dialog.
+        Loaded += (_, _) => ShowNextDialog();
     }
 
     /// <summary>Follows <paramref name="model"/> for as long as the window lives.</summary>
@@ -51,6 +69,10 @@ public sealed partial class TitleBarToolbar : UserControl
     {
         _model = model;
         model.PropertyChanged += OnModelChanged;
+        model.MicRouteLostAsk += OnMicRouteLostAsk;
+        _blinkTimer = DispatcherQueue.CreateTimer();
+        _blinkTimer.Interval = BlinkInterval;
+        _blinkTimer.Tick += (_, _) => Blink();
         Update();
     }
 
@@ -59,7 +81,10 @@ public sealed partial class TitleBarToolbar : UserControl
     {
         if (_model is null) return;
         _model.PropertyChanged -= OnModelChanged;
+        _model.MicRouteLostAsk -= OnMicRouteLostAsk;
         _model = null;
+        _blinkTimer?.Stop();
+        _blinkTimer = null;
     }
 
     /// <summary>
@@ -96,7 +121,11 @@ public sealed partial class TitleBarToolbar : UserControl
             case nameof(AppViewModel.IsStarting):
             case nameof(AppViewModel.TranscriptionProgress):
             case nameof(AppViewModel.TranscriptionErrors):
+            case nameof(AppViewModel.SelectedTarget):
                 Update();
+                break;
+            case nameof(AppViewModel.RecordingError):
+                ShowNextDialog();
                 break;
             case nameof(AppViewModel.RecordTargets):
                 // Apps that started playing since the menu opened show up in it.
@@ -114,6 +143,8 @@ public sealed partial class TitleBarToolbar : UserControl
         var paused = _model.RecordingSnapshot.State == RecordingEngine.State.Paused;
         RecordSplitButton.Visibility = Shown(!recording);
         RecordSplitButton.IsEnabled = !_model.IsStarting;
+        var recordTip = $"Record {_model.SelectedTarget?.Name ?? Loc.T("All system audio")}";
+        if (recordTip != _recordTip) ToolTipService.SetToolTip(RecordSplitButton, _recordTip = recordTip);
         StopButton.Visibility = Shown(recording);
         StopButton.IsEnabled = !_model.IsStarting;
         PauseButton.Visibility = Shown(recording);
@@ -121,6 +152,13 @@ public sealed partial class TitleBarToolbar : UserControl
         var pauseLabel = Loc.T(paused ? "Resume recording" : "Pause recording");
         AutomationProperties.SetName(PauseButton, pauseLabel);
         ToolTipService.SetToolTip(PauseButton, pauseLabel);
+        UpdateBlink(recording && !paused);
+        // The recording ended (stopped elsewhere): the lost-mic question no longer applies.
+        if (!recording)
+        {
+            _routePromptPending = false;
+            _routePrompt?.Hide();
+        }
 
         var conversation = ShownConversation();
         var onConversation = conversation is not null;
@@ -171,9 +209,12 @@ public sealed partial class TitleBarToolbar : UserControl
         {
             Text = text,
             GroupName = "RecordTarget",
-            IsChecked = _target?.Exe == group?.Exe,
+            IsChecked = _model?.SelectedTarget?.Exe == group?.Exe,
         };
-        item.Click += (_, _) => _target = group;
+        item.Click += (_, _) =>
+        {
+            if (_model is not null) _model.SelectedTarget = group;
+        };
         return item;
     }
 
@@ -219,27 +260,124 @@ public sealed partial class TitleBarToolbar : UserControl
     /// <summary>The macOS alert's texts (not in its string catalog), with the Recycle Bin for the Trash.</summary>
     private async Task<bool> ConfirmDeleteAsync(Conversation conversation, bool audioOnly)
     {
-        if (_confirming) return false;
-        _confirming = true;
+        if (_dialog is not null) return false;
+        var dialog = NewDialog(
+            audioOnly ? $"Delete the audio of \"{conversation.Title}\"?" : $"Delete \"{conversation.Title}\"?",
+            audioOnly
+                ? "The audio is moved to the Recycle Bin. The transcript, summary and chat stay; playback and re-transcribing are no longer possible."
+                : "The recording and its files are moved to the Recycle Bin.");
+        dialog.PrimaryButtonText = Loc.T("Delete");
+        dialog.CloseButtonText = Loc.T("Cancel");
+        dialog.DefaultButton = ContentDialogButton.Close;
+        var confirmed = false;
+        await ShowAsync(dialog, result => confirmed = result == ContentDialogResult.Primary);
+        return confirmed;
+    }
+
+    // Recording dialogs and indicator
+
+    /// <summary>Shows what waits, unless a dialog is open: a recording problem first, then the lost-mic prompt.</summary>
+    private void ShowNextDialog()
+    {
+        if (_model is null || _dialog is not null || XamlRoot is null) return;
+        if (_model.RecordingError is { } error)
+        {
+            _ = ShowRecordingProblemAsync(error);
+        }
+        else if (_routePromptPending)
+        {
+            _routePromptPending = false;
+            if (_model.IsRecording) _ = AskRouteLostAsync();
+        }
+    }
+
+    /// <summary>
+    /// "Recording problem" (macOS MainView.swift alert on recordingError): the only UI for a start or resume that
+    /// failed and for a recording the engine stopped on its own.
+    /// </summary>
+    private Task ShowRecordingProblemAsync(string error)
+    {
+        var dialog = NewDialog(Loc.T("Recording problem"), error);
+        dialog.CloseButtonText = Loc.T("OK");
+        dialog.DefaultButton = ContentDialogButton.Close;
+        return ShowAsync(dialog, _ => _model?.DismissRecordingError(error));
+    }
+
+    private void OnMicRouteLostAsk()
+    {
+        if (_routePrompt is not null) return;
+        _routePromptPending = true;
+        ShowNextDialog();
+    }
+
+    /// <summary>
+    /// The lost mic with "Ask to stop" (macOS: the pill's end prompt for inputRouteLost, its countdown comes with
+    /// Phase 19): Stop now stops as Stop does, Keep recording carries on with the default input.
+    /// </summary>
+    private async Task AskRouteLostAsync()
+    {
+        var dialog = NewDialog("Microphone disconnected — stop recording?", null);
+        dialog.PrimaryButtonText = Loc.T("Stop now");
+        dialog.CloseButtonText = Loc.T("Keep recording");
+        dialog.DefaultButton = ContentDialogButton.Primary;
+        _routePrompt = dialog;
+        await ShowAsync(dialog, result =>
+        {
+            if (result == ContentDialogResult.Primary && _model is { IsRecording: true } model) _ = model.StopRecordingAsync();
+        });
+        _routePrompt = null;
+    }
+
+    private ContentDialog NewDialog(string title, string? content) => new()
+    {
+        XamlRoot = XamlRoot,
+        Style = Application.Current.Resources["DefaultContentDialogStyle"] as Style,
+        Title = title,
+        Content = content,
+    };
+
+    /// <summary>
+    /// Shows <paramref name="dialog"/> as the open one, hands its result to <paramref name="answered"/> (not once the
+    /// window closed), then shows what waits.
+    /// </summary>
+    private async Task ShowAsync(ContentDialog dialog, Action<ContentDialogResult> answered)
+    {
+        _dialog = dialog;
+        ContentDialogResult result;
         try
         {
-            var dialog = new ContentDialog
-            {
-                XamlRoot = XamlRoot,
-                Style = Application.Current.Resources["DefaultContentDialogStyle"] as Style,
-                Title = audioOnly ? $"Delete the audio of \"{conversation.Title}\"?" : $"Delete \"{conversation.Title}\"?",
-                Content = audioOnly
-                    ? "The audio is moved to the Recycle Bin. The transcript, summary and chat stay; playback and re-transcribing are no longer possible."
-                    : "The recording and its files are moved to the Recycle Bin.",
-                PrimaryButtonText = Loc.T("Delete"),
-                CloseButtonText = Loc.T("Cancel"),
-                DefaultButton = ContentDialogButton.Close,
-            };
-            return await dialog.ShowAsync() == ContentDialogResult.Primary;
+            result = await dialog.ShowAsync();
+        }
+        catch (Exception e)
+        {
+            Debug.WriteLine($"EchoDiar: could not show a dialog: {e}");
+            result = ContentDialogResult.None;
         }
         finally
         {
-            _confirming = false;
+            _dialog = null;
         }
+        if (_model is null) return;
+        answered(result);
+        ShowNextDialog();
+    }
+
+    /// <summary>Stop blinks while recording, unless paused, the window is hidden or Windows animations are off.</summary>
+    private void UpdateBlink(bool active)
+    {
+        if (_blinkTimer is null) return;
+        active &= UISettings.AnimationsEnabled;
+        if (active && !_blinkTimer.IsRunning) _blinkTimer.Start();
+        if (!active)
+        {
+            _blinkTimer.Stop();
+            StopIcon.Opacity = 1;
+        }
+    }
+
+    private void Blink()
+    {
+        if (_model is null) return;
+        StopIcon.Opacity = StopIcon.Opacity < 1 || XamlRoot is not { IsHostVisible: true } ? 1 : 0.35;
     }
 }

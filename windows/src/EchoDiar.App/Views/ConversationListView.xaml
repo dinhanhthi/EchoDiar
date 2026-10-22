@@ -15,12 +15,6 @@
         <!-- The header and the banner are left out of the wide layout's sidebar, which shows only the rows. -->
         <Grid x:Name="HeaderGrid">
             <TextBlock VerticalAlignment="Center" Style="{StaticResource TitleTextBlockStyle}" Text="Library" />
-            <Button
-                x:Name="RecordButton"
-                HorizontalAlignment="Right"
-                Click="OnRecordClick"
-                Content="Record"
-                Style="{StaticResource AccentButtonStyle}" />
         </Grid>
 
         <!-- Shown until a speech model is installed (and a speaker model, with "Tell speakers apart" on). -->
@@ -54,6 +48,7 @@
             Text="No recordings yet. Press Record to start one."
             Visibility="Collapsed" />
 
+        <!-- The header is the recording's card while recording, above the conversations. -->
         <ListView
             x:Name="ConversationList"
             Grid.Row="2"

@@ -10,6 +10,7 @@
     <Grid x:Name="RootGrid">
         <Grid.RowDefinitions>
             <RowDefinition Height="48" />
+            <RowDefinition Height="Auto" />
             <RowDefinition Height="*" />
         </Grid.RowDefinitions>
 
@@ -24,11 +25,36 @@
             <views:TitleBarToolbar x:Name="Toolbar" Grid.Column="1" />
         </Grid>
 
+        <!-- GlobalTapNote (macOS MainView.swift): before recording, the picked app cannot be recorded on its own. -->
+        <Grid
+            x:Name="GlobalTapNote"
+            Grid.Row="1"
+            Margin="12,12,12,0"
+            ColumnSpacing="6"
+            Visibility="Collapsed">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="Auto" />
+                <ColumnDefinition Width="*" />
+            </Grid.ColumnDefinitions>
+            <FontIcon
+                VerticalAlignment="Top"
+                Margin="0,2,0,0"
+                FontFamily="{ThemeResource SymbolThemeFontFamily}"
+                FontSize="14"
+                Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                Glyph="&#xE946;" />
+            <TextBlock
+                x:Name="GlobalTapNoteText"
+                Grid.Column="1"
+                Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                TextWrapping="Wrap" />
+        </Grid>
+
         <!--
             Compact (the list route): the library fills the window. Wide (a conversation, the recording): the same
             library as a 360 px sidebar, then the route's page.
         -->
-        <Grid Grid.Row="1">
+        <Grid Grid.Row="2">
             <Grid.ColumnDefinitions>
                 <ColumnDefinition x:Name="SidebarColumn" Width="*" />
                 <ColumnDefinition x:Name="DetailColumn" Width="0" />

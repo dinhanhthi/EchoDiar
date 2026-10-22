@@ -1,4 +1,5 @@
 using System.Runtime.InteropServices;
+using EchoDiar.Core.Audio;
 using Windows.Win32;
 using Windows.Win32.Foundation;
 using Windows.Win32.Media.Audio;
@@ -27,7 +28,7 @@ public readonly record struct AudioInputDevice(string Id, string Name);
 /// returns, so a handler checks its own session generation.
 /// </para>
 /// </summary>
-public sealed class AudioRouteMonitor : IDisposable
+public sealed class AudioRouteMonitor : IAudioRouteSource, IDisposable
 {
     private static readonly TimeSpan Coalesce = TimeSpan.FromMilliseconds(300);
 

@@ -88,6 +88,7 @@ public sealed partial class MainWindow : Window
 
         _model.PropertyChanged += OnModelChanged;
         ShowRoute();
+        UpdateGlobalTapNote();
         StartupTrace.Write("end MainWindow ctor");
     }
 
@@ -223,7 +224,27 @@ public sealed partial class MainWindow : Window
 
     private void OnModelChanged(object? sender, PropertyChangedEventArgs e)
     {
-        if (e.PropertyName == nameof(AppViewModel.Route)) ShowRoute();
+        switch (e.PropertyName)
+        {
+            case nameof(AppViewModel.Route):
+                ShowRoute();
+                break;
+            case nameof(AppViewModel.SelectedTarget):
+            case nameof(AppViewModel.RecordingSnapshot):
+                UpdateGlobalTapNote();
+                break;
+        }
+    }
+
+    /// <summary>Shown while idle when the picked app needs the global capture (macOS GlobalTapNote).</summary>
+    private void UpdateGlobalTapNote()
+    {
+        var app = _model.IsRecording ? null : _model.SelectedTarget;
+        GlobalTapNote.Visibility = app is { NeedsGlobalTap: true } ? Visibility.Visible : Visibility.Collapsed;
+        if (app is { NeedsGlobalTap: true })
+        {
+            RecordingCard.SetText(GlobalTapNoteText, Loc.Format("%@ cannot be recorded on its own: all system audio will be recorded.", app.Name));
+        }
     }
 
     /// <summary>Shows the route's page in its layout, then resizes the window to that layout.</summary>

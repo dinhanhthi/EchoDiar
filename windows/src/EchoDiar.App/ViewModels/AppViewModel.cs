@@ -217,6 +217,7 @@ public sealed partial class AppViewModel : ObservableObject
         };
         _services.Pipeline.Progress += progress => Post(() => ApplyProgress(progress));
         _services.Engine.SnapshotChanged += snapshot => Post(() => ApplySnapshot(snapshot));
+        FollowRouteChanges();
         _recovery = LoadAndRecoverAsync();
         await _recovery;
         StartupTrace.Write("begin library load");
@@ -371,6 +372,7 @@ public sealed partial class AppViewModel : ObservableObject
         if (IsRecording || IsStarting || _closing) return;
         IsStarting = true;
         RecordingError = null;
+        RecordingSourceName = app?.Name;
         var root = _services.Paths.Conversations;
         try
         {
@@ -395,6 +397,7 @@ public sealed partial class AppViewModel : ObservableObject
         catch (Exception e)
         {
             Debug.WriteLine($"EchoDiar: could not start recording: {e}");
+            RecordingSourceName = null;
             RecordingError = e is RecordingDiskFullException
                 ? "There is not enough free disk space to record."
                 : $"The recording could not start ({e.Message}).";
@@ -482,6 +485,7 @@ public sealed partial class AppViewModel : ObservableObject
             return;
         }
         StopPolling();
+        RecordingSourceName = null;
         if (snapshot.EndReason is not { } reason) return;
         if (StopMessage(reason) is { } message) RecordingError = message;
         var folder = _activeFolder;

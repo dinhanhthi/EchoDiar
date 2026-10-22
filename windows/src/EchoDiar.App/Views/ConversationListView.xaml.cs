@@ -14,11 +14,19 @@ namespace EchoDiar.App.Views;
 /// <summary>One library entry: the title, then the date, duration and status.</summary>
 public sealed partial record ConversationRow(Guid Id, string Title, string Detail);
 
-/// <summary>The library, newest first, with the model download banner (MVP; Phase 11 completes it).</summary>
+/// <summary>
+/// The library, newest first, with the model download banner (MVP; Phase 11 completes it). While recording, the
+/// recording's card sits above the conversations and the recording's own entry is left out (macOS MainView.swift
+/// listed and ConversationListView.swift).
+/// </summary>
 public sealed partial class ConversationListView : UserControl
 {
     private readonly AppViewModel _model;
     private readonly ObservableCollection<ConversationRow> _rows = [];
+    private readonly RecordingCard _card;
+
+    /// <summary>The recording state the rows were last listed for.</summary>
+    private bool _listedWhileRecording;
 
     /// <summary>Shown as the wide layout's sidebar: only the rows.</summary>
     private bool _sidebar;
@@ -31,6 +39,9 @@ public sealed partial class ConversationListView : UserControl
         _model = model;
         InitializeComponent();
         ConversationList.ItemsSource = _rows;
+        // The rows' ListViewItem padding, so the card lines up with them.
+        _card = new RecordingCard(model) { Margin = new Thickness(16, 0, 12, 0), Visibility = Visibility.Collapsed };
+        ConversationList.Header = _card;
         Loaded += (_, _) =>
         {
             StartupTrace.Write("library view Loaded");
@@ -50,6 +61,10 @@ public sealed partial class ConversationListView : UserControl
             case nameof(AppViewModel.TranscriptionErrors):
                 UpdateRows();
                 break;
+            case nameof(AppViewModel.RecordingSnapshot):
+                // At 15 Hz while recording: only the start and the end change the list.
+                if (_model.IsRecording != _listedWhileRecording) UpdateRows();
+                break;
             case nameof(AppViewModel.InstalledModelIds):
             case nameof(AppViewModel.Settings):
             case nameof(AppViewModel.Downloads):
@@ -62,7 +77,11 @@ public sealed partial class ConversationListView : UserControl
     /// <summary>Replaces only the rows that changed, so the list keeps its scroll position.</summary>
     private void UpdateRows()
     {
+        var recording = _model.IsRecording;
+        _listedWhileRecording = recording;
+        _card.Visibility = recording ? Visibility.Visible : Visibility.Collapsed;
         var rows = _model.Conversations
+            .Where(c => !(recording && c.Status == ConversationStatus.Recording))
             .Select(c => new ConversationRow(c.Id, c.Title, ConversationText.Detail(c, _model)))
             .ToList();
         if (rows.Count == _rows.Count && rows.Select(r => r.Id).SequenceEqual(_rows.Select(r => r.Id)))
@@ -77,7 +96,7 @@ public sealed partial class ConversationListView : UserControl
             _rows.Clear();
             foreach (var row in rows) _rows.Add(row);
         }
-        EmptyText.Visibility = rows.Count == 0 ? Visibility.Visible : Visibility.Collapsed;
+        EmptyText.Visibility = rows.Count == 0 && !recording ? Visibility.Visible : Visibility.Collapsed;
         StartupTrace.Write($"library rows updated ({rows.Count} rows)");
         // Replaced rows lose the selection.
         UpdateSelection();
@@ -92,6 +111,8 @@ public sealed partial class ConversationListView : UserControl
         _sidebar = sidebar;
         _selectedId = selectedId;
         HeaderGrid.Visibility = sidebar ? Visibility.Collapsed : Visibility.Visible;
+        _card.Compact = sidebar;
+        _card.Selected = _model.Route.Kind == RouteKind.Recording;
         UpdateBanner();
         UpdateSelection();
         if (ConversationList.SelectedItem is { } selected) ConversationList.ScrollIntoView(selected);
@@ -143,8 +164,6 @@ public sealed partial class ConversationListView : UserControl
         DownloadErrorText.Text = error is null ? "" : $"The download failed: {error}";
         DownloadErrorText.Visibility = error is null ? Visibility.Collapsed : Visibility.Visible;
     }
-
-    private void OnRecordClick(object sender, RoutedEventArgs e) => _model.ShowRecording();
 
     private void OnConversationClick(object sender, ItemClickEventArgs e)
     {

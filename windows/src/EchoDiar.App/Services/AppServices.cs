@@ -12,11 +12,12 @@ namespace EchoDiar.App.Services;
 
 /// <summary>
 /// The app's long-lived services over one library root: settings, library, models, the model load gate, the
-/// transcription pipeline and the recording engine with the Platform capture sources. Created once, on launch.
+/// transcription pipeline and the recording engine with the Platform capture sources and route monitor. Created once, on launch.
 /// </summary>
 internal sealed class AppServices : IDisposable
 {
     private readonly HttpClient _http;
+    private readonly AudioRouteMonitor _routes = new();
 
     public AppServices(AppPaths paths)
     {
@@ -37,7 +38,7 @@ internal sealed class AppServices : IDisposable
             Models.IsInstalled,
             Models.Folder,
             Gate);
-        Engine = new RecordingEngine(OpenSystem, OpenMic)
+        Engine = new RecordingEngine(OpenSystem, OpenMic, routes: _routes)
         {
             IsTargetPlayingOutput = IsTargetPlayingOutput,
         };
@@ -51,10 +52,11 @@ internal sealed class AppServices : IDisposable
     public TranscriptionPipeline Pipeline { get; }
     public RecordingEngine Engine { get; }
 
-    /// <summary>Stops a running recording (its CAF is finished) and releases the HTTP client.</summary>
+    /// <summary>Stops a running recording (its CAF is finished), then releases the route monitor and the HTTP client.</summary>
     public void Dispose()
     {
         Engine.Dispose();
+        _routes.Dispose();
         _http.Dispose();
     }
 
