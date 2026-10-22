@@ -9,15 +9,13 @@ namespace EchoDiar.Transcribe.Engines;
 /// <c>Models/&lt;id&gt;/</c>. The model is loaded per job and freed before <see cref="TranscribeAsync"/> returns.
 /// Parakeet detects the language itself: the ranges' languages are not used.
 /// </summary>
-public sealed class ParakeetEngine(ModelEntry entry, string folder) : ITranscriptionEngine
+/// <remarks>
+/// Audio is decoded in speech chunks of at most the entry's window (30 s): the sherpa-onnx encoder aborts the process
+/// (an uncatchable onnxruntime error) beyond about 400 s, and its peak memory grows with the length (about 2.4 GB at
+/// 60 s, 4.2 GB at 180 s).
+/// </remarks>
+public sealed class ParakeetEngine(ModelEntry entry, string folder) : ISessionTranscriptionEngine
 {
-    /// <summary>
-    /// Audio decoded at once, shorter than <see cref="MonoAudio.SlabSeconds"/>: the sherpa-onnx encoder aborts the
-    /// process (an uncatchable onnxruntime error) beyond about 400 s, and its peak memory grows with the length
-    /// (about 2.4 GB at 60 s, 4.2 GB at 180 s).
-    /// </summary>
-    public const double SlabSeconds = 60;
-
     /// <summary>A pause this long between words starts a new segment.</summary>
     public const double SegmentGapSeconds = 1.0;
 
@@ -29,22 +27,65 @@ public sealed class ParakeetEngine(ModelEntry entry, string folder) : ITranscrip
 
     private const int SampleRate = (int)MonoAudio.SampleRate;
 
-    /// <summary>A shorter slab (the tail of a range or file) is skipped.</summary>
-    private const double MinSlabSeconds = 0.3;
+    /// <summary>A shorter chunk is padded with silence (sherpa-onnx may abort the process on too few frames).</summary>
+    private const int MinChunkSamples = (int)(0.3 * SampleRate);
 
     private sealed record Word(string Text, double Start, double End);
 
     /// <summary>A <see cref="TranscriptionPipeline.EngineFactory"/>.</summary>
     public static ITranscriptionEngine Create(ModelEntry entry, string folder) => new ParakeetEngine(entry, folder);
 
-    public Task<IReadOnlyList<RawSegment>> TranscribeAsync(
+    /// <summary>
+    /// The file cut into speech chunks (<see cref="TranscriptionPipeline.FillGapsAsync"/> over the whole file), each
+    /// decoded by one <see cref="Session"/>; silence is not decoded.
+    /// </summary>
+    public async Task<IReadOnlyList<RawSegment>> TranscribeAsync(
         string channelPath, IReadOnlyList<LanguageRange> languageRanges, Action<double> progress,
-        CancellationToken cancellationToken) =>
-        Task.Run(() =>
+        CancellationToken cancellationToken)
+    {
+        await using var session = await OpenSessionAsync(cancellationToken).ConfigureAwait(false);
+        var segments = await TranscriptionPipeline.FillGapsAsync(
+            [new Span(0, MonoAudio.Duration(channelPath))], channelPath, entry, languageRanges, _ => Task.FromResult(session),
+            progress, cancellationToken).ConfigureAwait(false);
+        progress(1);
+        return segments;
+    }
+
+    /// <summary>Loads the recognizer off the caller's thread; disposing the session frees it.</summary>
+    public async Task<ITranscriptionSession> OpenSessionAsync(CancellationToken cancellationToken) =>
+        new Session(await Task.Run(() => new OfflineRecognizer(Config()), cancellationToken).ConfigureAwait(false));
+
+    /// <summary>
+    /// One recognizer for many chunks, each decoded from a fresh stream (Swift <c>ParakeetEngine.Session</c>). Not
+    /// thread-safe.
+    /// </summary>
+    public sealed class Session(OfflineRecognizer recognizer) : ITranscriptionSession
+    {
+        /// <summary>
+        /// <paramref name="language"/> is not used: Parakeet detects it. A chunk shorter than 300 ms is padded with
+        /// silence.
+        /// </summary>
+        public Task<IReadOnlyList<RawSegment>> TranscribeAsync(
+            float[] samples, string? language, CancellationToken cancellationToken) =>
+            Task.Run<IReadOnlyList<RawSegment>>(() =>
+            {
+                var padded = samples.Length >= MinChunkSamples ? samples : [.. samples, .. new float[MinChunkSamples - samples.Length]];
+                using var stream = recognizer.CreateStream();
+                stream.AcceptWaveform(SampleRate, padded);
+                recognizer.Decode(stream);
+                var result = stream.Result;
+                var words = Words(result, (double)padded.Length / SampleRate);
+                if (words.Count > 0) return Segments(words, 0);
+                var text = result.Text.Trim();
+                return text.Length == 0 ? [] : [new RawSegment(0, (double)samples.Length / SampleRate, text)];
+            }, cancellationToken);
+
+        public ValueTask DisposeAsync()
         {
-            using var recognizer = new OfflineRecognizer(Config());
-            return Decode(recognizer, channelPath, languageRanges, progress, cancellationToken);
-        }, cancellationToken);
+            recognizer.Dispose();
+            return ValueTask.CompletedTask;
+        }
+    }
 
     private OfflineRecognizerConfig Config()
     {
@@ -68,60 +109,6 @@ public sealed class ParakeetEngine(ModelEntry entry, string folder) : ITranscrip
         var path = file is null ? null : Path.Combine(folder, file);
         if (path is null || !File.Exists(path)) throw new TranscriptionException(TranscriptionErrorKind.NeedsModel, entry.Id);
         return path;
-    }
-
-    /// <summary>
-    /// One decode per language range, each read in slabs of at most <see cref="SlabSeconds"/>. Before the last
-    /// slab of a range, its last sentence may be cut by the slab end: it is decoded again with the next slab, which
-    /// starts at it. Swift carries only the last word over, which is enough every 600 s; at 60 s the cut is frequent, and
-    /// TDT token times trail the audio, so restarting at the cut word still repeats the words before it.
-    /// </summary>
-    private static IReadOnlyList<RawSegment> Decode(
-        OfflineRecognizer recognizer, string channelPath, IReadOnlyList<LanguageRange> ranges, Action<double> progress,
-        CancellationToken cancellationToken)
-    {
-        var duration = MonoAudio.Duration(channelPath);
-        var total = Math.Max(1, duration);
-        var segments = new List<RawSegment>();
-        foreach (var range in ranges)
-        {
-            var rangeEnd = Math.Min(range.End ?? duration, duration);
-            var slabStart = range.Start;
-            while (slabStart < rangeEnd)
-            {
-                cancellationToken.ThrowIfCancellationRequested();
-                var slabEnd = Math.Min(slabStart + SlabSeconds, rangeEnd);
-                var samples = MonoAudio.Read(channelPath, slabStart, slabEnd);
-                // As Swift: a slab under 300 ms is not decoded (sherpa-onnx may abort the process on too few frames).
-                if (samples.Length < MinSlabSeconds * SampleRate) break;
-                using var stream = recognizer.CreateStream();
-                stream.AcceptWaveform(SampleRate, samples);
-                recognizer.Decode(stream);
-                var result = stream.Result;
-                var words = Words(result, (double)samples.Length / SampleRate);
-                var nextStart = slabEnd;
-                if (words.Count == 0)
-                {
-                    var text = result.Text.Trim();
-                    if (text.Length > 0) segments.Add(new RawSegment(slabStart, slabEnd, text));
-                }
-                else
-                {
-                    var slabSegments = Segments(words, slabStart);
-                    // The carried-over sentence must start after the slab, or the loop would not advance.
-                    if (slabEnd < rangeEnd && slabSegments.Count > 1 && slabSegments[^1].Start > slabStart)
-                    {
-                        nextStart = slabSegments[^1].Start;
-                        slabSegments.RemoveAt(slabSegments.Count - 1);
-                    }
-                    segments.AddRange(slabSegments);
-                }
-                progress(Math.Min(1, nextStart / total));
-                slabStart = nextStart;
-            }
-        }
-        progress(1);
-        return segments;
     }
 
     /// <summary>

@@ -9,9 +9,9 @@ namespace EchoDiar.Transcribe.Engines;
 /// whisper.cpp ggml models through Whisper.net (Swift <c>WhisperKitEngine</c>), from <c>Models/&lt;id&gt;/</c>.
 /// The model is loaded per job and freed before <see cref="TranscribeAsync"/> returns.
 /// </summary>
-public sealed partial class WhisperEngine(ModelEntry entry, string folder) : ITranscriptionEngine
+public sealed partial class WhisperEngine(ModelEntry entry, string folder) : ISessionTranscriptionEngine
 {
-    public const int DefaultWindowSeconds = 30;
+    public const int DefaultWindowSeconds = TranscriptionPipeline.DefaultWindowSeconds;
 
     /// <summary>
     /// RMS (about −50 dBFS) that some 100 ms frame of a segment's audio must reach for the segment to be kept, see
@@ -24,71 +24,88 @@ public sealed partial class WhisperEngine(ModelEntry entry, string folder) : ITr
     /// <summary>A <see cref="TranscriptionPipeline.EngineFactory"/>.</summary>
     public static ITranscriptionEngine Create(ModelEntry entry, string folder) => new WhisperEngine(entry, folder);
 
+    /// <summary>
+    /// The file cut into speech chunks (<see cref="TranscriptionPipeline.FillGapsAsync"/> over the whole file), each
+    /// decoded by one <see cref="Session"/> with the language of its range; silence is not decoded.
+    /// </summary>
     public async Task<IReadOnlyList<RawSegment>> TranscribeAsync(
         string channelPath, IReadOnlyList<LanguageRange> languageRanges, Action<double> progress,
         CancellationToken cancellationToken)
     {
+        await using var session = await OpenSessionAsync(cancellationToken).ConfigureAwait(false);
+        var segments = await TranscriptionPipeline.FillGapsAsync(
+            [new Span(0, MonoAudio.Duration(channelPath))], channelPath, entry, languageRanges, _ => Task.FromResult(session),
+            progress, cancellationToken).ConfigureAwait(false);
+        progress(1);
+        return segments;
+    }
+
+    /// <summary>Loads the model from the entry's single ggml file; disposing the session frees it.</summary>
+    public Task<ITranscriptionSession> OpenSessionAsync(CancellationToken cancellationToken)
+    {
         var model = entry.Files is [var file] ? Path.Combine(folder, file) : null;
         if (model is null || !File.Exists(model)) throw new TranscriptionException(TranscriptionErrorKind.NeedsModel, entry.Id);
-        using var factory = WhisperFactory.FromPath(model);
-        return await DecodeAsync(factory, channelPath, languageRanges, progress, cancellationToken).ConfigureAwait(false);
+        return Task.FromResult<ITranscriptionSession>(
+            new Session(WhisperFactory.FromPath(model), (entry.WindowSeconds ?? DefaultWindowSeconds) * SampleRate));
     }
 
     /// <summary>
-    /// One decode per language range; each range is read in slabs of at most <see cref="MonoAudio.SlabSeconds"/>, each
-    /// slab is split at silences into windows of the entry's window length, and every window detects its own language
-    /// when the range has none.
+    /// One loaded model for many chunks, decoded like WhisperKit's batch windows (Swift <c>WhisperKitEngine.Session</c>):
+    /// a chunk longer than the window is split at silences, and each window is filtered by <see cref="SpeechText"/> and
+    /// <see cref="IsSilent"/>. Not thread-safe.
     /// </summary>
-    private async Task<IReadOnlyList<RawSegment>> DecodeAsync(
-        WhisperFactory factory, string channelPath, IReadOnlyList<LanguageRange> ranges, Action<double> progress,
-        CancellationToken cancellationToken)
+    public sealed class Session(WhisperFactory factory, int windowSamples) : ITranscriptionSession
     {
-        var duration = MonoAudio.Duration(channelPath);
-        var total = Math.Max(1, duration);
-        var windowSamples = (entry.WindowSeconds ?? DefaultWindowSeconds) * SampleRate;
-        var segments = new List<RawSegment>();
-        foreach (var range in ranges)
+        private WhisperProcessor? _processor;
+        private string? _processorLanguage;
+
+        /// <summary><paramref name="language"/> is a BCP-47 code; null, empty or <c>auto</c> detects it per window.</summary>
+        public async Task<IReadOnlyList<RawSegment>> TranscribeAsync(
+            float[] samples, string? language, CancellationToken cancellationToken)
         {
-            var language = range.Language is { } code ? WhisperLanguages.Primary(code) : null;
-            // No context: each window is decoded on its own, as WhisperKit does, so a hallucination never seeds the next.
-            await using var processor = factory.CreateBuilder().WithLanguage(language ?? "auto").WithNoContext().Build();
-            var rangeEnd = Math.Min(range.End ?? duration, duration);
-            var slabStart = range.Start;
-            while (slabStart < rangeEnd)
+            var trimmed = language?.Trim() ?? "";
+            var code = trimmed.Length == 0 || trimmed.Equals("auto", StringComparison.OrdinalIgnoreCase)
+                ? null
+                : WhisperLanguages.Primary(trimmed);
+            var processor = await Processor(code ?? "auto").ConfigureAwait(false);
+            var segments = new List<RawSegment>();
+            foreach (var (start, length) in Windows(samples, windowSamples))
             {
                 cancellationToken.ThrowIfCancellationRequested();
-                var slabEnd = Math.Min(slabStart + MonoAudio.SlabSeconds, rangeEnd);
-                var samples = MonoAudio.Read(channelPath, slabStart, slabEnd);
-                if (samples.Length == 0) break;
-                var windows = Windows(samples, windowSamples);
-                // Before the last slab, the last window ends at the slab cut, maybe mid-word: it is decoded with the
-                // next slab, which starts where it starts (a VAD silence).
-                var nextStart = slabEnd;
-                if (slabEnd < rangeEnd && windows.Count > 1)
+                var offset = (double)start / SampleRate;
+                var window = samples.AsMemory(start, length);
+                await foreach (var segment in processor.ProcessAsync(window, cancellationToken).ConfigureAwait(false))
                 {
-                    nextStart = slabStart + (double)windows[^1].Start / SampleRate;
-                    windows.RemoveAt(windows.Count - 1);
+                    var text = SpeechText(segment.Text);
+                    if (text.Length == 0 || IsSilent(window.Span, (float)segment.Start.TotalSeconds, (float)segment.End.TotalSeconds)) continue;
+                    segments.Add(new RawSegment(
+                        offset + segment.Start.TotalSeconds, offset + segment.End.TotalSeconds, text,
+                        code is null ? segment.Language : null));
                 }
-                foreach (var (start, length) in windows)
-                {
-                    cancellationToken.ThrowIfCancellationRequested();
-                    var offset = slabStart + (double)start / SampleRate;
-                    var window = samples.AsMemory(start, length);
-                    await foreach (var segment in processor.ProcessAsync(window, cancellationToken).ConfigureAwait(false))
-                    {
-                        var text = SpeechText(segment.Text);
-                        if (text.Length == 0 || IsSilent(window.Span, (float)segment.Start.TotalSeconds, (float)segment.End.TotalSeconds)) continue;
-                        segments.Add(new RawSegment(
-                            offset + segment.Start.TotalSeconds, offset + segment.End.TotalSeconds, text,
-                            language is null ? segment.Language : null));
-                    }
-                    progress(Math.Min(1, (offset + (double)length / SampleRate) / total));
-                }
-                slabStart = nextStart;
             }
+            return segments;
         }
-        progress(1);
-        return segments;
+
+        /// <summary>
+        /// The processor for <paramref name="language"/>, rebuilt when it changes. No context: each window is decoded
+        /// on its own, as WhisperKit does, so a hallucination never seeds the next.
+        /// </summary>
+        private async ValueTask<WhisperProcessor> Processor(string language)
+        {
+            if (_processor is not null && _processorLanguage == language) return _processor;
+            if (_processor is not null) await _processor.DisposeAsync().ConfigureAwait(false);
+            _processor = null;
+            _processor = factory.CreateBuilder().WithLanguage(language).WithNoContext().Build();
+            _processorLanguage = language;
+            return _processor;
+        }
+
+        public async ValueTask DisposeAsync()
+        {
+            if (_processor is not null) await _processor.DisposeAsync().ConfigureAwait(false);
+            _processor = null;
+            factory.Dispose();
+        }
     }
 
     // Text rules

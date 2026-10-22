@@ -22,6 +22,30 @@ public interface ITranscriptionEngine
 }
 
 /// <summary>
+/// A batch engine that also loads as an <see cref="ITranscriptionSession"/> (Swift <c>TranscriptionSessions.load</c>):
+/// Whisper and Parakeet. Only these keep a prior transcription and fill its gaps.
+/// </summary>
+public interface ISessionTranscriptionEngine : ITranscriptionEngine
+{
+    /// <summary>Loads the model; the caller disposes the session, which unloads it.</summary>
+    Task<ITranscriptionSession> OpenSessionAsync(CancellationToken cancellationToken);
+}
+
+/// <summary>
+/// A model loaded once to transcribe many chunks of 16 kHz mono audio, then unloaded by
+/// <see cref="IAsyncDisposable.DisposeAsync"/> (Swift <c>TranscriptionSession</c>). Not thread-safe: one task loads,
+/// uses and disposes it.
+/// </summary>
+public interface ITranscriptionSession : IAsyncDisposable
+{
+    /// <summary>
+    /// Speech in <paramref name="samples"/>, with times in seconds from the chunk's first sample.
+    /// <paramref name="language"/> is a BCP-47 code; null, empty or <c>auto</c> detects it.
+    /// </summary>
+    Task<IReadOnlyList<RawSegment>> TranscribeAsync(float[] samples, string? language, CancellationToken cancellationToken);
+}
+
+/// <summary>
 /// Speaker turns on the system channel (Swift <c>SpeakerDiarizer</c>). Loads its model inside
 /// <see cref="DiarizeAsync"/> and unloads before returning.
 /// </summary>
@@ -69,7 +93,6 @@ public sealed record LanguageRange(
 /// One conversation folder to transcribe (Swift <c>TranscriptionJob</c>). Keys as the Swift Codable; Swift never
 /// persists a job, so only the key names are kept (<see cref="Folder"/> is a path, not a file URL).
 /// </summary>
-/// <remarks>Swift's <c>prior</c> (transcribe-while-recording reuse) arrives in Phase 16.</remarks>
 public sealed record TranscriptionJob
 {
     /// <summary>The conversation (and session) id.</summary>
@@ -96,6 +119,70 @@ public sealed record TranscriptionJob
     [JsonPropertyName("diarizerID")] public string? DiarizerID { get; set; }
     /// <summary>"Tell speakers apart": false runs no diarizer, so the whole system channel is one speaker (<c>s1</c>).</summary>
     [JsonPropertyName("diarize")] public bool Diarize { get; set; } = true;
+    /// <summary>
+    /// What the recording transcriber transcribed while recording: when <see cref="PriorTranscription.IsUsable"/> for
+    /// this run, the pipeline keeps its segments and transcribes only its gaps; null or not usable = the whole recording.
+    /// </summary>
+    [JsonPropertyName("prior")] public PriorTranscription? Prior { get; set; }
+}
+
+/// <summary>A stretch of the audio file, in seconds from its start.</summary>
+public sealed record Span(
+    [property: JsonPropertyName("start")] double Start,
+    [property: JsonPropertyName("end")] double End);
+
+/// <summary>
+/// What the recording transcriber transcribed while recording, in file time (Swift <c>PriorTranscription</c>): the
+/// pipeline keeps these segments and transcribes only the gaps at Stop.
+/// </summary>
+public sealed record PriorTranscription
+{
+    /// <summary>How one speech chunk of a channel ended.</summary>
+    public enum ChunkOutcome
+    {
+        Transcribed,
+        /// <summary>Peak below <see cref="MonoAudio.SilencePeak"/>: covered, not decoded.</summary>
+        Silence,
+        /// <summary>Over the queue cap.</summary>
+        Dropped,
+        /// <summary>The ASR threw.</summary>
+        Failed,
+        /// <summary>Not decoded by Stop.</summary>
+        Pending,
+    }
+
+    /// <summary>Catalog id of the engine that transcribed the segments.</summary>
+    [JsonPropertyName("engineID")] public required string EngineID { get; init; }
+    [JsonPropertyName("mic")] public IReadOnlyList<RawSegment> Mic { get; init; } = [];
+    [JsonPropertyName("system")] public IReadOnlyList<RawSegment> System { get; init; } = [];
+    /// <summary>Spans not transcribed, to transcribe at Stop.</summary>
+    [JsonPropertyName("micGaps")] public IReadOnlyList<Span> MicGaps { get; init; } = [];
+    [JsonPropertyName("systemGaps")] public IReadOnlyList<Span> SystemGaps { get; init; } = [];
+    /// <summary>Seconds of audio the transcriber saw (= the file's duration when every frame reached it).</summary>
+    [JsonPropertyName("duration")] public double Duration { get; init; }
+
+    /// <summary>
+    /// One channel's chunks in file order → the spans of the dropped, failed and pending ones, touching or overlapping
+    /// spans merged. Transcribed and silence chunks, and the pauses between chunks, are covered.
+    /// </summary>
+    public static List<Span> Gaps(IEnumerable<(Span Span, ChunkOutcome Outcome)> chunks)
+    {
+        var gaps = new List<Span>();
+        foreach (var (span, outcome) in chunks)
+        {
+            if (outcome is ChunkOutcome.Transcribed or ChunkOutcome.Silence) continue;
+            if (gaps.Count > 0 && gaps[^1].End >= span.Start) gaps[^1] = gaps[^1] with { End = Math.Max(gaps[^1].End, span.End) };
+            else gaps.Add(span);
+        }
+        return gaps;
+    }
+
+    /// <summary>
+    /// False when the run would not reproduce these segments: another engine, a language fallback, a language override
+    /// (re-transcribe), or audio whose duration differs by more than 0.1 s.
+    /// </summary>
+    public bool IsUsable(string engineID, string? engineFallback, string? languageOverride, double audioDuration) =>
+        engineID == EngineID && engineFallback is null && languageOverride is null && Math.Abs(Duration - audioDuration) <= 0.1;
 }
 
 [JsonConverter(typeof(JobStepConverter))]

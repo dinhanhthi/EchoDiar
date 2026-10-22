@@ -1,3 +1,4 @@
+using EchoDiar.Core;
 using EchoDiar.Core.Models;
 using EchoDiar.Transcribe;
 using EchoDiar.Transcribe.Engines;
@@ -60,6 +61,7 @@ public sealed class NativeSmokeTests : IDisposable
 
         var text = string.Join(" ", segments.Select(s => s.Text));
         Log($"whisper ({Environment.OSVersion}, {System.Runtime.InteropServices.RuntimeInformation.ProcessArchitecture}): {text}");
+        Log("whisper segments: " + Times(segments));
         Assert.Contains(KnownWord, text, StringComparison.OrdinalIgnoreCase);
     }
 
@@ -90,8 +92,12 @@ public sealed class NativeSmokeTests : IDisposable
 
         var text = string.Join(" ", segments.Select(s => s.Text));
         Log($"parakeet: {text}");
+        Log("parakeet segments: " + Times(segments));
         Assert.Contains(KnownWord, text, StringComparison.OrdinalIgnoreCase);
     }
+
+    private static string Times(IEnumerable<RawSegment> segments) =>
+        string.Join(", ", segments.Select(s => $"{s.Start:0.00}-{s.End:0.00}"));
 
     private static ModelEntry PinnedDiarizer()
     {
