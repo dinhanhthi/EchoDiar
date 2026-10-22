@@ -306,6 +306,7 @@ public sealed partial class TitleBarToolbar : UserControl
         else if (_routePromptPending)
         {
             _routePromptPending = false;
+            StartupTrace.Write($"lost-mic prompt: {(_model.IsRecording ? "shown" : "dropped, not recording")}");
             if (_model.IsRecording) _ = AskRouteLostAsync();
         }
     }
@@ -324,6 +325,7 @@ public sealed partial class TitleBarToolbar : UserControl
 
     private void OnMicRouteLostAsk()
     {
+        StartupTrace.Write($"lost-mic prompt asked: open prompt {_routePrompt is not null}, open dialog {_dialog is not null}, XamlRoot {XamlRoot is not null}");
         if (_routePrompt is not null) return;
         _routePromptPending = true;
         ShowNextDialog();
@@ -342,6 +344,7 @@ public sealed partial class TitleBarToolbar : UserControl
         _routePrompt = dialog;
         await ShowAsync(dialog, result =>
         {
+            StartupTrace.Write($"lost-mic prompt answered: {result}");
             if (result == ContentDialogResult.Primary && _model is { IsRecording: true } model) _ = model.StopRecordingAsync();
         });
         _routePrompt = null;

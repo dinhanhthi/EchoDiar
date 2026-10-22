@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using EchoDiar.App.Services;
 using EchoDiar.App.Views;
 using EchoDiar.Core.Audio;
 using EchoDiar.Core.Models;
@@ -119,6 +120,7 @@ public sealed partial class AppViewModel
     /// <summary>Ask: the window's prompt; Stop: the normal stop; Continue: nothing (macOS micRoutesLost).</summary>
     private void OnMicRouteLost(RouteChangeBehavior behavior)
     {
+        StartupTrace.Write($"MicRouteLost on the UI thread: {behavior}, recording {IsRecording}");
         if (!IsRecording) return;
         switch (behavior)
         {

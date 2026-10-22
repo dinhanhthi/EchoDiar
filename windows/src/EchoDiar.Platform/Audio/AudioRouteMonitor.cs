@@ -54,6 +54,12 @@ public sealed class AudioRouteMonitor : IAudioRouteSource, IDisposable
     public event Action? InputLost;
 
     /// <summary>
+    /// Diagnostics (null: none): each notification, start and evaluation as a line. Called on audio service and
+    /// thread-pool threads, inside the monitor's lock: it must be quick and never throw.
+    /// </summary>
+    public Action<string>? Log { get; set; }
+
+    /// <summary>
     /// Starts listening, after stopping any previous run. <paramref name="inputEndpointId"/>: the picked mic (null =
     /// the default input); while it is active it is the input in use. Returns false, staying stopped, when the
     /// endpoint notifications cannot be registered (no audio service).
@@ -73,6 +79,7 @@ public sealed class AudioRouteMonitor : IAudioRouteSource, IDisposable
             {
                 OnMta(() =>
                 {
+                    var registered = _client is null;
                     var client = _client ??= Register();
                     var input = ResolveInput(client.Enumerator, inputEndpointId);
                     var output = DefaultEndpoint(client.Enumerator, EDataFlow.eRender);
@@ -83,11 +90,13 @@ public sealed class AudioRouteMonitor : IAudioRouteSource, IDisposable
                         _output = output;
                         _running = true;
                     }
+                    Log?.Invoke($"route monitor: start, picked {inputEndpointId ?? "none (default)"}, client {(registered ? "registered" : "reused")}, input {input}, output {output}");
                 });
                 return true;
             }
-            catch (COMException)
+            catch (COMException e)
             {
+                Log?.Invoke($"route monitor: start failed, {e.GetType().Name} 0x{e.HResult:X8} {e.Message}");
                 return false;
             }
         }
@@ -97,6 +106,7 @@ public sealed class AudioRouteMonitor : IAudioRouteSource, IDisposable
     public void Stop()
     {
         lock (_gate) StopLocked();
+        Log?.Invoke("route monitor: stop");
     }
 
     /// <summary>Stops and unregisters the notification client.</summary>
@@ -158,7 +168,10 @@ public sealed class AudioRouteMonitor : IAudioRouteSource, IDisposable
     }
 
     /// <summary>An endpoint id (null = none) and its device format's sample rate (0 when unknown).</summary>
-    private readonly record struct Endpoint(string? Id, uint Rate);
+    private readonly record struct Endpoint(string? Id, uint Rate)
+    {
+        public override string ToString() => $"{Id ?? "none"} ({Rate} Hz)";
+    }
 
     private void StopLocked()
     {
@@ -209,20 +222,25 @@ public sealed class AudioRouteMonitor : IAudioRouteSource, IDisposable
                 if (!_running) return;
 
                 var enumerator = listener.Enumerator;
-                var inputLost = _input.Id is not null && !IsActive(enumerator, _input.Id);
+                var state = _input.Id is null ? null : StateOf(enumerator, _input.Id);
+                var inputLost = _input.Id is not null && state != DEVICE_STATE.DEVICE_STATE_ACTIVE;
                 var input = ResolveInput(enumerator, _pinnedId);
+                var inputEvent = inputLost ? nameof(InputLost) : input != _input ? nameof(InputChanged) : null;
                 if (inputLost) events.Add(InputLost);
                 else if (input != _input) events.Add(InputChanged);
-                _input = input;
 
                 var output = DefaultEndpoint(enumerator, EDataFlow.eRender);
                 if (output != _output) events.Add(OutputChanged);
+                Log?.Invoke($"route monitor: evaluate, input {_input} state {(state is { } s ? $"0x{(uint)s:X}" : "unreadable")} -> {input}, " +
+                    $"output {_output} -> {output}, raises [{string.Join(", ", new[] { inputEvent, output != _output ? nameof(OutputChanged) : null }.OfType<string>())}]");
+                _input = input;
                 _output = output;
             }
         }
-        catch (Exception)
+        catch (Exception e)
         {
             // An exception out of a timer callback ends the process; the next notification evaluates again.
+            Log?.Invoke($"route monitor: evaluate failed, {e.GetType().Name} 0x{e.HResult:X8} {e.Message}");
             return;
         }
         foreach (var handler in events) handler?.Invoke();
@@ -277,18 +295,21 @@ public sealed class AudioRouteMonitor : IAudioRouteSource, IDisposable
         }
     }
 
-    /// <summary>Whether the endpoint exists and is active (the counterpart of DeviceIsAlive); one that cannot be read is not.</summary>
-    private static bool IsActive(IMMDeviceEnumerator enumerator, string id)
+    /// <summary>
+    /// The endpoint's state, null when it cannot be read (removed); only an active one is alive (the counterpart of
+    /// DeviceIsAlive).
+    /// </summary>
+    private static DEVICE_STATE? StateOf(IMMDeviceEnumerator enumerator, string id)
     {
         IMMDevice? device = null;
         try
         {
             enumerator.GetDevice(id, out device);
-            return State(device) == DEVICE_STATE.DEVICE_STATE_ACTIVE;
+            return State(device);
         }
         catch (COMException)
         {
-            return false;
+            return null;
         }
         finally
         {
@@ -388,30 +409,41 @@ public sealed class AudioRouteMonitor : IAudioRouteSource, IDisposable
             _timer.Dispose();
         }
 
-        public void OnDeviceStateChanged(PCWSTR pwstrDeviceId, DEVICE_STATE dwNewState) => Schedule();
+        public void OnDeviceStateChanged(PCWSTR pwstrDeviceId, DEVICE_STATE dwNewState) =>
+            Schedule(_monitor.Log is null ? null : $"OnDeviceStateChanged {pwstrDeviceId} state 0x{(uint)dwNewState:X}");
 
-        public void OnDeviceAdded(PCWSTR pwstrDeviceId) => Schedule();
+        public void OnDeviceAdded(PCWSTR pwstrDeviceId) =>
+            Schedule(_monitor.Log is null ? null : $"OnDeviceAdded {pwstrDeviceId}");
 
-        public void OnDeviceRemoved(PCWSTR pwstrDeviceId) => Schedule();
+        public void OnDeviceRemoved(PCWSTR pwstrDeviceId) =>
+            Schedule(_monitor.Log is null ? null : $"OnDeviceRemoved {pwstrDeviceId}");
 
-        public void OnDefaultDeviceChanged(EDataFlow flow, ERole role, PCWSTR pwstrDefaultDeviceId) => Schedule();
+        public void OnDefaultDeviceChanged(EDataFlow flow, ERole role, PCWSTR pwstrDefaultDeviceId) =>
+            Schedule(_monitor.Log is null ? null : $"OnDefaultDeviceChanged {flow} {role} {pwstrDefaultDeviceId.ToString() ?? "none"}");
 
         public void OnPropertyValueChanged(PCWSTR pwstrDeviceId, PROPERTYKEY key)
         {
             var format = PInvoke.PKEY_AudioEngine_DeviceFormat;
-            if (key.fmtid == format.fmtid && key.pid == format.pid) Schedule();
+            if (key.fmtid == format.fmtid && key.pid == format.pid)
+                Schedule(_monitor.Log is null ? null : $"OnPropertyValueChanged {pwstrDeviceId} device format");
         }
 
-        /// <summary>While the monitor runs, the first notification of a burst arms the timer; the others until it fires are absorbed.</summary>
-        private void Schedule()
+        /// <summary>
+        /// While the monitor runs, the first notification of a burst arms the timer; the others until it fires are
+        /// absorbed. <paramref name="trace"/>: the notification, for <see cref="Log"/>.
+        /// </summary>
+        private void Schedule(string? trace)
         {
             try
             {
-                if (_monitor._running && Interlocked.Exchange(ref _pending, 1) == 0) _timer.Change(Coalesce, Timeout.InfiniteTimeSpan);
+                var running = _monitor._running;
+                var armed = running && Interlocked.Exchange(ref _pending, 1) == 0;
+                if (armed) _timer.Change(Coalesce, Timeout.InfiniteTimeSpan);
+                if (trace is not null) _monitor.Log?.Invoke($"route monitor: {trace}, running {running}, {(armed ? "evaluates in 300 ms" : "absorbed")}");
             }
             catch (Exception)
             {
-                // Disposed meanwhile (disposing): nothing to evaluate.
+                // Disposed meanwhile (disposing): nothing to evaluate. A log that threw: nothing to report.
             }
         }
     }

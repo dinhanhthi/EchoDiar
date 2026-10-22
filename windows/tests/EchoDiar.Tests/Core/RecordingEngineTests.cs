@@ -14,6 +14,7 @@ public sealed class RecordingEngineTests : IDisposable
     private readonly List<FakeSource> _systems = [];
     private readonly List<FakeSource> _mics = [];
     private readonly HashSet<string> _goneMics = [];
+    private bool _noDefaultMic;
     private readonly FakeRoutes _routes = new();
     private long _now = 1_000_000_000;
     private RecordingEngine? _engine;
@@ -33,7 +34,7 @@ public sealed class RecordingEngineTests : IDisposable
             id => Add(_mics, new FakeSource
             {
                 EndpointId = id,
-                StartError = id is not null && _goneMics.Contains(id) ? new InvalidOperationException("gone") : null,
+                StartError = (id is null ? _noDefaultMic : _goneMics.Contains(id)) ? new InvalidOperationException("gone") : null,
             }),
             availableFreeSpace: _ => 10_000_000_000,
             clock: () => _now,
@@ -118,6 +119,38 @@ public sealed class RecordingEngineTests : IDisposable
         Assert.Equal(1, engine.CurrentSnapshot().MicRoutesLost);
         Assert.Equal([RouteChangeBehavior.Stop], behaviors);
         Assert.Equal(RecordingEngine.State.Recording, engine.CurrentSnapshot().State); // the App applies the behavior
+    }
+
+    [Fact]
+    public void LostDefaultInputWithNoOtherMicRecordsSilenceAndAsks()
+    {
+        var engine = Engine();
+        var behaviors = new List<RouteChangeBehavior>();
+        engine.MicRouteLost += behaviors.Add;
+        var folder = engine.Start(CaptureTarget.Global, "auto", micEndpointId: null, _root);
+        Assert.Equal([null], _routes.Starts);
+        Assert.Equal("Fake", RecordingSession.Read(folder).MicDeviceName);
+
+        _noDefaultMic = true; // the only capture endpoint was disabled: no default input either
+        _routes.InputLost?.Invoke();
+
+        Assert.Equal(2, _mics.Count);
+        Assert.True(_mics[0].Disposed);
+        Assert.Null(_mics[1].EndpointId);
+        Assert.Null(RecordingSession.Read(folder).MicDeviceName); // the silent stand-in, saved
+        Assert.Equal(1, engine.CurrentSnapshot().MicRoutesLost);
+        Assert.Equal([RouteChangeBehavior.Ask], behaviors); // no RouteBehavior: Ask
+        Assert.Equal(RecordingEngine.State.Recording, engine.CurrentSnapshot().State);
+
+        _noDefaultMic = false; // re-enabled: the monitor reports a new input
+        _routes.InputChanged?.Invoke();
+
+        Assert.Equal(3, _mics.Count);
+        Assert.Null(_mics[2].EndpointId);
+        Assert.False(_mics[2].Disposed);
+        Assert.Equal("Fake", RecordingSession.Read(folder).MicDeviceName);
+        Assert.Equal(1, engine.CurrentSnapshot().MicRoutesLost);
+        Assert.Single(behaviors);
     }
 
     [Fact]

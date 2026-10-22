@@ -42,6 +42,11 @@ internal sealed class AppServices : IDisposable
         {
             IsTargetPlayingOutput = IsTargetPlayingOutput,
         };
+#if DEBUG
+        // Route changes in Logs\startup.log; Release builds leave both null and format nothing.
+        _routes.Log = message => StartupTrace.Write(message);
+        Engine.Log = message => StartupTrace.Write(message);
+#endif
     }
 
     public AppPaths Paths { get; }

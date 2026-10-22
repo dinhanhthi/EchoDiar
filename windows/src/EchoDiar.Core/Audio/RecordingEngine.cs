@@ -214,6 +214,12 @@ public sealed class RecordingEngine : IDisposable
     /// <summary>The <c>routeChangeBehavior</c> setting, read when the mic is lost. Null: <see cref="RouteChangeBehavior.Ask"/>.</summary>
     public Func<RouteChangeBehavior>? RouteBehavior { get; set; }
 
+    /// <summary>
+    /// Diagnostics (null: none): the route source's start and stop, each route change and what it did, a failed mic.
+    /// Called on thread-pool threads, often inside the engine's lock: it must be quick and never throw.
+    /// </summary>
+    public Action<string>? Log { get; set; }
+
     /// <summary>Gets each written block (see <see cref="ChannelWriter.LiveSink"/>). Read at <see cref="Start"/>.</summary>
     public ChannelWriter.LiveSinkHandler? LiveSink { get; set; }
 
@@ -501,6 +507,7 @@ public sealed class RecordingEngine : IDisposable
         lock (_gate)
         {
             if (generation != _micGeneration || _state != State.Recording || _writer is null || _session is null) return;
+            Log?.Invoke("engine: the mic failed, its channel continues as silence");
             _mic?.Source?.Dispose();
             _micGeneration++;
             var standIn = StandInMic();
@@ -544,6 +551,7 @@ public sealed class RecordingEngine : IDisposable
                     _routes.InputChanged -= old.Input;
                     _routes.InputLost -= old.Lost;
                     _routes.Stop();
+                    Log?.Invoke($"engine: route source stopped for session {_routesGeneration}");
                 }
                 _routesGeneration = generation;
                 if (generation == 0) return;
@@ -555,12 +563,14 @@ public sealed class RecordingEngine : IDisposable
                 _routes.OutputChanged += handlers.Output;
                 _routes.InputChanged += handlers.Input;
                 _routes.InputLost += handlers.Lost;
-                _routes.Start(endpointId);
+                var listening = _routes.Start(endpointId);
+                Log?.Invoke($"engine: route source started for session {generation}, mic {endpointId ?? "default"}, listening {listening}");
             }
             catch (Exception e)
             {
                 // The recording goes on without following route changes.
                 Debug.WriteLine($"EchoDiar: could not sync the route monitor: {e}");
+                Log?.Invoke($"engine: could not sync the route source, {e.GetType().Name} 0x{e.HResult:X8} {e.Message}");
             }
         }
     }
@@ -577,6 +587,7 @@ public sealed class RecordingEngine : IDisposable
         {
             lock (_gate)
             {
+                Log?.Invoke($"engine: {route} for session {generation} (current {_sessionGeneration}, {_state})");
                 if (generation != _sessionGeneration || _state == State.Idle) return;
                 switch (route)
                 {
@@ -590,7 +601,9 @@ public sealed class RecordingEngine : IDisposable
                         _micRoutesLost++;
                         Publish();
                         ReopenMic(null); // the lost id cannot reopen: the default input
-                        MicRouteLost?.Invoke(RouteBehavior?.Invoke() ?? RouteChangeBehavior.Ask);
+                        var behavior = RouteBehavior?.Invoke() ?? RouteChangeBehavior.Ask;
+                        Log?.Invoke($"engine: micRoutesLost {_micRoutesLost}, MicRouteLost raised with {behavior} ({MicRouteLost?.GetInvocationList().Length ?? 0} handlers)");
+                        MicRouteLost?.Invoke(behavior);
                         break;
                 }
             }
@@ -598,6 +611,7 @@ public sealed class RecordingEngine : IDisposable
         catch (Exception e)
         {
             Debug.WriteLine($"EchoDiar: route change {route} failed: {e}");
+            Log?.Invoke($"engine: {route} failed, {e.GetType().Name} 0x{e.HResult:X8} {e.Message}");
         }
     }
 
@@ -638,7 +652,11 @@ public sealed class RecordingEngine : IDisposable
     /// <summary>Replaces the open mic with <paramref name="endpointId"/> (see <see cref="OpenMic"/>) while recording.</summary>
     private void ReopenMic(string? endpointId)
     {
-        if (_state != State.Recording || _writer is null || _session is null) return;
+        if (_state != State.Recording || _writer is null || _session is null)
+        {
+            Log?.Invoke($"engine: mic not reopened while {_state}");
+            return;
+        }
         _mic?.Source?.Dispose();
         _mic = null;
         var mic = OpenMic(endpointId);
@@ -658,6 +676,7 @@ public sealed class RecordingEngine : IDisposable
         _session.MicDeviceName = mic.Source?.Name;
         Save();
         lock (_shared) _micRing = mic.Ring;
+        Log?.Invoke($"engine: mic reopened with {endpointId ?? "the default input"}: {mic.Source?.Name ?? "silent stand-in"}");
     }
 
     private void CloseSources()
