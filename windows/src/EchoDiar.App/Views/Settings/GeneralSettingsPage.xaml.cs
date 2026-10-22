@@ -26,7 +26,6 @@ public sealed partial class GeneralSettingsPage : UserControl
     [
         new("Launch at login", ["startup", "startup apps", "login item", "open at login", "sign in"]),
         new("Default language", ["language", "English", "French", "Vietnamese"]),
-        new("Playback", ["stereo", "mono", "left", "right", "ear", "headphones", "channels"]),
         new("Show floating indicator while recording", ["pill", "overlay", "floating"]),
         new("Hide it while an EchoDiar window is in front", ["floating indicator", "pill", "hide"]),
         new("Show it in screenshots and screen recordings", ["floating indicator", "pill", "screenshot", "screen sharing", "capture"]),
@@ -49,7 +48,6 @@ public sealed partial class GeneralSettingsPage : UserControl
         _model = model;
         _settings = model.SettingsModel;
         InitializeComponent();
-        PlaybackCard.Description = Loc.T("How the transcript plays your microphone and the meeting's sound.");
         ConsentText.Text = $"\"{Loc.T(ConsentMessage)}\"";
 
         LaunchToggle.Toggled += (_, _) => _ = OnLaunchToggledAsync();
@@ -57,10 +55,6 @@ public sealed partial class GeneralSettingsPage : UserControl
         {
             var index = LanguageCombo.SelectedIndex;
             if (!_syncing && index >= 0 && index < _languageCodes.Count) _settings.DefaultLanguage = _languageCodes[index];
-        };
-        PlaybackCombo.SelectionChanged += (_, _) =>
-        {
-            if (!_syncing && PlaybackCombo.SelectedIndex >= 0) _settings.PlaybackChannels = (PlaybackChannels)PlaybackCombo.SelectedIndex;
         };
         ShowPillToggle.Toggled += (_, _) => Set(() => _settings.ShowPill = ShowPillToggle.IsOn);
         HidePillToggle.Toggled += (_, _) => Set(() => _settings.HidePillWhenAppActive = HidePillToggle.IsOn);
@@ -98,7 +92,6 @@ public sealed partial class GeneralSettingsPage : UserControl
             LaunchToggle.IsEnabled = _settings.CanChangeLaunchAtLogin;
             LaunchCard.Description = _settings.LaunchAtLoginNote!; // null hides it
             RefreshLanguages();
-            PlaybackCombo.SelectedIndex = (int)_settings.PlaybackChannels;
             ShowPillToggle.IsOn = _settings.ShowPill;
             HidePillToggle.IsOn = _settings.HidePillWhenAppActive;
             // macOS disables "Hide it…" while the indicator is off.

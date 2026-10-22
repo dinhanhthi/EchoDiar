@@ -41,15 +41,17 @@ public sealed record SettingsSection(
 public static class SettingsSearch
 {
     public const string General = "general";
+    public const string Storage = "storage";
     public const string About = "about";
     public const string Acknowledgements = "acknowledgements";
 
     /// <summary>Every section, in sidebar order (macOS: General, Recording, Transcription, AI, RAG, Storage, Shortcuts, About, Acknowledgements).</summary>
     public static IReadOnlyList<SettingsSection> Sections { get; } =
     [
-        // Default language and Playback are in General on Windows until the Transcription and Storage sections exist.
+        // Default language is in General on Windows until the Transcription section exists.
         new(General, "General", "\uE713", [], GeneralSettingsPage.SearchEntries, model => new GeneralSettingsPage(model)),
-        new(About, "About", "\uE946", [], AboutSettingsPage.SearchEntries, model => new AboutSettingsPage(model)),
+        new(Storage, "Storage", "\uEDA2", StorageSettingsPage.SubTabs, StorageSettingsPage.SearchEntries, model => new StorageSettingsPage(model)),
+        new(About, "About", "\uE946", [], AboutSettingsPage.SearchEntries, _ => new AboutSettingsPage()),
         new(Acknowledgements, "Acknowledgements", "\uE8A5", [], AcknowledgementsSettingsPage.SearchEntries, _ => new AcknowledgementsSettingsPage()),
     ];
 

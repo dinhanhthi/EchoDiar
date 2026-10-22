@@ -121,6 +121,22 @@ public sealed partial class SettingsViewModel : ObservableObject
         set => Update(s => s with { PlaybackChannels = value });
     }
 
+    // Storage
+
+    /// <summary>"Compression bitrate": the total AAC bitrate of the m4a, in kbps.</summary>
+    public int CompressionBitrateKbps
+    {
+        get => Settings.CompressionBitrateKbps;
+        set => Update(s => s with { CompressionBitrateKbps = value });
+    }
+
+    /// <summary>"Keep uncompressed audio": the CAF stays next to the m4a.</summary>
+    public bool KeepUncompressedAudio
+    {
+        get => Settings.KeepUncompressedAudio;
+        set => Update(s => s with { KeepUncompressedAudio = value });
+    }
+
     /// <summary>"Show floating indicator while recording".</summary>
     public bool ShowPill
     {

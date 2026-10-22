@@ -1,5 +1,6 @@
 using System.Diagnostics;
 using EchoDiar.App.Services;
+using EchoDiar.Core;
 using EchoDiar.Core.Settings;
 using Microsoft.UI.Dispatching;
 
@@ -31,6 +32,12 @@ public sealed partial class AppViewModel
 
     /// <summary>The folder of every recording (macOS <c>RecordingSession.conversationsRoot</c>), Settings' data folder.</summary>
     public string ConversationsFolder => _services.Paths.Conversations;
+
+    /// <summary>
+    /// Bytes on disk by kind (macOS <c>storageUsage</c>): the library's folders and every installed model, measured off
+    /// the UI thread.
+    /// </summary>
+    public Task<LibraryStore.Usage> StorageUsageAsync() => _services.Library.UsageAsync(_services.Models.TotalInstalledBytes);
 
     /// <summary>The id of the Settings section shown (<see cref="SettingsSearch.Sections"/>).</summary>
     public string SettingsSection

@@ -1,10 +1,10 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!--
     Settings › General (macOS GeneralSettingsView.swift): launch at login, the floating indicator, deleting without
-    confirmation and the consent message, as Windows 11 Settings cards under section headers. Default language and
-    Playback are here too until the Transcription and Storage sections exist (macOS has them there). The "Permissions
-    and consent" section's "Show onboarding again" comes with the onboarding (task 19.4). Each searchable card's Tag is
-    its search entry's title (SearchEntries), so a search result can bring it into view.
+    confirmation and the consent message, as Windows 11 Settings cards under section headers. Default language is here
+    too until the Transcription section exists (macOS has it there). The "Permissions and consent" section's "Show
+    onboarding again" comes with the onboarding (task 19.4). Each searchable card's Tag is its search entry's title
+    (SearchEntries), so a search result can bring it into view.
 -->
 <UserControl
     x:Class="EchoDiar.App.Views.GeneralSettingsPage"
@@ -40,20 +40,6 @@
                     x:Name="LanguageCombo"
                     MinWidth="200"
                     AutomationProperties.Name="{local:T Text='Default language'}" />
-            </controls:SettingsCard>
-
-            <!-- Description in code: the text has an apostrophe. -->
-            <controls:SettingsCard
-                x:Name="PlaybackCard"
-                Header="{local:T Text='Playback'}"
-                Tag="Playback">
-                <ComboBox
-                    x:Name="PlaybackCombo"
-                    MinWidth="200"
-                    AutomationProperties.Name="{local:T Text='Playback'}">
-                    <ComboBoxItem Content="{local:T Text='Both voices in both ears'}" />
-                    <ComboBoxItem Content="{local:T Text='My voice left, others right'}" />
-                </ComboBox>
             </controls:SettingsCard>
 
             <StackPanel Style="{StaticResource SectionHeaderStyle}">

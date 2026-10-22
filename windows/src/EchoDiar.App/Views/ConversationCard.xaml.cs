@@ -336,7 +336,7 @@ public sealed partial class ConversationCard : UserControl
     }
 
     /// <summary>Like ByteCountFormatter's file style: decimal units, "12 KB", "3.4 MB", "1.23 GB".</summary>
-    private static string FileSize(long bytes)
+    internal static string FileSize(long bytes)
     {
         var culture = CultureInfo.CurrentCulture;
         if (bytes < 1_000) return string.Format(culture, "{0} bytes", bytes);

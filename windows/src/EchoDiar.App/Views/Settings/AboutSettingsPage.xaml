@@ -1,8 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!--
-    Settings › About (macOS SettingsWindow.swift AboutSettingsView): the logo, name and version, the license, the GitHub
-    link, and the data folder with "Open in File Explorer" (macOS has it in Storage), as Windows 11 Settings cards. Each
-    searchable card's Tag is its search entry's title (SearchEntries).
+    Settings › About (macOS SettingsWindow.swift AboutSettingsView): the logo, name and version, the license and the
+    GitHub link, as Windows 11 Settings cards. Each searchable card's Tag is its search entry's title (SearchEntries).
 -->
 <UserControl
     x:Class="EchoDiar.App.Views.AboutSettingsPage"
@@ -45,21 +44,6 @@
                 <controls:SettingsCard.ActionIcon>
                     <FontIcon FontFamily="{ThemeResource SymbolThemeFontFamily}" Glyph="&#xE8A7;" />
                 </controls:SettingsCard.ActionIcon>
-            </controls:SettingsCard>
-
-            <controls:SettingsCard
-                Header="{local:T Text='Data folder'}"
-                Tag="Data folder">
-                <controls:SettingsCard.HeaderIcon>
-                    <FontIcon FontFamily="{ThemeResource SymbolThemeFontFamily}" Glyph="&#xE8B7;" />
-                </controls:SettingsCard.HeaderIcon>
-                <controls:SettingsCard.Description>
-                    <TextBlock
-                        x:Name="DataFolderText"
-                        IsTextSelectionEnabled="True"
-                        TextWrapping="Wrap" />
-                </controls:SettingsCard.Description>
-                <Button x:Name="OpenFolderButton" Content="{local:T Text='Open in File Explorer'}" />
             </controls:SettingsCard>
         </StackPanel>
     </ScrollViewer>
