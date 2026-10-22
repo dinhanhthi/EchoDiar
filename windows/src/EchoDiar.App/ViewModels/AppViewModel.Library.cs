@@ -30,19 +30,29 @@ public sealed partial class AppViewModel
 
     /// <summary>
     /// Searchable text by conversation (speakers, transcript, summary, chat), read off the UI thread only while a term
-    /// is searched; read again when the conversation's size or files change (a new transcript or summary).
+    /// is searched; read again when the conversation's size or files change (a new transcript or summary) or its
+    /// transcript is edited.
     /// </summary>
     private readonly Dictionary<Guid, SearchDocument> _searchDocuments = [];
+
+    /// <summary>
+    /// macOS <c>transcriptEdits</c>: transcript edits by conversation. A speaker renamed to a name of the same length
+    /// leaves the size unchanged, so the count marks the document stale instead.
+    /// </summary>
+    private readonly Dictionary<Guid, int> _transcriptEdits = [];
 
     /// <summary>A read is under way; a change meanwhile reads again after it.</summary>
     private bool _searchLoading;
     private bool _searchReloadPending;
 
     /// <summary>What a document was read for: it is stale once one of these changes.</summary>
-    private sealed record SearchDocument(long Size, bool HasTranscript, bool HasSummary, ConversationSearch.Document Document)
+    private sealed record SearchDocument(long Size, bool HasTranscript, bool HasSummary, int Edits, ConversationSearch.Document Document)
     {
-        public bool IsFresh(Conversation c) => Size == c.SizeBytes && HasTranscript == c.HasTranscript && HasSummary == c.HasSummary;
+        public bool IsFresh(Conversation c, int edits) =>
+            Size == c.SizeBytes && HasTranscript == c.HasTranscript && HasSummary == c.HasSummary && Edits == edits;
     }
+
+    private int TranscriptEdits(Guid id) => _transcriptEdits.GetValueOrDefault(id);
 
     /// <summary>The toolbar's search, trimmed (the toolbar debounces typing); empty shows every conversation.</summary>
     public string SearchTerm
@@ -90,7 +100,9 @@ public sealed partial class AppViewModel
         var listed = Conversations.Select(c => c.Id).ToHashSet();
         foreach (var id in _searchDocuments.Keys.Where(id => !listed.Contains(id)).ToList()) _searchDocuments.Remove(id);
         var stale = Conversations
-            .Where(c => c.HasTranscript && !(_searchDocuments.TryGetValue(c.Id, out var cached) && cached.IsFresh(c)))
+            .Where(c => c.HasTranscript && !(_searchDocuments.TryGetValue(c.Id, out var cached) && cached.IsFresh(c, TranscriptEdits(c.Id))))
+            // The edit count read now: an edit during the read leaves the document stale.
+            .Select(c => (Conversation: c, Edits: TranscriptEdits(c.Id)))
             .ToList();
         if (stale.Count == 0) return;
         _searchLoading = true;
@@ -98,7 +110,9 @@ public sealed partial class AppViewModel
         try
         {
             loaded = await Task.Run(() => stale
-                .Select(c => (c.Id, Document: new SearchDocument(c.SizeBytes, c.HasTranscript, c.HasSummary, ReadSearchDocument(c))))
+                .Select(s => (s.Conversation.Id, Document: new SearchDocument(
+                    s.Conversation.SizeBytes, s.Conversation.HasTranscript, s.Conversation.HasSummary, s.Edits,
+                    ReadSearchDocument(s.Conversation))))
                 .ToList());
         }
         catch (Exception e)
@@ -159,9 +173,14 @@ public sealed partial class AppViewModel
 
     /// <summary>
     /// macOS <c>transcriptEdited</c>: re-lists the conversation after its <c>transcript.json</c> changed (a speaker
-    /// renamed), so its size, and with it the search document, is fresh.
+    /// renamed), so its size is fresh, and counts the edit, so its search document is read again even when the size
+    /// did not change. The stale document still serves until the new one replaces it.
     /// </summary>
-    public Task TranscriptEditedAsync(Guid id) => ReloadAsync(id);
+    public Task TranscriptEditedAsync(Guid id)
+    {
+        _transcriptEdits[id] = TranscriptEdits(id) + 1;
+        return ReloadAsync(id);
+    }
 
     /// <summary>Opens File Explorer with the conversation's folder selected.</summary>
     public static void RevealInExplorer(Conversation conversation)
