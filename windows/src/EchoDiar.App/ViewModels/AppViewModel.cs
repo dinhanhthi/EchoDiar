@@ -257,6 +257,39 @@ public sealed partial class AppViewModel : ObservableObject
 
     public void GoBack() => Route = Route.List;
 
+    // Deleting
+
+    /// <summary>Not while it is recorded, compressed or transcribed.</summary>
+    public bool CanDelete(Conversation conversation) =>
+        conversation.Status is not (ConversationStatus.Recording or ConversationStatus.Compressing) && !IsTranscribing(conversation.Id);
+
+    /// <summary>Moves the conversation to the Recycle Bin; its page goes back to the list first.</summary>
+    public async Task DeleteConversationAsync(Guid id)
+    {
+        if (Route.ConversationId == id) Route = Route.List;
+        try
+        {
+            await _services.Library.DeleteAsync(id);
+        }
+        catch (Exception e)
+        {
+            Debug.WriteLine($"EchoDiar: could not delete conversation {id}: {e}");
+        }
+    }
+
+    /// <summary>Moves the conversation's audio to the Recycle Bin; its transcript, summary and chat stay.</summary>
+    public async Task DeleteAudioAsync(Guid id)
+    {
+        try
+        {
+            await _services.Library.DeleteAudioAsync(id);
+        }
+        catch (Exception e)
+        {
+            Debug.WriteLine($"EchoDiar: could not delete the audio of conversation {id}: {e}");
+        }
+    }
+
     // Recording
 
     /// <summary>Records <paramref name="app"/>'s audio (null: all system audio) and the mic, after launch recovery.</summary>

@@ -1,0 +1,188 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    The title bar's toolbar (macOS MainView.swift toolbar). Leading: Back, the record capsule, the conversation's title.
+    Trailing: Update, Reveal and Delete, Settings and Ask across conversations, Search, the conversation's tabs. Each
+    group is one capsule; the title and the empty space drag the window (MainWindow makes only the capsules, the lone
+    buttons and the search box passthrough).
+-->
+<UserControl
+    x:Class="EchoDiar.App.Views.TitleBarToolbar"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:local="using:EchoDiar.App">
+
+    <Grid Padding="12,0,8,0" ColumnSpacing="12">
+        <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="Auto" />
+            <ColumnDefinition Width="*" />
+            <ColumnDefinition Width="Auto" />
+        </Grid.ColumnDefinitions>
+
+        <StackPanel Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
+            <Button
+                x:Name="BackButton"
+                Style="{StaticResource LoneButton}"
+                AutomationProperties.Name="{local:T Text='Back'}"
+                ToolTipService.ToolTip="{local:T Text='Back'}"
+                Visibility="Collapsed">
+                <FontIcon FontFamily="{ThemeResource SymbolThemeFontFamily}" FontSize="14" Glyph="&#xE72B;" />
+            </Button>
+
+            <!-- Idle: Record and its menu of targets. Recording: Stop and Pause or Resume. -->
+            <Border x:Name="RecordCapsule" Style="{StaticResource CapsuleGroup}">
+                <StackPanel Orientation="Horizontal">
+                    <SplitButton
+                        x:Name="RecordSplitButton"
+                        Style="{StaticResource CapsuleSplitButton}"
+                        AutomationProperties.Name="{local:T Text='Record'}"
+                        ToolTipService.ToolTip="{local:T Text='Record'}">
+                        <FontIcon FontFamily="{ThemeResource SymbolThemeFontFamily}" FontSize="14" Glyph="&#xE7C8;" />
+                        <SplitButton.Flyout>
+                            <MenuFlyout x:Name="TargetMenu" Placement="BottomEdgeAlignedLeft" />
+                        </SplitButton.Flyout>
+                    </SplitButton>
+                    <Button
+                        x:Name="StopButton"
+                        Style="{StaticResource CapsuleButton}"
+                        AutomationProperties.Name="{local:T Text='Stop recording'}"
+                        ToolTipService.ToolTip="{local:T Text='Stop recording'}"
+                        Visibility="Collapsed">
+                        <FontIcon
+                            FontFamily="{ThemeResource SymbolThemeFontFamily}"
+                            FontSize="14"
+                            Foreground="{ThemeResource SystemFillColorCriticalBrush}"
+                            Glyph="&#xE71A;" />
+                    </Button>
+                    <Button x:Name="PauseButton" Style="{StaticResource CapsuleButton}" Visibility="Collapsed">
+                        <FontIcon
+                            x:Name="PauseIcon"
+                            FontFamily="{ThemeResource SymbolThemeFontFamily}"
+                            FontSize="14"
+                            Glyph="&#xE769;" />
+                    </Button>
+                </StackPanel>
+            </Border>
+        </StackPanel>
+
+        <!-- The shown conversation's title and details; not passthrough, so it drags the window like on macOS. -->
+        <StackPanel
+            x:Name="TitlePanel"
+            Grid.Column="1"
+            VerticalAlignment="Center"
+            Visibility="Collapsed">
+            <TextBlock
+                x:Name="TitleText"
+                Style="{StaticResource BodyStrongTextBlockStyle}"
+                MaxLines="1"
+                TextTrimming="CharacterEllipsis"
+                TextWrapping="NoWrap" />
+            <TextBlock
+                x:Name="DetailText"
+                Style="{StaticResource CaptionTextBlockStyle}"
+                Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                MaxLines="1"
+                TextTrimming="CharacterEllipsis"
+                TextWrapping="NoWrap" />
+        </StackPanel>
+
+        <StackPanel
+            Grid.Column="2"
+            Orientation="Horizontal"
+            Spacing="8"
+            VerticalAlignment="Center">
+            <!-- Phase 27 shows it while an update is available. -->
+            <Button
+                x:Name="UpdateButton"
+                Style="{StaticResource LoneButton}"
+                AutomationProperties.Name="{local:T Text='Update'}"
+                ToolTipService.ToolTip="{local:T Text='Install the available update'}"
+                Visibility="Collapsed">
+                <FontIcon
+                    FontFamily="{ThemeResource SymbolThemeFontFamily}"
+                    FontSize="14"
+                    Foreground="{ThemeResource SystemFillColorSuccessBrush}"
+                    Glyph="&#xE896;" />
+            </Button>
+
+            <Border x:Name="FileCapsule" Style="{StaticResource CapsuleGroup}" Visibility="Collapsed">
+                <StackPanel Orientation="Horizontal">
+                    <Button
+                        x:Name="RevealButton"
+                        Style="{StaticResource CapsuleButton}"
+                        AutomationProperties.Name="Reveal in Explorer"
+                        ToolTipService.ToolTip="Reveal in Explorer">
+                        <FontIcon FontFamily="{ThemeResource SymbolThemeFontFamily}" FontSize="14" Glyph="&#xE8B7;" />
+                    </Button>
+                    <Button
+                        x:Name="DeleteButton"
+                        Style="{StaticResource CapsuleButton}"
+                        AutomationProperties.Name="{local:T Text='Delete'}"
+                        ToolTipService.ToolTip="{local:T Text='Delete the audio or the whole conversation'}">
+                        <FontIcon FontFamily="{ThemeResource SymbolThemeFontFamily}" FontSize="14" Glyph="&#xE74D;" />
+                        <Button.Flyout>
+                            <MenuFlyout x:Name="DeleteMenu" Placement="BottomEdgeAlignedRight">
+                                <MenuFlyoutItem x:Name="DeleteAudioItem" />
+                                <MenuFlyoutItem x:Name="DeleteConversationItem" />
+                            </MenuFlyout>
+                        </Button.Flyout>
+                    </Button>
+                </StackPanel>
+            </Border>
+
+            <!-- Settings comes with Phase 13, Ask across conversations with Phase 26. -->
+            <Border x:Name="AppCapsule" Style="{StaticResource CapsuleGroup}">
+                <StackPanel Orientation="Horizontal">
+                    <Button
+                        x:Name="SettingsButton"
+                        Style="{StaticResource CapsuleButton}"
+                        AutomationProperties.Name="{local:T Text='Settings'}"
+                        IsEnabled="False"
+                        ToolTipService.ToolTip="{local:T Text='Settings'}">
+                        <FontIcon FontFamily="{ThemeResource SymbolThemeFontFamily}" FontSize="14" Glyph="&#xE9E9;" />
+                    </Button>
+                    <Button
+                        x:Name="AskButton"
+                        Style="{StaticResource CapsuleButton}"
+                        AutomationProperties.Name="{local:T Text='Ask across conversations'}"
+                        ToolTipService.ToolTip="{local:T Text='Ask across conversations'}"
+                        Visibility="Collapsed">
+                        <FontIcon FontFamily="{ThemeResource SymbolThemeFontFamily}" FontSize="14" Glyph="&#xE8BD;" />
+                    </Button>
+                </StackPanel>
+            </Border>
+
+            <!-- Phase 11 makes it filter the library. -->
+            <TextBox
+                x:Name="SearchBox"
+                Style="{StaticResource SolidInput}"
+                Width="160"
+                Height="32"
+                VerticalAlignment="Center"
+                AutomationProperties.Name="{local:T Text='Search conversations'}"
+                CornerRadius="16"
+                IsEnabled="False"
+                PlaceholderText="{local:T Text='Search'}" />
+
+            <!-- Only Transcript for now: Phase 12 adds the tab pages, Phase 23 Summary and Chat. -->
+            <Border x:Name="TabsCapsule" Style="{StaticResource CapsuleGroup}" Visibility="Collapsed">
+                <StackPanel Orientation="Horizontal">
+                    <Button
+                        x:Name="TranscriptTab"
+                        Style="{StaticResource CapsuleButton}"
+                        Background="{StaticResource PalettePressedFillBrush}"
+                        Content="{local:T Text='Transcript'}" />
+                    <Button
+                        x:Name="SummaryTab"
+                        Style="{StaticResource CapsuleButton}"
+                        Content="{local:T Text='Summary'}"
+                        IsEnabled="False" />
+                    <Button
+                        x:Name="ChatTab"
+                        Style="{StaticResource CapsuleButton}"
+                        Content="{local:T Text='Chat'}"
+                        IsEnabled="False" />
+                </StackPanel>
+            </Border>
+        </StackPanel>
+    </Grid>
+</UserControl>
