@@ -41,6 +41,7 @@ public sealed partial class ConversationView : UserControl
         {
             _model.PropertyChanged += OnModelChanged;
             _playback.PropertyChanged += OnPlaybackChanged;
+            _model.ReleasingAudio += OnReleasingAudio;
             UpdateConversation();
             UpdatePlayback();
         };
@@ -48,6 +49,7 @@ public sealed partial class ConversationView : UserControl
         {
             _model.PropertyChanged -= OnModelChanged;
             _playback.PropertyChanged -= OnPlaybackChanged;
+            _model.ReleasingAudio -= OnReleasingAudio;
             _loadGeneration++; // a load still reading must not open a player after this
             _playback.Dispose();
         };
@@ -66,6 +68,14 @@ public sealed partial class ConversationView : UserControl
     }
 
     private void OnPlaybackChanged(object? sender, PropertyChangedEventArgs e) => UpdatePlayback();
+
+    /// <summary>Its audio is about to be deleted: closes the file now; a load still reading must not reopen it.</summary>
+    private void OnReleasingAudio(Guid id)
+    {
+        if (id != _id) return;
+        _loadGeneration++;
+        _playback.Close();
+    }
 
     private void UpdateConversation()
     {

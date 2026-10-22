@@ -328,9 +328,16 @@ public sealed partial class AppViewModel : ObservableObject
     public bool CanDelete(Conversation conversation) =>
         conversation.Status is not (ConversationStatus.Recording or ConversationStatus.Compressing) && !IsTranscribing(conversation.Id);
 
+    /// <summary>
+    /// Raised on the UI thread before a conversation's audio or folder is deleted: its open player must close the
+    /// file first, or the move to the Recycle Bin finds it in use.
+    /// </summary>
+    public event Action<Guid>? ReleasingAudio;
+
     /// <summary>Moves the conversation to the Recycle Bin; its page goes back to the list first.</summary>
     public async Task DeleteConversationAsync(Guid id)
     {
+        ReleasingAudio?.Invoke(id);
         if (Route.ConversationId == id) Route = Route.List;
         try
         {
@@ -345,6 +352,7 @@ public sealed partial class AppViewModel : ObservableObject
     /// <summary>Moves the conversation's audio to the Recycle Bin; its transcript, summary and chat stay.</summary>
     public async Task DeleteAudioAsync(Guid id)
     {
+        ReleasingAudio?.Invoke(id);
         try
         {
             await _services.Library.DeleteAudioAsync(id);
