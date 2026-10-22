@@ -95,8 +95,8 @@ public sealed partial class ConversationCard : UserControl
         Unloaded += (_, _) => _openTimer.Stop();
     }
 
-    /// <summary>The conversation as last listed.</summary>
-    public Conversation Conversation { get; private set; }
+    /// <summary>The conversation as last listed. Internal: the XAML type info would try to create a public property's type.</summary>
+    internal Conversation Conversation { get; private set; }
 
     /// <summary>Shows <paramref name="conversation"/>; compact for the wide layout's sidebar; selected adds the accent fill and edge.</summary>
     internal void Update(Conversation conversation, bool compact, bool selected)

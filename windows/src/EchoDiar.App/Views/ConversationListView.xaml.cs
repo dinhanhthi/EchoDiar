@@ -81,7 +81,7 @@ public sealed partial class ConversationListView : UserControl
     /// The window's delete flow (<see cref="TitleBarToolbar.DeleteAsync"/>: eligibility, the confirmation, the delete);
     /// true when something was deleted.
     /// </summary>
-    public Func<IReadOnlyList<Conversation>, bool, Task<bool>>? Delete { get; set; }
+    internal Func<IReadOnlyList<Conversation>, bool, Task<bool>>? Delete { get; set; }
 
     private void OnModelChanged(object? sender, PropertyChangedEventArgs e)
     {
