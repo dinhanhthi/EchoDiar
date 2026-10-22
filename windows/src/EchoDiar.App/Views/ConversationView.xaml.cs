@@ -134,9 +134,10 @@ public sealed partial class ConversationView : UserControl
     {
         PlayButton.IsEnabled = _playback.IsReady;
         PlayButton.Content = _playback.IsPlaying ? "Pause" : "Play";
-        TimeText.Text = _playback.IsReady
-            ? $"{ConversationText.Timestamp(_playback.CurrentTime)} / {ConversationText.Timestamp(_playback.Duration)}"
-            : _playback.Error ?? "";
+        TimeText.Text = _playback.Error
+            ?? (_playback.IsReady
+                ? $"{ConversationText.Timestamp(_playback.CurrentTime)} / {ConversationText.Timestamp(_playback.Duration)}"
+                : "");
 
         var active = _playback.ActiveSegmentId is { } id ? _lines.FirstOrDefault(l => l.Segment.Id == id) : null;
         if (!Equals(LineList.SelectedItem, active))

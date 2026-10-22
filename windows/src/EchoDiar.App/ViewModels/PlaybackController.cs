@@ -117,6 +117,7 @@ public sealed partial class PlaybackController : ObservableObject, IDisposable
             Error = $"Could not play the audio ({e.Message}).";
             return;
         }
+        Error = null;
         IsPlaying = true;
         UpdateActiveSegment();
         _ticker.Start();
