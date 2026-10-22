@@ -26,29 +26,14 @@
         </Grid>
 
         <!-- GlobalTapNote (macOS MainView.swift): before recording, the picked app cannot be recorded on its own. -->
-        <Grid
+        <InfoBar
             x:Name="GlobalTapNote"
             Grid.Row="1"
             Margin="12,12,12,0"
-            ColumnSpacing="6"
-            Visibility="Collapsed">
-            <Grid.ColumnDefinitions>
-                <ColumnDefinition Width="Auto" />
-                <ColumnDefinition Width="*" />
-            </Grid.ColumnDefinitions>
-            <FontIcon
-                VerticalAlignment="Top"
-                Margin="0,2,0,0"
-                FontFamily="{ThemeResource SymbolThemeFontFamily}"
-                FontSize="14"
-                Foreground="{ThemeResource TextFillColorSecondaryBrush}"
-                Glyph="&#xE946;" />
-            <TextBlock
-                x:Name="GlobalTapNoteText"
-                Grid.Column="1"
-                Foreground="{ThemeResource TextFillColorSecondaryBrush}"
-                TextWrapping="Wrap" />
-        </Grid>
+            IsClosable="False"
+            IsOpen="False"
+            Severity="Informational"
+            Visibility="Collapsed" />
 
         <!--
             Compact (the list route): the library fills the window. Wide (a conversation, the recording): the same

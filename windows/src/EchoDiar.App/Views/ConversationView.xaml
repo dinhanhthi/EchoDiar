@@ -5,7 +5,7 @@
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
     xmlns:views="using:EchoDiar.App.Views">
 
-    <!-- The page on a card beside the wide layout's sidebar (Phase 12 restyles it). -->
+    <!-- The page on a Fluent card beside the wide layout's sidebar; Phase 13 completes the transcript view. -->
     <Border
         Margin="0,8,12,12"
         Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
@@ -28,7 +28,11 @@
                     Click="OnPlayClick"
                     Content="Play"
                     IsEnabled="False" />
-                <TextBlock x:Name="TimeText" VerticalAlignment="Center" />
+                <TextBlock
+                    x:Name="TimeText"
+                    VerticalAlignment="Center"
+                    Style="{StaticResource BodyTextBlockStyle}"
+                    TextWrapping="NoWrap" />
                 <Button
                     x:Name="TranscribeButton"
                     Click="OnTranscribeClick"
@@ -37,26 +41,30 @@
                 <TextBlock
                     x:Name="StatusText"
                     VerticalAlignment="Center"
-                    Foreground="{ThemeResource TextFillColorSecondaryBrush}"
-                    TextWrapping="Wrap" />
+                    Style="{StaticResource BodyTextBlockStyle}"
+                    Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
             </StackPanel>
 
-            <StackPanel Grid.Row="2" Spacing="4">
+            <StackPanel Grid.Row="2" Spacing="8">
                 <ProgressBar x:Name="JobBar" Maximum="1" Visibility="Collapsed" />
-                <TextBlock
-                    x:Name="ErrorText"
-                    Foreground="{ThemeResource SystemFillColorCriticalBrush}"
-                    TextWrapping="Wrap"
-                    Visibility="Collapsed" />
+                <InfoBar
+                    x:Name="ErrorBar"
+                    IsClosable="False"
+                    IsOpen="False"
+                    Severity="Error" />
             </StackPanel>
 
             <TextBlock
                 x:Name="EmptyText"
                 Grid.Row="3"
+                Style="{StaticResource BodyTextBlockStyle}"
                 Foreground="{ThemeResource TextFillColorSecondaryBrush}"
                 Visibility="Collapsed" />
 
-            <!-- One line per segment; clicking a line plays from it, the line under the play head is selected. -->
+            <!--
+                One line per segment (the speaker, the time, the text); clicking a line plays from it, the line under the
+                play head is selected (the ListView's subtle fill and accent bar).
+            -->
             <ListView
                 x:Name="LineList"
                 Grid.Row="3"
@@ -65,7 +73,21 @@
                 SelectionMode="Single">
                 <ListView.ItemTemplate>
                     <DataTemplate x:DataType="views:TranscriptLine">
-                        <TextBlock Padding="0,4" Text="{x:Bind Text}" TextWrapping="Wrap" />
+                        <StackPanel Padding="0,6" Spacing="2">
+                            <StackPanel Orientation="Horizontal" Spacing="8">
+                                <TextBlock
+                                    Style="{StaticResource BodyStrongTextBlockStyle}"
+                                    Text="{x:Bind Speaker}"
+                                    TextWrapping="NoWrap" />
+                                <TextBlock
+                                    VerticalAlignment="Center"
+                                    Style="{StaticResource CaptionTextBlockStyle}"
+                                    Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                                    Text="{x:Bind Time}"
+                                    TextWrapping="NoWrap" />
+                            </StackPanel>
+                            <TextBlock Style="{StaticResource BodyTextBlockStyle}" Text="{x:Bind Text}" />
+                        </StackPanel>
                     </DataTemplate>
                 </ListView.ItemTemplate>
             </ListView>

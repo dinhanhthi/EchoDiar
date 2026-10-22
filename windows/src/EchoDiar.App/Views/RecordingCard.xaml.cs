@@ -57,7 +57,7 @@ public sealed partial class RecordingCard : UserControl
         set
         {
             _compact = value;
-            ContentGrid.Padding = value ? new Thickness(10, 8, 10, 8) : new Thickness(14, 10, 14, 10);
+            ContentGrid.Padding = value ? new Thickness(12, 8, 12, 8) : new Thickness(16, 12, 16, 12);
             ButtonRow.Visibility = value ? Visibility.Collapsed : Visibility.Visible;
         }
     }

@@ -22,9 +22,9 @@ namespace EchoDiar.App.Views;
 /// The library (macOS ConversationListView.swift and MainView.swift libraryPane): conversation cards under day headers
 /// (Today, Yesterday, then the date), filtered by the toolbar's search, with the model download banner (MVP). While
 /// recording, the recording's card sits above them and the recording's own entry is left out. Ctrl-click and
-/// Shift-click select cards (from the open entry in the sidebar, as in Mail); the selection bar then shows above the
-/// list with Delete and Cancel (Esc). Delete deletes the selection, else the focused card. The ListView itself never
-/// selects: the cards draw the open conversation and the selection, so the arrow keys only move the focus.
+/// Shift-click select cards (from the open entry in the sidebar, as in Mail); the selection bar then shows over the top
+/// of the list with Delete and Cancel (Esc). Delete deletes the selection, else the focused card. The ListView itself
+/// never selects: the cards draw the open conversation and the selection, so the arrow keys only move the focus.
 /// </summary>
 public sealed partial class ConversationListView : UserControl
 {
@@ -181,7 +181,7 @@ public sealed partial class ConversationListView : UserControl
         }
     }
 
-    /// <summary>"Today", "Yesterday", or the long date without the weekday, as muted centered text; not focusable.</summary>
+    /// <summary>"Today", "Yesterday", or the long date without the weekday, as muted left-aligned text; not focusable.</summary>
     private ListViewItem Header(DateTime day)
     {
         if (!_headers.TryGetValue(day, out var header))
@@ -367,11 +367,11 @@ public sealed partial class ConversationListView : UserControl
     {
         var needsSpeech = !_model.HasTranscriptionModel;
         var visible = !_sidebar && (needsSpeech || _model.NeedsDiarizer);
-        ModelBanner.Visibility = visible ? Visibility.Visible : Visibility.Collapsed;
+        ModelBanner.IsOpen = visible;
         if (!visible) return;
 
-        BannerTitle.Text = needsSpeech ? "Download a transcription model" : "Download a speaker model";
-        BannerDetail.Text = needsSpeech
+        ModelBanner.Title = needsSpeech ? "Download a transcription model" : "Download a speaker model";
+        ModelBanner.Message = needsSpeech
             ? "Recordings are transcribed on this PC. Pick a speech recognition model to download."
             : "\"Tell speakers apart\" is on. Download a model to tell the other speakers apart.";
         var entries = (needsSpeech ? ModelCatalog.Asr : ModelCatalog.Diarization)

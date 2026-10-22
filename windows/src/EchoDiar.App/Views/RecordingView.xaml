@@ -10,6 +10,19 @@
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
     xmlns:local="using:EchoDiar.App">
 
+    <UserControl.Resources>
+        <!--
+            RecordingWave: the system accent while recording, the disabled text colour while paused; ThemeResources, so
+            a theme switch repaints the bars even while they stand still.
+        -->
+        <Style x:Key="WaveBarStyle" TargetType="Rectangle">
+            <Setter Property="Fill" Value="{ThemeResource AccentFillColorDefaultBrush}" />
+        </Style>
+        <Style x:Key="PausedWaveBarStyle" TargetType="Rectangle">
+            <Setter Property="Fill" Value="{ThemeResource TextFillColorDisabledBrush}" />
+        </Style>
+    </UserControl.Resources>
+
     <Grid Padding="12" RowSpacing="8">
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto" />
@@ -19,12 +32,12 @@
         </Grid.RowDefinitions>
 
         <Border
-            Padding="14,10"
+            Padding="16,12"
             Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
             BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
             BorderThickness="1"
             CornerRadius="{StaticResource OverlayCornerRadius}">
-            <Grid ColumnSpacing="10">
+            <Grid ColumnSpacing="12">
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="Auto" />
                     <ColumnDefinition Width="Auto" />
@@ -52,28 +65,31 @@
                     x:Name="ElapsedText"
                     Grid.Column="1"
                     VerticalAlignment="Center"
-                    FontWeight="SemiBold" />
+                    Style="{StaticResource BodyStrongTextBlockStyle}" />
                 <TextBlock
                     x:Name="StateText"
                     Grid.Column="2"
                     VerticalAlignment="Center"
+                    Style="{StaticResource BodyTextBlockStyle}"
                     Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
 
-                <!-- ChannelMeters: mic over system, 110 px wide. -->
+                <!-- ChannelMeters: mic over system, 120 px wide. -->
                 <StackPanel
                     x:Name="ChannelMeters"
                     Grid.Column="4"
-                    Width="110"
+                    Width="120"
                     VerticalAlignment="Center"
                     Spacing="3">
                     <Grid x:Name="MicMeter" ColumnSpacing="6">
                         <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="38" />
+                            <ColumnDefinition Width="44" />
                             <ColumnDefinition Width="*" />
                         </Grid.ColumnDefinitions>
                         <TextBlock
-                            FontSize="11"
+                            VerticalAlignment="Center"
+                            Style="{StaticResource CaptionTextBlockStyle}"
                             Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                            TextWrapping="NoWrap"
                             Text="Mic" />
                         <Border
                             x:Name="MicTrack"
@@ -86,18 +102,20 @@
                                 x:Name="MicFill"
                                 Width="0"
                                 HorizontalAlignment="Left"
-                                Background="{ThemeResource SystemFillColorSuccessBrush}"
+                                Background="{ThemeResource AccentFillColorDefaultBrush}"
                                 CornerRadius="2.5" />
                         </Border>
                     </Grid>
                     <Grid x:Name="SystemMeter" ColumnSpacing="6">
                         <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="38" />
+                            <ColumnDefinition Width="44" />
                             <ColumnDefinition Width="*" />
                         </Grid.ColumnDefinitions>
                         <TextBlock
-                            FontSize="11"
+                            VerticalAlignment="Center"
+                            Style="{StaticResource CaptionTextBlockStyle}"
                             Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                            TextWrapping="NoWrap"
                             Text="System" />
                         <Border
                             x:Name="SystemTrack"
@@ -110,7 +128,7 @@
                                 x:Name="SystemFill"
                                 Width="0"
                                 HorizontalAlignment="Left"
-                                Background="{ThemeResource SystemFillColorSuccessBrush}"
+                                Background="{ThemeResource AccentFillColorDefaultBrush}"
                                 CornerRadius="2.5" />
                         </Border>
                     </Grid>
@@ -122,60 +140,21 @@
         </Border>
 
         <!-- The picked app could not be isolated: every process except EchoDiar is recorded. -->
-        <Grid
+        <InfoBar
             x:Name="GlobalTapWarning"
             Grid.Row="1"
-            ColumnSpacing="6"
-            Visibility="Collapsed">
-            <Grid.ColumnDefinitions>
-                <ColumnDefinition Width="Auto" />
-                <ColumnDefinition Width="*" />
-            </Grid.ColumnDefinitions>
-            <FontIcon
-                VerticalAlignment="Top"
-                Margin="0,2,0,0"
-                FontFamily="{ThemeResource SymbolThemeFontFamily}"
-                FontSize="14"
-                Foreground="{ThemeResource SystemFillColorCautionBrush}"
-                Glyph="&#xE7BA;" />
-            <TextBlock
-                x:Name="GlobalTapText"
-                Grid.Column="1"
-                Foreground="{ThemeResource SystemFillColorCautionBrush}"
-                TextWrapping="Wrap" />
-        </Grid>
+            IsClosable="False"
+            IsOpen="False"
+            Severity="Warning" />
 
         <!-- SilentTapBanner: the app plays but the capture hears only silence. -->
-        <Border
+        <InfoBar
             x:Name="SilentTapBanner"
             Grid.Row="2"
-            Padding="12,8"
-            Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
-            BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
-            BorderThickness="1"
-            CornerRadius="{StaticResource OverlayCornerRadius}"
-            Visibility="Collapsed">
-            <Grid ColumnSpacing="10">
-                <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="Auto" />
-                    <ColumnDefinition Width="*" />
-                </Grid.ColumnDefinitions>
-                <FontIcon
-                    VerticalAlignment="Center"
-                    FontFamily="{ThemeResource SymbolThemeFontFamily}"
-                    FontSize="16"
-                    Foreground="{ThemeResource SystemFillColorCautionBrush}"
-                    Glyph="&#xE74F;" />
-                <StackPanel Grid.Column="1" Spacing="2">
-                    <TextBlock Style="{StaticResource BodyStrongTextBlockStyle}" Text="{local:T Text='No system audio'}" />
-                    <TextBlock
-                        x:Name="SilentTapText"
-                        Style="{StaticResource CaptionTextBlockStyle}"
-                        Foreground="{ThemeResource TextFillColorSecondaryBrush}"
-                        TextWrapping="Wrap" />
-                </StackPanel>
-            </Grid>
-        </Border>
+            IsClosable="False"
+            IsOpen="False"
+            Severity="Warning"
+            Title="{local:T Text='No system audio'}" />
 
         <StackPanel
             Grid.Row="3"
@@ -194,6 +173,7 @@
             <TextBlock
                 x:Name="ReasonText"
                 HorizontalAlignment="Center"
+                Style="{StaticResource BodyTextBlockStyle}"
                 Foreground="{ThemeResource TextFillColorSecondaryBrush}"
                 TextAlignment="Center"
                 TextWrapping="Wrap" />

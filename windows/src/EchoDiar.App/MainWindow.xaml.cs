@@ -300,10 +300,13 @@ public sealed partial class MainWindow : Window
     private void UpdateGlobalTapNote()
     {
         var app = _model.IsRecording ? null : _model.SelectedTarget;
-        GlobalTapNote.Visibility = app is { NeedsGlobalTap: true } ? Visibility.Visible : Visibility.Collapsed;
+        // A closed InfoBar keeps its margin: collapsed too, so the page does not move down while it is closed.
+        GlobalTapNote.IsOpen = app is { NeedsGlobalTap: true };
+        GlobalTapNote.Visibility = GlobalTapNote.IsOpen ? Visibility.Visible : Visibility.Collapsed;
         if (app is { NeedsGlobalTap: true })
         {
-            RecordingCard.SetText(GlobalTapNoteText, Loc.Format("%@ cannot be recorded on its own: all system audio will be recorded.", app.Name));
+            var message = Loc.Format("%@ cannot be recorded on its own: all system audio will be recorded.", app.Name);
+            if (GlobalTapNote.Message != message) GlobalTapNote.Message = message;
         }
     }
 

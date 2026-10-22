@@ -95,7 +95,7 @@ public sealed partial class ConversationCard : UserControl
     internal void Update(Conversation conversation, bool compact, bool selected)
     {
         Conversation = conversation;
-        ContentGrid.Padding = compact ? new Thickness(10, 8, 10, 8) : new Thickness(14, 10, 14, 10);
+        ContentGrid.Padding = compact ? new Thickness(12, 8, 12, 8) : new Thickness(16, 12, 16, 12);
         ButtonsPanel.Visibility = Shown(!compact);
         ActionRow.Margin = new Thickness(0, compact ? 0 : 6, 0, 0);
         SelectionFill.Visibility = Shown(selected);
@@ -112,9 +112,14 @@ public sealed partial class ConversationCard : UserControl
             || TranscribeButton.Visibility == Visibility.Visible);
     }
 
-    /// <summary>The date, the duration and size when known, the status badge, and whether the audio was removed.</summary>
+    /// <summary>
+    /// The source app's name when known, the date, the duration and size when known, the status badge, and whether
+    /// the audio was removed.
+    /// </summary>
     private void UpdateDetails(Conversation c)
     {
+        SourceAppText.Visibility = Shown(!string.IsNullOrWhiteSpace(c.SourceAppName));
+        RecordingCard.SetText(SourceAppText, c.SourceAppName ?? "");
         RecordingCard.SetText(DateText, c.CreatedAt.ToLocalTime().ToString("g", CultureInfo.CurrentCulture));
         DurationText.Visibility = Shown(c.Duration > 0);
         RecordingCard.SetText(DurationText, ConversationText.Clock(c.Duration));

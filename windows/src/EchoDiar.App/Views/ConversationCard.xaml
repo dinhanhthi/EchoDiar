@@ -1,11 +1,11 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!--
     One conversation of the library (macOS ConversationCard.swift): the source icon, the title (double-click to rename),
-    the date, duration, size, status badge and "Audio has been removed" marker, the reason of a failed transcription,
-    then a row with Reveal in Explorer, the Delete menu and the transcription progress or its action. Fluent default
-    controls and theme resources (Light and Dark). Compact (the
-    wide layout's sidebar) drops the buttons, which stay in the context menu. Selected adds the accent fill and edge.
-    The AI and Summary buttons come with Phase 23.
+    the source app's name, the date, duration, size, status pill and "Audio has been removed" marker, the reason of a
+    failed transcription, then a row with Reveal in Explorer, the Delete menu and the transcription progress or its
+    action. A Fluent card (card fill and stroke, overlay corners, 16 px padding) in theme resources (Light and Dark).
+    Compact (the wide layout's sidebar) drops the buttons, which stay in the context menu. Selected adds the accent
+    fill and edge. The AI and Summary buttons come with Phase 23.
 -->
 <UserControl
     x:Class="EchoDiar.App.Views.ConversationCard"
@@ -36,7 +36,7 @@
             Opacity="0.12"
             Visibility="Collapsed" />
 
-        <Grid x:Name="ContentGrid" Padding="14,10" ColumnSpacing="12">
+        <Grid x:Name="ContentGrid" Padding="16,12" ColumnSpacing="12">
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="Auto" />
                 <ColumnDefinition Width="*" />
@@ -73,6 +73,16 @@
                 </Grid>
 
                 <StackPanel x:Name="DetailsRow" Orientation="Horizontal" Spacing="8">
+                    <!-- The source app (macOS shows its icon; Windows keeps only its name and exe). -->
+                    <TextBlock
+                        x:Name="SourceAppText"
+                        MaxWidth="160"
+                        VerticalAlignment="Center"
+                        Style="{StaticResource CaptionTextBlockStyle}"
+                        Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                        MaxLines="1"
+                        TextWrapping="NoWrap"
+                        Visibility="Collapsed" />
                     <TextBlock
                         x:Name="DateText"
                         VerticalAlignment="Center"
@@ -88,13 +98,13 @@
                         VerticalAlignment="Center"
                         Style="{StaticResource CaptionTextBlockStyle}"
                         Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
-                    <!-- The statuses that need attention: one badge per severity, in the theme's status colors. -->
+                    <!-- The statuses that need attention: one pill per severity, in the theme's status colors. -->
                     <Border
                         x:Name="CriticalBadge"
-                        Padding="6,1"
+                        Padding="8,1"
                         VerticalAlignment="Center"
                         Background="{ThemeResource SystemFillColorCriticalBackgroundBrush}"
-                        CornerRadius="{StaticResource ControlCornerRadius}"
+                        CornerRadius="9"
                         Visibility="Collapsed">
                         <TextBlock
                             x:Name="CriticalBadgeText"
@@ -104,10 +114,10 @@
                     </Border>
                     <Border
                         x:Name="CautionBadge"
-                        Padding="6,1"
+                        Padding="8,1"
                         VerticalAlignment="Center"
                         Background="{ThemeResource SystemFillColorCautionBackgroundBrush}"
-                        CornerRadius="{StaticResource ControlCornerRadius}"
+                        CornerRadius="9"
                         Visibility="Collapsed">
                         <TextBlock
                             x:Name="CautionBadgeText"
@@ -117,10 +127,10 @@
                     </Border>
                     <Border
                         x:Name="AttentionBadge"
-                        Padding="6,1"
+                        Padding="8,1"
                         VerticalAlignment="Center"
                         Background="{ThemeResource SystemFillColorAttentionBackgroundBrush}"
-                        CornerRadius="{StaticResource ControlCornerRadius}"
+                        CornerRadius="9"
                         Visibility="Collapsed">
                         <TextBlock
                             x:Name="AttentionBadgeText"
@@ -197,15 +207,16 @@
                     <!-- macOS opens Settings > Transcription; Settings comes with a later phase. -->
                     <Border
                         x:Name="NeedsModelBadge"
-                        Padding="8,2"
+                        Padding="8,1"
                         VerticalAlignment="Center"
                         Background="{ThemeResource SystemFillColorCautionBackgroundBrush}"
-                        CornerRadius="{StaticResource ControlCornerRadius}"
+                        CornerRadius="9"
                         ToolTipService.ToolTip="{local:T Text='Download a transcription model in Settings'}"
                         Visibility="Collapsed">
                         <TextBlock
                             VerticalAlignment="Center"
                             Style="{StaticResource CaptionTextBlockStyle}"
+                            FontWeight="SemiBold"
                             Foreground="{ThemeResource SystemFillColorCautionBrush}"
                             Text="{local:T Text='Needs model'}" />
                     </Border>

@@ -6,10 +6,10 @@
     xmlns:local="using:EchoDiar.App">
 
     <UserControl.Resources>
-        <!-- The day headers (macOS DayHeader): muted, semibold caption text, centered. -->
+        <!-- The day headers (macOS DayHeader): muted, semibold caption text, left-aligned with the cards. -->
         <Style x:Key="DayHeaderText" TargetType="TextBlock" BasedOn="{StaticResource CaptionTextBlockStyle}">
-            <Setter Property="Margin" Value="0,6,0,0" />
-            <Setter Property="HorizontalAlignment" Value="Center" />
+            <Setter Property="Margin" Value="0,8,0,0" />
+            <Setter Property="HorizontalAlignment" Value="Left" />
             <Setter Property="FontWeight" Value="SemiBold" />
             <Setter Property="Foreground" Value="{ThemeResource TextFillColorSecondaryBrush}" />
         </Style>
@@ -28,46 +28,67 @@
         </Grid>
 
         <!-- Shown until a speech model is installed (and a speaker model, with "Tell speakers apart" on). -->
-        <StackPanel
+        <InfoBar
             x:Name="ModelBanner"
             Grid.Row="1"
-            Padding="16"
-            Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
-            CornerRadius="8"
-            Spacing="8"
-            Visibility="Collapsed">
-            <TextBlock x:Name="BannerTitle" Style="{StaticResource BodyStrongTextBlockStyle}" Text="Download a transcription model" />
-            <TextBlock x:Name="BannerDetail" TextWrapping="Wrap" />
-            <StackPanel Orientation="Horizontal" Spacing="8">
-                <ComboBox x:Name="ModelPicker" MinWidth="320" AutomationProperties.Name="Model" />
-                <Button x:Name="DownloadButton" Click="OnDownloadClick" Content="Download" />
-                <Button x:Name="CancelButton" Click="OnCancelClick" Content="Cancel" Visibility="Collapsed" />
+            IsClosable="False"
+            IsOpen="False"
+            Severity="Informational"
+            Title="Download a transcription model">
+            <StackPanel Margin="0,0,16,16" Spacing="8">
+                <StackPanel Orientation="Horizontal" Spacing="8">
+                    <ComboBox x:Name="ModelPicker" MinWidth="320" AutomationProperties.Name="Model" />
+                    <Button x:Name="DownloadButton" Click="OnDownloadClick" Content="Download" />
+                    <Button x:Name="CancelButton" Click="OnCancelClick" Content="Cancel" Visibility="Collapsed" />
+                </StackPanel>
+                <ProgressBar x:Name="DownloadBar" Maximum="1" Visibility="Collapsed" />
+                <TextBlock
+                    x:Name="DownloadErrorText"
+                    Style="{StaticResource BodyTextBlockStyle}"
+                    Foreground="{ThemeResource SystemFillColorCriticalBrush}"
+                    Visibility="Collapsed" />
             </StackPanel>
-            <ProgressBar x:Name="DownloadBar" Maximum="1" Visibility="Collapsed" />
-            <TextBlock
-                x:Name="DownloadErrorText"
-                Foreground="{ThemeResource SystemFillColorCriticalBrush}"
-                TextWrapping="Wrap"
-                Visibility="Collapsed" />
-        </StackPanel>
+        </InfoBar>
 
         <Grid Grid.Row="2">
-            <Grid.RowDefinitions>
-                <RowDefinition Height="Auto" />
-                <RowDefinition Height="*" />
-            </Grid.RowDefinitions>
+            <!--
+                Day headers and conversation cards (ListViewItems made in code), newest first; the header is the
+                recording's card while recording. No ListView selection: the cards draw the open conversation and the
+                Ctrl/Shift selection themselves, so the arrow keys only move the focus.
+            -->
+            <ListView
+                x:Name="ConversationList"
+                IsItemClickEnabled="False"
+                SelectionMode="None" />
 
-            <!-- While cards are selected (Ctrl-click, Shift-click): their count, Delete and Cancel, above the list. -->
+            <!-- Why there are no cards: an empty library, or a search without results. -->
+            <TextBlock
+                x:Name="EmptyText"
+                Margin="20,12"
+                HorizontalAlignment="Center"
+                VerticalAlignment="Center"
+                Style="{StaticResource BodyTextBlockStyle}"
+                Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                IsHitTestVisible="False"
+                TextAlignment="Center"
+                Visibility="Collapsed" />
+
+            <!--
+                While cards are selected (Ctrl-click, Shift-click): their count, Delete and Cancel, as a command bar over
+                the top of the list (acrylic, so the cards under it do not show through), so the list does not move
+                under the pointer when it appears.
+            -->
             <Border
                 x:Name="SelectionBar"
-                Margin="0,0,0,8"
-                Padding="12,6"
-                Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
+                Padding="12,4,4,4"
+                VerticalAlignment="Top"
+                Canvas.ZIndex="1"
+                Background="{ThemeResource AcrylicInAppFillColorDefaultBrush}"
                 BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
                 BorderThickness="1"
                 CornerRadius="{StaticResource OverlayCornerRadius}"
                 Visibility="Collapsed">
-                <Grid ColumnSpacing="8">
+                <Grid ColumnSpacing="4">
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="*" />
                         <ColumnDefinition Width="Auto" />
@@ -78,53 +99,38 @@
                         VerticalAlignment="Center"
                         Style="{StaticResource BodyStrongTextBlockStyle}"
                         MaxLines="1"
-                        TextTrimming="CharacterEllipsis" />
-                    <DropDownButton
+                        TextTrimming="CharacterEllipsis"
+                        TextWrapping="NoWrap" />
+                    <Button
                         x:Name="SelectionDeleteButton"
                         Grid.Column="1"
+                        Width="32"
+                        Height="32"
+                        Padding="0"
+                        Style="{StaticResource SubtleButtonStyle}"
                         AutomationProperties.Name="{local:T Text='Delete'}"
                         ToolTipService.ToolTip="{local:T Text='Delete the audio or the selected conversations'}">
-                        <FontIcon FontFamily="{ThemeResource SymbolThemeFontFamily}" FontSize="14" Glyph="&#xE74D;" />
-                        <DropDownButton.Flyout>
+                        <FontIcon FontFamily="{ThemeResource SymbolThemeFontFamily}" FontSize="16" Glyph="&#xE74D;" />
+                        <Button.Flyout>
                             <MenuFlyout x:Name="SelectionDeleteMenu" Placement="BottomEdgeAlignedRight">
                                 <MenuFlyoutItem x:Name="SelectionDeleteAudioItem" />
                                 <MenuFlyoutItem x:Name="SelectionDeleteConversationsItem" />
                             </MenuFlyout>
-                        </DropDownButton.Flyout>
-                    </DropDownButton>
+                        </Button.Flyout>
+                    </Button>
                     <Button
                         x:Name="SelectionCancelButton"
                         Grid.Column="2"
+                        Width="32"
+                        Height="32"
+                        Padding="0"
+                        Style="{StaticResource SubtleButtonStyle}"
                         AutomationProperties.Name="{local:T Text='Cancel'}"
                         ToolTipService.ToolTip="{local:T Text='Cancel the selection (Esc)'}">
-                        <FontIcon FontFamily="{ThemeResource SymbolThemeFontFamily}" FontSize="12" Glyph="&#xE711;" />
+                        <FontIcon FontFamily="{ThemeResource SymbolThemeFontFamily}" FontSize="16" Glyph="&#xE711;" />
                     </Button>
                 </Grid>
             </Border>
-
-            <!--
-                Day headers and conversation cards (ListViewItems made in code), newest first; the header is the
-                recording's card while recording. No ListView selection: the cards draw the open conversation and the
-                Ctrl/Shift selection themselves, so the arrow keys only move the focus.
-            -->
-            <ListView
-                x:Name="ConversationList"
-                Grid.Row="1"
-                IsItemClickEnabled="False"
-                SelectionMode="None" />
-
-            <!-- Why there are no cards: an empty library, or a search without results. -->
-            <TextBlock
-                x:Name="EmptyText"
-                Grid.Row="1"
-                Margin="20,12"
-                HorizontalAlignment="Center"
-                VerticalAlignment="Center"
-                Foreground="{ThemeResource TextFillColorSecondaryBrush}"
-                IsHitTestVisible="False"
-                TextAlignment="Center"
-                TextWrapping="Wrap"
-                Visibility="Collapsed" />
         </Grid>
     </Grid>
 </UserControl>

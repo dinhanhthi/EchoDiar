@@ -10,11 +10,15 @@ using Microsoft.UI.Xaml.Controls;
 
 namespace EchoDiar.App.Views;
 
-/// <summary>One transcript line, "Name [mm:ss]: text".</summary>
-public sealed partial record TranscriptLine(Transcript.Segment Segment, string Text);
+/// <summary>One transcript line: the speaker's name, the start as "mm:ss" and the text.</summary>
+public sealed partial record TranscriptLine(Transcript.Segment Segment, string Speaker, string Time, string Text)
+{
+    /// <summary>"Name [mm:ss]: text", the list item's name for screen readers.</summary>
+    public override string ToString() => $"{Speaker} [{Time}]: {Text}";
+}
 
 /// <summary>
-/// One conversation (MVP; Phase 12 completes it): the title, the status or job progress, the transcript lines and
+/// One conversation (MVP; Phase 13 completes it): the title, the status or job progress, the transcript lines and
 /// playback. Clicking a line plays from it.
 /// </summary>
 public sealed partial class ConversationView : UserControl
@@ -97,8 +101,8 @@ public sealed partial class ConversationView : UserControl
         JobBar.Value = progress?.Fraction ?? 0;
 
         var error = _model.TranscriptionErrors.GetValueOrDefault(_id);
-        ErrorText.Text = error is null ? "" : $"Transcription failed: {error}";
-        ErrorText.Visibility = error is null ? Visibility.Collapsed : Visibility.Visible;
+        ErrorBar.Message = error is null ? "" : $"Transcription failed: {error}";
+        ErrorBar.IsOpen = error is not null;
 
         var canTranscribe = !running && !conversation.HasTranscript && conversation.HasAudio
             && conversation.Status is not (ConversationStatus.Recording or ConversationStatus.Failed);
@@ -129,7 +133,7 @@ public sealed partial class ConversationView : UserControl
         foreach (var segment in segments)
         {
             var name = transcript!.DisplayName(segment.Speaker);
-            _lines.Add(new TranscriptLine(segment, $"{name} [{ConversationText.Timestamp(segment.Start)}]: {segment.Text.Trim()}"));
+            _lines.Add(new TranscriptLine(segment, name, ConversationText.Timestamp(segment.Start), segment.Text.Trim()));
         }
         EmptyText.Text = hasTranscript && transcript is null
             ? "The transcript could not be read."

@@ -31,7 +31,7 @@
             Opacity="0.18"
             Visibility="Collapsed" />
 
-        <Grid x:Name="ContentGrid" Padding="14,10" ColumnSpacing="12">
+        <Grid x:Name="ContentGrid" Padding="16,12" ColumnSpacing="12">
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="Auto" />
                 <ColumnDefinition Width="*" />
@@ -92,7 +92,7 @@
                                 x:Name="MicFill"
                                 Width="0"
                                 HorizontalAlignment="Left"
-                                Background="{ThemeResource SystemFillColorSuccessBrush}"
+                                Background="{ThemeResource AccentFillColorDefaultBrush}"
                                 CornerRadius="1.5" />
                         </Border>
                         <Border Height="3" Background="{ThemeResource ControlStrongFillColorDefaultBrush}" CornerRadius="1.5">
@@ -100,7 +100,7 @@
                                 x:Name="SystemFill"
                                 Width="0"
                                 HorizontalAlignment="Left"
-                                Background="{ThemeResource SystemFillColorSuccessBrush}"
+                                Background="{ThemeResource AccentFillColorDefaultBrush}"
                                 CornerRadius="1.5" />
                         </Border>
                     </StackPanel>
@@ -125,7 +125,11 @@
                         Style="{StaticResource SubtleButtonStyle}"
                         AutomationProperties.Name="{local:T Text='Stop'}"
                         ToolTipService.ToolTip="{local:T Text='Stop recording'}">
-                        <FontIcon FontFamily="{ThemeResource SymbolThemeFontFamily}" FontSize="15" Glyph="&#xE71A;" />
+                        <FontIcon
+                            FontFamily="{ThemeResource SymbolThemeFontFamily}"
+                            FontSize="15"
+                            Foreground="{ThemeResource SystemFillColorCriticalBrush}"
+                            Glyph="&#xE71A;" />
                     </Button>
                     <Button x:Name="PauseButton" Style="{StaticResource SubtleButtonStyle}">
                         <FontIcon

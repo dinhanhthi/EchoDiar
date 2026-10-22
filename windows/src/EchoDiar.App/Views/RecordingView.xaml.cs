@@ -40,7 +40,7 @@ public sealed partial class RecordingView : UserControl
             Wave.Children.Add(_bars[i]);
         }
         LanguageHost.Content = new LanguagePicker(model, shortLabel: false);
-        GlobalTapText.Text = Loc.T("This app's audio cannot be isolated, so all system audio is being recorded.");
+        GlobalTapWarning.Message = Loc.T("This app's audio cannot be isolated, so all system audio is being recorded.");
         AutomationProperties.SetName(MicMeter, Loc.Format("%@ level", "Mic"));
         AutomationProperties.SetName(SystemMeter, Loc.Format("%@ level", "System"));
         Loaded += (_, _) =>
@@ -82,10 +82,10 @@ public sealed partial class RecordingView : UserControl
         RecordingCard.SetText(StateText, Loc.T(paused ? "Paused" : "Recording"));
         ChannelMeters.Visibility = paused ? Visibility.Collapsed : Visibility.Visible;
 
-        GlobalTapWarning.Visibility = recording && snapshot.GlobalTapFallback ? Visibility.Visible : Visibility.Collapsed;
-        SilentTapBanner.Visibility = recording && snapshot.SilentTapSuspected ? Visibility.Visible : Visibility.Collapsed;
-        RecordingCard.SetText(SilentTapText,
-            $"EchoDiar hears nothing from {_model.RecordingSourceName ?? "the app"}. Pick another source or check that the app is playing.");
+        GlobalTapWarning.IsOpen = recording && snapshot.GlobalTapFallback;
+        SilentTapBanner.IsOpen = recording && snapshot.SilentTapSuspected;
+        var silentTap = $"EchoDiar hears nothing from {_model.RecordingSourceName ?? "the app"}. Pick another source or check that the app is playing.";
+        if (SilentTapBanner.Message != silentTap) SilentTapBanner.Message = silentTap;
 
         var live = recording && !paused;
         _ticker.Run(live);
@@ -122,16 +122,19 @@ public sealed partial class RecordingView : UserControl
         UpdateWave(paused: false);
     }
 
-    /// <summary>Flat and grey while paused; a still shape when animations are off; else the last peaks, newest on the right.</summary>
+    /// <summary>
+    /// Flat and grey while paused; a still shape when animations are off; else the last peaks, newest on the right. The
+    /// colours come from styles with ThemeResources, so a theme switch repaints the bars even while they stand still.
+    /// </summary>
     private void UpdateWave(bool paused)
     {
         var still = !UISettings.AnimationsEnabled;
-        var fill = paused ? StateText.Foreground : RecordingIcon.Foreground;
+        var style = (Style)Resources[paused ? "PausedWaveBarStyle" : "WaveBarStyle"];
         for (var i = 0; i < BarCount; i++)
         {
             var height = paused ? 0 : still ? 0.2 + 0.4 * Math.Abs(Math.Sin(i * 0.5)) : _history[i];
             _bars[i].Height = Math.Max(4, WaveHeight * height);
-            if (_bars[i].Fill != fill) _bars[i].Fill = fill;
+            if (_bars[i].Style != style) _bars[i].Style = style;
         }
     }
 
