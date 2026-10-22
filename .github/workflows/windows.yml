@@ -1,0 +1,157 @@
+name: Windows
+
+# Builds the Windows port (windows/): runs the unit tests once they exist and packages a
+# signed sideload MSIX per architecture for the QA VM (artifact EchoDiar-win-<arch>).
+# Signing uses the dev certificate in the WINDOWS_DEV_CERT_PFX / WINDOWS_DEV_CERT_PASSWORD
+# secrets; pull requests from forks get no secrets and build an unsigned package.
+
+on:
+  push:
+    branches: [plan/2026-10-21-windows-port, main]
+    paths:
+      - 'windows/**'
+      - '.github/workflows/windows.yml'
+  pull_request:
+    paths:
+      - 'windows/**'
+      - '.github/workflows/windows.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: windows-${{ github.ref }}
+  cancel-in-progress: true
+
+defaults:
+  run:
+    shell: pwsh
+
+jobs:
+  test:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6.0.0
+        with:
+          global-json-file: windows/global.json
+
+      # A job-level hashFiles() guard never runs (checkout has not happened yet), so probe here.
+      - id: probe
+        name: Probe for tests
+        run: |
+          $hasTests = Test-Path windows/tests/EchoDiar.Tests/EchoDiar.Tests.csproj
+          "has_tests=$($hasTests.ToString().ToLowerInvariant())" >> $env:GITHUB_OUTPUT
+
+      # Native model tests run only in the native-smoke job.
+      - name: Test
+        if: steps.probe.outputs.has_tests == 'true'
+        run: dotnet test windows/tests/EchoDiar.Tests --filter "Category!=Native&Category!=NativeLLM"
+
+  package:
+    runs-on: windows-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        arch: [x64, arm64]
+    env:
+      ARCH: ${{ matrix.arch }}
+      PLATFORM_NAME: ${{ matrix.arch == 'arm64' && 'ARM64' || 'x64' }}
+    steps:
+      - name: Set paths
+        run: |
+          "PFX_PATH=$env:RUNNER_TEMP\EchoDiarDev.pfx" >> $env:GITHUB_ENV
+          "OUT_DIR=$env:RUNNER_TEMP\AppPackages" >> $env:GITHUB_ENV
+          "STAGE_DIR=$env:RUNNER_TEMP\artifact" >> $env:GITHUB_ENV
+
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6.0.0
+        with:
+          global-json-file: windows/global.json
+
+      - uses: microsoft/setup-msbuild@30375c66a4eea26614e0d39710365f22f8b0af57 # v3.0.0
+
+      - name: Patch manifest version
+        env:
+          RUN_NUMBER: ${{ github.run_number }}
+        run: |
+          $path = 'windows/src/EchoDiar.App/Package.appxmanifest'
+          $xml = Get-Content -Raw $path
+          $patched = [regex]::Replace($xml, '(<Identity\b[^>]*?\bVersion=")[^"]*(")', "`${1}0.0.$env:RUN_NUMBER.0`${2}")
+          if ($patched -eq $xml) { throw "Identity Version not found in $path" }
+          Set-Content -Path $path -Value $patched -NoNewline -Encoding utf8
+          Select-String -Path $path -Pattern 'Version="0\.0\.' | ForEach-Object { $_.Line.Trim() }
+
+      - name: Decode signing certificate
+        if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
+        env:
+          PFX_BASE64: ${{ secrets.WINDOWS_DEV_CERT_PFX }}
+        run: |
+          if (-not $env:PFX_BASE64) { throw 'WINDOWS_DEV_CERT_PFX is empty' }
+          [IO.File]::WriteAllBytes($env:PFX_PATH, [Convert]::FromBase64String($env:PFX_BASE64))
+
+      # MSBuild (Visual Studio) packages the single-project MSIX; dotnet publish is the fallback
+      # if the runner's MSBuild cannot build net10.0 WinUI.
+      - name: Build MSIX
+        env:
+          PFX_PASSWORD: ${{ secrets.WINDOWS_DEV_CERT_PASSWORD }}
+        run: |
+          $props = @(
+            '/p:Configuration=Debug',
+            "/p:Platform=$env:PLATFORM_NAME",
+            "/p:RuntimeIdentifier=win-$env:ARCH",
+            '/p:GenerateAppxPackageOnBuild=true',
+            '/p:UapAppxPackageBuildMode=SideloadOnly',
+            '/p:AppxBundle=Never',
+            "/p:AppxPackageDir=$env:OUT_DIR\"
+          )
+          if (Test-Path $env:PFX_PATH) {
+            $props += '/p:AppxPackageSigningEnabled=true'
+            $props += "/p:PackageCertificateKeyFile=$env:PFX_PATH"
+            $props += "/p:PackageCertificatePassword=$env:PFX_PASSWORD"
+          } else {
+            Write-Host 'No signing certificate (fork pull request): building an unsigned package.'
+            $props += '/p:AppxPackageSigningEnabled=false'
+          }
+          msbuild windows/src/EchoDiar.App/EchoDiar.App.csproj /restore /nologo /v:minimal @props
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
+      - name: Stage artifact
+        env:
+          PFX_PASSWORD: ${{ secrets.WINDOWS_DEV_CERT_PASSWORD }}
+        run: |
+          Get-ChildItem -LiteralPath $env:OUT_DIR -Recurse -File | Select-Object -ExpandProperty FullName
+          $msix = @(Get-ChildItem -LiteralPath $env:OUT_DIR -Recurse -File -Filter '*.msix' |
+            Where-Object { $_.FullName -notmatch '\\Dependencies\\' })
+          if ($msix.Count -ne 1) { throw "Expected one .msix under $env:OUT_DIR, found $($msix.Count)" }
+          New-Item -ItemType Directory -Path $env:STAGE_DIR | Out-Null
+          Copy-Item -LiteralPath $msix[0].FullName -Destination $env:STAGE_DIR
+          $deps = Join-Path $msix[0].DirectoryName 'Dependencies'
+          if (Test-Path $deps) { Copy-Item -LiteralPath $deps -Destination $env:STAGE_DIR -Recurse }
+          if (Test-Path $env:PFX_PATH) {
+            # Public certificate only: the PFX never leaves the runner.
+            $cert = New-Object System.Security.Cryptography.X509Certificates.X509Certificate2($env:PFX_PATH, $env:PFX_PASSWORD)
+            $der = $cert.Export([System.Security.Cryptography.X509Certificates.X509ContentType]::Cert)
+            [IO.File]::WriteAllBytes((Join-Path $env:STAGE_DIR 'EchoDiarDev.cer'), $der)
+          }
+          Copy-Item -LiteralPath windows/scripts/vm-install.ps1 -Destination $env:STAGE_DIR
+          if (Get-ChildItem -LiteralPath $env:STAGE_DIR -Recurse -File -Include '*.pfx', '*.p12') { throw 'Private key in artifact' }
+          Get-ChildItem -LiteralPath $env:STAGE_DIR -Recurse -File | ForEach-Object { $_.FullName.Substring($env:STAGE_DIR.Length + 1) }
+
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: EchoDiar-win-${{ matrix.arch }}
+          path: ${{ runner.temp }}/artifact
+          retention-days: 14
+          if-no-files-found: error
+
+      - name: Remove signing certificate
+        if: always()
+        run: Remove-Item -LiteralPath $env:PFX_PATH -Force -ErrorAction SilentlyContinue
