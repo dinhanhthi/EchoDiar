@@ -1,3 +1,6 @@
+using System.ComponentModel;
+using EchoDiar.App.ViewModels;
+using EchoDiar.App.Views;
 using Microsoft.UI.Composition;
 using Microsoft.UI.Composition.SystemBackdrops;
 using Microsoft.UI.Input;
@@ -13,10 +16,12 @@ namespace EchoDiar.App;
 
 public sealed partial class MainWindow : Window
 {
+    private readonly AppViewModel _model;
     private RectInt32 _passthrough;
 
-    public MainWindow()
+    public MainWindow(AppViewModel model)
     {
+        _model = model;
         InitializeComponent();
         SystemBackdrop = new TintedMicaBackdrop();
 
@@ -29,10 +34,30 @@ public sealed partial class MainWindow : Window
         titleBar.ButtonHoverBackgroundColor = Color.FromArgb(0x1A, 0xFF, 0xFF, 0xFF);
         titleBar.ButtonPressedBackgroundColor = Color.FromArgb(0x33, 0xFF, 0xFF, 0xFF);
 
-        DataRootText.Text = App.DataRoot;
-
         TitleBarGrid.SizeChanged += (_, _) => UpdateTitleBarRegions();
         TitleBarGrid.LayoutUpdated += (_, _) => UpdateTitleBarRegions();
+
+        BackButton.Click += (_, _) => _model.GoBack();
+        _model.PropertyChanged += OnModelChanged;
+        ShowRoute();
+    }
+
+    private void OnModelChanged(object? sender, PropertyChangedEventArgs e)
+    {
+        if (e.PropertyName == nameof(AppViewModel.Route)) ShowRoute();
+    }
+
+    /// <summary>Shows the route's page; Back returns to the list from the other pages.</summary>
+    private void ShowRoute()
+    {
+        var route = _model.Route;
+        BackButton.IsEnabled = route.Kind != RouteKind.List;
+        RouteHost.Content = route switch
+        {
+            { Kind: RouteKind.Recording } => new RecordingView(_model),
+            { Kind: RouteKind.Conversation, ConversationId: { } id } => new ConversationView(_model, id),
+            _ => new ConversationListView(_model),
+        };
     }
 
     // Keeps the capsule clickable: everything else in the title bar row drags the window.

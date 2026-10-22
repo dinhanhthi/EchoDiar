@@ -66,9 +66,12 @@
             </Border>
         </Grid>
 
-        <StackPanel Grid.Row="1" Margin="24" Spacing="6">
-            <TextBlock Style="{StaticResource SubtitleTextBlockStyle}" Text="Library folder" />
-            <TextBlock x:Name="DataRootText" IsTextSelectionEnabled="True" TextWrapping="Wrap" />
-        </StackPanel>
+        <!-- The current route's page: the library list, the recording page or one conversation. -->
+        <ContentControl
+            x:Name="RouteHost"
+            Grid.Row="1"
+            HorizontalContentAlignment="Stretch"
+            VerticalContentAlignment="Stretch"
+            IsTabStop="False" />
     </Grid>
 </Window>
