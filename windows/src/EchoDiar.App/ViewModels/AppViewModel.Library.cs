@@ -68,7 +68,8 @@ public sealed partial class AppViewModel
             if (term.Length == 0) return Conversations;
             return Conversations.Where(c =>
             {
-                var document = _searchDocuments.TryGetValue(c.Id, out var cached) && cached.IsFresh(c)
+                // A stale document still serves until its new one replaces it, as on macOS.
+                var document = _searchDocuments.TryGetValue(c.Id, out var cached)
                     // The current title: a rename does not change the size.
                     ? cached.Document with { Title = c.Title }
                     : new ConversationSearch.Document(c.Title, [], "", "", "");
