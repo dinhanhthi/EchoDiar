@@ -62,7 +62,7 @@ public sealed class RetentionPolicyTests : IDisposable
         var old = Make(ageDays: 400, status: status);
         foreach (var mode in new[] { RetentionMode.AudioOnly, RetentionMode.WholeConversation })
         {
-            Assert.Empty(RetentionPolicy.Select([old], Now, Settings(mode, 1), Audio));
+            Assert.Empty(RetentionPolicy.Select([old], Now, Settings(mode, 1), Audio, _ => true));
         }
     }
 
@@ -70,7 +70,7 @@ public sealed class RetentionPolicyTests : IDisposable
     public void TranscribedStatusWithoutTranscriptIsNeverSelected()
     {
         var old = Make(ageDays: 400, hasTranscript: false);
-        Assert.Empty(RetentionPolicy.Select([old], Now, Settings(RetentionMode.WholeConversation, 1), Audio));
+        Assert.Empty(RetentionPolicy.Select([old], Now, Settings(RetentionMode.WholeConversation, 1), Audio, _ => true));
     }
 
     // conversation.json may come from another device (sync): marked transcribed but without transcript.json on disk
