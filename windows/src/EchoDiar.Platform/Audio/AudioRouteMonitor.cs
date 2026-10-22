@@ -32,9 +32,13 @@ public sealed class AudioRouteMonitor : IAudioRouteSource, IDisposable
 {
     private static readonly TimeSpan Coalesce = TimeSpan.FromMilliseconds(300);
 
+    // Clients whose unregistration failed: the audio service may still call them, so they are never collected.
+    private static readonly List<Listener> Unreleased = [];
+
     private readonly object _gate = new(); // serializes Start, Stop and Dispose (held across register/unregister)
     private readonly object _lock = new(); // the state shared with the coalescing timer
-    private Listener? _listener;
+    private Listener? _client; // registered once, on the first Start, until Dispose
+    private volatile bool _running;
     private string? _pinnedId;
     private Endpoint _input;
     private Endpoint _output;
@@ -53,6 +57,11 @@ public sealed class AudioRouteMonitor : IAudioRouteSource, IDisposable
     /// Starts listening, after stopping any previous run. <paramref name="inputEndpointId"/>: the picked mic (null =
     /// the default input); while it is active it is the input in use. Returns false, staying stopped, when the
     /// endpoint notifications cannot be registered (no audio service).
+    /// <para>
+    /// The notification client is registered on the first Start and stays registered, rooted by this monitor, until
+    /// <see cref="Dispose"/>: Start and Stop only reset the routes and turn the events on or off. Registering a new
+    /// client per run left the audio service with a pointer to a client the GC could free.
+    /// </para>
     /// </summary>
     public bool Start(string? inputEndpointId)
     {
@@ -60,46 +69,46 @@ public sealed class AudioRouteMonitor : IAudioRouteSource, IDisposable
         {
             ObjectDisposedException.ThrowIf(_disposed, this);
             StopLocked();
-            Listener? listener = null;
             try
             {
                 OnMta(() =>
                 {
-                    listener = new Listener(this, (IMMDeviceEnumerator)new MMDeviceEnumerator());
-                    var input = ResolveInput(listener.Enumerator, inputEndpointId);
-                    var output = DefaultEndpoint(listener.Enumerator, EDataFlow.eRender);
+                    var client = _client ??= Register();
+                    var input = ResolveInput(client.Enumerator, inputEndpointId);
+                    var output = DefaultEndpoint(client.Enumerator, EDataFlow.eRender);
                     lock (_lock)
                     {
                         _pinnedId = inputEndpointId;
                         _input = input;
                         _output = output;
-                        _listener = listener;
+                        _running = true;
                     }
-                    listener.Enumerator.RegisterEndpointNotificationCallback(listener);
                 });
                 return true;
             }
             catch (COMException)
             {
-                lock (_lock) _listener = null;
-                if (listener is not null) OnMta(listener.Release);
                 return false;
             }
         }
     }
 
-    /// <summary>Stops listening and the coalescing timer. Safe to call repeatedly.</summary>
+    /// <summary>Stops the events and the coalescing timer; the client stays registered. Safe to call repeatedly.</summary>
     public void Stop()
     {
         lock (_gate) StopLocked();
     }
 
+    /// <summary>Stops and unregisters the notification client.</summary>
     public void Dispose()
     {
         lock (_gate)
         {
-            StopLocked();
+            if (_disposed) return;
             _disposed = true;
+            StopLocked();
+            if (_client is { } client) OnMta(client.Unregister);
+            _client = null;
         }
     }
 
@@ -132,7 +141,7 @@ public sealed class AudioRouteMonitor : IAudioRouteSource, IDisposable
                 }
                 finally
                 {
-                    if (device is not null) Marshal.FinalReleaseComObject(device);
+                    if (device is not null) Marshal.ReleaseComObject(device);
                 }
             }
         }
@@ -142,8 +151,8 @@ public sealed class AudioRouteMonitor : IAudioRouteSource, IDisposable
         }
         finally
         {
-            if (devices is not null) Marshal.FinalReleaseComObject(devices);
-            if (enumerator is not null) Marshal.FinalReleaseComObject(enumerator);
+            if (devices is not null) Marshal.ReleaseComObject(devices);
+            if (enumerator is not null) Marshal.ReleaseComObject(enumerator);
         }
         return list;
     }
@@ -153,14 +162,39 @@ public sealed class AudioRouteMonitor : IAudioRouteSource, IDisposable
 
     private void StopLocked()
     {
-        Listener? listener;
-        lock (_lock)
+        lock (_lock) _running = false;
+        _client?.Disarm();
+    }
+
+    /// <summary>
+    /// A new client, registered with its own enumerator. Throws, registering nothing, without an audio service. On an
+    /// MTA thread.
+    /// </summary>
+    private Listener Register()
+    {
+        var client = new Listener(this, UniqueEnumerator());
+        client.Enumerator.RegisterEndpointNotificationCallback(client);
+        return client;
+    }
+
+    /// <summary>
+    /// An enumerator wrapper of its own: the runtime shares one wrapper per COM object, and the enumerator may be a
+    /// singleton, so a release elsewhere (ListInputDevices, AudioSessions, the captures) could otherwise end the
+    /// wrapper this monitor keeps for its lifetime.
+    /// </summary>
+    private static IMMDeviceEnumerator UniqueEnumerator()
+    {
+        var shared = new MMDeviceEnumerator();
+        var unknown = Marshal.GetIUnknownForObject(shared);
+        try
         {
-            listener = _listener;
-            _listener = null;
+            return (IMMDeviceEnumerator)Marshal.GetUniqueObjectForIUnknown(unknown);
         }
-        // Outside _lock: unregistering may wait for a notification in flight.
-        if (listener is not null) OnMta(listener.Unregister);
+        finally
+        {
+            Marshal.Release(unknown);
+            Marshal.ReleaseComObject(shared);
+        }
     }
 
     /// <summary>The coalescing timer's callback (thread pool, MTA): compares the routes with the last ones.</summary>
@@ -171,8 +205,8 @@ public sealed class AudioRouteMonitor : IAudioRouteSource, IDisposable
         {
             lock (_lock)
             {
-                if (_listener != listener) return;
                 listener.ClearPending(); // a notification from now on schedules another evaluation
+                if (!_running) return;
 
                 var enumerator = listener.Enumerator;
                 var inputLost = _input.Id is not null && !IsActive(enumerator, _input.Id);
@@ -218,7 +252,7 @@ public sealed class AudioRouteMonitor : IAudioRouteSource, IDisposable
             }
             finally
             {
-                if (device is not null) Marshal.FinalReleaseComObject(device);
+                if (device is not null) Marshal.ReleaseComObject(device);
             }
         }
         return DefaultEndpoint(enumerator, EDataFlow.eCapture);
@@ -239,7 +273,7 @@ public sealed class AudioRouteMonitor : IAudioRouteSource, IDisposable
         }
         finally
         {
-            if (device is not null) Marshal.FinalReleaseComObject(device);
+            if (device is not null) Marshal.ReleaseComObject(device);
         }
     }
 
@@ -258,7 +292,7 @@ public sealed class AudioRouteMonitor : IAudioRouteSource, IDisposable
         }
         finally
         {
-            if (device is not null) Marshal.FinalReleaseComObject(device);
+            if (device is not null) Marshal.ReleaseComObject(device);
         }
     }
 
@@ -303,48 +337,55 @@ public sealed class AudioRouteMonitor : IAudioRouteSource, IDisposable
         finally
         {
             PInvoke.PropVariantClear(ref value);
-            if (store is not null) Marshal.FinalReleaseComObject(store);
+            if (store is not null) Marshal.ReleaseComObject(store);
         }
     }
 
     /// <summary>
-    /// One registration: the enumerator it is registered with, the coalescing timer, and the notification client.
-    /// Its callbacks run on an audio service MTA thread and only arm the timer: no COM call, no lock, no throw.
+    /// The registered notification client: the enumerator it is registered with and the coalescing timer, for the
+    /// monitor's lifetime. Its callbacks run on an audio service thread and only arm the timer: no COM call, no lock,
+    /// no throw.
     /// </summary>
     private sealed class Listener : IMMNotificationClient
     {
+        private readonly AudioRouteMonitor _monitor;
         private readonly Timer _timer;
         private int _pending;
 
         public Listener(AudioRouteMonitor monitor, IMMDeviceEnumerator enumerator)
         {
+            _monitor = monitor;
             Enumerator = enumerator;
             _timer = new Timer(_ => monitor.Evaluate(this), null, Timeout.Infinite, Timeout.Infinite);
         }
 
+        /// <summary>Never released by hand: the runtime owns the wrapper, which lives as long as this client.</summary>
         public IMMDeviceEnumerator Enumerator { get; }
 
         public void ClearPending() => Volatile.Write(ref _pending, 0);
 
-        /// <summary>Stops the timer, unregisters (not from a notification) and releases the enumerator. On an MTA thread.</summary>
+        /// <summary>Cancels a scheduled evaluation; one already running finds the monitor stopped.</summary>
+        public void Disarm()
+        {
+            _timer.Change(Timeout.Infinite, Timeout.Infinite);
+            ClearPending();
+        }
+
+        /// <summary>
+        /// Unregisters (not from a notification) and stops the timer. On an MTA thread. When unregistering fails the
+        /// audio service may still call this client: it is then kept alive for the process's lifetime.
+        /// </summary>
         public void Unregister()
         {
             try
             {
                 Enumerator.UnregisterEndpointNotificationCallback(this);
             }
-            catch (COMException)
+            catch (Exception)
             {
-                // Never registered, or the audio service went away.
+                lock (Unreleased) Unreleased.Add(this);
             }
-            Release();
-        }
-
-        /// <summary>Stops the timer and releases the enumerator. On an MTA thread.</summary>
-        public void Release()
-        {
             _timer.Dispose();
-            Marshal.FinalReleaseComObject(Enumerator);
         }
 
         public void OnDeviceStateChanged(PCWSTR pwstrDeviceId, DEVICE_STATE dwNewState) => Schedule();
@@ -361,16 +402,16 @@ public sealed class AudioRouteMonitor : IAudioRouteSource, IDisposable
             if (key.fmtid == format.fmtid && key.pid == format.pid) Schedule();
         }
 
-        /// <summary>The first notification of a burst arms the timer; the others until it fires are absorbed.</summary>
+        /// <summary>While the monitor runs, the first notification of a burst arms the timer; the others until it fires are absorbed.</summary>
         private void Schedule()
         {
             try
             {
-                if (Interlocked.Exchange(ref _pending, 1) == 0) _timer.Change(Coalesce, Timeout.InfiniteTimeSpan);
+                if (_monitor._running && Interlocked.Exchange(ref _pending, 1) == 0) _timer.Change(Coalesce, Timeout.InfiniteTimeSpan);
             }
             catch (Exception)
             {
-                // Disposed meanwhile (stopping): nothing to evaluate.
+                // Disposed meanwhile (disposing): nothing to evaluate.
             }
         }
     }

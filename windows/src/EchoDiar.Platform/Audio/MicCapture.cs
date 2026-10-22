@@ -194,8 +194,8 @@ internal sealed class CaptureLoop : IDisposable
         }
         finally
         {
-            if (device is not null) Marshal.FinalReleaseComObject(device);
-            Marshal.FinalReleaseComObject(enumerator);
+            if (device is not null) Marshal.ReleaseComObject(device);
+            Marshal.ReleaseComObject(enumerator);
         }
     }
 
@@ -218,7 +218,7 @@ internal sealed class CaptureLoop : IDisposable
         finally
         {
             PInvoke.PropVariantClear(ref value);
-            if (store is not null) Marshal.FinalReleaseComObject(store);
+            if (store is not null) Marshal.ReleaseComObject(store);
         }
     }
 

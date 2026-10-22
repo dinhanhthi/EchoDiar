@@ -78,8 +78,8 @@ public static class AudioSessions
         }
         finally
         {
-            if (devices is not null) Marshal.FinalReleaseComObject(devices);
-            if (enumerator is not null) Marshal.FinalReleaseComObject(enumerator);
+            if (devices is not null) Marshal.ReleaseComObject(devices);
+            if (enumerator is not null) Marshal.ReleaseComObject(enumerator);
         }
         return states;
     }
@@ -104,9 +104,9 @@ public static class AudioSessions
         }
         finally
         {
-            if (sessions is not null) Marshal.FinalReleaseComObject(sessions);
-            if (manager is not null) Marshal.FinalReleaseComObject(manager);
-            if (device is not null) Marshal.FinalReleaseComObject(device);
+            if (sessions is not null) Marshal.ReleaseComObject(sessions);
+            if (manager is not null) Marshal.ReleaseComObject(manager);
+            if (device is not null) Marshal.ReleaseComObject(device);
         }
     }
 
@@ -130,7 +130,7 @@ public static class AudioSessions
         }
         finally
         {
-            if (session is not null) Marshal.FinalReleaseComObject(session);
+            if (session is not null) Marshal.ReleaseComObject(session);
         }
     }
 
