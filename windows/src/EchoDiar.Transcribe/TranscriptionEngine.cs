@@ -146,7 +146,11 @@ public sealed class TranscriptionException(TranscriptionErrorKind kind, string d
 /// <summary>Language codes of the multilingual Whisper models.</summary>
 public static class WhisperLanguages
 {
-    /// <summary>whisper.cpp's language table (OpenAI Whisper's 99 codes plus <c>yue</c>). Phase 7's engine may own it.</summary>
+    /// <summary>
+    /// whisper.cpp's language table (OpenAI Whisper's 99 codes plus <c>yue</c>), in id order, checked against the
+    /// Whisper.net 1.9.1 natives (<c>whisper_lang_id</c>, ids 0…99). Whisper.net's <c>GetSupportedLanguages</c> lists
+    /// only ids 0…98, so it omits <c>yue</c>.
+    /// </summary>
     public static readonly IReadOnlyList<string> All =
     [
         "en", "zh", "de", "es", "ru", "ko", "fr", "ja", "pt", "tr", "pl", "ca", "nl", "ar", "sv", "it", "id", "hi",
