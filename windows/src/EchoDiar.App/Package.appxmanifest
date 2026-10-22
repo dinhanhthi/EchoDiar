@@ -44,8 +44,8 @@
       <Extensions>
         <uap5:Extension
           Category="windows.appExecutionAlias"
-          Executable="$targetnametoken$.exe"
-          EntryPoint="$targetentrypoint$">
+          Executable="EchoDiar.App.exe"
+          EntryPoint="Windows.FullTrustApplication">
           <uap5:AppExecutionAlias>
             <uap5:ExecutionAlias Alias="echodiar.exe" />
           </uap5:AppExecutionAlias>
