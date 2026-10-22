@@ -184,6 +184,34 @@ public sealed class FileFormatTests : IDisposable
         Assert.Equal(["Release date"], ChatArchive.Entries(_dir).Select(e => e.Title));
     }
 
+    // macos-written.json comes from the macOS encoders (CrossPlatformFixturesTests.swift): each file kind must decode and
+    // re-encode to the same JSON. Parsed nodes are compared, as Swift writes `"k" : v` and escapes `/` as `\/`.
+    [Fact]
+    public void MacOSWrittenFilesRoundTrip()
+    {
+        var macos = JsonNode.Parse(File.ReadAllBytes(Path.Combine(AppContext.BaseDirectory, "Fixtures", "macos-written.json")))!
+            .AsObject();
+
+        Assert.Equal(Fixtures().Keys.Order(StringComparer.Ordinal), macos.Select(p => p.Key).Order(StringComparer.Ordinal));
+        foreach (var (name, json) in macos)
+        {
+            var bytes = Encoding.UTF8.GetBytes(json!.ToJsonString());
+            var reencoded = name switch
+            {
+                Conversation.FileName => SwiftJson.Serialize(SwiftJson.Deserialize<Conversation>(bytes)),
+                Transcript.FileName => SwiftJson.Serialize(SwiftJson.Deserialize<Transcript>(bytes)),
+                RecordingSession.FileName => SwiftJson.Serialize(SwiftJson.Deserialize<RecordingSession>(bytes)),
+                ChatLog.FileName => ChatLog.Decode(bytes).Encoded(),
+                ChatArchive.IndexFileName => SwiftJson.Serialize(SwiftJson.Deserialize<ChatArchive.Index>(bytes)),
+                Conversation.SummaryIndexFileName => SwiftJson.Serialize(SwiftJson.Deserialize<SummaryIndex>(bytes)),
+                _ => throw new InvalidDataException($"Unexpected file kind {name}"),
+            };
+
+            Assert.True(JsonNode.DeepEquals(json, JsonNode.Parse(reencoded)),
+                $"{name} changed on re-encode:\n{json.ToJsonString()}\n{Encoding.UTF8.GetString(reencoded)}");
+        }
+    }
+
     // Writes the fixture 3.4's Swift test decodes with the EchoCore types.
     [Fact]
     public void WritesWindowsJsonFixture()

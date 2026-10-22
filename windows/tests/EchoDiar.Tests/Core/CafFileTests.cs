@@ -57,6 +57,18 @@ public sealed class CafFileTests : IDisposable
         }
     }
 
+    // Written on macOS by afconvert (-f caff -d LEI16@16000 -c 2), with the extra chunks Core Audio adds.
+    [Fact]
+    public void ReadsMacOSWrittenFile()
+    {
+        using var reader = new CafFile.Reader(Path.Combine(AppContext.BaseDirectory, "Fixtures", "macos-audio.caf"));
+
+        Assert.Equal(16000, reader.SampleRate);
+        Assert.Equal(2, reader.Channels);
+        Assert.Equal(CafFile.SampleFormat.Int16, reader.Format);
+        Assert.True(reader.Frames > 0);
+    }
+
     [Fact]
     public void UnfinishedFileReportsWholeFramesOnly()
     {
