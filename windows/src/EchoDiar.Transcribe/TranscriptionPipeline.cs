@@ -188,7 +188,7 @@ public sealed class TranscriptionPipeline(
     /// most <see cref="MonoAudio.SlabSeconds"/> into one <see cref="SpeechChunker"/>, so silence is not decoded; a chunk
     /// below <see cref="MonoAudio.SilencePeak"/> is skipped, and each chunk gets the language of
     /// <paramref name="ranges"/> at its start. <paramref name="session"/> is called for every chunk to decode (the
-    /// caller loads it once, on the first call). Also the batch engines' decode, with the whole file as one gap.
+    /// caller loads it once, on the first call). Only for a prior's gaps: the batch engines decode all the audio.
     /// </summary>
     public static async Task<List<RawSegment>> FillGapsAsync(
         IReadOnlyList<Span> gaps, string extract, ModelEntry entry, IReadOnlyList<LanguageRange> ranges,

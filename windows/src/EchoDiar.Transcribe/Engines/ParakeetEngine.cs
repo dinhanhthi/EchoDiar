@@ -9,13 +9,15 @@ namespace EchoDiar.Transcribe.Engines;
 /// <c>Models/&lt;id&gt;/</c>. The model is loaded per job and freed before <see cref="TranscribeAsync"/> returns.
 /// Parakeet detects the language itself: the ranges' languages are not used.
 /// </summary>
-/// <remarks>
-/// Audio is decoded in speech chunks of at most the entry's window (30 s): the sherpa-onnx encoder aborts the process
-/// (an uncatchable onnxruntime error) beyond about 400 s, and its peak memory grows with the length (about 2.4 GB at
-/// 60 s, 4.2 GB at 180 s).
-/// </remarks>
 public sealed class ParakeetEngine(ModelEntry entry, string folder) : ISessionTranscriptionEngine
 {
+    /// <summary>
+    /// Audio decoded at once, shorter than <see cref="MonoAudio.SlabSeconds"/>: the sherpa-onnx encoder aborts the
+    /// process (an uncatchable onnxruntime error) beyond about 400 s, and its peak memory grows with the length
+    /// (about 2.4 GB at 60 s, 4.2 GB at 180 s).
+    /// </summary>
+    public const double SlabSeconds = 60;
+
     /// <summary>A pause this long between words starts a new segment.</summary>
     public const double SegmentGapSeconds = 1.0;
 
@@ -30,23 +32,55 @@ public sealed class ParakeetEngine(ModelEntry entry, string folder) : ISessionTr
     /// <summary>A shorter chunk is padded with silence (sherpa-onnx may abort the process on too few frames).</summary>
     private const int MinChunkSamples = (int)(0.3 * SampleRate);
 
+    /// <summary>A shorter slab (the tail of a range or file) is skipped.</summary>
+    private const double MinSlabSeconds = 0.3;
+
     private sealed record Word(string Text, double Start, double End);
 
     /// <summary>A <see cref="TranscriptionPipeline.EngineFactory"/>.</summary>
     public static ITranscriptionEngine Create(ModelEntry entry, string folder) => new ParakeetEngine(entry, folder);
 
     /// <summary>
-    /// The file cut into speech chunks (<see cref="TranscriptionPipeline.FillGapsAsync"/> over the whole file), each
-    /// decoded by one <see cref="Session"/>; silence is not decoded.
+    /// All the audio: one decode per language range, each read in slabs of at most <see cref="SlabSeconds"/>, each
+    /// slab decoded by one <see cref="Session"/>. Before the last slab of a range, its last sentence may be cut by the
+    /// slab end: it is decoded again with the next slab, which starts at it. Swift carries only the last word over,
+    /// which is enough every 600 s; at 60 s the cut is frequent, and TDT token times trail the audio, so restarting at
+    /// the cut word still repeats the words before it.
     /// </summary>
     public async Task<IReadOnlyList<RawSegment>> TranscribeAsync(
         string channelPath, IReadOnlyList<LanguageRange> languageRanges, Action<double> progress,
         CancellationToken cancellationToken)
     {
         await using var session = await OpenSessionAsync(cancellationToken).ConfigureAwait(false);
-        var segments = await TranscriptionPipeline.FillGapsAsync(
-            [new Span(0, MonoAudio.Duration(channelPath))], channelPath, entry, languageRanges, _ => Task.FromResult(session),
-            progress, cancellationToken).ConfigureAwait(false);
+        var duration = MonoAudio.Duration(channelPath);
+        var total = Math.Max(1, duration);
+        var segments = new List<RawSegment>();
+        foreach (var range in languageRanges)
+        {
+            var rangeEnd = Math.Min(range.End ?? duration, duration);
+            var slabStart = range.Start;
+            while (slabStart < rangeEnd)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                var slabEnd = Math.Min(slabStart + SlabSeconds, rangeEnd);
+                var samples = MonoAudio.Read(channelPath, slabStart, slabEnd);
+                // As Swift: a slab under 300 ms is not decoded (sherpa-onnx may abort the process on too few frames).
+                if (samples.Length < MinSlabSeconds * SampleRate) break;
+                var offset = slabStart;
+                var slabSegments = (await session.TranscribeAsync(samples, null, cancellationToken).ConfigureAwait(false))
+                    .Select(s => s with { Start = s.Start + offset, End = s.End + offset }).ToList();
+                var nextStart = slabEnd;
+                // The carried-over sentence must start after the slab, or the loop would not advance.
+                if (slabEnd < rangeEnd && slabSegments.Count > 1 && slabSegments[^1].Start > slabStart)
+                {
+                    nextStart = slabSegments[^1].Start;
+                    slabSegments.RemoveAt(slabSegments.Count - 1);
+                }
+                segments.AddRange(slabSegments);
+                progress(Math.Min(1, nextStart / total));
+                slabStart = nextStart;
+            }
+        }
         progress(1);
         return segments;
     }
