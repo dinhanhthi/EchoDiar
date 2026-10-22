@@ -1,7 +1,8 @@
 name: Windows
 
-# Builds the Windows port (windows/): runs the unit tests once they exist and packages a
-# signed sideload MSIX per architecture for the QA VM (artifact EchoDiar-win-<arch>).
+# Builds the Windows port (windows/): runs the unit tests once they exist, the native engine smoke
+# tests on x64 and ARM64, and packages a signed sideload MSIX per architecture for the QA VM
+# (artifact EchoDiar-win-<arch>).
 # Signing uses the dev certificate in the WINDOWS_DEV_CERT_PFX / WINDOWS_DEV_CERT_PASSWORD
 # secrets; pull requests from forks get no secrets and build an unsigned package.
 
@@ -76,6 +77,38 @@ jobs:
         if: steps.probe.outputs.has_tests == 'true'
         working-directory: windows
         run: dotnet test tests/EchoDiar.Tests/EchoDiar.Tests.csproj --filter "Category!=Native&Category!=NativeLLM"
+
+  # The real engines on their native libraries (Whisper.net, sherpa-onnx) on x64 and ARM64. The tests download
+  # their pinned, SHA-256 checked models from Hugging Face into ECHODIAR_TEST_MODELS, cached between runs.
+  native-smoke:
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-latest, windows-11-arm]
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6.0.0
+        with:
+          global-json-file: windows/global.json
+
+      # Keyed by the SHA-256 of ggml-tiny.bin, the pyannote segmentation model and the campplus embedding.
+      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ${{ runner.temp }}/echodiar-test-models
+          key: echodiar-test-models-be07e048e1e599ad46341c8d2a135645097a538221678b7acdd1b1919c6e1b21-220ad67ca923bef2fa91f2390c786097bf305bceb5e261d4af67b38e938e1079-aa3cfc16963a10586a9393f5035d6d6b57e98d358b347f80c2a30bf4f00ceba2
+
+      - name: Native smoke tests
+        working-directory: windows
+        env:
+          ECHODIAR_TEST_MODELS: ${{ runner.temp }}/echodiar-test-models
+        run: |
+          "Runner: $env:RUNNER_ARCH, OS arch: $([System.Runtime.InteropServices.RuntimeInformation]::OSArchitecture)"
+          dotnet test tests/EchoDiar.Tests/EchoDiar.Tests.csproj --filter Category=Native --logger "console;verbosity=detailed"
 
   package:
     runs-on: windows-latest
