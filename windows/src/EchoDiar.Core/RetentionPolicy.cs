@@ -18,21 +18,24 @@ public static class RetentionPolicy
     /// <summary>
     /// Transcribed conversations created more than <see cref="AppSettings.AutoDeleteAfterDays"/> days before
     /// <paramref name="now"/>. Never selects a conversation that is recording, compressing, transcribing, failed or not
-    /// yet transcribed. Audio only: lists just the conversation's <paramref name="audioFiles"/> (default
+    /// yet transcribed, nor one whose transcript file is missing from disk (<paramref name="hasTranscriptFile"/>, default
+    /// <see cref="LibraryStore.HasTranscriptFile"/>): conversation.json may come from another device through sync, or a
+    /// partial sync. Audio only: lists just the conversation's <paramref name="audioFiles"/> (default
     /// <see cref="LibraryStore.AudioFiles"/>), and skips it when it has none left.
     /// </summary>
     public static IReadOnlyList<Deletion> Select(
         IEnumerable<Conversation> conversations, DateTimeOffset now, AppSettings settings,
-        Func<Conversation, IReadOnlyList<string>>? audioFiles = null)
+        Func<Conversation, IReadOnlyList<string>>? audioFiles = null, Func<Conversation, bool>? hasTranscriptFile = null)
     {
         audioFiles ??= c => LibraryStore.AudioFiles(c.Folder);
+        hasTranscriptFile ??= c => LibraryStore.HasTranscriptFile(c.Folder);
         var days = AppSettings.Clamp(settings.AutoDeleteAfterDays, AppSettings.AutoDeleteDaysRange);
         var cutoff = now.AddSeconds(-(double)days * 86_400);
         List<Deletion> deletions = [];
         foreach (var conversation in conversations)
         {
             if (conversation.Status != ConversationStatus.Transcribed || !conversation.HasTranscript
-                || conversation.CreatedAt >= cutoff)
+                || conversation.CreatedAt >= cutoff || !hasTranscriptFile(conversation))
             {
                 continue;
             }

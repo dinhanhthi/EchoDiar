@@ -205,6 +205,13 @@ public sealed class LibraryStore(string root, IFileTrash trash)
             .ToList();
     }
 
+    /// <summary>The conversation folder holds its transcript as a regular file (not a link or other reparse point, not hidden).</summary>
+    public static bool HasTranscriptFile(string folder)
+    {
+        var info = new FileInfo(Path.Combine(folder, Transcript.FileName));
+        return info.Exists && IsPlain(info);
+    }
+
     /// <summary>Bytes of every regular file in <paramref name="folder"/>, recursively; links are not followed or counted.</summary>
     public static long SizeOnDisk(string folder)
     {
@@ -334,6 +341,8 @@ public sealed class LibraryStore(string root, IFileTrash trash)
         }
         conversation.SizeBytes = SizeOnDisk(folder);
         conversation.HasAudio = AudioFiles(folder).Count > 0;
+        // conversation.json may come from another device (sync): no transcript unless its file is on disk.
+        conversation.HasTranscript &= HasTranscriptFile(folder);
         return conversation;
     }
 

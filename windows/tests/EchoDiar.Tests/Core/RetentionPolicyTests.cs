@@ -21,7 +21,8 @@ public sealed class RetentionPolicyTests : IDisposable
         var old = Make(ageDays: 31);
         var recent = Make(ageDays: 29);
 
-        var deletions = RetentionPolicy.Select([old, recent], Now, Settings(RetentionMode.WholeConversation, 30), Audio);
+        var deletions = RetentionPolicy.Select(
+            [old, recent], Now, Settings(RetentionMode.WholeConversation, 30), Audio, _ => true);
 
         var deletion = Assert.Single(deletions);
         Assert.Equal(old.Id, deletion.ConversationId);
@@ -38,7 +39,7 @@ public sealed class RetentionPolicyTests : IDisposable
 
         var deletions = RetentionPolicy.Select(
             [withAudio, withoutAudio], Now, Settings(RetentionMode.AudioOnly, 90),
-            c => c.Id == withAudio.Id ? Audio(c) : []);
+            c => c.Id == withAudio.Id ? Audio(c) : [], _ => true);
 
         var deletion = Assert.Single(deletions);
         Assert.Equal(withAudio.Id, deletion.ConversationId);
@@ -72,6 +73,22 @@ public sealed class RetentionPolicyTests : IDisposable
         Assert.Empty(RetentionPolicy.Select([old], Now, Settings(RetentionMode.WholeConversation, 1), Audio));
     }
 
+    // conversation.json may come from another device (sync): marked transcribed but without transcript.json on disk
+    // (a partial sync, a forged file), the conversation is kept; with the file, it goes.
+    [Theory]
+    [InlineData(RetentionMode.WholeConversation)]
+    [InlineData(RetentionMode.AudioOnly)]
+    public void TranscribedWithoutTranscriptFileOnDiskIsNeverSelected(RetentionMode mode)
+    {
+        var old = Make(ageDays: 400);
+        Directory.CreateDirectory(old.Folder);
+
+        Assert.Empty(RetentionPolicy.Select([old], Now, Settings(mode, 1), Audio));
+
+        File.WriteAllText(Path.Combine(old.Folder, Transcript.FileName), "{}");
+        Assert.Equal([old.Id], RetentionPolicy.Select([old], Now, Settings(mode, 1), Audio).Select(d => d.ConversationId));
+    }
+
     // macOS applyRetention: a conversation with an active job (isBusy) keeps its files, the others go.
     [Fact]
     public async Task ApplyRetentionSkipsBusyConversations()
@@ -83,6 +100,7 @@ public sealed class RetentionPolicyTests : IDisposable
             Directory.CreateDirectory(conversation.Folder);
             conversation.Write();
             File.WriteAllText(Path.Combine(conversation.Folder, "audio.m4a"), "x");
+            File.WriteAllText(Path.Combine(conversation.Folder, Transcript.FileName), "{}");
         }
         var store = new LibraryStore(_dir, new DeletingTrash());
 
