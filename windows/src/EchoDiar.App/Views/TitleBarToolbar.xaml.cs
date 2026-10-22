@@ -72,6 +72,12 @@ public sealed partial class TitleBarToolbar : UserControl
     /// <summary>The icon button opened the box, which takes the trailing buttons' place until it is left empty.</summary>
     private bool _searchOpened;
 
+    /// <summary>
+    /// The width the title bar gives the toolbar: ActualWidth is never less than the desired width (an overflowing
+    /// toolbar is clipped), so it cannot tell that the box does not fit.
+    /// </summary>
+    private double _availableWidth = double.PositiveInfinity;
+
     /// <summary>The Record menu's end: a separator and the Language submenu, kept while the targets are rebuilt.</summary>
     private readonly MenuFlyoutSeparator _languageSeparator = new();
     private readonly MenuFlyoutSubItem _languageItem = new() { Text = Loc.T("Language") };
@@ -408,7 +414,10 @@ public sealed partial class TitleBarToolbar : UserControl
         {
             e.Handled = true;
             CloseSearch();
-            DispatcherQueue.TryEnqueue(() => SearchButton.Focus(FocusState.Keyboard));
+            DispatcherQueue.TryEnqueue(() =>
+            {
+                if (_model is not null) SearchButton.Focus(FocusState.Keyboard);
+            });
         }
     }
 
@@ -419,14 +428,20 @@ public sealed partial class TitleBarToolbar : UserControl
     /// </summary>
     private void UpdateSearchMode()
     {
-        if (_model is null || _searchOpened || ToolbarGrid.ActualWidth <= 0) return;
+        if (_model is null || _searchOpened || double.IsInfinity(_availableWidth) || ToolbarGrid.ActualWidth <= 0) return;
         var others = ToolbarGrid.Padding.Left + LeadingColumn.ActualWidth + TrailingColumn.ActualWidth
             + TabsColumn.ActualWidth + DragColumn.ActualWidth;
-        var asIcon = ToolbarGrid.ActualWidth - others < SearchMinWidth;
+        var asIcon = _availableWidth - others < SearchMinWidth;
         if (asIcon == _searchAsIcon) return;
         _searchAsIcon = asIcon;
-        StartupTrace.Write($"search as icon {asIcon} (toolbar {ToolbarGrid.ActualWidth:0}, other columns {others:0})");
+        StartupTrace.Write($"search as icon {asIcon} (available {_availableWidth:0}, other columns {others:0})");
         ApplySearchMode();
+    }
+
+    protected override Size MeasureOverride(Size availableSize)
+    {
+        _availableWidth = availableSize.Width;
+        return base.MeasureOverride(availableSize);
     }
 
     private void ApplySearchMode()
