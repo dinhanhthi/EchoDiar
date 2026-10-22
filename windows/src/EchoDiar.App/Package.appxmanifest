@@ -1,0 +1,62 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Package
+  xmlns="http://schemas.microsoft.com/appx/manifest/foundation/windows10"
+  xmlns:uap="http://schemas.microsoft.com/appx/manifest/uap/windows10"
+  xmlns:uap5="http://schemas.microsoft.com/appx/manifest/uap/windows10/5"
+  xmlns:rescap="http://schemas.microsoft.com/appx/manifest/foundation/windows10/restrictedcapabilities"
+  xmlns:desktop6="http://schemas.microsoft.com/appx/manifest/desktop/windows10/6"
+  IgnorableNamespaces="uap uap5 rescap desktop6">
+
+  <!-- Version is patched by CI (0.0.<run number>.0). -->
+  <Identity
+    Name="dinh.thi.EchoDiar"
+    Publisher="CN=EchoDiar Dev"
+    Version="0.0.1.0" />
+
+  <Properties>
+    <DisplayName>EchoDiar</DisplayName>
+    <PublisherDisplayName>Anh-Thi Dinh</PublisherDisplayName>
+    <Logo>Assets\StoreLogo.png</Logo>
+    <!-- The library lives at the real %LOCALAPPDATA%\EchoDiar, not a per-package redirected copy. -->
+    <desktop6:FileSystemWriteVirtualization>disabled</desktop6:FileSystemWriteVirtualization>
+  </Properties>
+
+  <Dependencies>
+    <TargetDeviceFamily Name="Windows.Desktop" MinVersion="10.0.22000.0" MaxVersionTested="10.0.26100.0" />
+  </Dependencies>
+
+  <Resources>
+    <Resource Language="x-generate" />
+  </Resources>
+
+  <Applications>
+    <Application Id="App"
+      Executable="$targetnametoken$.exe"
+      EntryPoint="$targetentrypoint$">
+      <uap:VisualElements
+        DisplayName="EchoDiar"
+        Description="EchoDiar"
+        BackgroundColor="transparent"
+        Square150x150Logo="Assets\Square150x150Logo.png"
+        Square44x44Logo="Assets\Square44x44Logo.png">
+        <uap:SplashScreen Image="Assets\Square150x150Logo.png" />
+      </uap:VisualElements>
+      <Extensions>
+        <uap5:Extension
+          Category="windows.appExecutionAlias"
+          Executable="$targetnametoken$.exe"
+          EntryPoint="$targetentrypoint$">
+          <uap5:AppExecutionAlias>
+            <uap5:ExecutionAlias Alias="echodiar.exe" />
+          </uap5:AppExecutionAlias>
+        </uap5:Extension>
+      </Extensions>
+    </Application>
+  </Applications>
+
+  <Capabilities>
+    <rescap:Capability Name="runFullTrust" />
+    <rescap:Capability Name="unvirtualizedResources" />
+    <DeviceCapability Name="microphone" />
+  </Capabilities>
+</Package>

@@ -55,3 +55,9 @@ sparkle_private_key*
 *.keychain*
 .env*
 *private_key*
+
+# Windows port build output
+windows/**/bin/
+windows/**/obj/
+windows/**/AppPackages/
+*.pfx
