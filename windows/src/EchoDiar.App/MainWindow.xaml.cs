@@ -3,6 +3,7 @@ using EchoDiar.App.Services;
 using EchoDiar.App.Themes;
 using EchoDiar.App.ViewModels;
 using EchoDiar.App.Views;
+using Microsoft.UI.Dispatching;
 using Microsoft.UI.Input;
 using Microsoft.UI.Windowing;
 using Microsoft.UI.Xaml;
@@ -30,6 +31,10 @@ public sealed partial class MainWindow : Window
 
     /// <summary>A re-realization after lost surface contents waits for its frame: more losses meanwhile add none.</summary>
     private bool _reattachQueued;
+
+    /// <summary>The one-shot re-realizations of the first launch, kept so they tick.</summary>
+    private DispatcherQueueTimer? _presentedTimer;
+    private DispatcherQueueTimer? _backstopTimer;
 
     public MainWindow(AppViewModel model)
     {
@@ -122,14 +127,52 @@ public sealed partial class MainWindow : Window
     /// <summary>
     /// The text of the first frame can be lost while the window is first shown (seen in a VM on warm launches: the
     /// toolbar's icons and labels and the library header stayed blank, while backgrounds and later text drew). A text
-    /// element makes its glyphs again only when it leaves the tree and enters it again, so once shown and after one
-    /// drawn frame, the toolbar's and the library's content are taken out and put back.
+    /// element makes its glyphs again only when it leaves the tree and enters it again, so the toolbar's and the
+    /// library's content are taken out and put back: 300 ms after the first presented frame (the first Rendering whose
+    /// rendering time has started; the loss comes after the earlier ones), and once more 1.5 s after the window shows.
     /// </summary>
     private void OnFirstActivated(object sender, WindowActivatedEventArgs args)
     {
         if (args.WindowActivationState == WindowActivationState.Deactivated) return;
         Activated -= OnFirstActivated;
-        AfterNextFrame(() => ReattachChrome("after the first frame"));
+        CompositionTarget.Rendering += OnFirstPresentedRendering;
+        _backstopTimer = StartOnce(TimeSpan.FromSeconds(1.5), "backstop +1.5 s");
+    }
+
+    private void OnFirstPresentedRendering(object? sender, object e)
+    {
+        if (!_closing && (e is not RenderingEventArgs args || args.RenderingTime <= TimeSpan.Zero)) return;
+        CompositionTarget.Rendering -= OnFirstPresentedRendering;
+        if (_closing) return;
+        StartupTrace.Write("first presented frame");
+        _presentedTimer = StartOnce(TimeSpan.FromMilliseconds(300), "after first presented frame +300 ms");
+    }
+
+    private DispatcherQueueTimer StartOnce(TimeSpan delay, string reason)
+    {
+        var timer = DispatcherQueue.CreateTimer();
+        timer.Interval = delay;
+        timer.IsRepeating = false;
+        timer.Tick += (t, _) =>
+        {
+            t.Stop();
+            ReattachIfShown(reason);
+        };
+        timer.Start();
+        return timer;
+    }
+
+    /// <summary>Skipped while closing, while minimized or hidden, and while a re-realization after lost contents waits.</summary>
+    private void ReattachIfShown(string reason)
+    {
+        if (_closing) return;
+        var minimized = AppWindow.Presenter is OverlappedPresenter { State: OverlappedPresenterState.Minimized };
+        if (_reattachQueued || minimized || !AppWindow.IsVisible)
+        {
+            StartupTrace.Write($"skip reattach {reason} (queued {_reattachQueued}, minimized {minimized}, visible {AppWindow.IsVisible})");
+            return;
+        }
+        ReattachChrome(reason);
     }
 
     /// <summary>
