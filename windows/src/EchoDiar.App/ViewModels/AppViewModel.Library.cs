@@ -152,6 +152,12 @@ public sealed partial class AppViewModel
         }
     }
 
+    /// <summary>
+    /// macOS <c>transcriptEdited</c>: re-lists the conversation after its <c>transcript.json</c> changed (a speaker
+    /// renamed), so its size, and with it the search document, is fresh.
+    /// </summary>
+    public Task TranscriptEditedAsync(Guid id) => ReloadAsync(id);
+
     /// <summary>Opens File Explorer with the conversation's folder selected.</summary>
     public static void RevealInExplorer(Conversation conversation)
     {

@@ -545,31 +545,36 @@ public sealed partial class AppViewModel : ObservableObject
         TranscriptionProgress.TryGetValue(id, out var progress) && progress.Step != JobStep.NeedsModel;
 
     /// <summary>
-    /// The conversation's Transcribe and Retry (<paramref name="engineId"/>: a catalog id from "Retry with another
-    /// engine", null = the default resolution): queues it unless a job for it is active or it has no audio.
+    /// The conversation's Transcribe and Retry, and the transcript's Re-transcribe (<paramref name="engineId"/>: a
+    /// catalog id from "Retry with another engine" or "Transcribe again with", null = the default resolution;
+    /// <paramref name="language"/> replaces the recording's language markers, null keeps them): queues it unless a job
+    /// for it is active or it has no audio.
     /// </summary>
-    public async Task TranscribeAsync(Guid id, string? engineId = null)
+    public async Task TranscribeAsync(Guid id, string? engineId = null, string? language = null)
     {
         if (IsTranscribing(id) || Conversations.FirstOrDefault(c => c.Id == id) is not { HasAudio: true } conversation) return;
+        if (language is not null) RememberLanguage(language);
         var session = await Task.Run(() => ReadSession(conversation.Folder));
-        if (session is not null) SubmitTranscription(conversation.Folder, session, engineId);
+        if (session is not null) SubmitTranscription(conversation.Folder, session, engineId, language);
     }
 
     /// <summary>
     /// Queues a job with <paramref name="engineId"/>, else the default engine when it is installed and handles the
-    /// recording's first language (else the pipeline's default resolution), and the speaker settings. A failed or
-    /// probe recording is never transcribed.
+    /// recording's first language (else the pipeline's default resolution), and the speaker settings;
+    /// <paramref name="language"/> replaces the recording's language markers. A failed or probe recording is never
+    /// transcribed.
     /// </summary>
-    private void SubmitTranscription(string folder, RecordingSession session, string? engineId = null)
+    private void SubmitTranscription(string folder, RecordingSession session, string? engineId = null, string? language = null)
     {
         var id = session.Id;
         if (_closing || session.Probe || session.State == SessionState.Failed || IsTranscribing(id)) return;
-        var language = session.LanguageMarkers.MinBy(m => m.FileTime)?.Language ?? "auto";
+        var firstLanguage = language ?? session.LanguageMarkers.MinBy(m => m.FileTime)?.Language ?? "auto";
         var job = new TranscriptionJob
         {
             ConversationID = id,
             Folder = folder,
-            EngineID = engineId ?? PreferredEngine(language),
+            EngineID = engineId ?? PreferredEngine(firstLanguage),
+            Language = language,
             SpeakerCountHint = Settings.SpeakerCountHint,
             DiarizerID = Settings.DefaultDiarizerModelID,
             Diarize = Settings.Diarization,
