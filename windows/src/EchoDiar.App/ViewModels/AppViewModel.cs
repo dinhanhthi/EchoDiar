@@ -1,4 +1,6 @@
+using System.ComponentModel;
 using System.Diagnostics;
+using System.Runtime.InteropServices;
 using CommunityToolkit.Mvvm.ComponentModel;
 using EchoDiar.App.Services;
 using EchoDiar.Core.Audio;
@@ -34,6 +36,9 @@ public sealed partial class AppViewModel : ObservableObject
     /// <summary>15 Hz: the elapsed time and level meters while recording.</summary>
     private static readonly TimeSpan PollInterval = TimeSpan.FromMilliseconds(67);
 
+    /// <summary>How long <see cref="Shutdown"/> waits for a start under way and the stop that finishes the audio.</summary>
+    private const uint ShutdownWaitMilliseconds = 10_000;
+
     private readonly AppServices _services;
     private readonly DispatcherQueue _dispatcher;
     private readonly DispatcherQueueTimer _pollTimer;
@@ -45,7 +50,10 @@ public sealed partial class AppViewModel : ObservableObject
     /// </summary>
     private Task _recovery = Task.CompletedTask;
 
-    /// <summary>The window closed: a start under way stops its recording instead of leaving it running.</summary>
+    /// <summary>
+    /// The window closed: a start under way stops its recording instead of leaving it running, and nothing reaches the
+    /// UI any more (no property change, no dispatched event, no timer, no step after a recording).
+    /// </summary>
     private volatile bool _closing;
 
     /// <summary>The engine start under way, which <see cref="Shutdown"/> waits for before stopping.</summary>
@@ -197,9 +205,9 @@ public sealed partial class AppViewModel : ObservableObject
     /// <summary>Loads the settings, recovers sessions a crash left open, then lists the library and the models.</summary>
     public async Task StartAsync()
     {
-        _services.Library.Changed += list => _dispatcher.TryEnqueue(() => Conversations = list);
-        _services.Pipeline.Progress += progress => _dispatcher.TryEnqueue(() => ApplyProgress(progress));
-        _services.Engine.SnapshotChanged += snapshot => _dispatcher.TryEnqueue(() => ApplySnapshot(snapshot));
+        _services.Library.Changed += list => Post(() => Conversations = list);
+        _services.Pipeline.Progress += progress => Post(() => ApplyProgress(progress));
+        _services.Engine.SnapshotChanged += snapshot => Post(() => ApplySnapshot(snapshot));
         _recovery = LoadAndRecoverAsync();
         await _recovery;
         await _services.Library.RefreshAsync();
@@ -215,22 +223,58 @@ public sealed partial class AppViewModel : ObservableObject
 
     /// <summary>
     /// Stops a running recording before the app quits, so its audio file is finished; a start under way is waited for
-    /// (at most 5 s) and stops itself.
+    /// and stops itself. Both run off the UI thread, waited for at most 10 s without pumping its messages: a managed
+    /// wait on this STA thread would run queued XAML work while the window closes. False when the wait timed out (a
+    /// device open that hangs holds the engine): the engine must then not be touched again, and launch recovery
+    /// finishes the session next time.
     /// </summary>
-    public void Shutdown()
+    public bool Shutdown()
     {
         _closing = true;
         _pollTimer.Stop();
         foreach (var token in _downloadTokens.Values) token.Cancel();
-        try
+        var start = _startTask;
+        var stop = Task.Run(() =>
         {
-            _startTask?.Wait(TimeSpan.FromSeconds(5));
-        }
-        catch (AggregateException)
+            try
+            {
+                start?.Wait();
+            }
+            catch (AggregateException)
+            {
+                // A failed start left nothing running.
+            }
+            _services.Engine.Stop();
+        });
+        var handle = ((IAsyncResult)stop).AsyncWaitHandle.SafeWaitHandle;
+        if (WaitForSingleObject(handle, ShutdownWaitMilliseconds) != WaitObject0)
         {
-            // A failed start left nothing running.
+            Debug.WriteLine("EchoDiar: the recording did not stop in time on quit.");
+            return false;
         }
-        _services.Engine.Stop();
+        if (stop.Exception is { } error) Debug.WriteLine($"EchoDiar: could not stop recording on quit: {error}");
+        return true;
+    }
+
+    private const uint WaitObject0 = 0;
+
+    [DllImport("kernel32.dll")]
+    private static extern uint WaitForSingleObject(Microsoft.Win32.SafeHandles.SafeWaitHandle handle, uint milliseconds);
+
+    /// <summary>Runs <paramref name="action"/> on the UI thread, unless the window closed before or meanwhile.</summary>
+    private void Post(Action action)
+    {
+        if (_closing) return;
+        _dispatcher.TryEnqueue(() =>
+        {
+            if (!_closing) action();
+        });
+    }
+
+    /// <summary>Silent once the window closed: its controls fail every call, and a failure in a dispatched callback ends the app.</summary>
+    protected override void OnPropertyChanged(PropertyChangedEventArgs e)
+    {
+        if (!_closing) base.OnPropertyChanged(e);
     }
 
     private void Recover()
@@ -313,7 +357,10 @@ public sealed partial class AppViewModel : ObservableObject
                 _services.Engine.Stop();
                 return null;
             });
-            _activeFolder = await _startTask;
+            var folder = await _startTask;
+            // The window may have closed while the devices opened: Shutdown stopped the timer for good.
+            if (_closing) return;
+            _activeFolder = folder;
             if (_activeFolder is not null) _pollTimer.Start();
         }
         catch (Exception e)
@@ -375,6 +422,7 @@ public sealed partial class AppViewModel : ObservableObject
 
     private void PollRecording()
     {
+        if (_closing) return;
         var snapshot = _services.Engine.CurrentSnapshot();
         if (snapshot.State == RecordingEngine.State.Idle)
         {
@@ -397,6 +445,7 @@ public sealed partial class AppViewModel : ObservableObject
     /// <summary>The single consumer of the engine's snapshots: an end snapshot, user stop or not, finishes the recording.</summary>
     private void ApplySnapshot(RecordingEngine.Snapshot snapshot)
     {
+        if (_closing) return;
         RecordingSnapshot = snapshot;
         if (snapshot.State != RecordingEngine.State.Idle)
         {
@@ -414,10 +463,12 @@ public sealed partial class AppViewModel : ObservableObject
     /// <summary>Lists the recording, opens it when the recording page is showing, and queues its transcription.</summary>
     private async Task FinishRecordingAsync(string folder)
     {
+        if (_closing) return;
         try
         {
             var list = await _services.Library.RefreshAsync();
             var session = await Task.Run(() => ReadSession(folder));
+            if (_closing) return;
             if (Route.Kind == RouteKind.Recording)
             {
                 Route = session is not null && list.Any(c => c.Id == session.Id) ? Route.ForConversation(session.Id) : Route.List;
@@ -463,7 +514,7 @@ public sealed partial class AppViewModel : ObservableObject
     private void SubmitTranscription(string folder, RecordingSession session)
     {
         var id = session.Id;
-        if (session.Probe || session.State == SessionState.Failed || IsTranscribing(id)) return;
+        if (_closing || session.Probe || session.State == SessionState.Failed || IsTranscribing(id)) return;
         var language = session.LanguageMarkers.MinBy(m => m.FileTime)?.Language ?? "auto";
         var job = new TranscriptionJob
         {
@@ -581,7 +632,7 @@ public sealed partial class AppViewModel : ObservableObject
 
     private async Task RunDownloadAsync(ModelEntry entry, CancellationTokenSource cancellation)
     {
-        var progress = new DownloadProgress(fraction => _dispatcher.TryEnqueue(() =>
+        var progress = new DownloadProgress(fraction => Post(() =>
         {
             if (Downloads.ContainsKey(entry.Id)) Downloads = With(Downloads, entry.Id, fraction);
         }));

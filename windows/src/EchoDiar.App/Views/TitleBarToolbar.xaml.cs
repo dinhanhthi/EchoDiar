@@ -53,6 +53,14 @@ public sealed partial class TitleBarToolbar : UserControl
         Update();
     }
 
+    /// <summary>The window closed: its controls fail every call, so the model's changes no longer reach them.</summary>
+    public void Detach()
+    {
+        if (_model is null) return;
+        _model.PropertyChanged -= OnModelChanged;
+        _model = null;
+    }
+
     /// <summary>
     /// The window-space rects (physical pixels at <paramref name="scale"/>) of every visible interactive element: the
     /// title bar passes clicks there to the controls, and drags the window everywhere else.

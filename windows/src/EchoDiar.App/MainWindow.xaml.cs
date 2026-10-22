@@ -89,6 +89,7 @@ public sealed partial class MainWindow : Window
         TitleBarGrid.LayoutUpdated -= OnTitleBarLayoutUpdated;
         if (_xamlRoot is not null) _xamlRoot.Changed -= OnXamlRootChanged;
         _model.PropertyChanged -= OnModelChanged;
+        Toolbar.Detach();
         _frames.Save();
         _frames.Detach();
     }

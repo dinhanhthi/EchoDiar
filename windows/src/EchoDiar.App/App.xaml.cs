@@ -94,7 +94,8 @@ public partial class App : Application
     /// <summary>The window closed: a running recording is stopped so its audio file is finished.</summary>
     private void Shutdown()
     {
-        _model?.Shutdown();
+        // A stop that did not end in time still holds the engine: disposing it would block on it.
+        if (_model is { } model && !model.Shutdown()) return;
         _services?.Dispose();
     }
 
