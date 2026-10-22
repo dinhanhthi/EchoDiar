@@ -47,7 +47,7 @@ public static class SessionRecovery
                 continue;
             }
 
-            var duration = AudioDuration(Path.Combine(folder, session.AudioFileName));
+            var duration = AudioDuration(folder, session.AudioFileName);
             session.State = duration > 0 ? SessionState.Recovered : SessionState.Failed;
             try
             {
@@ -62,15 +62,20 @@ public static class SessionRecovery
         return results;
     }
 
-    // Seconds of audio in the file; 0 when it is missing, empty or unreadable.
-    private static double AudioDuration(string path)
+    // Seconds of audio in the session's file; 0 when its name is not a plain name in the folder (session.json is
+    // untrusted) or the file is missing, not a regular file, empty or unreadable.
+    private static double AudioDuration(string folder, string fileName)
     {
         try
         {
+            if (ConversationFiles.AudioPath(folder, fileName) is not { } path) return 0;
+            var info = new FileInfo(path);
+            if (!info.Exists || (info.Attributes & FileAttributes.ReparsePoint) != 0) return 0;
             using var reader = new CafFile.Reader(path);
             return reader.Frames > 0 ? reader.Frames / reader.SampleRate : 0;
         }
-        catch (Exception e) when (IsFileError(e) || e is InvalidDataException or NotSupportedException)
+        // ArgumentException: a path FileStream rejects, so one bad session.json cannot stop the others' recovery.
+        catch (Exception e) when (IsFileError(e) || e is InvalidDataException or NotSupportedException or ArgumentException)
         {
             return 0;
         }

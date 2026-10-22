@@ -63,6 +63,36 @@ public sealed class SessionRecoveryTests : IDisposable
         Assert.Equal(SessionState.Failed, RecordingSession.Read(folder).State);
     }
 
+    // session.json is untrusted: a rooted or ".." name must not make recovery open a file outside the folder (on
+    // Windows a UNC path leaks credentials), and a name FileStream rejects must not stop the other sessions' recovery.
+    [Theory]
+    [InlineData("{outside}")]
+    [InlineData("..\\..\\outside.caf")]
+    [InlineData("../../outside.caf")]
+    [InlineData("audio\0.caf")]
+    public void HostileAudioFileNameFailsWithoutOpeningIt(string name)
+    {
+        var library = Path.Combine(_root, "library");
+        var outside = Path.Combine(_root, "outside.caf");
+        WriteCaf(outside);
+        var hostile = new RecordingSession
+        {
+            Pid = DeadPid, State = SessionState.Recording, AudioFileName = name.Replace("{outside}", outside),
+        };
+        var hostileFolder = hostile.Folder(library);
+        hostile.Write(hostileFolder);
+        var normal = new RecordingSession { Pid = DeadPid, State = SessionState.Recording };
+        var normalFolder = normal.Folder(library);
+        normal.Write(normalFolder);
+        WriteCaf(Path.Combine(normalFolder, normal.AudioFileName));
+
+        var results = SessionRecovery.Recover(library, (_, _) => false, Environment.ProcessId);
+
+        Assert.Equal(SessionState.Failed, Assert.Single(results, r => r.Folder == hostileFolder).State);
+        Assert.Equal(SessionState.Recovered, Assert.Single(results, r => r.Folder == normalFolder).State);
+        Assert.Equal(SessionState.Failed, RecordingSession.Read(hostileFolder).State);
+    }
+
     [Fact]
     public void LiveOwnerIsUntouched()
     {
@@ -90,5 +120,11 @@ public sealed class SessionRecoveryTests : IDisposable
 
         Assert.Empty(results);
         Assert.Equal(before, File.ReadAllBytes(Path.Combine(folder, RecordingSession.FileName)));
+    }
+
+    private static void WriteCaf(string path)
+    {
+        using var writer = new CafFile.Writer(path, 16_000, 2, CafFile.SampleFormat.Int16);
+        writer.Append(new short[1_600 * 2]);
     }
 }

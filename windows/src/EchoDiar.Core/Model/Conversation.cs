@@ -286,14 +286,14 @@ public static class ConversationFiles
 {
     /// <summary>
     /// <c>folder/fileName</c>, or null when <paramref name="fileName"/> is not a plain name (empty, <c>.</c>, <c>..</c>,
-    /// contains <c>/</c>, <c>\</c> or <c>:</c>), points outside <paramref name="folder"/>, or is a symlink. A missing
-    /// file is allowed; callers check existence.
+    /// contains <c>/</c>, <c>\</c>, <c>:</c> or NUL), points outside <paramref name="folder"/>, or is a symlink. A
+    /// missing file is allowed; callers check existence.
     /// </summary>
     public static string? AudioPath(string folder, string fileName)
     {
         if (fileName is "" or "." or "..") return null;
-        // ':' too: a drive-relative name ("C:x") or an NTFS alternate data stream ("audio.caf:x").
-        if (fileName.IndexOfAny(['/', '\\', ':']) >= 0) return null;
+        // ':' too: a drive-relative name ("C:x") or an NTFS alternate data stream ("audio.caf:x"). NUL: path APIs throw.
+        if (fileName.IndexOfAny(['/', '\\', ':', '\0']) >= 0) return null;
         var path = Path.Combine(folder, fileName);
         if (Path.GetFileName(path) != fileName) return null;
         if (new FileInfo(path).LinkTarget is not null) return null;
