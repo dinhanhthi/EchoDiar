@@ -1,6 +1,8 @@
+using System.Diagnostics;
 using System.Text.Json;
 using EchoDiar.Core.Audio;
 using EchoDiar.Core.Model;
+using EchoDiar.Core.Settings;
 
 namespace EchoDiar.Core;
 
@@ -144,6 +146,37 @@ public sealed class LibraryStore(string root, IFileTrash trash)
         if (HasMetadataFile(current.Folder)) conversation.Write();
         Replace(index, conversation);
     });
+
+    /// <summary>
+    /// Rescans the root, then moves what <see cref="RetentionPolicy.Select"/> picks to the Recycle Bin (the folder, or
+    /// the audio files listed again at deletion time); returns the deletions done. <paramref name="isBusy"/> is asked
+    /// right before each one (recording, compressing, transcribing or an AI job), which is then skipped; it is awaited
+    /// without holding the store, so it may dispatch to the UI thread. A failure is logged and the rest continue.
+    /// </summary>
+    public async Task<IReadOnlyList<RetentionPolicy.Deletion>> ApplyRetentionAsync(
+        AppSettings settings, Func<Guid, Task<bool>> isBusy, DateTimeOffset? now = null)
+    {
+        var conversations = await RefreshAsync().ConfigureAwait(false);
+        var deletions = RetentionPolicy.Select(conversations, now ?? DateTimeOffset.UtcNow, settings);
+        List<RetentionPolicy.Deletion> done = [];
+        foreach (var deletion in deletions)
+        {
+            if (await isBusy(deletion.ConversationId).ConfigureAwait(false)) continue;
+            try
+            {
+                if (deletion.Mode == RetentionMode.WholeConversation) await DeleteAsync(deletion.ConversationId).ConfigureAwait(false);
+                else await DeleteAudioAsync(deletion.ConversationId).ConfigureAwait(false);
+                done.Add(deletion);
+            }
+            // OperationCanceledException: the user cancelled a Recycle Bin error dialog (ShellFiles).
+            catch (Exception e) when (e is IOException or UnauthorizedAccessException or LibraryNotFoundException
+                or OperationCanceledException)
+            {
+                Debug.WriteLine($"EchoDiar: auto-delete failed for {deletion.ConversationId}: {e}");
+            }
+        }
+        return done;
+    }
 
     /// <summary>Measures every conversation folder of the last refresh now. <paramref name="modelBytes"/> sizes the models.</summary>
     public Task<Usage> UsageAsync(Func<long> modelBytes) => Run(() =>
