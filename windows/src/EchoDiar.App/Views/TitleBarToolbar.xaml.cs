@@ -10,6 +10,7 @@ using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Automation;
 using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Input;
+using Microsoft.UI.Xaml.Media;
 using Windows.Foundation;
 using Windows.Graphics;
 using VirtualKey = Windows.System.VirtualKey;
@@ -20,7 +21,8 @@ namespace EchoDiar.App.Views;
 /// <summary>
 /// The title bar's button groups (macOS MainView.swift toolbar), shown by route: Back off the list; Record with its menu of
 /// targets and the language (Stop, blinking, and Pause or Resume while recording); on a conversation its title, Reveal, Delete and the
-/// tabs; Settings (a placeholder until Phase 13) and Search everywhere. Update and Ask across conversations stay
+/// tabs (a SelectorBar); Settings (a placeholder until Phase 13) and Search everywhere, an icon button that opens the box
+/// where the box does not fit. Update and Ask across conversations stay
 /// collapsed until Phases 27 and 26. It also hosts the window's dialogs (it lives as long as the window): the delete
 /// confirmations (of this conversation, and of the library's cards and selection), "Recording problem" and the
 /// lost-mic prompt, one at a time.
@@ -35,6 +37,9 @@ public sealed partial class TitleBarToolbar : UserControl
 
     /// <summary>The cards are filtered once typing pauses this long (at once when cleared).</summary>
     private static readonly TimeSpan SearchDelay = TimeSpan.FromMilliseconds(200);
+
+    /// <summary>The search box's narrowest width that still shows its placeholder whole.</summary>
+    private const double SearchMinWidth = 120;
 
     private static readonly UISettings UISettings = new();
 
@@ -61,6 +66,12 @@ public sealed partial class TitleBarToolbar : UserControl
     /// <summary>The pause state Pause or Resume was last labeled for.</summary>
     private bool? _shownPaused;
 
+    /// <summary>The search box does not fit next to the other columns: Search shows as an icon button.</summary>
+    private bool _searchAsIcon;
+
+    /// <summary>The icon button opened the box, which takes the trailing buttons' place until it is left empty.</summary>
+    private bool _searchOpened;
+
     /// <summary>The Record menu's end: a separator and the Language submenu, kept while the targets are rebuilt.</summary>
     private readonly MenuFlyoutSeparator _languageSeparator = new();
     private readonly MenuFlyoutSubItem _languageItem = new() { Text = Loc.T("Language") };
@@ -82,6 +93,11 @@ public sealed partial class TitleBarToolbar : UserControl
         SearchBox.TextChanged += (_, _) => OnSearchTextChanged();
         // The inner text field handles Esc first.
         SearchBox.AddHandler(KeyDownEvent, new KeyEventHandler(OnSearchKeyDown), handledEventsToo: true);
+        SearchBox.LostFocus += (_, _) => OnSearchLostFocus();
+        SearchButton.Click += (_, _) => OpenSearch();
+        LayoutUpdated += (_, _) => UpdateSearchMode();
+        // Summary and Chat stay disabled until their phases.
+        TabsBar.SelectedItem = TranscriptTab;
         // A start that failed before the window was shown still gets its dialog.
         Loaded += (_, _) => ShowNextDialog();
     }
@@ -125,11 +141,11 @@ public sealed partial class TitleBarToolbar : UserControl
     /// </summary>
     public IReadOnlyList<RectInt32> PassthroughRects(double scale)
     {
-        FrameworkElement[] elements = [BackButton, RecordGroup, UpdateButton, FileGroup, AppGroup, SearchBox, TabsGroup];
+        FrameworkElement[] elements = [BackButton, RecordGroup, UpdateButton, FileGroup, AppGroup, SearchBox, SearchButton, TabsBar];
         var rects = new List<RectInt32>();
         foreach (var element in elements)
         {
-            if (element.Visibility != Visibility.Visible || element.ActualWidth <= 0 || element.ActualHeight <= 0) continue;
+            if (!IsShown(element) || element.ActualWidth <= 0 || element.ActualHeight <= 0) continue;
             var bounds = element.TransformToVisual(null).TransformBounds(new Rect(0, 0, element.ActualWidth, element.ActualHeight));
             rects.Add(new RectInt32(
                 (int)Math.Round(bounds.X * scale),
@@ -138,6 +154,16 @@ public sealed partial class TitleBarToolbar : UserControl
                 (int)Math.Round(bounds.Height * scale)));
         }
         return rects;
+    }
+
+    /// <summary>The element and its parents up to the toolbar are visible: a hidden panel's children keep their last size.</summary>
+    private bool IsShown(FrameworkElement element)
+    {
+        for (DependencyObject? e = element; e is not null && e != this; e = VisualTreeHelper.GetParent(e))
+        {
+            if (e is UIElement { Visibility: not Visibility.Visible }) return false;
+        }
+        return true;
     }
 
     private void OnModelChanged(object? sender, PropertyChangedEventArgs e)
@@ -175,6 +201,7 @@ public sealed partial class TitleBarToolbar : UserControl
         if (onListPage != _onListPage)
         {
             _onListPage = onListPage;
+            CloseSearch();
             SearchBox.Text = "";
         }
 
@@ -208,7 +235,7 @@ public sealed partial class TitleBarToolbar : UserControl
         var onConversation = conversation is not null;
         TitlePanel.Visibility = Shown(onConversation);
         FileGroup.Visibility = Shown(onConversation);
-        TabsGroup.Visibility = Shown(onConversation);
+        TabsBar.Visibility = Shown(onConversation);
         if (conversation is null) return;
         TitleText.Text = conversation.Title;
         DetailText.Text = ConversationText.Detail(conversation, _model);
@@ -368,12 +395,86 @@ public sealed partial class TitleBarToolbar : UserControl
         else _searchTimer.Start();
     }
 
-    /// <summary>Esc clears the search (macOS closes its search bar).</summary>
+    /// <summary>Esc clears the search (macOS closes its search bar); on an empty opened box it goes back to the icon.</summary>
     private void OnSearchKeyDown(object sender, KeyRoutedEventArgs e)
     {
-        if (e.Key != VirtualKey.Escape || SearchBox.Text.Length == 0) return;
-        e.Handled = true;
-        SearchBox.Text = "";
+        if (e.Key != VirtualKey.Escape) return;
+        if (SearchBox.Text.Length > 0)
+        {
+            e.Handled = true;
+            SearchBox.Text = "";
+        }
+        else if (_searchOpened)
+        {
+            e.Handled = true;
+            CloseSearch();
+            DispatcherQueue.TryEnqueue(() => SearchButton.Focus(FocusState.Keyboard));
+        }
+    }
+
+    /// <summary>
+    /// Search is an icon button where the box would get less than <see cref="SearchMinWidth"/> next to the other columns
+    /// (the compact minimum, if the caption buttons take more than expected), and the box again once it fits. Not while
+    /// the opened box hides the trailing buttons, whose width it needs.
+    /// </summary>
+    private void UpdateSearchMode()
+    {
+        if (_model is null || _searchOpened || ToolbarGrid.ActualWidth <= 0) return;
+        var others = ToolbarGrid.Padding.Left + LeadingColumn.ActualWidth + TrailingColumn.ActualWidth
+            + TabsColumn.ActualWidth + DragColumn.ActualWidth;
+        var asIcon = ToolbarGrid.ActualWidth - others < SearchMinWidth;
+        if (asIcon == _searchAsIcon) return;
+        _searchAsIcon = asIcon;
+        StartupTrace.Write($"search as icon {asIcon} (toolbar {ToolbarGrid.ActualWidth:0}, other columns {others:0})");
+        ApplySearchMode();
+    }
+
+    private void ApplySearchMode()
+    {
+        var box = !_searchAsIcon || _searchOpened;
+        SearchBox.Visibility = Shown(box);
+        SearchButton.Visibility = Shown(!box);
+        SearchColumn.Width = box ? new GridLength(1, GridUnitType.Star) : GridLength.Auto;
+        SearchColumn.MinWidth = box ? SearchMinWidth : 0;
+        TrailingPanel.Visibility = Shown(!_searchOpened);
+    }
+
+    private void OpenSearch()
+    {
+        _searchOpened = true;
+        ApplySearchMode();
+        DispatcherQueue.TryEnqueue(() =>
+        {
+            if (_model is not null) SearchBox.Focus(FocusState.Programmatic);
+        });
+    }
+
+    private void CloseSearch()
+    {
+        if (!_searchOpened) return;
+        _searchOpened = false;
+        ApplySearchMode();
+    }
+
+    /// <summary>The opened box, left empty, goes back to the icon.</summary>
+    private void OnSearchLostFocus()
+    {
+        if (!_searchOpened) return;
+        // Focus moving inside the box (its text field, its buttons) is not leaving it.
+        DispatcherQueue.TryEnqueue(() =>
+        {
+            if (_model is not null && SearchBox.Text.Length == 0 && !SearchHasFocus()) CloseSearch();
+        });
+    }
+
+    private bool SearchHasFocus()
+    {
+        var focused = XamlRoot is null ? null : FocusManager.GetFocusedElement(XamlRoot) as DependencyObject;
+        for (var e = focused; e is not null; e = VisualTreeHelper.GetParent(e))
+        {
+            if (e == SearchBox) return true;
+        }
+        return false;
     }
 
     // Recording dialogs and indicator
