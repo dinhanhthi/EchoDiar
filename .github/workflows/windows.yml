@@ -37,6 +37,10 @@ jobs:
         with:
           persist-credentials: false
 
+      # Resources.resw must match the macOS Localizable.xcstrings it is generated from.
+      - name: Check strings
+        run: python -I windows/tools/xcstrings_to_resw.py --check
+
       - uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6.0.0
         with:
           global-json-file: windows/global.json
