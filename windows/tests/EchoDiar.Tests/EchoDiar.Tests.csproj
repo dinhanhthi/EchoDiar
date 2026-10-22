@@ -17,6 +17,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\..\src\EchoDiar.Core\EchoDiar.Core.csproj" />
+    <ProjectReference Include="..\..\src\EchoDiar.Transcribe\EchoDiar.Transcribe.csproj" />
   </ItemGroup>
 
   <ItemGroup>

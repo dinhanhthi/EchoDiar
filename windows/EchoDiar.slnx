@@ -9,6 +9,7 @@
     </Project>
     <Project Path="src/EchoDiar.Core/EchoDiar.Core.csproj" />
     <Project Path="src/EchoDiar.Platform/EchoDiar.Platform.csproj" />
+    <Project Path="src/EchoDiar.Transcribe/EchoDiar.Transcribe.csproj" />
   </Folder>
   <Folder Name="/tests/">
     <Project Path="tests/EchoDiar.Tests/EchoDiar.Tests.csproj" />

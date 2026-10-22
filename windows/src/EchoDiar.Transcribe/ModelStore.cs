@@ -1,0 +1,331 @@
+using System.Security.Cryptography;
+using System.Text.Json;
+using EchoDiar.Core.Models;
+
+namespace EchoDiar.Transcribe;
+
+public enum ModelStoreError
+{
+    NotDownloadable,
+    UnsafePath,
+    ListingFailed,
+    NoFiles,
+    HttpStatus,
+    SizeMismatch,
+    ChecksumMismatch,
+    InsufficientSpace,
+}
+
+public sealed class ModelStoreException(ModelStoreError kind, string message) : Exception(message)
+{
+    public ModelStoreError Kind { get; } = kind;
+}
+
+/// <summary>Download progress in bytes over all files of one model.</summary>
+/// <param name="File">Repo path of the file being fetched; empty once all files are done.</param>
+public readonly record struct ModelDownloadProgress(long CompletedBytes, long TotalBytes, string File)
+{
+    public double Fraction => TotalBytes > 0 ? Math.Min(1, (double)CompletedBytes / TotalBytes) : 0;
+}
+
+/// <summary>
+/// Opt-in downloads of catalog models into <c>Models/&lt;id&gt;/</c> (Swift <c>ModelStore</c>). Only the entry's
+/// repos at their pinned revisions are fetched; the Hugging Face listing is untrusted: every listed path is
+/// checked before anything is written, and each file must match its listed size and SHA-256 (LFS oid).
+/// </summary>
+/// <remarks>
+/// Layout: repo files with <see cref="ModelEntry.Subfolder"/> stripped, and <see cref="ModelEntry.ExtraFiles"/>
+/// at their repo paths, all in <c>Models/&lt;id&gt;/</c> (the ggml file and the sherpa-onnx files sit at its root).
+/// The injected <see cref="HttpClient"/> should have <c>Timeout = InfiniteTimeSpan</c>: large models take longer
+/// than the 100 s default, and the cancellation token stops a download.
+/// </remarks>
+public sealed class ModelStore(string root, HttpClient http, Func<string, long>? freeBytes = null)
+{
+    private const string HubHost = "huggingface.co";
+    private const int BufferSize = 1 << 20;
+    private static readonly JsonSerializerOptions Json = new(JsonSerializerDefaults.Web);
+
+    private readonly Func<string, long> _freeBytes = freeBytes ?? DefaultFreeBytes;
+
+    /// <summary>The <c>Models</c> folder (<c>AppPaths.Models</c>).</summary>
+    public string Root { get; } = root;
+
+    public string Folder(ModelEntry entry) => Path.Combine(Root, SafeId(entry));
+
+    public string PartialFolder(ModelEntry entry) => Path.Combine(Root, ".partial-" + SafeId(entry));
+
+    // Installed state
+
+    /// <summary>Every allowlisted file is in place and the folder holds exactly the catalog's byte count.</summary>
+    public bool IsInstalled(ModelEntry entry)
+    {
+        if (entry.Repo is null || !Directory.Exists(Folder(entry))) return false;
+        var subfolder = entry.Subfolder is null ? [] : Components(entry.Subfolder);
+        if (subfolder is null) return false;
+        var required = new List<string[]?>();
+        if (entry.Files is not null) required.AddRange(entry.Files.Select(f => Components(f) is { } p ? Destination(p, subfolder) : null));
+        if (entry.ExtraFiles is not null) required.AddRange(entry.ExtraFiles.Files.Select(Components));
+        foreach (var parts in required)
+        {
+            if (parts is null || SafePath(Folder(entry), parts) is not { } path || !Path.Exists(path)) return false;
+        }
+        return InstalledBytes(entry) == entry.DiskBytes;
+    }
+
+    /// <summary>Bytes on disk under <c>Models/&lt;id&gt;/</c>.</summary>
+    public long InstalledBytes(ModelEntry entry) => SizeOf(Folder(entry));
+
+    /// <summary>Bytes of all installed models (partial downloads excluded).</summary>
+    public long TotalInstalledBytes() =>
+        Directory.Exists(Root)
+            ? Directory.EnumerateDirectories(Root).Where(d => !Path.GetFileName(d).StartsWith('.')).Sum(SizeOf)
+            : 0;
+
+    private static long SizeOf(string folder) =>
+        Directory.Exists(folder)
+            ? new DirectoryInfo(folder).EnumerateFiles("*", SearchOption.AllDirectories).Sum(f => f.Length)
+            : 0;
+
+    /// <summary>Removes <c>Models/&lt;id&gt;/</c> and any partial download.</summary>
+    public void Delete(ModelEntry entry)
+    {
+        foreach (var folder in new[] { Folder(entry), PartialFolder(entry) })
+        {
+            if (Directory.Exists(folder)) Directory.Delete(folder, recursive: true);
+        }
+    }
+
+    // Download
+
+    private sealed record Lfs(string Oid);
+
+    private sealed record TreeItem(string Type, string Path, long? Size, Lfs? Lfs);
+
+    private sealed record RemoteFile(string Repo, string Revision, string Path, string[] Destination, long Size, string? Sha256);
+
+    /// <summary>
+    /// Downloads the entry into <c>.partial-&lt;id&gt;</c>, verifies every file, then moves it to
+    /// <c>Models/&lt;id&gt;/</c> (replacing an older copy). On any failure or cancellation the partial folder is
+    /// removed and the error rethrown; an existing install is left as it was.
+    /// </summary>
+    public async Task DownloadAsync(
+        ModelEntry entry, IProgress<ModelDownloadProgress>? progress = null, CancellationToken cancellationToken = default)
+    {
+        if (entry.Repo is null || entry.Revision is null)
+        {
+            throw new ModelStoreException(ModelStoreError.NotDownloadable, $"{entry.Id} is not downloadable.");
+        }
+        var staging = PartialFolder(entry);
+        var final = Folder(entry);
+        Directory.CreateDirectory(Root);
+        if (Directory.Exists(staging)) Directory.Delete(staging, recursive: true);
+        try
+        {
+            var files = await RemoteFiles(entry, cancellationToken);
+            var total = files.Sum(f => f.Size);
+            var needed = total + total / 10;
+            var available = _freeBytes(Root);
+            if (available < needed)
+            {
+                throw new ModelStoreException(ModelStoreError.InsufficientSpace,
+                    $"Not enough disk space: {needed / 1_048_576} MiB needed, {available / 1_048_576} MiB available.");
+            }
+            var targets = files.Select(f => SafePath(staging, f.Destination)
+                ?? throw Unsafe(f.Path)).ToArray();
+
+            Directory.CreateDirectory(staging);
+            long done = 0;
+            for (var i = 0; i < files.Count; i++)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                var (file, before) = (files[i], done);
+                progress?.Report(new(done, total, file.Path));
+                await Fetch(file, targets[i], bytes => progress?.Report(new(before + bytes, total, file.Path)), cancellationToken);
+                done += file.Size;
+            }
+            progress?.Report(new(done, total, ""));
+
+            cancellationToken.ThrowIfCancellationRequested();
+            if (Directory.Exists(final)) Directory.Delete(final, recursive: true);
+            Directory.Move(staging, final);
+        }
+        catch
+        {
+            try
+            {
+                if (Directory.Exists(staging)) Directory.Delete(staging, recursive: true);
+            }
+            catch (IOException) { }
+            catch (UnauthorizedAccessException) { }
+            throw;
+        }
+    }
+
+    /// <summary>The allowlisted files of both repos. Any unsafe path in a listing fails the whole download.</summary>
+    private async Task<List<RemoteFile>> RemoteFiles(ModelEntry entry, CancellationToken cancellationToken)
+    {
+        var subfolder = entry.Subfolder is null ? [] : Components(entry.Subfolder) ?? throw Unsafe(entry.Subfolder);
+        var files = await Pick(entry.Repo!, entry.Revision!, subfolder, entry.Files, cancellationToken);
+        if (entry.ExtraFiles is { } extra)
+        {
+            files.AddRange(await Pick(extra.Repo, extra.Revision, [], extra.Files, cancellationToken));
+        }
+        if (files.Count == 0) throw new ModelStoreException(ModelStoreError.NoFiles, $"No files to download for {entry.Id}.");
+        var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        foreach (var file in files)
+        {
+            if (!seen.Add(string.Join('/', file.Destination))) throw Unsafe(file.Path);
+        }
+        return files;
+    }
+
+    /// <summary>
+    /// Listed files under <paramref name="subfolder"/> that match <paramref name="allowlist"/> on whole path
+    /// components (null = all), with the subfolder stripped from their destination.
+    /// </summary>
+    private async Task<List<RemoteFile>> Pick(
+        string repo, string revision, string[] subfolder, IReadOnlyList<string>? allowlist, CancellationToken cancellationToken)
+    {
+        var allowed = allowlist?.Select(a => Components(a) ?? throw Unsafe(a)).ToArray();
+        var picked = new List<RemoteFile>();
+        var matched = new HashSet<int>();
+        foreach (var item in await List(repo, revision, subfolder, cancellationToken))
+        {
+            if (item.Type != "file") continue;
+            var parts = Components(item.Path) ?? throw Unsafe(item.Path);
+            var hit = allowed is null ? -1 : Array.FindIndex(allowed, a => StartsWith(parts, a));
+            if (allowed is not null && hit < 0) continue;
+            matched.Add(hit);
+            var destination = Destination(parts, subfolder) ?? throw Unsafe(item.Path);
+            picked.Add(new(repo, revision, item.Path, destination, item.Size ?? 0, item.Lfs?.Oid));
+        }
+        if (allowed is not null && matched.Count < allowed.Length)
+        {
+            throw new ModelStoreException(ModelStoreError.ListingFailed, $"{repo} at {revision} misses an allowlisted file.");
+        }
+        return picked;
+    }
+
+    /// <summary>The recursive HF tree of a repo folder, following <c>Link: &lt;…&gt;; rel="next"</c> pages.</summary>
+    private async Task<List<TreeItem>> List(string repo, string revision, string[] subfolder, CancellationToken cancellationToken)
+    {
+        var path = subfolder.Length == 0 ? "" : "/" + Encode(subfolder);
+        Uri? next = new($"https://{HubHost}/api/models/{repo}/tree/{revision}{path}?recursive=1");
+        var items = new List<TreeItem>();
+        while (next is not null)
+        {
+            using var response = await http.GetAsync(next, cancellationToken);
+            if (!response.IsSuccessStatusCode)
+            {
+                throw new ModelStoreException(ModelStoreError.ListingFailed, $"HTTP {(int)response.StatusCode} listing {repo}.");
+            }
+            try
+            {
+                await using var body = await response.Content.ReadAsStreamAsync(cancellationToken);
+                items.AddRange(await JsonSerializer.DeserializeAsync<List<TreeItem>>(body, Json, cancellationToken) ?? []);
+            }
+            catch (JsonException error)
+            {
+                throw new ModelStoreException(ModelStoreError.ListingFailed, $"Unreadable listing of {repo}: {error.Message}");
+            }
+            next = NextPage(response.Headers.TryGetValues("Link", out var links) ? string.Join(",", links) : null);
+        }
+        return items;
+    }
+
+    /// <summary>The <c>rel="next"</c> URL of a Link header; only an https URL on the hub host is followed.</summary>
+    private static Uri? NextPage(string? link)
+    {
+        if (link is null) return null;
+        foreach (var part in link.Split(','))
+        {
+            if (!part.Contains("rel=\"next\"")) continue;
+            int start = part.IndexOf('<'), end = part.IndexOf('>');
+            if (start < 0 || end <= start) continue;
+            var text = part[(start + 1)..end];
+            if (Uri.TryCreate(text, UriKind.Absolute, out var uri) && uri.Scheme == Uri.UriSchemeHttps
+                && string.Equals(uri.Host, HubHost, StringComparison.OrdinalIgnoreCase))
+            {
+                return uri;
+            }
+            throw new ModelStoreException(ModelStoreError.ListingFailed, $"Refusing next page {text}.");
+        }
+        return null;
+    }
+
+    /// <summary>One file, streamed to disk while hashing; stops as soon as it exceeds the listed size.</summary>
+    private async Task Fetch(RemoteFile file, string target, Action<long> onBytes, CancellationToken cancellationToken)
+    {
+        var url = new Uri($"https://{HubHost}/{file.Repo}/resolve/{file.Revision}/{Encode(file.Path.Split('/'))}");
+        using var response = await http.GetAsync(url, HttpCompletionOption.ResponseHeadersRead, cancellationToken);
+        if (!response.IsSuccessStatusCode)
+        {
+            throw new ModelStoreException(ModelStoreError.HttpStatus, $"HTTP {(int)response.StatusCode} while downloading {file.Path}.");
+        }
+        Directory.CreateDirectory(Path.GetDirectoryName(target)!);
+        using var hash = IncrementalHash.CreateHash(HashAlgorithmName.SHA256);
+        long written = 0;
+        await using (var input = await response.Content.ReadAsStreamAsync(cancellationToken))
+        await using (var output = new FileStream(target, FileMode.CreateNew, FileAccess.Write, FileShare.None, BufferSize, useAsync: true))
+        {
+            var buffer = new byte[BufferSize];
+            int read;
+            while ((read = await input.ReadAsync(buffer, cancellationToken)) > 0)
+            {
+                written += read;
+                if (written > file.Size) throw Mismatch(ModelStoreError.SizeMismatch, "Size", file.Path);
+                hash.AppendData(buffer, 0, read);
+                await output.WriteAsync(buffer.AsMemory(0, read), cancellationToken);
+                onBytes(written);
+            }
+        }
+        if (written != file.Size) throw Mismatch(ModelStoreError.SizeMismatch, "Size", file.Path);
+        if (file.Sha256 is not null
+            && !string.Equals(Convert.ToHexString(hash.GetHashAndReset()), file.Sha256, StringComparison.OrdinalIgnoreCase))
+        {
+            throw Mismatch(ModelStoreError.ChecksumMismatch, "SHA-256", file.Path);
+        }
+    }
+
+    // Paths
+
+    /// <summary>
+    /// The <c>/</c>-separated components of a repo path, or null when it is rooted or has a backslash, colon, NUL,
+    /// or an empty, <c>.</c>, <c>..</c> or trailing-dot/space component (Windows would rewrite those).
+    /// </summary>
+    private static string[]? Components(string path)
+    {
+        if (path.Length == 0 || Path.IsPathRooted(path) || path.IndexOfAny(['\\', ':', '\0']) >= 0) return null;
+        var parts = path.Split('/');
+        return parts.All(p => p.Length > 0 && p != "." && p != ".." && !p.EndsWith('.') && !p.EndsWith(' ')) ? parts : null;
+    }
+
+    /// <summary>Components relative to <c>Models/&lt;id&gt;/</c>, or null when outside the subfolder (or the subfolder itself).</summary>
+    private static string[]? Destination(string[] parts, string[] subfolder) =>
+        parts.Length > subfolder.Length && StartsWith(parts, subfolder) ? parts[subfolder.Length..] : null;
+
+    private static bool StartsWith(string[] parts, string[] prefix) =>
+        parts.Length >= prefix.Length && parts.AsSpan(0, prefix.Length).SequenceEqual(prefix);
+
+    /// <summary>The full path of <paramref name="parts"/> in <paramref name="folder"/>, or null when it resolves outside it.</summary>
+    private static string? SafePath(string folder, string[] parts)
+    {
+        var baseFull = Path.GetFullPath(folder) + Path.DirectorySeparatorChar;
+        var full = Path.GetFullPath(Path.Combine([folder, .. parts]));
+        return full.StartsWith(baseFull, StringComparison.Ordinal) ? full : null;
+    }
+
+    private static string SafeId(ModelEntry entry) =>
+        Components(entry.Id) is [_] && !entry.Id.StartsWith('.') ? entry.Id : throw Unsafe(entry.Id);
+
+    private static string Encode(IEnumerable<string> parts) => string.Join('/', parts.Select(Uri.EscapeDataString));
+
+    private static ModelStoreException Unsafe(string path) =>
+        new(ModelStoreError.UnsafePath, $"Refusing unsafe model path {path}.");
+
+    private static ModelStoreException Mismatch(ModelStoreError kind, string what, string path) =>
+        new(kind, $"{what} mismatch for {path}.");
+
+    private static long DefaultFreeBytes(string folder) =>
+        new DriveInfo(Path.GetPathRoot(Path.GetFullPath(folder)) ?? folder).AvailableFreeSpace;
+}
