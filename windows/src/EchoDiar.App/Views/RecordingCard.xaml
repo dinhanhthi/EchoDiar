@@ -19,11 +19,15 @@
             </MenuFlyout>
         </Grid.ContextFlyout>
 
-        <Border Style="{StaticResource SolidCard}" CornerRadius="{StaticResource CornerRadiusXLarge}" />
+        <Border
+            Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
+            BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
+            BorderThickness="1"
+            CornerRadius="{StaticResource OverlayCornerRadius}" />
         <Border
             x:Name="SelectionFill"
             Background="{ThemeResource AccentFillColorDefaultBrush}"
-            CornerRadius="{StaticResource CornerRadiusXLarge}"
+            CornerRadius="{StaticResource OverlayCornerRadius}"
             Opacity="0.18"
             Visibility="Collapsed" />
 
@@ -83,7 +87,7 @@
                         VerticalAlignment="Center"
                         AutomationProperties.AccessibilityView="Raw"
                         Spacing="2">
-                        <Border Height="3" Background="{StaticResource PaletteHoverFillBrush}" CornerRadius="1.5">
+                        <Border Height="3" Background="{ThemeResource ControlStrongFillColorDefaultBrush}" CornerRadius="1.5">
                             <Border
                                 x:Name="MicFill"
                                 Width="0"
@@ -91,7 +95,7 @@
                                 Background="{ThemeResource SystemFillColorSuccessBrush}"
                                 CornerRadius="1.5" />
                         </Border>
-                        <Border Height="3" Background="{StaticResource PaletteHoverFillBrush}" CornerRadius="1.5">
+                        <Border Height="3" Background="{ThemeResource ControlStrongFillColorDefaultBrush}" CornerRadius="1.5">
                             <Border
                                 x:Name="SystemFill"
                                 Width="0"
@@ -118,12 +122,12 @@
                     Spacing="12">
                     <Button
                         x:Name="StopButton"
-                        Style="{StaticResource CapsuleButton}"
+                        Style="{StaticResource SubtleButtonStyle}"
                         AutomationProperties.Name="{local:T Text='Stop'}"
                         ToolTipService.ToolTip="{local:T Text='Stop recording'}">
                         <FontIcon FontFamily="{ThemeResource SymbolThemeFontFamily}" FontSize="15" Glyph="&#xE71A;" />
                     </Button>
-                    <Button x:Name="PauseButton" Style="{StaticResource CapsuleButton}">
+                    <Button x:Name="PauseButton" Style="{StaticResource SubtleButtonStyle}">
                         <FontIcon
                             x:Name="PauseIcon"
                             FontFamily="{ThemeResource SymbolThemeFontFamily}"
@@ -138,7 +142,7 @@
             x:Name="SelectionStroke"
             BorderBrush="{ThemeResource AccentFillColorDefaultBrush}"
             BorderThickness="1.5"
-            CornerRadius="{StaticResource CornerRadiusXLarge}"
+            CornerRadius="{StaticResource OverlayCornerRadius}"
             IsHitTestVisible="False"
             Visibility="Collapsed" />
     </Grid>

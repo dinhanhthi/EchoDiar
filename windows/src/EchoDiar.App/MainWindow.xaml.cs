@@ -1,8 +1,8 @@
 using System.ComponentModel;
 using EchoDiar.App.Services;
-using EchoDiar.App.Themes;
 using EchoDiar.App.ViewModels;
 using EchoDiar.App.Views;
+using Microsoft.UI.Composition.SystemBackdrops;
 using Microsoft.UI.Dispatching;
 using Microsoft.UI.Input;
 using Microsoft.UI.Windowing;
@@ -45,28 +45,26 @@ public sealed partial class MainWindow : Window
 #if DEBUG
         TraceWindowEvents();
 #endif
-        var backdrop = TintedBackdrop.IsSupported;
+        // Standard Mica, else Desktop Acrylic; with neither, RootGrid keeps the theme's solid background (XAML).
+        SystemBackdrop? backdrop = MicaController.IsSupported() ? new MicaBackdrop { Kind = MicaKind.Base }
+            : DesktopAcrylicController.IsSupported() ? new DesktopAcrylicBackdrop()
+            : null;
 #if DEBUG
-        if (App.NoBackdrop) backdrop = false;
+        if (App.NoBackdrop) backdrop = null;
 #endif
-        StartupTrace.Write($"backdrop: supported {TintedBackdrop.IsSupported}, used {backdrop}");
-        if (backdrop)
+        StartupTrace.Write(
+            $"backdrop: mica {MicaController.IsSupported()}, acrylic {DesktopAcrylicController.IsSupported()}, used {backdrop?.GetType().Name ?? "solid"}");
+        if (backdrop is not null)
         {
-            SystemBackdrop = new TintedBackdrop();
-        }
-        else
-        {
-            RootGrid.Background = new SolidColorBrush(TintedBackdrop.Tint);
+            SystemBackdrop = backdrop;
+            RootGrid.Background = null;
         }
 
         ExtendsContentIntoTitleBar = true;
         SetTitleBar(TitleBarGrid);
-        var titleBar = AppWindow.TitleBar;
-        titleBar.PreferredHeightOption = TitleBarHeightOption.Tall;
-        titleBar.ButtonBackgroundColor = Color.FromArgb(0x00, 0x00, 0x00, 0x00);
-        titleBar.ButtonInactiveBackgroundColor = Color.FromArgb(0x00, 0x00, 0x00, 0x00);
-        titleBar.ButtonHoverBackgroundColor = Color.FromArgb(0x1A, 0xFF, 0xFF, 0xFF);
-        titleBar.ButtonPressedBackgroundColor = Color.FromArgb(0x33, 0xFF, 0xFF, 0xFF);
+        AppWindow.TitleBar.PreferredHeightOption = TitleBarHeightOption.Tall;
+        ApplyCaptionButtonColors();
+        RootGrid.ActualThemeChanged += OnActualThemeChanged;
 
         TitleBarGrid.SizeChanged += OnTitleBarSizeChanged;
         TitleBarGrid.LayoutUpdated += OnTitleBarLayoutUpdated;
@@ -108,6 +106,66 @@ public sealed partial class MainWindow : Window
         _frames.ApplyBounds();
     }
 
+    /// <summary>Windows switched Light and Dark: the caption buttons follow (the views follow through their ThemeResources).</summary>
+    private void OnActualThemeChanged(FrameworkElement sender, object args)
+    {
+        if (_closing) return;
+        ApplyCaptionButtonColors();
+    }
+
+    /// <summary>
+    /// The caption buttons (minimize, maximize, close) in the current theme: transparent at rest, the subtle fills on
+    /// hover and press, the primary text colour (disabled text while the window is inactive).
+    /// </summary>
+    private void ApplyCaptionButtonColors()
+    {
+        var theme = RootGrid.ActualTheme;
+        var titleBar = AppWindow.TitleBar;
+        var transparent = ThemeColor("SubtleFillColorTransparent", theme);
+        var foreground = ThemeColor("TextFillColorPrimary", theme);
+        titleBar.ButtonBackgroundColor = transparent;
+        titleBar.ButtonInactiveBackgroundColor = transparent;
+        titleBar.ButtonHoverBackgroundColor = ThemeColor("SubtleFillColorSecondary", theme);
+        titleBar.ButtonPressedBackgroundColor = ThemeColor("SubtleFillColorTertiary", theme);
+        titleBar.ButtonForegroundColor = foreground;
+        titleBar.ButtonHoverForegroundColor = foreground;
+        titleBar.ButtonPressedForegroundColor = ThemeColor("TextFillColorSecondary", theme);
+        titleBar.ButtonInactiveForegroundColor = ThemeColor("TextFillColorDisabled", theme);
+        StartupTrace.Write($"caption colours for {theme}: foreground {foreground}");
+    }
+
+    /// <summary>
+    /// <paramref name="key"/>'s colour in the theme dictionary of <paramref name="theme"/> (WinUI keeps Dark under
+    /// "Default"). The app-level lookup is the fallback only: it keeps the theme the app started in.
+    /// </summary>
+    private static Color ThemeColor(string key, ElementTheme theme)
+    {
+        string[] names = theme == ElementTheme.Light ? ["Light"] : ["Dark", "Default"];
+        if (FindThemeValue(Application.Current.Resources, key, names) is Color color) return color;
+        StartupTrace.Write($"theme colour {key} for {theme}: app-level lookup");
+        return (Color)Application.Current.Resources[key];
+    }
+
+    private static object? FindThemeValue(ResourceDictionary dictionary, string key, string[] names)
+    {
+        foreach (var name in names)
+        {
+            if (dictionary.ThemeDictionaries.TryGetValue(name, out var found)
+                && found is ResourceDictionary themed
+                && themed.TryGetValue(key, out var value))
+            {
+                return value;
+            }
+        }
+
+        foreach (var merged in dictionary.MergedDictionaries)
+        {
+            if (FindThemeValue(merged, key, names) is { } value) return value;
+        }
+
+        return null;
+    }
+
     /// <summary>Saves the frame while the window still answers, then lets go of everything that would call it.</summary>
     private void OnClosed(object sender, WindowEventArgs args)
     {
@@ -117,6 +175,7 @@ public sealed partial class MainWindow : Window
 #if DEBUG
         UntraceWindowEvents();
 #endif
+        RootGrid.ActualThemeChanged -= OnActualThemeChanged;
         TitleBarGrid.SizeChanged -= OnTitleBarSizeChanged;
         TitleBarGrid.LayoutUpdated -= OnTitleBarLayoutUpdated;
         if (_xamlRoot is not null) _xamlRoot.Changed -= OnXamlRootChanged;

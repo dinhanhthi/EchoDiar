@@ -12,7 +12,7 @@
 
     <Button
         x:Name="MenuButton"
-        Style="{StaticResource CapsuleButton}"
+        Style="{StaticResource SubtleButtonStyle}"
         Foreground="{ThemeResource TextFillColorSecondaryBrush}"
         AutomationProperties.Name="{local:T Text='Language'}"
         ToolTipService.ToolTip="{local:T Text='Language from now on'}">

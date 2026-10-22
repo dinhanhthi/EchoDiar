@@ -18,7 +18,12 @@
             <RowDefinition Height="*" />
         </Grid.RowDefinitions>
 
-        <Border Padding="14,10" Style="{StaticResource SolidCard}">
+        <Border
+            Padding="14,10"
+            Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
+            BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
+            BorderThickness="1"
+            CornerRadius="{StaticResource OverlayCornerRadius}">
             <Grid ColumnSpacing="10">
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="Auto" />
@@ -75,7 +80,7 @@
                             Grid.Column="1"
                             Height="5"
                             VerticalAlignment="Center"
-                            Background="{StaticResource PaletteHoverFillBrush}"
+                            Background="{ThemeResource ControlStrongFillColorDefaultBrush}"
                             CornerRadius="2.5">
                             <Border
                                 x:Name="MicFill"
@@ -99,7 +104,7 @@
                             Grid.Column="1"
                             Height="5"
                             VerticalAlignment="Center"
-                            Background="{StaticResource PaletteHoverFillBrush}"
+                            Background="{ThemeResource ControlStrongFillColorDefaultBrush}"
                             CornerRadius="2.5">
                             <Border
                                 x:Name="SystemFill"
@@ -145,8 +150,10 @@
             x:Name="SilentTapBanner"
             Grid.Row="2"
             Padding="12,8"
-            CornerRadius="{StaticResource CornerRadiusMedium}"
-            Style="{StaticResource SolidCard}"
+            Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
+            BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
+            BorderThickness="1"
+            CornerRadius="{StaticResource OverlayCornerRadius}"
             Visibility="Collapsed">
             <Grid ColumnSpacing="10">
                 <Grid.ColumnDefinitions>

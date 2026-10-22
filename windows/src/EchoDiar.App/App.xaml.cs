@@ -22,7 +22,7 @@ public partial class App : Application
     private AppViewModel? _model;
 
 #if DEBUG
-    /// <summary>DEBUG <c>--no-backdrop</c>: the window paints its tint solid instead of setting a system backdrop (A/B in a VM).</summary>
+    /// <summary>DEBUG <c>--no-backdrop</c>: the window paints the theme's solid background instead of setting a system backdrop (A/B in a VM).</summary>
     internal static bool NoBackdrop { get; } = Environment.GetCommandLineArgs().Contains("--no-backdrop");
 #endif
 

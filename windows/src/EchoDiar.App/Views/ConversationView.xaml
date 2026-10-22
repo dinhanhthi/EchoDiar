@@ -6,7 +6,12 @@
     xmlns:views="using:EchoDiar.App.Views">
 
     <!-- The page on a card beside the wide layout's sidebar (Phase 12 restyles it). -->
-    <Border Margin="0,8,12,12" Style="{StaticResource SolidCard}">
+    <Border
+        Margin="0,8,12,12"
+        Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
+        BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
+        BorderThickness="1"
+        CornerRadius="{StaticResource OverlayCornerRadius}">
         <Grid Padding="16" RowSpacing="12">
             <Grid.RowDefinitions>
                 <RowDefinition Height="Auto" />

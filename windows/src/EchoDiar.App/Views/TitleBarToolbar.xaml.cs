@@ -18,7 +18,7 @@ using Windows.UI.ViewManagement;
 namespace EchoDiar.App.Views;
 
 /// <summary>
-/// The title bar's capsules (macOS MainView.swift toolbar), shown by route: Back off the list; Record with its menu of
+/// The title bar's button groups (macOS MainView.swift toolbar), shown by route: Back off the list; Record with its menu of
 /// targets and the language (Stop, blinking, and Pause or Resume while recording); on a conversation its title, Reveal, Delete and the
 /// tabs; Settings (a placeholder until Phase 13) and Search everywhere. Update and Ask across conversations stay
 /// collapsed until Phases 27 and 26. It also hosts the window's dialogs (it lives as long as the window): the delete
@@ -125,7 +125,7 @@ public sealed partial class TitleBarToolbar : UserControl
     /// </summary>
     public IReadOnlyList<RectInt32> PassthroughRects(double scale)
     {
-        FrameworkElement[] elements = [BackButton, RecordCapsule, UpdateButton, FileCapsule, AppCapsule, SearchBox, TabsCapsule];
+        FrameworkElement[] elements = [BackButton, RecordGroup, UpdateButton, FileGroup, AppGroup, SearchBox, TabsGroup];
         var rects = new List<RectInt32>();
         foreach (var element in elements)
         {
@@ -207,8 +207,8 @@ public sealed partial class TitleBarToolbar : UserControl
         var conversation = ShownConversation();
         var onConversation = conversation is not null;
         TitlePanel.Visibility = Shown(onConversation);
-        FileCapsule.Visibility = Shown(onConversation);
-        TabsCapsule.Visibility = Shown(onConversation);
+        FileGroup.Visibility = Shown(onConversation);
+        TabsGroup.Visibility = Shown(onConversation);
         if (conversation is null) return;
         TitleText.Text = conversation.Title;
         DetailText.Text = ConversationText.Detail(conversation, _model);
