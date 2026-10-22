@@ -165,27 +165,29 @@ public sealed class MediaFoundationAudio : IAudioDecoder
         }
     }
 
-    /// <summary>The AAC-LC 48 kHz output type at <paramref name="kbps"/>, or null when the encoder does not offer it.</summary>
+    /// <summary>
+    /// The encoder's raw AAC-LC 48 kHz output type at <paramref name="kbps"/>, or null when it does not offer one. Filtered,
+    /// not overridden: the type's AudioSpecificConfig must match its profile. Missing attributes take their defaults.
+    /// </summary>
     private static MediaType? AacType(int channels, int kbps)
     {
         var types = MediaFoundationEncoder.GetOutputMediaTypes(AudioSubtypes.MFAudioFormat_AAC);
-        var selected = types.FirstOrDefault(t =>
-            t.SampleRate == EncodeSampleRate && t.ChannelCount == channels && t.AverageBytesPerSecond == kbps * 1000 / 8);
-        foreach (var type in types)
-        {
-            if (!ReferenceEquals(type, selected)) type.Dispose();
-        }
-        if (selected is null) return null;
+        MediaType? selected = null;
         try
         {
-            selected.SetUInt32(MediaFoundationAttributes.MF_MT_AAC_PAYLOAD_TYPE, RawAacPayload);
-            selected.SetUInt32(MediaFoundationAttributes.MF_MT_AAC_AUDIO_PROFILE_LEVEL_INDICATION, AacLcProfileLevel2);
+            selected = types.FirstOrDefault(t =>
+                t.SampleRate == EncodeSampleRate && t.ChannelCount == channels && t.AverageBytesPerSecond == kbps * 1000 / 8
+                && t.TryGetUInt32(MediaFoundationAttributes.MF_MT_AAC_PAYLOAD_TYPE, RawAacPayload) == RawAacPayload
+                && t.TryGetUInt32(MediaFoundationAttributes.MF_MT_AAC_AUDIO_PROFILE_LEVEL_INDICATION, AacLcProfileLevel2)
+                    == AacLcProfileLevel2);
             return selected;
         }
-        catch
+        finally
         {
-            selected.Dispose();
-            throw;
+            foreach (var type in types)
+            {
+                if (!ReferenceEquals(type, selected)) type.Dispose();
+            }
         }
     }
 
