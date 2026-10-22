@@ -1,8 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!--
     The recording page (macOS RecordingViews.swift RecordingDetailView and RecordingHeader): the header with the
-    state, the elapsed time and the mic and system meters, the capture warnings, then the wave and why there is no
-    live transcript (Phase 16 shows the live transcript in its place).
+    state, the elapsed time, the mic and system meters and the language, the capture warnings, then the wave and why
+    there is no live transcript (Phase 16 shows the live transcript in its place).
 -->
 <UserControl
     x:Class="EchoDiar.App.Views.RecordingView"
@@ -18,7 +18,6 @@
             <RowDefinition Height="*" />
         </Grid.RowDefinitions>
 
-        <!-- The language menu joins the header in 10.4. -->
         <Border Padding="14,10" Style="{StaticResource SolidCard}">
             <Grid ColumnSpacing="10">
                 <Grid.ColumnDefinitions>
@@ -26,6 +25,7 @@
                     <ColumnDefinition Width="Auto" />
                     <ColumnDefinition Width="Auto" />
                     <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
                     <ColumnDefinition Width="Auto" />
                 </Grid.ColumnDefinitions>
                 <Grid VerticalAlignment="Center">
@@ -110,6 +110,9 @@
                         </Border>
                     </Grid>
                 </StackPanel>
+
+                <!-- The language menu, set in code. -->
+                <ContentPresenter x:Name="LanguageHost" Grid.Column="5" VerticalAlignment="Center" />
             </Grid>
         </Border>
 

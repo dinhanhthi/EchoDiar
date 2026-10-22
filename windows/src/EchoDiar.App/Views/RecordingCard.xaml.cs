@@ -12,8 +12,8 @@ using Microsoft.UI.Xaml.Media;
 namespace EchoDiar.App.Views;
 
 /// <summary>
-/// The recording's card at the top of the library (macOS RecordingViews.swift RecordingCard), while recording. The
-/// mini meters move at 15 Hz while the window is shown.
+/// The recording's card at the top of the library (macOS RecordingViews.swift RecordingCard), while recording: Stop,
+/// Pause or Resume and the language in its row. The mini meters move at 15 Hz while the window is shown.
 /// </summary>
 public sealed partial class RecordingCard : UserControl
 {
@@ -36,6 +36,7 @@ public sealed partial class RecordingCard : UserControl
         StopItem.Click += (_, _) => _ = _model.StopRecordingAsync();
         PauseButton.Click += (_, _) => _ = _model.TogglePauseAsync();
         PauseItem.Click += (_, _) => _ = _model.TogglePauseAsync();
+        ButtonRow.Children.Add(new LanguagePicker(model, shortLabel: true));
         Tapped += OnTapped;
         Loaded += (_, _) =>
         {

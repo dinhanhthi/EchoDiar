@@ -1,17 +1,30 @@
+using System.Diagnostics;
+using EchoDiar.App.Views;
 using EchoDiar.Core.Audio;
+using EchoDiar.Core.Models;
 using EchoDiar.Core.Settings;
+using EchoDiar.Transcribe;
 
 namespace EchoDiar.App.ViewModels;
 
 /// <summary>
 /// The recording state the card, the recording page and the toolbar share (macOS AppModel: selectedTarget,
-/// sourceApp, recordingError, micRoutesLost): what Record records, the recorded app, the "Recording problem" answer
-/// and the lost-mic route change.
+/// sourceApp, recordingError, micRoutesLost, recordingLanguage): what Record records, the recorded app, the
+/// "Recording problem" answer, the lost-mic route change and the recording language.
 /// </summary>
 public sealed partial class AppViewModel
 {
     private AudioProcessGroup? _selectedTarget;
     private string? _recordingSourceName;
+
+    /// <summary>The language picked since the last recording ended; null = the default language.</summary>
+    private string? _languageOverride;
+
+    private IReadOnlyList<string>? _supportedLanguages;
+
+    /// <summary>The last language marker and settings writes; each next one runs after it.</summary>
+    private Task _languageWrite = Task.CompletedTask;
+    private Task _settingsWrite = Task.CompletedTask;
 
     /// <summary>What Record records: null for all system audio, else the app picked in the Record menu.</summary>
     public AudioProcessGroup? SelectedTarget
@@ -40,6 +53,60 @@ public sealed partial class AppViewModel
     public void DismissRecordingError(string shown)
     {
         if (RecordingError == shown) RecordingError = null;
+    }
+
+    /// <summary>The language the next recording starts with, or the current one while recording.</summary>
+    public string RecordingLanguage => _languageOverride ?? Settings.DefaultLanguage;
+
+    /// <summary>Before recording: the next session's language. While recording: a language marker at the current time.</summary>
+    public void SetRecordingLanguage(string language)
+    {
+        if (language == RecordingLanguage) return;
+        _languageOverride = language;
+        OnPropertyChanged(nameof(RecordingLanguage));
+        if (IsRecording)
+        {
+            // In pick order, off the UI thread: the engine writes session.json under its lock.
+            _languageWrite = _languageWrite.ContinueWith(_ =>
+            {
+                try
+                {
+                    _services.Engine.SetLanguage(language);
+                }
+                catch (Exception e)
+                {
+                    Debug.WriteLine($"EchoDiar: could not add the language marker: {e}");
+                }
+            }, TaskScheduler.Default);
+        }
+        RememberLanguage(language);
+    }
+
+    /// <summary>Codes the catalog's default engine accepts, sorted by name.</summary>
+    public IReadOnlyList<string> SupportedLanguages() =>
+        _supportedLanguages ??= [.. TranscriptionPipeline.SupportedLanguages(ModelCatalog.DefaultASR)
+            .OrderBy(LanguageOptions.Name, StringComparer.CurrentCultureIgnoreCase)];
+
+    /// <summary>Most recent first; Auto and the pinned languages are always listed, so they are not kept.</summary>
+    private void RememberLanguage(string language)
+    {
+        if (language == LanguageOptions.Auto || LanguageOptions.Pinned.Contains(language)) return;
+        var settings = Settings with
+        {
+            RecentLanguages = [.. Settings.RecentLanguages.Where(l => l != language).Prepend(language).Take(LanguageOptions.MaxRecent)],
+        };
+        Settings = settings;
+        _settingsWrite = _settingsWrite.ContinueWith(_ =>
+        {
+            try
+            {
+                _services.Settings.Save(settings);
+            }
+            catch (Exception e)
+            {
+                Debug.WriteLine($"EchoDiar: could not save the settings: {e}");
+            }
+        }, TaskScheduler.Default);
     }
 
     /// <summary>The engine reads the setting when the mic is lost, and reports it here through the UI thread.</summary>

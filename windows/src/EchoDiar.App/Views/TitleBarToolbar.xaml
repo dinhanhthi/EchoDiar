@@ -36,7 +36,7 @@
                 <FontIcon FontFamily="{ThemeResource SymbolThemeFontFamily}" FontSize="14" Glyph="&#xE72B;" />
             </Button>
 
-            <!-- Idle: Record and its menu of targets. Recording: Stop and Pause or Resume. -->
+            <!-- Idle: Record and its menu of targets and the language. Recording: Stop and Pause or Resume. -->
             <Border x:Name="RecordCapsule" Style="{StaticResource CapsuleGroup}">
                 <StackPanel Orientation="Horizontal">
                     <SplitButton

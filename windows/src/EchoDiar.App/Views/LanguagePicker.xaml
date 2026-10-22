@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    The recording's language menu (macOS RecordingViews.swift languageMenu, LanguagePicker.swift): a globe and the
+    current language, opening Auto, the pinned languages, the recent ones and every other supported language. The card
+    shows the short code, the recording page the name. Picking one adds a marker at the current recording time.
+-->
+<UserControl
+    x:Class="EchoDiar.App.Views.LanguagePicker"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:local="using:EchoDiar.App">
+
+    <Button
+        x:Name="MenuButton"
+        Style="{StaticResource CapsuleButton}"
+        Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+        AutomationProperties.Name="{local:T Text='Language'}"
+        ToolTipService.ToolTip="{local:T Text='Language from now on'}">
+        <StackPanel Orientation="Horizontal" Spacing="4">
+            <FontIcon
+                x:Name="GlobeIcon"
+                FontFamily="{ThemeResource SymbolThemeFontFamily}"
+                FontSize="14"
+                Glyph="&#xE774;" />
+            <TextBlock x:Name="LabelText" VerticalAlignment="Center" />
+        </StackPanel>
+        <Button.Flyout>
+            <MenuFlyout x:Name="LanguageMenu" Placement="BottomEdgeAlignedLeft" />
+        </Button.Flyout>
+    </Button>
+</UserControl>

@@ -39,6 +39,7 @@ public sealed partial class RecordingView : UserControl
             _bars[i] = new Rectangle { Width = 4, Height = 4, RadiusX = 2, RadiusY = 2, VerticalAlignment = VerticalAlignment.Center };
             Wave.Children.Add(_bars[i]);
         }
+        LanguageHost.Content = new LanguagePicker(model, shortLabel: false);
         GlobalTapText.Text = Loc.T("This app's audio cannot be isolated, so all system audio is being recorded.");
         AutomationProperties.SetName(MicMeter, Loc.Format("%@ level", "Mic"));
         AutomationProperties.SetName(SystemMeter, Loc.Format("%@ level", "System"));

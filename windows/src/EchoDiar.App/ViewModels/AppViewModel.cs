@@ -97,7 +97,10 @@ public sealed partial class AppViewModel : ObservableObject
     public AppSettings Settings
     {
         get => _settings;
-        private set => SetProperty(ref _settings, value);
+        private set
+        {
+            if (SetProperty(ref _settings, value)) OnPropertyChanged(nameof(RecordingLanguage));
+        }
     }
 
     /// <summary>The library, newest first.</summary>
@@ -377,7 +380,7 @@ public sealed partial class AppViewModel : ObservableObject
         try
         {
             await _recovery;
-            var language = Settings.DefaultLanguage;
+            var language = RecordingLanguage;
             var micEndpointId = Settings.MicDeviceUID;
             _startTask = Task.Run<string?>(() =>
             {
@@ -487,6 +490,12 @@ public sealed partial class AppViewModel : ObservableObject
         StopPolling();
         RecordingSourceName = null;
         if (snapshot.EndReason is not { } reason) return;
+        // The next recording starts with the default language again.
+        if (_languageOverride is not null)
+        {
+            _languageOverride = null;
+            OnPropertyChanged(nameof(RecordingLanguage));
+        }
         if (StopMessage(reason) is { } message) RecordingError = message;
         var folder = _activeFolder;
         _activeFolder = null;

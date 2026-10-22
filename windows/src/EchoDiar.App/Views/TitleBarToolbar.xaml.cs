@@ -17,7 +17,7 @@ namespace EchoDiar.App.Views;
 
 /// <summary>
 /// The title bar's capsules (macOS MainView.swift toolbar), shown by route: Back off the list; Record with its menu of
-/// targets (Stop, blinking, and Pause or Resume while recording); on a conversation its title, Reveal, Delete and the
+/// targets and the language (Stop, blinking, and Pause or Resume while recording); on a conversation its title, Reveal, Delete and the
 /// tabs; Settings and Search everywhere (placeholders until Phases 13 and 11). Update and Ask across conversations
 /// stay collapsed until Phases 27 and 26. It also hosts the window's dialogs (it lives as long as the window): the
 /// delete confirmation, "Recording problem" and the lost-mic prompt, one at a time.
@@ -51,11 +51,17 @@ public sealed partial class TitleBarToolbar : UserControl
     /// <summary>The pause state Pause or Resume was last labeled for.</summary>
     private bool? _shownPaused;
 
+    /// <summary>The Record menu's end: a separator and the Language submenu, kept while the targets are rebuilt.</summary>
+    private readonly MenuFlyoutSeparator _languageSeparator = new();
+    private readonly MenuFlyoutSubItem _languageItem = new() { Text = Loc.T("Language") };
+
     public TitleBarToolbar()
     {
         InitializeComponent();
         BackButton.Click += (_, _) => _model?.GoBack();
         RecordSplitButton.Click += (_, _) => _ = _model?.StartRecordingAsync(_model.SelectedTarget);
+        TargetMenu.Items.Add(_languageSeparator);
+        TargetMenu.Items.Add(_languageItem);
         TargetMenu.Opening += (_, _) => OnTargetMenuOpening();
         StopButton.Click += (_, _) => _ = _model?.StopRecordingAsync();
         PauseButton.Click += (_, _) => _ = _model?.TogglePauseAsync();
@@ -192,21 +198,26 @@ public sealed partial class TitleBarToolbar : UserControl
     /// <summary>Built when it opens, then refreshed: apps that started playing since show up.</summary>
     private void OnTargetMenuOpening()
     {
+        if (_model is not null) LanguageOptions.Fill(_languageItem.Items, _model);
         BuildTargetMenu();
         _ = _model?.RefreshRecordTargetsAsync();
     }
 
-    /// <summary>"All system audio" first, then the apps with audio; the picked one is checked.</summary>
+    /// <summary>
+    /// "All system audio" first, then the apps with audio (the picked one is checked), then Language. Only the targets
+    /// are rebuilt, so an open Language submenu stays open.
+    /// </summary>
     private void BuildTargetMenu()
     {
         if (_model is null) return;
-        TargetMenu.Items.Clear();
-        TargetMenu.Items.Add(TargetItem(Loc.T("All system audio"), null));
+        while (TargetMenu.Items[0] != _languageSeparator) TargetMenu.Items.RemoveAt(0);
+        var index = 0;
+        TargetMenu.Items.Insert(index++, TargetItem(Loc.T("All system audio"), null));
         if (_model.RecordTargets.Count == 0) return;
-        TargetMenu.Items.Add(new MenuFlyoutSeparator());
+        TargetMenu.Items.Insert(index++, new MenuFlyoutSeparator());
         foreach (var group in _model.RecordTargets)
         {
-            TargetMenu.Items.Add(TargetItem(group.NeedsGlobalTap ? $"{group.Name} (records all system audio)" : group.Name, group));
+            TargetMenu.Items.Insert(index++, TargetItem(group.NeedsGlobalTap ? $"{group.Name} (records all system audio)" : group.Name, group));
         }
     }
 

@@ -110,7 +110,7 @@
                         TextTrimming="CharacterEllipsis" />
                 </Grid>
 
-                <!-- The language menu joins this row in 10.4. -->
+                <!-- Stop, Pause or Resume, then the language menu (added in code). -->
                 <StackPanel
                     x:Name="ButtonRow"
                     Margin="0,4,0,0"
