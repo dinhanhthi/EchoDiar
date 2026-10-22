@@ -25,6 +25,7 @@ public sealed partial class RecordingCard : UserControl
     private readonly FrameTicker _ticker;
     private bool _compact;
     private bool _selected;
+    private bool? _shownPaused;
 
     public RecordingCard(AppViewModel model)
     {
@@ -98,14 +99,17 @@ public sealed partial class RecordingCard : UserControl
 
         StopButton.IsEnabled = !_model.IsStarting;
         StopItem.IsEnabled = !_model.IsStarting;
+        _ticker.Run(recording && !paused);
+        if (!recording || paused) UpdateMeters();
+
+        // The snapshot changes at 15 Hz: a tooltip set again each time would close under the pointer.
+        if (paused == _shownPaused) return;
+        _shownPaused = paused;
         PauseIcon.Glyph = paused ? ResumeGlyph : PauseGlyph;
         var pauseTitle = Loc.T(paused ? "Resume" : "Pause");
         AutomationProperties.SetName(PauseButton, pauseTitle);
         ToolTipService.SetToolTip(PauseButton, Loc.T(paused ? "Resume recording" : "Pause recording"));
         PauseItem.Text = pauseTitle;
-
-        _ticker.Run(recording && !paused);
-        if (!recording || paused) UpdateMeters();
     }
 
     /// <summary>The mic and system peaks the model reads at 15 Hz; empty while paused or idle.</summary>

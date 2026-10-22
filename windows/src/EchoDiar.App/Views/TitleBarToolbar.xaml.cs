@@ -48,6 +48,9 @@ public sealed partial class TitleBarToolbar : UserControl
     /// <summary>Record's tooltip, "Record" and the target; set again only when the target changes.</summary>
     private string? _recordTip;
 
+    /// <summary>The pause state Pause or Resume was last labeled for.</summary>
+    private bool? _shownPaused;
+
     public TitleBarToolbar()
     {
         InitializeComponent();
@@ -148,10 +151,15 @@ public sealed partial class TitleBarToolbar : UserControl
         StopButton.Visibility = Shown(recording);
         StopButton.IsEnabled = !_model.IsStarting;
         PauseButton.Visibility = Shown(recording);
-        PauseIcon.Glyph = paused ? ResumeGlyph : PauseGlyph;
-        var pauseLabel = Loc.T(paused ? "Resume recording" : "Pause recording");
-        AutomationProperties.SetName(PauseButton, pauseLabel);
-        ToolTipService.SetToolTip(PauseButton, pauseLabel);
+        // The snapshot changes at 15 Hz: a tooltip set again each time would close under the pointer.
+        if (paused != _shownPaused)
+        {
+            _shownPaused = paused;
+            PauseIcon.Glyph = paused ? ResumeGlyph : PauseGlyph;
+            var pauseLabel = Loc.T(paused ? "Resume recording" : "Pause recording");
+            AutomationProperties.SetName(PauseButton, pauseLabel);
+            ToolTipService.SetToolTip(PauseButton, pauseLabel);
+        }
         UpdateBlink(recording && !paused);
         // The recording ended (stopped elsewhere): the lost-mic question no longer applies.
         if (!recording)
