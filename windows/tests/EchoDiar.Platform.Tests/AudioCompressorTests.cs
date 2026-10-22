@@ -93,17 +93,21 @@ public sealed class AudioCompressorTests : IDisposable
         Assert.Equal(ConversationStatus.CompressionFailed, Conversation.Read(folder).Status);
     }
 
-    // Decision 6: the AAC encoder takes no 16 kHz input, so the CAF is resampled to 48 kHz, where it offers every
-    // bitrate of the Storage page (96/128/160/192 kbps).
+    // Decision 6: at 16 kHz the AAC encoder offers only low bitrates (at most 32 kbps on Windows 11), none of the
+    // Storage page's 96/128/160/192 kbps, so the CAF is resampled to 48 kHz, where it offers all four.
     [Theory]
     [InlineData(2)]
     [InlineData(1)]
-    public void EncoderRejects16kHzAndOffersTheBitratesAt48kHz(int channels)
+    public void EncoderOffersTheBitratesOnlyAt48kHz(int channels)
     {
-        Assert.Empty(MediaFoundationAudio.AacBytesPerSecond(16_000, channels));
-        var offered = MediaFoundationAudio.AacBytesPerSecond(MediaFoundationAudio.EncodeSampleRate, channels);
-        _output.WriteLine($"48 kHz, {channels} ch: {string.Join(", ", offered)} bytes/s");
-        foreach (var bytesPerSecond in new[] { 12_000, 16_000, 20_000, 24_000 }) Assert.Contains(bytesPerSecond, offered);
+        var at16k = MediaFoundationAudio.AacBytesPerSecond(16_000, channels);
+        var at48k = MediaFoundationAudio.AacBytesPerSecond(MediaFoundationAudio.EncodeSampleRate, channels);
+        _output.WriteLine($"{channels} ch: 16 kHz {string.Join(", ", at16k)} bytes/s; 48 kHz {string.Join(", ", at48k)} bytes/s");
+        foreach (var bytesPerSecond in new[] { 12_000, 16_000, 20_000, 24_000 })
+        {
+            Assert.DoesNotContain(bytesPerSecond, at16k);
+            Assert.Contains(bytesPerSecond, at48k);
+        }
     }
 
     // The mono fallback writes one CAF channel per file.

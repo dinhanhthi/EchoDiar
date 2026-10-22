@@ -33,7 +33,7 @@ public sealed class AudioEncodeException(AudioEncodeFailure failure, string mess
 /// </summary>
 public sealed class MediaFoundationAudio : IAudioDecoder
 {
-    /// <summary>The m4a rate (decision 6): the Media Foundation AAC encoder accepts only 44.1 and 48 kHz.</summary>
+    /// <summary>The m4a rate (decision 6): at 16 kHz the Media Foundation AAC encoder offers at most 32 kbps.</summary>
     public const int EncodeSampleRate = 48_000;
 
     /// <summary>Total bitrates the AAC encoder offers at 48 kHz (12000/16000/20000/24000 bytes per second).</summary>
@@ -100,7 +100,7 @@ public sealed class MediaFoundationAudio : IAudioDecoder
 
     /// <summary>
     /// Average bytes per second the AAC encoder offers for PCM at <paramref name="sampleRate"/> and
-    /// <paramref name="channels"/>; empty when it rejects that input (16 kHz, decision 6).
+    /// <paramref name="channels"/>; empty when it rejects that input. At 16 kHz only up to 4000 (decision 6).
     /// </summary>
     public static IReadOnlyList<int> AacBytesPerSecond(int sampleRate, int channels)
     {
