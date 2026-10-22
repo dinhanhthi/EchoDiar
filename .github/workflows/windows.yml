@@ -47,10 +47,35 @@ jobs:
           $hasTests = Test-Path windows/tests/EchoDiar.Tests/EchoDiar.Tests.csproj
           "has_tests=$($hasTests.ToString().ToLowerInvariant())" >> $env:GITHUB_OUTPUT
 
-      # Native model tests run only in the native-smoke job.
+      # Native model tests run only in the native-smoke job. Run from windows/ so global.json applies.
       - name: Test
         if: steps.probe.outputs.has_tests == 'true'
-        run: dotnet test windows/tests/EchoDiar.Tests --filter "Category!=Native&Category!=NativeLLM"
+        working-directory: windows
+        run: dotnet test tests/EchoDiar.Tests/EchoDiar.Tests.csproj --filter "Category!=Native&Category!=NativeLLM"
+
+  # Same as test, on a native ARM64 runner (the QA VM is ARM64).
+  test-arm64:
+    runs-on: windows-11-arm
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6.0.0
+        with:
+          global-json-file: windows/global.json
+
+      - id: probe
+        name: Probe for tests
+        run: |
+          "Runner: $env:RUNNER_ARCH, OS arch: $([System.Runtime.InteropServices.RuntimeInformation]::OSArchitecture)"
+          $hasTests = Test-Path windows/tests/EchoDiar.Tests/EchoDiar.Tests.csproj
+          "has_tests=$($hasTests.ToString().ToLowerInvariant())" >> $env:GITHUB_OUTPUT
+
+      - name: Test
+        if: steps.probe.outputs.has_tests == 'true'
+        working-directory: windows
+        run: dotnet test tests/EchoDiar.Tests/EchoDiar.Tests.csproj --filter "Category!=Native&Category!=NativeLLM"
 
   package:
     runs-on: windows-latest
@@ -123,6 +148,73 @@ jobs:
           }
           msbuild windows/src/EchoDiar.App/EchoDiar.App.csproj /restore /nologo /v:minimal @props
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
+      # Fails unless every native library ships in the .msix for this architecture, and the only
+      # onnxruntime.dll is sherpa-onnx's (a WASDK ML copy winning would break diarization).
+      - name: Check package contents
+        run: |
+          function Get-PeMachine([string]$path) {
+            $fs = [IO.File]::OpenRead($path)
+            try {
+              $br = New-Object IO.BinaryReader($fs)
+              if ($br.ReadUInt16() -ne 0x5A4D) { throw "No MZ header: $path" }
+              $fs.Position = 0x3C
+              $fs.Position = $br.ReadInt32()
+              if ($br.ReadUInt32() -ne 0x4550) { throw "No PE signature: $path" }
+              return [int]$br.ReadUInt16()
+            } finally { $fs.Dispose() }
+          }
+          $expected = if ($env:ARCH -eq 'arm64') { 0xAA64 } else { 0x8664 }
+          $msix = @(Get-ChildItem -LiteralPath $env:OUT_DIR -Recurse -File -Filter '*.msix' |
+            Where-Object { $_.FullName -notmatch '\\Dependencies\\' })
+          if ($msix.Count -ne 1) { throw "Expected one .msix under $env:OUT_DIR, found $($msix.Count)" }
+          $root = Join-Path $env:RUNNER_TEMP 'msix-contents'
+          Add-Type -AssemblyName System.IO.Compression.FileSystem
+          [IO.Compression.ZipFile]::ExtractToDirectory($msix[0].FullName, $root)
+          $rt = "runtimes/win-$env:ARCH"
+          # Exact paths (Whisper.net, sherpa-onnx) and names searched recursively (LLamaSharp: x64 splits
+          # into avx/avx2/avx512/noavx folders).
+          $exact = @("$rt/whisper.dll", "$rt/ggml-whisper.dll", "$rt/ggml-base-whisper.dll", "$rt/ggml-cpu-whisper.dll",
+            'sherpa-onnx-c-api.dll', 'onnxruntime.dll')
+          $llama = @('llama.dll', 'ggml.dll', 'ggml-base.dll', 'ggml-cpu.dll')
+          $files = @()
+          $errors = @()
+          foreach ($rel in $exact) {
+            $path = Join-Path $root $rel
+            if (Test-Path -LiteralPath $path) { $files += Get-Item -LiteralPath $path } else { $errors += "Missing $rel" }
+          }
+          $llamaDir = Join-Path $root "$rt/native"
+          foreach ($name in $llama) {
+            $found = @(if (Test-Path -LiteralPath $llamaDir) { Get-ChildItem -LiteralPath $llamaDir -Recurse -File -Filter $name })
+            if ($found.Count -eq 0) { $errors += "Missing $rt/native/**/$name" } else { $files += $found }
+          }
+          foreach ($file in $files) {
+            $machine = Get-PeMachine $file.FullName
+            $rel = $file.FullName.Substring($root.Length + 1)
+            '{0,-50} 0x{1:X4}' -f $rel, $machine
+            if ($machine -ne $expected) { $errors += ('{0}: machine 0x{1:X4}, expected 0x{2:X4}' -f $rel, $machine, $expected) }
+          }
+          $ort = @(Get-ChildItem -LiteralPath $root -Recurse -File -Filter 'onnxruntime.dll')
+          if ($ort.Count -ne 1) {
+            $errors += "Expected exactly one onnxruntime.dll in the package, found $($ort.Count): " +
+              (($ort | ForEach-Object { $_.FullName.Substring($root.Length + 1) }) -join ', ')
+          } else {
+            $nuget = if ($env:NUGET_PACKAGES) { $env:NUGET_PACKAGES } else { Join-Path $env:USERPROFILE '.nuget\packages' }
+            $ref = @(Get-ChildItem -Path (Join-Path $nuget "org.k2fsa.sherpa.onnx.runtime.win-$env:ARCH") -Recurse -File -Filter 'onnxruntime.dll' -ErrorAction SilentlyContinue)
+            "sherpa-onnx runtime onnxruntime.dll: $(($ref | ForEach-Object FullName) -join ', ')"
+            if ($ref.Count -ne 1) {
+              $errors += "Expected one onnxruntime.dll in the restored org.k2fsa.sherpa.onnx.runtime.win-$env:ARCH package under $nuget, found $($ref.Count)"
+            } else {
+              $pkgVersion = [System.Diagnostics.FileVersionInfo]::GetVersionInfo($ort[0].FullName).FileVersion
+              $refVersion = [System.Diagnostics.FileVersionInfo]::GetVersionInfo($ref[0].FullName).FileVersion
+              "onnxruntime.dll FileVersion: package '$pkgVersion', sherpa-onnx '$refVersion'"
+              if (-not $refVersion -or $pkgVersion -ne $refVersion) {
+                $errors += "onnxruntime.dll FileVersion '$pkgVersion' in the package does not match sherpa-onnx's '$refVersion' (another package's copy won)"
+              }
+            }
+          }
+          if ($errors) { $errors | ForEach-Object { Write-Host "::error::$_" }; throw "Package contents check failed ($($errors.Count) problems)" }
+          'Package contents OK.'
 
       - name: Stage artifact
         env:
