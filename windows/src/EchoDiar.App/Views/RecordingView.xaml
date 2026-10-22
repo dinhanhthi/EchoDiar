@@ -1,8 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!--
     The recording page (macOS RecordingViews.swift RecordingDetailView and RecordingHeader): the header with the
-    state, the elapsed time, the mic and system meters and the language, the capture warnings, then the wave and why
-    there is no live transcript (Phase 16 shows the live transcript in its place).
+    state, the elapsed time, the mic and system meters and the language, the capture warnings, then the live transcript,
+    or the wave and why there is none.
 -->
 <UserControl
     x:Class="EchoDiar.App.Views.RecordingView"
@@ -156,7 +156,11 @@
             Severity="Warning"
             Title="{local:T Text='No system audio'}" />
 
+        <!-- LiveTranscriptView, set in code; shown while the recording has a live transcriber. -->
+        <Border x:Name="LiveHost" Grid.Row="3" Visibility="Collapsed" />
+
         <StackPanel
+            x:Name="NoLivePanel"
             Grid.Row="3"
             MaxWidth="560"
             HorizontalAlignment="Center"

@@ -12,8 +12,8 @@ namespace EchoDiar.App.Services;
 
 /// <summary>
 /// The app's long-lived services over one library root: settings, library, models, the model load gate, the
-/// transcription pipeline (reading m4a through the Media Foundation decoder), the audio compressor and the recording
-/// engine with the Platform capture sources and route monitor. Created once, on launch.
+/// transcription pipeline (reading m4a through the Media Foundation decoder) and its engine factories, the audio
+/// compressor and the recording engine with the Platform capture sources and route monitor. Created once, on launch.
 /// </summary>
 internal sealed class AppServices : IDisposable
 {
@@ -31,12 +31,13 @@ internal sealed class AppServices : IDisposable
         Gate = new ModelLoadGate();
         var decoder = new MediaFoundationAudio();
         Compressor = new AudioCompressor(decoder: decoder);
+        Engines = new Dictionary<ModelRuntime, TranscriptionPipeline.EngineFactory>
+        {
+            [ModelRuntime.WhisperNet] = WhisperEngine.Create,
+            [ModelRuntime.SherpaOnnx] = ParakeetEngine.Create,
+        };
         Pipeline = new TranscriptionPipeline(
-            new Dictionary<ModelRuntime, TranscriptionPipeline.EngineFactory>
-            {
-                [ModelRuntime.WhisperNet] = WhisperEngine.Create,
-                [ModelRuntime.SherpaOnnx] = ParakeetEngine.Create,
-            },
+            Engines,
             SherpaDiarizer.Create,
             Models.IsInstalled,
             Models.Folder,
@@ -59,6 +60,9 @@ internal sealed class AppServices : IDisposable
     public ModelStore Models { get; }
     public ModelLoadGate Gate { get; }
     public TranscriptionPipeline Pipeline { get; }
+
+    /// <summary>The pipeline's batch engine factories by runtime; the recording transcriber loads its session from them.</summary>
+    public IReadOnlyDictionary<ModelRuntime, TranscriptionPipeline.EngineFactory> Engines { get; }
     public AudioCompressor Compressor { get; }
     public RecordingEngine Engine { get; }
 

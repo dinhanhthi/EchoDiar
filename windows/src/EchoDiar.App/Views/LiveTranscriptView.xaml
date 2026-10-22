@@ -1,0 +1,90 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    Live captions on the recording page, under its header (macOS LiveTranscriptView.swift, setting "Transcribe while
+    recording"): the transcriber's state, then the newest lines, scrolled to the bottom as they arrive unless the user
+    scrolled up, filling the page. The lines are built in code.
+-->
+<UserControl
+    x:Class="EchoDiar.App.Views.LiveTranscriptView"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+
+    <UserControl.Resources>
+        <!-- The transcript's colors (TranscriptView SpeakerMe and Speaker0): me in the accent color, the others in caution. -->
+        <Style x:Key="LiveSpeakerBase" BasedOn="{StaticResource BodyStrongTextBlockStyle}" TargetType="TextBlock">
+            <Setter Property="TextWrapping" Value="NoWrap" />
+        </Style>
+        <Style x:Key="LiveSpeakerMe" BasedOn="{StaticResource LiveSpeakerBase}" TargetType="TextBlock">
+            <Setter Property="Foreground" Value="{ThemeResource AccentTextFillColorPrimaryBrush}" />
+        </Style>
+        <Style x:Key="LiveSpeakerOthers" BasedOn="{StaticResource LiveSpeakerBase}" TargetType="TextBlock">
+            <Setter Property="Foreground" Value="{ThemeResource SystemFillColorCautionBrush}" />
+        </Style>
+        <Style x:Key="LiveLineText" BasedOn="{StaticResource BodyTextBlockStyle}" TargetType="TextBlock">
+            <Setter Property="TextWrapping" Value="Wrap" />
+            <Setter Property="IsTextSelectionEnabled" Value="True" />
+        </Style>
+
+        <!-- The state: secondary text, or caution when the transcriber stopped. -->
+        <Style x:Key="LiveStatusText" BasedOn="{StaticResource CaptionTextBlockStyle}" TargetType="TextBlock">
+            <Setter Property="Foreground" Value="{ThemeResource TextFillColorSecondaryBrush}" />
+        </Style>
+        <Style x:Key="LiveStatusErrorText" BasedOn="{StaticResource CaptionTextBlockStyle}" TargetType="TextBlock">
+            <Setter Property="Foreground" Value="{ThemeResource SystemFillColorCautionBrush}" />
+        </Style>
+        <Style x:Key="LiveStatusIcon" TargetType="FontIcon">
+            <Setter Property="Foreground" Value="{ThemeResource TextFillColorSecondaryBrush}" />
+        </Style>
+        <Style x:Key="LiveStatusErrorIcon" TargetType="FontIcon">
+            <Setter Property="Foreground" Value="{ThemeResource SystemFillColorCautionBrush}" />
+        </Style>
+    </UserControl.Resources>
+
+    <Border
+        Padding="16,12"
+        Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
+        BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
+        BorderThickness="1"
+        CornerRadius="{StaticResource OverlayCornerRadius}">
+        <Grid RowSpacing="8">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="*" />
+            </Grid.RowDefinitions>
+
+            <!-- Why the transcriber stopped shows as the state's tooltip. -->
+            <Grid x:Name="StatusPanel" ColumnSpacing="8">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="*" />
+                </Grid.ColumnDefinitions>
+                <FontIcon
+                    x:Name="StatusIcon"
+                    VerticalAlignment="Center"
+                    AutomationProperties.AccessibilityView="Raw"
+                    FontFamily="{ThemeResource SymbolThemeFontFamily}"
+                    FontSize="14"
+                    Glyph="&#xE7F0;"
+                    Style="{StaticResource LiveStatusIcon}" />
+                <TextBlock
+                    x:Name="StatusText"
+                    Grid.Column="1"
+                    VerticalAlignment="Center"
+                    AutomationProperties.LiveSetting="Polite"
+                    Style="{StaticResource LiveStatusText}"
+                    TextWrapping="Wrap" />
+            </Grid>
+
+            <ScrollViewer
+                x:Name="Scroller"
+                Grid.Row="1"
+                HorizontalScrollBarVisibility="Disabled"
+                HorizontalScrollMode="Disabled"
+                VerticalScrollBarVisibility="Auto"
+                Visibility="Collapsed">
+                <!-- Right padding keeps the text clear of the scroll bar. -->
+                <StackPanel x:Name="LinesPanel" Padding="0,0,16,0" Spacing="6" />
+            </ScrollViewer>
+        </Grid>
+    </Border>
+</UserControl>

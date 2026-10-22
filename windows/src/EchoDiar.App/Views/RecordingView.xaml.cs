@@ -11,8 +11,9 @@ namespace EchoDiar.App.Views;
 
 /// <summary>
 /// The recording page (macOS RecordingViews.swift RecordingDetailView, RecordingHeader, ChannelMeters and
-/// RecordingWave), opened from the recording's card. The meters and the wave move at 15 Hz while the window is shown
-/// and the recording is not paused; the wave stands still when Windows animations are off (Reduce Motion).
+/// RecordingWave), opened from the recording's card: the live transcript, or the wave and why there is none. The
+/// meters and the wave move at 15 Hz while the window is shown and the recording is not paused; the wave stands still
+/// when Windows animations are off (Reduce Motion).
 /// </summary>
 public sealed partial class RecordingView : UserControl
 {
@@ -40,6 +41,7 @@ public sealed partial class RecordingView : UserControl
             Wave.Children.Add(_bars[i]);
         }
         LanguageHost.Content = new LanguagePicker(model, shortLabel: false);
+        LiveHost.Child = new LiveTranscriptView(model);
         GlobalTapWarning.Message = Loc.T("This app's audio cannot be isolated, so all system audio is being recorded.");
         AutomationProperties.SetName(MicMeter, Loc.Format("%@ level", "Mic"));
         AutomationProperties.SetName(SystemMeter, Loc.Format("%@ level", "System"));
@@ -48,6 +50,7 @@ public sealed partial class RecordingView : UserControl
             _model.PropertyChanged += OnModelChanged;
             Update();
             UpdateReason();
+            UpdateLive();
         };
         Unloaded += (_, _) =>
         {
@@ -67,6 +70,9 @@ public sealed partial class RecordingView : UserControl
                 break;
             case nameof(AppViewModel.Settings):
                 UpdateReason();
+                break;
+            case nameof(AppViewModel.RecordingCaptions):
+                UpdateLive();
                 break;
         }
     }
@@ -96,7 +102,18 @@ public sealed partial class RecordingView : UserControl
         UpdateWave(paused);
     }
 
-    /// <summary>Why there is no live transcript yet; Phase 16 transcribes while recording.</summary>
+    /// <summary>The live transcript while the recording has a transcriber, else the wave and why.</summary>
+    private void UpdateLive()
+    {
+        var live = _model.RecordingCaptions is not null;
+        LiveHost.Visibility = live ? Visibility.Visible : Visibility.Collapsed;
+        NoLivePanel.Visibility = live ? Visibility.Collapsed : Visibility.Visible;
+    }
+
+    /// <summary>
+    /// Why there is no live transcript (the conditions of AppViewModel.AttachRecordingTranscriberAsync, read from the
+    /// settings). The last one names the Windows engines (macOS: WhisperKit and Parakeet).
+    /// </summary>
     private void UpdateReason()
     {
         var settings = _model.Settings;
@@ -104,7 +121,7 @@ public sealed partial class RecordingView : UserControl
             ? Loc.T("Transcription is off. Turn on Transcribe automatically in Settings › Recording.")
             : !settings.TranscribeWhileRecording
                 ? Loc.T("Transcribe while recording is off. Turn it on in Settings › Transcription.")
-                : "The recording is transcribed after Stop.";
+                : Loc.T("This engine transcribes after Stop. Whisper and Parakeet models also transcribe while recording.");
     }
 
     private void OnTick()
@@ -115,7 +132,8 @@ public sealed partial class RecordingView : UserControl
         SystemFill.Width = SystemTrack.ActualWidth * system;
         SetPercent(MicMeter, mic, ref _micPercent);
         SetPercent(SystemMeter, system, ref _systemPercent);
-        if (!UISettings.AnimationsEnabled) return;
+        // The live transcript hides the wave.
+        if (!UISettings.AnimationsEnabled || NoLivePanel.Visibility != Visibility.Visible) return;
         // The louder channel's peak; a fall decays from the last bar so the wave does not flicker.
         Array.Copy(_history, 1, _history, 0, BarCount - 1);
         _history[^1] = Math.Max(Math.Max(mic, system), _history[^2] * 0.8);

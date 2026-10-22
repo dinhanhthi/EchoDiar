@@ -272,7 +272,8 @@ public sealed partial class AppViewModel : ObservableObject
 
     /// <summary>
     /// Stops a running recording before the app quits, so its audio file is finished; a start under way is waited for
-    /// and stops itself. The last settings write is waited for too. All run off the UI thread, waited for at most 10 s without pumping its messages: a managed
+    /// and stops itself. The last settings write is waited for too, then the live transcribers' unload (which does not
+    /// decide the result). All run off the UI thread, waited for at most 10 s without pumping its messages: a managed
     /// wait on this STA thread would run queued XAML work while the window closes. False when the wait timed out (a
     /// device open that hangs holds the engine): the engine must then not be touched again, and launch recovery
     /// finishes the session next time.
@@ -289,6 +290,9 @@ public sealed partial class AppViewModel : ObservableObject
         // A settings change still waiting for its debounce is written now, and waited for with the stop.
         FlushSettings();
         var settingsWrite = _settingsWrite;
+        // Live transcribers stop now, in parallel with the recording's stop; waited for after it, apart.
+        var transcribers = DisposeRecordingTranscribers();
+        var waited = Stopwatch.StartNew();
         var start = _startTask;
         var stop = Task.Run(() =>
         {
@@ -309,6 +313,13 @@ public sealed partial class AppViewModel : ObservableObject
             return false;
         }
         if (stop.Exception is { } error) Debug.WriteLine($"EchoDiar: could not stop recording on quit: {error}");
+        // The engine no longer calls the transcribers; one still decoding only delays the exit, within the same 10 s.
+        var left = (uint)Math.Max(0, ShutdownWaitMilliseconds - waited.ElapsedMilliseconds);
+        var transcribersHandle = ((IAsyncResult)transcribers).AsyncWaitHandle.SafeWaitHandle;
+        if (WaitForSingleObject(transcribersHandle, left) != WaitObject0)
+        {
+            Debug.WriteLine("EchoDiar: the live transcriber did not stop in time on quit.");
+        }
         return true;
     }
 
@@ -435,6 +446,9 @@ public sealed partial class AppViewModel : ObservableObject
             await _recovery;
             var language = RecordingLanguage;
             var micEndpointId = Settings.MicDeviceUID;
+            // Before the engine starts, with the engine's first marker language, so the prior's engine is the one the
+            // Stop job resolves to.
+            await AttachRecordingTranscriberAsync(language);
             _startTask = Task.Run<string?>(() =>
             {
                 if (_closing) return null;
@@ -453,6 +467,7 @@ public sealed partial class AppViewModel : ObservableObject
         catch (Exception e)
         {
             Debug.WriteLine($"EchoDiar: could not start recording: {e}");
+            CancelRecordingTranscriber();
             RecordingSourceName = null;
             RecordingError = e is RecordingDiskFullException
                 ? "There is not enough free disk space to record."
@@ -469,12 +484,21 @@ public sealed partial class AppViewModel : ObservableObject
     {
         var state = RecordingSnapshot.State;
         if (state == RecordingEngine.State.Idle) return;
+        var transcriber = _recordingTranscriber;
         try
         {
             await Task.Run(() =>
             {
-                if (state == RecordingEngine.State.Recording) _services.Engine.Pause();
-                else _services.Engine.Resume();
+                if (state == RecordingEngine.State.Recording)
+                {
+                    _services.Engine.Pause();
+                    // The writer flushed its last frames through the sink before Pause returned.
+                    transcriber?.Flush();
+                }
+                else
+                {
+                    _services.Engine.Resume();
+                }
             });
         }
         catch (Exception e)
@@ -552,12 +576,18 @@ public sealed partial class AppViewModel : ObservableObject
         if (StopMessage(reason) is { } message) RecordingError = message;
         var folder = _activeFolder;
         _activeFolder = null;
-        if (folder is not null) _ = FinishRecordingAsync(folder);
+        var transcriber = TakeRecordingTranscriber();
+        if (folder is not null) _ = FinishRecordingAsync(folder, transcriber);
+        else if (transcriber is not null) CancelRecordingTranscriber(transcriber);
     }
 
-    /// <summary>Lists the recording, opens it when the recording page is showing, then compresses and transcribes it.</summary>
-    private async Task FinishRecordingAsync(string folder)
+    /// <summary>
+    /// Lists the recording, opens it when the recording page is showing, then compresses and transcribes it with what
+    /// the live transcriber transcribed, which drains meanwhile.
+    /// </summary>
+    private async Task FinishRecordingAsync(string folder, RecordingTranscriber? transcriber)
     {
+        var prior = transcriber is null ? null : FinishRecordingTranscriberAsync(transcriber);
         if (_closing) return;
         try
         {
@@ -569,7 +599,7 @@ public sealed partial class AppViewModel : ObservableObject
                 DetailTab = DetailTab.Transcript;
                 Route = session is not null && list.Any(c => c.Id == session.Id) ? Route.ForConversation(session.Id) : Route.List;
             }
-            await CompressAndTranscribeAsync(folder, session);
+            await CompressAndTranscribeAsync(folder, session, prior);
         }
         catch (Exception e)
         {
@@ -618,10 +648,13 @@ public sealed partial class AppViewModel : ObservableObject
     /// recording's first language (else the pipeline's default resolution), and the speaker settings;
     /// <paramref name="language"/> replaces the recording's language markers. A failed or probe recording is never
     /// transcribed. <paramref name="deleteAudioAfter"/> null = "Delete audio after transcription", read when the job
-    /// succeeds (macOS <c>submitTranscription</c>). Returns the job (true when it succeeded), null when none was queued.
+    /// succeeds (macOS <c>submitTranscription</c>). <paramref name="prior"/>: what the recording's live transcriber
+    /// transcribed (see <see cref="TranscriptionJob.Prior"/>). Returns the job (true when it succeeded), null when none
+    /// was queued.
     /// </summary>
     private Task<bool>? SubmitTranscription(
-        string folder, RecordingSession session, string? engineId = null, string? language = null, bool? deleteAudioAfter = null)
+        string folder, RecordingSession session, string? engineId = null, string? language = null, bool? deleteAudioAfter = null,
+        PriorTranscription? prior = null)
     {
         var id = session.Id;
         if (_closing || session.Probe || session.State == SessionState.Failed || HasJob(id)) return null;
@@ -637,6 +670,7 @@ public sealed partial class AppViewModel : ObservableObject
             SpeakerCountHint = Settings.SpeakerCountHint,
             DiarizerID = Settings.DefaultDiarizerModelID,
             Diarize = Settings.Diarization,
+            Prior = prior,
         };
         TranscriptionErrors = Without(TranscriptionErrors, id);
         // Set now so the screens show the job before the pipeline's first event arrives.

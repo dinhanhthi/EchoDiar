@@ -80,6 +80,8 @@ public sealed partial class AppViewModel
         OnPropertyChanged(nameof(RecordingLanguage));
         if (IsRecording)
         {
+            // The live transcriber's next chunks.
+            _liveLanguage = language;
             // In pick order, off the UI thread: the engine writes session.json under its lock.
             _languageWrite = _languageWrite.ContinueWith(_ =>
             {
@@ -155,25 +157,28 @@ public sealed partial class AppViewModel
     /// The post-stop sequence for one folder (macOS AppModel <c>finishRecording</c>). A recording auto-transcribed now
     /// (usable, not transcribed yet, its CAF has frames) is transcribed from the CAF first; then its audio goes to the
     /// Recycle Bin (success with "Delete audio after transcription") or is compressed. Otherwise it is compressed first,
-    /// then transcribed when "Transcribe automatically" is on.
+    /// then transcribed when "Transcribe automatically" is on. <paramref name="prior"/> (what the live transcriber
+    /// transcribed, once it drained and unloaded its model) goes to the job either way.
     /// </summary>
-    private async Task CompressAndTranscribeAsync(string folder, RecordingSession? session)
+    private async Task CompressAndTranscribeAsync(string folder, RecordingSession? session, Task<PriorTranscription?>? prior = null)
     {
         if (_closing) return;
         var id = session?.Id;
         if (id is { } added) SetFinishing(added, true);
         try
         {
+            var transcribed = prior is null ? null : await prior;
+            if (_closing) return;
             var autoTranscribe = Settings.AutoTranscribe;
             if (session is not null && await Task.Run(() => TranscribesFirst(folder, session, autoTranscribe))
-                && SubmitTranscription(folder, session, deleteAudioAfter: false) is { } job)
+                && SubmitTranscription(folder, session, deleteAudioAfter: false, prior: transcribed) is { } job)
             {
                 var succeeded = await job;
                 if (succeeded && !_closing && Settings.DeleteAudioAfterTranscription) await DeleteAudioAsync(session.Id);
                 else await CompressAsync(folder);
                 return;
             }
-            if (await CompressAsync(folder) is { } result) await TranscribeAfterAsync(result);
+            if (await CompressAsync(folder) is { } result) await TranscribeAfterAsync(result, transcribed);
         }
         catch (Exception e)
         {
@@ -244,9 +249,9 @@ public sealed partial class AppViewModel
     /// <summary>
     /// Queues the folder once compression is done, when "Transcribe automatically" is on (a failed compression leaves
     /// the CAF, which is used instead). Skipped when the folder has no usable audio or session, already has a
-    /// transcript, or its last transcription failed (macOS <c>transcribe(after:)</c>).
+    /// transcript, or its last transcription failed (macOS <c>transcribe(after:)</c>). <paramref name="prior"/> goes to the job.
     /// </summary>
-    private async Task TranscribeAfterAsync(CompressionResult result)
+    private async Task TranscribeAfterAsync(CompressionResult result, PriorTranscription? prior = null)
     {
         if (!Settings.AutoTranscribe || _closing) return;
         if (result.Failure is AudioCompressionFailure.SessionUnreadable or AudioCompressionFailure.StillRecording
@@ -256,7 +261,7 @@ public sealed partial class AppViewModel
         }
         var (session, conversation) = await Task.Run(() => (ReadSession(result.Folder), ReadConversation(result.Folder)));
         if (session is null || conversation?.HasTranscript == true || conversation?.Status == ConversationStatus.TranscriptionFailed) return;
-        _ = SubmitTranscription(result.Folder, session);
+        _ = SubmitTranscription(result.Folder, session, prior: prior);
     }
 
     /// <summary>
