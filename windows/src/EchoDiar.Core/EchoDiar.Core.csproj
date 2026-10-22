@@ -3,4 +3,8 @@
     <TargetFramework>net10.0</TargetFramework>
     <RootNamespace>EchoDiar.Core</RootNamespace>
   </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="NAudio.Core" />
+  </ItemGroup>
 </Project>
