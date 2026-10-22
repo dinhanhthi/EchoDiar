@@ -136,6 +136,22 @@ public sealed record Transcript
         }
     }
 
+    /// <summary>
+    /// The index of the segment under <paramref name="time"/> in <paramref name="segments"/> sorted by start, or -1:
+    /// the last one starting at or before it, while <paramref name="time"/> is not past its end. Binary search.
+    /// </summary>
+    public static int SegmentIndexAt(IReadOnlyList<Segment> segments, double time)
+    {
+        int low = 0, high = segments.Count;
+        while (low < high)
+        {
+            var mid = (low + high) / 2;
+            if (segments[mid].Start <= time) low = mid + 1;
+            else high = mid;
+        }
+        return low > 0 && time <= segments[low - 1].End ? low - 1 : -1;
+    }
+
     public static Transcript Read(string folder) => SwiftJson.Read<Transcript>(Path.Combine(folder, FileName));
 
     /// <summary>

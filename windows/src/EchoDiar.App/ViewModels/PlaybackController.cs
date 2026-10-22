@@ -22,7 +22,7 @@ public sealed partial class PlaybackController : ObservableObject, IDisposable
     private PlaybackChannels _channels = PlaybackChannels.Mixed;
 
     /// <summary>Sorted by start.</summary>
-    private (Guid Id, double Start, double End)[] _segments = [];
+    private Transcript.Segment[] _segments = [];
 
     /// <summary>Bumped whenever the player closes, so a late end of the previous one is ignored.</summary>
     private int _generation;
@@ -88,7 +88,7 @@ public sealed partial class PlaybackController : ObservableObject, IDisposable
     /// </summary>
     public void Load(string? audioPath, IReadOnlyList<Transcript.Segment> segments, PlaybackChannels channels)
     {
-        _segments = [.. segments.Select(s => (s.Id, s.Start, s.End)).OrderBy(s => s.Start)];
+        _segments = [.. segments.OrderBy(s => s.Start)];
         if (audioPath != _path)
         {
             Close();
@@ -104,24 +104,14 @@ public sealed partial class PlaybackController : ObservableObject, IDisposable
     }
 
     /// <summary>
-    /// Plays both voices in both ears, or as recorded (mic left, system right), keeping the play head and whether it
-    /// plays. Until Task 13.3 switches the open player live, the file is opened again at the play head.
+    /// Plays both voices in both ears, or as recorded (mic left, system right), switching the open player live: the
+    /// play head and whether it plays are kept.
     /// </summary>
     public void SetChannels(PlaybackChannels channels)
     {
         if (channels == _channels) return;
         _channels = channels;
-        if (_path is not { } path || _player is null) return;
-        // The exact play head, not the last 4 Hz reading.
-        Tick();
-        var time = CurrentTime;
-        var wasPlaying = IsPlaying;
-        Close();
-        _path = path;
-        Open(path, channels);
-        if (!IsReady) return;
-        Seek(time);
-        if (wasPlaying) Play();
+        _player?.SetChannels(channels);
     }
 
     public void TogglePlay()
@@ -239,13 +229,7 @@ public sealed partial class PlaybackController : ObservableObject, IDisposable
     /// <summary>The last segment starting at or before the play head, while the play head is inside it.</summary>
     private void UpdateActiveSegment()
     {
-        int low = 0, high = _segments.Length;
-        while (low < high)
-        {
-            var mid = (low + high) / 2;
-            if (_segments[mid].Start <= CurrentTime) low = mid + 1;
-            else high = mid;
-        }
-        ActiveSegmentId = low > 0 && CurrentTime <= _segments[low - 1].End ? _segments[low - 1].Id : null;
+        var index = Transcript.SegmentIndexAt(_segments, CurrentTime);
+        ActiveSegmentId = index >= 0 ? _segments[index].Id : null;
     }
 }

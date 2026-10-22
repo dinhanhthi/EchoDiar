@@ -8,8 +8,8 @@ namespace EchoDiar.Platform.Audio;
 /// <summary>
 /// Plays a recording's CAF file on the default output device through WASAPI shared mode (100 ms latency): both voices
 /// in both ears (<see cref="PlaybackChannels.Mixed"/>), or as recorded, mic left and system right
-/// (<see cref="PlaybackChannels.Split"/>). Create, control and dispose it on one thread; <see cref="Ended"/> may be
-/// raised on another.
+/// (<see cref="PlaybackChannels.Split"/>), switchable while it plays. Create, control and dispose it on one thread;
+/// <see cref="Ended"/> may be raised on another.
 /// </summary>
 /// <remarks>
 /// NAudio 3's <c>WasapiPlayer</c>, the replacement for the obsolete <c>WasapiOut</c>. It never changes the sample
@@ -78,6 +78,12 @@ public sealed class AudioPlayer : IDisposable
     /// <summary>Moves the play head (clamped to the file); while playing, the buffered audio still plays first.</summary>
     public void Seek(double seconds) => _source.Seek(seconds);
 
+    /// <summary>
+    /// Switches between mixed and split from the next buffer read, keeping the play head and the state; while playing,
+    /// the buffered audio (up to the 100 ms latency) still plays the old way.
+    /// </summary>
+    public void SetChannels(PlaybackChannels channels) => _source.SetChannels(channels);
+
     public void Dispose()
     {
         _output.PlaybackStopped -= OnPlaybackStopped;
@@ -93,7 +99,7 @@ public sealed class AudioPlayer : IDisposable
 
     /// <summary>
     /// A CAF file (Int16 or Float32, mono or stereo) as stereo Float32 at the file's rate. Read on the playback thread,
-    /// seeked on the caller's: one lock guards the reader and the frame position.
+    /// seeked and switched on the caller's: one lock guards the reader, the frame position and the channel mode.
     /// </summary>
     private sealed class CafSampleProvider : ISampleProvider, IDisposable
     {
@@ -101,7 +107,7 @@ public sealed class AudioPlayer : IDisposable
 
         private readonly object _lock = new();
         private readonly CafFile.Reader _reader;
-        private readonly bool _mixed;
+        private bool _mixed;
         private long _frame;
         private bool _atEnd;
         private bool _disposed;
@@ -148,6 +154,11 @@ public sealed class AudioPlayer : IDisposable
                 _frame = Math.Clamp(frame, 0, _reader.Frames);
                 _atEnd = false;
             }
+        }
+
+        public void SetChannels(PlaybackChannels channels)
+        {
+            lock (_lock) _mixed = channels == PlaybackChannels.Mixed;
         }
 
         public int Read(Span<float> buffer)
