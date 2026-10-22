@@ -163,7 +163,7 @@
             </Border>
         </StackPanel>
 
-        <!-- Phase 11 makes it filter the library. -->
+        <!-- Filters the library and the sidebar as typed; Esc clears it. -->
         <TextBox
             x:Name="SearchBox"
             Grid.Column="3"
@@ -173,7 +173,6 @@
             VerticalAlignment="Center"
             AutomationProperties.Name="{local:T Text='Search conversations'}"
             CornerRadius="16"
-            IsEnabled="False"
             PlaceholderText="{local:T Text='Search'}" />
 
         <!-- Only Transcript for now: Phase 12 adds the tab pages, Phase 23 Summary and Chat. -->

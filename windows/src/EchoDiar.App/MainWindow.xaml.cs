@@ -72,8 +72,9 @@ public sealed partial class MainWindow : Window
         TitleBarGrid.LayoutUpdated += OnTitleBarLayoutUpdated;
 
         Toolbar.Attach(_model);
-        // One library for both layouts: the whole page on compact, the sidebar on wide.
-        _library = new ConversationListView(_model);
+        // One library for both layouts: the whole page on compact, the sidebar on wide. Its deletes ask through the
+        // toolbar, which shows the window's dialogs one at a time.
+        _library = new ConversationListView(_model) { Delete = Toolbar.DeleteAsync };
         ListHost.Content = _library;
 
         _frames = new WindowFrames(AppWindow);

@@ -9,8 +9,10 @@ using Microsoft.UI.Dispatching;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Automation;
 using Microsoft.UI.Xaml.Controls;
+using Microsoft.UI.Xaml.Input;
 using Windows.Foundation;
 using Windows.Graphics;
+using VirtualKey = Windows.System.VirtualKey;
 using Windows.UI.ViewManagement;
 
 namespace EchoDiar.App.Views;
@@ -18,9 +20,10 @@ namespace EchoDiar.App.Views;
 /// <summary>
 /// The title bar's capsules (macOS MainView.swift toolbar), shown by route: Back off the list; Record with its menu of
 /// targets and the language (Stop, blinking, and Pause or Resume while recording); on a conversation its title, Reveal, Delete and the
-/// tabs; Settings and Search everywhere (placeholders until Phases 13 and 11). Update and Ask across conversations
-/// stay collapsed until Phases 27 and 26. It also hosts the window's dialogs (it lives as long as the window): the
-/// delete confirmation, "Recording problem" and the lost-mic prompt, one at a time.
+/// tabs; Settings (a placeholder until Phase 13) and Search everywhere. Update and Ask across conversations stay
+/// collapsed until Phases 27 and 26. It also hosts the window's dialogs (it lives as long as the window): the delete
+/// confirmations (of this conversation, and of the library's cards and selection), "Recording problem" and the
+/// lost-mic prompt, one at a time.
 /// </summary>
 public sealed partial class TitleBarToolbar : UserControl
 {
@@ -29,6 +32,9 @@ public sealed partial class TitleBarToolbar : UserControl
 
     /// <summary>The recording indicator dims every other second (macOS RecordingBlink).</summary>
     private static readonly TimeSpan BlinkInterval = TimeSpan.FromSeconds(1);
+
+    /// <summary>The cards are filtered once typing pauses this long (at once when cleared).</summary>
+    private static readonly TimeSpan SearchDelay = TimeSpan.FromMilliseconds(200);
 
     private static readonly UISettings UISettings = new();
 
@@ -44,6 +50,10 @@ public sealed partial class TitleBarToolbar : UserControl
     private bool _routePromptPending;
 
     private DispatcherQueueTimer? _blinkTimer;
+    private DispatcherQueueTimer? _searchTimer;
+
+    /// <summary>The route's page was the list (not a conversation or the recording) when last shown.</summary>
+    private bool _onListPage = true;
 
     /// <summary>Record's tooltip, "Record" and the target; set again only when the target changes.</summary>
     private string? _recordTip;
@@ -67,8 +77,10 @@ public sealed partial class TitleBarToolbar : UserControl
         PauseButton.Click += (_, _) => _ = _model?.TogglePauseAsync();
         RevealButton.Click += (_, _) => Reveal();
         DeleteMenu.Opening += (_, _) => UpdateDeleteMenu();
-        DeleteAudioItem.Click += async (_, _) => await DeleteAsync(audioOnly: true);
-        DeleteConversationItem.Click += async (_, _) => await DeleteAsync(audioOnly: false);
+        DeleteAudioItem.Click += async (_, _) => await DeleteShownAsync(audioOnly: true);
+        DeleteConversationItem.Click += async (_, _) => await DeleteShownAsync(audioOnly: false);
+        SearchBox.TextChanged += (_, _) => OnSearchTextChanged();
+        SearchBox.KeyDown += OnSearchKeyDown;
         // A start that failed before the window was shown still gets its dialog.
         Loaded += (_, _) => ShowNextDialog();
     }
@@ -82,6 +94,14 @@ public sealed partial class TitleBarToolbar : UserControl
         _blinkTimer = DispatcherQueue.CreateTimer();
         _blinkTimer.Interval = BlinkInterval;
         _blinkTimer.Tick += (_, _) => Blink();
+        _searchTimer = DispatcherQueue.CreateTimer();
+        _searchTimer.Interval = SearchDelay;
+        _searchTimer.IsRepeating = false;
+        _searchTimer.Tick += (timer, _) =>
+        {
+            timer.Stop();
+            if (_model is not null) _model.SearchTerm = SearchBox.Text;
+        };
         Update();
     }
 
@@ -94,6 +114,8 @@ public sealed partial class TitleBarToolbar : UserControl
         _model = null;
         _blinkTimer?.Stop();
         _blinkTimer = null;
+        _searchTimer?.Stop();
+        _searchTimer = null;
     }
 
     /// <summary>
@@ -147,6 +169,13 @@ public sealed partial class TitleBarToolbar : UserControl
     {
         if (_model is null) return;
         BackButton.Visibility = Shown(_model.Route.Kind != RouteKind.List);
+        // Another page clears the search (macOS MainView.swift); another conversation keeps it, for the sidebar it filters.
+        var onListPage = _model.Route.Kind == RouteKind.List;
+        if (onListPage != _onListPage)
+        {
+            _onListPage = onListPage;
+            SearchBox.Text = "";
+        }
 
         var recording = _model.IsRecording;
         var paused = _model.RecordingSnapshot.State == RecordingEngine.State.Paused;
@@ -264,33 +293,86 @@ public sealed partial class TitleBarToolbar : UserControl
         DeleteConversationItem.Text = Loc.T(asks ? "Delete conversation…" : "Delete conversation");
     }
 
-    /// <summary>Asks first unless "Delete conversations without confirmation" is on, then deletes.</summary>
-    private async Task DeleteAsync(bool audioOnly)
+    private async Task DeleteShownAsync(bool audioOnly)
     {
-        if (_model is null || ShownConversation() is not { } conversation || !_model.CanDelete(conversation)) return;
-        var id = conversation.Id;
-        if (!_model.Settings.DeleteWithoutConfirmation && !await ConfirmDeleteAsync(conversation, audioOnly)) return;
-        // It may have started a job while the dialog was open.
-        if (_model.Conversations.FirstOrDefault(c => c.Id == id) is not { } current || !_model.CanDelete(current)) return;
-        if (audioOnly) await _model.DeleteAudioAsync(id);
-        else await _model.DeleteConversationAsync(id);
+        if (ShownConversation() is { } conversation) await DeleteAsync([conversation], audioOnly);
     }
 
-    /// <summary>The macOS alert's texts (not in its string catalog), with the Recycle Bin for the Trash.</summary>
-    private async Task<bool> ConfirmDeleteAsync(Conversation conversation, bool audioOnly)
+    /// <summary>
+    /// macOS DeleteMenuItems.delete, for this conversation and the library's cards and selection: only the
+    /// conversations that can be deleted now (and have audio, for the audio only), asked once for all unless "Delete
+    /// conversations without confirmation" is on; one is asked by its title. Then they are deleted one by one. True
+    /// when any was deleted (not cancelled, not none).
+    /// </summary>
+    public async Task<bool> DeleteAsync(IReadOnlyList<Conversation> conversations, bool audioOnly)
+    {
+        if (_model is not { } model) return false;
+        bool Eligible(Conversation c) => model.CanDelete(c) && (!audioOnly || c.HasAudio);
+        var eligible = conversations.Where(Eligible).ToList();
+        if (eligible.Count == 0) return false;
+        if (!model.Settings.DeleteWithoutConfirmation && !await ConfirmDeleteAsync(eligible, audioOnly)) return false;
+        // The window closed while the dialog was open.
+        if (_model is null) return false;
+        // A job may have started, or a conversation gone, while the dialog was open.
+        var ids = eligible
+            .Select(c => model.Conversations.FirstOrDefault(current => current.Id == c.Id))
+            .OfType<Conversation>()
+            .Where(Eligible)
+            .Select(c => c.Id)
+            .ToList();
+        // Each delete first has the open player let go of that conversation's audio (ReleasingAudio).
+        foreach (var id in ids)
+        {
+            if (audioOnly) await model.DeleteAudioAsync(id);
+            else await model.DeleteConversationAsync(id);
+        }
+        return true;
+    }
+
+    /// <summary>The macOS alerts' texts, with the Recycle Bin for the Trash.</summary>
+    private async Task<bool> ConfirmDeleteAsync(IReadOnlyList<Conversation> conversations, bool audioOnly)
     {
         if (_dialog is not null) return false;
-        var dialog = NewDialog(
-            audioOnly ? $"Delete the audio of \"{conversation.Title}\"?" : $"Delete \"{conversation.Title}\"?",
-            audioOnly
-                ? "The audio is moved to the Recycle Bin. The transcript, summary and chat stay; playback and re-transcribing are no longer possible."
-                : "The recording and its files are moved to the Recycle Bin.");
+        var one = conversations.Count == 1 ? conversations[0] : null;
+        var title = (one, audioOnly) switch
+        {
+            ({ } c, true) => Loc.Format("Delete the audio of \"%@\"?", c.Title),
+            // Not through Loc: the text is not in the catalog, and its slug finds the catalog's "Delete".
+            ({ } c, false) => $"Delete \"{c.Title}\"?",
+            (null, true) => Loc.Format("Delete the audio of %lld conversations?", conversations.Count),
+            (null, false) => Loc.Format("Delete %lld conversations?", conversations.Count),
+        };
+        var body = audioOnly
+            ? Loc.T("The audio is moved to the Recycle Bin. The transcript, summary and chat stay; playback and re-transcribing are no longer possible.")
+            : one is not null
+                ? Loc.T("The recording and its files are moved to the Recycle Bin.")
+                : Loc.T("The recordings and their files are moved to the Recycle Bin.");
+        var dialog = NewDialog(title, body);
         dialog.PrimaryButtonText = Loc.T("Delete");
         dialog.CloseButtonText = Loc.T("Cancel");
         dialog.DefaultButton = ContentDialogButton.Close;
         var confirmed = false;
         await ShowAsync(dialog, result => confirmed = result == ContentDialogResult.Primary);
         return confirmed;
+    }
+
+    // Search
+
+    /// <summary>Filters once typing pauses; a cleared field shows every conversation at once.</summary>
+    private void OnSearchTextChanged()
+    {
+        if (_model is null || _searchTimer is null) return;
+        _searchTimer.Stop();
+        if (SearchBox.Text.Length == 0) _model.SearchTerm = "";
+        else _searchTimer.Start();
+    }
+
+    /// <summary>Esc clears the search (macOS closes its search bar).</summary>
+    private void OnSearchKeyDown(object sender, KeyRoutedEventArgs e)
+    {
+        if (e.Key != VirtualKey.Escape || SearchBox.Text.Length == 0) return;
+        e.Handled = true;
+        SearchBox.Text = "";
     }
 
     // Recording dialogs and indicator

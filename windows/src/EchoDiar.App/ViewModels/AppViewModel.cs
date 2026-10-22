@@ -107,7 +107,10 @@ public sealed partial class AppViewModel : ObservableObject
     public IReadOnlyList<Conversation> Conversations
     {
         get => _conversations;
-        private set => SetProperty(ref _conversations, value);
+        private set
+        {
+            if (SetProperty(ref _conversations, value)) _ = LoadSearchDocumentsAsync();
+        }
     }
 
     /// <summary>The recording state, with the elapsed time read at 15 Hz while recording.</summary>
@@ -541,19 +544,23 @@ public sealed partial class AppViewModel : ObservableObject
     public bool IsTranscribing(Guid id) =>
         TranscriptionProgress.TryGetValue(id, out var progress) && progress.Step != JobStep.NeedsModel;
 
-    /// <summary>The conversation's Transcribe and Retry: queues it unless a job for it is active or it has no audio.</summary>
-    public async Task TranscribeAsync(Guid id)
+    /// <summary>
+    /// The conversation's Transcribe and Retry (<paramref name="engineId"/>: a catalog id from "Retry with another
+    /// engine", null = the default resolution): queues it unless a job for it is active or it has no audio.
+    /// </summary>
+    public async Task TranscribeAsync(Guid id, string? engineId = null)
     {
         if (IsTranscribing(id) || Conversations.FirstOrDefault(c => c.Id == id) is not { HasAudio: true } conversation) return;
         var session = await Task.Run(() => ReadSession(conversation.Folder));
-        if (session is not null) SubmitTranscription(conversation.Folder, session);
+        if (session is not null) SubmitTranscription(conversation.Folder, session, engineId);
     }
 
     /// <summary>
-    /// Queues a job with the default engine when it is installed and handles the recording's first language (else the
-    /// pipeline's default resolution), and the speaker settings. A failed or probe recording is never transcribed.
+    /// Queues a job with <paramref name="engineId"/>, else the default engine when it is installed and handles the
+    /// recording's first language (else the pipeline's default resolution), and the speaker settings. A failed or
+    /// probe recording is never transcribed.
     /// </summary>
-    private void SubmitTranscription(string folder, RecordingSession session)
+    private void SubmitTranscription(string folder, RecordingSession session, string? engineId = null)
     {
         var id = session.Id;
         if (_closing || session.Probe || session.State == SessionState.Failed || IsTranscribing(id)) return;
@@ -562,7 +569,7 @@ public sealed partial class AppViewModel : ObservableObject
         {
             ConversationID = id,
             Folder = folder,
-            EngineID = PreferredEngine(language),
+            EngineID = engineId ?? PreferredEngine(language),
             SpeakerCountHint = Settings.SpeakerCountHint,
             DiarizerID = Settings.DefaultDiarizerModelID,
             Diarize = Settings.Diarization,

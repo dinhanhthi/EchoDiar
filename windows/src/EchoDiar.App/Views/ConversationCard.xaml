@@ -1,0 +1,235 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    One conversation of the library (macOS ConversationCard.swift): the source icon, the title (double-click to rename),
+    the date, duration, size, status badge and "Audio has been removed" marker, the reason of a failed transcription,
+    then a row with Reveal in Explorer, the Delete menu and the transcription progress or its action. Compact (the
+    wide layout's sidebar) drops the buttons, which stay in the context menu. Selected adds the accent fill and edge.
+    The AI and Summary buttons come with Phase 23.
+-->
+<UserControl
+    x:Class="EchoDiar.App.Views.ConversationCard"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:local="using:EchoDiar.App">
+
+    <Grid Margin="0,5">
+        <Grid.ContextFlyout>
+            <MenuFlyout x:Name="CardMenu">
+                <MenuFlyoutItem x:Name="RenameItem" Text="{local:T Text='Rename'}" />
+                <MenuFlyoutItem x:Name="RevealItem" />
+                <MenuFlyoutSeparator />
+                <MenuFlyoutItem x:Name="MenuDeleteAudioItem" />
+                <MenuFlyoutItem x:Name="MenuDeleteConversationItem" />
+            </MenuFlyout>
+        </Grid.ContextFlyout>
+
+        <Border Style="{StaticResource SolidCard}" CornerRadius="{StaticResource CornerRadiusXLarge}" />
+        <Border
+            x:Name="SelectionFill"
+            Background="{ThemeResource AccentFillColorDefaultBrush}"
+            CornerRadius="{StaticResource CornerRadiusXLarge}"
+            Opacity="0.18"
+            Visibility="Collapsed" />
+
+        <Grid x:Name="ContentGrid" Padding="14,10" ColumnSpacing="12">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="Auto" />
+                <ColumnDefinition Width="*" />
+            </Grid.ColumnDefinitions>
+
+            <!-- Windows keeps only the exe name of the source app: a generic audio glyph, as macOS shows for global recordings. -->
+            <Grid
+                Width="32"
+                Height="32"
+                VerticalAlignment="Top"
+                AutomationProperties.AccessibilityView="Raw">
+                <FontIcon
+                    FontFamily="{ThemeResource SymbolThemeFontFamily}"
+                    FontSize="18"
+                    Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                    Glyph="&#xE8D6;" />
+            </Grid>
+
+            <StackPanel Grid.Column="1" Spacing="4">
+                <Grid>
+                    <TextBlock
+                        x:Name="TitleText"
+                        Style="{StaticResource BodyStrongTextBlockStyle}"
+                        MaxLines="1"
+                        TextTrimming="CharacterEllipsis"
+                        TextWrapping="NoWrap" />
+                    <TextBox
+                        x:Name="TitleBox"
+                        Padding="4,2"
+                        MinHeight="0"
+                        AutomationProperties.Name="{local:T Text='Title'}"
+                        PlaceholderText="{local:T Text='Title'}"
+                        Visibility="Collapsed" />
+                </Grid>
+
+                <StackPanel x:Name="DetailsRow" Orientation="Horizontal" Spacing="8">
+                    <TextBlock
+                        x:Name="DateText"
+                        VerticalAlignment="Center"
+                        Style="{StaticResource CaptionTextBlockStyle}"
+                        Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                    <TextBlock
+                        x:Name="DurationText"
+                        VerticalAlignment="Center"
+                        Style="{StaticResource CaptionTextBlockStyle}"
+                        Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                    <TextBlock
+                        x:Name="SizeText"
+                        VerticalAlignment="Center"
+                        Style="{StaticResource CaptionTextBlockStyle}"
+                        Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                    <Grid x:Name="StatusBadge" VerticalAlignment="Center" Visibility="Collapsed">
+                        <Border x:Name="StatusBadgeFill" CornerRadius="9" Opacity="0.18" />
+                        <TextBlock
+                            x:Name="StatusBadgeText"
+                            Margin="6,1"
+                            FontSize="11"
+                            FontWeight="SemiBold" />
+                    </Grid>
+                    <FontIcon
+                        x:Name="NoAudioIcon"
+                        VerticalAlignment="Center"
+                        FontFamily="{ThemeResource SymbolThemeFontFamily}"
+                        FontSize="12"
+                        Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                        Glyph="&#xE74F;"
+                        Visibility="Collapsed" />
+                </StackPanel>
+
+                <!-- Why the last transcription failed, up to two lines (the full text on hover). -->
+                <TextBlock
+                    x:Name="FailureText"
+                    Style="{StaticResource CaptionTextBlockStyle}"
+                    Foreground="{ThemeResource SystemFillColorCriticalBrush}"
+                    MaxLines="2"
+                    TextTrimming="CharacterEllipsis"
+                    TextWrapping="Wrap"
+                    Visibility="Collapsed" />
+
+                <!-- Reveal and Delete (not compact), then the transcription progress or its action. -->
+                <StackPanel
+                    x:Name="ActionRow"
+                    Margin="0,6,0,0"
+                    Orientation="Horizontal"
+                    Spacing="12">
+                    <StackPanel x:Name="ButtonsPanel" Orientation="Horizontal" Spacing="4">
+                        <Button x:Name="RevealButton" Style="{StaticResource CapsuleButton}">
+                            <FontIcon FontFamily="{ThemeResource SymbolThemeFontFamily}" FontSize="15" Glyph="&#xE8B7;" />
+                        </Button>
+                        <Button
+                            x:Name="DeleteButton"
+                            Style="{StaticResource CapsuleButton}"
+                            AutomationProperties.Name="{local:T Text='Delete'}"
+                            ToolTipService.ToolTip="{local:T Text='Delete the audio or the whole conversation'}">
+                            <StackPanel Orientation="Horizontal" Spacing="3">
+                                <FontIcon FontFamily="{ThemeResource SymbolThemeFontFamily}" FontSize="15" Glyph="&#xE74D;" />
+                                <FontIcon FontFamily="{ThemeResource SymbolThemeFontFamily}" FontSize="8" Glyph="&#xE70D;" />
+                            </StackPanel>
+                            <Button.Flyout>
+                                <MenuFlyout x:Name="DeleteMenu" Placement="BottomEdgeAlignedLeft">
+                                    <MenuFlyoutItem x:Name="DeleteAudioItem" />
+                                    <MenuFlyoutItem x:Name="DeleteConversationItem" />
+                                </MenuFlyout>
+                            </Button.Flyout>
+                        </Button>
+                    </StackPanel>
+
+                    <!-- A job's ring (or a spinner while queued), its step; the percent on hover. -->
+                    <StackPanel
+                        x:Name="ProgressPanel"
+                        VerticalAlignment="Center"
+                        Background="Transparent"
+                        Orientation="Horizontal"
+                        Spacing="6"
+                        Visibility="Collapsed">
+                        <ProgressRing
+                            x:Name="JobRing"
+                            Width="12"
+                            Height="12"
+                            MinWidth="0"
+                            MinHeight="0"
+                            Maximum="1" />
+                        <TextBlock
+                            x:Name="StepText"
+                            VerticalAlignment="Center"
+                            Style="{StaticResource CaptionTextBlockStyle}"
+                            Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                    </StackPanel>
+
+                    <!-- macOS opens Settings > Transcription; Settings comes with Phase 13. -->
+                    <Border
+                        x:Name="NeedsModelBadge"
+                        Height="24"
+                        Padding="8,0"
+                        VerticalAlignment="Center"
+                        Background="{StaticResource PaletteInputSurfaceBrush}"
+                        CornerRadius="12"
+                        ToolTipService.ToolTip="{local:T Text='Download a transcription model in Settings'}"
+                        Visibility="Collapsed">
+                        <TextBlock
+                            VerticalAlignment="Center"
+                            Style="{StaticResource CaptionTextBlockStyle}"
+                            Foreground="{ThemeResource SystemFillColorCautionBrush}"
+                            Text="{local:T Text='Needs model'}" />
+                    </Border>
+
+                    <StackPanel
+                        x:Name="RetryPanel"
+                        VerticalAlignment="Center"
+                        Orientation="Horizontal"
+                        Spacing="2"
+                        Visibility="Collapsed">
+                        <Button
+                            x:Name="RetryButton"
+                            Style="{StaticResource CapsuleButton}"
+                            Height="24"
+                            MinWidth="0"
+                            Background="{StaticResource PaletteInputSurfaceBrush}"
+                            CornerRadius="12"
+                            FontSize="12"
+                            Foreground="{ThemeResource SystemFillColorCriticalBrush}"
+                            Content="{local:T Text='Retry'}" />
+                        <Button
+                            x:Name="RetryEngineButton"
+                            Style="{StaticResource CapsuleButton}"
+                            Height="24"
+                            MinWidth="24"
+                            Padding="4,0"
+                            AutomationProperties.Name="{local:T Text='Retry with another engine'}">
+                            <FontIcon FontFamily="{ThemeResource SymbolThemeFontFamily}" FontSize="8" Glyph="&#xE70D;" />
+                            <Button.Flyout>
+                                <MenuFlyout x:Name="EngineMenu" Placement="BottomEdgeAlignedLeft" />
+                            </Button.Flyout>
+                        </Button>
+                    </StackPanel>
+
+                    <Button
+                        x:Name="TranscribeButton"
+                        Style="{StaticResource CapsuleButton}"
+                        Height="24"
+                        MinWidth="0"
+                        VerticalAlignment="Center"
+                        Background="{StaticResource PaletteInputSurfaceBrush}"
+                        CornerRadius="12"
+                        FontSize="12"
+                        Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                        Content="{local:T Text='Transcribe'}"
+                        Visibility="Collapsed" />
+                </StackPanel>
+            </StackPanel>
+        </Grid>
+
+        <Border
+            x:Name="SelectionStroke"
+            BorderBrush="{ThemeResource AccentFillColorDefaultBrush}"
+            BorderThickness="1.5"
+            CornerRadius="{StaticResource CornerRadiusXLarge}"
+            IsHitTestVisible="False"
+            Visibility="Collapsed" />
+    </Grid>
+</UserControl>
