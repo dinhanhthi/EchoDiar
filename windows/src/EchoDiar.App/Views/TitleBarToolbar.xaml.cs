@@ -211,11 +211,13 @@ public sealed partial class TitleBarToolbar : UserControl
     {
         if (_model is null) return;
         BackButton.Visibility = Shown(_model.Route.Kind != RouteKind.List);
-        // Another page clears the search (macOS MainView.swift); another conversation keeps it, for the sidebar it filters.
+        // Another page clears the search (the model has cleared the term: AppViewModel.Route); another conversation
+        // keeps it, for the sidebar it filters. Typing not applied yet is dropped too.
         var onListPage = _model.Route.Kind == RouteKind.List;
         if (onListPage != _onListPage)
         {
             _onListPage = onListPage;
+            _searchTimer?.Stop();
             CloseSearch();
             SearchBox.Text = "";
         }

@@ -95,7 +95,14 @@ public sealed partial class AppViewModel : ObservableObject
     public Route Route
     {
         get => _route;
-        private set => SetProperty(ref _route, value);
+        private set
+        {
+            // Another page clears the search (macOS MainView.swift), before the route changes: the library lists every
+            // conversation again before the page and the sidebar are shown. Another conversation keeps it, for the
+            // sidebar it filters.
+            if ((value.Kind == RouteKind.List) != (_route.Kind == RouteKind.List)) SearchTerm = "";
+            SetProperty(ref _route, value);
+        }
     }
 
     /// <summary>The conversation page's tab: kept while another conversation opens from the sidebar.</summary>

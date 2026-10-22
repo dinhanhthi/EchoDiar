@@ -94,14 +94,12 @@ public sealed partial class AppViewModel
             .ToList();
         if (stale.Count == 0) return;
         _searchLoading = true;
+        List<(Guid Id, SearchDocument Document)>? loaded = null;
         try
         {
-            var loaded = await Task.Run(() => stale
+            loaded = await Task.Run(() => stale
                 .Select(c => (c.Id, Document: new SearchDocument(c.SizeBytes, c.HasTranscript, c.HasSummary, ReadSearchDocument(c))))
                 .ToList());
-            if (_closing) return;
-            foreach (var (id, document) in loaded) _searchDocuments[id] = document;
-            OnPropertyChanged(nameof(SearchResults));
         }
         catch (Exception e)
         {
@@ -110,6 +108,13 @@ public sealed partial class AppViewModel
         finally
         {
             _searchLoading = false;
+        }
+        if (_closing) return;
+        if (loaded is not null)
+        {
+            foreach (var (id, document) in loaded) _searchDocuments[id] = document;
+            // Outside the try: a failure while the views update is not a read failure, and must not leave them half done.
+            OnPropertyChanged(nameof(SearchResults));
         }
         if (!_searchReloadPending) return;
         _searchReloadPending = false;

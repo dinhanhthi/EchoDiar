@@ -32,11 +32,14 @@ public sealed partial class ConversationListView : UserControl
 
     /// <summary>
     /// Day headers and cards, in list order, each in its own ListViewItem (so a card is never moved between item
-    /// containers). Cards are kept by id and headers by day, so updates keep them.
+    /// containers). Cards are kept by id and headers by day, so updates keep them. Each is kept with its content, never
+    /// read back from the item: WinUI clears a list item's Content when it clears it as the container of another item
+    /// (Selector.ClearContainerForItemOverride, for a recycled item whose link to itself was already undone), so it is
+    /// put back when that happened.
     /// </summary>
     private readonly ObservableCollection<ListViewItem> _items = [];
-    private readonly Dictionary<Guid, ListViewItem> _cards = [];
-    private readonly Dictionary<DateTime, ListViewItem> _headers = [];
+    private readonly Dictionary<Guid, (ListViewItem Item, ConversationCard Card)> _cards = [];
+    private readonly Dictionary<DateTime, (ListViewItem Item, TextBlock Text)> _headers = [];
 
     private readonly ListSelection _selection = new();
     private readonly RecordingCard _card;
@@ -128,15 +131,16 @@ public sealed partial class ConversationListView : UserControl
             {
                 if (!_cards.TryGetValue(conversation.Id, out var row))
                 {
-                    row = new ListViewItem
+                    var card = new ConversationCard(_model, this, conversation);
+                    row = (new ListViewItem
                     {
                         HorizontalContentAlignment = HorizontalAlignment.Stretch,
                         MinHeight = 0,
-                        Content = new ConversationCard(_model, this, conversation),
-                    };
+                        Content = card,
+                    }, card);
                     _cards[conversation.Id] = row;
                 }
-                wanted.Add(row);
+                wanted.Add(row.Item);
                 shown.Add(conversation);
             }
         }
@@ -186,20 +190,22 @@ public sealed partial class ConversationListView : UserControl
     {
         if (!_headers.TryGetValue(day, out var header))
         {
-            header = new ListViewItem
+            var text = new TextBlock { Style = (Style)Resources["DayHeaderText"] };
+            header = (new ListViewItem
             {
                 IsTabStop = false,
                 IsHitTestVisible = false,
                 HorizontalContentAlignment = HorizontalAlignment.Stretch,
                 MinHeight = 0,
-                Content = new TextBlock { Style = (Style)Resources["DayHeaderText"] },
-            };
-            AutomationProperties.SetHeadingLevel(header, AutomationHeadingLevel.Level2);
+                Content = text,
+            }, text);
+            AutomationProperties.SetHeadingLevel(header.Item, AutomationHeadingLevel.Level2);
             _headers[day] = header;
         }
+        if (!ReferenceEquals(header.Item.Content, header.Text)) header.Item.Content = header.Text;
         // Today and Yesterday move on at midnight.
-        RecordingCard.SetText((TextBlock)header.Content, DayTitle(day));
-        return header;
+        RecordingCard.SetText(header.Text, DayTitle(day));
+        return header.Item;
     }
 
     private static string DayTitle(DateTime day)
@@ -246,18 +252,23 @@ public sealed partial class ConversationListView : UserControl
         _card.Selected = _model.Route.Kind == RouteKind.Recording;
         UpdateBanner();
         UpdateCards();
-        if (selectedId is { } id && _cards.TryGetValue(id, out var row) && _items.Contains(row)) ConversationList.ScrollIntoView(row);
+        if (selectedId is { } id && _cards.TryGetValue(id, out var row) && _items.Contains(row.Item)) ConversationList.ScrollIntoView(row.Item);
     }
 
     // Selection
 
-    /// <summary>Each card's state: compact in the sidebar; selected as the open entry, or as part of the selection.</summary>
+    /// <summary>
+    /// Each card's state: compact in the sidebar; selected as the open entry, or as part of the selection. A card WinUI
+    /// took out of its item is put back first (see <see cref="_items"/>).
+    /// </summary>
     private void UpdateCards()
     {
         foreach (var conversation in _shown)
         {
+            if (!_cards.TryGetValue(conversation.Id, out var row)) continue;
+            if (!ReferenceEquals(row.Item.Content, row.Card)) row.Item.Content = row.Card;
             var selected = _selection.IsEmpty ? conversation.Id == _selectedId : _selection.Ids.Contains(conversation.Id);
-            ((ConversationCard)_cards[conversation.Id].Content).Update(conversation, _sidebar, selected);
+            row.Card.Update(conversation, _sidebar, selected);
         }
         UpdateSelectionBar();
     }
