@@ -2,11 +2,12 @@
 <!--
     Settings › Storage (macOS StorageSettingsView.swift), one panel per inner tab picked in the title bar:
     - Usage: disk usage by kind (a bar in the theme's attention, success and caution colours, then Audio, Transcripts
-      and AI, Models and Total), and the data folder with "Open in File Explorer".
-    - Audio: compression bitrate, keep uncompressed audio, playback.
-    Phase 16 adds the Auto-delete tab and the rest of the macOS page: the delete buttons by kind, Largest conversations,
-    Free space and Delete audio after transcription. Each searchable card's Tag is its search entry's title
-    (SearchEntries), so a search result can bring it into view.
+      and AI, Models, each with its Delete button, and Total), the largest conversations, and the data folder with
+      "Open in File Explorer".
+    - Audio: free space (delete the audio of transcribed conversations), delete audio after transcription, compression
+      bitrate, keep uncompressed audio, playback.
+    - Auto-delete: on or off, the age, what is deleted, and what the next run would delete.
+    Each searchable card's Tag is its search entry's title (SearchEntries), so a search result can bring it into view.
 -->
 <UserControl
     x:Class="EchoDiar.App.Views.StorageSettingsPage"
@@ -24,6 +25,36 @@
         <Style x:Key="SizeStyle" TargetType="TextBlock">
             <Setter Property="VerticalAlignment" Value="Center" />
             <Setter Property="Foreground" Value="{ThemeResource TextFillColorSecondaryBrush}" />
+        </Style>
+        <!-- The rows of Largest conversations and of the auto-delete preview, made in code, in theme colours. -->
+        <Style x:Key="TrackStyle" TargetType="Grid">
+            <Setter Property="Height" Value="4" />
+            <Setter Property="CornerRadius" Value="2" />
+            <Setter Property="Background" Value="{ThemeResource ControlStrongFillColorDisabledBrush}" />
+        </Style>
+        <Style x:Key="AudioPartStyle" TargetType="Border">
+            <Setter Property="Background" Value="{ThemeResource SystemFillColorAttentionBrush}" />
+        </Style>
+        <Style x:Key="RestPartStyle" TargetType="Border">
+            <Setter Property="Background" Value="{ThemeResource SystemFillColorSuccessBrush}" />
+        </Style>
+        <Style x:Key="ListTitleStyle" TargetType="TextBlock">
+            <Setter Property="TextTrimming" Value="CharacterEllipsis" />
+            <Setter Property="TextWrapping" Value="NoWrap" />
+        </Style>
+        <Style
+            x:Key="PreviewTitleStyle"
+            BasedOn="{StaticResource ListTitleStyle}"
+            TargetType="TextBlock">
+            <Setter Property="Foreground" Value="{ThemeResource TextFillColorSecondaryBrush}" />
+        </Style>
+        <!-- A usage row's Delete; the Total row keeps its width empty so the sizes line up. -->
+        <Style
+            x:Key="TrashButtonStyle"
+            BasedOn="{StaticResource SubtleButtonStyle}"
+            TargetType="Button">
+            <Setter Property="Width" Value="36" />
+            <Setter Property="Padding" Value="0,6" />
         </Style>
     </UserControl.Resources>
 
@@ -82,7 +113,12 @@
                             <TextBlock Text="{local:T Text='Audio'}" />
                         </StackPanel>
                     </controls:SettingsCard.Header>
-                    <TextBlock x:Name="AudioSizeText" Style="{StaticResource SizeStyle}" />
+                    <StackPanel Orientation="Horizontal" Spacing="8">
+                        <TextBlock x:Name="AudioSizeText" Style="{StaticResource SizeStyle}" />
+                        <Button x:Name="AudioDeleteButton" Style="{StaticResource TrashButtonStyle}">
+                            <FontIcon FontSize="16" Glyph="&#xE74D;" />
+                        </Button>
+                    </StackPanel>
                 </controls:SettingsCard>
 
                 <controls:SettingsCard>
@@ -92,7 +128,12 @@
                             <TextBlock Text="{local:T Text='Transcripts and AI'}" />
                         </StackPanel>
                     </controls:SettingsCard.Header>
-                    <TextBlock x:Name="TranscriptsSizeText" Style="{StaticResource SizeStyle}" />
+                    <StackPanel Orientation="Horizontal" Spacing="8">
+                        <TextBlock x:Name="TranscriptsSizeText" Style="{StaticResource SizeStyle}" />
+                        <Button x:Name="TranscriptsDeleteButton" Style="{StaticResource TrashButtonStyle}">
+                            <FontIcon FontSize="16" Glyph="&#xE74D;" />
+                        </Button>
+                    </StackPanel>
                 </controls:SettingsCard>
 
                 <controls:SettingsCard>
@@ -102,18 +143,37 @@
                             <TextBlock Text="{local:T Text='Models'}" />
                         </StackPanel>
                     </controls:SettingsCard.Header>
-                    <TextBlock x:Name="ModelsSizeText" Style="{StaticResource SizeStyle}" />
+                    <StackPanel Orientation="Horizontal" Spacing="8">
+                        <TextBlock x:Name="ModelsSizeText" Style="{StaticResource SizeStyle}" />
+                        <Button x:Name="ModelsDeleteButton" Style="{StaticResource TrashButtonStyle}">
+                            <FontIcon FontSize="16" Glyph="&#xE74D;" />
+                        </Button>
+                    </StackPanel>
                 </controls:SettingsCard>
 
                 <controls:SettingsCard Tag="Total">
                     <controls:SettingsCard.Header>
                         <TextBlock Style="{StaticResource BodyStrongTextBlockStyle}" Text="{local:T Text='Total'}" />
                     </controls:SettingsCard.Header>
-                    <TextBlock
-                        x:Name="TotalSizeText"
-                        VerticalAlignment="Center"
-                        Style="{StaticResource BodyStrongTextBlockStyle}" />
+                    <StackPanel Orientation="Horizontal" Spacing="8">
+                        <TextBlock
+                            x:Name="TotalSizeText"
+                            VerticalAlignment="Center"
+                            Style="{StaticResource BodyStrongTextBlockStyle}" />
+                        <Border Width="36" />
+                    </StackPanel>
                 </controls:SettingsCard>
+
+                <!-- Rows made in code (ShowLargest): the title and size over a bar of its share of the largest, and Delete. -->
+                <Expander
+                    x:Name="LargestExpander"
+                    HorizontalAlignment="Stretch"
+                    HorizontalContentAlignment="Stretch"
+                    Header="{local:T Text='Largest conversations'}"
+                    Tag="Largest conversations"
+                    Visibility="Collapsed">
+                    <StackPanel x:Name="LargestList" Spacing="12" />
+                </Expander>
 
                 <controls:SettingsCard
                     Margin="0,24,0,0"
@@ -137,6 +197,20 @@
                 x:Name="AudioPanel"
                 Spacing="4"
                 Visibility="Collapsed">
+
+                <controls:SettingsCard
+                    Description="{local:T Text='Transcripts, summaries and chats stay; playback and re-transcribing are no longer possible.'}"
+                    Header="{local:T Text='Free space'}"
+                    Tag="Free space">
+                    <Button x:Name="FreeSpaceButton" Content="{local:T Text='Delete audio of transcribed conversations…'}" />
+                </controls:SettingsCard>
+
+                <controls:SettingsCard
+                    Description="{local:T Text='Moves the audio to the Recycle Bin once a transcription succeeds.'}"
+                    Header="{local:T Text='Delete audio after transcription'}"
+                    Tag="Delete audio after transcription">
+                    <ToggleSwitch x:Name="DeleteAfterToggle" AutomationProperties.Name="{local:T Text='Delete audio after transcription'}" />
+                </controls:SettingsCard>
 
                 <controls:SettingsCard
                     Header="{local:T Text='Compression bitrate'}"
@@ -167,6 +241,61 @@
                         <ComboBoxItem Content="{local:T Text='My voice left, others right'}" />
                     </ComboBox>
                 </controls:SettingsCard>
+            </StackPanel>
+
+            <!-- Auto-delete -->
+            <StackPanel
+                x:Name="AutoDeletePanel"
+                Spacing="4"
+                Visibility="Collapsed">
+
+                <!-- Description in code: not through Loc. -->
+                <controls:SettingsCard
+                    x:Name="AutoDeleteCard"
+                    Header="{local:T Text='Auto-delete old conversations'}"
+                    Tag="Auto-delete old conversations">
+                    <ToggleSwitch x:Name="AutoDeleteToggle" AutomationProperties.Name="{local:T Text='Auto-delete old conversations'}" />
+                </controls:SettingsCard>
+
+                <controls:SettingsCard Header="{local:T Text='Older than'}">
+                    <StackPanel Orientation="Horizontal" Spacing="8">
+                        <NumberBox
+                            x:Name="DaysBox"
+                            MinWidth="120"
+                            AutomationProperties.Name="{local:T Text='Older than'}"
+                            SpinButtonPlacementMode="Inline"
+                            SmallChange="1"
+                            LargeChange="30" />
+                        <TextBlock VerticalAlignment="Center" Text="{local:T Text='days'}" />
+                    </StackPanel>
+                </controls:SettingsCard>
+
+                <controls:SettingsCard Header="{local:T Text='Delete'}">
+                    <ComboBox
+                        x:Name="ModeCombo"
+                        MinWidth="200"
+                        AutomationProperties.Name="{local:T Text='Delete'}">
+                        <ComboBoxItem Content="{local:T Text='Audio only (keep transcript, summary and chat)'}" />
+                        <ComboBoxItem Content="{local:T Text='Whole conversation'}" />
+                    </ComboBox>
+                </controls:SettingsCard>
+
+                <TextBlock
+                    x:Name="NothingMatchesText"
+                    Margin="16,8,16,0"
+                    Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                    Style="{StaticResource CaptionTextBlockStyle}"
+                    Text="{local:T Text='Nothing matches now.'}"
+                    Visibility="Collapsed" />
+
+                <!-- "Next run: …" or "Would delete now: …" with the titles, set in code (ShowPreview). -->
+                <Expander
+                    x:Name="PreviewExpander"
+                    HorizontalAlignment="Stretch"
+                    HorizontalContentAlignment="Stretch"
+                    Visibility="Collapsed">
+                    <StackPanel x:Name="PreviewList" Spacing="8" />
+                </Expander>
             </StackPanel>
         </Grid>
     </ScrollViewer>

@@ -137,6 +137,34 @@ public sealed partial class SettingsViewModel : ObservableObject
         set => Update(s => s with { KeepUncompressedAudio = value });
     }
 
+    /// <summary>"Delete audio after transcription": the audio goes to the Recycle Bin once a transcription succeeds.</summary>
+    public bool DeleteAudioAfterTranscription
+    {
+        get => Settings.DeleteAudioAfterTranscription;
+        set => Update(s => s with { DeleteAudioAfterTranscription = value });
+    }
+
+    /// <summary>"Auto-delete old conversations": its schedule starts or stops at once.</summary>
+    public bool AutoDeleteEnabled
+    {
+        get => Settings.AutoDeleteEnabled;
+        set => Update(s => s with { AutoDeleteEnabled = value });
+    }
+
+    /// <summary>Auto-delete's "Older than" in days.</summary>
+    public int AutoDeleteAfterDays
+    {
+        get => Settings.AutoDeleteAfterDays;
+        set => Update(s => s with { AutoDeleteAfterDays = value });
+    }
+
+    /// <summary>Auto-delete's "Delete": the audio only or the whole conversation.</summary>
+    public RetentionMode AutoDeleteMode
+    {
+        get => Settings.AutoDeleteMode;
+        set => Update(s => s with { AutoDeleteMode = value });
+    }
+
     /// <summary>"Show floating indicator while recording".</summary>
     public bool ShowPill
     {

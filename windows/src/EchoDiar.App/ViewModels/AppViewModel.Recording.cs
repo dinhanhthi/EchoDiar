@@ -153,8 +153,9 @@ public sealed partial class AppViewModel
 
     /// <summary>
     /// The post-stop sequence for one folder (macOS AppModel <c>finishRecording</c>). A recording auto-transcribed now
-    /// (usable, not transcribed yet, its CAF has frames) is transcribed from the CAF first, then compressed; otherwise it
-    /// is compressed first, then transcribed when "Transcribe automatically" is on.
+    /// (usable, not transcribed yet, its CAF has frames) is transcribed from the CAF first; then its audio goes to the
+    /// Recycle Bin (success with "Delete audio after transcription") or is compressed. Otherwise it is compressed first,
+    /// then transcribed when "Transcribe automatically" is on.
     /// </summary>
     private async Task CompressAndTranscribeAsync(string folder, RecordingSession? session)
     {
@@ -165,10 +166,11 @@ public sealed partial class AppViewModel
         {
             var autoTranscribe = Settings.AutoTranscribe;
             if (session is not null && await Task.Run(() => TranscribesFirst(folder, session, autoTranscribe))
-                && SubmitTranscription(folder, session) is { } job)
+                && SubmitTranscription(folder, session, deleteAudioAfter: false) is { } job)
             {
-                await job;
-                await CompressAsync(folder);
+                var succeeded = await job;
+                if (succeeded && !_closing && Settings.DeleteAudioAfterTranscription) await DeleteAudioAsync(session.Id);
+                else await CompressAsync(folder);
                 return;
             }
             if (await CompressAsync(folder) is { } result) await TranscribeAfterAsync(result);

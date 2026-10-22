@@ -251,7 +251,9 @@ public sealed partial class AppViewModel : ObservableObject
         StartupTrace.Write($"end library load ({list.Count} conversations)");
         await RefreshInstalledModelsAsync();
         StartupTrace.Write($"installed models: {InstalledModelIds.Count}");
-        _ = CompressLeftoversAsync();
+        _launchScan = CompressLeftoversAsync();
+        // Auto-delete's launch run waits for the scan (RunRetentionAsync).
+        SyncRetention();
     }
 
     private async Task LoadAndRecoverAsync()
@@ -279,6 +281,8 @@ public sealed partial class AppViewModel : ObservableObject
     {
         _closing = true;
         _pollTimer.Stop();
+        // A run under way asks before each deletion, and is told every conversation is busy now.
+        _retention?.Stop();
         foreach (var token in _downloadTokens.Values) token.Cancel();
         // Queued compressions never start; one under way is cut off by the exit and redone at the next launch.
         _compressionCancel.Cancel();
@@ -613,9 +617,11 @@ public sealed partial class AppViewModel : ObservableObject
     /// Queues a job with <paramref name="engineId"/>, else the default engine when it is installed and handles the
     /// recording's first language (else the pipeline's default resolution), and the speaker settings;
     /// <paramref name="language"/> replaces the recording's language markers. A failed or probe recording is never
-    /// transcribed. Returns the job, null when none was queued.
+    /// transcribed. <paramref name="deleteAudioAfter"/> null = "Delete audio after transcription", read when the job
+    /// succeeds (macOS <c>submitTranscription</c>). Returns the job (true when it succeeded), null when none was queued.
     /// </summary>
-    private Task? SubmitTranscription(string folder, RecordingSession session, string? engineId = null, string? language = null)
+    private Task<bool>? SubmitTranscription(
+        string folder, RecordingSession session, string? engineId = null, string? language = null, bool? deleteAudioAfter = null)
     {
         var id = session.Id;
         if (_closing || session.Probe || session.State == SessionState.Failed || HasJob(id)) return null;
@@ -635,19 +641,26 @@ public sealed partial class AppViewModel : ObservableObject
         TranscriptionErrors = Without(TranscriptionErrors, id);
         // Set now so the screens show the job before the pipeline's first event arrives.
         TranscriptionProgress = With(TranscriptionProgress, id, new JobProgress(id, JobStep.Queued, 0));
-        return RunTranscriptionAsync(job);
+        return RunTranscriptionAsync(job, deleteAudioAfter);
     }
 
-    private async Task RunTranscriptionAsync(TranscriptionJob job)
+    /// <summary>True when the job succeeded; its audio then goes to the Recycle Bin when asked, before the reload.</summary>
+    private async Task<bool> RunTranscriptionAsync(TranscriptionJob job, bool? deleteAudioAfter)
     {
+        var succeeded = false;
         try
         {
             await Task.Run(() => _services.Pipeline.TranscribeAsync(job));
+            succeeded = true;
         }
         catch (Exception e)
         {
             // The pipeline's Failed or NeedsModel event carries it to the screens.
             Debug.WriteLine($"EchoDiar: transcription failed for {job.Folder}: {e}");
+        }
+        if (succeeded && !_closing && (deleteAudioAfter ?? Settings.DeleteAudioAfterTranscription))
+        {
+            await DeleteAudioAsync(job.ConversationID);
         }
         try
         {
@@ -657,6 +670,7 @@ public sealed partial class AppViewModel : ObservableObject
         {
             Debug.WriteLine($"EchoDiar: could not reload {job.Folder}: {e}");
         }
+        return succeeded;
     }
 
     /// <summary>The default ASR model from the settings when it is installed and handles <paramref name="language"/>; else null.</summary>

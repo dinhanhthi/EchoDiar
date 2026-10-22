@@ -88,12 +88,15 @@ public sealed partial class AppViewModel
 
     /// <summary>
     /// Applies <paramref name="settings"/> at once (the screens and the next recording read them) and saves them 300 ms
-    /// after the last change, through the same ordered writes as every other settings change.
+    /// after the last change, through the same ordered writes as every other settings change. Turning auto-delete on or
+    /// off starts or stops its schedule at once (macOS <c>updateSettings</c>).
     /// </summary>
     internal void ApplySettings(AppSettings settings)
     {
         if (_closing || settings == Settings) return;
+        var retentionChanged = settings.AutoDeleteEnabled != Settings.AutoDeleteEnabled;
         Settings = settings;
+        if (retentionChanged) SyncRetention();
         if (_settingsSaveTimer is null)
         {
             _settingsSaveTimer = _dispatcher.CreateTimer();

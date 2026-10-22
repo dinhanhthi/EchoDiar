@@ -24,8 +24,8 @@ namespace EchoDiar.App.Views;
 /// tabs (a SelectorBar); on Settings the section's inner tabs after Record; Settings (opens the Settings page, or goes
 /// back from it) and Search everywhere, an icon button that opens the box where the box does not fit. Update and Ask across conversations stay
 /// collapsed until Phases 27 and 26. It also hosts the window's dialogs (it lives as long as the window): the delete
-/// confirmations (of this conversation, and of the library's cards and selection), "Recording problem" and the
-/// lost-mic prompt, one at a time.
+/// confirmations (of this conversation, and of the library's cards and selection), "Recording problem", the
+/// lost-mic prompt and the Settings pages' confirmations (<see cref="AppViewModel.Confirm"/>), one at a time.
 /// </summary>
 public sealed partial class TitleBarToolbar : UserControl
 {
@@ -128,6 +128,9 @@ public sealed partial class TitleBarToolbar : UserControl
         _model = model;
         model.PropertyChanged += OnModelChanged;
         model.MicRouteLostAsk += OnMicRouteLostAsk;
+        // Settings pages ask through here too, so the window never has two dialogs.
+        model.Confirm = ConfirmAsync;
+        model.DeleteFlow = DeleteAsync;
         _blinkTimer = DispatcherQueue.CreateTimer();
         _blinkTimer.Interval = BlinkInterval;
         _blinkTimer.Tick += (_, _) => Blink();
@@ -148,6 +151,8 @@ public sealed partial class TitleBarToolbar : UserControl
         if (_model is null) return;
         _model.PropertyChanged -= OnModelChanged;
         _model.MicRouteLostAsk -= OnMicRouteLostAsk;
+        _model.Confirm = null;
+        _model.DeleteFlow = null;
         _model = null;
         _blinkTimer?.Stop();
         _blinkTimer = null;
@@ -485,6 +490,22 @@ public sealed partial class TitleBarToolbar : UserControl
                 : Loc.T("The recordings and their files are moved to the Recycle Bin.");
         var dialog = NewDialog(title, body);
         dialog.PrimaryButtonText = Loc.T("Delete");
+        dialog.CloseButtonText = Loc.T("Cancel");
+        dialog.DefaultButton = ContentDialogButton.Close;
+        var confirmed = false;
+        await ShowAsync(dialog, result => confirmed = result == ContentDialogResult.Primary);
+        return confirmed;
+    }
+
+    /// <summary>
+    /// A confirmation for a page without a window of its own (Settings › Storage): the confirming button and Cancel,
+    /// Cancel the default. False when cancelled, when another dialog is open, or when the window closed meanwhile.
+    /// </summary>
+    private async Task<bool> ConfirmAsync(string title, string message, string confirm)
+    {
+        if (_model is null || _dialog is not null || XamlRoot is null) return false;
+        var dialog = NewDialog(title, message);
+        dialog.PrimaryButtonText = confirm;
         dialog.CloseButtonText = Loc.T("Cancel");
         dialog.DefaultButton = ContentDialogButton.Close;
         var confirmed = false;
