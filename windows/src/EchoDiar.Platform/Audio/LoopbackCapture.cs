@@ -1,3 +1,4 @@
+using EchoDiar.Core.Audio;
 using Windows.Win32;
 using Windows.Win32.Media.Audio;
 using Windows.Win32.System.Com;
@@ -10,33 +11,42 @@ namespace EchoDiar.Platform.Audio;
 /// Captures what apps play, downmixed to mono Float32: one process tree, everything except one
 /// process tree (both process loopback, 48 kHz), or the whole default render endpoint.
 /// </summary>
-public sealed class LoopbackCapture : IDisposable
+public sealed class LoopbackCapture : ICaptureSource
 {
     private static readonly TimeSpan ActivationTimeout = TimeSpan.FromSeconds(5);
 
     private readonly CaptureLoop _loop;
+    private string _name;
 
-    private LoopbackCapture(string name, Func<IAudioClient> activate, Func<IAudioClient, CaptureFormat> initialize)
+    private LoopbackCapture(
+        string threadName, string name, Func<LoopbackCapture, IAudioClient> activate, Func<IAudioClient, CaptureFormat> initialize)
     {
-        _loop = new CaptureLoop(name, activate, initialize);
+        _name = name;
+        _loop = new CaptureLoop(threadName, () => activate(this), initialize);
     }
 
     /// <summary>Audio played by <paramref name="pid"/> and its child processes.</summary>
-    public static LoopbackCapture ForProcessTree(int pid) =>
-        ProcessLoopback(pid, PROCESS_LOOPBACK_MODE.PROCESS_LOOPBACK_MODE_INCLUDE_TARGET_PROCESS_TREE);
+    /// <param name="name">The app's display name (the group's name) for <see cref="Name"/>; null gives "Process &lt;pid&gt;".</param>
+    public static LoopbackCapture ForProcessTree(int pid, string? name = null) =>
+        ProcessLoopback(pid, name ?? $"Process {pid}", PROCESS_LOOPBACK_MODE.PROCESS_LOOPBACK_MODE_INCLUDE_TARGET_PROCESS_TREE);
 
     /// <summary>All system audio except what <paramref name="ownPid"/> and its child processes play.</summary>
     public static LoopbackCapture AllExcept(int ownPid) =>
-        ProcessLoopback(ownPid, PROCESS_LOOPBACK_MODE.PROCESS_LOOPBACK_MODE_EXCLUDE_TARGET_PROCESS_TREE);
+        ProcessLoopback(ownPid, "All system audio", PROCESS_LOOPBACK_MODE.PROCESS_LOOPBACK_MODE_EXCLUDE_TARGET_PROCESS_TREE);
 
     /// <summary>
     /// Classic loopback of the default render endpoint at its mix format: the fallback when process
-    /// loopback fails. It also captures EchoDiar's own playback.
+    /// loopback fails. It also captures EchoDiar's own playback. <see cref="Name"/> is the endpoint's friendly name.
     /// </summary>
     public static LoopbackCapture Endpoint() => new(
         "EchoDiar endpoint loopback",
-        () => CaptureLoop.ActivateEndpoint(null, EDataFlow.eRender),
+        "System audio",
+        capture => CaptureLoop.ActivateEndpoint(null, EDataFlow.eRender, name => capture._name = name),
         client => CaptureLoop.InitializeWithMixFormat(client, PInvoke.AUDCLNT_STREAMFLAGS_LOOPBACK));
+
+    /// <summary>What is captured: "All system audio", the app's name, or the render endpoint's friendly name
+    /// (known once <see cref="Start"/> returns).</summary>
+    public string Name => _name;
 
     /// <inheritdoc cref="CaptureLoop.Failed"/>
     public event Action<Exception>? Failed
@@ -55,9 +65,10 @@ public sealed class LoopbackCapture : IDisposable
 
     public void Dispose() => _loop.Dispose();
 
-    private static LoopbackCapture ProcessLoopback(int pid, PROCESS_LOOPBACK_MODE mode) => new(
+    private static LoopbackCapture ProcessLoopback(int pid, string name, PROCESS_LOOPBACK_MODE mode) => new(
         "EchoDiar process loopback",
-        () => ActivateProcessLoopback(pid, mode),
+        name,
+        _ => ActivateProcessLoopback(pid, mode),
         // Process loopback has no mix format (GetMixFormat fails): ask for 48 kHz Float32 stereo.
         client => CaptureLoop.InitializeFloat48kStereo(
             client,

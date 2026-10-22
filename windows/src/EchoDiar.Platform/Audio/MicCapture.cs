@@ -2,6 +2,7 @@ using System.ComponentModel;
 using System.Diagnostics;
 using System.Runtime.ExceptionServices;
 using System.Runtime.InteropServices;
+using EchoDiar.Core.Audio;
 using Microsoft.Win32.SafeHandles;
 using Windows.Win32;
 using Windows.Win32.Foundation;
@@ -9,6 +10,9 @@ using Windows.Win32.Media.Audio;
 using Windows.Win32.Media.KernelStreaming;
 using Windows.Win32.Media.Multimedia;
 using Windows.Win32.System.Com;
+using Windows.Win32.System.Com.StructuredStorage;
+using Windows.Win32.System.Variant;
+using Windows.Win32.UI.Shell.PropertiesSystem;
 
 namespace EchoDiar.Platform.Audio;
 
@@ -16,15 +20,16 @@ namespace EchoDiar.Platform.Audio;
 /// Captures a microphone (the default capture endpoint, or the one with <c>endpointId</c>) in WASAPI
 /// shared, event-driven mode at the device mix format, downmixed to mono Float32.
 /// </summary>
-public sealed class MicCapture : IDisposable
+public sealed class MicCapture : ICaptureSource
 {
     private readonly CaptureLoop _loop;
+    private string _name = "Microphone";
 
     public MicCapture(string? endpointId = null)
     {
         _loop = new CaptureLoop(
             "EchoDiar mic capture",
-            () => CaptureLoop.ActivateEndpoint(endpointId, EDataFlow.eCapture),
+            () => CaptureLoop.ActivateEndpoint(endpointId, EDataFlow.eCapture, name => _name = name),
             client => CaptureLoop.InitializeWithMixFormat(client, 0),
             client => CaptureLoop.InitializeFloat48kStereo(
                 client,
@@ -37,6 +42,9 @@ public sealed class MicCapture : IDisposable
         add => _loop.Failed += value;
         remove => _loop.Failed -= value;
     }
+
+    /// <summary>The endpoint's friendly name, known once <see cref="Start"/> returns; "Microphone" before or without one.</summary>
+    public string Name => _name;
 
     /// <summary>The device rate in Hz, known once <see cref="Start"/> returns.</summary>
     public int SampleRate => _loop.SampleRate;
@@ -171,7 +179,8 @@ internal sealed class CaptureLoop : IDisposable
         _disposed = true;
     }
 
-    internal static IAudioClient ActivateEndpoint(string? endpointId, EDataFlow flow)
+    /// <param name="onName">Gets the endpoint's friendly name, when it has one, before the client is activated.</param>
+    internal static IAudioClient ActivateEndpoint(string? endpointId, EDataFlow flow, Action<string>? onName = null)
     {
         var enumerator = (IMMDeviceEnumerator)new MMDeviceEnumerator();
         IMMDevice? device = null;
@@ -179,6 +188,7 @@ internal sealed class CaptureLoop : IDisposable
         {
             if (endpointId is null) enumerator.GetDefaultAudioEndpoint(flow, ERole.eConsole, out device);
             else enumerator.GetDevice(endpointId, out device);
+            if (onName is not null && FriendlyName(device) is { } name) onName(name);
             device.Activate(typeof(IAudioClient).GUID, CLSCTX.CLSCTX_ALL, null, out var client);
             return (IAudioClient)client;
         }
@@ -186,6 +196,29 @@ internal sealed class CaptureLoop : IDisposable
         {
             if (device is not null) Marshal.FinalReleaseComObject(device);
             Marshal.FinalReleaseComObject(enumerator);
+        }
+    }
+
+    /// <summary>The endpoint's display name (PKEY_Device_FriendlyName), or null when it cannot be read.</summary>
+    private static unsafe string? FriendlyName(IMMDevice device)
+    {
+        IPropertyStore? store = null;
+        var value = default(PROPVARIANT);
+        try
+        {
+            device.OpenPropertyStore(STGM.STGM_READ, out store);
+            var key = PInvoke.PKEY_Device_FriendlyName;
+            store.GetValue(&key, out value);
+            return value.vt == VARENUM.VT_LPWSTR && value.pwszVal.Value != null ? value.pwszVal.ToString() : null;
+        }
+        catch (COMException)
+        {
+            return null;
+        }
+        finally
+        {
+            PInvoke.PropVariantClear(ref value);
+            if (store is not null) Marshal.FinalReleaseComObject(store);
         }
     }
 
