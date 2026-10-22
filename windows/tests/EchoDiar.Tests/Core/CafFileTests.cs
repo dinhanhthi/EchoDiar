@@ -9,6 +9,10 @@ public sealed class CafFileTests : IDisposable
     // Byte offsets fixed by the writer's layout: caff header (8), desc chunk header (12) + body (32), data chunk header (12).
     private const int DescFlagsOffset = 32;
     private const int DataSizeOffset = 56;
+    private const int DescSizeOffset = 12;
+    private const int SampleRateOffset = 20;
+    private const int BytesPerPacketOffset = 36;
+    private const int ChannelsOffset = 44;
 
     private readonly string _dir = Path.Combine(Path.GetTempPath(), "EchoDiarTests-" + Guid.NewGuid().ToString("N"));
 
@@ -77,5 +81,39 @@ public sealed class CafFileTests : IDisposable
         using var reader = new CafFile.Reader(copy);
         Assert.Equal(9, reader.Frames);
         Assert.Equal(18, reader.Read(0, 100).Length);
+    }
+
+    [Theory]
+    [InlineData("overflowing channels")]
+    [InlineData("truncated desc")]
+    [InlineData("huge chunk size")]
+    [InlineData("NaN sample rate")]
+    public void MalformedHeaderThrowsInvalidData(string defect)
+    {
+        var path = Path.Combine(_dir, "audio.caf");
+        using (var writer = new CafFile.Writer(path, 16000, 2, CafFile.SampleFormat.Int16))
+        {
+            writer.Append(new short[8]);
+        }
+        var bytes = File.ReadAllBytes(path);
+        switch (defect)
+        {
+            case "overflowing channels":
+                BinaryPrimitives.WriteUInt32BigEndian(bytes.AsSpan(ChannelsOffset), 0x80000000);
+                BinaryPrimitives.WriteUInt32BigEndian(bytes.AsSpan(BytesPerPacketOffset), 0);
+                break;
+            case "truncated desc":
+                bytes = bytes[..(SampleRateOffset + 10)];
+                break;
+            case "huge chunk size":
+                BinaryPrimitives.WriteInt64BigEndian(bytes.AsSpan(DescSizeOffset), long.MaxValue);
+                break;
+            case "NaN sample rate":
+                BinaryPrimitives.WriteDoubleBigEndian(bytes.AsSpan(SampleRateOffset), double.NaN);
+                break;
+        }
+        File.WriteAllBytes(path, bytes);
+
+        Assert.Throws<InvalidDataException>(() => new CafFile.Reader(path));
     }
 }

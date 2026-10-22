@@ -21,6 +21,10 @@ public static class CafFile
     private const int DescSize = 32;
     private const int EditCountSize = 4;
 
+    // Sanity caps for hostile headers: keep frame sizes and sample rates in a range the math below can't overflow.
+    private const uint MaxChannels = 64;
+    private const double MaxSampleRate = 768_000;
+
     private static int BytesPerSample(SampleFormat format) => format == SampleFormat.Int16 ? 2 : 4;
 
     /// <summary>
@@ -136,6 +140,9 @@ public static class CafFile
         private readonly long _dataOffset;
         private readonly int _bytesPerFrame;
 
+        // Largest frame count one Read returns, so the buffer size can't overflow.
+        private const int MaxReadFrames = 1 << 20;
+
         public double SampleRate { get; }
         public int Channels { get; }
         public SampleFormat Format { get; }
@@ -151,6 +158,7 @@ public static class CafFile
             try
             {
                 var length = _stream.Length;
+                if (length < FileHeaderSize) throw new InvalidDataException("Not a CAF file.");
                 Span<byte> buffer = stackalloc byte[DescSize];
                 _stream.ReadExactly(buffer[..FileHeaderSize]);
                 if (!IsTag(buffer, "caff")) throw new InvalidDataException("Not a CAF file.");
@@ -162,13 +170,7 @@ public static class CafFile
                     _stream.ReadExactly(buffer[..ChunkHeaderSize]);
                     var size = BinaryPrimitives.ReadInt64BigEndian(buffer[4..]);
                     var bodyStart = _stream.Position;
-                    if (IsTag(buffer, "desc"))
-                    {
-                        _stream.ReadExactly(buffer[..DescSize]);
-                        (SampleRate, Channels, Format) = ParseDesc(buffer);
-                        haveDesc = true;
-                    }
-                    else if (IsTag(buffer, "data"))
+                    if (IsTag(buffer, "data"))
                     {
                         _dataOffset = bodyStart + EditCountSize;
                         var available = Math.Max(0, length - _dataOffset);
@@ -176,6 +178,14 @@ public static class CafFile
                         break;
                     }
                     if (size < 0) throw new InvalidDataException("Only the data chunk may have an unknown size.");
+                    if (size > length - bodyStart) throw new InvalidDataException("CAF chunk runs past the end of the file.");
+                    if (IsTag(buffer, "desc"))
+                    {
+                        if (size < DescSize) throw new InvalidDataException("CAF desc chunk is too short.");
+                        _stream.ReadExactly(buffer[..DescSize]);
+                        (SampleRate, Channels, Format) = ParseDesc(buffer);
+                        haveDesc = true;
+                    }
                     _stream.Position = bodyStart + size;
                 }
 
@@ -184,6 +194,11 @@ public static class CafFile
                 _bytesPerFrame = Channels * BytesPerSample(Format);
                 Frames = dataBytes / _bytesPerFrame;
             }
+            catch (EndOfStreamException e)
+            {
+                _stream.Dispose();
+                throw new InvalidDataException("CAF file is truncated.", e);
+            }
             catch
             {
                 _stream.Dispose();
@@ -191,12 +206,13 @@ public static class CafFile
             }
         }
 
-        /// <summary>Reads up to <paramref name="count"/> frames from <paramref name="startFrame"/> as interleaved floats (Int16 scaled by 1/32768).</summary>
+        /// <summary>Reads up to <paramref name="count"/> frames (at most 2^20 per call) from <paramref name="startFrame"/> as interleaved floats (Int16 scaled by 1/32768).</summary>
         public float[] Read(long startFrame, int count)
         {
             ArgumentOutOfRangeException.ThrowIfNegative(startFrame);
             ArgumentOutOfRangeException.ThrowIfNegative(count);
-            var frames = (int)Math.Clamp(Frames - startFrame, 0, count);
+            var frames = (int)Math.Clamp(Frames - startFrame, 0, Math.Min(count, MaxReadFrames));
+            if (frames == 0) return [];
             var bytes = new byte[frames * _bytesPerFrame];
             _stream.Position = _dataOffset + startFrame * _bytesPerFrame;
             _stream.ReadExactly(bytes);
@@ -228,8 +244,13 @@ public static class CafFile
                 (FlagIsLittleEndian | FlagIsFloat, 32) => SampleFormat.Float32,
                 _ => null,
             };
-            if (!IsTag(desc[8..], "lpcm") || format is null || framesPerPacket != 1 || channels == 0
-                || bytesPerPacket != channels * (bits / 8))
+            if (!double.IsFinite(sampleRate) || sampleRate <= 0 || sampleRate > MaxSampleRate)
+            {
+                throw new InvalidDataException("CAF sample rate is out of range.");
+            }
+            if (channels == 0 || channels > MaxChannels) throw new InvalidDataException("CAF channel count is out of range.");
+            if (!IsTag(desc[8..], "lpcm") || format is null || framesPerPacket != 1
+                || bytesPerPacket != (long)channels * (bits / 8))
             {
                 throw new NotSupportedException("Only interleaved little-endian Int16 or Float32 linear PCM CAF files are supported.");
             }
