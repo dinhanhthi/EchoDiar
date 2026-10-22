@@ -1,0 +1,295 @@
+using System.ComponentModel;
+using System.Diagnostics;
+using System.Runtime.ExceptionServices;
+using System.Runtime.InteropServices;
+using Microsoft.Win32.SafeHandles;
+using Windows.Win32;
+using Windows.Win32.Foundation;
+using Windows.Win32.Media.Audio;
+using Windows.Win32.Media.KernelStreaming;
+using Windows.Win32.Media.Multimedia;
+using Windows.Win32.System.Com;
+
+namespace EchoDiar.Platform.Audio;
+
+/// <summary>
+/// Captures a microphone (the default capture endpoint, or the one with <c>endpointId</c>) in WASAPI
+/// shared, event-driven mode at the device mix format, downmixed to mono Float32.
+/// </summary>
+public sealed class MicCapture : IDisposable
+{
+    private readonly CaptureLoop _loop;
+
+    public MicCapture(string? endpointId = null)
+    {
+        _loop = new CaptureLoop(
+            "EchoDiar mic capture",
+            () => CaptureLoop.ActivateEndpoint(endpointId, EDataFlow.eCapture),
+            client => CaptureLoop.InitializeWithMixFormat(client, 0));
+    }
+
+    /// <inheritdoc cref="CaptureLoop.Failed"/>
+    public event Action<Exception>? Failed
+    {
+        add => _loop.Failed += value;
+        remove => _loop.Failed -= value;
+    }
+
+    /// <summary>The device rate in Hz, known once <see cref="Start"/> returns.</summary>
+    public int SampleRate => _loop.SampleRate;
+
+    /// <inheritdoc cref="CaptureLoop.Start"/>
+    public void Start(Action<ReadOnlySpan<float>, long, int> onSamples) => _loop.Start(onSamples);
+
+    public void Stop() => _loop.Stop();
+
+    public void Dispose() => _loop.Dispose();
+}
+
+/// <summary>A stream format the capture loop can downmix: Float32, or 16/24/32-bit integer PCM.</summary>
+internal readonly record struct CaptureFormat(int SampleRate, int Channels, bool IsFloat, int BytesPerSample)
+{
+    public static unsafe CaptureFormat From(WAVEFORMATEX* format)
+    {
+        var isFloat = format->wFormatTag == PInvoke.WAVE_FORMAT_IEEE_FLOAT;
+        var isPcm = format->wFormatTag == PInvoke.WAVE_FORMAT_PCM;
+        if (format->wFormatTag == PInvoke.WAVE_FORMAT_EXTENSIBLE)
+        {
+            var subFormat = ((WAVEFORMATEXTENSIBLE*)format)->SubFormat;
+            isFloat = subFormat == typeof(KSDATAFORMAT_SUBTYPE_IEEE_FLOAT).GUID;
+            isPcm = subFormat == typeof(KSDATAFORMAT_SUBTYPE_PCM).GUID;
+        }
+
+        // wBitsPerSample is the container size: 32 for 24-bit samples left-justified in 32 bits.
+        var bytes = format->wBitsPerSample / 8;
+        var supported = (isFloat && bytes == 4) || (isPcm && bytes is 2 or 3 or 4);
+        if (!supported || format->nChannels == 0)
+        {
+            throw new NotSupportedException(
+                $"Unsupported capture format: tag {format->wFormatTag}, {format->wBitsPerSample} bits, {format->nChannels} channels.");
+        }
+
+        return new CaptureFormat((int)format->nSamplesPerSec, format->nChannels, isFloat, bytes);
+    }
+}
+
+/// <summary>
+/// The WASAPI capture thread shared by <see cref="MicCapture"/> and <see cref="LoopbackCapture"/>.
+/// Every COM call runs on its own MTA thread: WASAPI objects created on the app's STA UI thread
+/// cannot be called from another apartment.
+/// </summary>
+internal sealed class CaptureLoop : IDisposable
+{
+    private const long BufferDuration100ns = 1_000_000; // 100 ms engine buffer
+    private const uint WaitTimeoutMs = 200; // endpoint loopback signals nothing while no app plays
+
+    private readonly string _name;
+    private readonly Func<IAudioClient> _activate;
+    private readonly Func<IAudioClient, CaptureFormat> _initialize;
+    private Action<ReadOnlySpan<float>, long, int>? _onSamples;
+    private Thread? _thread;
+    private volatile bool _stopRequested;
+    private bool _disposed;
+
+    public CaptureLoop(string name, Func<IAudioClient> activate, Func<IAudioClient, CaptureFormat> initialize)
+    {
+        _name = name;
+        _activate = activate;
+        _initialize = initialize;
+    }
+
+    /// <summary>
+    /// Raised on the capture thread when capture ends on an error after <see cref="Start"/> returned
+    /// (device removed, callback threw). Without a handler the error is rethrown on the capture
+    /// thread, which ends the process: an error is never dropped.
+    /// </summary>
+    public event Action<Exception>? Failed;
+
+    public int SampleRate { get; private set; }
+
+    /// <summary>
+    /// Opens the device and starts capturing; opening errors are thrown here. <c>onSamples</c> runs on
+    /// the capture thread with mono samples (valid only during the call), the packet's QPC time in
+    /// 100 ns units and the sample rate.
+    /// </summary>
+    public void Start(Action<ReadOnlySpan<float>, long, int> onSamples)
+    {
+        ObjectDisposedException.ThrowIf(_disposed, this);
+        if (_thread is not null) throw new InvalidOperationException("Capture is already running.");
+
+        _onSamples = onSamples;
+        _stopRequested = false;
+        var started = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        _thread = new Thread(() => Run(started)) { IsBackground = true, Name = _name };
+        _thread.Start();
+        try
+        {
+            started.Task.GetAwaiter().GetResult();
+        }
+        catch
+        {
+            _thread.Join();
+            _thread = null;
+            throw;
+        }
+    }
+
+    /// <summary>Stops capturing and waits for the capture thread. Do not call it from the callback.</summary>
+    public void Stop()
+    {
+        if (_thread is null) return;
+        _stopRequested = true;
+        _thread.Join();
+        _thread = null;
+    }
+
+    public void Dispose()
+    {
+        Stop();
+        _disposed = true;
+    }
+
+    internal static IAudioClient ActivateEndpoint(string? endpointId, EDataFlow flow)
+    {
+        var enumerator = (IMMDeviceEnumerator)new MMDeviceEnumerator();
+        IMMDevice? device = null;
+        try
+        {
+            if (endpointId is null) enumerator.GetDefaultAudioEndpoint(flow, ERole.eConsole, out device);
+            else enumerator.GetDevice(endpointId, out device);
+            device.Activate(typeof(IAudioClient).GUID, CLSCTX.CLSCTX_ALL, null, out var client);
+            return (IAudioClient)client;
+        }
+        finally
+        {
+            if (device is not null) Marshal.FinalReleaseComObject(device);
+            Marshal.FinalReleaseComObject(enumerator);
+        }
+    }
+
+    internal static unsafe CaptureFormat InitializeWithMixFormat(IAudioClient client, uint streamFlags)
+    {
+        client.GetMixFormat(out var mixFormat);
+        try
+        {
+            return Initialize(client, streamFlags, mixFormat);
+        }
+        finally
+        {
+            PInvoke.CoTaskMemFree(mixFormat);
+        }
+    }
+
+    /// <summary>Initializes a shared-mode, event-driven stream (EVENTCALLBACK is added here).</summary>
+    internal static unsafe CaptureFormat Initialize(IAudioClient client, uint streamFlags, WAVEFORMATEX* format)
+    {
+        var captureFormat = CaptureFormat.From(format);
+        client.Initialize(
+            AUDCLNT_SHAREMODE.AUDCLNT_SHAREMODE_SHARED,
+            streamFlags | PInvoke.AUDCLNT_STREAMFLAGS_EVENTCALLBACK,
+            BufferDuration100ns,
+            0,
+            format,
+            null);
+        return captureFormat;
+    }
+
+    private void Run(TaskCompletionSource started)
+    {
+        // MMCSS only raises the thread priority; capture still works when it fails (service off).
+        uint taskIndex = 0;
+        using var mmcss = PInvoke.AvSetMmThreadCharacteristics("Audio", ref taskIndex);
+
+        IAudioClient? client = null;
+        IAudioCaptureClient? captureClient = null;
+        SafeFileHandle? audioEvent = null;
+        var running = false;
+        try
+        {
+            client = _activate();
+            var format = _initialize(client);
+            audioEvent = PInvoke.CreateEvent(null, false, false, null);
+            if (audioEvent.IsInvalid) throw new Win32Exception();
+            client.SetEventHandle(audioEvent);
+            client.GetBufferSize(out var bufferFrames);
+            client.GetService(out IAudioCaptureClient service);
+            captureClient = service;
+            client.Start();
+            SampleRate = format.SampleRate;
+            running = true;
+            started.SetResult();
+
+            Pump(service, audioEvent, format, new float[bufferFrames]);
+            client.Stop();
+        }
+        catch (Exception error)
+        {
+            if (!running) started.SetException(error);
+            else if (Failed is { } failed) failed(error);
+            else ExceptionDispatchInfo.Throw(error);
+        }
+        finally
+        {
+            audioEvent?.Dispose();
+            if (captureClient is not null) Marshal.FinalReleaseComObject(captureClient);
+            if (client is not null) Marshal.FinalReleaseComObject(client);
+        }
+    }
+
+    private unsafe void Pump(IAudioCaptureClient captureClient, SafeFileHandle audioEvent, CaptureFormat format, float[] mono)
+    {
+        while (!_stopRequested)
+        {
+            if (PInvoke.WaitForSingleObject(audioEvent, WaitTimeoutMs) == WAIT_EVENT.WAIT_FAILED) throw new Win32Exception();
+
+            while (true)
+            {
+                captureClient.GetNextPacketSize(out var packetFrames);
+                if (packetFrames == 0) break;
+
+                captureClient.GetBuffer(out var data, out var frames, out var flags, out _, out var qpc100ns);
+                var count = (int)frames;
+                if (count > mono.Length) mono = new float[count];
+                var samples = mono.AsSpan(0, count);
+                if ((flags & (uint)_AUDCLNT_BUFFERFLAGS.AUDCLNT_BUFFERFLAGS_SILENT) != 0) samples.Clear();
+                else Downmix(data, format, samples);
+                captureClient.ReleaseBuffer(frames);
+
+                // Same clock as u64QPCPosition (QPC in 100 ns units), for packets without a valid one.
+                if ((flags & (uint)_AUDCLNT_BUFFERFLAGS.AUDCLNT_BUFFERFLAGS_TIMESTAMP_ERROR) != 0)
+                {
+                    qpc100ns = (ulong)Stopwatch.GetElapsedTime(0).Ticks;
+                }
+
+                _onSamples!(samples, (long)qpc100ns, format.SampleRate);
+            }
+        }
+    }
+
+    private static unsafe void Downmix(byte* data, CaptureFormat format, Span<float> mono)
+    {
+        var channels = format.Channels;
+        var scale = 1f / channels;
+        for (var frame = 0; frame < mono.Length; frame++)
+        {
+            var sum = 0f;
+            for (var channel = 0; channel < channels; channel++) sum += Sample(data, frame * channels + channel, format);
+            mono[frame] = sum * scale;
+        }
+    }
+
+    private static unsafe float Sample(byte* data, int index, CaptureFormat format)
+    {
+        if (format.IsFloat) return ((float*)data)[index];
+        switch (format.BytesPerSample)
+        {
+            case 2:
+                return ((short*)data)[index] / 32768f;
+            case 3:
+                var p = data + index * 3;
+                return (p[0] | p[1] << 8 | (sbyte)p[2] << 16) / 8388608f;
+            default:
+                return ((int*)data)[index] / 2147483648f;
+        }
+    }
+}
