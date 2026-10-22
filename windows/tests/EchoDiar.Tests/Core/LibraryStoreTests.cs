@@ -100,6 +100,33 @@ public sealed class LibraryStoreTests : IDisposable
         }
     }
 
+    // conversation.json may arrive by sync before transcript.json: the library (and so free space, which trusts the
+    // flag) must not count a transcript whose file is not in the folder, on a refresh as after a rename.
+    [Fact]
+    public async Task HasTranscriptNeedsTheTranscriptFile()
+    {
+        var folder = Path.Combine(_dir, "synced");
+        Directory.CreateDirectory(folder);
+        var synced = new Conversation
+        {
+            Id = Guid.NewGuid(), CreatedAt = DateTimeOffset.UtcNow, Status = ConversationStatus.Transcribed,
+            HasTranscript = true, Folder = folder,
+        };
+        synced.Write();
+        var store = new LibraryStore(_dir, new DeletingTrash());
+
+        await store.RefreshAsync();
+        Assert.False(Assert.Single(store.Conversations).HasTranscript);
+
+        await store.RenameAsync(synced.Id, "Renamed");
+        Assert.False(Assert.Single(store.Conversations).HasTranscript);
+        Assert.True(Conversation.Read(folder).HasTranscript);
+
+        File.WriteAllText(Path.Combine(folder, Transcript.FileName), "{}");
+        await store.RefreshAsync();
+        Assert.True(Assert.Single(store.Conversations).HasTranscript);
+    }
+
     private sealed class DeletingTrash : IFileTrash
     {
         public void MoveToTrash(string path)

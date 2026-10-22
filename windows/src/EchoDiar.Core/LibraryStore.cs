@@ -94,6 +94,7 @@ public sealed class LibraryStore(string root, IFileTrash trash)
         conversation.Write();
         conversation.SizeBytes = current.SizeBytes;
         conversation.HasAudio = current.HasAudio;
+        Normalize(conversation);
         Replace(index, conversation);
     });
 
@@ -110,6 +111,7 @@ public sealed class LibraryStore(string root, IFileTrash trash)
         conversation.SizeBytes = SizeOnDisk(current.Folder);
         conversation.HasAudio = false;
         if (HasMetadataFile(current.Folder)) conversation.Write();
+        Normalize(conversation);
         Replace(index, conversation);
     });
 
@@ -341,10 +343,16 @@ public sealed class LibraryStore(string root, IFileTrash trash)
         }
         conversation.SizeBytes = SizeOnDisk(folder);
         conversation.HasAudio = AudioFiles(folder).Count > 0;
-        // conversation.json may come from another device (sync): no transcript unless its file is on disk.
-        conversation.HasTranscript &= HasTranscriptFile(folder);
+        Normalize(conversation);
         return conversation;
     }
+
+    /// <summary>
+    /// <c>conversation.json</c> may come from another device (sync): no transcript unless its file is in the folder.
+    /// In memory only, after any write, so the file keeps the synced flag.
+    /// </summary>
+    private static void Normalize(Conversation conversation) =>
+        conversation.HasTranscript &= HasTranscriptFile(conversation.Folder);
 
     private static Conversation? TryRead(string folder)
     {
