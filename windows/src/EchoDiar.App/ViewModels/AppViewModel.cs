@@ -14,17 +14,19 @@ using Microsoft.UI.Dispatching;
 
 namespace EchoDiar.App.ViewModels;
 
-public enum RouteKind { List, Conversation, Recording }
+public enum RouteKind { List, Conversation, Recording, Settings }
 
 /// <summary>The conversation page's tab (macOS <c>AppModel.DetailTab</c>).</summary>
 public enum DetailTab { Transcript, Summary, Chat }
 
-/// <summary>What the main window shows: the library list, one conversation, or the recording page.</summary>
+/// <summary>What the main window shows: the library list, one conversation, the recording page or Settings.</summary>
 public sealed record Route(RouteKind Kind, Guid? ConversationId = null)
 {
     public static Route List { get; } = new(RouteKind.List);
 
     public static Route Recording { get; } = new(RouteKind.Recording);
+
+    public static Route Settings { get; } = new(RouteKind.Settings);
 
     public static Route ForConversation(Guid id) => new(RouteKind.Conversation, id);
 }
@@ -97,10 +99,10 @@ public sealed partial class AppViewModel : ObservableObject
         get => _route;
         private set
         {
-            // Another page clears the search (macOS MainView.swift), before the route changes: the library lists every
-            // conversation again before the page and the sidebar are shown. Another conversation keeps it, for the
-            // sidebar it filters.
-            if ((value.Kind == RouteKind.List) != (_route.Kind == RouteKind.List)) SearchTerm = "";
+            // Another page (list, entry, Settings) clears the search (macOS MainView.swift), before the route changes: the
+            // library lists every conversation again before the page and the sidebar are shown. Another conversation or
+            // the recording keeps it, for the sidebar it filters.
+            if (PageOf(value) != PageOf(_route)) SearchTerm = "";
             SetProperty(ref _route, value);
         }
     }
@@ -267,7 +269,7 @@ public sealed partial class AppViewModel : ObservableObject
 
     /// <summary>
     /// Stops a running recording before the app quits, so its audio file is finished; a start under way is waited for
-    /// and stops itself. Both run off the UI thread, waited for at most 10 s without pumping its messages: a managed
+    /// and stops itself. The last settings write is waited for too. All run off the UI thread, waited for at most 10 s without pumping its messages: a managed
     /// wait on this STA thread would run queued XAML work while the window closes. False when the wait timed out (a
     /// device open that hangs holds the engine): the engine must then not be touched again, and launch recovery
     /// finishes the session next time.
@@ -277,6 +279,9 @@ public sealed partial class AppViewModel : ObservableObject
         _closing = true;
         _pollTimer.Stop();
         foreach (var token in _downloadTokens.Values) token.Cancel();
+        // A settings change still waiting for its debounce is written now, and waited for with the stop.
+        FlushSettings();
+        var settingsWrite = _settingsWrite;
         var start = _startTask;
         var stop = Task.Run(() =>
         {
@@ -290,7 +295,7 @@ public sealed partial class AppViewModel : ObservableObject
             }
             _services.Engine.Stop();
         });
-        var handle = ((IAsyncResult)stop).AsyncWaitHandle.SafeWaitHandle;
+        var handle = ((IAsyncResult)Task.WhenAll(stop, settingsWrite)).AsyncWaitHandle.SafeWaitHandle;
         if (WaitForSingleObject(handle, ShutdownWaitMilliseconds) != WaitObject0)
         {
             Debug.WriteLine("EchoDiar: the recording did not stop in time on quit.");
@@ -353,7 +358,19 @@ public sealed partial class AppViewModel : ObservableObject
 
     public void ShowRecording() => Route = Route.Recording;
 
-    public void GoBack() => Route = Route.List;
+    /// <summary>
+    /// Back: a conversation or the recording goes to the list; Settings goes to the page it was opened from, or the list
+    /// when that conversation is gone or that recording has ended (macOS AppModel <c>goBack</c>).
+    /// </summary>
+    public void GoBack() => Route = Route.Kind == RouteKind.Settings ? SettingsReturnRoute() : Route.List;
+
+    /// <summary>The pages that slide on macOS (MainView.swift <c>Page</c>): a conversation and the recording share one.</summary>
+    public static int PageOf(Route route) => route.Kind switch
+    {
+        RouteKind.List => 0,
+        RouteKind.Settings => 2,
+        _ => 1,
+    };
 
     // Deleting
 

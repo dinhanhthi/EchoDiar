@@ -110,17 +110,7 @@ public sealed partial class AppViewModel
     private void SaveSettings(AppSettings settings)
     {
         Settings = settings;
-        _settingsWrite = _settingsWrite.ContinueWith(_ =>
-        {
-            try
-            {
-                _services.Settings.Save(settings);
-            }
-            catch (Exception e)
-            {
-                Debug.WriteLine($"EchoDiar: could not save the settings: {e}");
-            }
-        }, TaskScheduler.Default);
+        QueueSettingsWrite();
     }
 
     /// <summary>The engine reads the setting when the mic is lost, and reports it here through the UI thread.</summary>

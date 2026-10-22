@@ -37,7 +37,7 @@
 
         <!--
             Compact (the list route): the library fills the window. Wide (a conversation, the recording): the same
-            library as a 360 px sidebar, then the route's page.
+            library as a 360 px sidebar, then the route's page. Settings: its page alone, with its own sidebar.
         -->
         <Grid Grid.Row="2">
             <Grid.ColumnDefinitions>
@@ -51,7 +51,7 @@
                 VerticalContentAlignment="Stretch"
                 IsTabStop="False" />
 
-            <!-- The recording page or one conversation. -->
+            <!-- The recording page, one conversation or Settings. -->
             <ContentControl
                 x:Name="RouteHost"
                 Grid.Column="1"

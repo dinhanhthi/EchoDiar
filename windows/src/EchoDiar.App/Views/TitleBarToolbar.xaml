@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!--
     The title bar's toolbar (macOS MainView.swift toolbar) in Windows 11 title bar controls. Leading: Back, the record
-    group, the conversation's title. Trailing: Update, Reveal and Delete, Settings and Ask across conversations, Search,
+    group, a Settings section's inner tabs, the conversation's title. Trailing: Update, Reveal and Delete, Settings and Ask across conversations, Search,
     the conversation's tabs. The title and the empty space drag the window (MainWindow makes only the groups, the lone
     buttons, the search box and the tabs passthrough). Icon buttons are 32 x 32 subtle buttons with 16 px Segoe Fluent
     Icons; 4 px between the buttons of a group, 8 px between groups.
@@ -89,6 +89,16 @@
                         Glyph="&#xE769;" />
                 </Button>
             </StackPanel>
+
+            <!--
+                The shown Settings section's inner tabs (macOS settingsTabsItem), built per section; collapsed for a
+                section without tabs and while the search lists results.
+            -->
+            <SelectorBar
+                x:Name="SettingsTabsBar"
+                Padding="0"
+                VerticalAlignment="Center"
+                Visibility="Collapsed" />
         </StackPanel>
 
         <!-- The shown conversation's title and details; not passthrough, so it drags the window like on macOS. -->
@@ -171,7 +181,7 @@
                 </Button>
             </StackPanel>
 
-            <!-- Settings comes with Phase 13, Ask across conversations with Phase 26. -->
+            <!-- Settings opens the Settings page, or goes back from it; Ask across conversations comes with Phase 26. -->
             <StackPanel x:Name="AppGroup" Orientation="Horizontal" Spacing="4" VerticalAlignment="Center">
                 <Button
                     x:Name="SettingsButton"
@@ -180,7 +190,6 @@
                     Padding="0"
                     Style="{StaticResource SubtleButtonStyle}"
                     AutomationProperties.Name="{local:T Text='Settings'}"
-                    IsEnabled="False"
                     ToolTipService.ToolTip="{local:T Text='Settings'}">
                     <FontIcon FontFamily="{ThemeResource SymbolThemeFontFamily}" FontSize="16" Glyph="&#xE9E9;" />
                 </Button>
@@ -198,7 +207,7 @@
             </StackPanel>
         </StackPanel>
 
-        <!-- Filters the library and the sidebar as typed; Esc clears it. -->
+        <!-- Filters the library and the sidebar as typed, or on Settings the settings; Esc clears it. -->
         <AutoSuggestBox
             x:Name="SearchBox"
             Grid.Column="3"

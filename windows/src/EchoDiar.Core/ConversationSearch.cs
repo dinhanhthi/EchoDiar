@@ -1,4 +1,3 @@
-using System.Globalization;
 using EchoDiar.Core.Model;
 
 namespace EchoDiar.Core;
@@ -18,19 +17,9 @@ public static class ConversationSearch
         {
             term = term.Trim();
             if (term.Length == 0) return true;
-            var key = KeepStrokedD(term);
-            return new[] { Title, Transcript, Summary, Chat }.Concat(Speakers).Any(field => Contains(field, key));
+            var key = SearchText.Fold(term);
+            return new[] { Title, Transcript, Summary, Chat }.Concat(Speakers).Any(field => SearchText.ContainsFolded(field, key));
         }
-
-        private static bool Contains(string text, string key) =>
-            CultureInfo.InvariantCulture.CompareInfo.IndexOf(KeepStrokedD(text), key, CompareOptions.IgnoreCase | CompareOptions.IgnoreNonSpace) >= 0;
-
-        /// <summary>
-        /// ICU's <c>IgnoreNonSpace</c> folds "đ"/"Đ" into "d", but it is a letter of its own in Vietnamese and Swift keeps it
-        /// apart ("da nang" does not find "Đà Nẵng"; "đà nẵng" does). Both cases become one private-use character, which never
-        /// occurs in titles, transcripts, summaries or chats, so they match each other and nothing else.
-        /// </summary>
-        private static string KeepStrokedD(string s) => s.Replace('đ', '').Replace('Đ', '');
     }
 
     /// <summary>Builds the document of one conversation; a missing transcript, summary or chat yields empty fields.</summary>

@@ -88,10 +88,13 @@ public sealed partial class AppViewModel
         }
     }
 
-    /// <summary>Reads the documents not read yet or stale, while a term is searched; then the results change.</summary>
+    /// <summary>
+    /// Reads the documents not read yet or stale, while a term is searched; then the results change. Not on Settings,
+    /// whose search filters the settings.
+    /// </summary>
     private async Task LoadSearchDocumentsAsync()
     {
-        if (SearchTerm.Length == 0 || _closing) return;
+        if (SearchTerm.Length == 0 || _closing || Route.Kind == RouteKind.Settings) return;
         if (_searchLoading)
         {
             _searchReloadPending = true;

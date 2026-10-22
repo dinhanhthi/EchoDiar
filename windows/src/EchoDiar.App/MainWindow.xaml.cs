@@ -313,7 +313,10 @@ public sealed partial class MainWindow : Window
         }
     }
 
-    /// <summary>Shows the route's page in its layout, then resizes the window to that layout.</summary>
+    /// <summary>
+    /// Shows the route's page in its layout, then resizes the window to that layout. Settings takes the whole wide
+    /// window, with its own sidebar instead of the library (macOS MainView.swift).
+    /// </summary>
     private void ShowRoute()
     {
         var route = _model.Route;
@@ -321,12 +324,15 @@ public sealed partial class MainWindow : Window
         {
             { Kind: RouteKind.Recording } => new RecordingView(_model),
             { Kind: RouteKind.Conversation, ConversationId: { } id } => new ConversationView(_model, id),
+            { Kind: RouteKind.Settings } => new SettingsPage(_model),
             _ => null,
         };
         var layout = WindowFrames.For(route);
         var wide = layout == MainWindowLayout.Wide;
-        SidebarColumn.Width = wide ? new GridLength(360) : new GridLength(1, GridUnitType.Star);
+        var settings = route.Kind == RouteKind.Settings;
+        SidebarColumn.Width = settings ? new GridLength(0) : wide ? new GridLength(360) : new GridLength(1, GridUnitType.Star);
         DetailColumn.Width = wide ? new GridLength(1, GridUnitType.Star) : new GridLength(0);
+        ListHost.Visibility = settings ? Visibility.Collapsed : Visibility.Visible;
         RouteHost.Visibility = wide ? Visibility.Visible : Visibility.Collapsed;
         _library.ShowAsSidebar(wide, route.ConversationId);
         _frames.SwitchTo(layout);

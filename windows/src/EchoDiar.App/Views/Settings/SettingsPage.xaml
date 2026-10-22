@@ -1,0 +1,70 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    The Settings page of the main window (macOS SettingsWindow.swift SettingsView): a 200 px sidebar of the sections
+    (Services/SettingsSearch.cs) with their icons, the selected section's page on the right. While the toolbar's search
+    has a term, the sidebar lists only the sections with a matching row, none selected, and the right side lists the
+    matching rows (macOS SettingsSearchResults); a row opens its section and inner tab and clears the search.
+    A NavigationView in Left mode, pane always open: it sits below the custom title bar, so it never draws its own.
+-->
+<UserControl
+    x:Class="EchoDiar.App.Views.SettingsPage"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:controls="using:CommunityToolkit.WinUI.Controls"
+    xmlns:views="using:EchoDiar.App.Views">
+
+    <NavigationView
+        x:Name="Nav"
+        CompactModeThresholdWidth="0"
+        ExpandedModeThresholdWidth="0"
+        IsBackButtonVisible="Collapsed"
+        IsPaneOpen="True"
+        IsPaneToggleButtonVisible="False"
+        IsSettingsVisible="False"
+        IsTitleBarAutoPaddingEnabled="False"
+        OpenPaneLength="200"
+        PaneDisplayMode="Left">
+
+        <Grid>
+            <!-- The selected section's page; each section's page is made the first time it shows, then kept. -->
+            <ContentControl
+                x:Name="SectionHost"
+                HorizontalContentAlignment="Stretch"
+                VerticalContentAlignment="Stretch"
+                IsTabStop="False" />
+
+            <!-- Search results: one clickable row per matching setting, "Section › Tab › Row". -->
+            <Grid x:Name="ResultsPanel" Visibility="Collapsed">
+                <ScrollViewer x:Name="ResultsScroller">
+                    <ItemsRepeater x:Name="ResultsList" Margin="24,16,24,24">
+                        <ItemsRepeater.Layout>
+                            <StackLayout Spacing="4" />
+                        </ItemsRepeater.Layout>
+                        <ItemsRepeater.ItemTemplate>
+                            <DataTemplate x:DataType="views:SettingsResultRow">
+                                <controls:SettingsCard
+                                    Click="OnResultClick"
+                                    Header="{x:Bind Path}"
+                                    IsClickEnabled="True">
+                                    <controls:SettingsCard.HeaderIcon>
+                                        <FontIcon FontFamily="{ThemeResource SymbolThemeFontFamily}" Glyph="{x:Bind Glyph}" />
+                                    </controls:SettingsCard.HeaderIcon>
+                                </controls:SettingsCard>
+                            </DataTemplate>
+                        </ItemsRepeater.ItemTemplate>
+                    </ItemsRepeater>
+                </ScrollViewer>
+
+                <TextBlock
+                    x:Name="NoResultsText"
+                    Margin="24"
+                    HorizontalAlignment="Center"
+                    VerticalAlignment="Center"
+                    Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                    TextAlignment="Center"
+                    TextWrapping="Wrap"
+                    Visibility="Collapsed" />
+            </Grid>
+        </Grid>
+    </NavigationView>
+</UserControl>

@@ -21,8 +21,8 @@ namespace EchoDiar.App.Views;
 /// <summary>
 /// The title bar's button groups (macOS MainView.swift toolbar), shown by route: Back off the list; Record with its menu of
 /// targets and the language (Stop, blinking, and Pause or Resume while recording); on a conversation its title, Reveal, Delete and the
-/// tabs (a SelectorBar); Settings (a placeholder until Phase 13) and Search everywhere, an icon button that opens the box
-/// where the box does not fit. Update and Ask across conversations stay
+/// tabs (a SelectorBar); on Settings the section's inner tabs after Record; Settings (opens the Settings page, or goes
+/// back from it) and Search everywhere, an icon button that opens the box where the box does not fit. Update and Ask across conversations stay
 /// collapsed until Phases 27 and 26. It also hosts the window's dialogs (it lives as long as the window): the delete
 /// confirmations (of this conversation, and of the library's cards and selection), "Recording problem" and the
 /// lost-mic prompt, one at a time.
@@ -57,8 +57,14 @@ public sealed partial class TitleBarToolbar : UserControl
     private DispatcherQueueTimer? _blinkTimer;
     private DispatcherQueueTimer? _searchTimer;
 
-    /// <summary>The route's page was the list (not a conversation or the recording) when last shown.</summary>
-    private bool _onListPage = true;
+    /// <summary>The route's page (<see cref="AppViewModel.PageOf"/>) when last shown.</summary>
+    private int _page;
+
+    /// <summary>The Settings section the inner tabs were built for.</summary>
+    private string? _tabsSection;
+
+    /// <summary>The inner tabs or their selection are being set from the model: not a pick.</summary>
+    private bool _syncingSettingsTabs;
 
     /// <summary>Record's tooltip, "Record" and the target; set again only when the target changes.</summary>
     private string? _recordTip;
@@ -92,6 +98,7 @@ public sealed partial class TitleBarToolbar : UserControl
     {
         InitializeComponent();
         BackButton.Click += (_, _) => _model?.GoBack();
+        SettingsButton.Click += (_, _) => ToggleSettings();
         RecordSplitButton.Click += (_, _) => _ = _model?.StartRecordingAsync(_model.SelectedTarget);
         TargetMenu.Items.Add(_languageSeparator);
         TargetMenu.Items.Add(_languageItem);
@@ -110,6 +117,7 @@ public sealed partial class TitleBarToolbar : UserControl
         LayoutUpdated += (_, _) => UpdateSearchMode();
         TabsBar.SelectedItem = TranscriptTab;
         TabsBar.SelectionChanged += (_, _) => OnTabSelected();
+        SettingsTabsBar.SelectionChanged += (_, _) => OnSettingsTabSelected();
         // A start that failed before the window was shown still gets its dialog.
         Loaded += (_, _) => ShowNextDialog();
     }
@@ -153,7 +161,7 @@ public sealed partial class TitleBarToolbar : UserControl
     /// </summary>
     public IReadOnlyList<RectInt32> PassthroughRects(double scale)
     {
-        FrameworkElement[] elements = [BackButton, RecordGroup, UpdateButton, FileGroup, AppGroup, SearchBox, SearchButton, TabsBar];
+        FrameworkElement[] elements = [BackButton, RecordGroup, SettingsTabsBar, UpdateButton, FileGroup, AppGroup, SearchBox, SearchButton, TabsBar];
         var rects = new List<RectInt32>();
         foreach (var element in elements)
         {
@@ -200,6 +208,13 @@ public sealed partial class TitleBarToolbar : UserControl
             case nameof(AppViewModel.DetailTab):
                 UpdateTabs();
                 break;
+            case nameof(AppViewModel.SettingsSection):
+            case nameof(AppViewModel.SettingsSubTab):
+                UpdateSettingsTabs();
+                break;
+            case nameof(AppViewModel.SearchTerm):
+                OnSearchTermChanged();
+                break;
             case nameof(AppViewModel.RecordTargets):
                 // Apps that started playing since the menu opened show up in it.
                 if (TargetMenu.IsOpen) BuildTargetMenu();
@@ -211,16 +226,20 @@ public sealed partial class TitleBarToolbar : UserControl
     {
         if (_model is null) return;
         BackButton.Visibility = Shown(_model.Route.Kind != RouteKind.List);
-        // Another page clears the search (the model has cleared the term: AppViewModel.Route); another conversation
-        // keeps it, for the sidebar it filters. Typing not applied yet is dropped too.
-        var onListPage = _model.Route.Kind == RouteKind.List;
-        if (onListPage != _onListPage)
+        // Another page (list, entry, Settings) clears the search (the model has cleared the term: AppViewModel.Route);
+        // another conversation keeps it, for the sidebar it filters. Typing not applied yet is dropped too.
+        var page = AppViewModel.PageOf(_model.Route);
+        if (page != _page)
         {
-            _onListPage = onListPage;
+            _page = page;
             _searchTimer?.Stop();
             CloseSearch();
             SearchBox.Text = "";
+            var searchLabel = Loc.T(_model.Route.Kind == RouteKind.Settings ? "Search settings" : "Search conversations");
+            AutomationProperties.SetName(SearchBox, searchLabel);
+            AutomationProperties.SetName(SearchButton, searchLabel);
         }
+        UpdateSettingsTabs();
 
         var recording = _model.IsRecording;
         var paused = _model.RecordingSnapshot.State == RecordingEngine.State.Paused;
@@ -290,6 +309,53 @@ public sealed partial class TitleBarToolbar : UserControl
         _model.DetailTab = TabsBar.SelectedItem == SummaryTab ? DetailTab.Summary
             : TabsBar.SelectedItem == ChatTab ? DetailTab.Chat
             : DetailTab.Transcript;
+    }
+
+    // Settings
+
+    /// <summary>macOS's Settings toggle: opens Settings, or on Settings goes back to the page it was opened from.</summary>
+    private void ToggleSettings()
+    {
+        if (_model is null) return;
+        if (_model.Route.Kind == RouteKind.Settings) _model.GoBack();
+        else _model.OpenSettings();
+    }
+
+    /// <summary>
+    /// The shown section's inner tabs, built again when another section shows (its own tabs, not the old ones'
+    /// selection), with the model's tab selected. Hidden off Settings, for a section without tabs, and while the search
+    /// lists results in the section's place.
+    /// </summary>
+    private void UpdateSettingsTabs()
+    {
+        if (_model is null) return;
+        var section = _model.Route.Kind == RouteKind.Settings ? SettingsSearch.Section(_model.SettingsSection) : null;
+        var hasTabs = section is { SubTabs.Count: > 0 };
+        SettingsTabsBar.Visibility = Shown(hasTabs && _model.SearchTerm.Length == 0);
+        if (section is null || !hasTabs) return;
+        _syncingSettingsTabs = true;
+        try
+        {
+            if (section.Id != _tabsSection)
+            {
+                _tabsSection = section.Id;
+                SettingsTabsBar.Items.Clear();
+                foreach (var tab in section.SubTabs) SettingsTabsBar.Items.Add(new SelectorBarItem { Text = Loc.T(tab.Title), Tag = tab.Id });
+            }
+            var selected = SettingsTabsBar.Items.FirstOrDefault(i => i.Tag as string == _model.SettingsSubTab);
+            if (SettingsTabsBar.SelectedItem != selected) SettingsTabsBar.SelectedItem = selected;
+        }
+        finally
+        {
+            _syncingSettingsTabs = false;
+        }
+    }
+
+    /// <summary>A picked inner tab shows in the section.</summary>
+    private void OnSettingsTabSelected()
+    {
+        if (_syncingSettingsTabs || _model is null || SettingsTabsBar.SelectedItem is not { Tag: string id }) return;
+        _model.SetSettingsSubTab(_model.SettingsSection, id);
     }
 
     // Record menu
@@ -427,6 +493,19 @@ public sealed partial class TitleBarToolbar : UserControl
     }
 
     // Search
+
+    /// <summary>
+    /// The model cleared the search (a Settings result or section was picked): the box follows, and typing not applied
+    /// yet is dropped. The box's own clearing, or a blank term, leaves it as it is.
+    /// </summary>
+    private void OnSearchTermChanged()
+    {
+        if (_model is null) return;
+        UpdateSettingsTabs();
+        if (_model.SearchTerm.Length > 0 || SearchBox.Text.Trim().Length == 0) return;
+        _searchTimer?.Stop();
+        SearchBox.Text = "";
+    }
 
     /// <summary>Filters once typing pauses; a cleared field shows every conversation at once.</summary>
     private void OnSearchTextChanged()
