@@ -1,4 +1,5 @@
 using System.ComponentModel;
+using EchoDiar.App.Services;
 using EchoDiar.App.Themes;
 using EchoDiar.App.ViewModels;
 using EchoDiar.App.Views;
@@ -15,6 +16,8 @@ namespace EchoDiar.App;
 public sealed partial class MainWindow : Window
 {
     private readonly AppViewModel _model;
+    private readonly WindowFrames _frames;
+    private readonly ConversationListView _library;
     private IReadOnlyList<RectInt32> _passthrough = [];
 
     public MainWindow(AppViewModel model)
@@ -43,6 +46,19 @@ public sealed partial class MainWindow : Window
         TitleBarGrid.LayoutUpdated += (_, _) => UpdateTitleBarRegions();
 
         Toolbar.Attach(_model);
+        // One library for both layouts: the whole page on compact, the sidebar on wide.
+        _library = new ConversationListView(_model);
+        ListHost.Content = _library;
+
+        _frames = new WindowFrames(AppWindow);
+        _frames.Place(WindowFrames.For(_model.Route));
+        // A move to a display of another DPI changes the presenter's bounds in physical pixels.
+        RootGrid.Loaded += (_, _) =>
+        {
+            if (RootGrid.XamlRoot is { } root) root.Changed += (_, _) => _frames.ApplyBounds();
+        };
+        Closed += (_, _) => _frames.Save();
+
         _model.PropertyChanged += OnModelChanged;
         ShowRoute();
     }
@@ -52,7 +68,7 @@ public sealed partial class MainWindow : Window
         if (e.PropertyName == nameof(AppViewModel.Route)) ShowRoute();
     }
 
-    /// <summary>Shows the route's page.</summary>
+    /// <summary>Shows the route's page in its layout, then resizes the window to that layout.</summary>
     private void ShowRoute()
     {
         var route = _model.Route;
@@ -60,8 +76,15 @@ public sealed partial class MainWindow : Window
         {
             { Kind: RouteKind.Recording } => new RecordingView(_model),
             { Kind: RouteKind.Conversation, ConversationId: { } id } => new ConversationView(_model, id),
-            _ => new ConversationListView(_model),
+            _ => null,
         };
+        var layout = WindowFrames.For(route);
+        var wide = layout == MainWindowLayout.Wide;
+        SidebarColumn.Width = wide ? new GridLength(360) : new GridLength(1, GridUnitType.Star);
+        DetailColumn.Width = wide ? new GridLength(1, GridUnitType.Star) : new GridLength(0);
+        RouteHost.Visibility = wide ? Visibility.Visible : Visibility.Collapsed;
+        _library.ShowAsSidebar(wide, route.ConversationId);
+        _frames.SwitchTo(layout);
     }
 
     // Keeps the toolbar's controls clickable: everything else in the title bar row drags the window.

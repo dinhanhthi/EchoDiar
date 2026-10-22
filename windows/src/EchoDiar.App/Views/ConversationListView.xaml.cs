@@ -19,6 +19,12 @@ public sealed partial class ConversationListView : UserControl
     private readonly AppViewModel _model;
     private readonly ObservableCollection<ConversationRow> _rows = [];
 
+    /// <summary>Shown as the wide layout's sidebar: only the rows.</summary>
+    private bool _sidebar;
+
+    /// <summary>The sidebar's selected row: the shown conversation.</summary>
+    private Guid? _selectedId;
+
     public ConversationListView(AppViewModel model)
     {
         _model = model;
@@ -70,6 +76,28 @@ public sealed partial class ConversationListView : UserControl
             foreach (var row in rows) _rows.Add(row);
         }
         EmptyText.Visibility = rows.Count == 0 ? Visibility.Visible : Visibility.Collapsed;
+        // Replaced rows lose the selection.
+        UpdateSelection();
+    }
+
+    /// <summary>
+    /// The whole page on the compact layout; on wide, the sidebar beside the page (macOS compact cards): the rows only,
+    /// with <paramref name="selectedId"/> (the shown conversation) selected.
+    /// </summary>
+    public void ShowAsSidebar(bool sidebar, Guid? selectedId)
+    {
+        _sidebar = sidebar;
+        _selectedId = selectedId;
+        HeaderGrid.Visibility = sidebar ? Visibility.Collapsed : Visibility.Visible;
+        UpdateBanner();
+        UpdateSelection();
+        if (ConversationList.SelectedItem is { } selected) ConversationList.ScrollIntoView(selected);
+    }
+
+    private void UpdateSelection()
+    {
+        var selected = _selectedId is { } id ? _rows.FirstOrDefault(r => r.Id == id) : null;
+        if (!Equals(ConversationList.SelectedItem, selected)) ConversationList.SelectedItem = selected;
     }
 
     /// <summary>
@@ -79,7 +107,7 @@ public sealed partial class ConversationListView : UserControl
     private void UpdateBanner()
     {
         var needsSpeech = !_model.HasTranscriptionModel;
-        var visible = needsSpeech || _model.NeedsDiarizer;
+        var visible = !_sidebar && (needsSpeech || _model.NeedsDiarizer);
         ModelBanner.Visibility = visible ? Visibility.Visible : Visibility.Collapsed;
         if (!visible) return;
 

@@ -12,7 +12,8 @@
             <RowDefinition Height="*" />
         </Grid.RowDefinitions>
 
-        <Grid>
+        <!-- The header and the banner are left out of the wide layout's sidebar, which shows only the rows. -->
+        <Grid x:Name="HeaderGrid">
             <TextBlock VerticalAlignment="Center" Style="{StaticResource TitleTextBlockStyle}" Text="Library" />
             <Button
                 x:Name="RecordButton"
@@ -58,16 +59,18 @@
             Grid.Row="2"
             IsItemClickEnabled="True"
             ItemClick="OnConversationClick"
-            SelectionMode="None">
+            SelectionMode="Single">
             <ListView.ItemTemplate>
                 <DataTemplate x:DataType="views:ConversationRow">
-                    <StackPanel Padding="0,8" Spacing="2">
-                        <TextBlock Style="{StaticResource BodyStrongTextBlockStyle}" Text="{x:Bind Title}" TextTrimming="CharacterEllipsis" />
-                        <TextBlock
-                            Foreground="{ThemeResource TextFillColorSecondaryBrush}"
-                            Style="{StaticResource CaptionTextBlockStyle}"
-                            Text="{x:Bind Detail}" />
-                    </StackPanel>
+                    <Border Margin="0,3" Padding="12,10" Style="{StaticResource SolidCard}">
+                        <StackPanel Spacing="2">
+                            <TextBlock Style="{StaticResource BodyStrongTextBlockStyle}" Text="{x:Bind Title}" TextTrimming="CharacterEllipsis" />
+                            <TextBlock
+                                Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                                Style="{StaticResource CaptionTextBlockStyle}"
+                                Text="{x:Bind Detail}" />
+                        </StackPanel>
+                    </Border>
                 </DataTemplate>
             </ListView.ItemTemplate>
         </ListView>

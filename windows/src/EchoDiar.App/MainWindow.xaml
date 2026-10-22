@@ -24,12 +24,30 @@
             <views:TitleBarToolbar x:Name="Toolbar" Grid.Column="1" />
         </Grid>
 
-        <!-- The current route's page: the library list, the recording page or one conversation. -->
-        <ContentControl
-            x:Name="RouteHost"
-            Grid.Row="1"
-            HorizontalContentAlignment="Stretch"
-            VerticalContentAlignment="Stretch"
-            IsTabStop="False" />
+        <!--
+            Compact (the list route): the library fills the window. Wide (a conversation, the recording): the same
+            library as a 360 px sidebar, then the route's page.
+        -->
+        <Grid Grid.Row="1">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition x:Name="SidebarColumn" Width="*" />
+                <ColumnDefinition x:Name="DetailColumn" Width="0" />
+            </Grid.ColumnDefinitions>
+
+            <ContentControl
+                x:Name="ListHost"
+                HorizontalContentAlignment="Stretch"
+                VerticalContentAlignment="Stretch"
+                IsTabStop="False" />
+
+            <!-- The recording page or one conversation. -->
+            <ContentControl
+                x:Name="RouteHost"
+                Grid.Column="1"
+                HorizontalContentAlignment="Stretch"
+                VerticalContentAlignment="Stretch"
+                IsTabStop="False"
+                Visibility="Collapsed" />
+        </Grid>
     </Grid>
 </Window>
