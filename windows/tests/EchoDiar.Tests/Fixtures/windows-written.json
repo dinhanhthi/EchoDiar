@@ -1,0 +1,142 @@
+{
+  "chat.json": {
+    "messages": [
+      {
+        "role": "user",
+        "text": "Xin chào, cuộc họp",
+        "timestamp": "2026-10-21T09:30:15Z"
+      },
+      {
+        "model": "claude-sonnet-5-5",
+        "provider": "anthropic",
+        "references": [
+          {
+            "conversationID": "6F1C2A9E-3B4D-4E5F-8A7B-1C2D3E4F5A6B",
+            "number": 1,
+            "title": "Xin chào, cuộc họp"
+          }
+        ],
+        "role": "assistant",
+        "text": "Ship on Friday [00:05].",
+        "timestamp": "2026-10-21T09:30:20Z"
+      }
+    ],
+    "title": "Xin chào, cuộc họp",
+    "version": 1
+  },
+  "chats.json": {
+    "chats": [
+      {
+        "archivedAt": "2026-10-21T09:30:15Z",
+        "id": "0A1B2C3D-4E5F-4061-8273-94A5B6C7D8E9",
+        "messageCount": 2,
+        "title": "Xin chào, cuộc họp"
+      }
+    ],
+    "version": 1
+  },
+  "conversation.json": {
+    "createdAt": 814267815.25,
+    "customTitle": true,
+    "duration": 61.5,
+    "hasSummary": true,
+    "hasTranscript": true,
+    "id": "6F1C2A9E-3B4D-4E5F-8A7B-1C2D3E4F5A6B",
+    "sizeBytes": 1234567,
+    "sourceAppName": "Zoom",
+    "sourceBundleID": "Zoom.exe",
+    "status": "transcribed",
+    "title": "Xin chào, cuộc họp",
+    "version": 1
+  },
+  "session.json": {
+    "audioFileName": "audio.caf",
+    "channels": [
+      "mic",
+      "system"
+    ],
+    "endReason": "user",
+    "globalTapFallback": true,
+    "id": "6F1C2A9E-3B4D-4E5F-8A7B-1C2D3E4F5A6B",
+    "languageMarkers": [
+      {
+        "fileTime": 0,
+        "language": "vi"
+      }
+    ],
+    "micDeviceName": "Microphone (Realtek)",
+    "outputDeviceName": "Speakers (Realtek)",
+    "pauses": [
+      {
+        "end": 814267815.25,
+        "fileTime": 12.5,
+        "start": 814267785.25
+      }
+    ],
+    "pid": 4242,
+    "probe": true,
+    "sampleFormat": "int16",
+    "sampleRate": 16000,
+    "sourceApps": [
+      {
+        "bundleIDs": [
+          "Zoom.exe"
+        ],
+        "name": "Zoom",
+        "pids": [
+          1234,
+          5678
+        ]
+      }
+    ],
+    "startedAt": 814267815.25,
+    "state": "stopped",
+    "tapMode": "perApp",
+    "version": 1
+  },
+  "summaries.json": {
+    "summaries": [
+      {
+        "createdAt": "2026-10-21T09:30:15Z",
+        "model": "claude-sonnet-5-5",
+        "number": 1,
+        "provider": "anthropic",
+        "stopped": true
+      }
+    ],
+    "version": 1
+  },
+  "transcript.json": {
+    "createdAt": 814267815.25,
+    "engineFallback": "parakeet",
+    "engineID": "whisper",
+    "modelID": "openai_whisper-small",
+    "notes": [
+      "diarization model not installed"
+    ],
+    "segments": [
+      {
+        "channel": "mic",
+        "end": 2.75,
+        "id": "11111111-2222-4333-8444-555555555555",
+        "language": "vi",
+        "speaker": "me",
+        "start": 0.5,
+        "text": "Xin chào, cuộc họp"
+      },
+      {
+        "channel": "system",
+        "end": 4.25,
+        "id": "66666666-7777-4888-9999-AAAAAAAAAAAA",
+        "language": "en",
+        "speaker": "s2",
+        "start": 3,
+        "text": "Hello"
+      }
+    ],
+    "speakerNames": {
+      "s2": "Lan"
+    },
+    "version": 1
+  }
+}
