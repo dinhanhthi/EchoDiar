@@ -39,8 +39,17 @@ public sealed partial class AppViewModel : ObservableObject
     private readonly DispatcherQueueTimer _pollTimer;
     private readonly Dictionary<string, CancellationTokenSource> _downloadTokens = [];
 
-    /// <summary>Launch recovery; a recording starts only after it, so it never marks the new session.</summary>
+    /// <summary>
+    /// Launch: settings load, then recovery. A recording starts only after it, so it uses the loaded settings and
+    /// recovery never marks the new session.
+    /// </summary>
     private Task _recovery = Task.CompletedTask;
+
+    /// <summary>The window closed: a start under way stops its recording instead of leaving it running.</summary>
+    private volatile bool _closing;
+
+    /// <summary>The engine start under way, which <see cref="Shutdown"/> waits for before stopping.</summary>
+    private Task<string?>? _startTask;
 
     /// <summary>The running recording's folder, for the steps after it ends.</summary>
     private string? _activeFolder;
@@ -188,22 +197,39 @@ public sealed partial class AppViewModel : ObservableObject
     /// <summary>Loads the settings, recovers sessions a crash left open, then lists the library and the models.</summary>
     public async Task StartAsync()
     {
-        Settings = await Task.Run(() => _services.Settings.Load());
-        OnPropertyChanged(nameof(NeedsDiarizer));
         _services.Library.Changed += list => _dispatcher.TryEnqueue(() => Conversations = list);
         _services.Pipeline.Progress += progress => _dispatcher.TryEnqueue(() => ApplyProgress(progress));
         _services.Engine.SnapshotChanged += snapshot => _dispatcher.TryEnqueue(() => ApplySnapshot(snapshot));
-        _recovery = Task.Run(Recover);
+        _recovery = LoadAndRecoverAsync();
         await _recovery;
         await _services.Library.RefreshAsync();
         await RefreshInstalledModelsAsync();
     }
 
-    /// <summary>Stops a running recording before the app quits, so its audio file is finished.</summary>
+    private async Task LoadAndRecoverAsync()
+    {
+        Settings = await Task.Run(() => _services.Settings.Load());
+        OnPropertyChanged(nameof(NeedsDiarizer));
+        await Task.Run(Recover);
+    }
+
+    /// <summary>
+    /// Stops a running recording before the app quits, so its audio file is finished; a start under way is waited for
+    /// (at most 5 s) and stops itself.
+    /// </summary>
     public void Shutdown()
     {
+        _closing = true;
         _pollTimer.Stop();
         foreach (var token in _downloadTokens.Values) token.Cancel();
+        try
+        {
+            _startTask?.Wait(TimeSpan.FromSeconds(5));
+        }
+        catch (AggregateException)
+        {
+            // A failed start left nothing running.
+        }
         _services.Engine.Stop();
     }
 
@@ -236,17 +262,26 @@ public sealed partial class AppViewModel : ObservableObject
     /// <summary>Records <paramref name="app"/>'s audio (null: all system audio) and the mic, after launch recovery.</summary>
     public async Task StartRecordingAsync(AudioProcessGroup? app)
     {
-        if (IsRecording || IsStarting) return;
+        if (IsRecording || IsStarting || _closing) return;
         IsStarting = true;
         RecordingError = null;
-        var language = Settings.DefaultLanguage;
-        var micEndpointId = Settings.MicDeviceUID;
         var root = _services.Paths.Conversations;
         try
         {
             await _recovery;
-            _activeFolder = await Task.Run(() => _services.Engine.Start(Resolved(app), language, micEndpointId, root));
-            _pollTimer.Start();
+            var language = Settings.DefaultLanguage;
+            var micEndpointId = Settings.MicDeviceUID;
+            _startTask = Task.Run<string?>(() =>
+            {
+                if (_closing) return null;
+                var folder = _services.Engine.Start(Resolved(app), language, micEndpointId, root);
+                if (!_closing) return folder;
+                // The window closed while the devices opened: nothing else would stop this recording.
+                _services.Engine.Stop();
+                return null;
+            });
+            _activeFolder = await _startTask;
+            if (_activeFolder is not null) _pollTimer.Start();
         }
         catch (Exception e)
         {
