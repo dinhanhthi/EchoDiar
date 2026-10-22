@@ -3,8 +3,8 @@ using EchoDiar.Core.Audio;
 namespace EchoDiar.Transcribe;
 
 /// <summary>
-/// 16 kHz mono Float32 channel files (Swift <c>MonoAudio</c>). Recordings are CAF; m4a goes through the
-/// <c>decoder</c> hook (Phase 14's <c>IAudioDecoder.DecodeToMono16k(path, channel)</c>).
+/// 16 kHz mono Float32 channel files (Swift <c>MonoAudio</c>). Recordings are CAF; compressed ones (m4a) go through
+/// an <see cref="IAudioDecoder"/> (Platform's Media Foundation decoder, passed in by the app).
 /// </summary>
 public static class MonoAudio
 {
@@ -17,9 +17,10 @@ public static class MonoAudio
     // Frames per CafFile.Reader.Read call, well under its 2^20 cap: every read below loops until done.
     private const int ChunkFrames = 16_384;
 
-    public static int ChannelCount(string path)
+    /// <summary>Channels in the file; a non-CAF file needs <paramref name="decoder"/>.</summary>
+    public static int ChannelCount(string path, IAudioDecoder? decoder = null)
     {
-        RequireCaf(path);
+        if (!IsCaf(path)) return Unreadable(path, () => Decoder(path, decoder).ChannelCount(path));
         return Unreadable(path, () =>
         {
             using var reader = new CafFile.Reader(path);
@@ -98,10 +99,10 @@ public static class MonoAudio
         });
     }
 
-    /// <summary>Seconds of audio.</summary>
-    public static double Duration(string path)
+    /// <summary>Seconds of audio; a non-CAF file needs <paramref name="decoder"/>, which decodes it whole.</summary>
+    public static double Duration(string path, IAudioDecoder? decoder = null)
     {
-        RequireCaf(path);
+        if (!IsCaf(path)) return Unreadable(path, () => Decoder(path, decoder).Duration(path));
         return Unreadable(path, () =>
         {
             using var reader = new CafFile.Reader(path);
@@ -117,7 +118,9 @@ public static class MonoAudio
     }
 
     private static TranscriptionException NotSupportedYet(string path) =>
-        new(TranscriptionErrorKind.AudioUnreadable, $"{Path.GetFileName(path)}: m4a not supported yet");
+        new(TranscriptionErrorKind.AudioUnreadable, $"{Path.GetFileName(path)}: no decoder for this format");
+
+    private static IAudioDecoder Decoder(string path, IAudioDecoder? decoder) => decoder ?? throw NotSupportedYet(path);
 
     private static float Peak(ReadOnlySpan<float> samples)
     {

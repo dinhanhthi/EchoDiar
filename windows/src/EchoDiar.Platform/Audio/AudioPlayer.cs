@@ -1,31 +1,35 @@
 using EchoDiar.Core.Audio;
 using EchoDiar.Core.Settings;
+using NAudio.MediaFoundation;
 using NAudio.Wave;
 using NAudio.Wave.SampleProviders;
 
 namespace EchoDiar.Platform.Audio;
 
 /// <summary>
-/// Plays a recording's CAF file on the default output device through WASAPI shared mode (100 ms latency): both voices
-/// in both ears (<see cref="PlaybackChannels.Mixed"/>), or as recorded, mic left and system right
-/// (<see cref="PlaybackChannels.Split"/>), switchable while it plays. Create, control and dispose it on one thread;
+/// Plays a recording's audio file (the recorder's CAF, or the compressor's m4a through Media Foundation) on the default
+/// output device through WASAPI shared mode (100 ms latency): both voices in both ears
+/// (<see cref="PlaybackChannels.Mixed"/>), or as recorded, mic left and system right (<see cref="PlaybackChannels.Split"/>),
+/// switchable while it plays. A mono file plays in both ears either way. Create, control and dispose it on one thread;
 /// <see cref="Ended"/> may be raised on another.
 /// </summary>
 /// <remarks>
 /// NAudio 3's <c>WasapiPlayer</c>, the replacement for the obsolete <c>WasapiOut</c>. It never changes the sample
-/// rate itself, so the 16 kHz file is resampled to the device's mix rate here.
+/// rate itself, so the file (16 kHz CAF, 48 kHz m4a) is resampled to the device's mix rate here.
 /// </remarks>
 public sealed class AudioPlayer : IDisposable
 {
     private const int LatencyMilliseconds = 100;
 
-    private readonly CafSampleProvider _source;
+    private readonly PlaybackSource _source;
     private readonly WasapiPlayer _output;
 
-    /// <summary>Opens <paramref name="cafPath"/> and the output device; throws when either cannot be opened.</summary>
-    public AudioPlayer(string cafPath, PlaybackChannels channels)
+    /// <summary>Opens <paramref name="path"/> (<c>.caf</c> or <c>.m4a</c>) and the output device; throws when either cannot be opened.</summary>
+    public AudioPlayer(string path, PlaybackChannels channels)
     {
-        _source = new CafSampleProvider(cafPath, channels);
+        _source = Path.GetExtension(path).Equals(".caf", StringComparison.OrdinalIgnoreCase)
+            ? new CafSampleProvider(path, channels)
+            : new MediaFoundationSampleProvider(path, channels);
         WasapiPlayer? output = null;
         try
         {
@@ -98,42 +102,40 @@ public sealed class AudioPlayer : IDisposable
     }
 
     /// <summary>
-    /// A CAF file (Int16 or Float32, mono or stereo) as stereo Float32 at the file's rate. Read on the playback thread,
-    /// seeked and switched on the caller's: one lock guards the reader, the frame position and the channel mode.
+    /// A file as stereo Float32 at the file's rate. Read on the playback thread, seeked and switched on the caller's: one
+    /// lock guards the file, the frame position and the channel mode.
     /// </summary>
-    private sealed class CafSampleProvider : ISampleProvider, IDisposable
+    private abstract class PlaybackSource : ISampleProvider, IDisposable
     {
-        private const int OutputChannels = 2;
+        protected const int OutputChannels = 2;
 
         private readonly object _lock = new();
-        private readonly CafFile.Reader _reader;
         private bool _mixed;
         private long _frame;
         private bool _atEnd;
         private bool _disposed;
 
-        public CafSampleProvider(string path, PlaybackChannels channels)
+        protected PlaybackSource(int sampleRate, PlaybackChannels channels)
         {
-            _reader = new CafFile.Reader(path);
-            if (_reader.SampleRate is not (>= 1 and <= 384_000) || _reader.Channels < 1)
-            {
-                _reader.Dispose();
-                throw new InvalidDataException($"{Path.GetFileName(path)} has an unsupported format.");
-            }
             _mixed = channels == PlaybackChannels.Mixed;
-            WaveFormat = WaveFormat.CreateIeeeFloatWaveFormat((int)_reader.SampleRate, OutputChannels);
-            Duration = _reader.Frames / _reader.SampleRate;
+            WaveFormat = WaveFormat.CreateIeeeFloatWaveFormat(sampleRate, OutputChannels);
         }
 
         public WaveFormat WaveFormat { get; }
 
-        public double Duration { get; }
+        public abstract double Duration { get; }
+
+        /// <summary>Frames in the file.</summary>
+        protected abstract long Frames { get; }
+
+        /// <summary>Channels in the file.</summary>
+        protected abstract int Channels { get; }
 
         public double Position
         {
             get
             {
-                lock (_lock) return _frame / _reader.SampleRate;
+                lock (_lock) return (double)_frame / WaveFormat.SampleRate;
             }
         }
 
@@ -150,9 +152,10 @@ public sealed class AudioPlayer : IDisposable
         {
             lock (_lock)
             {
-                var frame = (long)(Math.Clamp(seconds, 0, Duration) * _reader.SampleRate);
-                _frame = Math.Clamp(frame, 0, _reader.Frames);
+                var frame = (long)(Math.Clamp(seconds, 0, Duration) * WaveFormat.SampleRate);
+                _frame = Math.Clamp(frame, 0, Frames);
                 _atEnd = false;
+                MoveTo(_frame);
             }
         }
 
@@ -166,8 +169,8 @@ public sealed class AudioPlayer : IDisposable
             lock (_lock)
             {
                 if (_disposed || _atEnd) return 0;
-                var channels = _reader.Channels;
-                var samples = _reader.Read(_frame, buffer.Length / OutputChannels);
+                var channels = Channels;
+                var samples = ReadFrames(_frame, buffer.Length / OutputChannels);
                 var frames = samples.Length / channels;
                 for (var i = 0; i < frames; i++)
                 {
@@ -188,8 +191,115 @@ public sealed class AudioPlayer : IDisposable
             lock (_lock)
             {
                 _disposed = true;
-                _reader.Dispose();
+                Close();
             }
+        }
+
+        /// <summary>Up to <paramref name="maxFrames"/> interleaved frames from <paramref name="frame"/>; empty at the end. Under the lock.</summary>
+        protected abstract ReadOnlySpan<float> ReadFrames(long frame, int maxFrames);
+
+        /// <summary>The next <see cref="ReadFrames"/> starts at <paramref name="frame"/>. Under the lock.</summary>
+        protected virtual void MoveTo(long frame)
+        {
+        }
+
+        protected abstract void Close();
+    }
+
+    /// <summary>A CAF file (Int16 or Float32, mono or stereo).</summary>
+    private sealed class CafSampleProvider : PlaybackSource
+    {
+        private readonly CafFile.Reader _reader;
+
+        public CafSampleProvider(string path, PlaybackChannels channels)
+            : this(Open(path), channels)
+        {
+        }
+
+        private CafSampleProvider(CafFile.Reader reader, PlaybackChannels channels)
+            : base((int)reader.SampleRate, channels)
+        {
+            _reader = reader;
+            Duration = _reader.Frames / _reader.SampleRate;
+        }
+
+        public override double Duration { get; }
+
+        protected override long Frames => _reader.Frames;
+
+        protected override int Channels => _reader.Channels;
+
+        protected override ReadOnlySpan<float> ReadFrames(long frame, int maxFrames) => _reader.Read(frame, maxFrames);
+
+        protected override void Close() => _reader.Dispose();
+
+        private static CafFile.Reader Open(string path)
+        {
+            var reader = new CafFile.Reader(path);
+            if (reader.SampleRate is not (>= 1 and <= 384_000) || reader.Channels < 1)
+            {
+                reader.Dispose();
+                throw new InvalidDataException($"{Path.GetFileName(path)} has an unsupported format.");
+            }
+            return reader;
+        }
+    }
+
+    /// <summary>
+    /// A file Media Foundation decodes (the compressor's AAC m4a, mono or stereo), as Float32. NAudio's reader opens its
+    /// source reader again on the thread that reads, so it may be created on the UI thread.
+    /// </summary>
+    private sealed class MediaFoundationSampleProvider : PlaybackSource
+    {
+        private readonly MediaFoundationReader _reader;
+        private readonly ISampleProvider _samples;
+        private float[] _buffer = [];
+
+        public MediaFoundationSampleProvider(string path, PlaybackChannels channels)
+            : this(Open(path), channels)
+        {
+        }
+
+        private MediaFoundationSampleProvider(MediaFoundationReader reader, PlaybackChannels channels)
+            : base(reader.WaveFormat.SampleRate, channels)
+        {
+            _reader = reader;
+            _samples = reader.ToSampleProvider();
+            Channels = reader.WaveFormat.Channels;
+            Duration = reader.TotalTime.TotalSeconds;
+            Frames = (long)(Duration * reader.WaveFormat.SampleRate);
+        }
+
+        public override double Duration { get; }
+
+        protected override long Frames { get; }
+
+        protected override int Channels { get; }
+
+        protected override ReadOnlySpan<float> ReadFrames(long frame, int maxFrames)
+        {
+            var count = maxFrames * Channels;
+            if (_buffer.Length < count) _buffer = new float[count];
+            var read = _samples.Read(_buffer.AsSpan(0, count));
+            return _buffer.AsSpan(0, read - read % Channels);
+        }
+
+        protected override void MoveTo(long frame) => _reader.Position = frame * _reader.WaveFormat.BlockAlign;
+
+        protected override void Close() => _reader.Dispose();
+
+        private static MediaFoundationReader Open(string path)
+        {
+            if (!File.Exists(path)) throw new FileNotFoundException($"{Path.GetFileName(path)} is missing", path);
+            // Reference-counted by Media Foundation, so a second start next to MediaFoundationAudio's is harmless.
+            MediaFoundationApi.Startup();
+            var reader = new MediaFoundationReader(path, new MediaFoundationReader.MediaFoundationReaderSettings { RequestFloatOutput = true });
+            if (reader.WaveFormat.SampleRate is not (>= 1 and <= 384_000) || reader.WaveFormat.Channels < 1)
+            {
+                reader.Dispose();
+                throw new InvalidDataException($"{Path.GetFileName(path)} has an unsupported format.");
+            }
+            return reader;
         }
     }
 }

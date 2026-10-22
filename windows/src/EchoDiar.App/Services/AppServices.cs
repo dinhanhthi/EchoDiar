@@ -12,7 +12,8 @@ namespace EchoDiar.App.Services;
 
 /// <summary>
 /// The app's long-lived services over one library root: settings, library, models, the model load gate, the
-/// transcription pipeline and the recording engine with the Platform capture sources and route monitor. Created once, on launch.
+/// transcription pipeline (reading m4a through the Media Foundation decoder), the audio compressor and the recording
+/// engine with the Platform capture sources and route monitor. Created once, on launch.
 /// </summary>
 internal sealed class AppServices : IDisposable
 {
@@ -28,6 +29,8 @@ internal sealed class AppServices : IDisposable
         _http = new HttpClient { Timeout = Timeout.InfiniteTimeSpan };
         Models = new ModelStore(paths.Models, _http);
         Gate = new ModelLoadGate();
+        var decoder = new MediaFoundationAudio();
+        Compressor = new AudioCompressor(decoder: decoder);
         Pipeline = new TranscriptionPipeline(
             new Dictionary<ModelRuntime, TranscriptionPipeline.EngineFactory>
             {
@@ -37,7 +40,8 @@ internal sealed class AppServices : IDisposable
             SherpaDiarizer.Create,
             Models.IsInstalled,
             Models.Folder,
-            Gate);
+            Gate,
+            decoder: decoder);
         Engine = new RecordingEngine(OpenSystem, OpenMic, routes: _routes)
         {
             IsTargetPlayingOutput = IsTargetPlayingOutput,
@@ -55,6 +59,7 @@ internal sealed class AppServices : IDisposable
     public ModelStore Models { get; }
     public ModelLoadGate Gate { get; }
     public TranscriptionPipeline Pipeline { get; }
+    public AudioCompressor Compressor { get; }
     public RecordingEngine Engine { get; }
 
     /// <summary>Launch at login: a stand-in until task 14.3 adds the startup task.</summary>

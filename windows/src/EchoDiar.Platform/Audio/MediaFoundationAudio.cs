@@ -119,6 +119,17 @@ public sealed class MediaFoundationAudio : IAudioDecoder
         return reader.WaveFormat.Channels;
     });
 
+    public double Duration(string path) => Decoding(path, () =>
+    {
+        using var reader = Open(path);
+        var format = reader.WaveFormat;
+        var bytes = new byte[ChunkFrames * format.BlockAlign];
+        long total = 0;
+        int read;
+        while ((read = reader.Read(bytes, 0, bytes.Length)) > 0) total += read;
+        return (double)(total / format.BlockAlign) / format.SampleRate;
+    });
+
     public float[] DecodeToMono16k(string path, int channel) => Decoding(path, () =>
     {
         using var reader = Open(path);

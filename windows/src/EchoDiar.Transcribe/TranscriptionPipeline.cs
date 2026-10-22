@@ -1,4 +1,5 @@
 using EchoDiar.Core;
+using EchoDiar.Core.Audio;
 using EchoDiar.Core.Model;
 using EchoDiar.Core.Models;
 
@@ -19,7 +20,7 @@ namespace EchoDiar.Transcribe;
 /// <param name="isInstalled">Whether a catalog entry is installed (<see cref="ModelStore.IsInstalled"/>).</param>
 /// <param name="modelFolder">An entry's <c>Models/&lt;id&gt;/</c> folder (<see cref="ModelStore.Folder"/>).</param>
 /// <param name="speakerCountHint">Speakers expected on the system channel when the job sets none.</param>
-/// <param name="decoder">Decodes a non-CAF file's channel to 16 kHz mono (Phase 14); null = CAF only.</param>
+/// <param name="decoder">Reads non-CAF (compressed m4a) audio; null = CAF only.</param>
 public sealed class TranscriptionPipeline(
     IReadOnlyDictionary<ModelRuntime, TranscriptionPipeline.EngineFactory> engines,
     TranscriptionPipeline.DiarizerFactory? diarizer,
@@ -27,7 +28,7 @@ public sealed class TranscriptionPipeline(
     Func<ModelEntry, string> modelFolder,
     ModelLoadGate gate,
     int? speakerCountHint = null,
-    Func<string, int, float[]>? decoder = null)
+    IAudioDecoder? decoder = null)
 {
     public delegate ITranscriptionEngine EngineFactory(ModelEntry entry, string folder);
 
@@ -194,7 +195,7 @@ public sealed class TranscriptionPipeline(
     /// <summary>The extracted file, or null when the channel is silent.</summary>
     private async Task<string?> ExtractAsync(ChannelSource source, string path, CancellationToken cancellationToken)
     {
-        var peak = await Task.Run(() => MonoAudio.Extract(source.Channel, source.Path, path, decoder), cancellationToken).ConfigureAwait(false);
+        var peak = await Task.Run(() => MonoAudio.Extract(source.Channel, source.Path, path, decoder is null ? null : decoder.DecodeToMono16k), cancellationToken).ConfigureAwait(false);
         if (peak >= MonoAudio.SilencePeak) return path;
         TryDelete(path);
         return null;
@@ -213,7 +214,7 @@ public sealed class TranscriptionPipeline(
 
         var audio = Existing(session.AudioFileName);
         if (job.SystemFileName is { } systemName) return (new(audio, 0), new(Existing(systemName), 0));
-        if (MonoAudio.ChannelCount(audio) < 2) return (null, new(audio, 0));
+        if (MonoAudio.ChannelCount(audio, decoder) < 2) return (null, new(audio, 0));
         return (new(audio, RecordingSession.Channel.Mic), new(audio, RecordingSession.Channel.System));
     }
 
@@ -344,7 +345,7 @@ public sealed class TranscriptionPipeline(
     /// <paramref name="session"/> with the session audio's duration; nothing is written without a session, or when
     /// the existing file is unreadable.
     /// </summary>
-    private static void UpdateConversation(string folder, RecordingSession? session, Action<Conversation> change)
+    private void UpdateConversation(string folder, RecordingSession? session, Action<Conversation> change)
     {
         Conversation conversation;
         if (File.Exists(Path.Combine(folder, Conversation.FileName)))
@@ -364,7 +365,7 @@ public sealed class TranscriptionPipeline(
             var duration = 0.0;
             if (ConversationFiles.AudioPath(folder, session.AudioFileName) is { } audio)
             {
-                try { duration = MonoAudio.Duration(audio); }
+                try { duration = MonoAudio.Duration(audio, decoder); }
                 catch (TranscriptionException) { }
             }
             conversation = Conversation.FromSession(session, folder, duration);

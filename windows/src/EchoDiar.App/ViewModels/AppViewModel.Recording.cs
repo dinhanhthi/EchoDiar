@@ -2,8 +2,10 @@ using System.Diagnostics;
 using EchoDiar.App.Services;
 using EchoDiar.App.Views;
 using EchoDiar.Core.Audio;
+using EchoDiar.Core.Model;
 using EchoDiar.Core.Models;
 using EchoDiar.Core.Settings;
+using EchoDiar.Platform.Audio;
 using EchoDiar.Transcribe;
 
 namespace EchoDiar.App.ViewModels;
@@ -11,7 +13,8 @@ namespace EchoDiar.App.ViewModels;
 /// <summary>
 /// The recording state the card, the recording page and the toolbar share (macOS AppModel: selectedTarget,
 /// sourceApp, recordingError, micRoutesLost, recordingLanguage): what Record records, the recorded app, the
-/// "Recording problem" answer, the lost-mic route change and the recording language.
+/// "Recording problem" answer, the lost-mic route change and the recording language; and the steps after a recording
+/// (macOS finishRecording): transcription and compression to m4a.
 /// </summary>
 public sealed partial class AppViewModel
 {
@@ -26,6 +29,15 @@ public sealed partial class AppViewModel
     /// <summary>The last language marker and settings writes; each next one runs after it.</summary>
     private Task _languageWrite = Task.CompletedTask;
     private Task _settingsWrite = Task.CompletedTask;
+
+    /// <summary>
+    /// Conversations in <see cref="CompressAndTranscribeAsync"/> until its last step returns: between the transcription
+    /// and the compression no status guards the audio, which the compressor rewrites and deletes (macOS finishingIDs).
+    /// </summary>
+    private readonly HashSet<Guid> _finishing = [];
+
+    /// <summary>Cancelled on quit: queued compressions never start.</summary>
+    private readonly CancellationTokenSource _compressionCancel = new();
 
     /// <summary>What Record records: null for all system audio, else the app picked in the Record menu.</summary>
     public AudioProcessGroup? SelectedTarget
@@ -133,6 +145,188 @@ public sealed partial class AppViewModel
             case RouteChangeBehavior.Stop:
                 _ = StopRecordingAsync();
                 break;
+        }
+    }
+
+    // After a recording
+
+    /// <summary>
+    /// The post-stop sequence for one folder (macOS AppModel <c>finishRecording</c>). A recording auto-transcribed now
+    /// (usable, not transcribed yet, its CAF has frames) is transcribed from the CAF first, then compressed; otherwise it
+    /// is compressed first, then transcribed when "Transcribe automatically" is on.
+    /// </summary>
+    private async Task CompressAndTranscribeAsync(string folder, RecordingSession? session)
+    {
+        if (_closing) return;
+        var id = session?.Id;
+        if (id is { } added) SetFinishing(added, true);
+        try
+        {
+            var autoTranscribe = Settings.AutoTranscribe;
+            if (session is not null && await Task.Run(() => TranscribesFirst(folder, session, autoTranscribe))
+                && SubmitTranscription(folder, session) is { } job)
+            {
+                await job;
+                await CompressAsync(folder);
+                return;
+            }
+            if (await CompressAsync(folder) is { } result) await TranscribeAfterAsync(result);
+        }
+        catch (Exception e)
+        {
+            Debug.WriteLine($"EchoDiar: could not compress or transcribe {folder}: {e}");
+        }
+        finally
+        {
+            if (id is { } removed) SetFinishing(removed, false);
+        }
+    }
+
+    /// <summary>
+    /// Launch: folders whose audio is still the CAF of a finished or recovered session (a recording stopped at quit) and
+    /// folders left compressing by an interrupted job are compressed one at a time, then transcribed as after a stop
+    /// (macOS AppModel <c>start</c>).
+    /// </summary>
+    private async Task CompressLeftoversAsync()
+    {
+        try
+        {
+            var folders = await Task.Run(() => UncompressedFolders(_services.Paths.Conversations));
+            foreach (var folder in folders)
+            {
+                if (_closing) return;
+                if (await CompressAsync(folder) is { } result) await TranscribeAfterAsync(result);
+            }
+        }
+        catch (Exception e)
+        {
+            Debug.WriteLine($"EchoDiar: could not compress the leftover recordings: {e}");
+        }
+    }
+
+    /// <summary>
+    /// One compression with the current bitrate and keep-CAF settings, queued behind the others; the library is
+    /// refreshed once the folder is marked compressing (the card shows it) and when the job ends. Null when the app quit
+    /// before it started.
+    /// </summary>
+    private async Task<CompressionResult?> CompressAsync(string folder)
+    {
+        if (_closing) return null;
+        CompressionResult result;
+        try
+        {
+            result = await _services.Compressor.CompressAsync(
+                folder, Settings.CompressionBitrateKbps, Settings.KeepUncompressedAudio, () => _ = RefreshLibraryAsync(),
+                _compressionCancel.Token);
+        }
+        catch (OperationCanceledException)
+        {
+            return null;
+        }
+        if (result.Failure is { } failure) Debug.WriteLine($"EchoDiar: compression failed for {folder}: {failure} {result.Detail}");
+        await RefreshLibraryAsync();
+        return _closing ? null : result;
+    }
+
+    /// <summary>
+    /// Queues the folder once compression is done, when "Transcribe automatically" is on (a failed compression leaves
+    /// the CAF, which is used instead). Skipped when the folder has no usable audio or session, already has a
+    /// transcript, or its last transcription failed (macOS <c>transcribe(after:)</c>).
+    /// </summary>
+    private async Task TranscribeAfterAsync(CompressionResult result)
+    {
+        if (!Settings.AutoTranscribe || _closing) return;
+        if (result.Failure is AudioCompressionFailure.SessionUnreadable or AudioCompressionFailure.StillRecording
+            or AudioCompressionFailure.UnsafeAudioFileName or AudioCompressionFailure.SourceUnreadable)
+        {
+            return;
+        }
+        var (session, conversation) = await Task.Run(() => (ReadSession(result.Folder), ReadConversation(result.Folder)));
+        if (session is null || conversation?.HasTranscript == true || conversation?.Status == ConversationStatus.TranscriptionFailed) return;
+        _ = SubmitTranscription(result.Folder, session);
+    }
+
+    /// <summary>
+    /// Whether the recording is transcribed from its CAF before compression: auto-transcribe is on, the recording is
+    /// usable and not transcribed (or failed) yet, and its CAF has frames. Reads files: off the UI thread.
+    /// </summary>
+    private static bool TranscribesFirst(string folder, RecordingSession session, bool autoTranscribe)
+    {
+        if (!autoTranscribe || session.Probe || session.State == SessionState.Failed) return false;
+        var conversation = ReadConversation(folder);
+        if (conversation?.HasTranscript == true || conversation?.Status == ConversationStatus.TranscriptionFailed) return false;
+        if (session.AudioFileName != AudioCompressor.CafFileName
+            || ConversationFiles.AudioPath(folder, session.AudioFileName) is not { } caf)
+        {
+            return false;
+        }
+        try
+        {
+            using var reader = new CafFile.Reader(caf);
+            return reader.Frames > 0;
+        }
+        catch (Exception e) when (e is IOException or UnauthorizedAccessException or InvalidDataException or NotSupportedException)
+        {
+            return false;
+        }
+    }
+
+    /// <summary>
+    /// Folders of finished or recovered sessions whose audio is still the CAF, and folders left compressing. Hidden
+    /// entries and links are skipped (macOS <c>uncompressedFolders</c>).
+    /// </summary>
+    private static List<string> UncompressedFolders(string root)
+    {
+        var options = new EnumerationOptions
+        {
+            AttributesToSkip = FileAttributes.Hidden | FileAttributes.System | FileAttributes.ReparsePoint,
+            IgnoreInaccessible = true,
+        };
+        List<string> folders;
+        try
+        {
+            folders = [.. Directory.EnumerateDirectories(root, "*", options)];
+        }
+        catch (Exception e) when (e is IOException or UnauthorizedAccessException)
+        {
+            return [];
+        }
+        return folders.Where(folder =>
+        {
+            if (ReadSession(folder) is not { Probe: false, State: SessionState.Stopped or SessionState.Recovered } session) return false;
+            if (ReadConversation(folder)?.Status == ConversationStatus.Compressing) return true;
+            return session.AudioFileName == AudioCompressor.CafFileName
+                && ConversationFiles.AudioPath(folder, session.AudioFileName) is { } caf && File.Exists(caf);
+        }).ToList();
+    }
+
+    private static Conversation? ReadConversation(string folder)
+    {
+        try
+        {
+            return Conversation.Read(folder);
+        }
+        catch (Exception e) when (e is IOException or UnauthorizedAccessException or System.Text.Json.JsonException)
+        {
+            return null;
+        }
+    }
+
+    /// <summary>The screens that read <see cref="IsTranscribing"/> follow <see cref="TranscriptionProgress"/>, so it is raised for them.</summary>
+    private void SetFinishing(Guid id, bool finishing)
+    {
+        if (finishing ? _finishing.Add(id) : _finishing.Remove(id)) OnPropertyChanged(nameof(TranscriptionProgress));
+    }
+
+    private async Task RefreshLibraryAsync()
+    {
+        try
+        {
+            await _services.Library.RefreshAsync();
+        }
+        catch (Exception e)
+        {
+            Debug.WriteLine($"EchoDiar: could not refresh the library: {e}");
         }
     }
 }

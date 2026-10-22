@@ -251,6 +251,7 @@ public sealed partial class AppViewModel : ObservableObject
         StartupTrace.Write($"end library load ({list.Count} conversations)");
         await RefreshInstalledModelsAsync();
         StartupTrace.Write($"installed models: {InstalledModelIds.Count}");
+        _ = CompressLeftoversAsync();
     }
 
     private async Task LoadAndRecoverAsync()
@@ -279,6 +280,8 @@ public sealed partial class AppViewModel : ObservableObject
         _closing = true;
         _pollTimer.Stop();
         foreach (var token in _downloadTokens.Values) token.Cancel();
+        // Queued compressions never start; one under way is cut off by the exit and redone at the next launch.
+        _compressionCancel.Cancel();
         // A settings change still waiting for its debounce is written now, and waited for with the stop.
         FlushSettings();
         var settingsWrite = _settingsWrite;
@@ -548,7 +551,7 @@ public sealed partial class AppViewModel : ObservableObject
         if (folder is not null) _ = FinishRecordingAsync(folder);
     }
 
-    /// <summary>Lists the recording, opens it when the recording page is showing, and queues its transcription.</summary>
+    /// <summary>Lists the recording, opens it when the recording page is showing, then compresses and transcribes it.</summary>
     private async Task FinishRecordingAsync(string folder)
     {
         if (_closing) return;
@@ -562,7 +565,7 @@ public sealed partial class AppViewModel : ObservableObject
                 DetailTab = DetailTab.Transcript;
                 Route = session is not null && list.Any(c => c.Id == session.Id) ? Route.ForConversation(session.Id) : Route.List;
             }
-            if (session is not null && Settings.AutoTranscribe) SubmitTranscription(folder, session);
+            await CompressAndTranscribeAsync(folder, session);
         }
         catch (Exception e)
         {
@@ -584,8 +587,11 @@ public sealed partial class AppViewModel : ObservableObject
 
     // Transcription
 
-    /// <summary>Queued or running; a "needs model" result is not.</summary>
-    public bool IsTranscribing(Guid id) =>
+    /// <summary>Queued or running, or still between its recording's end and compression; a "needs model" result is not.</summary>
+    public bool IsTranscribing(Guid id) => _finishing.Contains(id) || HasJob(id);
+
+    /// <summary>A job is queued or running; a "needs model" result is not.</summary>
+    private bool HasJob(Guid id) =>
         TranscriptionProgress.TryGetValue(id, out var progress) && progress.Step != JobStep.NeedsModel;
 
     /// <summary>
@@ -599,24 +605,26 @@ public sealed partial class AppViewModel : ObservableObject
         if (IsTranscribing(id) || Conversations.FirstOrDefault(c => c.Id == id) is not { HasAudio: true } conversation) return;
         if (language is not null) RememberLanguage(language);
         var session = await Task.Run(() => ReadSession(conversation.Folder));
-        if (session is not null) SubmitTranscription(conversation.Folder, session, engineId, language);
+        if (session is not null) _ = SubmitTranscription(conversation.Folder, session, engineId, language);
     }
 
     /// <summary>
     /// Queues a job with <paramref name="engineId"/>, else the default engine when it is installed and handles the
     /// recording's first language (else the pipeline's default resolution), and the speaker settings;
     /// <paramref name="language"/> replaces the recording's language markers. A failed or probe recording is never
-    /// transcribed.
+    /// transcribed. Returns the job, null when none was queued.
     /// </summary>
-    private void SubmitTranscription(string folder, RecordingSession session, string? engineId = null, string? language = null)
+    private Task? SubmitTranscription(string folder, RecordingSession session, string? engineId = null, string? language = null)
     {
         var id = session.Id;
-        if (_closing || session.Probe || session.State == SessionState.Failed || IsTranscribing(id)) return;
+        if (_closing || session.Probe || session.State == SessionState.Failed || HasJob(id)) return null;
         var firstLanguage = language ?? session.LanguageMarkers.MinBy(m => m.FileTime)?.Language ?? "auto";
         var job = new TranscriptionJob
         {
             ConversationID = id,
             Folder = folder,
+            // The mono fallback: session.json names the mic file; the system file sits next to it.
+            SystemFileName = session.AudioFileName == AudioCompressor.MicFileName ? AudioCompressor.SystemFileName : null,
             EngineID = engineId ?? PreferredEngine(firstLanguage),
             Language = language,
             SpeakerCountHint = Settings.SpeakerCountHint,
@@ -626,7 +634,7 @@ public sealed partial class AppViewModel : ObservableObject
         TranscriptionErrors = Without(TranscriptionErrors, id);
         // Set now so the screens show the job before the pipeline's first event arrives.
         TranscriptionProgress = With(TranscriptionProgress, id, new JobProgress(id, JobStep.Queued, 0));
-        _ = RunTranscriptionAsync(job);
+        return RunTranscriptionAsync(job);
     }
 
     private async Task RunTranscriptionAsync(TranscriptionJob job)

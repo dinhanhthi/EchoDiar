@@ -1,6 +1,5 @@
 using System.ComponentModel;
 using EchoDiar.App.ViewModels;
-using EchoDiar.Core;
 using EchoDiar.Core.Model;
 using Microsoft.UI.Dispatching;
 using Microsoft.UI.Xaml;
@@ -143,7 +142,7 @@ public sealed partial class ConversationView : UserControl
         var folder = conversation.Folder;
         var playable = conversation.HasAudio
             && conversation.Status is not (ConversationStatus.Recording or ConversationStatus.Compressing);
-        var audio = playable ? await Task.Run(() => CafPath(folder)) : null;
+        var audio = playable ? await Task.Run(() => AudioPath(folder)) : null;
         if (generation != _loadGeneration || _model.IsClosing) return;
         _audioPath = audio;
         LoadPlayback();
@@ -199,7 +198,20 @@ public sealed partial class ConversationView : UserControl
         }
     }
 
-    /// <summary>The recording's CAF file; other formats (m4a) play from Phase 15.</summary>
-    private static string? CafPath(string folder) =>
-        LibraryStore.AudioFiles(folder).FirstOrDefault(p => string.Equals(Path.GetExtension(p), ".caf", StringComparison.OrdinalIgnoreCase));
+    /// <summary>
+    /// The session's audio file (macOS TranscriptView <c>load</c>): the CAF, or the m4a once compressed (the mic file of
+    /// the mono fallback). Null when session.json is unreadable or the file is missing.
+    /// </summary>
+    private static string? AudioPath(string folder)
+    {
+        try
+        {
+            var name = RecordingSession.Read(folder).AudioFileName;
+            return ConversationFiles.AudioPath(folder, name) is { } path && File.Exists(path) ? path : null;
+        }
+        catch (Exception e) when (e is IOException or UnauthorizedAccessException or System.Text.Json.JsonException)
+        {
+            return null;
+        }
+    }
 }
