@@ -1,5 +1,7 @@
+using System.Collections.Concurrent;
 using System.Security.Cryptography;
 using System.Text.Json;
+using EchoDiar.Core.Model;
 using EchoDiar.Core.Models;
 
 namespace EchoDiar.Transcribe;
@@ -31,21 +33,27 @@ public readonly record struct ModelDownloadProgress(long CompletedBytes, long To
 /// <summary>
 /// Opt-in downloads of catalog models into <c>Models/&lt;id&gt;/</c> (Swift <c>ModelStore</c>). Only the entry's
 /// repos at their pinned revisions are fetched; the Hugging Face listing is untrusted: every listed path is
-/// checked before anything is written, and each file must match its listed size and SHA-256 (LFS oid).
+/// checked before anything is written, and each file must match its listed size and its SHA-256: the catalog's
+/// (<see cref="ModelEntry.Sha256"/>) when it has one, else the listed LFS oid. A file with neither is refused.
 /// </summary>
 /// <remarks>
 /// Layout: repo files with <see cref="ModelEntry.Subfolder"/> stripped, and <see cref="ModelEntry.ExtraFiles"/>
 /// at their repo paths, all in <c>Models/&lt;id&gt;/</c> (the ggml file and the sherpa-onnx files sit at its root).
 /// The injected <see cref="HttpClient"/> should have <c>Timeout = InfiniteTimeSpan</c>: large models take longer
-/// than the 100 s default, and the cancellation token stops a download.
+/// than the 100 s default, and the cancellation token stops a download. Downloads of the same entry through one
+/// store run one after the other (a second call waits for the first); separate store instances are not serialized.
 /// </remarks>
 public sealed class ModelStore(string root, HttpClient http, Func<string, long>? freeBytes = null)
 {
     private const string HubHost = "huggingface.co";
     private const int BufferSize = 1 << 20;
+    private const int MaxPages = 100;
+    private const int MaxItems = 100_000;
+    private const int MaxPageBytes = 16 << 20;
     private static readonly JsonSerializerOptions Json = new(JsonSerializerDefaults.Web);
 
     private readonly Func<string, long> _freeBytes = freeBytes ?? DefaultFreeBytes;
+    private readonly ConcurrentDictionary<string, SemaphoreSlim> _downloads = new();
 
     /// <summary>The <c>Models</c> folder (<c>AppPaths.Models</c>).</summary>
     public string Root { get; } = root;
@@ -53,6 +61,9 @@ public sealed class ModelStore(string root, HttpClient http, Func<string, long>?
     public string Folder(ModelEntry entry) => Path.Combine(Root, SafeId(entry));
 
     public string PartialFolder(ModelEntry entry) => Path.Combine(Root, ".partial-" + SafeId(entry));
+
+    /// <summary>Where an install is moved before it is deleted or replaced, so <c>Models/&lt;id&gt;/</c> is never half there.</summary>
+    private string OldFolder(ModelEntry entry) => Path.Combine(Root, ".old-" + SafeId(entry));
 
     // Installed state
 
@@ -86,10 +97,16 @@ public sealed class ModelStore(string root, HttpClient http, Func<string, long>?
             ? new DirectoryInfo(folder).EnumerateFiles("*", SearchOption.AllDirectories).Sum(f => f.Length)
             : 0;
 
-    /// <summary>Removes <c>Models/&lt;id&gt;/</c> and any partial download.</summary>
+    /// <summary>
+    /// Removes <c>Models/&lt;id&gt;/</c> and any partial download. The install is first renamed to <c>.old-&lt;id&gt;</c>,
+    /// so a delete that fails midway leaves no half-installed model.
+    /// </summary>
     public void Delete(ModelEntry entry)
     {
-        foreach (var folder in new[] { Folder(entry), PartialFolder(entry) })
+        var old = OldFolder(entry);
+        if (Directory.Exists(old)) Directory.Delete(old, recursive: true);
+        if (Directory.Exists(Folder(entry))) Directory.Move(Folder(entry), old);
+        foreach (var folder in new[] { old, PartialFolder(entry) })
         {
             if (Directory.Exists(folder)) Directory.Delete(folder, recursive: true);
         }
@@ -101,12 +118,14 @@ public sealed class ModelStore(string root, HttpClient http, Func<string, long>?
 
     private sealed record TreeItem(string Type, string Path, long? Size, Lfs? Lfs);
 
-    private sealed record RemoteFile(string Repo, string Revision, string Path, string[] Destination, long Size, string? Sha256);
+    private sealed record RemoteFile(string Repo, string Revision, string Path, string[] Destination, long Size, string Sha256);
 
     /// <summary>
     /// Downloads the entry into <c>.partial-&lt;id&gt;</c>, verifies every file, then moves it to
     /// <c>Models/&lt;id&gt;/</c> (replacing an older copy). On any failure or cancellation the partial folder is
-    /// removed and the error rethrown; an existing install is left as it was.
+    /// removed and the error rethrown; an existing install is left as it was (it is set aside in
+    /// <c>.old-&lt;id&gt;</c> during the final move and put back if that move fails).
+    /// A concurrent download of the same entry through this store waits until this one ends.
     /// </summary>
     public async Task DownloadAsync(
         ModelEntry entry, IProgress<ModelDownloadProgress>? progress = null, CancellationToken cancellationToken = default)
@@ -115,8 +134,21 @@ public sealed class ModelStore(string root, HttpClient http, Func<string, long>?
         {
             throw new ModelStoreException(ModelStoreError.NotDownloadable, $"{entry.Id} is not downloadable.");
         }
+        var gate = _downloads.GetOrAdd(SafeId(entry), _ => new SemaphoreSlim(1, 1));
+        await gate.WaitAsync(cancellationToken);
+        try
+        {
+            await Install(entry, progress, cancellationToken);
+        }
+        finally
+        {
+            gate.Release();
+        }
+    }
+
+    private async Task Install(ModelEntry entry, IProgress<ModelDownloadProgress>? progress, CancellationToken cancellationToken)
+    {
         var staging = PartialFolder(entry);
-        var final = Folder(entry);
         Directory.CreateDirectory(Root);
         if (Directory.Exists(staging)) Directory.Delete(staging, recursive: true);
         try
@@ -146,29 +178,53 @@ public sealed class ModelStore(string root, HttpClient http, Func<string, long>?
             progress?.Report(new(done, total, ""));
 
             cancellationToken.ThrowIfCancellationRequested();
-            if (Directory.Exists(final)) Directory.Delete(final, recursive: true);
+            Replace(entry, staging);
+        }
+        catch
+        {
+            TryDelete(staging);
+            throw;
+        }
+    }
+
+    /// <summary>Moves <paramref name="staging"/> to <c>Models/&lt;id&gt;/</c>, restoring the previous install if the move fails.</summary>
+    private void Replace(ModelEntry entry, string staging)
+    {
+        var final = Folder(entry);
+        var old = OldFolder(entry);
+        if (Directory.Exists(old)) Directory.Delete(old, recursive: true);
+        var hadInstall = Directory.Exists(final);
+        if (hadInstall) Directory.Move(final, old);
+        try
+        {
             Directory.Move(staging, final);
         }
         catch
         {
-            try
-            {
-                if (Directory.Exists(staging)) Directory.Delete(staging, recursive: true);
-            }
-            catch (IOException) { }
-            catch (UnauthorizedAccessException) { }
+            if (hadInstall) Directory.Move(old, final);
             throw;
         }
+        TryDelete(old);
+    }
+
+    private static void TryDelete(string folder)
+    {
+        try
+        {
+            if (Directory.Exists(folder)) Directory.Delete(folder, recursive: true);
+        }
+        catch (IOException) { }
+        catch (UnauthorizedAccessException) { }
     }
 
     /// <summary>The allowlisted files of both repos. Any unsafe path in a listing fails the whole download.</summary>
     private async Task<List<RemoteFile>> RemoteFiles(ModelEntry entry, CancellationToken cancellationToken)
     {
         var subfolder = entry.Subfolder is null ? [] : Components(entry.Subfolder) ?? throw Unsafe(entry.Subfolder);
-        var files = await Pick(entry.Repo!, entry.Revision!, subfolder, entry.Files, cancellationToken);
+        var files = await Pick(entry.Repo!, entry.Revision!, subfolder, entry.Files, entry.Sha256, cancellationToken);
         if (entry.ExtraFiles is { } extra)
         {
-            files.AddRange(await Pick(extra.Repo, extra.Revision, [], extra.Files, cancellationToken));
+            files.AddRange(await Pick(extra.Repo, extra.Revision, [], extra.Files, extra.Sha256, cancellationToken));
         }
         if (files.Count == 0) throw new ModelStoreException(ModelStoreError.NoFiles, $"No files to download for {entry.Id}.");
         var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
@@ -181,10 +237,12 @@ public sealed class ModelStore(string root, HttpClient http, Func<string, long>?
 
     /// <summary>
     /// Listed files under <paramref name="subfolder"/> that match <paramref name="allowlist"/> on whole path
-    /// components (null = all), with the subfolder stripped from their destination.
+    /// components (null = all), with the subfolder stripped from their destination. Each gets its catalog SHA-256
+    /// from <paramref name="hashes"/> (keyed by repo path), else its listed LFS oid; a file with neither fails.
     /// </summary>
     private async Task<List<RemoteFile>> Pick(
-        string repo, string revision, string[] subfolder, IReadOnlyList<string>? allowlist, CancellationToken cancellationToken)
+        string repo, string revision, string[] subfolder, IReadOnlyList<string>? allowlist,
+        IReadOnlyDictionary<string, string>? hashes, CancellationToken cancellationToken)
     {
         var allowed = allowlist?.Select(a => Components(a) ?? throw Unsafe(a)).ToArray();
         var picked = new List<RemoteFile>();
@@ -197,40 +255,62 @@ public sealed class ModelStore(string root, HttpClient http, Func<string, long>?
             if (allowed is not null && hit < 0) continue;
             matched.Add(hit);
             var destination = Destination(parts, subfolder) ?? throw Unsafe(item.Path);
-            picked.Add(new(repo, revision, item.Path, destination, item.Size ?? 0, item.Lfs?.Oid));
+            var sha = hashes?.GetValueOrDefault(item.Path) ?? item.Lfs?.Oid
+                ?? throw new ModelStoreException(ModelStoreError.ChecksumMismatch, $"No SHA-256 known for {item.Path}.");
+            picked.Add(new(repo, revision, item.Path, destination, item.Size ?? 0, sha));
         }
         if (allowed is not null && matched.Count < allowed.Length)
         {
-            throw new ModelStoreException(ModelStoreError.ListingFailed, $"{repo} at {revision} misses an allowlisted file.");
+            throw ListingFailed($"{repo} at {revision} misses an allowlisted file.");
         }
         return picked;
     }
 
-    /// <summary>The recursive HF tree of a repo folder, following <c>Link: &lt;…&gt;; rel="next"</c> pages.</summary>
+    /// <summary>
+    /// The recursive HF tree of a repo folder, following <c>Link: &lt;…&gt;; rel="next"</c> pages. A page seen twice,
+    /// more than <see cref="MaxPages"/> pages, <see cref="MaxItems"/> items or a page over <see cref="MaxPageBytes"/> fails.
+    /// </summary>
     private async Task<List<TreeItem>> List(string repo, string revision, string[] subfolder, CancellationToken cancellationToken)
     {
         var path = subfolder.Length == 0 ? "" : "/" + Encode(subfolder);
         Uri? next = new($"https://{HubHost}/api/models/{repo}/tree/{revision}{path}?recursive=1");
         var items = new List<TreeItem>();
+        var visited = new HashSet<string>(StringComparer.Ordinal);
         while (next is not null)
         {
-            using var response = await http.GetAsync(next, cancellationToken);
-            if (!response.IsSuccessStatusCode)
-            {
-                throw new ModelStoreException(ModelStoreError.ListingFailed, $"HTTP {(int)response.StatusCode} listing {repo}.");
-            }
+            if (!visited.Add(next.AbsoluteUri)) throw ListingFailed($"The listing of {repo} loops back to {next}.");
+            if (visited.Count > MaxPages) throw ListingFailed($"The listing of {repo} has more than {MaxPages} pages.");
+            using var response = await http.GetAsync(next, HttpCompletionOption.ResponseHeadersRead, cancellationToken);
+            if (!response.IsSuccessStatusCode) throw ListingFailed($"HTTP {(int)response.StatusCode} listing {repo}.");
             try
             {
-                await using var body = await response.Content.ReadAsStreamAsync(cancellationToken);
+                await using var body = await ReadPage(response, repo, cancellationToken);
                 items.AddRange(await JsonSerializer.DeserializeAsync<List<TreeItem>>(body, Json, cancellationToken) ?? []);
             }
             catch (JsonException error)
             {
-                throw new ModelStoreException(ModelStoreError.ListingFailed, $"Unreadable listing of {repo}: {error.Message}");
+                throw ListingFailed($"Unreadable listing of {repo}: {error.Message}");
             }
+            if (items.Count > MaxItems) throw ListingFailed($"The listing of {repo} has more than {MaxItems} items.");
             next = NextPage(response.Headers.TryGetValues("Link", out var links) ? string.Join(",", links) : null);
         }
         return items;
+    }
+
+    /// <summary>One listing page in memory, failing once it exceeds <see cref="MaxPageBytes"/>.</summary>
+    private static async Task<MemoryStream> ReadPage(HttpResponseMessage response, string repo, CancellationToken cancellationToken)
+    {
+        await using var input = await response.Content.ReadAsStreamAsync(cancellationToken);
+        var page = new MemoryStream();
+        var buffer = new byte[81_920];
+        int read;
+        while ((read = await input.ReadAsync(buffer, cancellationToken)) > 0)
+        {
+            if (page.Length + read > MaxPageBytes) throw ListingFailed($"A listing page of {repo} exceeds {MaxPageBytes} bytes.");
+            page.Write(buffer, 0, read);
+        }
+        page.Position = 0;
+        return page;
     }
 
     /// <summary>The <c>rel="next"</c> URL of a Link header; only an https URL on the hub host is followed.</summary>
@@ -248,7 +328,7 @@ public sealed class ModelStore(string root, HttpClient http, Func<string, long>?
             {
                 return uri;
             }
-            throw new ModelStoreException(ModelStoreError.ListingFailed, $"Refusing next page {text}.");
+            throw ListingFailed($"Refusing next page {text}.");
         }
         return null;
     }
@@ -280,8 +360,7 @@ public sealed class ModelStore(string root, HttpClient http, Func<string, long>?
             }
         }
         if (written != file.Size) throw Mismatch(ModelStoreError.SizeMismatch, "Size", file.Path);
-        if (file.Sha256 is not null
-            && !string.Equals(Convert.ToHexString(hash.GetHashAndReset()), file.Sha256, StringComparison.OrdinalIgnoreCase))
+        if (!string.Equals(Convert.ToHexString(hash.GetHashAndReset()), file.Sha256, StringComparison.OrdinalIgnoreCase))
         {
             throw Mismatch(ModelStoreError.ChecksumMismatch, "SHA-256", file.Path);
         }
@@ -291,13 +370,15 @@ public sealed class ModelStore(string root, HttpClient http, Func<string, long>?
 
     /// <summary>
     /// The <c>/</c>-separated components of a repo path, or null when it is rooted or has a backslash, colon, NUL,
-    /// or an empty, <c>.</c>, <c>..</c> or trailing-dot/space component (Windows would rewrite those).
+    /// or an empty, <c>.</c>, <c>..</c> or trailing-dot/space component (Windows would rewrite those), or a Windows
+    /// device name such as <c>NUL</c> or <c>CON.bin</c> (Windows would open a device).
     /// </summary>
     private static string[]? Components(string path)
     {
         if (path.Length == 0 || Path.IsPathRooted(path) || path.IndexOfAny(['\\', ':', '\0']) >= 0) return null;
         var parts = path.Split('/');
-        return parts.All(p => p.Length > 0 && p != "." && p != ".." && !p.EndsWith('.') && !p.EndsWith(' ')) ? parts : null;
+        return parts.All(p => p.Length > 0 && p != "." && p != ".." && !p.EndsWith('.') && !p.EndsWith(' ')
+            && !ConversationFiles.IsDeviceName(p)) ? parts : null;
     }
 
     /// <summary>Components relative to <c>Models/&lt;id&gt;/</c>, or null when outside the subfolder (or the subfolder itself).</summary>
@@ -322,6 +403,8 @@ public sealed class ModelStore(string root, HttpClient http, Func<string, long>?
 
     private static ModelStoreException Unsafe(string path) =>
         new(ModelStoreError.UnsafePath, $"Refusing unsafe model path {path}.");
+
+    private static ModelStoreException ListingFailed(string message) => new(ModelStoreError.ListingFailed, message);
 
     private static ModelStoreException Mismatch(ModelStoreError kind, string what, string path) =>
         new(kind, $"{what} mismatch for {path}.");

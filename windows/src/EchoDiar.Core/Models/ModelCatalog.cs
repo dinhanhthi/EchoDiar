@@ -11,7 +11,9 @@ public enum ModelRuntime { WhisperNet, SherpaOnnx }
 /// <param name="Repo">Hugging Face repo id.</param>
 /// <param name="Revision">Full HF commit sha the download is pinned to (never <c>main</c>).</param>
 /// <param name="Files">Allowlist of paths relative to that repo's root, matched as <see cref="ModelEntry.Files"/>.</param>
-public sealed record ModelExtraFiles(string Repo, string Revision, IReadOnlyList<string> Files);
+/// <param name="Sha256">Expected SHA-256 per repo path, as <see cref="ModelEntry.Sha256"/>.</param>
+public sealed record ModelExtraFiles(
+    string Repo, string Revision, IReadOnlyList<string> Files, IReadOnlyDictionary<string, string>? Sha256 = null);
 
 /// <summary>Short quality notes for the three first-class content languages.</summary>
 public sealed record ModelQualityNotes(string En, string Fr, string Vi);
@@ -41,6 +43,11 @@ public sealed record ModelEntry
     /// null = everything under <see cref="Subfolder"/> (or the whole repo).
     /// </summary>
     public IReadOnlyList<string>? Files { get; init; }
+    /// <summary>
+    /// Expected SHA-256 (lowercase hex) per repo path, relative to the repo root. Required for every file the HF
+    /// tree does not list as LFS (no listed hash); when present it is checked instead of the listed LFS oid.
+    /// </summary>
+    public IReadOnlyDictionary<string, string>? Sha256 { get; init; }
     /// <summary>Files from a second repo, installed into the same <c>Models/&lt;id&gt;/</c> folder.</summary>
     public ModelExtraFiles? ExtraFiles { get; init; }
     public required ModelRuntime Runtime { get; init; }
@@ -141,6 +148,11 @@ public static class ModelCatalog
             Repo = "csukuangfj/sherpa-onnx-nemo-parakeet-tdt-0.6b-v3-int8",
             Revision = "2bda32ec70b097a55adaa07d9a7173915b43cc78",
             Files = ["encoder.int8.onnx", "decoder.int8.onnx", "joiner.int8.onnx", "tokens.txt"],
+            // tokens.txt is a plain git blob (no LFS oid in the tree); its hash was read at this revision.
+            Sha256 = new Dictionary<string, string>
+            {
+                ["tokens.txt"] = "d58544679ea4bc6ac563d1f545eb7d474bd6cfa467f0a6e2c1dc1c7d37e3c35d",
+            },
             // 652_184_281 + 11_845_275 + 6_355_277 + 93_939
             Runtime = ModelRuntime.SherpaOnnx, DiskBytes = 670_478_772, RamMB = 1000, RamIsEstimate = true,
             Languages = ParakeetLanguages,

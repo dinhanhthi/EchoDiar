@@ -305,8 +305,11 @@ public static class ConversationFiles
         return path;
     }
 
-    // CON, PRN, AUX, NUL, COM0-9 and LPT0-9 (and ¹²³), any case, before the first dot and trailing spaces.
-    private static bool IsDeviceName(string fileName)
+    /// <summary>
+    /// Whether Windows opens a device for this path component: CON, PRN, AUX, NUL, COM0-9 and LPT0-9 (and ¹²³),
+    /// any case, before the first dot and trailing spaces.
+    /// </summary>
+    public static bool IsDeviceName(string fileName)
     {
         var dot = fileName.IndexOf('.');
         var stem = (dot < 0 ? fileName : fileName[..dot]).TrimEnd(' ');
