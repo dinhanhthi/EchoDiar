@@ -523,6 +523,12 @@ public sealed class RecordingEngine : IDisposable
     private void SyncRoutes()
     {
         if (_routes is null) return;
+        if (Monitor.IsEntered(_gate))
+        {
+            // Stop called by a handler raised inside _gate: taking _routeLock here could deadlock with Tick.
+            ThreadPool.QueueUserWorkItem(_ => SyncRoutes());
+            return;
+        }
         lock (_routeLock)
         {
             long generation;
