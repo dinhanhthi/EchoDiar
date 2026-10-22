@@ -188,4 +188,41 @@ struct CrossPlatformFixturesTests {
         #expect(abs(crossings - 880) <= 20)
         #expect((system.map(abs).max() ?? 0) < 0.001)
     }
+
+    /// `ECHODIAR_DECODE_FOLDER`: a real conversation folder recorded on Windows. Only read, never written.
+    private static let decodeFolder = ProcessInfo.processInfo.environment["ECHODIAR_DECODE_FOLDER"]
+        .map { URL(fileURLWithPath: ($0 as NSString).expandingTildeInPath, isDirectory: true) }
+
+    /// The app's readers decode a real Windows folder, and its audio has speech on the system channel: a Float32/Int16
+    /// or endianness mistake reads as clipped noise (RMS above 0.5).
+    @Test(.enabled(if: decodeFolder != nil))
+    func decodesRealWindowsFolder() throws {
+        let folder = try #require(Self.decodeFolder)
+        _ = try Conversation.read(from: folder)
+        _ = try Transcript.read(from: folder)
+        let session = try RecordingSession.read(from: folder)
+
+        let url = try #require(ConversationFiles.audioURL(in: folder, fileName: session.audioFileName))
+        let file = try AVAudioFile(forReading: url)
+        let duration = Double(file.length) / file.fileFormat.sampleRate
+        #expect(duration > 0)
+        try #require(file.processingFormat.channelCount >= 2)
+
+        let frames = AVAudioFrameCount(min(file.length, AVAudioFramePosition(file.processingFormat.sampleRate * 10)))
+        let buffer = try #require(AVAudioPCMBuffer(pcmFormat: file.processingFormat, frameCapacity: frames))
+        try file.read(into: buffer, frameCount: frames)
+        let channels = try #require(buffer.floatChannelData)
+        let mic = UnsafeBufferPointer(start: channels[0], count: Int(buffer.frameLength))
+        let system = UnsafeBufferPointer(start: channels[1], count: Int(buffer.frameLength))
+        func rms(_ samples: UnsafeBufferPointer<Float>) -> Float {
+            (samples.reduce(0) { $0 + $1 * $1 } / Float(max(samples.count, 1))).squareRoot()
+        }
+        let micRMS = rms(mic), systemRMS = rms(system)
+        print("decodesRealWindowsFolder: \(session.audioFileName) duration \(duration) s, "
+            + "\(file.fileFormat.channelCount) ch, mic RMS \(micRMS), system RMS \(systemRMS)")
+
+        #expect(systemRMS > 0.01 && systemRMS < 0.5)
+        #expect(mic.allSatisfy { $0.isFinite })
+        #expect(micRMS < 0.5)
+    }
 }
