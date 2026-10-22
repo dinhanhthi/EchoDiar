@@ -605,7 +605,8 @@ public sealed partial class AppViewModel : ObservableObject
         if (IsTranscribing(id) || Conversations.FirstOrDefault(c => c.Id == id) is not { HasAudio: true } conversation) return;
         if (language is not null) RememberLanguage(language);
         var session = await Task.Run(() => ReadSession(conversation.Folder));
-        if (session is not null) _ = SubmitTranscription(conversation.Folder, session, engineId, language);
+        // The launch scan may have started compressing it meanwhile.
+        if (session is not null && !IsTranscribing(id)) _ = SubmitTranscription(conversation.Folder, session, engineId, language);
     }
 
     /// <summary>

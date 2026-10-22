@@ -31,8 +31,9 @@ public sealed partial class AppViewModel
     private Task _settingsWrite = Task.CompletedTask;
 
     /// <summary>
-    /// Conversations in <see cref="CompressAndTranscribeAsync"/> until its last step returns: between the transcription
-    /// and the compression no status guards the audio, which the compressor rewrites and deletes (macOS finishingIDs).
+    /// Conversations in <see cref="CompressAndTranscribeAsync"/> until its last step returns, or compressed by
+    /// <see cref="CompressLeftoversAsync"/>: between the transcription and the compression no status guards the audio,
+    /// which the compressor rewrites and deletes (macOS finishingIDs).
     /// </summary>
     private readonly HashSet<Guid> _finishing = [];
 
@@ -185,17 +186,27 @@ public sealed partial class AppViewModel
     /// <summary>
     /// Launch: folders whose audio is still the CAF of a finished or recovered session (a recording stopped at quit) and
     /// folders left compressing by an interrupted job are compressed one at a time, then transcribed as after a stop
-    /// (macOS AppModel <c>start</c>).
+    /// (macOS AppModel <c>start</c>). A folder being transcribed is skipped (its CAF stays for the next launch); the
+    /// others are marked finishing on the UI thread, so Transcribe stays off while the compressor rewrites the audio.
     /// </summary>
     private async Task CompressLeftoversAsync()
     {
         try
         {
             var folders = await Task.Run(() => UncompressedFolders(_services.Paths.Conversations));
-            foreach (var folder in folders)
+            foreach (var (folder, id) in folders)
             {
                 if (_closing) return;
-                if (await CompressAsync(folder) is { } result) await TranscribeAfterAsync(result);
+                if (IsTranscribing(id)) continue;
+                SetFinishing(id, true);
+                try
+                {
+                    if (await CompressAsync(folder) is { } result) await TranscribeAfterAsync(result);
+                }
+                finally
+                {
+                    SetFinishing(id, false);
+                }
             }
         }
         catch (Exception e)
@@ -273,9 +284,9 @@ public sealed partial class AppViewModel
 
     /// <summary>
     /// Folders of finished or recovered sessions whose audio is still the CAF, and folders left compressing. Hidden
-    /// entries and links are skipped (macOS <c>uncompressedFolders</c>).
+    /// entries and links are skipped (macOS <c>uncompressedFolders</c>). Each with its session id.
     /// </summary>
-    private static List<string> UncompressedFolders(string root)
+    private static List<(string Folder, Guid Id)> UncompressedFolders(string root)
     {
         var options = new EnumerationOptions
         {
@@ -291,13 +302,18 @@ public sealed partial class AppViewModel
         {
             return [];
         }
-        return folders.Where(folder =>
+        var leftovers = new List<(string Folder, Guid Id)>();
+        foreach (var folder in folders)
         {
-            if (ReadSession(folder) is not { Probe: false, State: SessionState.Stopped or SessionState.Recovered } session) return false;
-            if (ReadConversation(folder)?.Status == ConversationStatus.Compressing) return true;
-            return session.AudioFileName == AudioCompressor.CafFileName
-                && ConversationFiles.AudioPath(folder, session.AudioFileName) is { } caf && File.Exists(caf);
-        }).ToList();
+            if (ReadSession(folder) is not { Probe: false, State: SessionState.Stopped or SessionState.Recovered } session) continue;
+            if (ReadConversation(folder)?.Status == ConversationStatus.Compressing
+                || (session.AudioFileName == AudioCompressor.CafFileName
+                    && ConversationFiles.AudioPath(folder, session.AudioFileName) is { } caf && File.Exists(caf)))
+            {
+                leftovers.Add((folder, session.Id));
+            }
+        }
+        return leftovers;
     }
 
     private static Conversation? ReadConversation(string folder)
