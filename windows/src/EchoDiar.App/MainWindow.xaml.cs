@@ -1,8 +1,7 @@
 using System.ComponentModel;
+using EchoDiar.App.Themes;
 using EchoDiar.App.ViewModels;
 using EchoDiar.App.Views;
-using Microsoft.UI.Composition;
-using Microsoft.UI.Composition.SystemBackdrops;
 using Microsoft.UI.Input;
 using Microsoft.UI.Windowing;
 using Microsoft.UI.Xaml;
@@ -23,7 +22,14 @@ public sealed partial class MainWindow : Window
     {
         _model = model;
         InitializeComponent();
-        SystemBackdrop = new TintedMicaBackdrop();
+        if (TintedBackdrop.IsSupported)
+        {
+            SystemBackdrop = new TintedBackdrop();
+        }
+        else
+        {
+            RootGrid.Background = new SolidColorBrush(TintedBackdrop.Tint);
+        }
 
         ExtendsContentIntoTitleBar = true;
         SetTitleBar(TitleBarGrid);
@@ -96,57 +102,5 @@ public sealed partial class MainWindow : Window
         {
             column.Width = length;
         }
-    }
-}
-
-/// <summary>Mica tinted like the macOS window glass (#1C1C1E at 0.6); Desktop Acrylic where Mica is unsupported.</summary>
-internal sealed partial class TintedMicaBackdrop : SystemBackdrop
-{
-    private static readonly Color Tint = Color.FromArgb(0xFF, 0x1C, 0x1C, 0x1E);
-    private const float TintOpacity = 0.6f;
-
-    private ISystemBackdropControllerWithTargets? _controller;
-
-    protected override void OnTargetConnected(ICompositionSupportsSystemBackdrop connectedTarget, XamlRoot xamlRoot)
-    {
-        base.OnTargetConnected(connectedTarget, xamlRoot);
-
-        // Set the theme before the tint: a theme change resets the tint to the theme defaults.
-        var config = new SystemBackdropConfiguration { Theme = SystemBackdropTheme.Dark, IsInputActive = true };
-        _controller = CreateController(config);
-        _controller?.AddSystemBackdropTarget(connectedTarget);
-    }
-
-    protected override void OnTargetDisconnected(ICompositionSupportsSystemBackdrop disconnectedTarget)
-    {
-        base.OnTargetDisconnected(disconnectedTarget);
-        _controller?.RemoveSystemBackdropTarget(disconnectedTarget);
-        _controller?.Dispose();
-        _controller = null;
-    }
-
-    private static ISystemBackdropControllerWithTargets? CreateController(SystemBackdropConfiguration config)
-    {
-        if (MicaController.IsSupported())
-        {
-            var mica = new MicaController();
-            mica.SetSystemBackdropConfiguration(config);
-            mica.TintColor = Tint;
-            mica.TintOpacity = TintOpacity;
-            mica.FallbackColor = Tint;
-            return mica;
-        }
-
-        if (DesktopAcrylicController.IsSupported())
-        {
-            var acrylic = new DesktopAcrylicController();
-            acrylic.SetSystemBackdropConfiguration(config);
-            acrylic.TintColor = Tint;
-            acrylic.TintOpacity = TintOpacity;
-            acrylic.FallbackColor = Tint;
-            return acrylic;
-        }
-
-        return null;
     }
 }
