@@ -135,6 +135,29 @@ public sealed class FileFormatTests : IDisposable
         Assert.True(Conversation.Read(_dir).HasSummary);
     }
 
+    // Swift: a null required key or array element fails the decode (the corrupt-file fallback); a null optional key
+    // reads as its default. Neither may leave a null in a non-nullable property.
+    [Theory]
+    [InlineData(Conversation.SummaryIndexFileName, """{"version":1,"summaries":null}""")]
+    [InlineData(Conversation.SummaryIndexFileName, """{"version":1,"summaries":[null]}""")]
+    [InlineData(ChatLog.FileName, """{"version":1,"messages":null}""")]
+    [InlineData(ChatLog.FileName, """{"version":1,"messages":[null]}""")]
+    [InlineData(ChatLog.FileName, """{"version":1,"messages":[{"role":"assistant","text":"A","references":[null]}]}""")]
+    public void NullValuesInHostileJsonFallBackLikeMalformedJson(string fileName, string json)
+    {
+        if (fileName == ChatLog.FileName)
+        {
+            File.WriteAllText(Path.Combine(_dir, fileName), json);
+            Assert.Empty(ChatLog.Read(_dir).Messages);
+        }
+        else
+        {
+            Directory.CreateDirectory(Path.Combine(_dir, Conversation.SummariesFolderName));
+            File.WriteAllText(Path.Combine(_dir, Conversation.SummariesFolderName, fileName), json);
+            Assert.Empty(Conversation.ReadSummaryVersions(_dir));
+        }
+    }
+
     [Fact]
     public void ResumeRestoresTheArchivedChatAndArchivesTheOpenOne()
     {

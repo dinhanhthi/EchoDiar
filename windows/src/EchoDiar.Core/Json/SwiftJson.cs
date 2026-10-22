@@ -1,8 +1,10 @@
+using System.Collections;
 using System.Globalization;
 using System.Text.Encodings.Web;
 using System.Text.Json;
 using System.Text.Json.Nodes;
 using System.Text.Json.Serialization;
+using System.Text.Json.Serialization.Metadata;
 
 namespace EchoDiar.Core.Json;
 
@@ -30,10 +32,50 @@ public static class SwiftJson
             PropertyNameCaseInsensitive = false,
             UnmappedMemberHandling = JsonUnmappedMemberHandling.Skip,
             WriteIndented = true,
+            RespectNullableAnnotations = true,
+            TypeInfoResolver = new DefaultJsonTypeInfoResolver { Modifiers = { ReadNullsAsSwift } },
             Converters = { new UpperGuidConverter() },
         };
         options.MakeReadOnly(populateMissingResolver: true);
         return options;
+    }
+
+    /// <summary>
+    /// <c>null</c> as Swift decodes it: on a key that is optional but not nullable here (<c>decodeIfPresent ?? default</c>)
+    /// it keeps the default; in an array or dictionary of non-optionals it throws. A required key that is not nullable
+    /// already throws (<see cref="JsonSerializerOptions.RespectNullableAnnotations"/>), as Swift's <c>decode</c> does.
+    /// </summary>
+    private static void ReadNullsAsSwift(JsonTypeInfo info)
+    {
+        if (info.Kind != JsonTypeInfoKind.Object) return;
+        foreach (var property in info.Properties)
+        {
+            if (property.Set is not { } set || property.PropertyType.IsValueType) continue;
+            var keepsDefault = !property.IsSetNullable && !property.IsRequired;
+            if (keepsDefault) property.IsSetNullable = true;
+            property.Set = (target, value) =>
+            {
+                if (value is null && keepsDefault) return;
+                if (value is not null) RejectNullItems(value);
+                set(target, value);
+            };
+        }
+    }
+
+    private static void RejectNullItems(object value)
+    {
+        var items = value switch
+        {
+            IDictionary dictionary => dictionary.Values,
+            string => null,
+            IEnumerable enumerable => enumerable,
+            _ => null,
+        };
+        if (items is null) return;
+        foreach (var item in items)
+        {
+            if (item is null) throw new JsonException("Null array element or dictionary value.");
+        }
     }
 
     /// <summary>UTF-8 JSON, indented, with object keys sorted (ordinal) at every level.</summary>
