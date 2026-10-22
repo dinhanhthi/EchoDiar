@@ -42,6 +42,9 @@ public sealed partial class MainWindow : Window
         _model = model;
         InitializeComponent();
         StartupTrace.Write("MainWindow InitializeComponent done");
+        // Taskbar, Alt+Tab and title bar icon (windows/tools/make-icons.sh makes it from assets/logo.png).
+        var icon = Path.Combine(AppContext.BaseDirectory, "Assets", "EchoDiar.ico");
+        if (File.Exists(icon)) AppWindow.SetIcon(icon);
 #if DEBUG
         TraceWindowEvents();
 #endif

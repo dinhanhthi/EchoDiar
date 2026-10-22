@@ -18,6 +18,7 @@ windows/
   tests/EchoDiar.Tests/         net10.0 xUnit v3 tests for Core, plus the cross-platform Fixtures/
   scripts/vm-install.ps1        installs a CI build in a Windows VM
   scripts/qa-fixtures.sh        makes the QA audio and model fixtures on the Mac
+  tools/make-icons.sh           re-run after a logo change: regenerates App/Assets from assets/logo.png
 ```
 
 ProjectReference graph (no cycles):

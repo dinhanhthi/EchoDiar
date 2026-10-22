@@ -14,6 +14,7 @@
 
   <ItemGroup>
     <Content Include="Assets\**\*.png" />
+    <Content Include="Assets\EchoDiar.ico" />
   </ItemGroup>
 
   <ItemGroup>
