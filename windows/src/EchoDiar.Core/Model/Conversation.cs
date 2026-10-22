@@ -286,20 +286,38 @@ public static class ConversationFiles
 {
     /// <summary>
     /// <c>folder/fileName</c>, or null when <paramref name="fileName"/> is not a plain name (empty, <c>.</c>, <c>..</c>,
-    /// contains <c>/</c>, <c>\</c>, <c>:</c> or NUL), points outside <paramref name="folder"/>, or is a symlink. A
-    /// missing file is allowed; callers check existence.
+    /// contains <c>/</c>, <c>\</c>, <c>:</c> or NUL, ends with a dot or a space, or is a Windows device name such as
+    /// <c>CON</c> or <c>COM1.caf</c>), points outside <paramref name="folder"/>, or is a symlink. The same on every OS,
+    /// as the library is shared with macOS. A missing file is allowed; callers check existence.
     /// </summary>
     public static string? AudioPath(string folder, string fileName)
     {
         if (fileName is "" or "." or "..") return null;
         // ':' too: a drive-relative name ("C:x") or an NTFS alternate data stream ("audio.caf:x"). NUL: path APIs throw.
         if (fileName.IndexOfAny(['/', '\\', ':', '\0']) >= 0) return null;
+        // Windows drops a trailing dot or space, and opens a device for a reserved name (even with an extension).
+        if (fileName[^1] is '.' or ' ' || IsDeviceName(fileName)) return null;
         var path = Path.Combine(folder, fileName);
         if (Path.GetFileName(path) != fileName) return null;
         if (new FileInfo(path).LinkTarget is not null) return null;
         var parent = Path.GetDirectoryName(Path.GetFullPath(path));
         if (parent is null || !string.Equals(Trim(parent), Trim(Path.GetFullPath(folder)), PathComparison)) return null;
         return path;
+    }
+
+    // CON, PRN, AUX, NUL, COM0-9 and LPT0-9 (and ¹²³), any case, before the first dot and trailing spaces.
+    private static bool IsDeviceName(string fileName)
+    {
+        var dot = fileName.IndexOf('.');
+        var stem = (dot < 0 ? fileName : fileName[..dot]).TrimEnd(' ');
+        if (stem.Equals("CON", StringComparison.OrdinalIgnoreCase) || stem.Equals("PRN", StringComparison.OrdinalIgnoreCase)
+            || stem.Equals("AUX", StringComparison.OrdinalIgnoreCase) || stem.Equals("NUL", StringComparison.OrdinalIgnoreCase))
+        {
+            return true;
+        }
+        return stem.Length == 4
+            && (stem.StartsWith("COM", StringComparison.OrdinalIgnoreCase) || stem.StartsWith("LPT", StringComparison.OrdinalIgnoreCase))
+            && "0123456789¹²³".Contains(stem[3]);
     }
 
     private static readonly StringComparison PathComparison =

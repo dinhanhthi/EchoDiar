@@ -49,8 +49,8 @@ public sealed class LibraryStore(string root, IFileTrash trash)
 
     /// <summary>
     /// Rescans the root. Reads only metadata: <c>conversation.json</c> when present, else derived from
-    /// <c>session.json</c>. Never writes. Hidden folders, links, probe sessions, and folders where neither file
-    /// decodes, are skipped.
+    /// <c>session.json</c>. Never writes. Hidden folders, links, probe sessions, folders where neither file decodes, and
+    /// folders that otherwise fail to load, are skipped.
     /// </summary>
     public Task<IReadOnlyList<Conversation>> RefreshAsync() => Run(() =>
     {
@@ -71,7 +71,7 @@ public sealed class LibraryStore(string root, IFileTrash trash)
             return;
         }
         var list = Conversations.ToList();
-        if (Load(list[index].Folder) is { } conversation) list[index] = conversation;
+        if (TryLoad(list[index].Folder) is { } conversation) list[index] = conversation;
         else list.RemoveAt(index);
         Publish(list);
     });
@@ -217,7 +217,7 @@ public sealed class LibraryStore(string root, IFileTrash trash)
             var options = new EnumerationOptions { AttributesToSkip = 0, IgnoreInaccessible = true };
             foreach (var folder in Directory.EnumerateDirectories(Root, "*", options))
             {
-                if (Load(folder) is { } conversation) list.Add(conversation);
+                if (TryLoad(folder) is { } conversation) list.Add(conversation);
             }
         }
         Publish(list.OrderByDescending(c => c.CreatedAt).ToList());
@@ -255,6 +255,19 @@ public sealed class LibraryStore(string root, IFileTrash trash)
     {
         Volatile.Write(ref _conversations, list);
         Changed?.Invoke(list);
+    }
+
+    // One folder that fails to load in an unforeseen way (session.json is untrusted) is skipped, not the whole library.
+    private static Conversation? TryLoad(string folder)
+    {
+        try
+        {
+            return Load(folder);
+        }
+        catch (Exception e) when (e is not (OutOfMemoryException or OperationCanceledException))
+        {
+            return null;
+        }
     }
 
     private static Conversation? Load(string folder)
@@ -304,18 +317,23 @@ public sealed class LibraryStore(string root, IFileTrash trash)
     }
 
     /// <summary>
-    /// Seconds of audio in a CAF file; 0 when it is missing, empty or unreadable. Other formats (m4a) read as 0 until
-    /// Core has a decoder (Phase 14); the compressor writes <c>conversation.json</c> with the duration anyway.
+    /// Seconds of audio in a CAF file; 0 when it is missing, not a regular file, empty or unreadable. Other formats
+    /// (m4a) read as 0 until Core has a decoder (Phase 14); the compressor writes <c>conversation.json</c> with the
+    /// duration anyway.
     /// </summary>
     private static double AudioDuration(string path)
     {
         if (!string.Equals(Path.GetExtension(path), ".caf", StringComparison.OrdinalIgnoreCase)) return 0;
         try
         {
+            var info = new FileInfo(path);
+            if (!info.Exists || (info.Attributes & FileAttributes.ReparsePoint) != 0) return 0;
             using var reader = new CafFile.Reader(path);
             return reader.Frames > 0 && reader.SampleRate > 0 ? reader.Frames / reader.SampleRate : 0;
         }
-        catch (Exception e) when (e is IOException or UnauthorizedAccessException or InvalidDataException)
+        // NotSupportedException, ArgumentException: a path FileStream rejects (a device, say).
+        catch (Exception e) when (e is IOException or UnauthorizedAccessException or InvalidDataException
+            or NotSupportedException or ArgumentException)
         {
             return 0;
         }

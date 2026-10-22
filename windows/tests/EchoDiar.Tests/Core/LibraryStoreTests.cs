@@ -1,4 +1,5 @@
 using EchoDiar.Core;
+using EchoDiar.Core.Audio;
 using EchoDiar.Core.Model;
 
 namespace EchoDiar.Tests.Core;
@@ -59,6 +60,44 @@ public sealed class LibraryStoreTests : IDisposable
         Directory.Delete(newer.Folder, recursive: true);
         await store.ReloadAsync(newer.Id);
         Assert.Equal([older.Id], store.Conversations.Select(c => c.Id));
+    }
+
+    // session.json is untrusted: an audio name that Windows resolves to a DOS device (CON, NUL, COM1, even with an
+    // extension, inside a folder) or alters (a trailing dot) is not a plain name, and one such folder must not fault
+    // the refresh and hide the whole library.
+    [Fact]
+    public async Task HostileSessionDoesNotHideTheLibrary()
+    {
+        string[] hostileNames = ["CON.caf", "nul.m4a", "COM1.caf", "audio.caf."];
+        foreach (var name in hostileNames.Concat(["PRN", "aux.caf", "LPT¹.caf", "com9.x.caf", "con .caf", "audio.caf "]))
+        {
+            Assert.Null(ConversationFiles.AudioPath(_dir, name));
+        }
+        var hostileIds = hostileNames.Select(name =>
+        {
+            var session = new RecordingSession { State = SessionState.Stopped, AudioFileName = name };
+            session.Write(session.Folder(_dir));
+            return session.Id;
+        }).ToList();
+        var normal = new RecordingSession { State = SessionState.Stopped };
+        var normalFolder = normal.Folder(_dir);
+        normal.Write(normalFolder);
+        using (var writer = new CafFile.Writer(Path.Combine(normalFolder, normal.AudioFileName), 16_000, 2, CafFile.SampleFormat.Int16))
+        {
+            writer.Append(new short[1_600 * 2]);
+        }
+
+        var conversations = await new LibraryStore(_dir, new DeletingTrash()).RefreshAsync();
+
+        var listed = Assert.Single(conversations, c => c.Id == normal.Id);
+        Assert.Equal(0.1, listed.Duration, precision: 6);
+        Assert.True(listed.HasAudio);
+        foreach (var id in hostileIds)
+        {
+            var hostile = Assert.Single(conversations, c => c.Id == id);
+            Assert.Equal(0, hostile.Duration);
+            Assert.False(hostile.HasAudio);
+        }
     }
 
     private sealed class DeletingTrash : IFileTrash
