@@ -26,15 +26,13 @@
     <PackageReference Include="Microsoft.WindowsAppSDK.DWrite" />
     <PackageReference Include="Microsoft.Windows.SDK.BuildTools" />
     <PackageReference Include="CommunityToolkit.Mvvm" />
-    <PackageReference Include="Whisper.net" />
-    <PackageReference Include="Whisper.net.Runtime" />
-    <PackageReference Include="org.k2fsa.sherpa.onnx" />
     <PackageReference Include="LLamaSharp" />
     <PackageReference Include="LLamaSharp.Backend.Cpu" />
   </ItemGroup>
 
   <ItemGroup>
     <ProjectReference Include="..\EchoDiar.Platform\EchoDiar.Platform.csproj" />
+    <ProjectReference Include="..\EchoDiar.Transcribe\EchoDiar.Transcribe.csproj" />
   </ItemGroup>
 
   <!-- Single-project MSIX: lets Visual Studio show Package and Publish for this project. -->

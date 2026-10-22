@@ -3,11 +3,12 @@ using System.Globalization;
 using System.Runtime.InteropServices;
 using System.Text.Json;
 using EchoDiar.Core.Audio;
+using EchoDiar.Core.Models;
 using EchoDiar.Platform.Audio;
+using EchoDiar.Transcribe;
+using EchoDiar.Transcribe.Engines;
 using LLama.Native;
 using Microsoft.UI.Dispatching;
-using SherpaOnnx;
-using Whisper.net;
 
 namespace EchoDiar.App;
 
@@ -293,10 +294,21 @@ internal static class CaptureProbe
 
     // --native-probe <modelsDir>, with sample.wav and two-voice.wav in <modelsDir>\..
 
+    // Ad-hoc entries over the files in <modelsDir> (the engines only need the file names): the catalog has no tiny Whisper.
+    private static readonly ModelEntry WhisperTiny = ModelCatalog.Entry("whisper-base")! with
+    {
+        Id = "whisper-tiny-probe",
+        Files = ["ggml-tiny.bin"],
+    };
+
+    private static readonly ModelEntry Diarizer = ModelCatalog.Entry("sherpa-pyannote-3")!;
+
     private static async Task RunNativeAsync(string[] args)
     {
         Directory.CreateDirectory(ProbesDir);
-        var path = Path.Combine(ProbesDir, $"native-{Timestamp()}.json");
+        var stamp = Timestamp();
+        var path = Path.Combine(ProbesDir, $"native-{stamp}.json");
+        var work = Path.Combine(ProbesDir, $"native-{stamp}");
         var errors = new List<string>();
         string? whisperText = null;
         int? sherpaSegments = null;
@@ -312,10 +324,14 @@ internal static class CaptureProbe
 
             var models = Path.GetFullPath(args[0]);
             var fixtures = Path.GetFullPath(Path.Combine(models, ".."));
+            Directory.CreateDirectory(work);
 
             try
             {
-                whisperText = await TranscribeAsync(Path.Combine(models, "ggml-tiny.bin"), Path.Combine(fixtures, "sample.wav"));
+                var audio = Channel(Path.Combine(fixtures, "sample.wav"), work);
+                var segments = await WhisperEngine.Create(WhisperTiny, models)
+                    .TranscribeAsync(audio, [new LanguageRange(0, null, "en")], _ => { }, CancellationToken.None);
+                whisperText = string.Join(" ", segments.Select(s => s.Text)).Trim();
             }
             catch (Exception ex)
             {
@@ -324,10 +340,10 @@ internal static class CaptureProbe
 
             try
             {
-                (sherpaSegments, sherpaSpeakers) = Diarize(
-                    Path.Combine(models, "model.onnx"),
-                    Path.Combine(models, "3dspeaker_speech_campplus_sv_zh_en_16k-common_advanced.onnx"),
-                    Path.Combine(fixtures, "two-voice.wav"));
+                var audio = Channel(Path.Combine(fixtures, "two-voice.wav"), work);
+                var turns = await SherpaDiarizer.Create(Diarizer, models, null).DiarizeAsync(audio, _ => { }, CancellationToken.None);
+                sherpaSegments = turns.Count;
+                sherpaSpeakers = turns.Select(t => t.SpeakerIndex).Distinct().Count();
             }
             catch (Exception ex)
             {
@@ -355,42 +371,21 @@ internal static class CaptureProbe
                 errors,
             };
             await File.WriteAllTextAsync(path, JsonSerializer.Serialize(result, JsonOptions));
+            if (Directory.Exists(work)) Directory.Delete(work, recursive: true);
         }
     }
 
-    private static async Task<string> TranscribeAsync(string modelPath, string wavPath)
+    /// <summary>The 16 kHz mono CAF the engines read, made from a 16 kHz PCM16 WAV fixture in <paramref name="dir"/>.</summary>
+    private static string Channel(string wavPath, string dir)
     {
-        var (samples, rate) = ReadWav(wavPath);
-        if (rate != 16000) throw new InvalidDataException($"{wavPath} is {rate} Hz; Whisper needs 16000 Hz.");
-
-        using var factory = WhisperFactory.FromPath(modelPath);
-        await using var processor = factory.CreateBuilder().WithLanguage("en").Build();
-        var text = new System.Text.StringBuilder();
-        await foreach (var segment in processor.ProcessAsync(samples))
+        var caf = Path.Combine(dir, Path.ChangeExtension(Path.GetFileName(wavPath), ".caf"));
+        MonoAudio.Extract(0, wavPath, caf, (path, _) =>
         {
-            text.Append(segment.Text);
-        }
-
-        return text.ToString().Trim();
-    }
-
-    private static (int Segments, int Speakers) Diarize(string segmentationModel, string embeddingModel, string wavPath)
-    {
-        var config = new OfflineSpeakerDiarizationConfig();
-        config.Segmentation.Pyannote.Model = segmentationModel;
-        config.Embedding.Model = embeddingModel;
-        config.Clustering.NumClusters = -1; // let the threshold decide how many speakers there are
-        config.Clustering.Threshold = 0.5f;
-
-        using var diarizer = new OfflineSpeakerDiarization(config);
-        var (samples, rate) = ReadWav(wavPath);
-        if (rate != diarizer.SampleRate)
-        {
-            throw new InvalidDataException($"{wavPath} is {rate} Hz; the diarizer needs {diarizer.SampleRate} Hz.");
-        }
-
-        var segments = diarizer.Process(samples);
-        return (segments.Length, segments.Select(s => s.Speaker).Distinct().Count());
+            var (samples, rate) = ReadWav(path);
+            if (rate != MonoAudio.SampleRate) throw new InvalidDataException($"{path} is {rate} Hz; the engines need 16000 Hz.");
+            return samples;
+        });
+        return caf;
     }
 
     /// <summary>Reads a 16-bit PCM WAV file as mono floats (channels averaged).</summary>
