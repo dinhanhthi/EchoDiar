@@ -5,6 +5,7 @@ using Windows.Win32.Foundation;
 using Windows.Win32.Graphics.Dwm;
 using Windows.Win32.Graphics.Gdi;
 using Windows.Win32.UI.HiDpi;
+using Windows.Win32.UI.Input.KeyboardAndMouse;
 using Windows.Win32.UI.WindowsAndMessaging;
 
 namespace EchoDiar.Platform.Windowing;
@@ -87,6 +88,32 @@ public static class PillWindowStyle
         if (!Guarded.Remove((HWND)hwnd) || Guarded.Count > 0 || _cbtHook.IsNull) return;
         PInvoke.UnhookWindowsHookEx(_cbtHook);
         _cbtHook = default;
+    }
+
+    /// <summary>
+    /// Moves the window's top-left corner to <paramref name="origin"/> (physical screen pixels) without activating it
+    /// or changing its size or z-order. <c>AppWindow.Move</c> may ask for activation, which the CBT hook refuses.
+    /// False when Windows refused.
+    /// </summary>
+    public static bool MoveTo(nint hwnd, PointInt32 origin) =>
+        PInvoke.SetWindowPos((HWND)hwnd, HWND.Null, origin.X, origin.Y, 0, 0,
+            SET_WINDOW_POS_FLAGS.SWP_NOSIZE | SET_WINDOW_POS_FLAGS.SWP_NOZORDER | SET_WINDOW_POS_FLAGS.SWP_NOOWNERZORDER
+            | SET_WINDOW_POS_FLAGS.SWP_NOACTIVATE);
+
+    /// <summary>The pointer's position in physical screen pixels; null when Windows cannot tell.</summary>
+    public static PointInt32? CursorPosition() =>
+        PInvoke.GetCursorPos(out var point) ? new PointInt32(point.X, point.Y) : null;
+
+    /// <summary>
+    /// The primary (logical left) mouse button is down now, whichever window the pointer is over: GetAsyncKeyState
+    /// reads the physical buttons, so swapped buttons read the right one.
+    /// </summary>
+    public static bool IsPrimaryButtonDown()
+    {
+        var key = PInvoke.GetSystemMetrics(SYSTEM_METRICS_INDEX.SM_SWAPBUTTON) != 0
+            ? VIRTUAL_KEY.VK_RBUTTON
+            : VIRTUAL_KEY.VK_LBUTTON;
+        return (PInvoke.GetAsyncKeyState((int)key) & 0x8000) != 0;
     }
 
     /// <summary>False once the window is destroyed (closed by the system or the user).</summary>

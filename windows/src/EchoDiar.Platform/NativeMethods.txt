@@ -88,3 +88,7 @@ CallNextHookEx
 HOOKPROC
 HCBT_ACTIVATE
 GetCurrentThreadId
+GetCursorPos
+GetAsyncKeyState
+VIRTUAL_KEY
+GetSystemMetrics
