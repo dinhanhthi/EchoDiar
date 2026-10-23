@@ -410,9 +410,12 @@ public sealed class CLIRunner : ILLMProvider
     private async Task RunStartedAsync(Process process, string input, ProcessControl control, Action<string> yield)
     {
         var name = Preset.ExecutableName();
-        control.Attach(process);
+        // The only WaitForExitAsync on this process: each call adds and removes an Exited handler, and concurrent
+        // calls can lose one (the event's add/remove is not thread-safe), leaving that wait pending forever.
+        var exited = process.WaitForExitAsync(CancellationToken.None);
+        control.Attach(process, exited);
         _ = Task.Run(() => WriteInputAsync(process, input, control.InputStopped));
-        var exitGrace = AfterExitAsync(process);
+        var exitGrace = AfterExitAsync(exited);
         var errorTail = new MemoryStream();
         var errors = PumpAsync(process.StandardError.BaseStream, exitGrace, (buffer, count) =>
         {
@@ -461,7 +464,7 @@ public sealed class CLIRunner : ILLMProvider
             control.Stop(StopReason.Failed);
         });
         Consume();
-        await process.WaitForExitAsync(CancellationToken.None);
+        await exited;
         await errors;
         var status = process.ExitCode;
 
@@ -480,10 +483,10 @@ public sealed class CLIRunner : ILLMProvider
         if (answer is not null) yield(answer);
     }
 
-    /// <summary>Completes <see cref="ExitGrace"/> after <paramref name="process"/> exits.</summary>
-    private static async Task AfterExitAsync(Process process)
+    /// <summary>Completes <see cref="ExitGrace"/> after <paramref name="exited"/>.</summary>
+    private static async Task AfterExitAsync(Task exited)
     {
-        await process.WaitForExitAsync(CancellationToken.None);
+        await exited;
         await Task.Delay(ExitGrace);
     }
 
@@ -580,6 +583,7 @@ public sealed class CLIRunner : ILLMProvider
         private readonly Lock _lock = new();
         private readonly CancellationTokenSource _input = new();
         private Process? _process;
+        private Task? _exited;
         private StopReason? _reason;
 
         /// <summary>Fires when the CLI is asked to stop: the stdin writer stops and closes stdin.</summary>
@@ -593,53 +597,58 @@ public sealed class CLIRunner : ILLMProvider
             }
         }
 
-        /// <summary>Stops <paramref name="process"/> right away when a stop came before it started.</summary>
-        public void Attach(Process process)
+        /// <summary>
+        /// Stops <paramref name="process"/> right away when a stop came before it started. <paramref name="exited"/> is
+        /// the run's own wait for its exit.
+        /// </summary>
+        public void Attach(Process process, Task exited)
         {
             bool stopped;
             lock (_lock)
             {
                 _process = process;
+                _exited = exited;
                 stopped = _reason is not null;
             }
-            if (stopped) Interrupt(process);
+            if (stopped) Interrupt(process, exited);
         }
 
         /// <summary>The run is over; a later stop only records its reason.</summary>
         public void Detach()
         {
-            lock (_lock) _process = null;
+            lock (_lock)
+            {
+                _process = null;
+                _exited = null;
+            }
         }
 
         public void Stop(StopReason reason)
         {
             Process? process;
+            Task? exited;
             lock (_lock)
             {
                 if (_reason is not null) return;
                 _reason = reason;
                 process = _process;
+                exited = _exited;
             }
-            if (process is not null) Interrupt(process);
+            if (process is not null && exited is not null) Interrupt(process, exited);
         }
 
-        private void Interrupt(Process process)
+        private void Interrupt(Process process, Task exited)
         {
             _input.Cancel();
             _ = Task.Run(async () =>
             {
                 try
                 {
-                    using var grace = new CancellationTokenSource(StopGrace);
-                    await process.WaitForExitAsync(grace.Token);
+                    await exited.WaitAsync(StopGrace);
                 }
-                catch (OperationCanceledException)
+                catch (TimeoutException)
                 {
                     Kill(process);
-                }
-                catch (InvalidOperationException)
-                {
-                    // Disposed: the run is over.
                 }
             });
         }
