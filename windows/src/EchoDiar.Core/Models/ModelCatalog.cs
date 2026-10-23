@@ -5,7 +5,13 @@ public enum ModelKind { Asr, Diarization, Llm, Embedding }
 public enum ModelTier { Fast, Balanced, Quality }
 
 /// <summary>The engine that runs a catalog entry. Phase 24 adds the local LLM and embedder runtimes.</summary>
-public enum ModelRuntime { WhisperNet, SherpaOnnx }
+public enum ModelRuntime
+{
+    WhisperNet,
+    SherpaOnnx,
+    /// <summary>Phi Silica through Windows AI (Copilot+ PCs): part of Windows, nothing to download.</summary>
+    WindowsAI,
+}
 
 /// <summary>Files fetched from a second Hugging Face repo for the same model (a two-repo diarizer).</summary>
 /// <param name="Repo">Hugging Face repo id.</param>
@@ -189,7 +195,20 @@ public static class ModelCatalog
 
     // LLM and embedding: Phase 24 adds the GGUF entries (and their runtimes) here.
 
-    public static readonly IReadOnlyList<ModelEntry> Llm = [];
+    public static readonly IReadOnlyList<ModelEntry> Llm =
+    [
+        // Swift apple-foundation-models: the system model, no download (Repo and Revision null).
+        new()
+        {
+            Id = "windows-phi-silica", Kind = ModelKind.Llm, Tier = ModelTier.Fast,
+            DisplayName = "Windows AI Phi Silica (system)",
+            Repo = null, Revision = null,
+            Runtime = ModelRuntime.WindowsAI, DiskBytes = 0, RamMB = 0, RamIsEstimate = false,
+            Languages = null,
+            QualityNotes = new("Fair (small context, Copilot+ PCs)", "Unverified", "Unverified"),
+            License = "Microsoft (system)",
+        },
+    ];
 
     public static readonly IReadOnlyList<ModelEntry> Embedding = [];
 

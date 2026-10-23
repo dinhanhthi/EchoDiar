@@ -6,15 +6,25 @@
     <TargetPlatformMinVersion>10.0.22000.0</TargetPlatformMinVersion>
     <RootNamespace>EchoDiar.Platform</RootNamespace>
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+    <!-- The Windows App SDK packages turn on MRT Core resource indexing; this library has no resources. -->
+    <AppxGeneratePriEnabled>false</AppxGeneratePriEnabled>
   </PropertyGroup>
 
   <ItemGroup>
     <PackageReference Include="Microsoft.Windows.CsWin32" PrivateAssets="all" />
     <PackageReference Include="NAudio.Wasapi" />
+    <!-- Phi Silica (WindowsAIProvider). The component package (Base and Foundation only), never the metapackage, whose
+         ML component ships an onnxruntime.dll that collides with sherpa-onnx's. Private: Base makes every exe that gets
+         it a self-contained Windows App SDK app (Platform.Tests would need a RID), so App references it itself. -->
+    <PackageReference Include="Microsoft.WindowsAppSDK.AI" PrivateAssets="all" />
+    <!-- Foundation 2.3.12 asks for InteractiveExperiences >= 2.1.8, which NuGet does not have (NU1603); pin the
+         2.1.9 that App uses. -->
+    <PackageReference Include="Microsoft.WindowsAppSDK.InteractiveExperiences" PrivateAssets="all" />
   </ItemGroup>
 
   <ItemGroup>
     <ProjectReference Include="..\EchoDiar.Core\EchoDiar.Core.csproj" />
+    <ProjectReference Include="..\EchoDiar.AI\EchoDiar.AI.csproj" />
   </ItemGroup>
 
   <ItemGroup>

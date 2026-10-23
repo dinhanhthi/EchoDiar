@@ -27,6 +27,8 @@
     <PackageReference Include="Microsoft.WindowsAppSDK.WinUI" />
     <PackageReference Include="Microsoft.WindowsAppSDK.InteractiveExperiences" />
     <PackageReference Include="Microsoft.WindowsAppSDK.DWrite" />
+    <!-- Windows AI (Platform's WindowsAIProvider): depends only on Base and Foundation, not ML. -->
+    <PackageReference Include="Microsoft.WindowsAppSDK.AI" />
     <PackageReference Include="Microsoft.Windows.SDK.BuildTools" />
     <PackageReference Include="CommunityToolkit.Mvvm" />
     <PackageReference Include="CommunityToolkit.WinUI.Controls.SettingsControls" />
