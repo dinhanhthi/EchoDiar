@@ -231,12 +231,17 @@ public sealed partial class LibraryIndex(string root)
         }));
 
     /// <summary>
-    /// Reads every shard of <paramref name="key"/> into memory, replacing what was loaded. Unreadable shards, and shards
-    /// whose vector length differs from the first one read, are skipped (their conversations come back as stale).
-    /// Cancelled midway, no key is loaded.
+    /// Reads every shard of <paramref name="key"/> into memory, replacing what was loaded; does nothing when
+    /// <paramref name="key"/> is already loaded. Unreadable shards, and shards whose vector length differs from the first
+    /// one read, are skipped (their conversations come back as stale). Cancelled midway, no key is loaded.
     /// </summary>
+    /// <remarks>
+    /// The already-loaded check stands in for macOS <c>libraryIndexKey</c>: Swift loads cannot be cancelled, ours can,
+    /// so only the index knows which key is in.
+    /// </remarks>
     public Task LoadAsync(string key, CancellationToken cancellationToken = default) => RunAsync(() =>
     {
+        if (_key == key) return;
         _entries = [];
         _dimension = null;
         _key = null;

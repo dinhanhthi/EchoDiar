@@ -111,7 +111,28 @@ public sealed class LibraryIndexTests : IDisposable
         Assert.False(Directory.Exists(shards));
     }
 
-    // A load cancelled while it reads shards leaves no key loaded (IndexAsync refuses), and the next load works again.
+    // Loading the key already loaded reads nothing (shards added on disk stay out); another key in between loads it again.
+    [Fact]
+    public async Task LoadOfTheLoadedKeyKeepsItsEntries()
+    {
+        var (conversation, transcript) = MakeConversation(turns: 5);
+        var index = new LibraryIndex(Rag);
+        await index.LoadAsync(Key, Token);
+        await index.IndexAsync(conversation, transcript, null, new KeywordEmbedder(), Token);
+        var shard = Path.Combine(Rag, Key, LibraryIndex.ShardFileName(conversation.Id));
+        for (var i = 0; i < 3; i++)
+            File.Copy(shard, Path.Combine(Rag, Key, LibraryIndex.ShardFileName(Guid.NewGuid())));
+
+        await index.LoadAsync(Key, Token);
+        Assert.Equal(1, await index.CountAsync());
+
+        await index.LoadAsync("other", Token);
+        await index.LoadAsync(Key, Token);
+        Assert.Equal(4, await index.CountAsync());
+    }
+
+    // A load cancelled while it reads shards leaves no key loaded (IndexAsync refuses), and the next load of the same key
+    // reads it again.
     [Fact]
     public async Task CancelledLoadLeavesNoKeyAndNextLoadIndexesAgain()
     {
@@ -124,11 +145,15 @@ public sealed class LibraryIndexTests : IDisposable
         var shard = Path.Combine(Rag, Key, LibraryIndex.ShardFileName(conversation.Id));
         for (var i = 0; i < copies; i++)
             File.Copy(shard, Path.Combine(Rag, Key, LibraryIndex.ShardFileName(Guid.NewGuid())));
+        // Another key with one shard, loaded before each attempt: a load of the loaded key would do nothing.
+        Directory.CreateDirectory(Path.Combine(Rag, "other"));
+        File.Copy(shard, Path.Combine(Rag, "other", LibraryIndex.ShardFileName(conversation.Id)));
 
         // Retries until the cancel lands inside the loop: not before the load starts (the old shards stay), not after it ends.
         var midway = false;
         for (var attempt = 0; attempt < 20 && !midway; attempt++)
         {
+            await index.LoadAsync("other", Token);
             using var cancel = new CancellationTokenSource();
             var load = index.LoadAsync(Key, cancel.Token);
             await Task.Yield();

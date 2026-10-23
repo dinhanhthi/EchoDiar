@@ -58,9 +58,6 @@ public sealed partial class AppViewModel
     private bool _indexPending;
     private CancellationTokenSource? _indexCancel;
 
-    /// <summary>The embedder key last loaded into the index.</summary>
-    private string? _indexKey;
-
     /// <summary>The next pass deletes the current key's shards first (Rebuild).</summary>
     private bool _indexRebuild;
 
@@ -235,7 +232,6 @@ public sealed partial class AppViewModel
         if (!Settings.RagEnabled)
         {
             await _services.Index.RemoveAllAsync();
-            _indexKey = null;
             RAGStatus = new RAGStatus();
             return;
         }
@@ -247,7 +243,6 @@ public sealed partial class AppViewModel
         if (conversations.Count == 0)
         {
             await _services.Index.RemoveAllAsync();
-            _indexKey = null;
             RAGStatus = RAGStatus with { Total = 0, Indexed = 0 };
             return;
         }
@@ -268,13 +263,7 @@ public sealed partial class AppViewModel
         }
         var key = embedder.Key;
         await _services.Index.RemoveAllExceptAsync(key);
-        if (_indexKey != key)
-        {
-            // A cancelled load leaves no key loaded: forget the old one until this one is in.
-            _indexKey = null;
-            await _services.Index.LoadAsync(key, token);
-            _indexKey = key;
-        }
+        await _services.Index.LoadAsync(key, token);
         if (_indexRebuild)
         {
             _indexRebuild = false;
@@ -563,13 +552,7 @@ public sealed partial class AppViewModel
         var (embedder, _) = await Task.Run(() => _services.MakeEmbedder(settings, configs), token);
         if (embedder is null || (!embedder.IsLocal && EmbedderNeedsConsent(settings, configs))) return null;
         var key = embedder.Key;
-        if (_indexKey != key)
-        {
-            // A cancelled load leaves no key loaded: forget the old one until this one is in.
-            _indexKey = null;
-            await _services.Index.LoadAsync(key, token);
-            _indexKey = key;
-        }
+        await _services.Index.LoadAsync(key, token);
         var gated = embedder is not APITextEmbedder;
         if (gated && ModelGateBusy) return null;
         try
