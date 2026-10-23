@@ -288,6 +288,17 @@ internal sealed class FloatingPillController : IDisposable
         Place();
         // Never Activate(): it would take the focus from the meeting app.
         window.AppWindow.Show(activateWindow: false);
+        GuardInput();
+    }
+
+    /// <summary>
+    /// Clicks on the pill's windows never ask for activation, and its presses are seen before XAML (drag); again on
+    /// every show and layout, as the XAML island may add child windows. Windows already guarded are skipped.
+    /// </summary>
+    private void GuardInput()
+    {
+        var added = PillWindowStyle.GuardInput(_hwnd);
+        if (added.Count > 0) StartupTrace.Write($"The pill's windows guarded: {string.Join(", ", added)}.");
     }
 
     private void Hide()
@@ -309,6 +320,7 @@ internal sealed class FloatingPillController : IDisposable
     {
         if (_disposed) return;
         Place();
+        GuardInput();
     }
 
     // Placement

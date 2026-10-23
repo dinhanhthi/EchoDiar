@@ -1,4 +1,5 @@
 using System.ComponentModel;
+using EchoDiar.App.Services;
 using EchoDiar.App.ViewModels;
 using EchoDiar.Core.Audio;
 using EchoDiar.Core.Settings;
@@ -11,6 +12,7 @@ using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Controls.Primitives;
 using Microsoft.UI.Xaml.Input;
 using Microsoft.UI.Xaml.Media;
+using Windows.Foundation;
 using Windows.Graphics;
 using Windows.UI.ViewManagement;
 
@@ -85,6 +87,7 @@ public sealed partial class FloatingPillWindow : Window
         Capsule.PointerPressed += OnPointerPressed;
         Capsule.SizeChanged += OnCapsuleSizeChanged;
         RootCanvas.Loaded += OnRootLoaded;
+        PillWindowStyle.PrimaryPressed += OnNativePressed;
         Closed += OnClosed;
     }
 
@@ -276,34 +279,83 @@ public sealed partial class FloatingPillWindow : Window
 
     // Drag: the window has no title bar, so a press outside the buttons moves the window by how far the pointer went
     // from where it was pressed, until the button is released. Read from Windows, not from XAML's pointer capture: the
-    // window refuses activation, which cancels XAML's capture (and its moves) on a press.
+    // window refuses activation, which cancels XAML's capture (and its moves) on a press. The press comes from Windows
+    // (PillWindowStyle.PrimaryPressed, seen before XAML) or from XAML's PointerPressed, whichever comes first.
+
+    private nint Hwnd => Win32Interop.GetWindowFromWindowId(AppWindow.Id);
 
     private void OnPointerPressed(object sender, PointerRoutedEventArgs e)
     {
-        if (_closing || !_attached || _dragTimer.IsRunning || IsInButton(e.OriginalSource as DependencyObject)) return;
-        if (!e.GetCurrentPoint(Capsule).Properties.IsLeftButtonPressed) return;
-        if (PillWindowStyle.CursorPosition() is not { } cursor) return;
+        if (_closing || !_attached) return;
+        var inButton = IsInButton(e.OriginalSource as DependencyObject);
+        var left = e.GetCurrentPoint(Capsule).Properties.IsLeftButtonPressed;
+        StartupTrace.Write($"Pill press (XAML): left button {left}, in a button {inButton}, dragging {_dragTimer.IsRunning}.");
+        if (inButton || !left || PillWindowStyle.CursorPosition() is not { } cursor) return;
+        StartDrag(cursor, "XAML");
+        e.Handled = true;
+    }
+
+    /// <summary>A press as Windows delivered it to the pill's windows, in physical screen pixels.</summary>
+    private void OnNativePressed(nint hwnd, PointInt32 point)
+    {
+        if (_closing || !_attached || hwnd != Hwnd) return;
+        // After the window procedure returns: XAML is not asked from inside it.
+        DispatcherQueue.TryEnqueue(() =>
+        {
+            if (_closing || !_attached) return;
+            var inButton = IsButtonAt(point);
+            StartupTrace.Write($"Pill press (Windows) at {point.X},{point.Y}: in a button {inButton?.ToString() ?? "(outside the capsule)"}, dragging {_dragTimer.IsRunning}.");
+            if (inButton == false) StartDrag(point, "Windows");
+        });
+    }
+
+    /// <summary>Whether a button is at the screen point; null when the point is outside the capsule or cannot be mapped.</summary>
+    private bool? IsButtonAt(PointInt32 screen)
+    {
+        if (_xamlRoot is null || PillWindowStyle.ToClient(Hwnd, screen) is not { } client) return null;
+        var scale = _xamlRoot.RasterizationScale;
+        if (scale <= 0 || !double.IsFinite(scale)) return null;
+        var inCapsule = false;
+        foreach (var hit in VisualTreeHelper.FindElementsInHostCoordinates(new Point(client.X / scale, client.Y / scale), Capsule))
+        {
+            if (hit is ButtonBase) return true;
+            inCapsule |= hit == Capsule;
+        }
+        return inCapsule ? false : null;
+    }
+
+    private void StartDrag(PointInt32 cursor, string source)
+    {
+        if (_dragTimer.IsRunning) return;
         _dragStart = cursor;
         _dragOrigin = AppWindow.Position;
         _dragMoved = new PointInt32(0, 0);
         _dragTimer.Start();
-        e.Handled = true;
+        StartupTrace.Write($"Pill drag started ({source}) at {cursor.X},{cursor.Y}, the window at {_dragOrigin.X},{_dragOrigin.Y}.");
     }
 
     private void DragStep()
     {
-        if (_closing || !_attached || !PillWindowStyle.IsPrimaryButtonDown()
-            || PillWindowStyle.CursorPosition() is not { } cursor)
+        var live = !_closing && _attached;
+        var down = live && PillWindowStyle.IsPrimaryButtonDown();
+        if (!down || PillWindowStyle.CursorPosition() is not { } cursor)
         {
             _dragTimer.Stop();
+            var reason = !live ? "the pill hid or closed" : down ? "no pointer position" : "button up";
+            StartupTrace.Write($"Pill drag ended ({reason}), moved {_dragMoved.X},{_dragMoved.Y}.");
             return;
         }
         var moved = new PointInt32(cursor.X - _dragStart.X, cursor.Y - _dragStart.Y);
         if (moved.Equals(_dragMoved)) return;
+        var first = _dragMoved.X == 0 && _dragMoved.Y == 0;
         _dragMoved = moved;
-        var hwnd = Win32Interop.GetWindowFromWindowId(AppWindow.Id);
-        if (!PillWindowStyle.MoveTo(hwnd, new PointInt32(_dragOrigin.X + moved.X, _dragOrigin.Y + moved.Y))) return;
-        Dragged?.Invoke();
+        var placed = PillWindowStyle.MoveTo(Hwnd, new PointInt32(_dragOrigin.X + moved.X, _dragOrigin.Y + moved.Y));
+        if (first)
+        {
+            var at = AppWindow.Position;
+            StartupTrace.Write($"Pill drag first move by {moved.X},{moved.Y}: {(placed ? "moved" : "Windows refused")}, the window at {at.X},{at.Y}.");
+        }
+        if (placed) Dragged?.Invoke();
     }
 
     private bool IsInButton(DependencyObject? element)
@@ -363,6 +415,7 @@ public sealed partial class FloatingPillWindow : Window
         Capsule.PointerPressed -= OnPointerPressed;
         Capsule.SizeChanged -= OnCapsuleSizeChanged;
         RootCanvas.Loaded -= OnRootLoaded;
+        PillWindowStyle.PrimaryPressed -= OnNativePressed;
         LanguageMenu.Closed -= OnMenuClosed;
         if (_xamlRoot is not null) _xamlRoot.Changed -= OnXamlRootChanged;
         _xamlRoot = null;

@@ -6,6 +6,7 @@ using Windows.Win32.Graphics.Dwm;
 using Windows.Win32.Graphics.Gdi;
 using Windows.Win32.UI.HiDpi;
 using Windows.Win32.UI.Input.KeyboardAndMouse;
+using Windows.Win32.UI.Shell;
 using Windows.Win32.UI.WindowsAndMessaging;
 
 namespace EchoDiar.Platform.Windowing;
@@ -52,6 +53,21 @@ public static class PillWindowStyle
     /// <summary>The UI thread's CBT hook while <see cref="Guarded"/> has a window.</summary>
     private static HHOOK _cbtHook;
 
+    /// <summary>Rooted for the process's life, as <see cref="CbtCallback"/>.</summary>
+    private static readonly SUBCLASSPROC InputCallback = OnInput;
+
+    /// <summary>The subclass id of <see cref="InputCallback"/> (one per window).</summary>
+    private const nuint InputSubclassId = 1;
+
+    /// <summary>The windows <see cref="GuardInput"/> subclassed, each with its pill. UI thread only.</summary>
+    private static readonly Dictionary<HWND, HWND> Subclassed = [];
+
+    /// <summary>
+    /// A primary-button press on a pill's window or one of its child windows, as Windows delivers it, before XAML
+    /// sees it: the pill's handle and the point in physical screen pixels. Raised inside the window procedure.
+    /// </summary>
+    public static event Action<nint, PointInt32>? PrimaryPressed;
+
     /// <summary>
     /// Something on the UI thread tried to activate a pill and was refused; raised on the stack that asked for it:
     /// WS_EX_NOACTIVATE only stops activation by a click, not by <c>SetFocus</c> or <c>SetWindowPos</c>.
@@ -82,10 +98,98 @@ public static class PillWindowStyle
         return guarded && placed && rounded.Succeeded;
     }
 
+    /// <summary>
+    /// Subclasses the window and its child windows (the XAML island's, which get the pointer) so that a click never
+    /// asks to activate it (WM_MOUSEACTIVATE and WM_POINTERACTIVATE answer "no activation", before the CBT hook has to
+    /// refuse one) and reports primary-button presses (<see cref="PrimaryPressed"/>). Call it on the window's thread
+    /// after the window and its content exist, again whenever child windows may have been added: windows already
+    /// subclassed are skipped. Returns the class names of the windows subclassed by this call.
+    /// </summary>
+    public static IReadOnlyList<string> GuardInput(nint hwnd)
+    {
+        var root = (HWND)hwnd;
+        var added = new List<string>();
+        void Add(HWND window)
+        {
+            if (Subclassed.ContainsKey(window) || !PInvoke.SetWindowSubclass(window, InputCallback, InputSubclassId, 0)) return;
+            Subclassed[window] = root;
+            added.Add(ClassName(window));
+        }
+        if (!PInvoke.IsWindow(root)) return added;
+        Add(root);
+        PInvoke.EnumChildWindows(root, (child, _) =>
+        {
+            Add(child);
+            return true;
+        }, 0);
+        return added;
+    }
+
+    private static unsafe string ClassName(HWND window)
+    {
+        var buffer = stackalloc char[256];
+        var length = PInvoke.GetClassName(window, buffer, 256);
+        return length > 0 ? new string(buffer, 0, length) : "?";
+    }
+
+    /// <summary>
+    /// The pill's (and its children's) window procedure, in front of WinUI's. Answers the activation questions and
+    /// reports presses; every message still reaches WinUI. Never throws (a native callback).
+    /// </summary>
+    private static LRESULT OnInput(HWND window, uint message, WPARAM wParam, LPARAM lParam, nuint id, nuint data)
+    {
+        try
+        {
+            switch (message)
+            {
+                case PInvoke.WM_MOUSEACTIVATE:
+                    return (LRESULT)(nint)PInvoke.MA_NOACTIVATE;
+                case PInvoke.WM_POINTERACTIVATE:
+                    return (LRESULT)(nint)PInvoke.PA_NOACTIVATE;
+                case PInvoke.WM_POINTERDOWN when ((uint)(nuint)wParam >> 16 & PInvoke.POINTER_MESSAGE_FLAG_FIRSTBUTTON) != 0:
+                    // Screen coordinates.
+                    Pressed(window, new PointInt32(LowWord(lParam), HighWord(lParam)));
+                    break;
+                case PInvoke.WM_LBUTTONDOWN:
+                    // Client coordinates.
+                    var point = new System.Drawing.Point(LowWord(lParam), HighWord(lParam));
+                    if (PInvoke.ClientToScreen(window, ref point)) Pressed(window, new PointInt32(point.X, point.Y));
+                    break;
+                case PInvoke.WM_NCDESTROY:
+                    PInvoke.RemoveWindowSubclass(window, InputCallback, id);
+                    Subclassed.Remove(window);
+                    break;
+            }
+        }
+        catch
+        {
+            // A handler's failure must not reach native code; the message goes on to WinUI.
+        }
+        return PInvoke.DefSubclassProc(window, message, wParam, lParam);
+    }
+
+    private static void Pressed(HWND window, PointInt32 point)
+    {
+        if (Subclassed.TryGetValue(window, out var root)) PrimaryPressed?.Invoke(root, point);
+    }
+
+    /// <summary>GET_X_LPARAM: signed, as coordinates on a monitor left of or above the primary one are.</summary>
+    private static int LowWord(LPARAM lParam) => (short)((nint)lParam & 0xFFFF);
+
+    /// <summary>GET_Y_LPARAM.</summary>
+    private static int HighWord(LPARAM lParam) => (short)(((nint)lParam >> 16) & 0xFFFF);
+
     /// <summary>The window closed or is being dropped: its activation is no longer refused (handles are reused).</summary>
     public static void Release(nint hwnd)
     {
-        if (!Guarded.Remove((HWND)hwnd) || Guarded.Count > 0 || _cbtHook.IsNull) return;
+        var root = (HWND)hwnd;
+        foreach (var (window, pill) in Subclassed.ToList())
+        {
+            if (pill != root) continue;
+            PInvoke.RemoveWindowSubclass(window, InputCallback, InputSubclassId);
+            Subclassed.Remove(window);
+        }
+        if (!Guarded.Remove(root) || Guarded.Count > 0 || _cbtHook.IsNull) return;
         PInvoke.UnhookWindowsHookEx(_cbtHook);
         _cbtHook = default;
     }
@@ -99,6 +203,13 @@ public static class PillWindowStyle
         PInvoke.SetWindowPos((HWND)hwnd, HWND.Null, origin.X, origin.Y, 0, 0,
             SET_WINDOW_POS_FLAGS.SWP_NOSIZE | SET_WINDOW_POS_FLAGS.SWP_NOZORDER | SET_WINDOW_POS_FLAGS.SWP_NOOWNERZORDER
             | SET_WINDOW_POS_FLAGS.SWP_NOACTIVATE);
+
+    /// <summary>A point in physical screen pixels in the window's client coordinates; null when Windows refused.</summary>
+    public static PointInt32? ToClient(nint hwnd, PointInt32 screen)
+    {
+        var point = new System.Drawing.Point(screen.X, screen.Y);
+        return PInvoke.ScreenToClient((HWND)hwnd, ref point) ? new PointInt32(point.X, point.Y) : null;
+    }
 
     /// <summary>The pointer's position in physical screen pixels; null when Windows cannot tell.</summary>
     public static PointInt32? CursorPosition() =>
