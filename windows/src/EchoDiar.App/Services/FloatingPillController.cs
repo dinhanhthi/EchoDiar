@@ -48,9 +48,6 @@ internal sealed class FloatingPillController : IDisposable
     /// <summary>The size the window's capsule region was last made for.</summary>
     private SizeInt32 _shapedSize;
 
-    /// <summary>A refused activation of the pill was traced (once per launch, with its stack).</summary>
-    private bool _activationTraced;
-
     /// <summary>The next <see cref="Place"/> starts from the saved spot; otherwise it keeps the top-right corner.</summary>
     private bool _restoreSaved = true;
 
@@ -72,7 +69,6 @@ internal sealed class FloatingPillController : IDisposable
         _saveTimer.Tick += (_, _) => SavePosition();
         _model.PropertyChanged += OnModelChanged;
         _mainWindow.Activated += OnMainActivated;
-        PillWindowStyle.ActivationRefused += OnActivationRefused;
         Evaluate();
     }
 
@@ -88,7 +84,6 @@ internal sealed class FloatingPillController : IDisposable
         try
         {
             _model.PropertyChanged -= OnModelChanged;
-            PillWindowStyle.ActivationRefused -= OnActivationRefused;
             try
             {
                 _mainWindow.Activated -= OnMainActivated;
@@ -138,7 +133,7 @@ internal sealed class FloatingPillController : IDisposable
         }
     }
 
-    /// <summary>The pill never activates, so the main window stays active while the pill is clicked.</summary>
+    /// <summary>A press on the pill may activate it for a moment; it then gives the foreground back.</summary>
     private void OnMainActivated(object sender, WindowActivatedEventArgs args)
     {
         if (_disposed || _model.IsClosing) return;
@@ -176,7 +171,7 @@ internal sealed class FloatingPillController : IDisposable
 
     /// <summary>
     /// The window, made once (again after it was destroyed): no border or title bar, not resizable, then the pill
-    /// style (tool window, never activated, topmost), before it is first shown.
+    /// style (tool window, not activated by a click, topmost), before it is first shown.
     /// </summary>
     private void EnsureWindow()
     {
@@ -209,7 +204,6 @@ internal sealed class FloatingPillController : IDisposable
         _window = null;
         _saveTimer.Stop();
         StopFollowing();
-        PillWindowStyle.Release(_hwnd);
         _hwnd = 0;
         _shown = false;
         _placed = false;
@@ -250,14 +244,6 @@ internal sealed class FloatingPillController : IDisposable
         DropWindow();
     }
 
-    /// <summary>Traces the first refused activation with its stack (the caller's), which tells what asked for it.</summary>
-    private void OnActivationRefused()
-    {
-        if (_disposed || _activationTraced) return;
-        _activationTraced = true;
-        StartupTrace.Write($"Refused to activate the pill (traced once):{Environment.NewLine}{Environment.StackTrace}");
-    }
-
     /// <summary>
     /// Shows the pill in screenshots and screen recordings or leaves it out, before every show and on every settings
     /// change. Fails closed: false when leaving it out was asked and Windows refused, so the pill is not shown.
@@ -288,17 +274,6 @@ internal sealed class FloatingPillController : IDisposable
         Place();
         // Never Activate(): it would take the focus from the meeting app.
         window.AppWindow.Show(activateWindow: false);
-        GuardInput();
-    }
-
-    /// <summary>
-    /// Clicks on the pill's windows never ask for activation, and its presses are seen before XAML (drag); again on
-    /// every show and layout, as the XAML island may add child windows. Windows already guarded are skipped.
-    /// </summary>
-    private void GuardInput()
-    {
-        var added = PillWindowStyle.GuardInput(_hwnd);
-        if (added.Count > 0) StartupTrace.Write($"The pill's windows guarded: {string.Join(", ", added)}.");
     }
 
     private void Hide()
@@ -320,7 +295,6 @@ internal sealed class FloatingPillController : IDisposable
     {
         if (_disposed) return;
         Place();
-        GuardInput();
     }
 
     // Placement

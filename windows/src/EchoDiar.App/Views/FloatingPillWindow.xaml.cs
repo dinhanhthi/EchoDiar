@@ -22,8 +22,8 @@ namespace EchoDiar.App.Views;
 /// The floating pill's window and content (macOS FloatingPillView.swift and PillHostingView): the recording
 /// indicator, its controls on hover, and the slot for Phase 20's prompts. <see cref="Services.FloatingPillController"/>
 /// owns it: it styles, shows, hides, places and closes it. The window reports its content's size in physical pixels and
-/// the user's drags (a press on the capsule, then the pointer read from Windows until the button is released: the window
-/// has no title bar and never activates).
+/// the user's drags (pointer capture on the capsule: the window has no title bar). A press may make the pill the
+/// foreground window: once the press is over it gives the foreground back to the window that had it.
 /// </summary>
 public sealed partial class FloatingPillWindow : Window
 {
@@ -36,27 +36,27 @@ public sealed partial class FloatingPillWindow : Window
     /// <summary>The recording dot dims every other second (macOS RecordingBlink).</summary>
     private static readonly TimeSpan BlinkInterval = TimeSpan.FromSeconds(1);
 
-    /// <summary>How often a drag reads the pointer (about a frame).</summary>
-    private static readonly TimeSpan DragInterval = TimeSpan.FromMilliseconds(15);
-
     private static readonly UISettings UISettings = new();
 
     private readonly AppViewModel _model;
     private readonly DispatcherQueueTimer _collapseTimer;
     private readonly DispatcherQueueTimer _blinkTimer;
-    private readonly DispatcherQueueTimer _dragTimer;
     private XamlRoot? _xamlRoot;
     private bool _attached;
     private bool _closing;
     private bool _hovering;
     private bool _menuOpen;
+    private bool _dragging;
+    private Point _pressed;
 
-    /// <summary>The pointer's and the window's position when the drag's press came, in physical screen pixels.</summary>
-    private PointInt32 _dragStart;
-    private PointInt32 _dragOrigin;
+    /// <summary>The drag moved the window at least once (traced once per drag).</summary>
+    private bool _dragMoved;
 
-    /// <summary>How far the drag has moved the window so far.</summary>
-    private PointInt32 _dragMoved;
+    /// <summary>The foreground window before the pointer came to the pill, which gets it back after a press; 0 = none.</summary>
+    private nint _returnTo;
+
+    /// <summary>Kept to remove the same handler it added.</summary>
+    private readonly PointerEventHandler _anyReleased;
     private double _scale;
     private bool? _shownPaused;
     private SizeInt32 _reportedSize;
@@ -72,22 +72,28 @@ public sealed partial class FloatingPillWindow : Window
         _blinkTimer = DispatcherQueue.CreateTimer();
         _blinkTimer.Interval = BlinkInterval;
         _blinkTimer.Tick += (_, _) => Blink();
-        _dragTimer = DispatcherQueue.CreateTimer();
-        _dragTimer.Interval = DragInterval;
-        _dragTimer.Tick += (_, _) => DragStep();
 
         PauseButton.Click += (_, _) => _ = _model.TogglePauseAsync();
         StopButton.Click += (_, _) => _ = _model.StopRecordingAsync();
-        LanguageMenu.Opening += (_, _) => LanguageOptions.Fill(LanguageMenu.Items, _model);
-        LanguageMenu.Opened += (_, _) => _menuOpen = true;
+        LanguageMenu.Opening += (_, _) =>
+        {
+            // At once, not at Opened: a hand-back queued by the button's release must not close the menu.
+            _menuOpen = true;
+            LanguageOptions.Fill(LanguageMenu.Items, _model);
+        };
         LanguageMenu.Closed += OnMenuClosed;
 
         RootCanvas.PointerEntered += OnPointerEntered;
         RootCanvas.PointerExited += OnPointerExited;
         Capsule.PointerPressed += OnPointerPressed;
+        Capsule.PointerMoved += OnPointerMoved;
+        Capsule.PointerReleased += OnPointerReleased;
+        Capsule.PointerCaptureLost += OnPointerCaptureLost;
+        // Every release, the buttons' (handled) too: the press is over.
+        _anyReleased = OnAnyPointerReleased;
+        RootCanvas.AddHandler(UIElement.PointerReleasedEvent, _anyReleased, true);
         Capsule.SizeChanged += OnCapsuleSizeChanged;
         RootCanvas.Loaded += OnRootLoaded;
-        PillWindowStyle.PrimaryPressed += OnNativePressed;
         Closed += OnClosed;
     }
 
@@ -119,7 +125,7 @@ public sealed partial class FloatingPillWindow : Window
         _blinkTimer.Stop();
         _collapseTimer.Stop();
         _hovering = false;
-        _dragTimer.Stop();
+        _dragging = false;
         if (!_closing)
         {
             RecordingDot.Opacity = 1;
@@ -233,6 +239,7 @@ public sealed partial class FloatingPillWindow : Window
     {
         if (_closing || !_attached) return;
         _hovering = true;
+        RememberForeground();
         _collapseTimer.Stop();
         Controls.Visibility = Visibility.Visible;
     }
@@ -248,6 +255,7 @@ public sealed partial class FloatingPillWindow : Window
     private void OnMenuClosed(object? sender, object e)
     {
         _menuOpen = false;
+        if (!_closing) HandBackForeground("the language menu closed");
         if (_closing || !_attached || _hovering) return;
         _collapseTimer.Stop();
         _collapseTimer.Start();
@@ -277,85 +285,110 @@ public sealed partial class FloatingPillWindow : Window
         RecordingDot.Opacity = RecordingDot.Opacity < 1 ? 1 : 0.35;
     }
 
-    // Drag: the window has no title bar, so a press outside the buttons moves the window by how far the pointer went
-    // from where it was pressed, until the button is released. Read from Windows, not from XAML's pointer capture: the
-    // window refuses activation, which cancels XAML's capture (and its moves) on a press. The press comes from Windows
-    // (PillWindowStyle.PrimaryPressed, seen before XAML) or from XAML's PointerPressed, whichever comes first.
-
-    private nint Hwnd => Win32Interop.GetWindowFromWindowId(AppWindow.Id);
+    // Drag: the window has no title bar, so a press outside the buttons captures the pointer and moves the window by
+    // how far the pointer left its press point (the window moves under it, so that point stays put relative to it).
 
     private void OnPointerPressed(object sender, PointerRoutedEventArgs e)
     {
         if (_closing || !_attached) return;
+        RememberForeground();
         var inButton = IsInButton(e.OriginalSource as DependencyObject);
-        var left = e.GetCurrentPoint(Capsule).Properties.IsLeftButtonPressed;
-        StartupTrace.Write($"Pill press (XAML): left button {left}, in a button {inButton}, dragging {_dragTimer.IsRunning}.");
-        if (inButton || !left || PillWindowStyle.CursorPosition() is not { } cursor) return;
-        StartDrag(cursor, "XAML");
+        var point = e.GetCurrentPoint(Capsule);
+        StartupTrace.Write($"Pill press: left button {point.Properties.IsLeftButtonPressed}, in a button {inButton}.");
+        if (inButton || !point.Properties.IsLeftButtonPressed) return;
+        if (!Capsule.CapturePointer(e.Pointer))
+        {
+            StartupTrace.Write("Pill drag not started: the pointer could not be captured.");
+            return;
+        }
+        _pressed = point.Position;
+        _dragging = true;
+        _dragMoved = false;
+        StartupTrace.Write($"Pill drag started at {AppWindow.Position.X},{AppWindow.Position.Y}.");
         e.Handled = true;
     }
 
-    /// <summary>A press as Windows delivered it to the pill's windows, in physical screen pixels.</summary>
-    private void OnNativePressed(nint hwnd, PointInt32 point)
+    private void OnPointerMoved(object sender, PointerRoutedEventArgs e)
     {
-        if (_closing || !_attached || hwnd != Hwnd) return;
-        // After the window procedure returns: XAML is not asked from inside it.
+        if (!_dragging || _closing || _xamlRoot is null) return;
+        var position = e.GetCurrentPoint(Capsule).Position;
+        var scale = _xamlRoot.RasterizationScale;
+        var dx = (int)Math.Round((position.X - _pressed.X) * scale);
+        var dy = (int)Math.Round((position.Y - _pressed.Y) * scale);
+        if (dx == 0 && dy == 0) return;
+        var origin = AppWindow.Position;
+        AppWindow.Move(new PointInt32(origin.X + dx, origin.Y + dy));
+        if (!_dragMoved)
+        {
+            _dragMoved = true;
+            StartupTrace.Write($"Pill drag first move by {dx},{dy}: the window at {AppWindow.Position.X},{AppWindow.Position.Y}.");
+        }
+        Dragged?.Invoke();
+        e.Handled = true;
+    }
+
+    private void OnPointerReleased(object sender, PointerRoutedEventArgs e)
+    {
+        if (!_dragging) return;
+        _dragging = false;
+        if (!_closing) Capsule.ReleasePointerCapture(e.Pointer);
+        e.Handled = true;
+        EndDrag("released");
+    }
+
+    private void OnPointerCaptureLost(object sender, PointerRoutedEventArgs e)
+    {
+        if (!_dragging) return;
+        _dragging = false;
+        EndDrag("capture lost");
+    }
+
+    private void EndDrag(string how)
+    {
+        StartupTrace.Write($"Pill drag ended ({how}), the window at {(_closing ? "?" : $"{AppWindow.Position.X},{AppWindow.Position.Y}")}.");
+        if (!_closing) HandBackForeground("a drag");
+    }
+
+    /// <summary>
+    /// A press on the pill (a button's included) is over: after the click is handled, the foreground goes back. Not
+    /// for the language button, whose menu opens now: its closing gives the foreground back.
+    /// </summary>
+    private void OnAnyPointerReleased(object sender, PointerRoutedEventArgs e)
+    {
+        if (_closing || !_attached || IsIn(e.OriginalSource as DependencyObject, LanguageButton)) return;
         DispatcherQueue.TryEnqueue(() =>
         {
-            if (_closing || !_attached) return;
-            var inButton = IsButtonAt(point);
-            StartupTrace.Write($"Pill press (Windows) at {point.X},{point.Y}: in a button {inButton?.ToString() ?? "(outside the capsule)"}, dragging {_dragTimer.IsRunning}.");
-            if (inButton == false) StartDrag(point, "Windows");
+            if (!_closing) HandBackForeground("a press");
         });
     }
 
-    /// <summary>Whether a button is at the screen point; null when the point is outside the capsule or cannot be mapped.</summary>
-    private bool? IsButtonAt(PointInt32 screen)
+    // Foreground: a press can make the pill the foreground window (WS_EX_NOACTIVATE does not hold for every
+    // activation), which would take Alt+F4 and typing from the meeting app. The window that had the foreground before
+    // the pointer came gets it back once the press is over, unless the language menu is open (it would close).
+
+    private nint Hwnd => Win32Interop.GetWindowFromWindowId(AppWindow.Id);
+
+    private void RememberForeground()
     {
-        if (_xamlRoot is null || PillWindowStyle.ToClient(Hwnd, screen) is not { } client) return null;
-        var scale = _xamlRoot.RasterizationScale;
-        if (scale <= 0 || !double.IsFinite(scale)) return null;
-        var inCapsule = false;
-        foreach (var hit in VisualTreeHelper.FindElementsInHostCoordinates(new Point(client.X / scale, client.Y / scale), Capsule))
-        {
-            if (hit is ButtonBase) return true;
-            inCapsule |= hit == Capsule;
-        }
-        return inCapsule ? false : null;
+        var foreground = PillWindowStyle.ForegroundWindow();
+        if (foreground != 0 && !PillWindowStyle.IsPillOrOwned(foreground, Hwnd)) _returnTo = foreground;
     }
 
-    private void StartDrag(PointInt32 cursor, string source)
+    private void HandBackForeground(string after)
     {
-        if (_dragTimer.IsRunning) return;
-        _dragStart = cursor;
-        _dragOrigin = AppWindow.Position;
-        _dragMoved = new PointInt32(0, 0);
-        _dragTimer.Start();
-        StartupTrace.Write($"Pill drag started ({source}) at {cursor.X},{cursor.Y}, the window at {_dragOrigin.X},{_dragOrigin.Y}.");
+        if (_dragging || _menuOpen || _returnTo == 0) return;
+        if (!PillWindowStyle.IsPillOrOwned(PillWindowStyle.ForegroundWindow(), Hwnd)) return;
+        var given = PillWindowStyle.SetForeground(_returnTo);
+        StartupTrace.Write($"Pill hand-back after {after}: {(given ? "the window before has the foreground again" : "the window before is gone or Windows refused")}.");
     }
 
-    private void DragStep()
+    private static bool IsIn(DependencyObject? element, DependencyObject ancestor)
     {
-        var live = !_closing && _attached;
-        var down = live && PillWindowStyle.IsPrimaryButtonDown();
-        if (!down || PillWindowStyle.CursorPosition() is not { } cursor)
+        for (; element is not null; element = VisualTreeHelper.GetParent(element))
         {
-            _dragTimer.Stop();
-            var reason = !live ? "the pill hid or closed" : down ? "no pointer position" : "button up";
-            StartupTrace.Write($"Pill drag ended ({reason}), moved {_dragMoved.X},{_dragMoved.Y}.");
-            return;
+            if (element == ancestor) return true;
         }
-        var moved = new PointInt32(cursor.X - _dragStart.X, cursor.Y - _dragStart.Y);
-        if (moved.Equals(_dragMoved)) return;
-        var first = _dragMoved.X == 0 && _dragMoved.Y == 0;
-        _dragMoved = moved;
-        var placed = PillWindowStyle.MoveTo(Hwnd, new PointInt32(_dragOrigin.X + moved.X, _dragOrigin.Y + moved.Y));
-        if (first)
-        {
-            var at = AppWindow.Position;
-            StartupTrace.Write($"Pill drag first move by {moved.X},{moved.Y}: {(placed ? "moved" : "Windows refused")}, the window at {at.X},{at.Y}.");
-        }
-        if (placed) Dragged?.Invoke();
+        return false;
     }
 
     private bool IsInButton(DependencyObject? element)
@@ -409,13 +442,15 @@ public sealed partial class FloatingPillWindow : Window
         Detach();
         _collapseTimer.Stop();
         _blinkTimer.Stop();
-        _dragTimer.Stop();
         RootCanvas.PointerEntered -= OnPointerEntered;
         RootCanvas.PointerExited -= OnPointerExited;
         Capsule.PointerPressed -= OnPointerPressed;
+        Capsule.PointerMoved -= OnPointerMoved;
+        Capsule.PointerReleased -= OnPointerReleased;
+        Capsule.PointerCaptureLost -= OnPointerCaptureLost;
+        RootCanvas.RemoveHandler(UIElement.PointerReleasedEvent, _anyReleased);
         Capsule.SizeChanged -= OnCapsuleSizeChanged;
         RootCanvas.Loaded -= OnRootLoaded;
-        PillWindowStyle.PrimaryPressed -= OnNativePressed;
         LanguageMenu.Closed -= OnMenuClosed;
         if (_xamlRoot is not null) _xamlRoot.Changed -= OnXamlRootChanged;
         _xamlRoot = null;
