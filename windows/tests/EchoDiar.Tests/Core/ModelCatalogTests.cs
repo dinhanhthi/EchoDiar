@@ -62,6 +62,16 @@ public sealed partial class ModelCatalogTests
     public void TheDefaultEmbedderIsTheSettingsDefault() =>
         Assert.Equal(AppSettings.DefaultEmbeddingModelID, ModelCatalog.Embedding.Single(e => e.IsDefault).Id);
 
+    // A settings.json from macOS keeps "mlx-qwen3-embedding-0.6b": it must pick the same model (and index key) here.
+    [Theory]
+    [InlineData("mlx-qwen3-embedding-0.6b", "gguf-qwen3-embedding-0.6b")]
+    [InlineData("gguf-qwen3-embedding-0.6b", "gguf-qwen3-embedding-0.6b")]
+    [InlineData("api:ollama", null)]
+    [InlineData("apple-nl", null)]
+    [InlineData("gguf-qwen3.5-4b", null)]
+    public void EmbeddingIdPicksItsGgufEntry(string id, string? entry) =>
+        Assert.Equal(entry, ModelCatalog.EmbeddingEntry(id)?.Id);
+
     [GeneratedRegex("^[0-9a-f]{40}$")]
     private static partial Regex Sha1Hex();
 

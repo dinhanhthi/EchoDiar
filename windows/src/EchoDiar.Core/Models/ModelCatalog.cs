@@ -305,6 +305,19 @@ public static class ModelCatalog
     /// <summary><c>embeddingModelID</c> prefix of an API embedder: <c>api:&lt;provider id&gt;</c> (Swift <c>apiEmbedderPrefix</c>).</summary>
     public const string ApiEmbedderPrefix = "api:";
 
+    /// <summary>macOS embedder ids with the same model in this catalog (as GGUF); <c>settings.json</c> keeps the macOS id.</summary>
+    private static readonly Dictionary<string, string> MacEmbeddingIds = new() { ["mlx-qwen3-embedding-0.6b"] = "gguf-qwen3-embedding-0.6b" };
+
+    /// <summary>
+    /// The embedding entry an <c>embeddingModelID</c> picks: its own entry, or the GGUF one of a macOS MLX id. Null for
+    /// API embedders, other kinds and unknown ids.
+    /// </summary>
+    public static ModelEntry? EmbeddingEntry(string embeddingModelID)
+    {
+        var id = MacEmbeddingIds.GetValueOrDefault(embeddingModelID, embeddingModelID);
+        return Embedding.FirstOrDefault(e => e.Id == id);
+    }
+
     // Declared after the lists: static initializers run in text order.
     public static readonly IReadOnlyList<ModelEntry> All = [.. Asr, .. Diarization, .. Llm, .. Embedding];
 
