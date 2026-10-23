@@ -12,7 +12,11 @@ namespace EchoDiar.Core.Settings;
 /// </summary>
 public sealed record AppSettings : IJsonOnDeserialized
 {
-    public const string DefaultEmbeddingModelID = "mlx-qwen3-embedding-0.6b";
+    /// <summary>
+    /// The Windows catalog's default embedder (macOS: <c>mlx-qwen3-embedding-0.6b</c>). Only a missing key gets it:
+    /// a macOS id read from <c>settings.json</c> is kept as is, and each OS treats the other's id as unknown.
+    /// </summary>
+    public const string DefaultEmbeddingModelID = "gguf-qwen3-embedding-0.6b";
     public static readonly (int Min, int Max) AutoDeleteDaysRange = (1, 3650);
     public static readonly (int Min, int Max) SpeakerCountHintRange = (1, 20);
     /// <summary>Chat context sizes offered in Settings, besides 0 (the whole chat).</summary>

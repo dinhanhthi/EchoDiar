@@ -4,13 +4,15 @@ public enum ModelKind { Asr, Diarization, Llm, Embedding }
 
 public enum ModelTier { Fast, Balanced, Quality }
 
-/// <summary>The engine that runs a catalog entry. Phase 24 adds the local LLM and embedder runtimes.</summary>
+/// <summary>The engine that runs a catalog entry.</summary>
 public enum ModelRuntime
 {
     WhisperNet,
     SherpaOnnx,
     /// <summary>Phi Silica through Windows AI (Copilot+ PCs): part of Windows, nothing to download.</summary>
     WindowsAI,
+    /// <summary>A GGUF file run by llama.cpp through LLamaSharp (chat models and text embedders).</summary>
+    Gguf,
 }
 
 /// <summary>Files fetched from a second Hugging Face repo for the same model (a two-repo diarizer).</summary>
@@ -193,7 +195,22 @@ public static class ModelCatalog
         },
     ];
 
-    // LLM and embedding: Phase 24 adds the GGUF entries (and their runtimes) here.
+    // LLM
+
+    // Swift mlx(...): the Q4_K_M file of the unsloth GGUF repo (Swift: the mlx-community 4-bit repo). Sizes,
+    // revisions and hashes read from the Hugging Face API on 2026-10-23. RAM = the file plus the headroom Swift's
+    // MLX entries allow over their weights (KV cache and compute buffers).
+    // Gemma 4 cards say apache-2.0 (license_link: the Gemma 4 license page), as Swift's comment notes.
+    private static ModelEntry Gguf(
+        string id, string displayName, ModelTier tier, string repo, string revision, string file, long diskBytes,
+        string sha256, int ramMB, string vi, bool isDefault = false) => new()
+    {
+        Id = id, Kind = ModelKind.Llm, Tier = tier, DisplayName = displayName,
+        Repo = repo, Revision = revision, Files = [file],
+        Sha256 = new Dictionary<string, string> { [file] = sha256 },
+        Runtime = ModelRuntime.Gguf, DiskBytes = diskBytes, RamMB = ramMB, RamIsEstimate = true,
+        Languages = null, QualityNotes = new("Good", "Good", vi), License = "Apache-2.0", IsDefault = isDefault,
+    };
 
     public static readonly IReadOnlyList<ModelEntry> Llm =
     [
@@ -208,9 +225,54 @@ public static class ModelCatalog
             QualityNotes = new("Fair (small context, Copilot+ PCs)", "Unverified", "Unverified"),
             License = "Microsoft (system)",
         },
+        Gguf("gguf-qwen3.5-2b", "Qwen3.5 2B", ModelTier.Fast,
+            "unsloth/Qwen3.5-2B-GGUF", "f6d5376be1edb4d416d56da11e5397a961aca8ae",
+            "Qwen3.5-2B-Q4_K_M.gguf", 1_280_835_840,
+            "aaf42c8b7c3cab2bf3d69c355048d4a0ee9973d48f16c731c0520ee914699223", 3100, "Fair"),
+        Gguf("gguf-gemma-4-e2b", "Gemma 4 E2B", ModelTier.Fast,
+            "unsloth/gemma-4-E2B-it-GGUF", "0314792d7f1f7e229411f620751375812bb9faf2",
+            "gemma-4-E2B-it-Q4_K_M.gguf", 3_106_738_272,
+            "740185b21d22ceb83a11c3aa62ad5842ef32c70f6096d756bbee85a1e4ec34b8", 4500, "Fair-Good"),
+        Gguf("gguf-qwen3.5-4b", "Qwen3.5 4B", ModelTier.Balanced,
+            "unsloth/Qwen3.5-4B-GGUF", "e87f176479d0855a907a41277aca2f8ee7a09523",
+            "Qwen3.5-4B-Q4_K_M.gguf", 2_740_937_888,
+            "00fe7986ff5f6b463e62455821146049db6f9313603938a70800d1fb69ef11a4", 5200, "Good", isDefault: true),
+        Gguf("gguf-gemma-4-e4b", "Gemma 4 E4B", ModelTier.Balanced,
+            "unsloth/gemma-4-E4B-it-GGUF", "bfc15c382204943c3a8fff0c750b94ae2364d7a3",
+            "gemma-4-E4B-it-Q4_K_M.gguf", 4_977_171_584,
+            "85a896a047553e842f25297ee5b031d64ff30147d9c4af17b1e4b394cd1fab87", 6800, "Good"),
+        Gguf("gguf-qwen3.5-9b", "Qwen3.5 9B", ModelTier.Balanced,
+            "unsloth/Qwen3.5-9B-GGUF", "3885219b6810b007914f3a7950a8d1b469d598a5",
+            "Qwen3.5-9B-Q4_K_M.gguf", 5_680_522_464,
+            "03b74727a860a56338e042c4420bb3f04b2fec5734175f4cb9fa853daf52b7e8", 8700, "Good-Very good"),
     ];
 
-    public static readonly IReadOnlyList<ModelEntry> Embedding = [];
+    // Embedding
+
+    /// <summary>
+    /// Text embedders for the library index. As in Swift, <c>api:&lt;provider id&gt;</c> (an enabled provider's
+    /// embeddings endpoint) is not a catalog entry: it is an <c>embeddingModelID</c> value the app resolves.
+    /// </summary>
+    public static readonly IReadOnlyList<ModelEntry> Embedding =
+    [
+        // RAM: about 1.2 GB measured while loaded (16 sequences of 512 tokens, task 25.1).
+        new()
+        {
+            Id = "gguf-qwen3-embedding-0.6b", Kind = ModelKind.Embedding, Tier = ModelTier.Balanced,
+            DisplayName = "Qwen3 Embedding 0.6B",
+            Repo = "Qwen/Qwen3-Embedding-0.6B-GGUF", Revision = "370f27d7550e0def9b39c1f16d3fbaa13aa67728",
+            Files = ["Qwen3-Embedding-0.6B-Q8_0.gguf"],
+            Sha256 = new Dictionary<string, string>
+            {
+                ["Qwen3-Embedding-0.6B-Q8_0.gguf"] = "06507c7b42688469c4e7298b0a1e16deff06caf291cf0a5b278c308249c3e439",
+            },
+            Runtime = ModelRuntime.Gguf, DiskBytes = 639_150_592, RamMB = 1200, RamIsEstimate = true,
+            Languages = null, QualityNotes = new("Good", "Good", "Good"), License = "Apache-2.0", IsDefault = true,
+        },
+    ];
+
+    /// <summary><c>embeddingModelID</c> prefix of an API embedder: <c>api:&lt;provider id&gt;</c> (Swift <c>apiEmbedderPrefix</c>).</summary>
+    public const string ApiEmbedderPrefix = "api:";
 
     // Declared after the lists: static initializers run in text order.
     public static readonly IReadOnlyList<ModelEntry> All = [.. Asr, .. Diarization, .. Llm, .. Embedding];

@@ -176,14 +176,15 @@ public sealed class SettingsTests : IDisposable
 
     private static string Json<T>(T value) => Encoding.UTF8.GetString(SwiftJson.Serialize(value));
 
-    // Every key Windows writes, with the macOS read defaults (Carbon shortcuts excluded, see AppSettings).
+    // Every key Windows writes, with the macOS read defaults (Carbon shortcuts excluded, see AppSettings) except
+    // embeddingModelID, the Windows catalog id.
     private const string DefaultsJson = """
         {
           "version": 1, "launchAtLogin": false, "defaultLanguage": "auto", "recentLanguages": [],
           "compressionBitrateKbps": 64, "keepUncompressedAudio": false, "playbackChannels": "mixed",
           "onboardingCompleted": false, "modelIdleMinutes": 2, "providers": [], "cloudSTTConfirmed": [],
           "summaryLanguage": "auto", "chatContextMessages": 10, "ragEnabled": false,
-          "embeddingModelID": "mlx-qwen3-embedding-0.6b", "embeddingAPIModel": "", "cloudEmbeddingConfirmed": [],
+          "embeddingModelID": "gguf-qwen3-embedding-0.6b", "embeddingAPIModel": "", "cloudEmbeddingConfirmed": [],
           "meetingDetection": true, "perAppBehavior": {}, "pillPositions": {}, "showPill": true,
           "hidePillWhenAppActive": false, "showPillInScreenCaptures": false, "attachPillToWindow": false,
           "pillSize": "medium",
