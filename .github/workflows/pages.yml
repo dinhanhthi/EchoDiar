@@ -39,6 +39,11 @@ jobs:
           mkdir -p _site
           cp -R website/. _site/
           cp appcast.xml _site/appcast.xml
+          # The Windows App Installer feed (docs/RELEASING.md), once a Windows release has committed it.
+          if [ -f windows/EchoDiar.appinstaller ]; then
+            mkdir -p _site/windows
+            cp windows/EchoDiar.appinstaller _site/windows/EchoDiar.appinstaller
+          fi
           for f in _site/index.html _site/appcast.xml; do
             [ -f "$f" ] || { echo "::error::$f is missing"; exit 1; }
           done
