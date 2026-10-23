@@ -94,6 +94,7 @@ public sealed partial class AppViewModel
     public void KeepRecording()
     {
         if (_closing || PillPrompt is not PillPrompt.MeetingEnded ended) return;
+        StartupTrace.Write($"end prompt kept: {ended.Reason}");
         PillPrompt = null;
         _endWatch?.Monitor.KeepRecording(ended.Reason, DateTimeOffset.Now);
         EvaluateEnd();
@@ -102,6 +103,7 @@ public sealed partial class AppViewModel
     /// <summary>"Stop now" on the end prompt, the end of its countdown, and a lost mic with the "stop" route setting.</summary>
     public void StopFromEndPrompt()
     {
+        StartupTrace.Write($"end prompt stop: {(PillPrompt as PillPrompt.MeetingEnded)?.Reason.ToString() ?? "no prompt"}");
         EndEndWatch();
         _ = StopRecordingAsync();
     }
@@ -361,6 +363,7 @@ public sealed partial class AppViewModel
             case MeetingEndMonitor.Decision.PromptStop prompt:
                 if (PillPrompt is PillPrompt.MeetingEnded shown && shown.Reason == prompt.Reason) return;
                 PillPrompt = new PillPrompt.MeetingEnded(prompt.Reason, now.AddSeconds(prompt.Countdown));
+                StartupTrace.Write($"end prompt: {prompt.Reason}");
                 break;
             case MeetingEndMonitor.Decision.StopNow stop:
                 StartupTrace.Write($"recording stopped: {stop.Reason}");
@@ -370,7 +373,11 @@ public sealed partial class AppViewModel
                 else _ = StopRecordingAsync();
                 break;
             default:
-                if (PillPrompt is PillPrompt.MeetingEnded) PillPrompt = null;
+                if (PillPrompt is PillPrompt.MeetingEnded dismissed)
+                {
+                    StartupTrace.Write($"end prompt dismissed: {dismissed.Reason}");
+                    PillPrompt = null;
+                }
                 break;
         }
     }
