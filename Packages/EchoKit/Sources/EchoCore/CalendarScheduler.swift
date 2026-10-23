@@ -13,10 +13,13 @@ public struct CalendarEvent: Sendable, Hashable, Identifiable {
     /// The current user declined the invitation.
     public let declined: Bool
     public let canceled: Bool
+    /// The current user organizes the event (or it has no attendees) or accepted it, tentatively or not; only then
+    /// may it start a recording without asking.
+    public let confirmed: Bool
 
     public init(
         id: String, title: String, start: Date, end: Date, isAllDay: Bool, calendarID: String, link: MeetingLink?,
-        declined: Bool, canceled: Bool
+        declined: Bool, canceled: Bool, confirmed: Bool
     ) {
         self.id = id
         self.title = title
@@ -27,6 +30,7 @@ public struct CalendarEvent: Sendable, Hashable, Identifiable {
         self.link = link
         self.declined = declined
         self.canceled = canceled
+        self.confirmed = confirmed
     }
 }
 
@@ -66,6 +70,11 @@ public struct CalendarScheduler: Sendable {
         public var skippedEvents: [String: Date]
 
         public static let stopAfterEndRange = 0...120
+
+        /// The value in force, clamped again at use: a configuration built in code is not clamped.
+        public var effectiveStopAfterEndMinutes: Int {
+            min(max(stopAfterEndMinutes, Self.stopAfterEndRange.lowerBound), Self.stopAfterEndRange.upperBound)
+        }
 
         public init(
             mode: Mode = .ask, ignoredCalendarIDs: [String] = [], allTimedEvents: Bool = false,

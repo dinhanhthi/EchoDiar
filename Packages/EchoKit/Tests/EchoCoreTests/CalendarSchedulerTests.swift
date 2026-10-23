@@ -14,7 +14,7 @@ struct CalendarSchedulerTests {
     ) -> CalendarEvent {
         CalendarEvent(
             id: id, title: id, start: start, end: at(3_600), isAllDay: isAllDay, calendarID: calendarID,
-            link: link ? zoom : nil, declined: declined, canceled: false)
+            link: link ? zoom : nil, declined: declined, canceled: false, confirmed: true)
     }
 
     @Test func onlyEligibleEventsAreKept() {
@@ -62,5 +62,6 @@ struct CalendarSchedulerTests {
         #expect(configuration.mode == .ask)
         #expect(configuration.stopAfterEndMinutes == 120)
         #expect(configuration.stopAtEventEnd)
+        #expect(CalendarScheduler.Configuration(stopAfterEndMinutes: 999).effectiveStopAfterEndMinutes == 120)
     }
 }

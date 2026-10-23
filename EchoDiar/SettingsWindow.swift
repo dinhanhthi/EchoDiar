@@ -29,7 +29,8 @@ enum SettingsTab: CaseIterable, Identifiable {
         switch self {
         case .recording:
             [.init(id: "microphone", title: "Microphone"), .init(id: "meetings", title: "Meetings"),
-             .init(id: "autoStop", title: "Auto-stop"), .init(id: "afterRecording", title: "After recording")]
+             .init(id: "calendar", title: "Calendar"), .init(id: "autoStop", title: "Auto-stop"),
+             .init(id: "afterRecording", title: "After recording")]
         case .transcription:
             [.init(id: "general", title: "General"), .init(id: "transcriptionModels", title: "Transcription model"),
              .init(id: "diarizationModels", title: "Diarization model")]
