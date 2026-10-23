@@ -133,6 +133,9 @@ read -r -p "Push the tag $TAG (starts $WORKFLOW)? [y/N] " reply
 
 echo "==> Tagging $TAG"
 git tag -a "$TAG" -m "EchoDiar for Windows $VERSION ($CHANNEL)"
+# Runs of an earlier, deleted tag of the same name are older: only a run created after the push counts (60 s
+# of slack for the Mac's clock; BSD date).
+START="$(date -u -v-60S +%Y-%m-%dT%H:%M:%SZ)"
 git push origin "refs/tags/$TAG"
 
 DISCARD="git push origin :refs/tags/$TAG && git tag -d $TAG"
@@ -142,7 +145,8 @@ RUN=""
 # gh answers 404 until the first run exists while the workflow is not on the default branch: keep polling.
 for _ in $(seq 1 20); do
   RUN="$(gh run list --repo "$GH_REPO" --workflow "$WORKFLOW" --event push --limit 20 \
-    --json databaseId,headBranch -q ".[] | select(.headBranch == \"$TAG\") | .databaseId" 2>/dev/null | head -1)" || RUN=""
+    --json databaseId,headBranch,createdAt \
+    -q ".[] | select(.headBranch == \"$TAG\" and .createdAt >= \"$START\") | .databaseId" 2>/dev/null | head -1)" || RUN=""
   [[ -n "$RUN" ]] && break
   sleep 15
 done
