@@ -1,7 +1,10 @@
 using System.Text;
 using EchoDiar.AI;
+using EchoDiar.Core.Models;
 using LLama;
 using LLama.Common;
+using LLama.Exceptions;
+using LLama.Native;
 using LLama.Sampling;
 
 namespace EchoDiar.LocalLLM;
@@ -37,37 +40,58 @@ public sealed class LlamaProvider(string entryID, string modelPath) : ILocalLLMP
     public Task<IReadOnlyList<string>> ListModelsAsync(CancellationToken cancellationToken = default) =>
         Task.FromResult<IReadOnlyList<string>>([EntryID]);
 
-    /// <summary>The context the model is loaded with (the RAM cap), without loading it.</summary>
+    /// <summary>
+    /// The context the model is loaded with, without loading it: the RAM cap, or the catalog's training window when
+    /// shorter (<see cref="ModelEntry.ContextTokens"/>, read from the GGUF header).
+    /// </summary>
     public ValueTask<int> ContextWindowAsync(string model, CancellationToken cancellationToken = default) =>
-        ValueTask.FromResult(ChosenContext);
+        ValueTask.FromResult(Math.Min(ChosenContext, ModelCatalog.Entry(EntryID)?.ContextTokens ?? int.MaxValue));
 
-    private sealed class Generator(LLamaWeights weights, ModelParams parameters) : ILocalLLMGenerator
+    /// <summary>
+    /// Answers from loaded weights, each in a fresh context (KV cache) freed when the answer ends. Internal for the
+    /// NativeLLM tests, which load the weights themselves.
+    /// </summary>
+    internal sealed class Generator(LLamaWeights weights, ModelParams parameters) : ILocalLLMGenerator
     {
-        // Each answer gets a fresh context (KV cache), freed when the answer ends.
-        private readonly StatelessExecutor _executor = new(weights, parameters);
+        private readonly LlamaPrompt _prompt = new(weights);
 
         /// <summary>Streams the answer through <paramref name="onText"/>; on cancel returns the text so far (22.3).</summary>
         public async Task<string> GenerateAsync(
             IReadOnlyList<LLMMessage> messages, int maxTokens, Action<string> onText,
             CancellationToken cancellationToken = default)
         {
-            var prompt = Prompt(messages);
+            var prompt = _prompt.Tokens(messages).Select(t => t.Token).ToList();
             cancellationToken.ThrowIfCancellationRequested();
-            var inference = new InferenceParams
-            {
-                MaxTokens = maxTokens,
-                // MLX's GenerateParameters default (the Mac app's sampling).
-                SamplingPipeline = new DefaultSamplingPipeline { Temperature = 0.6f },
-            };
+            using var context = weights.CreateContext(parameters);
+            if (prompt.Count >= context.ContextSize)
+                throw LLMException.Provider("The text is too long for this model's context.");
+            // MLX's GenerateParameters defaults (the Mac app's sampling): temperature 0.6, no top-p, top-k or min-p.
+            using var sampling = new DefaultSamplingPipeline { Temperature = 0.6f, TopP = 1f, TopK = 0, MinP = 0f };
+            var decoder = new StreamingTokenDecoder(context);
+            var batch = new LLamaBatch();
             var text = new StringBuilder();
             try
             {
-                // The prompt prefill cannot be cancelled; the token loop stops at the next token.
-                await foreach (var piece in _executor.InferAsync(prompt, inference, cancellationToken))
+                var (prefill, _, past) = await context.DecodeAsync(prompt, LLamaSeqId.Zero, batch, 0, cancellationToken);
+                if (prefill != DecodeResult.Ok) throw LLMException.Provider($"llama.cpp could not read the prompt ({prefill}).");
+                var limit = maxTokens < 0 ? int.MaxValue : maxTokens;
+                // Ends at the model's end-of-turn token, maxTokens, cancellation or a full context.
+                for (var i = 0; i < limit && past < context.ContextSize; i++)
                 {
-                    if (piece.Length == 0) continue;
-                    text.Append(piece);
-                    onText(piece);
+                    cancellationToken.ThrowIfCancellationRequested();
+                    var token = sampling.Sample(context.NativeHandle, batch.TokenCount - 1);
+                    if (token.IsEndOfGeneration(weights.Vocab)) break;
+                    decoder.Add(token);
+                    var piece = decoder.Read();
+                    if (piece.Length > 0)
+                    {
+                        text.Append(piece);
+                        onText(piece);
+                    }
+                    batch.Clear();
+                    batch.Add(token, past++, LLamaSeqId.Zero, true);
+                    var decoded = await context.DecodeAsync(batch, cancellationToken);
+                    if (decoded != DecodeResult.Ok) throw LLMException.Provider($"llama.cpp could not continue the answer ({decoded}).");
                 }
             }
             catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
@@ -75,25 +99,87 @@ public sealed class LlamaProvider(string entryID, string modelPath) : ILocalLLMP
             }
             return text.ToString();
         }
+    }
+}
 
-        /// <summary>The messages through the GGUF's chat template, with Qwen-style reasoning turned off.</summary>
-        private string Prompt(IReadOnlyList<LLMMessage> messages)
+/// <summary>
+/// The prompt of a chat as token ids, laid out so that only the chat template makes control tokens: the template's
+/// text is tokenized with special tokens parsed, each message body without (so <c>&lt;|im_end|&gt;</c> in a
+/// transcript stays text), and the user-defined tokens llama.cpp matches even then (Qwen's <c>&lt;think&gt;</c>,
+/// Gemma's <c>&lt;|channel&gt;</c>) are broken in the bodies first.
+/// </summary>
+internal sealed class LlamaPrompt
+{
+    private readonly LLamaWeights _weights;
+    private readonly string _template;
+    private readonly IReadOnlyList<string> _userDefined;
+
+    internal LlamaPrompt(LLamaWeights weights)
+    {
+        _weights = weights;
+        _template = weights.NativeHandle.GetTemplate(strict: false)
+            ?? throw LLMException.Provider("This model has no chat template.");
+        var vocab = weights.Vocab;
+        var userDefined = new List<string>();
+        for (var id = 0; id < vocab.Count; id++)
         {
-            var source = weights.NativeHandle.GetTemplate(strict: false)
-                ?? throw LLMException.Provider("This model has no chat template.");
-            var template = new LLamaTemplate(source) { AddAssistant = true };
-            foreach (var message in messages) template.Add(LlamaSettings.Role(message.Role), message.Content);
-            string prompt;
-            try
+            LLamaToken token = id;
+            if ((token.GetAttributes(vocab) & LLamaTokenAttr.UserDefined) != 0
+                && vocab.LLamaTokenToString(token, isSpecialToken: true) is { Length: > 1 } text)
             {
-                prompt = LLamaTemplate.Encoding.GetString(template.Apply());
+                userDefined.Add(text);
             }
-            catch (LLama.Exceptions.MissingTemplateException)
-            {
-                throw LLMException.Provider("llama.cpp does not support this model's chat template.");
-            }
-            return LlamaSettings.WithThinkingOff(prompt, source);
         }
+        _userDefined = userDefined;
+    }
+
+    /// <summary>
+    /// The ids of <paramref name="messages"/> through the GGUF's chat template, each marked with whether it comes from
+    /// a message body. Throws <see cref="LLMException"/> when the template cannot be applied or a body would still
+    /// hold a control or user-defined token.
+    /// </summary>
+    internal List<(LLamaToken Token, bool FromBody)> Tokens(IReadOnlyList<LLMMessage> messages)
+    {
+        var tokens = new List<(LLamaToken, bool)>();
+        foreach (var part in Parts(messages))
+        {
+            if (part.Text.Length == 0) continue;
+            var text = part.IsBody ? LlamaSettings.Neutralized(part.Text, _userDefined) : part.Text;
+            // BOS only before the first piece, when the model wants one (Gemma yes, Qwen no).
+            var ids = _weights.Tokenize(text, add_bos: tokens.Count == 0, special: !part.IsBody, Encoding.UTF8);
+            foreach (var id in ids)
+            {
+                if (part.IsBody && (id.GetAttributes(_weights.Vocab) & (LLamaTokenAttr.Control | LLamaTokenAttr.UserDefined)) != 0)
+                {
+                    throw LLMException.Provider("The text holds a token the model reserves for its chat format.");
+                }
+                tokens.Add((id, part.IsBody));
+            }
+        }
+        return tokens;
+    }
+
+    /// <summary>
+    /// Gemma 4 is laid out by hand: llama.cpp's built-in templates (all <c>llama_chat_apply_template</c> knows) have no
+    /// Gemma 4 format. Others go through llama.cpp with a placeholder per body, then are cut at the placeholders.
+    /// </summary>
+    private List<PromptPart> Parts(IReadOnlyList<LLMMessage> messages)
+    {
+        if (LlamaSettings.IsGemma4(_template)) return LlamaSettings.Gemma4Parts(messages);
+        var nonce = Guid.NewGuid().ToString("N");
+        var template = new LLamaTemplate(_template) { AddAssistant = true };
+        for (var i = 0; i < messages.Count; i++) template.Add(LlamaSettings.Role(messages[i].Role), LlamaSettings.Placeholder(nonce, i));
+        string rendered;
+        try
+        {
+            rendered = LLamaTemplate.Encoding.GetString(template.Apply());
+        }
+        catch (RuntimeError)
+        {
+            // MissingTemplateException's message holds the whole template source: never shown.
+            throw LLMException.Provider("llama.cpp does not support this model's chat template.");
+        }
+        return LlamaSettings.SplitAtPlaceholders(LlamaSettings.WithThinkingOff(rendered, _template), messages, nonce);
     }
 }
 
@@ -132,4 +218,82 @@ internal static class LlamaSettings
         && !prompt.EndsWith(EmptyThinking, StringComparison.Ordinal)
             ? prompt + EmptyThinking
             : prompt;
+
+    /// <summary>Gemma 4's chat template (<c>&lt;|turn&gt;role … &lt;turn|&gt;</c>), which llama.cpp's built-in matcher lacks.</summary>
+    internal static bool IsGemma4(string template) =>
+        template.Contains("<|turn>", StringComparison.Ordinal) && template.Contains("<turn|>", StringComparison.Ordinal);
+
+    /// <summary>
+    /// What Gemma 4's Jinja writes without tools and with <c>enable_thinking</c> false (the Mac app's setting): each
+    /// message as <c>&lt;|turn&gt;role\n</c> + its trimmed text + <c>&lt;turn|&gt;\n</c> (the assistant's role is
+    /// <c>model</c>), then <c>&lt;|turn&gt;model\n</c>; no <c>&lt;|think|&gt;</c> line, which would turn thinking on.
+    /// Its <c>bos_token</c> is the tokenizer's BOS, added when the first piece is tokenized.
+    /// </summary>
+    internal static List<PromptPart> Gemma4Parts(IReadOnlyList<LLMMessage> messages)
+    {
+        var parts = new List<PromptPart>();
+        var skeleton = new StringBuilder();
+        foreach (var message in messages)
+        {
+            skeleton.Append("<|turn>").Append(message.Role == LLMRole.Assistant ? "model" : Role(message.Role)).Append('\n');
+            parts.Add(new(skeleton.ToString(), IsBody: false));
+            parts.Add(new(message.Content.Trim(), IsBody: true));
+            skeleton.Clear().Append("<turn|>\n");
+        }
+        parts.Add(new(skeleton.Append("<|turn>model\n").ToString(), IsBody: false));
+        return parts;
+    }
+
+    /// <summary>What stands for body <paramref name="index"/> while llama.cpp applies the template.</summary>
+    internal static string Placeholder(string nonce, int index) => $"\u2063{nonce}:{index}\u2063";
+
+    /// <summary>
+    /// <paramref name="rendered"/> cut at each body's placeholder, in order, the bodies put back as body parts.
+    /// Throws <see cref="LLMException"/> when a placeholder is missing, repeated or out of order (a template that
+    /// rewrites its content).
+    /// </summary>
+    internal static List<PromptPart> SplitAtPlaceholders(string rendered, IReadOnlyList<LLMMessage> messages, string nonce)
+    {
+        var parts = new List<PromptPart>();
+        var start = 0;
+        for (var i = 0; i < messages.Count; i++)
+        {
+            var placeholder = Placeholder(nonce, i);
+            var at = rendered.IndexOf(placeholder, start, StringComparison.Ordinal);
+            if (at < 0 || rendered.IndexOf(placeholder, StringComparison.Ordinal) != at
+                || rendered.IndexOf(placeholder, at + placeholder.Length, StringComparison.Ordinal) >= 0)
+            {
+                throw LLMException.Provider("llama.cpp does not support this model's chat template.");
+            }
+            parts.Add(new(rendered[start..at], IsBody: false));
+            parts.Add(new(messages[i].Content, IsBody: true));
+            start = at + placeholder.Length;
+        }
+        parts.Add(new(rendered[start..], IsBody: false));
+        return parts;
+    }
+
+    /// <summary>
+    /// <paramref name="text"/> with every occurrence of a <paramref name="tokens"/> text broken by a zero-width space
+    /// after its first character, again until none is left (at most 8 passes), so the tokenizer cannot match it as
+    /// that token.
+    /// </summary>
+    internal static string Neutralized(string text, IReadOnlyCollection<string> tokens)
+    {
+        var changed = true;
+        for (var pass = 0; pass < 8 && changed; pass++)
+        {
+            changed = false;
+            foreach (var token in tokens)
+            {
+                if (token.Length < 2 || !text.Contains(token, StringComparison.Ordinal)) continue;
+                text = text.Replace(token, token[0] + "\u200B" + token[1..], StringComparison.Ordinal);
+                changed = true;
+            }
+        }
+        return text;
+    }
 }
+
+/// <summary>A piece of a prompt: chat template text (special tokens parsed) or a message body (never parsed).</summary>
+internal readonly record struct PromptPart(string Text, bool IsBody);

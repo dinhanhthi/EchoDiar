@@ -481,8 +481,7 @@ public sealed partial class ProvidersViewModel : ObservableObject
     {
         var installed = _app.InstalledModelIds.Contains(entry.Id);
         double? download = _app.Downloads.TryGetValue(entry.Id, out var fraction) ? fraction : null;
-        var busy = _app.TranscriptionProgress.Keys.Any(_app.IsTranscribing) || _app.RecordingCaptions is not null
-            || _app.AIJob is not null;
+        var busy = _app.ModelsInUse;
         return new ModelRowState(
             entry.IsDefault,
             installed,

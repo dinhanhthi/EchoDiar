@@ -159,12 +159,14 @@ public sealed partial class AppViewModel
 
     /// <summary>
     /// The transcriber for a recording in <paramref name="language"/>: the <see cref="IncrementalEntry"/> of the engine
-    /// the Stop job picks, loaded as a session; idle release after "Unload models after" minutes.
+    /// the Stop job picks, loaded as a session once its files pass <see cref="ModelStore.VerifiedFolder"/>; idle release
+    /// after "Unload models after" minutes.
     /// </summary>
     private RecordingTranscriber? CreateRecordingTranscriber(string language, AppSettings settings)
     {
         if (IncrementalEntry(PreferredEngine(language), language) is not { } entry
-            || _services.Engines[entry.Runtime](entry, _services.Models.Folder(entry)) is not ISessionTranscriptionEngine engine)
+            || _services.Models.VerifiedFolder(entry) is not { } folder
+            || _services.Engines[entry.Runtime](entry, folder) is not ISessionTranscriptionEngine engine)
         {
             return null;
         }

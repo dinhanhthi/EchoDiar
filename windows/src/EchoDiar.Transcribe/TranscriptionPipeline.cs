@@ -21,7 +21,10 @@ namespace EchoDiar.Transcribe;
 /// <param name="engines">Batch engine factories by catalog runtime.</param>
 /// <param name="diarizer">The local diarizer factory; null = none.</param>
 /// <param name="isInstalled">Whether a catalog entry is installed (<see cref="ModelStore.IsInstalled"/>).</param>
-/// <param name="modelFolder">An entry's <c>Models/&lt;id&gt;/</c> folder (<see cref="ModelStore.Folder"/>).</param>
+/// <param name="modelFolder">
+/// An entry's <c>Models/&lt;id&gt;/</c> folder, asked for right before its model is loaded (the app passes
+/// <see cref="ModelStore.VerifiedFolder"/> and throws <see cref="TranscriptionErrorKind.NeedsModel"/> when the files fail their check).
+/// </param>
 /// <param name="speakerCountHint">Speakers expected on the system channel when the job sets none.</param>
 /// <param name="decoder">Reads non-CAF (compressed m4a) audio; null = CAF only.</param>
 /// <param name="deferral">Holds jobs back while it says so (energy saver on); null = never.</param>

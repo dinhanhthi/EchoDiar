@@ -50,7 +50,9 @@ public sealed class ModelStoreTests : IDisposable
     {
         byte[] segmentation = [1, 2, 3, 4, 5];
         byte[] embedding = [7, 8, 9];
-        var entry = ModelCatalog.Entry("sherpa-pyannote-3")! with { DiskBytes = 8 };
+        var catalog = ModelCatalog.Entry("sherpa-pyannote-3")!;
+        // Listed hashes only (the catalog's would not match these bytes).
+        var entry = catalog with { DiskBytes = 8, Sha256 = null, ExtraFiles = catalog.ExtraFiles! with { Sha256 = null } };
         var extra = entry.ExtraFiles!;
         var embeddingName = extra.Files[0];
         var installed = Path.Combine(Models, entry.Id);
@@ -74,7 +76,8 @@ public sealed class ModelStoreTests : IDisposable
         Assert.True(store.IsInstalled(entry));
         Assert.Equal(segmentation, System.IO.File.ReadAllBytes(Path.Combine(installed, "model.onnx")));
         Assert.Equal(embedding, System.IO.File.ReadAllBytes(Path.Combine(installed, embeddingName)));
-        Assert.Equal([embeddingName, "model.onnx"], Directory.EnumerateFiles(installed).Select(Path.GetFileName).Order(StringComparer.Ordinal));
+        Assert.Equal([ModelStore.MarkerName, embeddingName, "model.onnx"],
+            Directory.EnumerateFiles(installed).Select(Path.GetFileName).Order(StringComparer.Ordinal));
         Assert.False(Directory.Exists(Path.Combine(Models, ".partial-" + entry.Id)));
 
         // A reinstall whose final move fails (its staging folder vanished) keeps the previous install.
@@ -133,6 +136,91 @@ public sealed class ModelStoreTests : IDisposable
         Assert.True(_hub.Requests.Count <= 3);
         Assert.Empty(Directory.EnumerateFiles(_dir, "*", SearchOption.AllDirectories));
     }
+
+    // The SHA-256s checked at download are kept in Models/<id>/.verified, and a load (VerifiedFolder) goes on only
+    // while it matches the catalog and each file's size and last write time.
+    [Fact]
+    public async Task ADownloadWritesTheMarkerALoadChecks()
+    {
+        byte[] model = [1, 2, 3, 4];
+        var entry = Base(model);
+        _hub.Tree(entry.Repo!, entry.Revision!, [Remote("ggml-base.bin", model)]);
+        var store = Store();
+
+        await store.DownloadAsync(entry, cancellationToken: TestContext.Current.CancellationToken);
+
+        var folder = Path.Combine(Models, entry.Id);
+        using var marker = JsonDocument.Parse(System.IO.File.ReadAllBytes(Path.Combine(folder, ModelStore.MarkerName)));
+        Assert.Equal(entry.Id, marker.RootElement.GetProperty("id").GetString());
+        var file = Assert.Single(marker.RootElement.GetProperty("files").EnumerateArray().ToList());
+        Assert.Equal("ggml-base.bin", file.GetProperty("path").GetString());
+        Assert.Equal(Sha(model), file.GetProperty("sha256").GetString());
+        Assert.Equal(model.Length, store.InstalledBytes(entry));
+        Assert.Equal(folder, store.VerifiedFolder(entry));
+    }
+
+    // A marker that does not match the catalog is not trusted: the file is hashed, fails, and the install is removed
+    // (it shows as not installed, to be downloaded again).
+    [Fact]
+    public async Task AMarkerThatDoesNotMatchTheCatalogIsNotVerified()
+    {
+        byte[] model = [1, 2, 3, 4];
+        var entry = Base(model);
+        _hub.Tree(entry.Repo!, entry.Revision!, [Remote("ggml-base.bin", model)]);
+        var store = Store();
+        await store.DownloadAsync(entry, cancellationToken: TestContext.Current.CancellationToken);
+
+        var updated = Base([9, 9, 9, 9]);
+
+        Assert.True(store.IsInstalled(updated));
+        Assert.Null(store.VerifiedFolder(updated));
+        Assert.False(store.IsInstalled(updated));
+        Assert.False(Directory.Exists(Path.Combine(Models, entry.Id)));
+    }
+
+    // A same-size file planted without a marker, or put over a verified one, is never handed to a loader; an install
+    // from before markers whose files match the catalog is hashed once and gets its marker.
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task ASameSizeFileIsNotLoadedUntilItMatches(bool overDownload)
+    {
+        byte[] model = [1, 2, 3, 4];
+        var entry = Base(model);
+        var folder = Path.Combine(Models, entry.Id);
+        var path = Path.Combine(folder, "ggml-base.bin");
+        var store = Store();
+        if (overDownload)
+        {
+            _hub.Tree(entry.Repo!, entry.Revision!, [Remote("ggml-base.bin", model)]);
+            await store.DownloadAsync(entry, cancellationToken: TestContext.Current.CancellationToken);
+        }
+        else
+        {
+            Directory.CreateDirectory(folder);
+        }
+
+        System.IO.File.WriteAllBytes(path, [6, 6, 6, 6]);
+        System.IO.File.SetLastWriteTimeUtc(path, DateTime.UtcNow.AddMinutes(-5));
+
+        Assert.True(store.IsInstalled(entry));
+        Assert.Null(store.VerifiedFolder(entry));
+        Assert.False(Directory.Exists(folder));
+
+        Directory.CreateDirectory(folder);
+        System.IO.File.WriteAllBytes(path, model);
+
+        Assert.Equal(folder, store.VerifiedFolder(entry));
+        Assert.True(System.IO.File.Exists(Path.Combine(folder, ModelStore.MarkerName)));
+        Assert.Equal(folder, store.VerifiedFolder(entry));
+    }
+
+    /// <summary>whisper-base with one fake file whose catalog hash is that of <paramref name="model"/>.</summary>
+    private static ModelEntry Base(byte[] model) => ModelCatalog.Entry("whisper-base")! with
+    {
+        DiskBytes = model.Length,
+        Sha256 = new Dictionary<string, string> { ["ggml-base.bin"] = Sha(model) },
+    };
 
     private static string Sha(byte[] data) => Convert.ToHexStringLower(SHA256.HashData(data));
 

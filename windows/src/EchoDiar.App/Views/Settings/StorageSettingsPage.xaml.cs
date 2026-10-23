@@ -178,6 +178,8 @@ public sealed partial class StorageSettingsPage : UserControl
                 break;
             case nameof(AppViewModel.TranscriptionProgress):
             case nameof(AppViewModel.IsRecording):
+            case nameof(AppViewModel.RecordingCaptions):
+            case nameof(AppViewModel.AIJob):
             case nameof(AppViewModel.Downloads):
                 UpdateDeleteButtons();
                 break;
@@ -418,9 +420,12 @@ public sealed partial class StorageSettingsPage : UserControl
         return [.. _model.Conversations.Where(c => c.Status == ConversationStatus.Transcribed && c.HasTranscript && withAudio.Contains(c.Id))];
     }
 
-    /// <summary>Models are removed only while nothing records or transcribes (no AI jobs yet).</summary>
+    /// <summary>
+    /// Models are removed only while nothing records and no model is in use (<see cref="AppViewModel.ModelsInUse"/>, as
+    /// the Delete of Settings › AI's model rows): an AI job's GGUF file cannot be deleted.
+    /// </summary>
     private bool CanDeleteModels() =>
-        _model.DeletableModels.Count > 0 && !_model.IsRecording && !_model.TranscriptionProgress.Keys.Any(_model.IsTranscribing);
+        _model.DeletableModels.Count > 0 && !_model.IsRecording && !_model.ModelsInUse;
 
     private void UpdateDeleteButtons()
     {

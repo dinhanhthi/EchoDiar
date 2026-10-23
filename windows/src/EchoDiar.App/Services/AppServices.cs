@@ -52,7 +52,8 @@ internal sealed class AppServices : IDisposable
             Engines,
             SherpaDiarizer.Create,
             Models.IsInstalled,
-            Models.Folder,
+            // Checked again before each load (a planted or changed file is never loaded).
+            entry => Models.VerifiedFolder(entry) ?? throw new TranscriptionException(TranscriptionErrorKind.NeedsModel, entry.Id),
             Gate,
             decoder: decoder,
             deferral: Deferral);
@@ -137,7 +138,8 @@ internal sealed class AppServices : IDisposable
     /// The in-app model of LLM catalog entry <paramref name="entryID"/> (macOS <c>AppModel.makeLocalProvider</c>): Windows
     /// AI, or a downloaded GGUF model run with llama.cpp; null when it is not installed or not an LLM. Both are
     /// <see cref="ILocalLLMProvider"/>s, which <see cref="AIService"/> runs inside <see cref="Gate"/> (owner LLM), loaded
-    /// for the job and freed when it ends. Checks the model's files: call it off the UI thread.
+    /// for the job and freed when it ends. A GGUF file is checked against its catalog SHA-256 first
+    /// (<see cref="ModelStore.VerifiedFolder"/>, which hashes it once when it has no marker): call it off the UI thread.
     /// </summary>
     public ILLMProvider? MakeLocalProvider(string entryID)
     {
@@ -145,8 +147,8 @@ internal sealed class AppServices : IDisposable
         return entry.Runtime switch
         {
             ModelRuntime.WindowsAI => WindowsAI,
-            ModelRuntime.Gguf when entry.Files is [var file] && Models.IsInstalled(entry) =>
-                new LlamaProvider(entry.Id, Path.Combine(Models.Folder(entry), file)),
+            ModelRuntime.Gguf when entry.Files is [var file] && Models.VerifiedFolder(entry) is { } folder =>
+                new LlamaProvider(entry.Id, Path.Combine(folder, file)),
             _ => null,
         };
     }

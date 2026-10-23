@@ -75,6 +75,11 @@ public sealed record ModelEntry
     public bool VietnameseOnly { get; init; }
     /// <summary>Decode window override in seconds (null = engine default).</summary>
     public int? WindowSeconds { get; init; }
+    /// <summary>
+    /// A GGUF chat model's training window in tokens (<c>&lt;arch&gt;.context_length</c> in its header), so the
+    /// context it gets is known without loading it; null otherwise.
+    /// </summary>
+    public int? ContextTokens { get; init; }
 
     /// <summary>Download size in MiB, rounded.</summary>
     public int DiskMB => (int)Math.Round(DiskBytes / 1_048_576.0);
@@ -91,7 +96,10 @@ public sealed record ModelEntry
     }
 }
 
-/// <summary>The named Windows model catalog. Sizes and revisions read from the Hugging Face API on 2026-10-22.</summary>
+/// <summary>
+/// The named Windows model catalog. Sizes and revisions read from the Hugging Face API on 2026-10-22; every file's SHA-256
+/// (its LFS oid at the pinned revision) on 2026-10-23, so an install can be checked again offline.
+/// </summary>
 /// <remarks>Ids differ from the macOS catalog; macOS shows an unknown id as raw text and falls back to its default.</remarks>
 public static class ModelCatalog
 {
@@ -105,11 +113,12 @@ public static class ModelCatalog
     ];
 
     private static ModelEntry Whisper(
-        string id, string displayName, ModelTier tier, string file, long diskBytes, int ramMB,
+        string id, string displayName, ModelTier tier, string file, long diskBytes, string sha256, int ramMB,
         ModelQualityNotes qualityNotes, bool isDefault = false) => new()
     {
         Id = id, Kind = ModelKind.Asr, Tier = tier, DisplayName = displayName,
         Repo = WhisperCppRepo, Revision = WhisperCppRevision, Files = [file],
+        Sha256 = new Dictionary<string, string> { [file] = sha256 },
         Runtime = ModelRuntime.WhisperNet, DiskBytes = diskBytes, RamMB = ramMB, RamIsEstimate = true,
         Languages = null, QualityNotes = qualityNotes, License = "MIT", Streaming = true, IsDefault = isDefault,
     };
@@ -119,20 +128,25 @@ public static class ModelCatalog
     public static readonly IReadOnlyList<ModelEntry> Asr =
     [
         Whisper("whisper-large-v3-turbo-q5", "Whisper Large v3 Turbo (q5_0, 547 MB)", ModelTier.Balanced,
-            "ggml-large-v3-turbo-q5_0.bin", 574_041_195, 1000,
+            "ggml-large-v3-turbo-q5_0.bin", 574_041_195,
+            "394221709cd5ad1f40c46e6031ca61bce88931e6e088c188294c6d5a55ffa7e2", 1000,
             new("Good (Open ASR avg 8.39%, unquantized turbo)", "Good", "Good (FLEURS vi 8.1-9.5%, unquantized turbo)"),
             isDefault: true),
         Whisper("whisper-large-v3-turbo", "Whisper Large v3 Turbo (1.5 GB)", ModelTier.Balanced,
-            "ggml-large-v3-turbo.bin", 1_624_555_275, 2000,
+            "ggml-large-v3-turbo.bin", 1_624_555_275,
+            "1fc70f774d38eb169993ac391eea357ef47c88757ef72ee5943879b7e8e2bc69", 2000,
             new("Good (turbo, Open ASR avg 8.39%)", "Good", "Good (FLEURS vi 8.1-9.5%)")),
         Whisper("whisper-large-v3-q5", "Whisper Large v3 (q5_0, 1 GB)", ModelTier.Quality,
-            "ggml-large-v3-q5_0.bin", 1_081_140_203, 1700,
+            "ggml-large-v3-q5_0.bin", 1_081_140_203,
+            "d75795ecff3f83b5faa89d1900604ad8c780abd5739fae406de19f23ecd98ad1", 1700,
             new("Very good (LibriSpeech clean 2.48%, unquantized model)", "Very good", "Good (FLEURS vi 8.74%, unquantized model)")),
         Whisper("whisper-small", "Whisper Small (465 MB)", ModelTier.Fast,
-            "ggml-small.bin", 487_601_967, 852,
+            "ggml-small.bin", 487_601_967,
+            "1be3a9b2063867b937e64e2ec7483364a79917e157fa98c5d94b5c1fffea987b", 852,
             new("Fair (LibriSpeech clean 4.03%)", "Fair", "Poor (FLEURS vi 22.5%)")),
         Whisper("whisper-base", "Whisper Base (141 MB)", ModelTier.Fast,
-            "ggml-base.bin", 147_951_465, 388,
+            "ggml-base.bin", 147_951_465,
+            "60ed5bc3dd14eea856493d334349b405782ddcaf0028d4b5df4088345fba2efe", 388,
             new("Fair (fastest, least accurate)", "Fair", "Poor")),
         // Third-party ggml conversion of vinai/PhoWhisper-medium (the repo card says Apache-2.0).
         new()
@@ -141,6 +155,10 @@ public static class ModelCatalog
             DisplayName = "PhoWhisper Medium (Vietnamese only, experimental)",
             Repo = "dongxiat/ggml-PhoWhisper-medium", Revision = "053b49372bcb9c587ec360f49b09687685ebb7db",
             Files = ["ggml-PhoWhisper-medium.bin"],
+            Sha256 = new Dictionary<string, string>
+            {
+                ["ggml-PhoWhisper-medium.bin"] = "24433822f81ab63826f35b4f6b6202c3724b0b43473700125c54029339ffee63",
+            },
             Runtime = ModelRuntime.WhisperNet, DiskBytes = 1_533_763_076, RamMB = 2100, RamIsEstimate = true,
             Languages = ["vi"],
             QualityNotes = new(
@@ -159,6 +177,9 @@ public static class ModelCatalog
             // tokens.txt is a plain git blob (no LFS oid in the tree); its hash was read at this revision.
             Sha256 = new Dictionary<string, string>
             {
+                ["encoder.int8.onnx"] = "acfc2b4456377e15d04f0243af540b7fe7c992f8d898d751cf134c3a55fd2247",
+                ["decoder.int8.onnx"] = "179e50c43d1a9de79c8a24149a2f9bac6eb5981823f2a2ed88d655b24248db4e",
+                ["joiner.int8.onnx"] = "3164c13fc2821009440d20fcb5fdc78bff28b4db2f8d0f0b329101719c0948b3",
                 ["tokens.txt"] = "d58544679ea4bc6ac563d1f545eb7d474bd6cfa467f0a6e2c1dc1c7d37e3c35d",
             },
             // 652_184_281 + 11_845_275 + 6_355_277 + 93_939
@@ -184,9 +205,18 @@ public static class ModelCatalog
             Repo = "csukuangfj/sherpa-onnx-pyannote-segmentation-3-0",
             Revision = "9403a6902bb58e3d5ae8c7e77c3422de279db2e0",
             Files = ["model.onnx"],
+            Sha256 = new Dictionary<string, string>
+            {
+                ["model.onnx"] = "220ad67ca923bef2fa91f2390c786097bf305bceb5e261d4af67b38e938e1079",
+            },
             ExtraFiles = new(
                 "csukuangfj/speaker-embedding-models", "0743f301363dec56491a490f6d6cbc9d67f9a3bf",
-                ["3dspeaker_speech_campplus_sv_zh_en_16k-common_advanced.onnx"]),
+                ["3dspeaker_speech_campplus_sv_zh_en_16k-common_advanced.onnx"],
+                new Dictionary<string, string>
+                {
+                    ["3dspeaker_speech_campplus_sv_zh_en_16k-common_advanced.onnx"] =
+                        "aa3cfc16963a10586a9393f5035d6d6b57e98d358b347f80c2a30bf4f00ceba2",
+                }),
             // 5_992_913 + 28_281_164
             Runtime = ModelRuntime.SherpaOnnx, DiskBytes = 34_274_077, RamMB = 150, RamIsEstimate = true,
             Languages = null,
@@ -203,13 +233,14 @@ public static class ModelCatalog
     // Gemma 4 cards say apache-2.0 (license_link: the Gemma 4 license page), as Swift's comment notes.
     private static ModelEntry Gguf(
         string id, string displayName, ModelTier tier, string repo, string revision, string file, long diskBytes,
-        string sha256, int ramMB, string vi, bool isDefault = false) => new()
+        string sha256, int contextTokens, int ramMB, string vi, bool isDefault = false) => new()
     {
         Id = id, Kind = ModelKind.Llm, Tier = tier, DisplayName = displayName,
         Repo = repo, Revision = revision, Files = [file],
         Sha256 = new Dictionary<string, string> { [file] = sha256 },
         Runtime = ModelRuntime.Gguf, DiskBytes = diskBytes, RamMB = ramMB, RamIsEstimate = true,
         Languages = null, QualityNotes = new("Good", "Good", vi), License = "Apache-2.0", IsDefault = isDefault,
+        ContextTokens = contextTokens,
     };
 
     public static readonly IReadOnlyList<ModelEntry> Llm =
@@ -228,23 +259,23 @@ public static class ModelCatalog
         Gguf("gguf-qwen3.5-2b", "Qwen3.5 2B", ModelTier.Fast,
             "unsloth/Qwen3.5-2B-GGUF", "f6d5376be1edb4d416d56da11e5397a961aca8ae",
             "Qwen3.5-2B-Q4_K_M.gguf", 1_280_835_840,
-            "aaf42c8b7c3cab2bf3d69c355048d4a0ee9973d48f16c731c0520ee914699223", 3100, "Fair"),
+            "aaf42c8b7c3cab2bf3d69c355048d4a0ee9973d48f16c731c0520ee914699223", 262_144, 3100, "Fair"),
         Gguf("gguf-gemma-4-e2b", "Gemma 4 E2B", ModelTier.Fast,
             "unsloth/gemma-4-E2B-it-GGUF", "0314792d7f1f7e229411f620751375812bb9faf2",
             "gemma-4-E2B-it-Q4_K_M.gguf", 3_106_738_272,
-            "740185b21d22ceb83a11c3aa62ad5842ef32c70f6096d756bbee85a1e4ec34b8", 4500, "Fair-Good"),
+            "740185b21d22ceb83a11c3aa62ad5842ef32c70f6096d756bbee85a1e4ec34b8", 131_072, 4500, "Fair-Good"),
         Gguf("gguf-qwen3.5-4b", "Qwen3.5 4B", ModelTier.Balanced,
             "unsloth/Qwen3.5-4B-GGUF", "e87f176479d0855a907a41277aca2f8ee7a09523",
             "Qwen3.5-4B-Q4_K_M.gguf", 2_740_937_888,
-            "00fe7986ff5f6b463e62455821146049db6f9313603938a70800d1fb69ef11a4", 5200, "Good", isDefault: true),
+            "00fe7986ff5f6b463e62455821146049db6f9313603938a70800d1fb69ef11a4", 262_144, 5200, "Good", isDefault: true),
         Gguf("gguf-gemma-4-e4b", "Gemma 4 E4B", ModelTier.Balanced,
             "unsloth/gemma-4-E4B-it-GGUF", "bfc15c382204943c3a8fff0c750b94ae2364d7a3",
             "gemma-4-E4B-it-Q4_K_M.gguf", 4_977_171_584,
-            "85a896a047553e842f25297ee5b031d64ff30147d9c4af17b1e4b394cd1fab87", 6800, "Good"),
+            "85a896a047553e842f25297ee5b031d64ff30147d9c4af17b1e4b394cd1fab87", 131_072, 6800, "Good"),
         Gguf("gguf-qwen3.5-9b", "Qwen3.5 9B", ModelTier.Balanced,
             "unsloth/Qwen3.5-9B-GGUF", "3885219b6810b007914f3a7950a8d1b469d598a5",
             "Qwen3.5-9B-Q4_K_M.gguf", 5_680_522_464,
-            "03b74727a860a56338e042c4420bb3f04b2fec5734175f4cb9fa853daf52b7e8", 8700, "Good-Very good"),
+            "03b74727a860a56338e042c4420bb3f04b2fec5734175f4cb9fa853daf52b7e8", 262_144, 8700, "Good-Very good"),
     ];
 
     // Embedding

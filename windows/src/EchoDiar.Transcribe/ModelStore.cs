@@ -35,6 +35,8 @@ public readonly record struct ModelDownloadProgress(long CompletedBytes, long To
 /// repos at their pinned revisions are fetched; the Hugging Face listing is untrusted: every listed path is
 /// checked before anything is written, and each file must match its listed size and its SHA-256: the catalog's
 /// (<see cref="ModelEntry.Sha256"/>) when it has one, else the listed LFS oid. A file with neither is refused.
+/// What was checked is kept in a <see cref="MarkerName"/> file, and <see cref="VerifiedFolder"/> checks it again
+/// before a model is loaded.
 /// </summary>
 /// <remarks>
 /// Layout: repo files with <see cref="ModelEntry.Subfolder"/> stripped, and <see cref="ModelEntry.ExtraFiles"/>
@@ -52,6 +54,13 @@ public sealed class ModelStore(string root, HttpClient http, Func<string, long>?
     private const int MaxPageBytes = 16 << 20;
     private static readonly JsonSerializerOptions Json = new(JsonSerializerDefaults.Web);
 
+    /// <summary>
+    /// The file in <c>Models/&lt;id&gt;/</c> that records each file's SHA-256 as checked, with its size and last write
+    /// time then; written in the staging folder after the checks, so it moves in with the files.
+    /// </summary>
+    public const string MarkerName = ".verified";
+    private const int MaxMarkerBytes = 1 << 20;
+
     private readonly Func<string, long> _freeBytes = freeBytes ?? DefaultFreeBytes;
     private readonly ConcurrentDictionary<string, SemaphoreSlim> _downloads = new();
 
@@ -67,7 +76,10 @@ public sealed class ModelStore(string root, HttpClient http, Func<string, long>?
 
     // Installed state
 
-    /// <summary>Every allowlisted file is in place and the folder holds exactly the catalog's byte count.</summary>
+    /// <summary>
+    /// Every allowlisted file is in place and the folder holds exactly the catalog's byte count (the marker aside). It
+    /// says what is on disk, not that it is what was downloaded: load from <see cref="VerifiedFolder"/>.
+    /// </summary>
     public bool IsInstalled(ModelEntry entry)
     {
         if (entry.Repo is null || !Directory.Exists(Folder(entry))) return false;
@@ -83,8 +95,130 @@ public sealed class ModelStore(string root, HttpClient http, Func<string, long>?
         return InstalledBytes(entry) == entry.DiskBytes;
     }
 
-    /// <summary>Bytes on disk under <c>Models/&lt;id&gt;/</c>.</summary>
-    public long InstalledBytes(ModelEntry entry) => SizeOf(Folder(entry));
+    /// <summary>Bytes of the model's files under <c>Models/&lt;id&gt;/</c> (its <see cref="MarkerName"/> file aside).</summary>
+    public long InstalledBytes(ModelEntry entry)
+    {
+        var marker = new FileInfo(Path.Combine(Folder(entry), MarkerName));
+        return SizeOf(Folder(entry)) - (marker.Exists ? marker.Length : 0);
+    }
+
+    // Verification
+
+    private sealed record MarkerFile(string Path, string Sha256, long Bytes, long ModifiedTicks);
+
+    private sealed record Marker(string Id, List<MarkerFile> Files);
+
+    /// <summary>
+    /// <c>Models/&lt;id&gt;/</c> when its files are those checked at download: the marker lists exactly the files there,
+    /// with the catalog's SHA-256 (or, for a file the catalog has none for, the one checked at download) and each
+    /// file's size and last write time. An install without a valid marker (one from before markers, or a file changed
+    /// since) is hashed once now: when every file matches the catalog it gets its marker; when one does not, the
+    /// install is deleted (unless a download of it runs), so it shows as not installed. Null when not installed or not
+    /// verified. Hashes whole files the first time: call it off the UI thread, before loading the model.
+    /// </summary>
+    public string? VerifiedFolder(ModelEntry entry)
+    {
+        if (!IsInstalled(entry)) return null;
+        var folder = Folder(entry);
+        var files = FilesIn(folder);
+        var expected = ExpectedHashes(entry);
+        if (ReadMarker(folder) is { } marker && Matches(marker, entry, folder, files, expected)) return folder;
+        var checkedFiles = new List<MarkerFile>();
+        foreach (var file in files)
+        {
+            if (!expected.TryGetValue(file, out var sha)) return null;
+            var info = new FileInfo(Path.Combine(folder, file));
+            if (!string.Equals(HashOf(info.FullName), sha, StringComparison.OrdinalIgnoreCase))
+            {
+                DeleteUnlessDownloading(entry);
+                return null;
+            }
+            checkedFiles.Add(new(file, sha, info.Length, info.LastWriteTimeUtc.Ticks));
+        }
+        // Written aside, then moved in, so a crash never leaves half a marker (or a stray file) in the folder.
+        var temporary = Path.Combine(Root, $".verified-{SafeId(entry)}-{Guid.NewGuid():N}");
+        WriteMarker(temporary, new(entry.Id, checkedFiles));
+        File.Move(temporary, Path.Combine(folder, MarkerName), overwrite: true);
+        return folder;
+    }
+
+    /// <summary>The files under <paramref name="folder"/> as <c>/</c>-separated relative paths, the marker aside.</summary>
+    private static List<string> FilesIn(string folder) =>
+        [.. Directory.EnumerateFiles(folder, "*", SearchOption.AllDirectories)
+            .Select(f => Path.GetRelativePath(folder, f).Replace(Path.DirectorySeparatorChar, '/'))
+            .Where(f => f != MarkerName)
+            .Order(StringComparer.Ordinal)];
+
+    /// <summary>The catalog's SHA-256 per installed path (the subfolder stripped), both repos' files.</summary>
+    private static Dictionary<string, string> ExpectedHashes(ModelEntry entry)
+    {
+        var hashes = new Dictionary<string, string>(StringComparer.Ordinal);
+        var subfolder = entry.Subfolder is null ? [] : Components(entry.Subfolder) ?? [];
+        foreach (var (path, sha) in entry.Sha256 ?? new Dictionary<string, string>())
+        {
+            if (Components(path) is { } parts && Destination(parts, subfolder) is { } destination) hashes[string.Join('/', destination)] = sha;
+        }
+        foreach (var (path, sha) in entry.ExtraFiles?.Sha256 ?? new Dictionary<string, string>())
+        {
+            if (Components(path) is { } parts) hashes[string.Join('/', parts)] = sha;
+        }
+        return hashes;
+    }
+
+    private static bool Matches(Marker marker, ModelEntry entry, string folder, List<string> files, Dictionary<string, string> expected)
+    {
+        if (marker.Id != entry.Id || marker.Files is null || marker.Files.Count != files.Count) return false;
+        var listed = marker.Files.Where(f => f?.Path is not null && f.Sha256 is not null)
+            .ToDictionary(f => f.Path, StringComparer.Ordinal);
+        foreach (var file in files)
+        {
+            if (!listed.TryGetValue(file, out var record)) return false;
+            if (expected.TryGetValue(file, out var sha) && !string.Equals(sha, record.Sha256, StringComparison.OrdinalIgnoreCase)) return false;
+            var info = new FileInfo(Path.Combine(folder, file));
+            if (info.Length != record.Bytes || info.LastWriteTimeUtc.Ticks != record.ModifiedTicks) return false;
+        }
+        return true;
+    }
+
+    private static Marker? ReadMarker(string folder)
+    {
+        var path = Path.Combine(folder, MarkerName);
+        try
+        {
+            if (!File.Exists(path) || new FileInfo(path).Length > MaxMarkerBytes) return null;
+            return JsonSerializer.Deserialize<Marker>(File.ReadAllBytes(path), Json);
+        }
+        catch (Exception e) when (e is IOException or UnauthorizedAccessException or JsonException)
+        {
+            return null;
+        }
+    }
+
+    private static void WriteMarker(string path, Marker marker) => File.WriteAllBytes(path, JsonSerializer.SerializeToUtf8Bytes(marker, Json));
+
+    private static string HashOf(string path)
+    {
+        using var stream = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.Read, BufferSize);
+        return Convert.ToHexString(SHA256.HashData(stream));
+    }
+
+    /// <summary>Removes an install that failed its check; left alone while a download of it runs (it replaces it).</summary>
+    private void DeleteUnlessDownloading(ModelEntry entry)
+    {
+        var gate = _downloads.GetOrAdd(SafeId(entry), _ => new SemaphoreSlim(1, 1));
+        if (!gate.Wait(0)) return;
+        try
+        {
+            Delete(entry);
+        }
+        catch (Exception e) when (e is IOException or UnauthorizedAccessException)
+        {
+        }
+        finally
+        {
+            gate.Release();
+        }
+    }
 
     /// <summary>Bytes of all installed models (partial downloads excluded).</summary>
     public long TotalInstalledBytes() =>
@@ -164,6 +298,7 @@ public sealed class ModelStore(string root, HttpClient http, Func<string, long>?
             }
             var targets = files.Select(f => SafePath(staging, f.Destination)
                 ?? throw Unsafe(f.Path)).ToArray();
+            if (files.Any(f => string.Equals(string.Join('/', f.Destination), MarkerName, StringComparison.OrdinalIgnoreCase))) throw Unsafe(MarkerName);
 
             Directory.CreateDirectory(staging);
             long done = 0;
@@ -178,6 +313,12 @@ public sealed class ModelStore(string root, HttpClient http, Func<string, long>?
             progress?.Report(new(done, total, ""));
 
             cancellationToken.ThrowIfCancellationRequested();
+            // Only now that every file matched: the record VerifiedFolder checks before each load.
+            WriteMarker(Path.Combine(staging, MarkerName), new(entry.Id, [.. files.Select((f, i) =>
+            {
+                var info = new FileInfo(targets[i]);
+                return new MarkerFile(string.Join('/', f.Destination), f.Sha256, info.Length, info.LastWriteTimeUtc.Ticks);
+            })]));
             Replace(entry, staging);
         }
         catch

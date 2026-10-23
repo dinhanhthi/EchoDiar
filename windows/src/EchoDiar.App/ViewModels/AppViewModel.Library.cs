@@ -347,6 +347,12 @@ public sealed partial class AppViewModel
         }
     }
 
+    /// <summary>
+    /// A model may be loaded: a transcription, the recording's transcriber or an AI job runs. Model files are not deleted
+    /// meanwhile: llama.cpp maps a GGUF file while loaded, which Windows then refuses to move or delete.
+    /// </summary>
+    public bool ModelsInUse => TranscriptionProgress.Keys.Any(IsTranscribing) || RecordingCaptions is not null || AIJob is not null;
+
     /// <summary>The downloaded models (not one still downloading), which "Delete all" removes.</summary>
     public IReadOnlyList<ModelEntry> DeletableModels =>
         ModelCatalog.All.Where(e => e.Repo is not null && InstalledModelIds.Contains(e.Id) && !Downloads.ContainsKey(e.Id)).ToList();

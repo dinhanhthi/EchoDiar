@@ -5,8 +5,8 @@ using EchoDiar.Core.Settings;
 namespace EchoDiar.Tests.Core;
 
 // Guards the catalog's shape: settings and Models/<id>/ folders key on unique ids, each kind has one default, and a
-// GGUF download is pinned (revision) and checked (SHA-256, size) before it is installed. Swift has no catalog test;
-// these are new.
+// download is pinned (revision) and checked (SHA-256, size) before it is installed and again before it is loaded.
+// Swift has no catalog test; these are new.
 public sealed partial class ModelCatalogTests
 {
     [Fact]
@@ -37,6 +37,26 @@ public sealed partial class ModelCatalogTests
             Assert.True(entry.DiskBytes > 0);
         });
     }
+
+    // ModelStore checks an install again against these hashes (its .verified marker, or a hash of the files once),
+    // so every downloadable file needs one, the second repo's included.
+    [Fact]
+    public void EveryDownloadableFileHasACatalogHash()
+    {
+        var entries = ModelCatalog.All.Where(e => e.Repo is not null).ToList();
+
+        Assert.All(entries, entry =>
+        {
+            Assert.All(entry.Files!, file => Assert.Matches(Sha256Hex(), entry.Sha256![file]));
+            if (entry.ExtraFiles is { } extra) Assert.All(extra.Files, file => Assert.Matches(Sha256Hex(), extra.Sha256![file]));
+        });
+    }
+
+    // LlamaProvider.ContextWindowAsync reports min(RAM cap, ContextTokens) without loading the model: every GGUF chat
+    // model has its training window, and none is under the 32K cap (a shorter one would need its own prompt budget).
+    [Fact]
+    public void EveryGgufChatModelHasItsTrainingWindow() =>
+        Assert.All(ModelCatalog.Llm.Where(e => e.Runtime == ModelRuntime.Gguf), entry => Assert.True(entry.ContextTokens >= 32_768, entry.Id));
 
     [Fact]
     public void TheDefaultEmbedderIsTheSettingsDefault() =>
