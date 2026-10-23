@@ -21,7 +21,7 @@ final class OnboardingWindow: NSObject, NSWindowDelegate {
                 self?.window?.close()
             }
             let window = NSWindow(contentViewController: NSHostingController(rootView: view))
-            window.title = "Welcome to EchoDiar"
+            window.title = String(localized: "Welcome to EchoDiar")
             window.titleVisibility = .hidden
             window.titlebarAppearsTransparent = true
             window.styleMask = [.titled, .closable, .fullSizeContentView]
@@ -177,7 +177,7 @@ private struct OnboardingView: View {
     let onDone: () -> Void
 
     @State private var step = 0
-    private static let titles = ["Before you record", "Microphone", "System audio"]
+    private static let titles: [LocalizedStringResource] = ["Before you record", "Microphone", "System audio"]
 
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
@@ -233,8 +233,13 @@ private struct OnboardingView: View {
     }
 }
 
+/// The message to send the people on a call; shown and copied by the consent step and the General settings.
+enum ConsentMessage {
+    static let text = String(
+        localized: "Heads up: I'm recording this call to take notes. The recording stays on my Mac.")
+}
+
 private struct ConsentStep: View {
-    private static let consentMessage = "Heads up: I'm recording this call to take notes. The recording stays on my Mac."
     @State private var copied = false
 
     var body: some View {
@@ -243,12 +248,12 @@ private struct ConsentStep: View {
                   systemImage: "person.2.wave.2")
             Label("Tell the people you record. You are responsible for their consent.", systemImage: "hand.raised")
             Label("Audio and transcripts stay on this Mac.", systemImage: "lock.laptopcomputer")
-            Text("\"\(Self.consentMessage)\"")
+            Text(verbatim: "\"\(ConsentMessage.text)\"")
                 .font(.callout)
                 .foregroundStyle(.secondary)
             Button(copied ? "Copied" : "Copy consent message", systemImage: copied ? "checkmark" : "square.on.square") {
                 NSPasteboard.general.clearContents()
-                NSPasteboard.general.setString(Self.consentMessage, forType: .string)
+                NSPasteboard.general.setString(ConsentMessage.text, forType: .string)
                 copied = true
             }
         }
@@ -287,7 +292,7 @@ private struct MicrophoneStep: View {
         }
     }
 
-    private var statusText: String {
+    private var statusText: LocalizedStringResource {
         switch status {
         case .authorized: "Microphone access is on."
         case .denied: "Microphone access is off."
@@ -318,8 +323,10 @@ private struct SystemAudioStep: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
-            Text("EchoDiar records the other people on the call from your Mac's audio. The test plays a short sound "
-                + "and listens for it. macOS asks for System Audio Recording permission the first time.")
+            Text("""
+                EchoDiar records the other people on the call from your Mac's audio. The test plays a short sound \
+                and listens for it. macOS asks for System Audio Recording permission the first time.
+                """)
                 .fixedSize(horizontal: false, vertical: true)
             switch test.phase {
             case .idle:
@@ -335,8 +342,10 @@ private struct SystemAudioStep: View {
             case .silent:
                 Label("EchoDiar heard only silence.", systemImage: "speaker.slash.fill")
                     .foregroundStyle(.yellow)
-                Text("macOS gives silence, not an error, when System Audio Recording is off. If you just allowed it, "
-                    + "test again. Otherwise turn on EchoDiar in Privacy & Security › Screen & System Audio Recording.")
+                Text("""
+                    macOS gives silence, not an error, when System Audio Recording is off. If you just allowed it, \
+                    test again. Otherwise turn on EchoDiar in Privacy & Security › Screen & System Audio Recording.
+                    """)
                     .font(.callout)
                     .foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)

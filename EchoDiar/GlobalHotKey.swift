@@ -27,7 +27,9 @@ final class GlobalHotKey {
             let status = InstallEventHandler(
                 GetApplicationEventTarget(), Self.callback, 1, &spec,
                 Unmanaged.passUnretained(self).toOpaque(), &handler)
-            guard status == noErr else { return "The shortcut could not be set up (error \(status))." }
+            guard status == noErr else {
+                return String(localized: "The shortcut could not be set up (error \(status)).")
+            }
         }
         var ref: EventHotKeyRef?
         let hotKeyID = EventHotKeyID(signature: Self.signature, id: id)
@@ -37,9 +39,9 @@ final class GlobalHotKey {
             registered = ref
             return nil
         case OSStatus(eventHotKeyExistsErr):
-            return "\(key.displayString) is already used by another app. Pick another shortcut."
+            return String(localized: "\(key.displayString) is already used by another app. Pick another shortcut.")
         default:
-            return "\(key.displayString) could not be registered (error \(status))."
+            return String(localized: "\(key.displayString) could not be registered (error \(status)).")
         }
     }
 
@@ -90,7 +92,8 @@ extension HotKey {
     }
 
     private static let specialKeys: [Int: String] = [
-        kVK_Space: "Space", kVK_Return: "↩", kVK_Tab: "⇥", kVK_Delete: "⌫", kVK_ForwardDelete: "⌦",
+        kVK_Space: String(localized: "Space", comment: "The Space bar, in a shortcut such as ⌥⌘Space"),
+        kVK_Return: "↩", kVK_Tab: "⇥", kVK_Delete: "⌫", kVK_ForwardDelete: "⌦",
         kVK_Escape: "⎋", kVK_LeftArrow: "←", kVK_RightArrow: "→", kVK_UpArrow: "↑", kVK_DownArrow: "↓",
         kVK_Home: "↖", kVK_End: "↘", kVK_PageUp: "⇞", kVK_PageDown: "⇟",
         kVK_F1: "F1", kVK_F2: "F2", kVK_F3: "F3", kVK_F4: "F4", kVK_F5: "F5", kVK_F6: "F6", kVK_F7: "F7",
@@ -103,7 +106,7 @@ extension HotKey {
         if let special = specialKeys[Int(keyCode)] { return special }
         guard let source = TISCopyCurrentKeyboardLayoutInputSource()?.takeRetainedValue(),
               let layout = TISGetInputSourceProperty(source, kTISPropertyUnicodeKeyLayoutData)
-        else { return "Key \(keyCode)" }
+        else { return String(localized: "Key \(Int(keyCode))") }
         let data = Unmanaged<CFData>.fromOpaque(layout).takeUnretainedValue() as Data
         var deadKeyState: UInt32 = 0
         var length = 0
@@ -115,7 +118,7 @@ extension HotKey {
                 UInt32(LMGetKbdType()), OptionBits(kUCKeyTranslateNoDeadKeysBit), &deadKeyState, characters.count,
                 &length, &characters)
         }
-        guard status == noErr, length > 0 else { return "Key \(keyCode)" }
+        guard status == noErr, length > 0 else { return String(localized: "Key \(Int(keyCode))") }
         return String(utf16CodeUnits: characters, count: length).uppercased()
     }
 }

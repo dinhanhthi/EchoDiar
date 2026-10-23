@@ -30,8 +30,8 @@ final class Updater: NSObject {
 
     /// The app menu's and the menu bar menu's item for `checkForUpdates`.
     var menuTitle: String {
-        if installNow != nil { return "Install Update and Relaunch" }
-        return updateAvailable ? "Update Available…" : "Check for Updates…"
+        if installNow != nil { return String(localized: "Install Update and Relaunch") }
+        return updateAvailable ? String(localized: "Update Available…") : String(localized: "Check for Updates…")
     }
 
     func start() {

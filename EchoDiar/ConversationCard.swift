@@ -4,15 +4,13 @@ import EchoCore
 import EchoTranscribe
 import SwiftUI
 
-/// One conversation of the library: source app icon, title (double-click to rename), time, duration, size and
-/// status, then a bottom row with the AI, Summary, Reveal in Finder and Delete (audio or conversation) buttons and the transcription progress
-/// or its action. A click elsewhere opens the transcript. Compact (the wide layout's sidebar) drops the buttons, which
-/// stay in the context menu and the detail, and keeps the status, and a click keeps the detail's tab; selected adds an
-/// accent fill and stroke. ⌘-click and ⇧-click select cards instead of opening.
+/// One conversation of the library's sidebar: source app icon, title (double-click to rename), time, duration, size
+/// and status, then a row with the transcription progress or its action. The actions are in the context menu and the
+/// detail. A click elsewhere opens the conversation on the detail's tab; selected adds an accent fill and stroke.
+/// ⌘-click and ⇧-click select cards instead of opening.
 struct ConversationCard: View {
     let conversation: Conversation
     let model: AppModel
-    var compact = false
     var selected = false
     /// ⌘-click toggles the card, ⇧-click (`extend`) adds the span from the anchor.
     var select: ((_ extend: Bool) -> Void)? = nil
@@ -27,44 +25,15 @@ struct ConversationCard: View {
                 title
                 details
                 TranscriptionFailureReason(conversation: conversation, model: model)
-                // The buttons and status have their own row under the title and details, from the same leading edge.
+                // The status has its own row under the title and details, from the same leading edge; often empty.
                 HStack(spacing: 12) {
-                    if !compact {
-                        rowButton("AI", systemImage: "sparkles") { model.open(conversation.id, tab: .chat) }
-                            .help("Ask AI about this conversation")
-                        if conversation.hasSummary {
-                            rowButton("Summary", systemImage: "text.alignleft") {
-                                model.open(conversation.id, tab: .summary)
-                            }
-                            .help("Show the summary")
-                        }
-                        rowButton("Reveal in Finder", systemImage: "folder", action: revealInFinder)
-                            .help("Reveal in Finder")
-                        Menu {
-                            DeleteMenuItems(conversation: conversation, model: model)
-                        } label: {
-                            HStack(spacing: 3) {
-                                Image(systemName: "trash").font(.system(size: 15))
-                                MenuChevron()
-                            }
-                        }
-                        .menuStyle(.button)
-                        .buttonStyle(RowIconButtonStyle(capsule: true))
-                        .menuIndicator(.hidden)
-                        .foregroundStyle(.secondary)
-                        .fixedSize()
-                        .disabled(!DeleteMenuItems.canDelete(conversation, model))
-                        .help("Delete the audio or the whole conversation")
-                    }
                     TranscriptionStatus(conversation: conversation, model: model)
                     Spacer(minLength: 0)
                 }
-                // Room between the details and the buttons; compact has no buttons, often an empty row.
-                .padding(.top, compact ? 0 : 6)
             }
         }
-        .padding(.horizontal, compact ? 10 : 14)
-        .padding(.vertical, compact ? 8 : 10)
+        .padding(.horizontal, 10)
+        .padding(.vertical, 8)
         // The fill sits under the content, on the surface; the stroke on top.
         .background {
             if selected { Self.shape.fill(Color.accentColor.opacity(0.18)) }
@@ -92,16 +61,6 @@ struct ConversationCard: View {
 
     /// The `GlassCard` shape, for the selection.
     private static let shape = RoundedRectangle(cornerRadius: 20, style: .continuous)
-
-    private func rowButton(_ title: String, systemImage: String, action: @escaping () -> Void) -> some View {
-        Button(action: action) {
-            Label(title, systemImage: systemImage)
-                .labelStyle(.iconOnly)
-                .font(.system(size: 15))
-        }
-        .buttonStyle(RowIconButtonStyle())
-        .foregroundStyle(.secondary)
-    }
 
     @ViewBuilder private var title: some View {
         if editing {
@@ -162,11 +121,11 @@ struct ConversationCard: View {
         editing = true
     }
 
-    /// Not while the title is being edited: clicks in its field must not open the transcript.
-    /// The transcript; in the sidebar, the tab the detail shows.
+    /// Not while the title is being edited: clicks in its field must not open the conversation.
+    /// On the tab the detail shows.
     private func open() {
         guard !editing else { return }
-        model.open(conversation.id, tab: compact ? model.detailTab : .transcript)
+        model.open(conversation.id, tab: model.detailTab)
     }
 
     private func revealInFinder() {
@@ -176,8 +135,8 @@ struct ConversationCard: View {
 }
 
 /// Delete's choices: the audio only (most of the size, often useless once transcribed) or the whole conversation,
-/// each asked first unless "Delete conversations without confirmation" is on. In the card's menu and context menu,
-/// the conversation's toolbar and Storage's largest conversations; the list page's selection bar uses the bulk
+/// each asked first unless "Delete conversations without confirmation" is on. In the card's context menu, the
+/// conversation's toolbar and Storage's largest conversations; the list page's selection bar uses the bulk
 /// `delete`.
 struct DeleteMenuItems: View {
     let conversation: Conversation
@@ -207,14 +166,14 @@ struct DeleteMenuItems: View {
         if !model.settings.deleteWithoutConfirmation {
             let alert = NSAlert()
             if audioOnly {
-                alert.messageText = "Delete the audio of \"\(conversation.title)\"?"
-                alert.informativeText = "The audio is moved to the Trash. The transcript, summary and chat stay; playback and re-transcribing are no longer possible."
+                alert.messageText = String(localized: "Delete the audio of \"\(conversation.title)\"?")
+                alert.informativeText = String(localized: "The audio is moved to the Trash. The transcript, summary and chat stay; playback and re-transcribing are no longer possible.")
             } else {
-                alert.messageText = "Delete \"\(conversation.title)\"?"
-                alert.informativeText = "The recording and its files are moved to the Trash."
+                alert.messageText = String(localized: "Delete \"\(conversation.title)\"?")
+                alert.informativeText = String(localized: "The recording and its files are moved to the Trash.")
             }
-            alert.addButton(withTitle: "Delete").hasDestructiveAction = true
-            alert.addButton(withTitle: "Cancel")
+            alert.addButton(withTitle: String(localized: "Delete")).hasDestructiveAction = true
+            alert.addButton(withTitle: String(localized: "Cancel"))
             guard alert.runModal() == .alertFirstButtonReturn else { return false }
         }
         if audioOnly {
@@ -234,14 +193,14 @@ struct DeleteMenuItems: View {
         if !model.settings.deleteWithoutConfirmation {
             let alert = NSAlert()
             if audioOnly {
-                alert.messageText = "Delete the audio of \(eligible.count) conversations?"
-                alert.informativeText = "The audio is moved to the Trash. The transcript, summary and chat stay; playback and re-transcribing are no longer possible."
+                alert.messageText = String(localized: "Delete the audio of \(eligible.count) conversations?")
+                alert.informativeText = String(localized: "The audio is moved to the Trash. The transcript, summary and chat stay; playback and re-transcribing are no longer possible.")
             } else {
-                alert.messageText = "Delete \(eligible.count) conversations?"
-                alert.informativeText = "The recordings and their files are moved to the Trash."
+                alert.messageText = String(localized: "Delete \(eligible.count) conversations?")
+                alert.informativeText = String(localized: "The recordings and their files are moved to the Trash.")
             }
-            alert.addButton(withTitle: "Delete").hasDestructiveAction = true
-            alert.addButton(withTitle: "Cancel")
+            alert.addButton(withTitle: String(localized: "Delete")).hasDestructiveAction = true
+            alert.addButton(withTitle: String(localized: "Cancel"))
             guard alert.runModal() == .alertFirstButtonReturn else { return false }
         }
         let ids = eligible.map(\.id)
@@ -336,19 +295,19 @@ struct TranscriptionStatus: View {
             .font(.caption)
             .foregroundStyle(.secondary)
             .help(progress.step == .deferred
-                  ? "Waiting while the Mac is hot or in Low Power Mode"
+                  ? String(localized: "Waiting while the Mac is hot or in Low Power Mode")
                   : fraction.formatted(.percent.precision(.fractionLength(0))))
         }
     }
 
     private static func stepText(_ step: JobProgress.Step) -> String {
         switch step {
-        case .queued: "Queued"
-        case .deferred: "Waiting…"
-        case .extracting: "Preparing audio…"
-        case .transcribingMic, .transcribingSystem: "Transcribing…"
-        case .diarizing: "Identifying speakers…"
-        case .merging, .finished: "Finishing…"
+        case .queued: String(localized: "Queued")
+        case .deferred: String(localized: "Waiting…")
+        case .extracting: String(localized: "Preparing audio…")
+        case .transcribingMic, .transcribingSystem: String(localized: "Transcribing…")
+        case .diarizing: String(localized: "Identifying speakers…")
+        case .merging, .finished: String(localized: "Finishing…")
         case .needsModel, .failed: ""
         }
     }
@@ -362,7 +321,7 @@ struct TranscriptionFailureReason: View {
 
     var body: some View {
         if TranscriptionStatus.showsFailure(conversation, model) {
-            let reason = model.transcriptionErrors[conversation.id] ?? "Transcription failed"
+            let reason = model.transcriptionErrors[conversation.id] ?? String(localized: "Transcription failed")
             Text(reason)
                 .font(.caption)
                 .foregroundStyle(.red)
@@ -377,7 +336,7 @@ struct TranscriptionFailureReason: View {
 /// Installed local engines, then the configured cloud engines under "Cloud", for the Retry and Re-transcribe menus;
 /// "Download a model…" when there are none. `pick` gets a catalog or cloud engine id.
 struct EngineMenuItems: View {
-    let title: String
+    let title: LocalizedStringKey
     let model: AppModel
     let pick: (String) -> Void
 
@@ -393,7 +352,7 @@ struct EngineMenuItems: View {
                 }
             }
             if !cloud.isEmpty {
-                Section(local.isEmpty ? "\(title) (cloud)" : "Cloud") {
+                Section(local.isEmpty ? "\(Text(title)) (cloud)" : "Cloud") {
                     ForEach(cloud) { config in
                         Button(model.cloudEngineName(config)) { pick(CloudTranscription.engineID(providerID: config.id)) }
                     }
@@ -411,11 +370,11 @@ struct StatusBadge: View {
 
     init?(status: Conversation.Status) {
         switch status {
-        case .recording: (text, color) = ("Recording", .red)
-        case .recovered: (text, color) = ("Recovered", .orange)
-        case .compressing: (text, color) = ("Compressing…", .blue)
-        case .compressionFailed: (text, color) = ("Compression failed", .red)
-        case .failed: (text, color) = ("Failed", .red)
+        case .recording: (text, color) = (String(localized: "Recording"), .red)
+        case .recovered: (text, color) = (String(localized: "Recovered"), .orange)
+        case .compressing: (text, color) = (String(localized: "Compressing…"), .blue)
+        case .compressionFailed: (text, color) = (String(localized: "Compression failed"), .red)
+        case .failed: (text, color) = (String(localized: "Failed"), .red)
         default: return nil
         }
     }

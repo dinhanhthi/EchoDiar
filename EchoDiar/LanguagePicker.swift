@@ -17,9 +17,13 @@ enum LanguageOptions {
         return [[auto], pinned, recent, others].filter { !$0.isEmpty }
     }
 
-    /// English name (the UI is English only); the code itself when the system has no name for it.
+    /// The name in the app's UI language, first letter capitalized ("français" is "Français"); the code itself when the
+    /// system has no name for it. Not `Locale.current`: that follows the region format, not the UI language.
     static func name(_ code: String) -> String {
-        code == auto ? "Auto" : Locale(identifier: "en").localizedString(forLanguageCode: code) ?? code
+        guard code != auto else { return String(localized: "Auto") }
+        let locale = Locale(identifier: Bundle.main.preferredLocalizations.first ?? "en")
+        guard let name = locale.localizedString(forLanguageCode: code) else { return code }
+        return name.prefix(1).capitalized(with: locale) + name.dropFirst()
     }
 
     /// Compact label ("VI", "ZH" for "zh-Hans"); "" is `LanguagePicker`'s "As recorded" tag. Lists keep `name`.
@@ -35,7 +39,7 @@ enum LanguageOptions {
 /// A language picker for menus (a submenu) and forms (a pop-up button), in `LanguageOptions` order.
 /// `asRecorded` adds a first option with the tag "" for "keep the recording's language markers".
 struct LanguagePicker: View {
-    let title: String
+    let title: LocalizedStringKey
     @Binding var selection: String
     let model: AppModel
     var engineID: String?

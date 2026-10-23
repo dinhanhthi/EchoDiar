@@ -16,9 +16,9 @@ enum IndicatorState: CaseIterable {
     var accessibilityLabel: String {
         switch self {
         case .idle: return "EchoDiar"
-        case .recording: return "EchoDiar, recording"
-        case .paused: return "EchoDiar, recording paused"
-        case .processing: return "EchoDiar, processing"
+        case .recording: return String(localized: "EchoDiar, recording")
+        case .paused: return String(localized: "EchoDiar, recording paused")
+        case .processing: return String(localized: "EchoDiar, processing")
         }
     }
 }
@@ -168,23 +168,23 @@ final class StatusItemController: NSObject, NSMenuDelegate {
 
     func menuNeedsUpdate(_ menu: NSMenu) {
         menu.removeAllItems()
-        menu.addItem(item("Open EchoDiar", #selector(openMain)))
+        menu.addItem(item(String(localized: "Open EchoDiar"), #selector(openMain)))
         let active = state == .recording || state == .paused
         if active, let controls = Self.controls {
             addRecordingItems(controls)
         } else {
-            let record = item("Start Recording", #selector(toggleRecording))
+            let record = item(String(localized: "Start Recording"), #selector(toggleRecording))
             record.isEnabled = recordingEnabled
             menu.addItem(record)
         }
         if let controls = Self.controls, let app = controls.detectedApp() {
-            let detected = NSMenuItem(title: "Detected: \(app)", action: nil, keyEquivalent: "")
+            let detected = NSMenuItem(title: String(localized: "Detected: \(app)"), action: nil, keyEquivalent: "")
             detected.isEnabled = false
             menu.addItem(detected)
-            menu.addItem(item("Stop asking for this app", #selector(stopAskingForDetectedApp)))
+            menu.addItem(item(String(localized: "Stop asking for this app"), #selector(stopAskingForDetectedApp)))
             menu.addItem(.separator())
         }
-        menu.addItem(item("Settings…", #selector(openSettings)))
+        menu.addItem(item(String(localized: "Settings…"), #selector(openSettings)))
         #if DEBUG
         let simulate = NSMenuItem(title: "Simulate state", action: nil, keyEquivalent: "")
         simulate.submenu = NSMenu()
@@ -201,11 +201,11 @@ final class StatusItemController: NSObject, NSMenuDelegate {
         let update = item(updater.menuTitle, #selector(checkForUpdates))
         update.isEnabled = updater.canCheck && !active
         menu.addItem(update)
-        menu.addItem(item("About EchoDiar", #selector(about)))
+        menu.addItem(item(String(localized: "About EchoDiar"), #selector(about)))
         menu.addItem(.separator())
-        let quit = NSMenuItem(title: "Quit", action: nil, keyEquivalent: "")
+        let quit = NSMenuItem(title: String(localized: "Quit"), action: nil, keyEquivalent: "")
         quit.submenu = NSMenu()
-        quit.submenu?.addItem(item("Sure to quit", #selector(terminate)))
+        quit.submenu?.addItem(item(String(localized: "Sure to quit"), #selector(terminate)))
         menu.addItem(quit)
     }
 
@@ -215,19 +215,23 @@ final class StatusItemController: NSObject, NSMenuDelegate {
         let elapsed = controls.elapsed()
         let pattern: Duration.TimeFormatStyle.Pattern = elapsed >= 3_600 ? .hourMinuteSecond : .minuteSecond
         let time = Duration.seconds(elapsed).formatted(.time(pattern: pattern))
-        let status = NSMenuItem(title: "\(state == .paused ? "Paused" : "Recording") \(time)", action: nil, keyEquivalent: "")
+        let title = state == .paused
+            ? String(localized: "Paused — \(time)", comment: "Status menu: elapsed recording time")
+            : String(localized: "Recording — \(time)", comment: "Status menu: elapsed recording time")
+        let status = NSMenuItem(title: title, action: nil, keyEquivalent: "")
         status.isEnabled = false
         menu.addItem(status)
-        menu.addItem(item(state == .paused ? "Resume" : "Pause", #selector(togglePause)))
+        let pause = state == .paused ? String(localized: "Resume") : String(localized: "Pause")
+        menu.addItem(item(pause, #selector(togglePause)))
         let mute = controls.micMuted()
             ? String(localized: "Unmute Microphone") : String(localized: "Mute Microphone")
         menu.addItem(item(mute, #selector(toggleMicMute)))
-        let stop = item("Stop Recording", #selector(stopRecording))
+        let stop = item(String(localized: "Stop Recording"), #selector(stopRecording))
         stop.isEnabled = recordingEnabled
         menu.addItem(stop)
         menu.addItem(languageItem(controls))
         if controls.silentTapSuspected() {
-            menu.addItem(item("System audio is silent — Fix…", #selector(fixSilentTap)))
+            menu.addItem(item(String(localized: "System audio is silent — Fix…"), #selector(fixSilentTap)))
         }
         menu.addItem(.separator())
     }
@@ -245,7 +249,7 @@ final class StatusItemController: NSObject, NSMenuDelegate {
                 submenu.addItem(option)
             }
         }
-        let language = NSMenuItem(title: "Language", action: nil, keyEquivalent: "")
+        let language = NSMenuItem(title: String(localized: "Language"), action: nil, keyEquivalent: "")
         language.submenu = submenu
         return language
     }

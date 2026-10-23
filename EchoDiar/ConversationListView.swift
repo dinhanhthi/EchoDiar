@@ -24,7 +24,7 @@ struct ConversationListView: View {
                         Section {
                             ForEach(group.conversations) { conversation in
                                 ConversationCard(
-                                    conversation: conversation, model: model, compact: true,
+                                    conversation: conversation, model: model,
                                     selected: selection.isEmpty
                                         ? conversation.id == selectedID : selection.ids.contains(conversation.id),
                                     select: { extend in
@@ -162,8 +162,8 @@ private struct DayHeader: View {
 
     private var title: String {
         let calendar = Calendar.current
-        if calendar.isDateInToday(day) { return "Today" }
-        if calendar.isDateInYesterday(day) { return "Yesterday" }
+        if calendar.isDateInToday(day) { return String(localized: "Today") }
+        if calendar.isDateInYesterday(day) { return String(localized: "Yesterday") }
         return day.formatted(date: .long, time: .omitted)
     }
 }

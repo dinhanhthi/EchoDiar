@@ -37,6 +37,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSMe
         // Tooltips after 0.25 s instead of the system's 1.5 s.
         UserDefaults.standard.register(defaults: ["NSInitialToolTipDelay": 250])
         guard !isTesting else { return }
+        // The language this run uses, kept before Settings can change it, so General can tell a relaunch is pending.
+        _ = AppLanguage.atLaunch
         #if DEBUG
         if CaptureProbe.isRequested {
             CaptureProbe.run()
@@ -189,7 +191,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSMe
             .font: NSFont.systemFont(ofSize: NSFont.smallSystemFontSize), .paragraphStyle: paragraph,
             .foregroundColor: NSColor.secondaryLabelColor,
         ]
-        let credits = NSMutableAttributedString(string: "Licensed under AGPL-3.0\n", attributes: attributes)
+        let credits = NSMutableAttributedString(
+            string: String(localized: "Licensed under AGPL-3.0") + "\n", attributes: attributes)
         var link = attributes
         link[.link] = AboutInfo.repository
         credits.append(NSAttributedString(string: "github.com/dinhanhthi/EchoDiar", attributes: link))
@@ -234,10 +237,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSMe
     func validateMenuItem(_ item: NSMenuItem) -> Bool {
         switch item.action {
         case #selector(toggleRecording):
-            item.title = model.isRecording ? "Stop Recording" : "Start Recording"
+            item.title = model.isRecording ? String(localized: "Stop Recording") : String(localized: "Start Recording")
             return !model.isStarting
         case #selector(togglePause):
-            item.title = model.snapshot.state == .paused ? "Resume Recording" : "Pause Recording"
+            item.title = model.snapshot.state == .paused
+                ? String(localized: "Resume Recording") : String(localized: "Pause Recording")
             return model.isRecording
         case #selector(showRecordingPage):
             return model.isRecording
@@ -288,30 +292,43 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSMe
     /// App menu (About, Check for Updates, Settings, Hide, Quit), File (recording), Edit, View (pages, back, search) and Window menus.
     private func makeMainMenu() -> NSMenu {
         let appMenu = NSMenu()
-        appMenu.addItem(withTitle: "About EchoDiar", action: #selector(showAbout), keyEquivalent: "").target = self
-        appMenu.addItem(withTitle: "Check for Updates…", action: #selector(checkForUpdates), keyEquivalent: "").target = self
+        appMenu.addItem(withTitle: String(localized: "About EchoDiar"), action: #selector(showAbout), keyEquivalent: "")
+            .target = self
+        appMenu.addItem(withTitle: String(localized: "Check for Updates…"), action: #selector(checkForUpdates),
+                        keyEquivalent: "").target = self
         appMenu.addItem(.separator())
-        appMenu.addItem(withTitle: "Settings…", action: #selector(showSettings), keyEquivalent: ",").target = self
+        appMenu.addItem(withTitle: String(localized: "Settings…"), action: #selector(showSettings), keyEquivalent: ",")
+            .target = self
         appMenu.addItem(.separator())
-        appMenu.addItem(withTitle: "Hide EchoDiar", action: #selector(NSApplication.hide(_:)), keyEquivalent: "h")
-        appMenu.addItem(withTitle: "Quit EchoDiar", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q")
-        let fileMenu = NSMenu(title: "File")
-        fileMenu.addItem(withTitle: "Start Recording", action: #selector(toggleRecording), keyEquivalent: "r").target = self
-        fileMenu.addItem(withTitle: "Pause Recording", action: #selector(togglePause), keyEquivalent: "P").target = self
-        let editMenu = NSMenu(title: "Edit")
-        editMenu.addItem(withTitle: "Cut", action: #selector(NSText.cut(_:)), keyEquivalent: "x")
-        editMenu.addItem(withTitle: "Copy", action: #selector(NSText.copy(_:)), keyEquivalent: "c")
-        editMenu.addItem(withTitle: "Paste", action: #selector(NSText.paste(_:)), keyEquivalent: "v")
-        editMenu.addItem(withTitle: "Select All", action: #selector(NSText.selectAll(_:)), keyEquivalent: "a")
-        let viewMenu = NSMenu(title: "View")
-        viewMenu.addItem(withTitle: "Recording", action: #selector(showRecordingPage), keyEquivalent: "1").target = self
-        viewMenu.addItem(withTitle: "Recordings", action: #selector(showLibrary), keyEquivalent: "2").target = self
-        viewMenu.addItem(withTitle: "Chat", action: #selector(openChat), keyEquivalent: "i").target = self
-        viewMenu.addItem(withTitle: "Back", action: #selector(goBack), keyEquivalent: "[").target = self
-        viewMenu.addItem(withTitle: "Search", action: #selector(showSearch), keyEquivalent: "f").target = self
-        let windowMenu = NSMenu(title: "Window")
-        windowMenu.addItem(withTitle: "Close", action: #selector(NSWindow.performClose(_:)), keyEquivalent: "w")
-        windowMenu.addItem(withTitle: "Minimize", action: #selector(NSWindow.performMiniaturize(_:)), keyEquivalent: "m")
+        appMenu.addItem(withTitle: String(localized: "Hide EchoDiar"), action: #selector(NSApplication.hide(_:)),
+                        keyEquivalent: "h")
+        appMenu.addItem(withTitle: String(localized: "Quit EchoDiar"), action: #selector(NSApplication.terminate(_:)),
+                        keyEquivalent: "q")
+        let fileMenu = NSMenu(title: String(localized: "File", comment: "Main menu"))
+        fileMenu.addItem(withTitle: String(localized: "Start Recording"), action: #selector(toggleRecording),
+                         keyEquivalent: "r").target = self
+        fileMenu.addItem(withTitle: String(localized: "Pause Recording"), action: #selector(togglePause),
+                         keyEquivalent: "P").target = self
+        let editMenu = NSMenu(title: String(localized: "Edit", comment: "Main menu"))
+        editMenu.addItem(withTitle: String(localized: "Cut"), action: #selector(NSText.cut(_:)), keyEquivalent: "x")
+        editMenu.addItem(withTitle: String(localized: "Copy"), action: #selector(NSText.copy(_:)), keyEquivalent: "c")
+        editMenu.addItem(withTitle: String(localized: "Paste"), action: #selector(NSText.paste(_:)), keyEquivalent: "v")
+        editMenu.addItem(withTitle: String(localized: "Select All"), action: #selector(NSText.selectAll(_:)),
+                         keyEquivalent: "a")
+        let viewMenu = NSMenu(title: String(localized: "View", comment: "Main menu"))
+        viewMenu.addItem(withTitle: String(localized: "Recording"), action: #selector(showRecordingPage),
+                         keyEquivalent: "1").target = self
+        viewMenu.addItem(withTitle: String(localized: "Recordings", comment: "View menu: the library page"),
+                         action: #selector(showLibrary), keyEquivalent: "2").target = self
+        viewMenu.addItem(withTitle: String(localized: "Chat"), action: #selector(openChat), keyEquivalent: "i").target = self
+        viewMenu.addItem(withTitle: String(localized: "Back"), action: #selector(goBack), keyEquivalent: "[").target = self
+        viewMenu.addItem(withTitle: String(localized: "Search"), action: #selector(showSearch), keyEquivalent: "f")
+            .target = self
+        let windowMenu = NSMenu(title: String(localized: "Window", comment: "Main menu"))
+        windowMenu.addItem(withTitle: String(localized: "Close"), action: #selector(NSWindow.performClose(_:)),
+                           keyEquivalent: "w")
+        windowMenu.addItem(withTitle: String(localized: "Minimize"), action: #selector(NSWindow.performMiniaturize(_:)),
+                           keyEquivalent: "m")
         NSApp.windowsMenu = windowMenu
         let mainMenu = NSMenu()
         for submenu in [appMenu, fileMenu, editMenu, viewMenu, windowMenu] {
