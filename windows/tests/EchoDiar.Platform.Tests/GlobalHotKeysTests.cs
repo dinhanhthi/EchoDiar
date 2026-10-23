@@ -55,15 +55,35 @@ public sealed class GlobalHotKeysTests
         hotKeys.Pressed += pressed.Add;
         Assert.Equal(0, hotKeys.Register(7, Exotic));
 
-        PInvoke.SendMessage(handle, PInvoke.WM_HOTKEY, 7, 0);
-        PInvoke.SendMessage(handle, PInvoke.WM_HOTKEY, 8, 0); // never registered
+        PInvoke.SendMessage(handle, PInvoke.WM_HOTKEY, 7, LParam(Exotic));
+        PInvoke.SendMessage(handle, PInvoke.WM_HOTKEY, 8, LParam(Exotic)); // never registered
         hotKeys.Unregister(7);
-        PInvoke.SendMessage(handle, PInvoke.WM_HOTKEY, 7, 0); // posted before the unregister
+        PInvoke.SendMessage(handle, PInvoke.WM_HOTKEY, 7, LParam(Exotic)); // posted before the unregister
         hotKeys.Dispose();
 
         Assert.Equal([7], pressed);
         Assert.False(PInvoke.IsWindow(handle));
     }
+
+    [Fact]
+    public void WmHotKeyWithOtherKeysIsIgnored()
+    {
+        using var hotKeys = new GlobalHotKeys();
+        var pressed = new List<int>();
+        hotKeys.Pressed += pressed.Add;
+        Assert.Equal(0, hotKeys.Register(7, Exotic));
+
+        PInvoke.SendMessage(hotKeys.Handle, PInvoke.WM_HOTKEY, 7, 0);
+        PInvoke.SendMessage(hotKeys.Handle, PInvoke.WM_HOTKEY, 7, LParam(Exotic with { VirtualKey = 0x86 }));
+        PInvoke.SendMessage(hotKeys.Handle, PInvoke.WM_HOTKEY, 7, LParam(Exotic with { Modifiers = WindowsHotKey.ModControl }));
+        Assert.Empty(pressed);
+
+        PInvoke.SendMessage(hotKeys.Handle, PInvoke.WM_HOTKEY, 7, LParam(Exotic));
+        Assert.Equal([7], pressed);
+    }
+
+    /// <summary>WM_HOTKEY's lParam as Windows sends it: the modifiers in LOWORD, the key in HIWORD.</summary>
+    private static nint LParam(WindowsHotKey key) => (nint)(key.VirtualKey << 16 | key.Modifiers);
 
     [Fact]
     public void DescribeWritesTheWindowsForm()

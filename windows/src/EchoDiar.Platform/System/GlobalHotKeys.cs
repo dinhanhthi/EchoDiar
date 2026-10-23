@@ -26,7 +26,8 @@ public sealed class GlobalHotKeys : IDisposable
     private const uint ModNoRepeat = 0x4000;
 
     private readonly MessageWindow _window;
-    private readonly HashSet<int> _registered = [];
+    /// <summary>The registered shortcuts by id.</summary>
+    private readonly Dictionary<int, WindowsHotKey> _registered = [];
     private bool _disposed;
 
     /// <summary>Creates the window. Throws <see cref="System.ComponentModel.Win32Exception"/> if Windows refuses.</summary>
@@ -55,7 +56,7 @@ public sealed class GlobalHotKeys : IDisposable
         {
             return Marshal.GetLastPInvokeError();
         }
-        _registered.Add(id);
+        _registered[id] = key;
         return 0;
     }
 
@@ -72,7 +73,7 @@ public sealed class GlobalHotKeys : IDisposable
         _window.CheckThread();
         if (_disposed) return;
         _disposed = true;
-        foreach (var id in _registered) PInvoke.UnregisterHotKey(_window.Handle, id);
+        foreach (var id in _registered.Keys) PInvoke.UnregisterHotKey(_window.Handle, id);
         _registered.Clear();
         _window.Dispose();
     }
@@ -117,8 +118,12 @@ public sealed class GlobalHotKeys : IDisposable
     private LRESULT? OnHotKey(WPARAM wParam, LPARAM lParam)
     {
         var id = (int)wParam.Value;
-        // A press of an id unregistered meanwhile (already posted) is dropped.
-        if (!_registered.Contains(id)) return null;
+        // A press of an id unregistered meanwhile (already posted) is dropped, and so is one whose keys (the modifiers in
+        // LOWORD, the key in HIWORD) are not the id's: a message another process posted.
+        if (!_registered.TryGetValue(id, out var key)) return null;
+        var modifiers = (uint)(lParam.Value & 0xFFFF) & ~ModNoRepeat;
+        var virtualKey = (uint)((lParam.Value >> 16) & 0xFFFF);
+        if (modifiers != key.Modifiers || virtualKey != key.VirtualKey) return null;
         Pressed?.Invoke(id);
         return (LRESULT)0;
     }

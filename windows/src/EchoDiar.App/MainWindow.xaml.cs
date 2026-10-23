@@ -41,6 +41,12 @@ public sealed partial class MainWindow : Window
     private DispatcherQueueTimer? _presentedTimer;
     private DispatcherQueueTimer? _backstopTimer;
 
+    /// <summary>The in-app shortcuts without modifiers (Esc, Space), run from <see cref="OnRootPreviewKeyDown"/>.</summary>
+    private readonly Dictionary<VirtualKey, InAppAction> _plainKeys = [];
+
+    /// <summary>The last press of a <see cref="_plainKeys"/> key ran its action: its repeats are taken too.</summary>
+    private bool _plainKeyHandled;
+
     public MainWindow(AppViewModel model)
     {
         StartupTrace.Write("begin MainWindow ctor");
@@ -354,7 +360,8 @@ public sealed partial class MainWindow : Window
 
     /// <summary>
     /// The in-app shortcuts (<see cref="ShortcutsSettingsPage.InAppShortcuts"/>: the macOS main menu's keys with Ctrl for
-    /// ⌘, and its main window's Esc and Space) as the window's keyboard accelerators.
+    /// ⌘, and its main window's Esc and Space) as the window's keyboard accelerators; Esc and Space in
+    /// <see cref="OnRootPreviewKeyDown"/> instead.
     /// </summary>
     private void AddAccelerators()
     {
@@ -363,14 +370,41 @@ public sealed partial class MainWindow : Window
         {
             foreach (var key in shortcut.Keys)
             {
+                if (key.Modifiers == 0)
+                {
+                    _plainKeys[(VirtualKey)key.VirtualKey] = shortcut.Action;
+                    continue;
+                }
                 var accelerator = new KeyboardAccelerator { Key = (VirtualKey)key.VirtualKey, Modifiers = Modifiers(key.Modifiers) };
                 var action = shortcut.Action;
-                var plain = key.Modifiers == 0;
-                accelerator.Invoked += (_, args) => args.Handled = Run(action, plain);
+                accelerator.Invoked += (_, args) => args.Handled = Run(action, plain: false);
                 RootGrid.KeyboardAccelerators.Add(accelerator);
             }
         }
+        RootGrid.PreviewKeyDown += OnRootPreviewKeyDown;
     }
+
+    /// <summary>
+    /// Esc and Space before the focused control sees them: a list item or a button marks them handled in its KeyDown,
+    /// which comes before keyboard accelerators, so a clicked card or button kept Space (<see cref="TakesSpace"/> decides
+    /// which control keeps it). Not with a modifier held; a held key's repeats do what its press did, once.
+    /// </summary>
+    private void OnRootPreviewKeyDown(object sender, KeyRoutedEventArgs e)
+    {
+        if (!_plainKeys.TryGetValue(e.Key, out var action)) return;
+        if (e.KeyStatus.WasKeyDown)
+        {
+            if (_plainKeyHandled) e.Handled = true;
+            return;
+        }
+        _plainKeyHandled = !ModifierDown(e) && Run(action, plain: true);
+        if (_plainKeyHandled) e.Handled = true;
+    }
+
+    private static bool ModifierDown(KeyRoutedEventArgs e) => e.KeyStatus.IsMenuKeyDown
+        || ConversationListView.IsKeyDown(VirtualKey.Control) || ConversationListView.IsKeyDown(VirtualKey.Menu)
+        || ConversationListView.IsKeyDown(VirtualKey.Shift) || ConversationListView.IsKeyDown(VirtualKey.LeftWindows)
+        || ConversationListView.IsKeyDown(VirtualKey.RightWindows);
 
     private static VirtualKeyModifiers Modifiers(uint modifiers)
     {

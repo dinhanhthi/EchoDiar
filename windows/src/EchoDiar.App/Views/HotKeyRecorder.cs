@@ -27,13 +27,7 @@ public sealed partial class HotKeyRecorder : UserControl
     /// </summary>
     private static readonly (WindowsHotKey Key, string Title)[] Standard =
     [
-        (Ctrl('C'), "Copy"),
-        (Ctrl('X'), "Cut"),
-        (Ctrl('V'), "Paste"),
-        (Ctrl('Z'), "Undo"),
-        (Ctrl('Y'), "Redo"),
-        (Ctrl('A'), "Select All"),
-        (new() { VirtualKey = (uint)VirtualKey.F4, Modifiers = WindowsHotKey.ModAlt }, "Close"),
+        .. WindowsHotKey.StandardShortcuts,
         .. ShortcutsSettingsPage.InAppShortcuts.SelectMany(s => s.Keys.Where(k => k.HasCtrlOrAlt).Select(k => (k, s.Title))),
     ];
 
@@ -101,15 +95,17 @@ public sealed partial class HotKeyRecorder : UserControl
 
     private string OtherName => _pause ? "global record shortcut" : "global pause shortcut";
 
-    private static WindowsHotKey Ctrl(char key) => new() { VirtualKey = key, Modifiers = WindowsHotKey.ModControl };
-
     private void OnModelChanged(object? sender, PropertyChangedEventArgs e)
     {
         switch (e.PropertyName)
         {
             case nameof(AppViewModel.IsCapturingHotKey):
                 // Ended by the model (the window was deactivated).
-                if (!_model.IsCapturingHotKey) _capturing = false;
+                if (!_model.IsCapturingHotKey)
+                {
+                    _capturing = false;
+                    ShowNote(null);
+                }
                 Refresh();
                 break;
             case nameof(AppViewModel.Settings):
@@ -193,6 +189,7 @@ public sealed partial class HotKeyRecorder : UserControl
     {
         if (!_capturing) return;
         _capturing = false;
+        ShowNote(null);
         _model.SetHotKeyCapture(false);
         Refresh();
     }

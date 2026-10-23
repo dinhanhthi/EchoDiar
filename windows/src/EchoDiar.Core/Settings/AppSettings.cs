@@ -96,9 +96,9 @@ public sealed record AppSettings : IJsonOnDeserialized
         ModelIdleMinutes = Clamp(ModelIdleMinutes, ModelIdleMinutesRange);
         AutoDeleteAfterDays = Clamp(AutoDeleteAfterDays, AutoDeleteDaysRange);
         if (SpeakerCountHint is { } hint) SpeakerCountHint = Clamp(hint, SpeakerCountHintRange);
-        // A shortcut without Ctrl or Alt (a hand-edited file) would take a key away from typing everywhere.
-        if (!GlobalHotKeyWindows.HasCtrlOrAlt) GlobalHotKeyWindows = WindowsHotKey.DefaultRecord;
-        if (!GlobalPauseHotKeyWindows.HasCtrlOrAlt) GlobalPauseHotKeyWindows = WindowsHotKey.DefaultPause;
+        // A shortcut the recorder refuses (a hand-edited or synced file) would take keys away from every app.
+        if (!GlobalHotKeyWindows.IsAllowedGlobal) GlobalHotKeyWindows = WindowsHotKey.DefaultRecord;
+        if (!GlobalPauseHotKeyWindows.IsAllowedGlobal) GlobalPauseHotKeyWindows = WindowsHotKey.DefaultPause;
     }
 
     internal static int Clamp(int value, (int Min, int Max) range) => Math.Clamp(value, range.Min, range.Max);
@@ -146,11 +146,43 @@ public readonly record struct WindowsHotKey
     /// <summary>Ctrl+Alt+P.</summary>
     public static readonly WindowsHotKey DefaultPause = new() { VirtualKey = 0x50, Modifiers = ModControl | ModAlt };
 
+    /// <summary>
+    /// Standard edit and window shortcuts, by English title, that a global one would take from every app (the recorder
+    /// also refuses EchoDiar's own in-app shortcuts).
+    /// </summary>
+    public static IReadOnlyList<(WindowsHotKey Key, string Title)> StandardShortcuts { get; } =
+    [
+        (Ctrl('C'), "Copy"),
+        (Ctrl('X'), "Cut"),
+        (Ctrl('V'), "Paste"),
+        (Ctrl('Z'), "Undo"),
+        (Ctrl('Y'), "Redo"),
+        (Ctrl('A'), "Select All"),
+        (new() { VirtualKey = 0x73, Modifiers = ModAlt }, "Close"), // Alt+F4
+    ];
+
     [JsonPropertyName("virtualKey")] public required uint VirtualKey { get; init; }
     [JsonPropertyName("modifiers")] public required uint Modifiers { get; init; }
 
     /// <summary>Has Ctrl or Alt: a shortcut with Shift or Win alone (or none) would take a key away from typing.</summary>
     [JsonIgnore] public bool HasCtrlOrAlt => (Modifiers & (ModControl | ModAlt)) != 0;
+
+    /// <summary>
+    /// May be read as a global shortcut: a virtual key (1...254), only <c>MOD_ALT</c>, <c>MOD_CONTROL</c>,
+    /// <c>MOD_SHIFT</c> and <c>MOD_WIN</c>, Ctrl or Alt among them, and not a <see cref="StandardShortcuts"/> one.
+    /// </summary>
+    [JsonIgnore]
+    public bool IsAllowedGlobal
+    {
+        get
+        {
+            var key = this;
+            return VirtualKey is >= 1 and <= 254 && (Modifiers & ~(ModAlt | ModControl | ModShift | ModWin)) == 0
+                && HasCtrlOrAlt && !StandardShortcuts.Any(s => s.Key == key);
+        }
+    }
+
+    private static WindowsHotKey Ctrl(char key) => new() { VirtualKey = key, Modifiers = ModControl };
 }
 
 /// <summary>The pill's top-right corner, in points from the top-right corner of its monitor's work area (or of the meeting window).</summary>

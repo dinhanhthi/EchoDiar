@@ -42,6 +42,14 @@ public sealed class NotifyIconTests
     }
 
     [Fact]
+    public void NotifyIconDataHasTheWindowsLayout()
+    {
+        // NOTIFYICONDATAW is declared by hand for 64-bit processes (the app ships x64 and ARM64 only).
+        Assert.Equal(8, IntPtr.Size);
+        Assert.Equal(976, NotifyIcon.DataSize);
+    }
+
+    [Fact]
     public void DisposeDestroysTheWindow()
     {
         var icon = new NotifyIcon(MissingIcon, "EchoDiar");

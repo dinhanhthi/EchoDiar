@@ -334,7 +334,8 @@ public sealed partial class ConversationListView : UserControl
     // Keys
 
     /// <summary>
-    /// Enter or Space opens the focused card; Delete deletes the selection, else the focused card; Esc ends the
+    /// Enter opens the focused card, Space only one reached with the keyboard (a clicked card leaves Space to the
+    /// window: <see cref="MainWindow"/> plays); Delete deletes the selection, else the focused card; Esc ends the
     /// selection. Not from a text field (the title being renamed) or a button.
     /// </summary>
     private void OnKeyDown(object sender, KeyRoutedEventArgs e)
@@ -342,7 +343,8 @@ public sealed partial class ConversationListView : UserControl
         if (e.OriginalSource is TextBox) return;
         switch (e.Key)
         {
-            case VirtualKey.Enter or VirtualKey.Space:
+            case VirtualKey.Enter:
+            case VirtualKey.Space when e.OriginalSource is ListViewItem { FocusState: FocusState.Keyboard }:
                 if (FocusedCard(e) is not { } card) return;
                 e.Handled = true;
                 Open(card);

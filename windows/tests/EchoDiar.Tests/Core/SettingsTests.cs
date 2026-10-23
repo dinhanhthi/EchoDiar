@@ -81,8 +81,18 @@ public sealed class SettingsTests : IDisposable
         """{"virtualKey":82,"modifiers":3}""")]
     [InlineData("""{"globalPauseHotKeyWindows":{"virtualKey":65,"modifiers":8}}""", "globalPauseHotKeyWindows",
         """{"virtualKey":80,"modifiers":3}""")]
-    [InlineData("""{"globalHotKeyWindows":{"virtualKey":65,"modifiers":2}}""", "globalHotKeyWindows",
-        """{"virtualKey":65,"modifiers":2}""")]
+    [InlineData("""{"globalHotKeyWindows":{"virtualKey":75,"modifiers":2}}""", "globalHotKeyWindows",
+        """{"virtualKey":75,"modifiers":2}""")]
+    [InlineData("""{"globalHotKeyWindows":{"virtualKey":67,"modifiers":2}}""", "globalHotKeyWindows",
+        """{"virtualKey":82,"modifiers":3}""")] // Ctrl+C
+    [InlineData("""{"globalPauseHotKeyWindows":{"virtualKey":115,"modifiers":1}}""", "globalPauseHotKeyWindows",
+        """{"virtualKey":80,"modifiers":3}""")] // Alt+F4
+    [InlineData("""{"globalHotKeyWindows":{"virtualKey":0,"modifiers":3}}""", "globalHotKeyWindows",
+        """{"virtualKey":82,"modifiers":3}""")]
+    [InlineData("""{"globalHotKeyWindows":{"virtualKey":255,"modifiers":3}}""", "globalHotKeyWindows",
+        """{"virtualKey":82,"modifiers":3}""")]
+    [InlineData("""{"globalHotKeyWindows":{"virtualKey":75,"modifiers":16386}}""", "globalHotKeyWindows",
+        """{"virtualKey":82,"modifiers":3}""")] // MOD_NOREPEAT | MOD_CONTROL
     public void ClampsAndEnumFallbacks(string json, string key, string expected)
     {
         var settings = SwiftJson.Deserialize<AppSettings>(Encoding.UTF8.GetBytes(json));

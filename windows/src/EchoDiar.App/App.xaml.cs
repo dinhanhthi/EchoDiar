@@ -238,6 +238,17 @@ public partial class App : Application
     {
         StartupTrace.Write("session ending");
         _quitting = true;
+        try
+        {
+            // First, as in Closed: a pending drag is saved while the model still answers. The tray icon stays: this
+            // runs inside its window procedure.
+            _pill?.Dispose();
+        }
+        catch (Exception e)
+        {
+            Debug.WriteLine($"EchoDiar: could not close the pill: {e}");
+        }
+        _pill = null;
         Shutdown();
         _dispatcher?.TryEnqueue(Quit);
     }

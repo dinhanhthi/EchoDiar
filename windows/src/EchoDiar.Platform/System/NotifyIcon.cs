@@ -88,6 +88,9 @@ public sealed class NotifyIcon : IDisposable
     /// <summary>The window (tests send it messages).</summary>
     internal HWND Handle => _window.Handle;
 
+    /// <summary>The size of the hand-declared NOTIFYICONDATAW (tests check the 64-bit layout).</summary>
+    internal static unsafe int DataSize => sizeof(NotifyIconData);
+
     /// <summary>Explorer took the icon.</summary>
     internal bool IsAdded { get; private set; }
 
@@ -242,7 +245,8 @@ public sealed class NotifyIcon : IDisposable
 
     private void Add()
     {
-        IsAdded = Notify(NOTIFY_ICON_MESSAGE.NIM_ADD);
+        // An icon still there (TaskbarCreated also comes when the taskbar only changed) refuses NIM_ADD: updated instead.
+        IsAdded = Notify(NOTIFY_ICON_MESSAGE.NIM_ADD) || Notify(NOTIFY_ICON_MESSAGE.NIM_MODIFY);
         if (!IsAdded)
         {
             Log("Shell_NotifyIcon(NIM_ADD)");
@@ -275,6 +279,9 @@ public sealed class NotifyIcon : IDisposable
         var notification = (uint)(lParam.Value & 0xFFFF);
         if (notification is PInvoke.NIN_SELECT or KeySelect)
         {
+            // Now, while the shell's foreground right from the click lasts (as ShowMenu): a window the handler shows
+            // later (posted) can then come in front, since the process owns the foreground.
+            PInvoke.SetForegroundWindow(_window.Handle);
             Clicked?.Invoke();
         }
         else if (notification == PInvoke.WM_CONTEXTMENU)
