@@ -145,7 +145,12 @@ public static partial class LocalHostDiscovery
                 }
                 finally
                 {
-                    if (!process.HasExited) process.Kill(entireProcessTree: true);
+                    if (!process.HasExited)
+                    {
+                        process.Kill(entireProcessTree: true);
+                        // Kill returns before the process is gone; its working directory can't be deleted until then.
+                        process.WaitForExit(1000);
+                    }
                 }
             }
             finally

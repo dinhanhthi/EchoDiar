@@ -10,7 +10,7 @@ namespace EchoDiar.Platform.AI;
 /// <summary>A Limited Access Feature unlock (Microsoft issues all three strings with the token).</summary>
 public sealed record LimitedAccessFeatureToken(string FeatureId, string Token, string Attestation)
 {
-    // ToString (logs, exceptions, the debugger) never shows the token or the attestation.
+    // ToString (logs, exceptions) never shows the token or the attestation; the debugger's member view still does.
     private bool PrintMembers(StringBuilder builder)
     {
         builder.Append("FeatureId = ").Append(FeatureId).Append(", Token = [redacted], Attestation = [redacted]");

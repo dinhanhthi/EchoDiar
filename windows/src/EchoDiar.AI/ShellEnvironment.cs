@@ -98,7 +98,12 @@ public sealed partial class ShellEnvironment
                 }
                 finally
                 {
-                    if (!process.HasExited) process.Kill(entireProcessTree: true);
+                    if (!process.HasExited)
+                    {
+                        process.Kill(entireProcessTree: true);
+                        // Kill returns before the process is gone; its working directory can't be deleted until then.
+                        process.WaitForExit(1000);
+                    }
                 }
             }
             finally
@@ -263,8 +268,9 @@ public sealed partial class ShellEnvironment
         var directory = System.IO.Path.GetFullPath(System.IO.Path.GetDirectoryName(shimPath)!);
         var scriptPath = System.IO.Path.GetFullPath(
             System.IO.Path.Combine(directory, script.Replace('\\', System.IO.Path.DirectorySeparatorChar)));
-        // The script must stay inside the shim's folder (no `..` out of it); the separator keeps C:\npm2 out of C:\npm.
-        var inside = System.IO.Path.TrimEndingDirectorySeparator(directory) + System.IO.Path.DirectorySeparatorChar;
+        // The script must stay inside the shim's folder (no `..` out of it); the separator keeps C:\npm2 out of C:\npm. A
+        // drive or share root already ends with one (C:\), so it is not doubled.
+        var inside = System.IO.Path.EndsInDirectorySeparator(directory) ? directory : directory + System.IO.Path.DirectorySeparatorChar;
         if (!scriptPath.StartsWith(inside, StringComparison.OrdinalIgnoreCase) || !File.Exists(scriptPath)) return null;
         var node = Native(System.IO.Path.Combine(directory, "node.exe"))
                    ?? Directories(Path).Select(entry => Native(System.IO.Path.Combine(entry, "node.exe"))).FirstOrDefault(found => found is not null);
