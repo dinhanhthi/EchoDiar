@@ -28,7 +28,8 @@ public static class ProviderInput
 
     /// <summary>
     /// Whether <paramref name="baseURL"/>'s host is this PC: localhost, 127.0.0.0/8 or ::1 (macOS <c>isLoopback</c>).
-    /// Anything else, a trailing dot or a short IPv4 form included, counts as another machine (fail-safe: it warns).
+    /// Anything else, a trailing dot included, counts as another machine (fail-safe: it warns). Short and decimal IPv4
+    /// forms (127.1) are normalized by Uri to the address HttpClient connects to, so they count as this PC.
     /// </summary>
     public static bool IsLoopback(string baseURL)
     {
