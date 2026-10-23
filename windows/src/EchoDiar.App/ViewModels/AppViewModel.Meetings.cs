@@ -30,6 +30,8 @@ public sealed partial class AppViewModel
     /// <summary>
     /// Group exes the detector reports in use, updated as it raises its events (its thread), before they are posted:
     /// a Detected whose Ended is already queued behind it neither starts a recording nor asks. Guarded by itself.
+    /// A handler still running when detection is turned off may add an exe after the clear: harmless, its post is
+    /// dropped while the detector is off, and the next Detected or Ended for that exe sets it right.
     /// </summary>
     private readonly HashSet<string> _raisedMeetings = new(StringComparer.OrdinalIgnoreCase);
 

@@ -46,6 +46,8 @@ public sealed class MeetingEndMonitorTests
         Assert.Equal(Decision.None, monitor.Evaluate(At(70)));
         monitor.Record(new Input.InputRouteLost(), At(370));
         Assert.Equal(Decision.None, monitor.Evaluate(At(370)));
+        // Kept and snoozed losses are gone: only a new loss prompts after the snooze.
+        Assert.Equal(Decision.None, monitor.Evaluate(At(70 + 600)));
         monitor.Record(new Input.InputRouteLost(), At(70 + 600));
         Assert.Equal(Prompt(Reason.InputRouteLost), monitor.Evaluate(At(70 + 600)));
     }
