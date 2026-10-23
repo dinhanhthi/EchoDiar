@@ -213,6 +213,9 @@ final class AppModel {
 
     var isRecording: Bool { snapshot.state != .idle }
 
+    /// The mic is muted in the current recording (its channel written as silence); false when idle.
+    var micMuted: Bool { snapshot.micMuted }
+
     /// Library indexing waits while any of these runs, so it never competes with them for the model gate or the CPU.
     var indexingPaused: Bool { isRecording || compressionJobs > 0 || transcriptionJobs > 0 || aiJob != nil }
 
@@ -304,6 +307,8 @@ final class AppModel {
             silentTapSuspected: { [weak self] in self?.snapshot.silentTapSuspected ?? false },
             toggleRecording: { [weak self] in self?.toggleRecording() },
             togglePause: { [weak self] in self?.togglePause() },
+            micMuted: { [weak self] in self?.micMuted ?? false },
+            toggleMicMute: { [weak self] in self?.toggleMicMute() },
             stop: { [weak self] in self?.stopRecording() },
             language: { [weak self] in self?.recordingLanguage ?? LanguageOptions.auto },
             languageGroups: { [weak self] in
@@ -396,6 +401,8 @@ final class AppModel {
                 NSLog("EchoDiar: could not start recording: \(error)")
                 autoStartedAppName = nil
                 recordingError = Self.captureFailureMessage(error, action: "start")
+                // The welcome pane's Record opens the recording page before the start; nothing to show there now.
+                if route == .recording { route = .list }
             }
             isStarting = false
         }
@@ -467,6 +474,15 @@ final class AppModel {
                 NSLog("EchoDiar: could not resume recording: \(failure)")
                 recordingError = Self.captureFailureMessage(failure, action: "resume")
             }
+        }
+    }
+
+    /// The engine flips its own state on its queue (quick toggles stay in order) and publishes it, which `snapshot`
+    /// picks up.
+    func toggleMicMute() {
+        guard isRecording else { return }
+        Task.detached(priority: .userInitiated) { [engine] in
+            engine.toggleMicMuted()
         }
     }
 

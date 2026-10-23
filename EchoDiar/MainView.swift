@@ -3,10 +3,10 @@ import EchoAudio
 import EchoCore
 import SwiftUI
 
-/// The main window, one page per `AppModel.Route`: the cards, a conversation, the open recording (while recording)
-/// or Settings. Back, Record (or Stop and Pause) and a conversation's title on the leading side; a conversation's
-/// Reveal in Finder, Settings, the library chat and Search, then the conversation's tabs on the trailing side. The
-/// library chat takes the cards' place on the list, or the sidebar's beside a conversation.
+/// The main window, two pages: the library (the cards as a sidebar, then a conversation, the open recording while
+/// recording, or the welcome pane) and Settings. Back, Record (or Stop and Pause) and a conversation's title on the
+/// leading side; a conversation's Reveal in Finder, Settings, the library chat and Search, then the conversation's tabs
+/// on the trailing side. The library chat takes the sidebar's place.
 struct MainView: View {
     let model: AppModel
     let updater: Updater
@@ -26,7 +26,7 @@ struct MainView: View {
     @State private var searchBarGhost: CGRect?
     /// The route on screen; it follows `model.route`, with a slide when the page changes.
     @State private var shownRoute = AppModel.Route.list
-    /// The last page change went to a page further right (list, entry, Settings).
+    /// The last page change went to a page further right (library, Settings).
     @State private var forward = true
     /// The toolbar title's rename popover is open, with `titleDraft` in its field.
     @State private var renamingTitle = false
@@ -49,16 +49,13 @@ struct MainView: View {
         let chatChanges: Int
     }
 
-    /// The pages that slide, left to right; moving between two conversations stays on the same page.
+    /// The pages that slide, left to right; moving between the list, conversations and the recording stays on the
+    /// library page, only its detail changes.
     private enum Page: Int {
-        case list, entry, settings
+        case library, settings
 
         init(_ route: AppModel.Route) {
-            switch route {
-            case .list: self = .list
-            case .conversation, .recording: self = .entry
-            case .settings: self = .settings
-            }
+            self = route == .settings ? .settings : .library
         }
     }
 
@@ -76,8 +73,7 @@ struct MainView: View {
             // Rendered from `shownRoute`, so the leaving page keeps its content while it slides out.
             ZStack {
                 switch Page(shownRoute) {
-                case .list: listPane.transition(pageTransition)
-                case .entry: entryPane.transition(pageTransition)
+                case .library: libraryPage.transition(pageTransition)
                 case .settings: SettingsView(model: model, query: $query).transition(pageTransition)
                 }
             }
@@ -91,8 +87,8 @@ struct MainView: View {
             }
             forward = Page(new).rawValue >= Page(old).rawValue
             withAnimation(Self.paneAnimation) { shownRoute = new }
-            // Another page closes the search bar back into the Search button and clears the query; another
-            // conversation keeps it, for the sidebar it filters.
+            // Another page closes the search bar back into the Search button and clears the query; another entry or
+            // the welcome pane keeps it, for the sidebar it filters.
             query = ""
             model.searchPresented = false
             searchExpanded = false
@@ -140,18 +136,14 @@ struct MainView: View {
             if model.route != .settings { model.globalChatOpen = false }
         }
         .toolbar {
-            // The compact window's search bar replaces every button; a wide one keeps Back, the title, Record,
-            // Update and the tabs.
-            if !searchExpanded || wide {
-                leadingItems
-            }
+            // The search bar replaces Reveal in Finder, Settings, the library chat and Search; Back, the title,
+            // Record, Update and the tabs stay.
+            leadingItems
             if searchExpanded {
-                if wide {
-                    flexibleSpacer
-                    updateItem
-                }
+                flexibleSpacer
+                updateItem
                 searchBarItem
-                if wide { tabsItem }
+                tabsItem
             } else {
                 // Pushes the other capsules to the trailing edge.
                 flexibleSpacer
@@ -391,15 +383,14 @@ struct MainView: View {
         return min(Self.titleMaxWidth, windowWidth - Self.leadingWidth - Self.tabsWidth - trailing - updateWidth)
     }
 
-    /// The wide window's search bar: shorter when the tabs beside it leave less room, so it stays out of the
-    /// overflow menu.
+    /// The search bar: shorter when the tabs beside it leave less room, so it stays out of the overflow menu.
     private var searchBarWidth: CGFloat {
         let tabs = toolbarConversation == nil ? 0 : Self.tabsWidth
         let free = windowWidth - Self.leadingWidth - tabs - ToolbarSearchBar.trailingInset - updateWidth
         return max(min(ToolbarSearchBar.wideWidth, free), ToolbarSearchBar.height)
     }
 
-    /// Too short a title is left out, also while the window grows into the wide layout.
+    /// Too short a title is left out.
     private var titleFits: Bool { titleWidth >= Self.titleMinWidth }
 
     /// A conversation's Reveal in Finder and Delete menu (the audio or the whole conversation) in one capsule, before
@@ -482,9 +473,6 @@ struct MainView: View {
         }
     }
 
-    /// A conversation, the recording or Settings: the window has its wide size.
-    private var wide: Bool { MainWindowLayout(model.route) == .wide }
-
     /// Checked when `target` is the selected one; matched by app, since process lists change.
     private func targetBinding(_ target: CaptureTarget) -> Binding<Bool> {
         Binding(
@@ -523,24 +511,16 @@ struct MainView: View {
             removal: .offset(x: -travel).combined(with: .opacity).animation(.easeOut(duration: 0.1)))
     }
 
-    /// The wide layout: the compact cards (or the library chat) as a sidebar, then the shown conversation (its state
-    /// and playback reset per conversation) or the recording. The sidebar stays while the entry changes. The list page
-    /// when the conversation is gone or the recording has ended.
-    @ViewBuilder private var entryPane: some View {
-        if entryShown {
-            // Both panes pad 12 pt on every side; overlapping those paddings by 6 pt leaves an 18 pt gap between them.
-            HStack(spacing: -6) {
-                chatOr(libraryPane(compact: true, selectedID: selectedID))
-                    .frame(width: 360)
-                entryDetail
-            }
-        } else {
-            listPane
+    /// The library page: the cards (or the library chat) as a sidebar, then the detail. The sidebar stays while the
+    /// detail changes.
+    private var libraryPage: some View {
+        // Both panes pad 12 pt on every side; overlapping those paddings by 6 pt leaves an 18 pt gap between them.
+        HStack(spacing: -6) {
+            chatOr(libraryPane(selectedID: selectedID))
+                .frame(width: 360)
+            detail
         }
     }
-
-    /// The list page: the cards, or the library chat in their place.
-    private var listPane: some View { chatOr(cardsPane) }
 
     /// The library chat in place of `list` while it is open; the two cross-fade, whoever toggles it (toolbar, Back,
     /// Esc, Search).
@@ -555,48 +535,39 @@ struct MainView: View {
         .animation(reduceMotion ? nil : Self.paneAnimation, value: model.globalChatOpen)
     }
 
-    /// The conversation still exists, or the recording still runs.
-    private var entryShown: Bool {
-        switch shownRoute {
-        case .conversation(let id): model.conversations.contains { $0.id == id }
-        case .recording: model.isRecording
-        default: false
-        }
-    }
-
     /// The sidebar's selected card: the shown conversation.
     private var selectedID: UUID? {
         if case .conversation(let id) = shownRoute { return id }
         return nil
     }
 
-    @ViewBuilder private var entryDetail: some View {
+    /// The shown conversation (its state and playback reset per conversation), or the recording while it runs; the
+    /// welcome pane on the list, for a conversation that is gone and once the recording has ended.
+    @ViewBuilder private var detail: some View {
         if case .conversation(let id) = shownRoute,
            let conversation = model.conversations.first(where: { $0.id == id }) {
             TranscriptView(conversation: conversation, model: model)
                 .id(id)
-        } else {
+        } else if shownRoute == .recording && model.isRecording {
             RecordingDetailView(model: model)
+        } else {
+            WelcomeView(model: model)
         }
     }
 
-    private var cardsPane: some View {
-        libraryPane(compact: false, selectedID: nil)
-    }
-
-    /// The cards matching the search, or why there are none; the recording's card stays on top while recording, alone
-    /// when the library is still empty and nothing is searched.
-    @ViewBuilder private func libraryPane(compact: Bool, selectedID: UUID?) -> some View {
+    /// The sidebar's cards matching the search, or why there are none; the recording's card stays on top while
+    /// recording, alone when the library is still empty and nothing is searched.
+    @ViewBuilder private func libraryPane(selectedID: UUID?) -> some View {
         let groups = DayGroup.groups(from: searchResults.filter(listed))
         if groups.isEmpty && model.isRecording && searchTerm.isEmpty {
-            ConversationListView(model: model, groups: [], compact: compact, selectedID: selectedID)
+            ConversationListView(model: model, groups: [], selectedID: selectedID)
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
         } else if !model.conversations.contains(where: listed) {
-            emptyState("No conversations yet — press ⌘R to record", compact: compact)
+            emptyState("No conversations yet")
         } else if groups.isEmpty {
-            emptyState("No conversations match \"\(searchTerm)\"", compact: compact)
+            emptyState("No conversations match \"\(searchTerm)\"")
         } else {
-            ConversationListView(model: model, groups: groups, compact: compact, selectedID: selectedID)
+            ConversationListView(model: model, groups: groups, selectedID: selectedID)
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
     }
@@ -606,10 +577,10 @@ struct MainView: View {
         !(model.isRecording && conversation.status == .recording)
     }
 
-    private func emptyState(_ text: String, compact: Bool) -> some View {
+    private func emptyState(_ text: LocalizedStringKey) -> some View {
         VStack(spacing: 0) {
             if model.isRecording {
-                RecordingCard(model: model, compact: compact, selected: model.route == .recording)
+                RecordingCard(model: model, selected: model.route == .recording)
                     .padding([.horizontal, .top], 12)
             }
             Text(text)
@@ -640,7 +611,7 @@ struct MainView: View {
     private var searchBar: some View {
         ToolbarSearchBar(
             text: $query, focusRequest: searchPresented, windowWidth: windowWidth,
-            maxWidth: wide ? searchBarWidth : nil,
+            maxWidth: searchBarWidth,
             accessibilityLabel: model.route == .settings
                 ? String(localized: "Search settings") : String(localized: "Search conversations")
         ) { frame in
@@ -703,15 +674,14 @@ struct MainView: View {
     }
 }
 
-/// The main window's search bar, in place of the toolbar's buttons: it grows out of the Search button's place to the
-/// toolbar's width (or `maxWidth` at the trailing edge in a wide window), and shrinks back before the buttons return.
-/// Not `.searchable`: the system search item widened when focused and pushed Record, Settings and AI into the
-/// toolbar's overflow menu in the 440 pt wide window.
+/// The main window's search bar, in place of the toolbar's trailing buttons: it grows out of the Search button's place
+/// to `maxWidth` at the trailing edge, and shrinks back before the buttons return. Not `.searchable`: the system search
+/// item widened when focused and pushed Record, Settings and AI into the toolbar's overflow menu in a narrow window.
 private struct ToolbarSearchBar: View {
     static let height: CGFloat = 34
     /// From the window's trailing edge, like the toolbar's buttons.
     static let trailingInset: CGFloat = 8
-    /// At most, in a wide window, which keeps Back, Record, Update and the tabs beside the bar.
+    /// At most, which keeps Back, Record, Update and the tabs beside the bar.
     static let wideWidth: CGFloat = 360
     /// Growing and shrinking.
     static let animation = Animation.snappy(duration: 0.3)

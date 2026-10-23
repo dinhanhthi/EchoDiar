@@ -59,7 +59,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSMe
             onAbout: { [weak self] in self?.showAbout() },
             updater: updater)
         observeIndicatorState()
-        observeRoute()
         // SIGTERM (`killall`, logout) goes through terminate, so applicationWillTerminate runs.
         signal(SIGTERM, SIG_IGN)
         let source = DispatchSource.makeSignalSource(signal: SIGTERM, queue: .main)
@@ -92,20 +91,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSMe
         }
     }
 
-    /// Resizes the main window when the route moves to the other layout; re-armed after each change.
-    private func observeRoute() {
-        withObservationTracking {
-            _ = model.route
-        } onChange: { [weak self] in
-            // onChange fires before the new value is stored; read it on the next turn.
-            Task { @MainActor [weak self] in
-                guard let self else { return }
-                if let window, window.isVisible { sizer.switchTo(MainWindowLayout(model.route), window: window) }
-                observeRoute()
-            }
-        }
-    }
-
     func showMainWindow() {
         if window == nil {
             let hosting = NSHostingController(rootView: MainView(model: model, updater: updater))
@@ -123,7 +108,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSMe
             // Full size content: the translucent background runs under the toolbar too.
             window.styleMask = [.titled, .closable, .miniaturizable, .resizable, .fullSizeContentView]
             window.isReleasedWhenClosed = false
-            sizer.place(window, layout: MainWindowLayout(model.route))
+            sizer.place(window)
             window.delegate = self
             self.window = window
         }
@@ -155,7 +140,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSMe
         // Release the window and its SwiftUI hierarchy after it finishes closing; it is recreated on the next open.
         Task { @MainActor [weak self] in
             self?.window = nil
-            // Each open starts on the list; set once the window is gone, so the closing window is not resized.
+            // Each open starts on the list; set once the window is gone, so the closing window keeps its page.
             self?.model.route = .list
             let otherWindowOpen = NSApp.windows.contains {
                 $0 !== closing && $0.isVisible && $0.styleMask.contains(.titled)
@@ -174,14 +159,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSMe
 
     func windowDidChangeOcclusionState(_ notification: Notification) {
         guard let window = notification.object as? NSWindow else { return }
-        let visible = window.occlusionState.contains(.visible)
-        model.mainWindowVisible = visible
-        // A route change while hidden (⌘H) or minimized did not resize the window.
-        if visible { sizer.switchTo(MainWindowLayout(model.route), window: window) }
-    }
-
-    func windowDidExitFullScreen(_ notification: Notification) {
-        if let window = notification.object as? NSWindow { sizer.exitedFullScreen(window) }
+        model.mainWindowVisible = window.occlusionState.contains(.visible)
     }
 
     @objc func showAbout() {
@@ -219,7 +197,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSMe
     }
 
     // MARK: - Main menu actions (the menu owns ⌘R, ⇧⌘P, ⌘1, ⌘2, ⌘I, ⌘[ and ⌘F, so they work from every window)
-    // The route is set before the window is shown, so a new window opens at that route's size.
+    // The route is set before the window is shown, so a new window opens on that page.
 
     @objc private func toggleRecording() { model.toggleRecording() }
 

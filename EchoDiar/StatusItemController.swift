@@ -29,6 +29,8 @@ struct RecordingMenuControls {
     var silentTapSuspected: @MainActor () -> Bool
     var toggleRecording: @MainActor () -> Void
     var togglePause: @MainActor () -> Void
+    var micMuted: @MainActor () -> Bool
+    var toggleMicMute: @MainActor () -> Void
     var stop: @MainActor () -> Void
     var language: @MainActor () -> String
     /// `LanguageOptions.groups` for the current language.
@@ -85,10 +87,10 @@ final class StatusItemController: NSObject, NSMenuDelegate {
             button.image = Self.logo
         case .recording:
             stopEffect()
-            button.image = symbol("record.circle.fill", tint: .systemRed)
+            button.image = Self.recordingLogo
         case .paused:
             stopEffect()
-            button.image = symbol("pause.circle.fill", tint: .systemOrange)
+            button.image = Self.pausedLogo
         case .processing:
             button.image = nil
             startEffect(in: button)
@@ -97,14 +99,43 @@ final class StatusItemController: NSObject, NSMenuDelegate {
 
     /// The idle icon: `logo_white` on a dark menu bar, `logo_black` on a light one. Drawn per appearance, so it
     /// follows the menu bar (which tracks the wallpaper, not only the system appearance).
-    private static let logo: NSImage? = {
+    private static let logo = logoImage()
+
+    /// The logo with a red dot at the bottom-right.
+    private static let recordingLogo = logoImage(knockout: NSRect(x: 10, y: -1, width: 9, height: 9)) {
+        NSColor.systemRed.setFill()
+        NSBezierPath(ovalIn: NSRect(x: 11, y: 0, width: 7, height: 7)).fill()
+    }
+
+    /// The logo with an orange pause badge ("||") at the bottom-right.
+    private static let pausedLogo = logoImage(knockout: NSRect(x: 9, y: -1, width: 10, height: 10)) {
+        NSColor.systemOrange.setFill()
+        NSBezierPath(ovalIn: NSRect(x: 10, y: 0, width: 8, height: 8)).fill()
+        NSColor.white.setFill()
+        NSRect(x: 12, y: 2, width: 1, height: 4).fill()
+        NSRect(x: 15, y: 2, width: 1, height: 4).fill()
+    }
+
+    /// An 18 pt image: the logo, cut out by `knockout` (so a badge reads against it), then `badge` on top. Whole-point
+    /// rects keep the badge crisp at 1x and 2x.
+    private static func logoImage(knockout: NSRect? = nil, badge: @escaping () -> Void = {}) -> NSImage? {
         guard let white = NSImage(named: "logo_white"), let black = NSImage(named: "logo_black") else { return nil }
         return NSImage(size: NSSize(width: 18, height: 18), flipped: false) { rect in
             let dark = NSAppearance.currentDrawing().bestMatch(from: [.aqua, .darkAqua]) == .darkAqua
+            NSGraphicsContext.saveGraphicsState()
+            if let knockout {
+                // Even-odd clip instead of a `.clear` fill, so nothing is erased if AppKit draws straight into the menu bar.
+                let clip = NSBezierPath(rect: rect)
+                clip.appendOval(in: knockout)
+                clip.windingRule = .evenOdd
+                clip.addClip()
+            }
             (dark ? white : black).draw(in: rect)
+            NSGraphicsContext.restoreGraphicsState()
+            badge()
             return true
         }
-    }()
+    }
 
     /// A template image when `tint` is nil, so it follows the menu bar's tint.
     private func symbol(_ name: String, tint: NSColor?) -> NSImage? {
@@ -178,7 +209,8 @@ final class StatusItemController: NSObject, NSMenuDelegate {
         menu.addItem(quit)
     }
 
-    /// Elapsed time, Pause/Resume, Stop, Language and the silent-tap fix. The values are read when the menu opens.
+    /// Elapsed time, Pause/Resume, Mute/Unmute Microphone, Stop, Language and the silent-tap fix. The values are read
+    /// when the menu opens.
     private func addRecordingItems(_ controls: RecordingMenuControls) {
         let elapsed = controls.elapsed()
         let pattern: Duration.TimeFormatStyle.Pattern = elapsed >= 3_600 ? .hourMinuteSecond : .minuteSecond
@@ -187,6 +219,9 @@ final class StatusItemController: NSObject, NSMenuDelegate {
         status.isEnabled = false
         menu.addItem(status)
         menu.addItem(item(state == .paused ? "Resume" : "Pause", #selector(togglePause)))
+        let mute = controls.micMuted()
+            ? String(localized: "Unmute Microphone") : String(localized: "Mute Microphone")
+        menu.addItem(item(mute, #selector(toggleMicMute)))
         let stop = item("Stop Recording", #selector(stopRecording))
         stop.isEnabled = recordingEnabled
         menu.addItem(stop)
@@ -226,6 +261,7 @@ final class StatusItemController: NSObject, NSMenuDelegate {
         if let controls = Self.controls { controls.toggleRecording() } else { onToggleRecording() }
     }
     @objc private func togglePause() { Self.controls?.togglePause() }
+    @objc private func toggleMicMute() { Self.controls?.toggleMicMute() }
     @objc private func stopRecording() { Self.controls?.stop() }
     @objc private func setLanguage(_ sender: NSMenuItem) {
         if let code = sender.representedObject as? String { Self.controls?.setLanguage(code) }

@@ -9,8 +9,9 @@ final class PillHover {
     var isHovering = false
 }
 
-/// The pill's content: the recording indicator (dot, elapsed time, level meter; Pause/Resume, Stop and Language on
-/// hover) or a prompt. Created each time the pill shows, so its clock and meter run only while it is visible.
+/// The pill's content: the recording indicator (dot, elapsed time, level meter, a muted mic's glyph; Pause/Resume,
+/// Mute/Unmute, Stop and Language on hover) or a prompt. Created each time the pill shows, so its clock and meter run
+/// only while it is visible.
 struct FloatingPillView: View {
     let model: AppModel
     let hover: PillHover
@@ -72,6 +73,13 @@ struct FloatingPillView: View {
                 TimelineView(.periodic(from: .now, by: 1)) { _ in elapsed }
                 PillMeter(feed: model.levels, scale: scale)
             }
+            // Expanded, the Mute button shows it.
+            if model.micMuted && !expanded {
+                Image(systemName: "mic.slash")
+                    .font(.system(size: 11 * scale))
+                    .foregroundStyle(.secondary)
+                    .accessibilityLabel("Microphone muted")
+            }
             if expanded {
                 controls(paused: paused)
                     .transition(.opacity)
@@ -93,6 +101,11 @@ struct FloatingPillView: View {
                 Label(paused ? "Resume" : "Pause", systemImage: paused ? "play.fill" : "pause.fill")
             }
             .help(paused ? "Resume recording" : "Pause recording")
+            Button(action: model.toggleMicMute) {
+                Label(model.micMuted ? "Unmute microphone" : "Mute microphone",
+                      systemImage: model.micMuted ? "mic.slash.fill" : "mic.fill")
+            }
+            .help(model.micMuted ? "Unmute microphone" : "Mute microphone")
             Button(action: model.stopRecording) {
                 Label("Stop", systemImage: "stop.fill")
             }
