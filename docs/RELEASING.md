@@ -7,6 +7,8 @@ Each release ships two notarized assets on the GitHub Release:
 - `EchoDiar-X.Y.Z.dmg`: drag-to-install download for new users.
 - `EchoDiar-X.Y.Z.zip`: the Sparkle update archive referenced by the appcast.
 
+The Windows app is released differently, from GitHub Actions: see [§3 Windows](#3-windows).
+
 EchoDiar is Apple Silicon only. `build-and-notarize.sh` passes `ARCHS=arm64` on the `xcodebuild` command line (speech-swift's Float16 code does not build for x86_64, and SPM package targets ignore a project-level `ARCHS`) and refuses an app whose `lipo -archs` is not exactly `arm64`. Pass `ARCHS=arm64` to any manual Release build too.
 
 ## §0 One-time setup
@@ -199,3 +201,135 @@ git push origin main
 ```
 
 Reverting the appcast stops offering the update to installed apps. Users who already updated keep that version; ship a fixed, higher version to move them on.
+
+## §3 Windows
+
+Unlike the macOS app, the Windows app ([windows/README.md](../windows/README.md)) is built and signed on GitHub Actions by `.github/workflows/windows-release.yml`, which a `windows-v*` tag starts. From the Mac, `windows/scripts/release.sh` pushes the tag, watches the run, downloads and checks its files and, with `--publish`, creates the GitHub Release. Installed apps update through App Installer from `https://ed.dinhanhthi.com/windows/EchoDiar.appinstaller`, which the Pages workflow publishes from `windows/EchoDiar.appinstaller` on `main`.
+
+There are two channels:
+
+- **dev**: tag `windows-vX.Y.Z-dev`, signed with the self-signed dev certificate (Publisher `CN=EchoDiar Dev`), published as a prerelease with `EchoDiarDev.cer`. For testing only: a machine must trust the certificate first, and its feed is never deployed.
+- **public**: tag `windows-vX.Y.Z` from `main`, signed with Trusted Signing. This is the one the website offers. It needs Trusted Signing (§3.0) and your own decision to publish: nothing starts it for you.
+
+Each release ships on the GitHub Release of its tag:
+
+- `EchoDiar_X.Y.Z.0.msixbundle`: the x64 and arm64 packages.
+- `EchoDiar.appinstaller`: the App Installer feed (its own Uri is the address above, its MainBundle Uri the `.msixbundle` asset of the tag).
+- `EchoDiarDev.cer` (dev channel only): the public dev certificate.
+
+### §3.0 One-time setup
+
+Never paste passwords, client secrets or private keys into an AI chat. Run the commands below in your own terminal.
+
+- Tools: `gh` authenticated (§0), plus the macOS `unzip` and `/usr/bin/python3` that `release.sh` uses to check the files.
+- GitHub Pages as in §0 (Source = GitHub Actions).
+
+#### Dev certificate
+
+The repository secrets `WINDOWS_DEV_CERT_PFX` (base64 PFX) and `WINDOWS_DEV_CERT_PASSWORD` hold the dev certificate, subject exactly `CN=EchoDiar Dev`. They also sign the CI builds of `windows.yml`. Create or rotate them as in [windows/README.md, Dev signing certificate](../windows/README.md#dev-signing-certificate-one-time).
+
+#### Trusted Signing (public channel)
+
+1. In Azure, create a Trusted Signing account, complete the identity validation and create a Public Trust certificate profile.
+2. Create an app registration (service principal) with a client secret, and give it the Trusted Signing Certificate Profile Signer role on the account.
+3. Store its values as repository secrets (`gh secret set` prompts for each value, so it never lands in shell history), and the certificate subject as a variable:
+
+   ```sh
+   for name in AZURE_TENANT_ID AZURE_CLIENT_ID AZURE_CLIENT_SECRET \
+               TRUSTED_SIGNING_ENDPOINT TRUSTED_SIGNING_ACCOUNT TRUSTED_SIGNING_CERT_PROFILE; do
+     gh secret set "$name" --repo dinhanhthi/EchoDiar
+   done
+   gh variable set WINDOWS_PUBLIC_PUBLISHER --repo dinhanhthi/EchoDiar --body '<certificate subject, e.g. CN=..., O=..., C=...>'
+   ```
+
+   `TRUSTED_SIGNING_ENDPOINT` is the account's region endpoint (`https://<region>.codesigning.azure.net/`). `WINDOWS_PUBLIC_PUBLISHER` must be exactly the subject of the Trusted Signing certificate: the workflow writes it into the manifest `Identity Publisher`, the bundle and the `.appinstaller`, and refuses `CN=EchoDiar Dev`.
+
+4. **Before the first public release, implement the signing step.** The Trusted Signing step of `windows-release.yml` is a placeholder that throws. Without the secrets above the run fails at once (the `prepare` job names the missing ones); with them it stops at that step. Replace it with real Trusted Signing (signtool with the Trusted Signing dlib, or Microsoft's signing action) for both packages and the bundle.
+
+The public Publisher differs from `CN=EchoDiar Dev`, so the package family name changes: the first public install is a new app next to any dev install, and a dev install never updates to it. Uninstall dev builds (the library in `%LOCALAPPDATA%\EchoDiar` stays):
+
+```powershell
+Get-AppxPackage dinh.thi.EchoDiar | Where-Object Publisher -eq 'CN=EchoDiar Dev' | Remove-AppxPackage
+```
+
+Keep the public Publisher from then on: changing it again would strand every installed copy.
+
+### §3.1 Per release
+
+Versions: the tag `windows-vX.Y.Z` (or `windows-vX.Y.Z-dev`) gives the package version `X.Y.Z.0` (each part 0-65535). The public channel defaults to `MARKETING_VERSION` of the committed `project.yml`, the macOS version; pass `--version X.Y.Z` otherwise. The dev channel needs `--version 0.0.N`, with N above the run number of the `windows.yml` CI builds (they are `0.0.<run>.0`): App Installer only moves to a higher version.
+
+Dev release (any branch, `HEAD` pushed):
+
+```sh
+windows/scripts/release.sh --dev --version 0.0.N            # build and check only
+windows/scripts/release.sh --dev --version 0.0.N --publish  # ... then create the prerelease (asks first)
+```
+
+Public release (from `main`, `HEAD` pushed):
+
+```sh
+windows/scripts/release.sh --publish                        # or --version X.Y.Z
+```
+
+What `release.sh` does:
+
+- Refuses uncommitted changes to tracked files, a detached `HEAD`, the public channel off `main`, `HEAD` not on `origin/<branch>`, `gh` not authenticated, and an existing tag, GitHub Release or `release/windows/<tag>/`.
+- Shows the channel, version, tag and commit, asks, then pushes the annotated tag and waits for the `windows-release.yml` run of that tag.
+- Downloads the artifact `EchoDiar-<tag>` into `release/windows/<tag>/` (gitignored) and checks it: no private key, the `.msixbundle` is signed, its Name, Version, Publisher and both architectures, and the `.appinstaller` (Version, Publisher, both Uris, `OnLaunch HoursBetweenUpdateChecks="0"`, `AutomaticBackgroundTask`).
+- With `--publish`, asks again and runs `gh release create <tag> --verify-tag --latest=false` (plus `--prerelease` on the dev channel). Without it, it prints that command so you can create the release by hand later: the tag stays.
+
+`--latest=false` on both channels: the website's macOS Download links `releases/latest`, which must keep pointing at the macOS release with the DMG. Check after a Windows release:
+
+```sh
+gh release view --repo dinhanhthi/EchoDiar --json tagName --jq .tagName   # vX.Y.Z, not windows-v...
+```
+
+#### Publish the feed (public channel only)
+
+Commit the rendered feed on `main`. The Pages workflow deploys it (its `paths` include `windows/EchoDiar.appinstaller`), which also shows the Windows download on the website:
+
+```sh
+cp release/windows/windows-vX.Y.Z/EchoDiar.appinstaller windows/EchoDiar.appinstaller
+git add -- windows/EchoDiar.appinstaller
+git commit -m "chore(release): windows appinstaller vX.Y.Z" -- windows/EchoDiar.appinstaller
+git push origin main
+```
+
+Never commit a dev `.appinstaller` there: it has the same Uri but the dev Publisher and a prerelease bundle. The commit also runs `windows.yml` (it is under `windows/`); that is harmless. To redeploy without a commit: `gh workflow run pages.yml --repo dinhanhthi/EchoDiar --ref main`.
+
+Verify:
+
+```sh
+curl -fsSI https://ed.dinhanhthi.com/windows/EchoDiar.appinstaller   # 200; note the Content-Type
+curl -fsSL https://ed.dinhanhthi.com/windows/EchoDiar.appinstaller | grep -E 'Version=|Uri='
+```
+
+#### Test an update locally
+
+`windows/scripts/serve-update.sh` serves a local feed to the VMPal VM, without a release. Put exactly one signed `.msix` or `.msixbundle` (a CI artifact or a dev release) in `~/Downloads/EchoDiar-update/`, then run it on the Mac. It renders `EchoDiar.appinstaller` there from the package's own manifest and serves the folder on port 8765 until Ctrl+C. In the VM, with the dev certificate trusted (`vm-install.ps1 -TrustCert`):
+
+```powershell
+Add-AppxPackage -AppInstallerFile http://<host>:8765/EchoDiar.appinstaller
+```
+
+To offer the next version, stop the script, replace the package with a higher version and run it again. The app shows its Update button once it finds it. `--render-only` writes the file without serving, `--host` and `--folder` override the defaults.
+
+### §3.2 Troubleshooting and rollback
+
+- The public run fails at "Check Trusted Signing secrets": its error names the missing secrets or variable (§3.0). It fails at the signing step: the placeholder is not implemented yet.
+- `release.sh` says the `.msixbundle` is not signed while it is: a known race (`unzip -l | grep -q` under `pipefail`, [docs/later/2026-10-23-release-sh-unzip-grep-q-pipefail-race.md](later/2026-10-23-release-sh-unzip-grep-q-pipefail-race.md)), not fixed yet. Discard the tag (`git push origin :refs/tags/<tag> && git tag -d <tag>`), delete `release/windows/<tag>/` and run it again.
+- The install fails for `Microsoft.VCLibs.140.00.UWPDesktop`: the `.appinstaller` lists no `Dependencies`, so App Installer relies on the framework being on the machine (it usually is when the Microsoft Store is). See the notes in [windows/README.md](../windows/README.md#testing-in-a-windows-vm).
+- Updates not offered: check the feed is live with a higher Version (curl above), the copy was installed from the `.appinstaller` (a sideloaded `.msix` never updates; Settings > About says so) and has the same Publisher.
+
+#### Roll back a bad release
+
+Re-publish the previous feed, then delete the bad release:
+
+```sh
+git revert <feed-commit>   # the "chore(release): windows appinstaller vX.Y.Z" commit
+git push origin main
+gh release delete windows-vX.Y.Z --repo dinhanhthi/EchoDiar
+git push origin :refs/tags/windows-vX.Y.Z && git tag -d windows-vX.Y.Z
+```
+
+Revert first: the previous feed points at the previous release's `.msixbundle`, so keep that release. Reverting the first public feed removes it, and the website hides the Windows download again. App Installer does not downgrade: users who already updated keep that version; ship a fixed, higher version to move them on.

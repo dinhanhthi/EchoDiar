@@ -18,6 +18,9 @@ windows/
   tests/EchoDiar.Tests/         net10.0 xUnit v3 tests for Core, plus the cross-platform Fixtures/
   scripts/vm-install.ps1        installs a CI build in a Windows VM
   scripts/qa-fixtures.sh        makes the QA audio and model fixtures on the Mac
+  scripts/release.sh            tags, checks and publishes a Windows release from the Mac
+  scripts/serve-update.sh       serves a local App Installer feed to test updates in the VM
+  packaging/                    the App Installer feed template of the release workflow
   tools/make-icons.sh           re-run after a logo change: regenerates App/Assets from assets/logo.png
 ```
 
@@ -175,6 +178,16 @@ PFX_PASSWORD="$(security find-generic-password -s echodiar-windows-dev-cert -a c
 ```
 
 The private key and the PFX never go in git. After a rotation, run `vm-install.ps1 -TrustCert` again in every VM with the new `EchoDiarDev.cer`.
+
+## Releasing and updating
+
+[docs/RELEASING.md, §3 Windows](../docs/RELEASING.md#3-windows) has the full steps, the one-time setup and the rollback. In short:
+
+- A tag `windows-vX.Y.Z-dev` (dev channel, dev certificate) or `windows-vX.Y.Z` (public channel, Trusted Signing, from `main`) runs [.github/workflows/windows-release.yml](../.github/workflows/windows-release.yml): Release builds for x64 and ARM64, one signed `EchoDiar_X.Y.Z.0.msixbundle`, and `EchoDiar.appinstaller` rendered from [packaging/EchoDiar.appinstaller.template](packaging/EchoDiar.appinstaller.template). The public channel fails until Trusted Signing is set up and its workflow step is implemented.
+- [scripts/release.sh](scripts/release.sh) runs on the Mac: `--dev --version 0.0.N` (N above the CI run number) or no flag for the public channel (`MARKETING_VERSION` of `project.yml`). It pushes the tag, downloads and checks the files into `release/windows/<tag>/`, and with `--publish` (after asking) creates the GitHub Release, never marked Latest.
+- Installed apps update through App Installer from `https://ed.dinhanhthi.com/windows/EchoDiar.appinstaller`, a copy of the public release's feed committed as `windows/EchoDiar.appinstaller` on `main` and deployed by the Pages workflow. The website shows its Windows download only once that file is live.
+- In the app, [Updater](src/EchoDiar.App/Services/Updater.cs) checks at launch and every 6 hours, only in a copy installed from an `.appinstaller` (a sideloaded `.msix`, like the CI builds above, never updates). An available update shows the title bar's Update button; the tray menu has Check for updates…, and Settings > About shows the last check.
+- To test an update in the VM without a release, [scripts/serve-update.sh](scripts/serve-update.sh) serves one signed package from `~/Downloads/EchoDiar-update/` with a rendered feed on port 8765; install it in the VM with `Add-AppxPackage -AppInstallerFile http://<host>:8765/EchoDiar.appinstaller`.
 
 ## Constraints
 

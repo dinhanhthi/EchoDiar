@@ -82,6 +82,21 @@
   badge.href = `https://github.com/${repo}/releases/tag/v${version}`;
 })();
 
+// Windows download. The [data-windows] blocks ship hidden and show only once the same-origin App Installer
+// feed exists, which a public Windows release deploys (docs/RELEASING.md). Any failure keeps them hidden.
+(async () => {
+  const blocks = document.querySelectorAll("[data-windows]");
+  if (!blocks.length) return;
+  try {
+    const response = await fetch("windows/EchoDiar.appinstaller", { method: "HEAD", cache: "no-store" });
+    if (!response.ok) return;
+  } catch {
+    // Offline or no Windows release yet (local preview): keep the Windows blocks hidden.
+    return;
+  }
+  blocks.forEach((block) => block.removeAttribute("hidden"));
+})();
+
 // Screenshot lightbox: click the poster or a thumbnail to open a full-screen carousel. Left/Right
 // buttons or arrow keys navigate (looping); click anywhere or press Esc to close.
 (() => {

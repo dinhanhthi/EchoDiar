@@ -15,12 +15,13 @@ Open http://localhost:8080.
 - `index.html`: landing page. `docs.html`: documentation. `privacy.html`: privacy statement.
 - `tokens.css`: design tokens (OKLCH colors, Geist fonts, spacing). `styles.css`: layout and components.
 - `site.js`: theme toggle, docs scroll-spy, header version, screenshot lightbox (the poster and the thumbnails open one carousel).
+- The Windows download (the `[data-windows]` elements of `index.html` and `docs.html`) ships hidden: `site.js` shows it only when a same-origin `HEAD windows/EchoDiar.appinstaller` answers 200, i.e. once a public Windows release has deployed its App Installer feed (`docs/RELEASING.md`). Local previews never show it.
 - The app version in each page header (`.version-badge`) is read at runtime from the same-origin `appcast.xml` (highest build number) by `site.js`; the static `v0.1.0` in each page is only a fallback, so no hand edit is needed on release.
 - `logo.png`, `poster.jpg`, `screenshots/`: images. The screenshots are made from local, untracked sources in `docs/showcase/source/screenshots/` (demo library, clean captures, `label-shots.py` for the ribbons; its README says how). `CNAME`: custom domain. `.nojekyll`: disables Jekyll. `llms.txt`: summary for LLM crawlers.
 
 ## Deploy
 
-`.github/workflows/pages.yml` uploads this folder to GitHub Pages on every push to `main` that touches `website/`. It also publishes `appcast.xml` from the repo root, which Sparkle auto-update needs: do not remove it.
+`.github/workflows/pages.yml` uploads this folder to GitHub Pages on every push to `main` that touches `website/`. It also publishes `appcast.xml` from the repo root, which Sparkle auto-update needs: do not remove it. A push of `windows/EchoDiar.appinstaller` (the Windows App Installer feed) deploys it to `/windows/EchoDiar.appinstaller` the same way.
 
 One-time setup:
 
