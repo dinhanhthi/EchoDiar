@@ -23,8 +23,9 @@ namespace EchoDiar.App.Views;
 /// (Today, Yesterday, then the date), filtered by the toolbar's search, with the model download banner (MVP). While
 /// recording, the recording's card sits above them and the recording's own entry is left out. Ctrl-click and
 /// Shift-click select cards (from the open entry in the sidebar, as in Mail); the selection bar then shows over the top
-/// of the list with Delete and Cancel (Esc). Delete deletes the selection, else the focused card. The ListView itself
-/// never selects: the cards draw the open conversation and the selection, so the arrow keys only move the focus.
+/// of the list with Delete and Cancel (Esc, the window's: <see cref="MainWindow"/>). Delete deletes the selection, else
+/// the focused card. The ListView itself never selects: the cards draw the open conversation and the selection, so the
+/// arrow keys only move the focus.
 /// </summary>
 public sealed partial class ConversationListView : UserControl
 {
@@ -291,7 +292,8 @@ public sealed partial class ConversationListView : UserControl
         UpdateCards();
     }
 
-    private void ClearSelection()
+    /// <summary>Ends the selection: the bar's Cancel, and Esc (<see cref="MainWindow"/>, wherever the focus is).</summary>
+    internal void ClearSelection()
     {
         if (_selection.IsEmpty) return;
         _selection.Clear();
@@ -335,8 +337,8 @@ public sealed partial class ConversationListView : UserControl
 
     /// <summary>
     /// Enter opens the focused card, Space only one reached with the keyboard (a clicked card leaves Space to the
-    /// window: <see cref="MainWindow"/> plays); Delete deletes the selection, else the focused card; Esc ends the
-    /// selection. Not from a text field (the title being renamed) or a button.
+    /// window: <see cref="MainWindow"/> plays); Delete deletes the selection, else the focused card. Not from a text
+    /// field (the title being renamed) or a button.
     /// </summary>
     private void OnKeyDown(object sender, KeyRoutedEventArgs e)
     {
@@ -357,15 +359,10 @@ public sealed partial class ConversationListView : UserControl
                 if (_selection.IsEmpty) _ = DeleteAsync(targets, audioOnly: false);
                 else _ = DeleteSelectionAsync(audioOnly: false);
                 break;
-            case VirtualKey.Escape:
-                if (_selection.IsEmpty) return;
-                e.Handled = true;
-                ClearSelection();
-                break;
         }
     }
 
-    /// <summary>Cards are selected: Esc ends the selection instead of going back (macOS <c>listSelectionActive</c>).</summary>
+    /// <summary>Cards are selected: the window's Esc ends the selection instead of going back (macOS <c>listSelectionActive</c>).</summary>
     internal bool HasSelection => !_selection.IsEmpty;
 
     /// <summary>The card whose list item has the keyboard focus (the key came from it).</summary>

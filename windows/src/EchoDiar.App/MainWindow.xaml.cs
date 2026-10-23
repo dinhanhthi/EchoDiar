@@ -450,8 +450,12 @@ public sealed partial class MainWindow : Window
             case InAppAction.Settings:
                 _model.OpenSettings();
                 return true;
-            // Esc first ends a selection of cards (the library's own Esc).
-            case InAppAction.Back when route != RouteKind.List && !(plain && ListHost.Visibility == Visibility.Visible && _library.HasSelection):
+            // Esc first ends a selection of cards (macOS listSelectionActive), wherever the focus is: a Ctrl-click does
+            // not move the focus into the list.
+            case InAppAction.Back when plain && ListHost.Visibility == Visibility.Visible && _library.HasSelection:
+                _library.ClearSelection();
+                return true;
+            case InAppAction.Back when route != RouteKind.List:
                 _model.GoBack();
                 return true;
             case InAppAction.PlayPause when route == RouteKind.Conversation && _model.DetailTab == DetailTab.Transcript
