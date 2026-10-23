@@ -15,7 +15,7 @@ public sealed class NativeSmokeTests : IDisposable
     /// <summary>Spoken by both voices of the fixture ("Good morning..." / "Morning...").</summary>
     private const string KnownWord = "morning";
 
-    private static readonly string ModelsRoot = Environment.GetEnvironmentVariable("ECHODIAR_TEST_MODELS") is { Length: > 0 } dir
+    internal static readonly string ModelsRoot = Environment.GetEnvironmentVariable("ECHODIAR_TEST_MODELS") is { Length: > 0 } dir
         ? dir
         : Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), ".cache", "echodiar-test-models");
 
@@ -49,7 +49,7 @@ public sealed class NativeSmokeTests : IDisposable
 
     private static CancellationToken Token => TestContext.Current.CancellationToken;
 
-    private static void Log(string line) => TestContext.Current.TestOutputHelper?.WriteLine("NativeSmoke: " + line);
+    internal static void Log(string line) => TestContext.Current.TestOutputHelper?.WriteLine("NativeSmoke: " + line);
 
     [Fact]
     public async Task WhisperTranscribesTheFixture()
@@ -120,7 +120,7 @@ public sealed class NativeSmokeTests : IDisposable
     }
 
     /// <summary>The entry's folder under <see cref="ModelsRoot"/>, downloaded and verified by ModelStore unless already installed.</summary>
-    private static async Task<string> Installed(ModelEntry entry)
+    internal static async Task<string> Installed(ModelEntry entry)
     {
         using var http = new HttpClient { Timeout = Timeout.InfiniteTimeSpan };
         var store = new ModelStore(ModelsRoot, http);

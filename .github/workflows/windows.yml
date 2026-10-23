@@ -125,8 +125,8 @@ jobs:
         working-directory: windows
         run: dotnet test tests/EchoDiar.Platform.Tests/EchoDiar.Platform.Tests.csproj --logger "console;verbosity=detailed"
 
-  # The real engines on their native libraries (Whisper.net, sherpa-onnx) on x64 and ARM64. The tests download
-  # their pinned, SHA-256 checked models from Hugging Face into ECHODIAR_TEST_MODELS, cached between runs.
+  # The real engines on their native libraries (Whisper.net, sherpa-onnx, LLamaSharp) on x64 and ARM64. The tests
+  # download their pinned, SHA-256 checked models from Hugging Face into ECHODIAR_TEST_MODELS, cached between runs.
   native-smoke:
     runs-on: ${{ matrix.os }}
     timeout-minutes: 30
@@ -143,11 +143,12 @@ jobs:
         with:
           global-json-file: windows/global.json
 
-      # Keyed by the SHA-256 of ggml-tiny.bin, the pyannote segmentation model and the campplus embedding.
+      # Keyed by the SHA-256 of ggml-tiny.bin, the pyannote segmentation model, the campplus embedding, Qwen3-0.6B
+      # Q8_0 and Qwen3-Embedding-0.6B Q8_0.
       - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: ${{ runner.temp }}/echodiar-test-models
-          key: echodiar-test-models-be07e048e1e599ad46341c8d2a135645097a538221678b7acdd1b1919c6e1b21-220ad67ca923bef2fa91f2390c786097bf305bceb5e261d4af67b38e938e1079-aa3cfc16963a10586a9393f5035d6d6b57e98d358b347f80c2a30bf4f00ceba2
+          key: echodiar-test-models-be07e048e1e599ad46341c8d2a135645097a538221678b7acdd1b1919c6e1b21-220ad67ca923bef2fa91f2390c786097bf305bceb5e261d4af67b38e938e1079-aa3cfc16963a10586a9393f5035d6d6b57e98d358b347f80c2a30bf4f00ceba2-9465e63a22add5354d9bb4b99e90117043c7124007664907259bd16d043bb031-06507c7b42688469c4e7298b0a1e16deff06caf291cf0a5b278c308249c3e439
 
       - name: Native smoke tests
         working-directory: windows
@@ -155,7 +156,7 @@ jobs:
           ECHODIAR_TEST_MODELS: ${{ runner.temp }}/echodiar-test-models
         run: |
           "Runner: $env:RUNNER_ARCH, OS arch: $([System.Runtime.InteropServices.RuntimeInformation]::OSArchitecture)"
-          dotnet test tests/EchoDiar.Tests/EchoDiar.Tests.csproj --filter Category=Native --logger "console;verbosity=detailed"
+          dotnet test tests/EchoDiar.Tests/EchoDiar.Tests.csproj --filter "Category=Native|Category=NativeLLM" --logger "console;verbosity=detailed"
 
   package:
     runs-on: windows-latest
