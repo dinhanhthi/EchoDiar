@@ -23,6 +23,19 @@ public sealed partial class AppViewModel
         IsStarting || IndexingPaused || Conversations.Any(c => c.Status == ConversationStatus.Compressing);
 
     /// <summary>
+    /// The install failed (or waits for the next launch): the notices it left (a transcription's failure reason, an AI
+    /// panel's or the library chat's error) go, as nothing failed.
+    /// </summary>
+    private void OnUpdaterChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs e)
+    {
+        if (e.PropertyName != nameof(Updater.IsInstalling) || Updater.IsInstalling) return;
+        var notice = InstallingNotice;
+        if (AIError?.Message == notice) AIError = null;
+        if (TranscriptionErrors.Values.Contains(notice))
+            TranscriptionErrors = TranscriptionErrors.Where(p => p.Value != notice).ToDictionary(p => p.Key, p => p.Value);
+    }
+
+    /// <summary>
     /// The confirmed update: the settings change still waiting for its delay is written first (Windows closes the app
     /// without the window's Closed), then the install starts. False when work started meanwhile.
     /// </summary>

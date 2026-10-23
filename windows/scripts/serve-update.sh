@@ -105,7 +105,11 @@ else
   OCTET='(25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9]?[0-9])'
   [[ "$HOST" =~ ^$OCTET\.$OCTET\.$OCTET\.$OCTET$ ]] \
     || die "--host '$HOST' is not an IPv4 address (the server listens on it; a host name is not accepted)"
+  [[ "$HOST" != "0.0.0.0" ]] \
+    || die "--host 0.0.0.0 would listen on every interface and write a feed Uri nobody can reach; pass the Mac's address on $VM_SUBNET.0/24."
   echo "==> Host $HOST (--host)"
+  [[ "$HOST" != 127.* ]] \
+    || echo "note: $HOST is reachable from this Mac only (curl tests); the VM cannot reach it." >&2
 fi
 BASE="http://$HOST:$PORT"
 APPINSTALLER="$DIR/EchoDiar.appinstaller"

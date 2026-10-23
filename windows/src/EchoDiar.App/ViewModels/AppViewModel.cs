@@ -92,6 +92,7 @@ public sealed partial class AppViewModel : ObservableObject
         _pollTimer.Interval = PollInterval;
         _pollTimer.Tick += (_, _) => PollRecording();
         Updater = new Updater(dispatcher);
+        Updater.PropertyChanged += OnUpdaterChanged;
     }
 
     // State

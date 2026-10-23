@@ -49,7 +49,8 @@ public sealed class LibraryChatViewModel(AppViewModel model)
     public AIJob? BusyElsewhere => model.AIJob is { ConversationId: not null } job ? job : null;
 
     /// <summary>As <see cref="AppViewModel.AskLibrary"/>'s guard: one AI job at a time (macOS <c>canAsk</c>).</summary>
-    public bool CanAsk => model.AIJob is null && !model.ChatChanging && RagEnabled && Providers.CurrentAIProvider is not null;
+    public bool CanAsk => model.AIJob is null && !model.ChatChanging && RagEnabled && Providers.CurrentAIProvider is not null
+        && !model.Updater.IsInstalling;
 
     /// <summary>Why the last library question or library chat change failed; null when none did.</summary>
     public string? Error => model.AIError is { ConversationId: null } error ? error.Message : null;
@@ -67,6 +68,7 @@ public sealed class LibraryChatViewModel(AppViewModel model)
         if (_attached) return;
         _attached = true;
         model.PropertyChanged += OnModelChanged;
+        model.Updater.PropertyChanged += OnUpdaterChanged;
         Providers.Changed += OnProvidersChanged;
         _job = RunningJob;
         Refresh();
@@ -77,12 +79,19 @@ public sealed class LibraryChatViewModel(AppViewModel model)
         if (!_attached) return;
         _attached = false;
         model.PropertyChanged -= OnModelChanged;
+        model.Updater.PropertyChanged -= OnUpdaterChanged;
         Providers.Changed -= OnProvidersChanged;
         _generation++;
         _loadedFor = null;
     }
 
     private void OnProvidersChanged() => Changed?.Invoke();
+
+    /// <summary>The update's install starts or fails: <see cref="CanAsk"/> changes.</summary>
+    private void OnUpdaterChanged(object? sender, PropertyChangedEventArgs e)
+    {
+        if (e.PropertyName == nameof(Services.Updater.IsInstalling)) Changed?.Invoke();
+    }
 
     private void OnModelChanged(object? sender, PropertyChangedEventArgs e)
     {

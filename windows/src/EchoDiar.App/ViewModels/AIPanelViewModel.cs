@@ -83,7 +83,8 @@ public sealed class AIPanelViewModel
     public string? EmptyNote => Conversation is { HasTranscript: true } ? null : Loc.T("This conversation has no transcript yet.");
 
     /// <summary>A summary or a question can start now (macOS <c>canRun</c>).</summary>
-    public bool CanRun => _model.AIJob is null && !_model.ChatChanging && Transcript is not null && Providers.CurrentAIProvider is not null;
+    public bool CanRun => _model.AIJob is null && !_model.ChatChanging && Transcript is not null && Providers.CurrentAIProvider is not null
+        && !_model.Updater.IsInstalling;
 
     /// <summary>Why this conversation's last job or chat change failed; null when none did.</summary>
     public string? Error => _model.AIError is { } error && error.ConversationId == ConversationId ? error.Message : null;
@@ -128,6 +129,7 @@ public sealed class AIPanelViewModel
         if (_attached) return;
         _attached = true;
         _model.PropertyChanged += OnModelChanged;
+        _model.Updater.PropertyChanged += OnUpdaterChanged;
         Providers.Changed += OnProvidersChanged;
         _job = RunningJob;
         Refresh();
@@ -138,6 +140,7 @@ public sealed class AIPanelViewModel
         if (!_attached) return;
         _attached = false;
         _model.PropertyChanged -= OnModelChanged;
+        _model.Updater.PropertyChanged -= OnUpdaterChanged;
         Providers.Changed -= OnProvidersChanged;
         _loadGeneration++;
         _chatGeneration++;
@@ -146,6 +149,12 @@ public sealed class AIPanelViewModel
     }
 
     private void OnProvidersChanged() => Changed?.Invoke();
+
+    /// <summary>The update's install starts or fails: <see cref="CanRun"/> changes.</summary>
+    private void OnUpdaterChanged(object? sender, PropertyChangedEventArgs e)
+    {
+        if (e.PropertyName == nameof(Services.Updater.IsInstalling)) Changed?.Invoke();
+    }
 
     private void OnModelChanged(object? sender, PropertyChangedEventArgs e)
     {
