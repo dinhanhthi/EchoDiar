@@ -250,20 +250,26 @@
                             Content="{local:T Text='Settings'}" />
                     </Grid>
 
-                    <!-- One row at any width: only the model menu shrinks (its name truncates). -->
-                    <StackPanel Orientation="Horizontal" Spacing="8">
+                    <!-- One row at any width: only the model menu shrinks (its name truncates; code-behind). -->
+                    <StackPanel x:Name="MenusRow" Orientation="Horizontal" Spacing="8">
                         <DropDownButton
                             x:Name="ModelButton"
                             MaxWidth="180"
                             ToolTipService.ToolTip="{local:T Text='Model for summaries and questions'}">
-                            <StackPanel Orientation="Horizontal" Spacing="6">
+                            <!-- A Grid, not a StackPanel: the name gets the width left, so it truncates. -->
+                            <Grid ColumnSpacing="6">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="Auto" />
+                                    <ColumnDefinition Width="*" />
+                                </Grid.ColumnDefinitions>
                                 <FontIcon FontFamily="{ThemeResource SymbolThemeFontFamily}" FontSize="14" Glyph="&#xE950;" />
                                 <TextBlock
                                     x:Name="ModelText"
+                                    Grid.Column="1"
                                     MaxLines="1"
                                     TextTrimming="CharacterEllipsis"
                                     TextWrapping="NoWrap" />
-                            </StackPanel>
+                            </Grid>
                             <DropDownButton.Flyout>
                                 <MenuFlyout x:Name="ModelMenu" Placement="TopEdgeAlignedLeft" />
                             </DropDownButton.Flyout>

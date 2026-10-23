@@ -67,6 +67,8 @@ public sealed partial class GlobalChatView : UserControl
         ClearHistoryButton.Click += (_, _) => _ = ClearHistoryAsync();
         QuestionBox.PreviewKeyDown += OnQuestionKeyDown;
         QuestionBox.TextChanged += (_, _) => UpdateActions();
+        MenusRow.SizeChanged += (_, _) => FitModelButton();
+        LanguageButton.SizeChanged += (_, _) => FitModelButton();
         Loaded += (_, _) => Attach();
         Unloaded += (_, _) => Detach();
     }
@@ -506,6 +508,17 @@ public sealed partial class GlobalChatView : UserControl
                 : status.Message ?? Loc.T("Your conversations are not indexed yet.");
         IndexingText.MaxLines = status.Running ? 1 : 2;
         ToolTipService.SetToolTip(IndexingText, IndexingText.Text);
+    }
+
+    /// <summary>
+    /// The model menu takes what the row leaves after the language menu, a fresh chat and History (at most 180, at least
+    /// 48), so the row fits the 360 px sidebar: the model name truncates instead of History being cut off.
+    /// </summary>
+    private void FitModelButton()
+    {
+        var others = LanguageButton.ActualWidth + FreshChatButton.ActualWidth + HistoryButton.ActualWidth + 3 * MenusRow.Spacing;
+        var width = Math.Clamp(MenusRow.ActualWidth - others, 48, 180);
+        if (ModelButton.MaxWidth != width) ModelButton.MaxWidth = width;
     }
 
     /// <summary>Send or Stop, enabled when a question can run; a fresh chat, not while empty or answering.</summary>
