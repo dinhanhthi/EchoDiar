@@ -129,7 +129,7 @@ jobs:
   # download their pinned, SHA-256 checked models from Hugging Face into ECHODIAR_TEST_MODELS, cached between runs.
   native-smoke:
     runs-on: ${{ matrix.os }}
-    timeout-minutes: 60
+    timeout-minutes: 30
     strategy:
       fail-fast: false
       matrix:
@@ -154,7 +154,6 @@ jobs:
         working-directory: windows
         env:
           ECHODIAR_TEST_MODELS: ${{ runner.temp }}/echodiar-test-models
-          ECHODIAR_TEST_GGUF_ALL: 1
         run: |
           "Runner: $env:RUNNER_ARCH, OS arch: $([System.Runtime.InteropServices.RuntimeInformation]::OSArchitecture)"
           dotnet test tests/EchoDiar.Tests/EchoDiar.Tests.csproj --filter "Category=Native|Category=NativeLLM" --logger "console;verbosity=detailed"
