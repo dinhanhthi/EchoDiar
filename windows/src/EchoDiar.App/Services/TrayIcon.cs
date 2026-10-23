@@ -131,7 +131,9 @@ internal sealed class TrayIcon : IDisposable
         }
         else
         {
-            items.Add(Item(Loc.T("Start recording"), () => _ = _model.StartRecordingAsync(_model.SelectedTarget), enabled: !_model.IsStarting));
+            // Off while the update installs: it closes the app.
+            items.Add(Item(Loc.T("Start recording"), () => _ = _model.StartRecordingAsync(_model.SelectedTarget),
+                enabled: !_model.IsStarting && !_model.Updater.IsInstalling));
         }
         if (_model.DetectedMeetingName is { } app)
         {
@@ -165,13 +167,14 @@ internal sealed class TrayIcon : IDisposable
 
     /// <summary>
     /// macOS's update item: "Check for updates…" checks and shows the answer in the window; "Update available…" asks to
-    /// install it there. Off while recording (installing closes the app), while a check or the install runs, and for a
-    /// copy not installed from an .appinstaller (its text says so).
+    /// install it there. Off while work runs that installing would cut off (<see cref="AppViewModel.UpdateBlocked"/>, as the
+    /// window's Update button), while a check or the install runs, and for a copy not installed from an .appinstaller (its
+    /// text says so).
     /// </summary>
     private NotifyIconMenuItem UpdateItem()
     {
         var updater = _model.Updater;
-        var enabled = updater.IsActive && !updater.IsChecking && !updater.IsInstalling && !_model.IsRecording && !_model.IsStarting;
+        var enabled = updater.IsActive && !updater.IsChecking && !updater.IsInstalling && !_model.UpdateBlocked;
         return Item(updater.MenuTitle, () =>
         {
             _openMain();

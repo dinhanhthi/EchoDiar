@@ -6,6 +6,8 @@
   Publisher of Package.appxmanifest), the address of this file itself and the address of the .msixbundle
   (the GitHub release asset of the tag). Never edit a rendered copy by hand.
   The app prompts before it updates (Updater.cs), so App Installer shows no prompt of its own (no ShowPrompt).
+  App Installer may also install an update on its own while the app is not running (OnLaunch checks at each launch,
+  AutomaticBackgroundTask every 8 hours), silently: there is no in-app prompt then.
 -->
 <AppInstaller
   xmlns="http://schemas.microsoft.com/appx/appinstaller/2018"

@@ -539,6 +539,13 @@ public sealed partial class AppViewModel : ObservableObject
     public async Task StartRecordingAsync(AudioProcessGroup? app)
     {
         if (IsRecording || IsStarting || _closing) return;
+        if (Updater.IsInstalling)
+        {
+            // Windows closes the app once the update is downloaded: the recording would be cut off.
+            AutoStartedAppName = null;
+            RecordingError = InstallingNotice;
+            return;
+        }
         IsStarting = true;
         RecordingError = null;
         RecordingSourceName = app?.Name;
@@ -778,6 +785,12 @@ public sealed partial class AppViewModel : ObservableObject
     {
         var id = session.Id;
         if (_closing || session.Probe || session.State == SessionState.Failed || HasJob(id)) return null;
+        if (Updater.IsInstalling)
+        {
+            // Windows closes the app once the update is downloaded: the job would be cut off.
+            TranscriptionErrors = With(TranscriptionErrors, id, InstallingNotice);
+            return null;
+        }
         if (PlanCloud(engineId, id, folder, language) is not { } cloud) return null;
         engineId = cloud.EngineId;
         var firstLanguage = language ?? session.LanguageMarkers.MinBy(m => m.FileTime)?.Language ?? "auto";

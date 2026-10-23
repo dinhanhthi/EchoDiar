@@ -128,6 +128,12 @@ public sealed partial class AppViewModel
         IReadOnlyList<ChatLog.Message> history, AIProviderInfo provider, string model)
     {
         if (_closing || AIJob is not null || kind == AIJobKind.Question && (ChatChanging || string.IsNullOrWhiteSpace(question))) return;
+        if (Updater.IsInstalling)
+        {
+            // Windows closes the app once the update is downloaded: the answer would be cut off.
+            AIError = new AIErrorInfo(conversation.Id, InstallingNotice);
+            return;
+        }
         model = model.Trim();
         ProvidersModel.SetAIModel(model, provider);
         AIError = null;

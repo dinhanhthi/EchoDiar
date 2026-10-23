@@ -479,6 +479,12 @@ public sealed partial class AppViewModel
         question = question.Trim();
         if (_closing || AIJob is not null || ChatChanging || question.Length == 0 || !Settings.RagEnabled
             || ProvidersModel.CurrentAIProvider is not { } provider) return;
+        if (Updater.IsInstalling)
+        {
+            // Windows closes the app once the update is downloaded: the answer would be cut off.
+            AIError = new AIErrorInfo(null, InstallingNotice);
+            return;
+        }
         var model = ProvidersModel.AIModelFor(provider).Trim();
         AIError = null;
         _aiStopRequested = false;

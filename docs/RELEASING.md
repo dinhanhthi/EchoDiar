@@ -208,7 +208,7 @@ Unlike the macOS app, the Windows app ([windows/README.md](../windows/README.md)
 
 There are two channels:
 
-- **dev**: tag `windows-vX.Y.Z-dev`, signed with the self-signed dev certificate (Publisher `CN=EchoDiar Dev`), published as a prerelease with `EchoDiarDev.cer`. For testing only: a machine must trust the certificate first, and its feed is never deployed.
+- **dev**: tag `windows-vX.Y.Z-dev`, signed with the self-signed dev certificate (Publisher `CN=EchoDiar Dev`), published as a prerelease with `EchoDiarDev.cer`. For testing only: a machine must trust the certificate first, and its feed is never deployed. A copy installed from a dev prerelease's `EchoDiar.appinstaller` takes that file's own Uri, the public feed address above, as its update source: it gets no update until a public feed with the same Publisher exists there, which never happens (the public Publisher differs, §3.0). Only a local feed (`serve-update.sh`, §3.1, or a `file://` `.appinstaller`) updates dev installs.
 - **public**: tag `windows-vX.Y.Z` from `main`, signed with Trusted Signing. This is the one the website offers. It needs Trusted Signing (§3.0) and your own decision to publish: nothing starts it for you.
 
 Each release ships on the GitHub Release of its tag:
@@ -227,6 +227,16 @@ Never paste passwords, client secrets or private keys into an AI chat. Run the c
 #### Dev certificate
 
 The repository secrets `WINDOWS_DEV_CERT_PFX` (base64 PFX) and `WINDOWS_DEV_CERT_PASSWORD` hold the dev certificate, subject exactly `CN=EchoDiar Dev`. They also sign the CI builds of `windows.yml`. Create or rotate them as in [windows/README.md, Dev signing certificate](../windows/README.md#dev-signing-certificate-one-time).
+
+#### Protect the signing secrets (recommended)
+
+Repository secrets reach every workflow run of the repository. Moving the signing secrets into GitHub Environments limits them to the runs you allow. Set it up once in the GitHub UI (Settings > Environments, Settings > Rules); no workflow sets it up for you:
+
+1. A tag ruleset on `windows-v*` (Settings > Rules > Rulesets, target tags): only you may create, update or delete these tags, so nobody else can start a release run.
+2. An environment `windows-dev-signing` with "Deployment branches and tags" set to selected branches and tags (`main`, `plan/*` for the CI builds and the `windows-v*` tags), or with yourself as a required reviewer. Move `WINDOWS_DEV_CERT_PFX` and `WINDOWS_DEV_CERT_PASSWORD` into it as environment secrets, then delete the repository secrets.
+3. The same for the public channel: an environment (e.g. `windows-public-signing`) restricted to the `windows-v*` tags with a required reviewer, holding the Trusted Signing secrets. Prefer OpenID Connect (a federated credential on the app registration, `azure/login` with `id-token: write`) over `AZURE_CLIENT_SECRET`, so no long-lived secret is stored at all.
+
+Only once an environment exists, change the workflows: add `environment: windows-dev-signing` to the jobs that read the dev certificate (`package` and `bundle` in `windows-release.yml`, `package` in `windows.yml`) and `environment: windows-public-signing` to the job that signs with Trusted Signing. Do not add it before: a job naming a missing environment creates it, unprotected.
 
 #### Trusted Signing (public channel)
 
@@ -306,7 +316,7 @@ curl -fsSL https://ed.dinhanhthi.com/windows/EchoDiar.appinstaller | grep -E 'Ve
 
 #### Test an update locally
 
-`windows/scripts/serve-update.sh` serves a local feed to the VMPal VM, without a release. Put exactly one signed `.msix` or `.msixbundle` (a CI artifact or a dev release) in `~/Downloads/EchoDiar-update/`, then run it on the Mac. It renders `EchoDiar.appinstaller` there from the package's own manifest and serves the folder on port 8765 until Ctrl+C. In the VM, with the dev certificate trusted (`vm-install.ps1 -TrustCert`):
+`windows/scripts/serve-update.sh` serves a local feed to the VMPal VM, without a release. Put exactly one signed `.msix` or `.msixbundle` (a CI artifact or a dev release) in `~/Downloads/EchoDiar-update/`, then run it on the Mac. It renders `EchoDiar.appinstaller` there from the package's own manifest and serves it on port 8765 until Ctrl+C. It listens only on the Mac's address on the VM bridge (`192.168.128.x`), or on the IPv4 address of `--host` (a host name is refused), and serves only the package, `EchoDiar.appinstaller` and `EchoDiarDev.cer` (when present): every other path is a 404, with no folder listing. It answers HTTP Range requests (206, one range per request), which App Installer and Delivery Optimization use to download the package. In the VM, with the dev certificate trusted (`vm-install.ps1 -TrustCert`):
 
 ```powershell
 Add-AppxPackage -AppInstallerFile http://<host>:8765/EchoDiar.appinstaller
@@ -317,7 +327,6 @@ To offer the next version, stop the script, replace the package with a higher ve
 ### §3.2 Troubleshooting and rollback
 
 - The public run fails at "Check Trusted Signing secrets": its error names the missing secrets or variable (§3.0). It fails at the signing step: the placeholder is not implemented yet.
-- `release.sh` says the `.msixbundle` is not signed while it is: a known race (`unzip -l | grep -q` under `pipefail`, [docs/later/2026-10-23-release-sh-unzip-grep-q-pipefail-race.md](later/2026-10-23-release-sh-unzip-grep-q-pipefail-race.md)), not fixed yet. Discard the tag (`git push origin :refs/tags/<tag> && git tag -d <tag>`), delete `release/windows/<tag>/` and run it again.
 - The install fails for `Microsoft.VCLibs.140.00.UWPDesktop`: the `.appinstaller` lists no `Dependencies`, so App Installer relies on the framework being on the machine (it usually is when the Microsoft Store is). See the notes in [windows/README.md](../windows/README.md#testing-in-a-windows-vm).
 - Updates not offered: check the feed is live with a higher Version (curl above), the copy was installed from the `.appinstaller` (a sideloaded `.msix` never updates; Settings > About says so) and has the same Publisher.
 

@@ -168,10 +168,11 @@ gh run download "$RUN" --repo "$GH_REPO" -n "EchoDiar-$TAG" -D "$OUT"
 if [[ "$CHANNEL" == dev ]]; then
   [[ -f "$OUT/EchoDiarDev.cer" ]] || die "EchoDiarDev.cer missing from the artifact"
 fi
-if find "$OUT" -type f \( -iname '*.pfx' -o -iname '*.p12' \) | grep -q .; then
-  die "private key in the artifact"
-fi
-unzip -l "$OUT/$BUNDLE" | grep -q ' AppxSignature\.p7x$' || die "$BUNDLE is not signed"
+# Listings go to variables first: with pipefail, grep -q closing the pipe early would fail the command before it.
+KEYS="$(find "$OUT" -type f \( -iname '*.pfx' -o -iname '*.p12' \))"
+[[ -z "$KEYS" ]] || die "private key in the artifact:"$'\n'"$KEYS"
+LISTING="$(unzip -l "$OUT/$BUNDLE")" || die "$BUNDLE is not a zip (MSIX bundle) file"
+grep -q ' AppxSignature\.p7x$' <<<"$LISTING" || die "$BUNDLE is not signed"
 
 # Downloaded files are data: parsed by an isolated Python (-I) with this script's code, never run. Reads the
 # bundle manifest on stdin; prints the publisher (the expected one, or the bundle's on the public channel).

@@ -11,15 +11,24 @@
 #     Uri and package Uri are http://<host>:8765/... (UpdateSettings as in the template). An .msix gets a
 #     <MainPackage> with its ProcessorArchitecture instead of the template's <MainBundle> (App Installer accepts
 #     either; the script swaps the element name, the template stays the one of the release workflow);
-#   - serves the folder over http on port 8765 in the foreground until Ctrl+C (python3 http.server, with the
-#     App Installer MIME types), and prints the command to run in the VM.
+#   - serves the package, EchoDiar.appinstaller and EchoDiarDev.cer (when the folder has it) over http on port
+#     8765 in the foreground until Ctrl+C (a small python3 http.server handler with the App Installer MIME types
+#     and HTTP Range support), and prints the command to run in the VM.
 #
-# Host: the address the VM reaches the Mac on. The VMPal VM's gateway is the Mac's address on the
-# 192.168.128.0/24 bridge (192.168.128.1), so the script picks the Mac's address on that subnet; without one
-# (no VM running) it stops: pass --host <ip>.
+# Host: the address the VM reaches the Mac on, and the only address the server listens on. The VMPal VM's
+# gateway is the Mac's address on the 192.168.128.0/24 bridge (192.168.128.1), so the script picks the Mac's
+# address on that subnet; without one (no VM running) it stops: pass --host <IPv4 address> (a host name is
+# refused: it is both the bind address and the feed's Uri, so it must be one exact address).
 #
-# Safety: only the folder is served. It must hold regular files only (no symlinks, no subfolders) and no
-# private keys (.pfx / .p12 / .key / .pvk); the port must be free. The server runs only while the script does.
+# Safety: the folder must hold regular files only (no symlinks, no subfolders) and no private keys
+# (.pfx / .p12 / .key / .pvk); the port must be free. Only the three files above are served, checked on each
+# request: any other path (the folder itself, a file added while it runs) is a 404, and there is no directory
+# listing. The server runs only while the script does.
+#
+# Range: App Installer and Delivery Optimization download the package in byte ranges. One range per request
+# (bytes=a-b, a-, -n) gets a 206 with Content-Range; an unsatisfiable one a 416 with "Content-Range: bytes */size";
+# several ranges in one request are answered with the whole file (200), which HTTP allows. Every answer says
+# Accept-Ranges: bytes. A client that drops the connection (BrokenPipe / ConnectionReset) is ignored quietly.
 #
 # Usage:
 #   windows/scripts/serve-update.sh                          # ~/Downloads/EchoDiar-update/, auto host
@@ -92,7 +101,10 @@ if [[ -z "$HOST" ]]; then
   [[ -n "$HOST" ]] || die "no address of this Mac on $VM_SUBNET.0/24 (is the VM running?); pass --host <ip>."
   echo "==> Host $HOST (this Mac on $VM_SUBNET.0/24, the VMPal VM's gateway)"
 else
-  [[ "$HOST" =~ ^[A-Za-z0-9.-]+$ ]] || die "--host '$HOST' is not an address or host name"
+  # The server binds this exact address: an IPv4 address, not a host name.
+  OCTET='(25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9]?[0-9])'
+  [[ "$HOST" =~ ^$OCTET\.$OCTET\.$OCTET\.$OCTET$ ]] \
+    || die "--host '$HOST' is not an IPv4 address (the server listens on it; a host name is not accepted)"
   echo "==> Host $HOST (--host)"
 fi
 BASE="http://$HOST:$PORT"
@@ -188,16 +200,116 @@ if lsof -nP -iTCP:"$PORT" -sTCP:LISTEN >/dev/null 2>&1; then
   die "port $PORT is in use:"$'\n'"$(lsof -nP -iTCP:"$PORT" -sTCP:LISTEN)"
 fi
 
-echo "==> Serving $DIR on 0.0.0.0:$PORT (Ctrl+C stops it):"
-find "$DIR" -mindepth 1 -maxdepth 1 -type f -exec basename {} \; | sort | sed "s|^|    $BASE/|"
+SERVED=("$NAME" EchoDiar.appinstaller)
+[[ -f "$DIR/EchoDiarDev.cer" ]] && SERVED+=(EchoDiarDev.cer)
+echo "==> Serving from $DIR on $HOST:$PORT only these files (Ctrl+C stops it):"
+printf "    $BASE/%s\n" "${SERVED[@]}"
 echo "    in the VM: $INSTALL_CMD"
 echo
-# python3 -m http.server, with the MIME types App Installer expects (Python knows none of them).
-exec "$PYTHON" -I -c '
-import mimetypes, runpy, sys
+# The served files are data: an isolated Python (-I) only reads and sends them.
+read -r -d '' SERVE_PY <<'PY' || true
+import http.server
+import mimetypes
+import os
+import re
+import shutil
+import sys
+from urllib.parse import unquote, urlsplit
+
+folder, host, port, *allowed = sys.argv[1:]
+allowed = frozenset(allowed)
+CHUNK = 1 << 20
+RANGE = re.compile(r"bytes=(\d*)-(\d*)")
 for ext, mime in ((".appinstaller", "application/appinstaller"), (".msix", "application/msix"),
-                  (".msixbundle", "application/msixbundle")):
+                  (".msixbundle", "application/msixbundle"), (".cer", "application/x-x509-ca-cert")):
     mimetypes.add_type(mime, ext)
-sys.argv = ["http.server", "--bind", "0.0.0.0", "--directory", sys.argv[1], sys.argv[2]]
-runpy.run_module("http.server", run_name="__main__", alter_sys=True)
-' "$DIR" "$PORT"
+
+
+def parse_range(header, size):
+    """(start, end) of a single range, None for no usable Range (the whole file), "bad" when unsatisfiable."""
+    if header is None or "," in header:
+        return None  # No range, or several: the whole file.
+    match = RANGE.fullmatch(header.strip())
+    if match is None or match.group(1) == match.group(2) == "":
+        return None  # Not a bytes range: ignored, as HTTP allows.
+    first, last = match.groups()
+    if first == "":
+        count = int(last)
+        return (max(size - count, 0), size - 1) if count > 0 and size > 0 else "bad"
+    start = int(first)
+    if last and int(last) < start:
+        return None  # Not a valid range: ignored too.
+    if start >= size:
+        return "bad"
+    return start, min(int(last), size - 1) if last else size - 1
+
+
+class Handler(http.server.BaseHTTPRequestHandler):
+    def version_string(self):
+        return "EchoDiarFeed"
+
+    def do_GET(self):
+        self.serve(body=True)
+
+    def do_HEAD(self):
+        self.serve(body=False)
+
+    def serve(self, body):
+        name = unquote(urlsplit(self.path).path).lstrip("/")
+        path = os.path.join(folder, name)
+        # Checked on each request: only the allowed names, still regular files (no symlink) in the folder.
+        if name not in allowed or not os.path.isfile(path) or os.path.islink(path):
+            self.reply(404, 0)
+            return
+        try:
+            file = open(path, "rb")
+        except OSError:
+            self.reply(404, 0)
+            return
+        with file:
+            size = os.fstat(file.fileno()).st_size
+            span = parse_range(self.headers.get("Range"), size)
+            if span == "bad":
+                self.reply(416, 0, {"Content-Range": f"bytes */{size}"})
+                return
+            start, end = span or (0, size - 1)
+            length = end - start + 1 if size else 0
+            headers = {"Content-Type": mimetypes.guess_type(name)[0] or "application/octet-stream"}
+            if span:
+                headers["Content-Range"] = f"bytes {start}-{end}/{size}"
+            self.reply(206 if span else 200, length, headers)
+            if not body:
+                return
+            file.seek(start)
+            while length > 0:
+                chunk = file.read(min(CHUNK, length))
+                if not chunk:
+                    break
+                self.wfile.write(chunk)
+                length -= len(chunk)
+
+    def reply(self, status, length, headers=None):
+        self.send_response(status)
+        self.send_header("Accept-Ranges", "bytes")
+        self.send_header("Content-Length", str(length))
+        for key, value in (headers or {}).items():
+            self.send_header(key, value)
+        self.end_headers()
+
+
+class Server(http.server.ThreadingHTTPServer):
+    daemon_threads = True
+
+    def handle_error(self, request, client_address):
+        if isinstance(sys.exc_info()[1], (BrokenPipeError, ConnectionResetError)):
+            return  # The client dropped the connection (App Installer cancels ranges it no longer needs).
+        super().handle_error(request, client_address)
+
+
+with Server((host, int(port)), Handler) as server:
+    try:
+        server.serve_forever()
+    except KeyboardInterrupt:
+        pass
+PY
+exec "$PYTHON" -I -c "$SERVE_PY" "$DIR" "$HOST" "$PORT" "${SERVED[@]}"

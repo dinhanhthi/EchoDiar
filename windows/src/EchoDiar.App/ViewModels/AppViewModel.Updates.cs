@@ -5,11 +5,15 @@ namespace EchoDiar.App.ViewModels;
 
 /// <summary>
 /// App Installer updates (<see cref="Services.Updater"/>): installing closes the app, so it never starts while work runs
-/// that the close would cut off (macOS hides Update while recording; here transcriptions and AI jobs count too).
+/// that the close would cut off (macOS hides Update while recording; here transcriptions and AI jobs count too), and no
+/// recording, transcription or AI job starts while it runs (<see cref="InstallingNotice"/> says why instead).
 /// </summary>
 public sealed partial class AppViewModel
 {
     internal Updater Updater { get; }
+
+    /// <summary>What a recording, transcription or AI job asked for while the update installs shows instead.</summary>
+    private static string InstallingNotice => Loc.T("Installing the update…");
 
     /// <summary>
     /// A recording (or its start, or its last steps), a compression, a transcription or an AI job runs: the Update button

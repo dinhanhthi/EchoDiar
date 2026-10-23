@@ -260,8 +260,10 @@ public sealed partial class TitleBarToolbar : UserControl
         var recording = _model.IsRecording;
         var paused = _model.RecordingSnapshot.State == RecordingEngine.State.Paused;
         RecordSplitButton.Visibility = Shown(!recording);
-        RecordSplitButton.IsEnabled = !_model.IsStarting;
-        var recordTip = $"Record {_model.SelectedTarget?.Name ?? Loc.T("All system audio")}";
+        // Installing the update closes the app: no recording starts meanwhile.
+        var installing = _model.Updater.IsInstalling;
+        RecordSplitButton.IsEnabled = !_model.IsStarting && !installing;
+        var recordTip = installing ? Loc.T("Installing the update…") : $"Record {_model.SelectedTarget?.Name ?? Loc.T("All system audio")}";
         if (recordTip != _recordTip) ToolTipService.SetToolTip(RecordSplitButton, _recordTip = recordTip);
         StopButton.Visibility = Shown(recording);
         StopButton.IsEnabled = !_model.IsStarting;
@@ -327,6 +329,8 @@ public sealed partial class TitleBarToolbar : UserControl
     {
         if (e.PropertyName == nameof(Updater.Report)) ShowNextDialog();
         else UpdateUpdateButton();
+        // The Record button is off while the update installs.
+        if (e.PropertyName == nameof(Updater.IsInstalling)) Update();
     }
 
     /// <summary>
@@ -372,7 +376,7 @@ public sealed partial class TitleBarToolbar : UserControl
     private Task ShowUpdateBlockedAsync()
     {
         if (_dialog is not null || XamlRoot is null) return Task.CompletedTask;
-        var dialog = NewDialog(Loc.T("Update after the recording"),
+        var dialog = NewDialog(Loc.T("Update after the current work"),
             Loc.T("EchoDiar installs the update once the recording, transcriptions and AI answers have finished."));
         dialog.CloseButtonText = Loc.T("OK");
         dialog.DefaultButton = ContentDialogButton.Close;
