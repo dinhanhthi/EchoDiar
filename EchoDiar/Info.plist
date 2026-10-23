@@ -8,7 +8,7 @@
 	<key>NSAudioCaptureUsageDescription</key>
 	<string>EchoDiar records the audio of your meeting apps. The audio is recorded and stored locally on this Mac.</string>
 	<key>NSCalendarsFullAccessUsageDescription</key>
-	<string>EchoDiar reads your calendars to offer recording when a meeting starts and to name the recording. Your calendars are not uploaded.</string>
+	<string>EchoDiar reads your calendars to offer recording when a meeting starts and to name the recording, and adds the events you create to an EchoDiar calendar. Your calendars are not uploaded.</string>
 	<!-- Sparkle: the updater stays off unless SUPublicEDKey is a base64 32-byte EdDSA key (see Updater.swift). -->
 	<key>SUFeedURL</key>
 	<string>https://ed.dinhanhthi.com/appcast.xml</string>

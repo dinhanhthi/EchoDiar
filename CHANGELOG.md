@@ -9,9 +9,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-- Calendar triggers (Settings > Recording > Calendar), with any account added to macOS Calendar (iCloud, Google, Outlook/Exchange, CalDAV) and the optional Calendars permission. "When a meeting starts": Off, Ask (default: the floating indicator offers Record, Join or Not now), Wait for the call (records the meeting app as soon as the call starts) or Record at start (records all system audio and the microphone at the start time). Automatic modes start without asking only for events you organize or accepted; other invites ask. Choose the calendars to watch, keep only events with a meeting link (Zoom, Google Meet, Microsoft Teams, Webex), and stop when the event ends plus a few minutes (10 by default, asked with a countdown). Works while EchoDiar runs, so Launch at login is recommended.
+- Calendar triggers (Settings > Recording > Calendar), with any account added to macOS Calendar (iCloud, Google, Outlook/Exchange, CalDAV) and the optional Calendars permission. "When a meeting starts": Off, Ask (default: the floating indicator offers Record, Join or Not now), Wait for the call (records the meeting app as soon as the call starts) or Record at start (records all system audio and the microphone at the start time). Automatic modes start without asking only for events you organize, accepted or answered Maybe to, and events without invitees on any calendar you can edit, shared ones included (and those you create in EchoDiar); other invites ask. Choose the calendars to watch, keep only events with a meeting link (Zoom, Google Meet, Microsoft Teams, Webex), and stop when the event ends plus a few minutes (10 by default, asked with a countdown). Works while EchoDiar runs, so Launch at login is recommended.
 - A recording started from a calendar event is named after the event.
-- A Calendar page (toolbar button next to Settings) lists the meetings of the next 7 days with Join, Record and Skip, and the menu bar menu lists upcoming meetings.
+- A Calendar page (toolbar button next to Settings) lists the meetings of the next 7 days, updated automatically, with Join, Record and Skip, and the menu bar menu lists upcoming meetings.
+- Create your own meetings from the Calendar page with "New Event…": title, date, start and end, an optional meeting link and Repeat (None, Daily, Weekdays, Weekly or Monthly, ending never or on a date). They go to an "EchoDiar" calendar (On My Mac when available, otherwise your default account, e.g. iCloud, which syncs those events like any other). "Edit…" changes or deletes them; for a repeating event, choose "This Event Only" or "This and Future Events" (only the latter when Repeat or End Repeat changed). Events in the EchoDiar calendar count even without a meeting link, and follow the same "When a meeting starts" mode.
+- Settings > Transcription > General > "Remember last record language" (off by default): the language picked in the Record button's menu before recording is kept for the next recordings instead of the default language.
+
+### Changed
+
+- Buttons in Settings and on the Calendar page are capsule-shaped.
 
 ## [1.0.2] - 2026-10-21
 

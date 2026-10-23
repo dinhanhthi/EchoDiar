@@ -23,7 +23,7 @@
 - Optional cloud transcription: OpenAI-compatible services, ElevenLabs, Gemini, Deepgram and AssemblyAI.
 - AI summaries and chat with on-device Foundation Models, local MLX models, local servers (LM Studio, Ollama, ...), cloud APIs (OpenAI, Anthropic, Gemini, ...) or coding CLIs (Claude Code, Codex, OpenCode, Gemini CLI). Answers cite timestamps that jump to that moment. "Copy as prompt" for any other AI tool.
 - Meeting detection that offers to record, a floating indicator that can follow the meeting window, and auto-stop when the call ends.
-- Calendar triggers with any account in macOS Calendar (iCloud, Google, Outlook/Exchange, ...): when a meeting starts, EchoDiar asks, waits for the call or records right away, names the recording after the event and can stop when it ends. A Calendar page and the menu bar list upcoming meetings to join, record or skip.
+- Calendar triggers with any account in macOS Calendar (iCloud, Google, Outlook/Exchange, ...): when a meeting starts, EchoDiar asks, waits for the call or records right away (without asking only for events you organize, accepted or answered Maybe to, and events without invitees on any calendar you can edit, shared ones included, and those you create in EchoDiar), names the recording after the event and can stop when it ends. A Calendar page and the menu bar list upcoming meetings to join, record or skip, and you can create your own meetings, one-off or repeating.
 - A library grouped by day with search (⌘F), compression to AAC, crash recovery, automatic deletion of old recordings, global shortcuts to record (⌥⌘R) and pause (⌥⌘P) and automatic updates.
 
 ## Install
@@ -35,7 +35,7 @@ Download the `.dmg` from [Releases](https://github.com/dinhanhthi/EchoDiar/relea
 - **Microphone**: records your voice.
 - **System Audio Recording**: records the meeting's audio. Onboarding tests it and opens the right Privacy & Security pane.
 - **Accessibility** (optional): only to attach the recording indicator to the meeting window.
-- **Calendars** (optional): reads your meetings from macOS Calendar to offer recording when they start and to name the recording.
+- **Calendars** (optional): reads your meetings from macOS Calendar to offer recording when they start and to name the recording, and adds the events you create to an "EchoDiar" calendar. EchoDiar writes to no other calendar.
 
 Always tell the other participants that you are recording, and follow the law where you and they live.
 
@@ -43,7 +43,7 @@ Always tell the other participants that you are recording, and follow the law wh
 
 - Local-first: recordings, transcripts, summaries and chats stay in `~/Library/Application Support/EchoDiar/`. No account, no analytics.
 - API keys are stored in the Keychain.
-- Calendars are read on this Mac; EchoDiar stores only the ids of meetings you skip. A recording started from an event takes the event's title, which goes to an AI provider only like any other conversation title, when you use one.
+- Calendars are read on this Mac; EchoDiar writes only to its own "EchoDiar" calendar (On My Mac when available, otherwise your default calendar account, e.g. iCloud, which then syncs those events like any other) and stores only that calendar's id, the ids of calendars you don't watch and the ids of meetings you skip. A recording started from an event takes the event's title, which goes to an AI provider only like any other conversation title, when you use one.
 - Audio or transcripts go to a cloud provider or a CLI only when you choose one; cloud transcription asks once for each destination before sending audio.
 - Models are downloaded from Hugging Face only when you click Download. Update checks use the Sparkle feed at `ed.dinhanhthi.com`.
 
