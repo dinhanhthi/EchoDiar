@@ -25,9 +25,12 @@ namespace EchoDiar.App.Views;
 /// </summary>
 public sealed partial class OnboardingWindow : Window
 {
-    /// <summary>The client area in DIPs (macOS 520 × 460).</summary>
+    /// <summary>
+    /// The client area in DIPs (macOS 520 × 460): taller, as Windows' text and buttons are, so step 1's card fits
+    /// without scrolling.
+    /// </summary>
     private const double ClientWidth = 520;
-    private const double ClientHeight = 460;
+    private const double ClientHeight = 540;
 
     private const string CopyGlyph = "";
     private const string CopiedGlyph = "";
@@ -439,9 +442,18 @@ public sealed partial class OnboardingWindow : Window
             samples[i] = (float)(0.25 * envelope * Math.Sin(2 * Math.PI * 880 * i / rate));
         }
         var path = Path.Combine(Path.GetTempPath(), $"EchoDiar-test-tone-{Guid.NewGuid():N}.caf");
-        using var writer = new CafFile.Writer(path, rate, 1, CafFile.SampleFormat.Float32);
-        writer.Append(samples);
-        writer.Finish();
+        try
+        {
+            using var writer = new CafFile.Writer(path, rate, 1, CafFile.SampleFormat.Float32);
+            writer.Append(samples);
+            writer.Finish();
+        }
+        catch
+        {
+            // A half-written file is not left in the temp folder; closed first by the using.
+            DeleteTone(path);
+            throw;
+        }
         return path;
     }
 

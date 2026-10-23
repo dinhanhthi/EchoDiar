@@ -82,12 +82,27 @@ public partial class App : Application
         _pill = new FloatingPillController(_model, _window, dispatcher);
         _window.Closed += (_, _) =>
         {
-            // First, while the model still answers: a pending drag is saved, and the pill's window closes (an open
-            // window, even hidden, would keep the app running).
-            _pill?.Dispose();
+            // Each apart, and neither may stop the recording's stop and the settings write below.
+            try
+            {
+                // First, while the model still answers: a pending drag is saved, and the pill's window closes (an
+                // open window, even hidden, would keep the app running).
+                _pill?.Dispose();
+            }
+            catch (Exception e)
+            {
+                Debug.WriteLine($"EchoDiar: could not close the pill: {e}");
+            }
             _pill = null;
-            // An open onboarding window would keep the app running too; closing it lets go of its mic and loopback.
-            _onboarding?.Close();
+            try
+            {
+                // An open onboarding window would keep the app running too; closing it lets go of its mic and loopback.
+                _onboarding?.Close();
+            }
+            catch (Exception e)
+            {
+                Debug.WriteLine($"EchoDiar: could not close the onboarding: {e}");
+            }
             _onboarding = null;
             // A closed window fails every call: a redirected launch queued meanwhile finds none.
             _window = null;

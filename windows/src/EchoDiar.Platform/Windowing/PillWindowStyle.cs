@@ -10,14 +10,19 @@ using Windows.Win32.UI.WindowsAndMessaging;
 namespace EchoDiar.Platform.Windowing;
 
 /// <summary>A monitor, as the pill places itself on it.</summary>
-/// <param name="Key">
-/// The <c>pillPositions</c> key: the monitor's device interface name (<c>EnumDisplayDevices</c> with
-/// <c>EDD_GET_DEVICE_INTERFACE_NAME</c>, <c>\\?\DISPLAY#…#{e6f07b5f-…}</c>), which survives reboots and arrangement
-/// changes like the macOS display UUID; the GDI device name (<c>\\.\DISPLAY1</c>) when Windows reports none.
-/// </param>
+/// <param name="Device">The monitor's GDI device name (<c>\\.\DISPLAY1</c>).</param>
 /// <param name="WorkArea">The monitor without the taskbar (NSScreen.visibleFrame), in physical pixels.</param>
 /// <param name="Scale">The monitor's effective DPI / 96.</param>
-public sealed record PillMonitor(string Key, RectInt32 WorkArea, double Scale);
+public sealed record PillMonitor(string Device, RectInt32 WorkArea, double Scale)
+{
+    /// <summary>
+    /// The <c>pillPositions</c> key: the monitor's device interface name (<c>EnumDisplayDevices</c> with
+    /// <c>EDD_GET_DEVICE_INTERFACE_NAME</c>, <c>\\?\DISPLAY#…#{e6f07b5f-…}</c>), which survives reboots and arrangement
+    /// changes like the macOS display UUID; <see cref="Device"/> when Windows reports none. Read on each use, only
+    /// where a position is saved or looked up: following a window places the pill without it.
+    /// </summary>
+    public string Key => PillWindowStyle.MonitorKey(Device);
+}
 
 /// <summary>
 /// The floating pill's window: a topmost tool window that never takes focus, clipped to a capsule, optionally kept out
@@ -100,7 +105,7 @@ public static class PillWindowStyle
             ? dpi / 96.0
             : 1;
         return new PillMonitor(
-            MonitorKey(info.szDevice.ToString()),
+            info.szDevice.ToString(),
             new RectInt32(work.left, work.top, work.right - work.left, work.bottom - work.top),
             scale);
     }
@@ -140,7 +145,7 @@ public static class PillWindowStyle
     /// The device interface name of the monitor on <paramref name="device"/> (an adapter output, <c>\\.\DISPLAY1</c>),
     /// preferring an active one (a cloned output lists several); <paramref name="device"/> itself when none has one.
     /// </summary>
-    private static unsafe string MonitorKey(string device)
+    internal static unsafe string MonitorKey(string device)
     {
         var display = new DISPLAY_DEVICEW { cb = (uint)sizeof(DISPLAY_DEVICEW) };
         string? first = null;

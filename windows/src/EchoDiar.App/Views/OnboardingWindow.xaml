@@ -16,7 +16,7 @@
         x:Name="RootGrid"
         Padding="24,12,24,20"
         Background="{ThemeResource SolidBackgroundFillColorBaseBrush}"
-        RowSpacing="16">
+        RowSpacing="12">
         <Grid.Resources>
             <Style x:Key="StepIconStyle" TargetType="FontIcon">
                 <Setter Property="FontFamily" Value="{ThemeResource SymbolThemeFontFamily}" />
@@ -45,8 +45,8 @@
 
         <StackPanel HorizontalAlignment="Center" Spacing="4">
             <Image
-                Width="64"
-                Height="64"
+                Width="48"
+                Height="48"
                 AutomationProperties.AccessibilityView="Raw"
                 Source="ms-appx:///Assets/Square44x44Logo.png" />
             <TextBlock
@@ -166,7 +166,7 @@
                         </StackPanel>
                         <Border
                             x:Name="MicTrack"
-                            AutomationProperties.Name="Microphone level"
+                            AutomationProperties.Name="{local:T Text='Microphone level'}"
                             Style="{StaticResource MeterTrackStyle}">
                             <Border x:Name="MicFill" Style="{StaticResource MeterFillStyle}" />
                         </Border>

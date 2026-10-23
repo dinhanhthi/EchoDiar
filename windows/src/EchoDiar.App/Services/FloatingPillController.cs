@@ -35,6 +35,9 @@ internal sealed class FloatingPillController : IDisposable
     private bool _mainActive;
     private bool _disposed;
 
+    /// <summary>Leaving the pill out of captures was asked and Windows refused: the pill stays hidden.</summary>
+    private bool _captureRefused;
+
     /// <summary>The window's frame was set once: later shows start from the monitor it is on.</summary>
     private bool _placed;
 
@@ -62,7 +65,10 @@ internal sealed class FloatingPillController : IDisposable
         Evaluate();
     }
 
-    /// <summary>Saves a drag still waiting for its delay, lets go of the meeting window, and closes the pill's window.</summary>
+    /// <summary>
+    /// Saves a drag still waiting for its delay (quietly: the main window is closing), lets go of the meeting window,
+    /// and closes the pill's window.
+    /// </summary>
     public void Dispose()
     {
         if (_disposed) return;
@@ -80,7 +86,7 @@ internal sealed class FloatingPillController : IDisposable
         if (_saveTimer.IsRunning)
         {
             _saveTimer.Stop();
-            SavePosition();
+            SavePosition(quietly: true);
         }
         StopFollowing();
         if (_window is not { } window) return;
@@ -105,8 +111,7 @@ internal sealed class FloatingPillController : IDisposable
         switch (e.PropertyName)
         {
             case nameof(AppViewModel.Settings):
-                // Any settings change applies it again (macOS sets sharingType in every apply).
-                if (_hwnd != 0) PillWindowStyle.SetShownInCaptures(_hwnd, _model.Settings.ShowPillInScreenCaptures);
+                // Any settings change applies "Show it in screenshots" again (macOS sets sharingType in every apply).
                 Evaluate();
                 break;
             case nameof(AppViewModel.IsRecording):
@@ -143,6 +148,11 @@ internal sealed class FloatingPillController : IDisposable
             return;
         }
         EnsureWindow();
+        if (!ApplyCaptures(settings.ShowPillInScreenCaptures))
+        {
+            Hide();
+            return;
+        }
         SyncAnchor(settings.AttachPillToWindow ? _model.PillAppRootPid : null);
         Show();
     }
@@ -163,11 +173,29 @@ internal sealed class FloatingPillController : IDisposable
         }
         _hwnd = Win32Interop.GetWindowFromWindowId(appWindow.Id);
         if (!PillWindowStyle.Apply(_hwnd)) Debug.WriteLine("EchoDiar: the pill's window style was not fully applied.");
-        PillWindowStyle.SetShownInCaptures(_hwnd, _model.Settings.ShowPillInScreenCaptures);
         appWindow.Changed += OnAppWindowChanged;
         window.ContentSizeChanged += OnContentSizeChanged;
         window.Dragged += OnDragged;
         _window = window;
+    }
+
+    /// <summary>
+    /// Shows the pill in screenshots and screen recordings or leaves it out, before every show and on every settings
+    /// change. Fails closed: false when leaving it out was asked and Windows refused, so the pill is not shown.
+    /// </summary>
+    private bool ApplyCaptures(bool shown)
+    {
+        var refused = !PillWindowStyle.SetShownInCaptures(_hwnd, shown) && !shown;
+        if (refused != _captureRefused)
+        {
+            _captureRefused = refused;
+            var message = refused
+                ? "Windows refused to leave the pill out of screen captures: the pill stays hidden."
+                : "The pill is left out of screen captures again.";
+            Debug.WriteLine($"EchoDiar: {message}");
+            StartupTrace.Write(message);
+        }
+        return !refused;
     }
 
     private void Show()
@@ -235,6 +263,9 @@ internal sealed class FloatingPillController : IDisposable
         _restoreSaved = false;
         _placed = true;
         window.AppWindow.MoveAndResize(frame);
+        // At once, not only in AppWindow.Changed: until then the old capsule clips the grown window and leaves stale
+        // pixels where the new content goes. The region's redraw repaints the whole window.
+        PillWindowStyle.UpdateShape(_hwnd);
     }
 
     /// <summary>The pill's frame once placed; before that the main window's, whose monitor it first shows on.</summary>
@@ -257,17 +288,17 @@ internal sealed class FloatingPillController : IDisposable
     }
 
     /// <summary>While following: the offset from the window; otherwise the spot on the pill's monitor (macOS <c>savePosition</c>).</summary>
-    private void SavePosition()
+    private void SavePosition(bool quietly = false)
     {
         if (_window is not { } window) return;
         if (_anchorFrame is not null)
         {
-            _model.SavePillWindowOffset(_windowOffset);
+            _model.SavePillWindowOffset(_windowOffset, quietly);
             return;
         }
         var frame = CurrentFrame(window);
         if (PillWindowStyle.MonitorFor(frame) is not { } monitor) return;
-        _model.SavePillPosition(monitor.Key, PillWindowStyle.OffsetOf(frame, monitor.WorkArea, monitor.Scale));
+        _model.SavePillPosition(monitor.Key, PillWindowStyle.OffsetOf(frame, monitor.WorkArea, monitor.Scale), quietly);
     }
 
     // Following the meeting window

@@ -52,17 +52,35 @@ public sealed partial class AppViewModel
     public int? PillAppRootPid => RecordingSourceRootPid;
 
     /// <summary>Where the pill was dragged on the monitor <paramref name="monitorKey"/>, saved at once.</summary>
-    internal void SavePillPosition(string monitorKey, PillPosition position)
+    /// <param name="quietly">See <see cref="SavePillSettings"/>.</param>
+    internal void SavePillPosition(string monitorKey, PillPosition position, bool quietly = false)
     {
         if (_closing || Settings.PillPositions.GetValueOrDefault(monitorKey) == position) return;
-        SaveSettings(Settings with { PillPositions = new(Settings.PillPositions) { [monitorKey] = position } });
+        SavePillSettings(Settings with { PillPositions = new(Settings.PillPositions) { [monitorKey] = position } }, quietly);
     }
 
     /// <summary>Where the pill was dragged from the meeting window's top-right corner, saved at once.</summary>
-    internal void SavePillWindowOffset(PillPosition? offset)
+    /// <param name="quietly">See <see cref="SavePillSettings"/>.</param>
+    internal void SavePillWindowOffset(PillPosition? offset, bool quietly = false)
     {
         if (_closing || Settings.PillWindowOffset == offset) return;
-        SaveSettings(Settings with { PillWindowOffset = offset });
+        SavePillSettings(Settings with { PillWindowOffset = offset }, quietly);
+    }
+
+    /// <summary>
+    /// Saves a drag. <paramref name="quietly"/> (the main window is closing): written without raising
+    /// <see cref="Settings"/>'s change, which the closed window's views would answer by touching their controls; the
+    /// quit still waits for the write.
+    /// </summary>
+    private void SavePillSettings(AppSettings settings, bool quietly)
+    {
+        if (!quietly)
+        {
+            SaveSettings(settings);
+            return;
+        }
+        _settings = settings;
+        QueueSettingsWrite();
     }
 }
 
