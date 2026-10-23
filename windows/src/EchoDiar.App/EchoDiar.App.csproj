@@ -32,12 +32,12 @@
     <PackageReference Include="Microsoft.Windows.SDK.BuildTools" />
     <PackageReference Include="CommunityToolkit.Mvvm" />
     <PackageReference Include="CommunityToolkit.WinUI.Controls.SettingsControls" />
-    <PackageReference Include="LLamaSharp" />
-    <PackageReference Include="LLamaSharp.Backend.Cpu" />
   </ItemGroup>
 
   <ItemGroup>
     <ProjectReference Include="..\EchoDiar.AI\EchoDiar.AI.csproj" />
+    <!-- Also brings LLamaSharp.Backend.Cpu's build props, which copy this RuntimeIdentifier's llama.cpp natives. -->
+    <ProjectReference Include="..\EchoDiar.LocalLLM\EchoDiar.LocalLLM.csproj" />
     <ProjectReference Include="..\EchoDiar.Platform\EchoDiar.Platform.csproj" />
     <ProjectReference Include="..\EchoDiar.Transcribe\EchoDiar.Transcribe.csproj" />
   </ItemGroup>
