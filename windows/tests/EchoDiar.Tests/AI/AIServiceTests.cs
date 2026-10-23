@@ -467,6 +467,57 @@ public sealed class AIServiceTests : IDisposable
         Assert.Equal("At [00:05](cite:5) and [1:02:03](cite:3723); see [10:00](https://x.y).", linked);
     }
 
+    // A citation is the rounded label the model saw (PromptBuilder.Timestamp): a segment starting at 25.3 s is shown
+    // and cited as [00:25], so [00:25] must pick it, not the segment before (VM QA 24.4). The play head lands inside the
+    // picked segment so it is the one highlighted.
+    [Theory]
+    [InlineData(25, 1, 25.3)] // rounded up: 25.3 s is labelled 00:25
+    [InlineData(21, 0, 21.0)]
+    [InlineData(23, 0, 23.0)]
+    [InlineData(30, 1, 29.0)] // in the gap after the last segment: its end
+    [InlineData(0, 0, 21.0)] // before every segment: the first, at its start
+    [InlineData(26, 1, 26.0)]
+    public void CitationsPickTheSegmentOfTheirLabel(double seconds, int index, double at)
+    {
+        Transcript.Segment[] segments =
+        [
+            new() { Start = 25.3, End = 29.0, Text = "second" },
+            new() { Start = 21.0, End = 25.3, Text = "first" },
+        ];
+        var ordered = segments.OrderBy(s => s.Start).ToArray();
+
+        var (segment, head) = TranscriptCitation.SegmentAt(segments, seconds)!.Value;
+
+        Assert.Same(ordered[index], segment);
+        Assert.Equal(at, head, 6);
+    }
+
+    [Fact]
+    public void CitationsPickTheLaterSegmentAtAHalfSecondTie()
+    {
+        // 24.5 rounds half to even (00:24), 25.5 to 00:26: [00:24] picks the 24.5 segment, [00:25] stays in it.
+        Transcript.Segment[] segments =
+        [
+            new() { Start = 20.0, End = 24.5 },
+            new() { Start = 24.5, End = 25.5 },
+            new() { Start = 25.5, End = 30.0 },
+        ];
+
+        Assert.Same(segments[1], TranscriptCitation.SegmentAt(segments, 24)!.Value.Segment);
+        Assert.Same(segments[1], TranscriptCitation.SegmentAt(segments, 25)!.Value.Segment);
+        Assert.Same(segments[2], TranscriptCitation.SegmentAt(segments, 26)!.Value.Segment);
+        Assert.Null(TranscriptCitation.SegmentAt([], 5));
+    }
+
+    [Fact]
+    public void RoundedSecondsMatchTheTimestampLabel()
+    {
+        Assert.Equal(25, PromptBuilder.RoundedSeconds(25.3));
+        Assert.Equal(26, PromptBuilder.RoundedSeconds(25.6));
+        Assert.Equal(0, PromptBuilder.RoundedSeconds(-2));
+        Assert.Equal("00:25", PromptBuilder.Timestamp(25.3));
+    }
+
     // From 1000 minutes on, PromptBuilder.Timestamp writes "1000:05" while macOS may write "1,000:05" (locale grouping);
     // both are cited back.
     [Theory]

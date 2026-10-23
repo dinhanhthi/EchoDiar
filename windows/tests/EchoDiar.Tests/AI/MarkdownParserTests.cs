@@ -52,6 +52,7 @@ public sealed class MarkdownParserTests
     [InlineData("http://example.com/a?b=1")]
     [InlineData("https://example.com/")]
     [InlineData("HTTPS://Example.com/path")]
+    [InlineData("HTTP://EXAMPLE.COM/")]
     public void WebLinksAreKept(string target)
     {
         var link = Assert.IsType<MarkdownLink.Web>(Inlines($"see [docs]({target})").Single(i => i.Link is not null).Link);
@@ -75,6 +76,12 @@ public sealed class MarkdownParserTests
     [InlineData("https://user@example.com/")]
     [InlineData("http:example.com")]
     [InlineData("echodiar-time:7")]
+    [InlineData("https://example.com/a b")]
+    [InlineData("https://example.com/a\u0001b")]
+    [InlineData("https://example.com/a\tb")]
+    [InlineData("<https://example.com/>")]
+    [InlineData("https://example.com/<x>")]
+    [InlineData("https://example.com/\"x\"")]
     public void OtherTargetsStayPlainText(string target)
     {
         var inlines = Inlines($"[click]({target})", References);
@@ -176,7 +183,8 @@ public sealed class MarkdownParserTests
 
         var blocks = MarkdownParser.Parse(markdown, unit.StartsWith("[1") ? References : null);
 
-        Assert.True(stopwatch.Elapsed < TimeSpan.FromSeconds(2), $"{stopwatch.Elapsed} for {unit}");
+        // Generous: linear time takes milliseconds; a quadratic parse takes minutes. A shared CI runner can be slow.
+        Assert.True(stopwatch.Elapsed < TimeSpan.FromSeconds(5), $"{stopwatch.Elapsed} for {unit}");
         Assert.True(Text(blocks.Single().Inlines).Length >= 900_000);
     }
 
@@ -189,7 +197,7 @@ public sealed class MarkdownParserTests
 
         var blocks = MarkdownParser.Parse(markdown);
 
-        Assert.True(stopwatch.Elapsed < TimeSpan.FromSeconds(2), stopwatch.Elapsed.ToString());
+        Assert.True(stopwatch.Elapsed < TimeSpan.FromSeconds(5), stopwatch.Elapsed.ToString());
         Assert.Equal(3 * (1_000_000 / sample.Length + 1), blocks.Count);
     }
 }

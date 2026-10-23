@@ -258,25 +258,6 @@ public sealed partial class ProvidersViewModel : ObservableObject
         return error;
     }
 
-    /// <summary>
-    /// Whether the key would go over plain http to another machine: <paramref name="config"/> sends a key (it has one,
-    /// or one is being typed) and its base URL is <c>http://</c> to a host that is not this PC.
-    /// </summary>
-    public static bool SendsKeyInClear(ProviderConfig config, bool hasKey) =>
-        config.AuthStyle != AuthStyle.None && hasKey
-        && Uri.TryCreate(config.BaseURL.Trim(), UriKind.Absolute, out var url)
-        && url.Scheme == Uri.UriSchemeHttp && !IsLoopback(config.BaseURL);
-
-    /// <summary>Whether <paramref name="baseURL"/>'s host is this PC: localhost, 127.0.0.0/8 or ::1 (macOS <c>isLoopback</c>).</summary>
-    public static bool IsLoopback(string baseURL)
-    {
-        if (!Uri.TryCreate(baseURL.Trim(), UriKind.Absolute, out var url)) return false;
-        var host = url.Host.ToLowerInvariant().Trim('[', ']');
-        if (host is "localhost" or "::1") return true;
-        var octets = host.Split('.');
-        return octets.Length == 4 && octets[0] == "127" && octets.All(o => byte.TryParse(o, out _));
-    }
-
     /// <summary>The first line of an error, at most 160 characters (macOS <c>shortMessage</c>); no parameter names.</summary>
     public static string ShortMessage(Exception error)
     {
@@ -407,33 +388,12 @@ public sealed partial class ProvidersViewModel : ObservableObject
     public bool AddCustomLocal(string text)
     {
         var url = text.Trim();
-        if (HostAndPort(url) is not { } name) return false;
+        if (ProviderInput.HostAndPort(url) is not { } name) return false;
         return AddProvider(new ProviderConfig
         {
             Id = Guid.NewGuid().ToString("D").ToUpperInvariant(), Kind = ProviderKind.Local, Preset = null,
             DisplayName = name, BaseURL = url, AuthStyle = AuthStyle.None, Enabled = true,
         });
-    }
-
-    /// <summary><c>host:port</c> of an http(s) URL, null when the text is not one (macOS <c>hostAndPort</c>).</summary>
-    public static string? HostAndPort(string text)
-    {
-        if (!Uri.TryCreate(text.Trim(), UriKind.Absolute, out var url)
-            || url.Scheme is not ("http" or "https") || url.Host.Length == 0) return null;
-        return HasExplicitPort(text) ? $"{url.Host}:{url.Port}" : url.Host;
-    }
-
-    /// <summary>Whether the URL's authority names a port (Swift <c>url.port</c> is nil without one, even for :80).</summary>
-    private static bool HasExplicitPort(string text)
-    {
-        var authority = text.Trim();
-        var start = authority.IndexOf("://", StringComparison.Ordinal);
-        if (start < 0) return false;
-        authority = authority[(start + 3)..];
-        var end = authority.IndexOfAny(['/', '?', '#']);
-        if (end >= 0) authority = authority[..end];
-        var colon = authority.LastIndexOf(':');
-        return colon >= 0 && colon > authority.LastIndexOf(']');
     }
 
     // CLIs
@@ -521,7 +481,7 @@ public sealed partial class ProvidersViewModel : ObservableObject
                 providers.Add(new AIProviderInfo(
                     config.Id, config.DisplayName, kind, config.DefaultModel, models,
                     CliPreset: kind == AIProviderKind.Cli ? CLIPresets.FromSlug(config.Preset) : null,
-                    RemoteHost: kind == AIProviderKind.LocalHost && !IsLoopback(config.BaseURL)));
+                    RemoteHost: kind == AIProviderKind.LocalHost && !ProviderInput.IsLoopback(config.BaseURL)));
             }
             return providers;
         }

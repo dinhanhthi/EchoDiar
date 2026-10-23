@@ -510,6 +510,20 @@ public static partial class TranscriptCitation
         var digits = string.Concat(text.Where(char.IsAsciiDigit));
         return long.TryParse(digits, NumberStyles.None, CultureInfo.InvariantCulture, out value);
     }
+
+    /// <summary>
+    /// The segment a citation of <paramref name="seconds"/> points at (macOS TranscriptView <c>showPendingTime</c>): the
+    /// last one whose label (<see cref="PromptBuilder.Timestamp"/>, rounded) is at or before it, else the first; and where
+    /// to put the play head, inside that segment so it is the one highlighted. Null without segments.
+    /// </summary>
+    public static (Transcript.Segment Segment, double At)? SegmentAt(IEnumerable<Transcript.Segment> segments, double seconds)
+    {
+        var ordered = segments.OrderBy(s => s.Start).ToList();
+        if (ordered.Count == 0) return null;
+        // The model saw rounded labels: a segment starting at 25.3 s is cited as [00:25], so compare in label units.
+        var segment = ordered.LastOrDefault(s => PromptBuilder.RoundedSeconds(s.Start) <= seconds) ?? ordered[0];
+        return (segment, Math.Max(segment.Start, Math.Min(seconds, segment.End)));
+    }
 }
 
 /// <summary>

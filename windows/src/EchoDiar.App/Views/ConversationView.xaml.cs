@@ -1,4 +1,5 @@
 using System.ComponentModel;
+using EchoDiar.AI;
 using EchoDiar.App.ViewModels;
 using EchoDiar.Core.Model;
 using Microsoft.UI.Dispatching;
@@ -164,7 +165,7 @@ public sealed partial class ConversationView : UserControl
 
     /// <summary>
     /// The citation's time once the transcript is read (macOS TranscriptView <c>showPendingTime</c>): the newest version
-    /// (citations point into it), scrolled to the segment containing the time (or the last one starting before it), with
+    /// (citations point into it), scrolled to the segment it cites (<see cref="TranscriptCitation.SegmentAt"/>), with
     /// the play head there, inside that segment so it is highlighted, without playing. Cleared even without segments.
     /// </summary>
     private void ShowPendingTime()
@@ -175,10 +176,8 @@ public sealed partial class ConversationView : UserControl
         {
             _transcript.ShowVersion(_transcript.Versions.Max(v => v.Number));
         }
-        if (_transcript.Transcript?.Segments is not { Count: > 0 } segments) return;
-        var ordered = segments.OrderBy(s => s.Start).ToList();
-        var segment = ordered.LastOrDefault(s => s.Start <= time) ?? ordered[0];
-        var at = Math.Max(segment.Start, Math.Min(time, segment.End));
+        if (_transcript.Transcript?.Segments is not { } segments
+            || TranscriptCitation.SegmentAt(segments, time) is not ({ } segment, var at)) return;
         if (_playback.IsReady) _playback.Seek(at);
         else _pendingSeek = at;
         TranscriptPane.ShowSegment(segment.Id);

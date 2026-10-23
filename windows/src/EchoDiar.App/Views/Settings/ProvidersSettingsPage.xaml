@@ -15,7 +15,8 @@
     xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
     xmlns:controls="using:CommunityToolkit.WinUI.Controls"
-    xmlns:local="using:EchoDiar.App">
+    xmlns:local="using:EchoDiar.App"
+    xmlns:views="using:EchoDiar.App.Views">
 
     <UserControl.Resources>
         <Style x:Key="SectionHeaderStyle" TargetType="StackPanel">
@@ -164,17 +165,17 @@
                 <StackPanel x:Name="LocalHostsList" Spacing="4" />
 
                 <controls:SettingsCard Header="{local:T Text='Custom URL'}">
-                    <StackPanel Orientation="Horizontal" Spacing="8">
+                    <!-- The box narrows (then Add wraps) in a narrow window instead of being clipped. -->
+                    <views:FieldPanel InputWidth="260">
                         <TextBox
                             x:Name="CustomUrlBox"
-                            MinWidth="260"
                             AutomationProperties.Name="{local:T Text='Custom URL'}"
                             PlaceholderText="http://127.0.0.1:8080/v1" />
                         <Button
                             x:Name="AddCustomButton"
                             Content="{local:T Text='Add'}"
                             IsEnabled="False" />
-                    </StackPanel>
+                    </views:FieldPanel>
                 </controls:SettingsCard>
             </StackPanel>
 

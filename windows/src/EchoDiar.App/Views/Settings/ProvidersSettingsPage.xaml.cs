@@ -110,7 +110,7 @@ public sealed partial class ProvidersSettingsPage : UserControl
             _providers.ChatContextMessages = _chatContextValues[index];
         };
         ScanButton.Click += (_, _) => _ = _providers.ScanAsync();
-        CustomUrlBox.TextChanged += (_, _) => AddCustomButton.IsEnabled = ProvidersViewModel.HostAndPort(CustomUrlBox.Text) is not null;
+        CustomUrlBox.TextChanged += (_, _) => AddCustomButton.IsEnabled = ProviderInput.HostAndPort(CustomUrlBox.Text) is not null;
         CustomUrlBox.KeyDown += (_, e) =>
         {
             if (e.Key != VirtualKey.Enter) return;
@@ -430,8 +430,19 @@ public sealed partial class ProvidersSettingsPage : UserControl
 
     private TextBlock Note(string style, string text = "") => new() { Style = (Style)Resources[style], Text = text };
 
-    /// <summary>A field of an expanded row: its label on the left, its input on the right (macOS <c>FieldRow</c>).</summary>
-    private static SettingsCard Field(string label, object content) => new() { Header = Loc.T(label), Content = content };
+    /// <summary>
+    /// A field of an expanded row: its label on the left, its input on the right (macOS <c>FieldRow</c>). Below
+    /// <see cref="FieldWrapWidth"/> the card puts the input under its label (the toolkit's default is 476), so the widest
+    /// field line (the model id, its models menu and Load models) keeps its buttons in view in a narrow window.
+    /// </summary>
+    private static SettingsCard Field(string label, object content)
+    {
+        var card = new SettingsCard { Header = Loc.T(label), Content = content };
+        card.Resources["SettingsCardWrapThreshold"] = FieldWrapWidth;
+        return card;
+    }
+
+    private const double FieldWrapWidth = 640;
 
     /// <summary>Sets a text box's text unless it already shows it (the caret stays where the user types).</summary>
     private static void SetText(TextBox box, string text)
@@ -447,6 +458,13 @@ public sealed partial class ProvidersSettingsPage : UserControl
     private static HyperlinkButton Link(string text, string url) => new() { Content = Loc.T(text), NavigateUri = new Uri(url), Padding = new Thickness(0) };
 
     private static bool IsEnter(KeyRoutedEventArgs e) => e.Key == VirtualKey.Enter;
+
+    /// <summary>A test's or model list's error; a local host or custom endpoint answering 404 likely lacks <c>/v1</c>.</summary>
+    private static string ErrorMessage(Exception error, ProviderConfig config)
+    {
+        var message = ProvidersViewModel.ShortMessage(error);
+        return ProviderInput.SuggestsV1(config, error) ? $"{message} {Loc.T("Check that the base URL ends with /v1.")}" : message;
+    }
 
     /// <summary>
     /// A cloud preset, local host or custom endpoint (macOS <c>APIProviderRow</c>): the Enabled switch; expanded, its
@@ -466,13 +484,14 @@ public sealed partial class ProvidersSettingsPage : UserControl
         private readonly ComboBox _authCombo = new() { MinWidth = 180 };
         private readonly SettingsCard _headersCard;
         private readonly TextBox _headersBox = new() { MinWidth = 260, AcceptsReturn = true, TextWrapping = TextWrapping.NoWrap, PlaceholderText = "HTTP-Referer: https://example.com" };
+        private readonly TextBlock _headersRefused;
         private readonly SettingsCard _keyCard;
-        private readonly PasswordBox _keyBox = new() { MinWidth = 260 };
+        private readonly PasswordBox _keyBox = new();
         private readonly StackPanel _savedLabel = new() { Orientation = Orientation.Horizontal, Spacing = 4, Visibility = Visibility.Collapsed };
         private readonly Button _removeKeyButton = new() { Visibility = Visibility.Collapsed };
         private readonly HyperlinkButton? _getKeyLink;
         private readonly TextBlock _keyError;
-        private readonly TextBox _baseBox = new() { MinWidth = 320 };
+        private readonly TextBox _baseBox = new();
         private readonly TextBlock _azureNote;
         private readonly TextBlock _httpWarning;
         private readonly ModelField _modelField;
@@ -503,12 +522,23 @@ public sealed partial class ProvidersSettingsPage : UserControl
 
             // Windows addition: macOS has no field for them. Saved in settings.json, never a key.
             _headersCard = Field("Extra headers", _headersBox);
-            _headersCard.Description = page.Note("NoteStyle", Loc.T("One per line, Name: value. Saved in the settings file: put API keys in the API key field."));
+            // A line naming a key header is not saved; this says why it went away.
+            _headersRefused = page.Note("CautionNoteStyle");
+            _headersRefused.Visibility = Visibility.Collapsed;
+            var headerNotes = new StackPanel { Spacing = 2 };
+            headerNotes.Children.Add(page.Note("NoteStyle", Loc.T("One per line, Name: value. Saved in the settings file: put API keys in the API key field.")));
+            headerNotes.Children.Add(_headersRefused);
+            _headersCard.Description = headerNotes;
             AutomationProperties.SetName(_headersBox, Loc.T("Extra headers"));
             _headersBox.LostFocus += (_, _) =>
             {
-                var headers = ParseHeaders(_headersBox.Text);
+                var headers = ProviderInput.ParseHeaders(_headersBox.Text, out var refused);
+                _headersRefused.Text = refused.Count == 0 ? "" : Loc.Format(
+                    "%@ not saved: put the key in the API key field, which keeps it in Credential Manager.", string.Join(", ", refused));
+                _headersRefused.Visibility = Show(refused.Count > 0);
                 Change(c => !SameHeaders(c.ExtraHeaders, headers), c => c.ExtraHeaders = headers);
+                // The refused lines leave the box even when nothing else changed.
+                if (refused.Count > 0) _headersBox.Text = HeadersText(headers);
             };
 
             // The key (macOS APIKeyField): saved on Enter, on leaving the field, by Save and by Test; only "Saved" shows.
@@ -531,7 +561,7 @@ public sealed partial class ProvidersSettingsPage : UserControl
             _removeKeyButton.Content = Loc.T("Remove");
             _removeKeyButton.Click += async (_, _) => ShowKeyError(await _page._providers.DeleteApiKeyAsync(_id));
             if (ProviderLinks.TryGetValue(id, out var links)) _getKeyLink = Link("Get an API key", links.Keys);
-            var keyPanel = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 8 };
+            var keyPanel = new FieldPanel { InputWidth = 260 };
             keyPanel.Children.Add(_keyBox);
             keyPanel.Children.Add(_savedLabel);
             keyPanel.Children.Add(_removeKeyButton);
@@ -548,7 +578,7 @@ public sealed partial class ProvidersSettingsPage : UserControl
             var baseNotes = new StackPanel { Spacing = 2 };
             baseNotes.Children.Add(_azureNote);
             baseNotes.Children.Add(_httpWarning);
-            var baseCard = Field("Base URL", _baseBox);
+            var baseCard = Field("Base URL", new FieldPanel { InputWidth = 320, Children = { _baseBox } });
             baseCard.Description = baseNotes;
 
             _modelField = new ModelField(page, id, id == "azure" ? "Deployment name" : "Model id",
@@ -587,7 +617,8 @@ public sealed partial class ProvidersSettingsPage : UserControl
             SetText(_nameBox, config.DisplayName);
             _authCombo.SelectedIndex = Array.IndexOf(AuthStyles, config.AuthStyle);
             // Saved on leaving the field: a half-typed line must not be replaced while the user types it.
-            if (_headersBox.FocusState == FocusState.Unfocused && !SameHeaders(ParseHeaders(_headersBox.Text), config.ExtraHeaders))
+            if (_headersBox.FocusState == FocusState.Unfocused
+                && !SameHeaders(ProviderInput.ParseHeaders(_headersBox.Text, out _), config.ExtraHeaders))
                 _headersBox.Text = HeadersText(config.ExtraHeaders);
             _keyCard.Visibility = Show(config.AuthStyle != AuthStyle.None);
             SetText(_baseBox, config.BaseURL);
@@ -626,7 +657,7 @@ public sealed partial class ProvidersSettingsPage : UserControl
         {
             if (_config is not { } config) return;
             var sendsKey = _page._providers.HasApiKey(_id) || _keyBox.Password.Length > 0;
-            var clear = ProvidersViewModel.SendsKeyInClear(config, sendsKey);
+            var clear = ProviderInput.SendsKeyInClear(config, sendsKey);
             _httpWarning.Visibility = Show(clear);
             if (clear && Uri.TryCreate(config.BaseURL.Trim(), UriKind.Absolute, out var url))
             {
@@ -660,20 +691,6 @@ public sealed partial class ProvidersSettingsPage : UserControl
         /// <summary>Whether a key is typed and not saved yet (Save is on then).</summary>
         private bool HasPendingKey => !string.IsNullOrWhiteSpace(_keyBox.Password);
 
-        internal static Dictionary<string, string> ParseHeaders(string text)
-        {
-            var headers = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
-            foreach (var line in text.Split('\n', '\r'))
-            {
-                var colon = line.IndexOf(':');
-                if (colon <= 0) continue;
-                var name = line[..colon].Trim();
-                if (name.Length == 0 || name.Any(c => c <= ' ' || c >= 127 || "()<>@,;:\\\"/[]?={}".Contains(c))) continue;
-                headers[name] = line[(colon + 1)..].Trim();
-            }
-            return new Dictionary<string, string>(headers);
-        }
-
         private static bool SameHeaders(IReadOnlyDictionary<string, string> a, IReadOnlyDictionary<string, string> b) =>
             a.Count == b.Count && a.All(pair => b.TryGetValue(pair.Key, out var value) && value == pair.Value);
 
@@ -693,7 +710,7 @@ public sealed partial class ProvidersSettingsPage : UserControl
         private readonly ToggleSwitch _enabled = new();
         private readonly TextBlock _name = new() { VerticalAlignment = VerticalAlignment.Center };
         private readonly ProgressRing _checkingRing = SmallRing();
-        private readonly TextBox _pathBox = new() { MinWidth = 320 };
+        private readonly TextBox _pathBox = new();
         private readonly TextBlock _pathNote;
         private readonly ModelField _modelField;
         private readonly TestField _test;
@@ -724,7 +741,7 @@ public sealed partial class ProvidersSettingsPage : UserControl
             _pathBox.LostFocus += (_, _) => Redetect();
             _pathNote = page.Note("CautionNoteStyle", Loc.T("Not found: give the full path to a .exe, or to an npm .cmd shim."));
             _pathNote.Visibility = Visibility.Collapsed;
-            var pathCard = Field("Path override", _pathBox);
+            var pathCard = Field("Path override", new FieldPanel { InputWidth = 320, Children = { _pathBox } });
             pathCard.Description = _pathNote;
 
             _modelField = new ModelField(page, _id, preset switch
@@ -804,7 +821,7 @@ public sealed partial class ProvidersSettingsPage : UserControl
 
         private readonly ProvidersSettingsPage _page;
         private readonly string _id;
-        private readonly TextBox _modelBox = new() { MinWidth = 220 };
+        private readonly TextBox _modelBox = new();
         private readonly DropDownButton _modelsButton = new() { Visibility = Visibility.Collapsed };
         private readonly MenuFlyout _modelsMenu = new();
         private readonly Button _loadButton = new();
@@ -831,7 +848,7 @@ public sealed partial class ProvidersSettingsPage : UserControl
             _modelsButton.Flyout = _modelsMenu;
             _loadButton.Content = Loc.T("Load models");
             _loadButton.Click += (_, _) => _ = LoadAsync();
-            var inputs = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 8 };
+            var inputs = new FieldPanel { InputWidth = 220 };
             inputs.Children.Add(_modelBox);
             inputs.Children.Add(_modelsButton);
             inputs.Children.Add(_loadButton);
@@ -909,7 +926,7 @@ public sealed partial class ProvidersSettingsPage : UserControl
             }
             catch (Exception e) when (!loading.IsCancellationRequested)
             {
-                error = ProvidersViewModel.ShortMessage(e);
+                error = ErrorMessage(e, config);
             }
             catch (Exception)
             {
@@ -1040,7 +1057,7 @@ public sealed partial class ProvidersSettingsPage : UserControl
             _error.Visibility = Visibility.Collapsed;
             _error.MaxLines = 3;
 
-            var buttons = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 8 };
+            var buttons = new FieldPanel();
             buttons.Children.Add(_testButton);
             buttons.Children.Add(_saveButton);
             buttons.Children.Add(_ring);
@@ -1100,7 +1117,7 @@ public sealed partial class ProvidersSettingsPage : UserControl
             }
             catch (Exception e) when (!cancellation.IsCancellationRequested)
             {
-                error = ProvidersViewModel.ShortMessage(e);
+                error = ErrorMessage(e, config);
             }
             catch (Exception)
             {

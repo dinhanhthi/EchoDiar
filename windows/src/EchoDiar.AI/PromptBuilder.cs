@@ -188,12 +188,18 @@ public static partial class PromptBuilder
         Escape(OneLine($"{transcript.DisplayName(segment.Speaker)} [{Timestamp(segment.Start)}]: {segment.Text}"));
 
     /// <summary>
+    /// The whole seconds <see cref="Timestamp"/> shows for <paramref name="seconds"/>: rounded half to even, never
+    /// negative. A citation of that label maps back to these seconds.
+    /// </summary>
+    public static long RoundedSeconds(double seconds) => (long)Math.Round(Math.Max(seconds, 0), MidpointRounding.ToEven);
+
+    /// <summary>
     /// mm:ss; minutes go past 59 in recordings longer than an hour (same format as the transcript view). Seconds are
     /// rounded half to even, as Swift's <c>Duration</c> <c>.minuteSecond</c> format does (1.5 → 00:02, 2.5 → 00:02).
     /// </summary>
     public static string Timestamp(double seconds)
     {
-        var whole = (long)Math.Round(Math.Max(seconds, 0), MidpointRounding.ToEven);
+        var whole = RoundedSeconds(seconds);
         return string.Create(CultureInfo.InvariantCulture, $"{whole / 60:00}:{whole % 60:00}");
     }
 
