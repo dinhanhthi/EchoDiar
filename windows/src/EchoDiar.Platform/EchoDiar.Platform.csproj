@@ -6,8 +6,6 @@
     <TargetPlatformMinVersion>10.0.22000.0</TargetPlatformMinVersion>
     <RootNamespace>EchoDiar.Platform</RootNamespace>
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
-    <!-- The Windows App SDK packages turn on MRT Core resource indexing; this library has no resources. -->
-    <AppxGeneratePriEnabled>false</AppxGeneratePriEnabled>
   </PropertyGroup>
 
   <ItemGroup>
