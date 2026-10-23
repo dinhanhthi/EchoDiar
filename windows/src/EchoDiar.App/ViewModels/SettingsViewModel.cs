@@ -121,6 +121,50 @@ public sealed partial class SettingsViewModel : ObservableObject
         set => Update(s => s with { PlaybackChannels = value });
     }
 
+    // Transcription
+
+    /// <summary>"Transcribe automatically": a recording is transcribed once it stops.</summary>
+    public bool AutoTranscribe
+    {
+        get => Settings.AutoTranscribe;
+        set => Update(s => s with { AutoTranscribe = value });
+    }
+
+    /// <summary>"Transcribe while recording": the live transcript, kept for the job at Stop.</summary>
+    public bool TranscribeWhileRecording
+    {
+        get => Settings.TranscribeWhileRecording;
+        set => Update(s => s with { TranscribeWhileRecording = value });
+    }
+
+    /// <summary>"Free unused models after", in minutes.</summary>
+    public int ModelIdleMinutes
+    {
+        get => Settings.ModelIdleMinutes;
+        set => Update(s => s with { ModelIdleMinutes = value });
+    }
+
+    /// <summary>Transcription waits while energy saver is on (the setting only; task 18.2 makes the pipeline wait).</summary>
+    public bool DeferTranscriptionWhenConstrained
+    {
+        get => Settings.DeferTranscriptionWhenConstrained;
+        set => Update(s => s with { DeferTranscriptionWhenConstrained = value });
+    }
+
+    /// <summary>"Tell speakers apart".</summary>
+    public bool Diarization
+    {
+        get => Settings.Diarization;
+        set => Update(s => s with { Diarization = value });
+    }
+
+    /// <summary>"Number of other speakers": null is Auto.</summary>
+    public int? SpeakerCountHint
+    {
+        get => Settings.SpeakerCountHint;
+        set => Update(s => s with { SpeakerCountHint = value });
+    }
+
     // Storage
 
     /// <summary>"Compression bitrate": the total AAC bitrate of the m4a, in kbps.</summary>

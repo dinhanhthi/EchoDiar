@@ -1,9 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!--
     Settings › General (macOS GeneralSettingsView.swift): launch at login, the floating indicator, deleting without
-    confirmation and the consent message, as Windows 11 Settings cards under section headers. Default language is here
-    too until the Transcription section exists (macOS has it there). The "Permissions and consent" section's "Show
-    onboarding again" comes with the onboarding (task 19.4). Each searchable card's Tag is its search entry's title
+    confirmation and the consent message, as Windows 11 Settings cards under section headers. The "Permissions and
+    consent" section's "Show onboarding again" comes with the onboarding (task 19.4). Each searchable card's Tag is its search entry's title
     (SearchEntries), so a search result can bring it into view.
 -->
 <UserControl
@@ -31,15 +30,6 @@
                 Header="{local:T Text='Launch at login'}"
                 Tag="Launch at login">
                 <ToggleSwitch x:Name="LaunchToggle" AutomationProperties.Name="{local:T Text='Launch at login'}" />
-            </controls:SettingsCard>
-
-            <controls:SettingsCard
-                Header="{local:T Text='Default language'}"
-                Tag="Default language">
-                <ComboBox
-                    x:Name="LanguageCombo"
-                    MinWidth="200"
-                    AutomationProperties.Name="{local:T Text='Default language'}" />
             </controls:SettingsCard>
 
             <StackPanel Style="{StaticResource SectionHeaderStyle}">

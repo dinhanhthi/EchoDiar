@@ -359,19 +359,50 @@ public sealed partial class AppViewModel
     {
         foreach (var entry in DeletableModels)
         {
-            try
-            {
-                await Task.Run(() => _services.Models.Delete(entry));
-            }
-            catch (Exception e)
-            {
-                Debug.WriteLine($"EchoDiar: could not delete model {entry.Id}: {e}");
-                DownloadErrors = With(DownloadErrors, entry.Id, e.Message);
-            }
+            await DeleteModelFilesAsync(entry);
             if (_closing) return;
-            if (Settings.DefaultASRModelID == entry.Id) SaveSettings(Settings with { DefaultASRModelID = null });
-            if (Settings.DefaultDiarizerModelID == entry.Id) SaveSettings(Settings with { DefaultDiarizerModelID = null });
         }
         await RefreshInstalledModelsAsync();
     }
+
+    /// <summary>
+    /// Removes one downloaded model (macOS <c>deleteModel</c>, Settings › Transcription's Delete); a model still
+    /// downloading is left alone. A default model removed is no longer the default.
+    /// </summary>
+    public async Task DeleteModelAsync(string id)
+    {
+        if (ModelCatalog.Entry(id) is not { Repo: not null } entry || Downloads.ContainsKey(id)) return;
+        await DeleteModelFilesAsync(entry);
+        if (_closing) return;
+        await RefreshInstalledModelsAsync();
+    }
+
+    /// <summary>
+    /// Deletes the model's folder off the UI thread; a failure is shown on its row. Its default is cleared either way
+    /// (macOS), or every new recording would stop at "Needs model".
+    /// </summary>
+    private async Task DeleteModelFilesAsync(ModelEntry entry)
+    {
+        try
+        {
+            await Task.Run(() => _services.Models.Delete(entry));
+        }
+        catch (Exception e)
+        {
+            Debug.WriteLine($"EchoDiar: could not delete model {entry.Id}: {e}");
+            DownloadErrors = With(DownloadErrors, entry.Id, e.Message);
+        }
+        if (_closing) return;
+        if (Settings.DefaultASRModelID == entry.Id) SaveSettings(Settings with { DefaultASRModelID = null });
+        if (Settings.DefaultDiarizerModelID == entry.Id) SaveSettings(Settings with { DefaultDiarizerModelID = null });
+    }
+
+    /// <summary>The installed models read again (macOS <c>refreshInstalledModels</c> when the Transcription section shows).</summary>
+    internal Task RefreshModelsAsync() => RefreshInstalledModelsAsync();
+
+    private ModelsViewModel? _modelsModel;
+
+    /// <summary>What Settings › Transcription binds to; one for the app's lifetime.</summary>
+    public ModelsViewModel ModelsModel =>
+        _modelsModel ??= new ModelsViewModel(this, _services.Models, _services.Engines.Keys.ToHashSet());
 }

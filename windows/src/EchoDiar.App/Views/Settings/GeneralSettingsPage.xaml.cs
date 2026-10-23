@@ -25,7 +25,6 @@ public sealed partial class GeneralSettingsPage : UserControl
     public static IReadOnlyList<SettingsEntry> SearchEntries { get; } =
     [
         new("Launch at login", ["startup", "startup apps", "login item", "open at login", "sign in"]),
-        new("Default language", ["language", "English", "French", "Vietnamese"]),
         new("Show floating indicator while recording", ["pill", "overlay", "floating"]),
         new("Hide it while an EchoDiar window is in front", ["floating indicator", "pill", "hide"]),
         new("Show it in screenshots and screen recordings", ["floating indicator", "pill", "screenshot", "screen sharing", "capture"]),
@@ -40,9 +39,6 @@ public sealed partial class GeneralSettingsPage : UserControl
     /// <summary>The controls are being set from the settings: their change events are not the user's.</summary>
     private bool _syncing;
 
-    /// <summary>The language menu's codes, in item order; rebuilt when the choices change.</summary>
-    private List<string> _languageCodes = [];
-
     public GeneralSettingsPage(AppViewModel model)
     {
         _model = model;
@@ -51,11 +47,6 @@ public sealed partial class GeneralSettingsPage : UserControl
         ConsentText.Text = $"\"{Loc.T(ConsentMessage)}\"";
 
         LaunchToggle.Toggled += (_, _) => _ = OnLaunchToggledAsync();
-        LanguageCombo.SelectionChanged += (_, _) =>
-        {
-            var index = LanguageCombo.SelectedIndex;
-            if (!_syncing && index >= 0 && index < _languageCodes.Count) _settings.DefaultLanguage = _languageCodes[index];
-        };
         ShowPillToggle.Toggled += (_, _) => Set(() => _settings.ShowPill = ShowPillToggle.IsOn);
         HidePillToggle.Toggled += (_, _) => Set(() => _settings.HidePillWhenAppActive = HidePillToggle.IsOn);
         CapturesToggle.Toggled += (_, _) => Set(() => _settings.ShowPillInScreenCaptures = CapturesToggle.IsOn);
@@ -91,7 +82,6 @@ public sealed partial class GeneralSettingsPage : UserControl
             LaunchToggle.IsOn = _settings.LaunchAtLogin;
             LaunchToggle.IsEnabled = _settings.CanChangeLaunchAtLogin;
             LaunchCard.Description = _settings.LaunchAtLoginNote!; // null hides it
-            RefreshLanguages();
             ShowPillToggle.IsOn = _settings.ShowPill;
             HidePillToggle.IsOn = _settings.HidePillWhenAppActive;
             // macOS disables "Hide it…" while the indicator is off.
@@ -104,23 +94,6 @@ public sealed partial class GeneralSettingsPage : UserControl
         {
             _syncing = false;
         }
-    }
-
-    /// <summary>
-    /// The default language menu in LanguageOptions order (Auto, the pinned languages, the recent ones, every other
-    /// supported one), flattened: a ComboBox has no separators.
-    /// </summary>
-    private void RefreshLanguages()
-    {
-        var selection = _settings.DefaultLanguage;
-        List<string> codes = [.. LanguageOptions.Groups(selection, _settings.Settings.RecentLanguages, _model.SupportedLanguages()).SelectMany(g => g)];
-        if (!codes.SequenceEqual(_languageCodes))
-        {
-            _languageCodes = codes;
-            LanguageCombo.Items.Clear();
-            foreach (var code in codes) LanguageCombo.Items.Add(LanguageOptions.Name(code));
-        }
-        LanguageCombo.SelectedIndex = _languageCodes.IndexOf(selection);
     }
 
     /// <summary>A flip by the user asks the startup task; the toggle then shows its real state.</summary>

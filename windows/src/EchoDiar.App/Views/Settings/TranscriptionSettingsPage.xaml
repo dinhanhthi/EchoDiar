@@ -1,0 +1,222 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    Settings › Transcription (macOS ModelsSettingsView.swift), one panel per inner tab picked in the title bar:
+    - General: default language, transcribe while recording, free unused models after, delete audio after transcription
+      (the same setting as Storage › Audio); then, until the Recording section exists (Phase 20, macOS Recording › After
+      recording), transcribe automatically and waiting while energy saver is on.
+    - Transcription model: what transcription is, then the speech models by tier, each with its details, Download,
+      progress and Cancel, Installed and Delete, Set default.
+    - Diarization model: tell speakers apart, the number of other speakers, what diarization is, then the speaker models.
+    The model rows are made in code (TranscriptionSettingsPage.CreateRow). The footer gives every installed model's size.
+    Each searchable element's Tag is its search entry's title (SearchEntries), so a search result can bring it into view.
+-->
+<UserControl
+    x:Class="EchoDiar.App.Views.TranscriptionSettingsPage"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:controls="using:CommunityToolkit.WinUI.Controls"
+    xmlns:local="using:EchoDiar.App">
+
+    <UserControl.Resources>
+        <Style x:Key="SectionHeaderStyle" TargetType="StackPanel">
+            <Setter Property="Margin" Value="1,24,0,4" />
+            <Setter Property="Spacing" Value="2" />
+        </Style>
+        <!-- What a tab's models do, above their sections. -->
+        <Style x:Key="IntroStyle" TargetType="TextBlock">
+            <Setter Property="Margin" Value="1,4,0,0" />
+            <Setter Property="Foreground" Value="{ThemeResource TextFillColorSecondaryBrush}" />
+            <Setter Property="TextWrapping" Value="Wrap" />
+        </Style>
+        <!-- The parts of the rows made in code, in theme colours. -->
+        <Style
+            x:Key="NoteStyle"
+            BasedOn="{StaticResource CaptionTextBlockStyle}"
+            TargetType="TextBlock">
+            <Setter Property="Foreground" Value="{ThemeResource TextFillColorSecondaryBrush}" />
+            <Setter Property="TextWrapping" Value="Wrap" />
+        </Style>
+        <Style
+            x:Key="CautionNoteStyle"
+            BasedOn="{StaticResource NoteStyle}"
+            TargetType="TextBlock">
+            <Setter Property="Foreground" Value="{ThemeResource SystemFillColorCautionBrush}" />
+        </Style>
+        <Style
+            x:Key="CriticalNoteStyle"
+            BasedOn="{StaticResource NoteStyle}"
+            TargetType="TextBlock">
+            <Setter Property="Foreground" Value="{ThemeResource SystemFillColorCriticalBrush}" />
+        </Style>
+        <Style
+            x:Key="SuccessNoteStyle"
+            BasedOn="{StaticResource NoteStyle}"
+            TargetType="TextBlock">
+            <Setter Property="Foreground" Value="{ThemeResource SystemFillColorSuccessBrush}" />
+            <Setter Property="VerticalAlignment" Value="Center" />
+        </Style>
+        <Style x:Key="CautionIconStyle" TargetType="FontIcon">
+            <Setter Property="FontSize" Value="12" />
+            <Setter Property="Foreground" Value="{ThemeResource SystemFillColorCautionBrush}" />
+        </Style>
+        <Style x:Key="SuccessIconStyle" TargetType="FontIcon">
+            <Setter Property="FontSize" Value="14" />
+            <Setter Property="VerticalAlignment" Value="Center" />
+            <Setter Property="Foreground" Value="{ThemeResource SystemFillColorSuccessBrush}" />
+        </Style>
+        <!-- The one badge that must stand out: Default, in the accent colour. -->
+        <Style x:Key="DefaultBadgeStyle" TargetType="Border">
+            <Setter Property="Padding" Value="6,1,6,2" />
+            <Setter Property="VerticalAlignment" Value="Center" />
+            <Setter Property="CornerRadius" Value="{ThemeResource ControlCornerRadius}" />
+            <Setter Property="Background" Value="{ThemeResource AccentFillColorDefaultBrush}" />
+        </Style>
+        <Style
+            x:Key="DefaultBadgeTextStyle"
+            BasedOn="{StaticResource CaptionTextBlockStyle}"
+            TargetType="TextBlock">
+            <Setter Property="Foreground" Value="{ThemeResource TextOnAccentFillColorPrimaryBrush}" />
+        </Style>
+    </UserControl.Resources>
+
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="*" />
+            <RowDefinition Height="Auto" />
+        </Grid.RowDefinitions>
+
+        <ScrollViewer>
+            <Grid MaxWidth="1000" Margin="24,12,24,24">
+
+                <!-- General -->
+                <StackPanel x:Name="GeneralPanel" Spacing="4">
+                    <controls:SettingsCard Header="{local:T Text='Default language'}" Tag="Default language">
+                        <ComboBox
+                            x:Name="LanguageCombo"
+                            MinWidth="200"
+                            AutomationProperties.Name="{local:T Text='Default language'}" />
+                    </controls:SettingsCard>
+
+                    <!-- The description is set in code (Windows text). -->
+                    <controls:SettingsCard
+                        x:Name="LiveCard"
+                        Header="{local:T Text='Transcribe while recording'}"
+                        Tag="Transcribe while recording">
+                        <ToggleSwitch x:Name="LiveToggle" AutomationProperties.Name="{local:T Text='Transcribe while recording'}" />
+                    </controls:SettingsCard>
+
+                    <controls:SettingsCard
+                        Description="{local:T Text='While a recording stays paused this long, the model that transcribes it is freed; it loads again when you resume. Other models are freed as soon as their job ends.'}"
+                        Header="{local:T Text='Free unused models after'}"
+                        Tag="Free unused models after">
+                        <ComboBox
+                            x:Name="IdleCombo"
+                            MinWidth="120"
+                            AutomationProperties.Name="{local:T Text='Free unused models after'}" />
+                    </controls:SettingsCard>
+
+                    <controls:SettingsCard
+                        Description="{local:T Text='Moves the audio to the Recycle Bin once a transcription succeeds.'}"
+                        Header="{local:T Text='Delete audio after transcription'}"
+                        Tag="Delete audio after transcription">
+                        <ToggleSwitch x:Name="DeleteAfterToggle" AutomationProperties.Name="{local:T Text='Delete audio after transcription'}" />
+                    </controls:SettingsCard>
+
+                    <!-- Phase 20 moves these two to Recording › After recording, where macOS has them. -->
+                    <StackPanel Style="{StaticResource SectionHeaderStyle}">
+                        <TextBlock Style="{StaticResource BodyStrongTextBlockStyle}" Text="{local:T Text='After recording'}" />
+                    </StackPanel>
+
+                    <controls:SettingsCard Header="{local:T Text='Transcribe automatically'}" Tag="Transcribe automatically">
+                        <ToggleSwitch x:Name="AutoTranscribeToggle" AutomationProperties.Name="{local:T Text='Transcribe automatically'}" />
+                    </controls:SettingsCard>
+
+                    <!-- Texts set in code (Windows text, not in the catalog). Task 18.2 makes the pipeline wait. -->
+                    <controls:SettingsCard x:Name="DeferCard">
+                        <ToggleSwitch x:Name="DeferToggle" />
+                    </controls:SettingsCard>
+                </StackPanel>
+
+                <!-- Transcription model -->
+                <StackPanel
+                    x:Name="TranscriptionPanel"
+                    Spacing="4"
+                    Visibility="Collapsed">
+                    <TextBlock
+                        Style="{StaticResource IntroStyle}"
+                        Tag="Transcription models"
+                        Text="{local:T Text='Transcription turns speech into text. The transcription model listens to the recording and writes what was said, with timestamps.'}" />
+
+                    <!-- A header per tier, then its rows (made in code). -->
+                    <StackPanel x:Name="TranscriptionList" Spacing="4" />
+
+                    <!--
+                        Task 26.3: the "Cloud" section (the default cloud engine's model, then every provider that
+                        transcribes, with Set default or Set Up) and the "Speech-to-text APIs" section go here, after
+                        the local tiers (macOS cloudSection(diarization: false) and speechToTextSection).
+                    -->
+                </StackPanel>
+
+                <!-- Diarization model -->
+                <StackPanel
+                    x:Name="DiarizationPanel"
+                    Spacing="4"
+                    Visibility="Collapsed">
+                    <controls:SettingsCard
+                        Description="{local:T Text='Labels each voice in the meeting audio: Speaker 1, 2, … Off: the meeting audio is one speaker.'}"
+                        Header="{local:T Text='Tell speakers apart'}"
+                        Tag="Tell speakers apart">
+                        <ToggleSwitch x:Name="DiarizationToggle" AutomationProperties.Name="{local:T Text='Tell speakers apart'}" />
+                    </controls:SettingsCard>
+
+                    <!-- Shown while Tell speakers apart is on; the description depends on the speaker model (set in code). -->
+                    <controls:SettingsCard
+                        x:Name="SpeakerCountCard"
+                        Header="{local:T Text='Number of other speakers'}"
+                        Tag="Number of other speakers">
+                        <ComboBox
+                            x:Name="SpeakerCountCombo"
+                            MinWidth="120"
+                            AutomationProperties.Name="{local:T Text='Number of other speakers'}" />
+                    </controls:SettingsCard>
+
+                    <TextBlock
+                        Style="{StaticResource IntroStyle}"
+                        Tag="Diarization models"
+                        Text="{local:T Text='Diarization finds who spoke when. The diarization model tells the voices apart and labels each part of the transcript with its speaker.'}" />
+
+                    <StackPanel x:Name="DiarizationList" Spacing="4" />
+
+                    <!--
+                        Task 26.3: the "Cloud" section of the diarizers (the default cloud diarizer's model, then the
+                        providers that label speakers) goes here (macOS cloudSection(diarization: true)).
+                    -->
+                </StackPanel>
+            </Grid>
+        </ScrollViewer>
+
+        <!-- Every tab: the installed models' size, and that nothing downloads by itself. -->
+        <Grid
+            Grid.Row="1"
+            MaxWidth="1000"
+            Margin="24,0,24,12"
+            ColumnSpacing="16">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="Auto" />
+                <ColumnDefinition Width="*" />
+            </Grid.ColumnDefinitions>
+            <TextBlock
+                x:Name="InstalledText"
+                Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                Style="{StaticResource CaptionTextBlockStyle}" />
+            <TextBlock
+                Grid.Column="1"
+                HorizontalAlignment="Right"
+                Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                Style="{StaticResource CaptionTextBlockStyle}"
+                Text="{local:T Text='Models are downloaded only when you click Download.'}"
+                TextAlignment="Right"
+                TextWrapping="Wrap" />
+        </Grid>
+    </Grid>
+</UserControl>
