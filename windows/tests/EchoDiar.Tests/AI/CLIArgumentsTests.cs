@@ -398,13 +398,12 @@ public sealed class CLIArgumentsTests : IDisposable
         Touch(npm, "node_modules", "@anthropic-ai", "claude-code", "cli.js");
         File.WriteAllText(Path.Combine(npm, "claude.cmd"), NewShim());
         var native = Touch(local, "claude.exe");
-        var relative = Path.GetRelativePath(Directory.GetCurrentDirectory(), local);
 
         var executable = Shell(npm, local).Executable("claude");
 
         Assert.Equal(native, executable?.FileName);
         Assert.Empty(executable!.LeadingArguments);
-        Assert.Equal("node.exe", Path.GetFileName(Shell(npm, relative).Executable("claude")?.FileName));
+        Assert.Equal("node.exe", Path.GetFileName(Shell(npm, "local", Path.Combine(".", "local")).Executable("claude")?.FileName));
     }
 
     [Fact]
