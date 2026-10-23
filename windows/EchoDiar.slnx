@@ -4,6 +4,7 @@
     <Platform Name="ARM64" />
   </Configurations>
   <Folder Name="/src/">
+    <Project Path="src/EchoDiar.AI/EchoDiar.AI.csproj" />
     <Project Path="src/EchoDiar.App/EchoDiar.App.csproj">
       <Deploy />
     </Project>
