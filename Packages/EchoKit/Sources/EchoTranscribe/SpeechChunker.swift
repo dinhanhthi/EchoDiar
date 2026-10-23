@@ -2,8 +2,10 @@ import Accelerate
 
 /// Splits a 16 kHz mono stream into speech chunks for transcribe-while-recording, with an energy VAD over 20 ms
 /// frames. A chunk opens on speech (with pre-roll), closes at a pause (with post-roll) and is cut at its quietest
-/// frame when it reaches `maxChunkSeconds`, so every chunk fits the model window. Silence between chunks is never
-/// emitted: it counts as covered. The clock is the sample index of the stream, so chunk starts are file time.
+/// frame when it reaches `maxChunkSeconds`, so every chunk fits the model window. The length a chunk needs before a
+/// short pause closes it is per instance (`shortPauseMinSeconds`): the batch gap fill keeps the default, the live path
+/// passes a shorter one. Silence between chunks is never emitted: it counts as covered. The clock is the sample index
+/// of the stream, so chunk starts are file time.
 ///
 /// Pure and bounded: only the open chunk and the pre-roll are retained.
 struct SpeechChunker {
@@ -38,7 +40,7 @@ struct SpeechChunker {
     static let shortPauseFrames = 30  // 0.6 s
     /// A pause this long closes a chunk of any length.
     static let longPauseFrames = 75  // 1.5 s
-    /// The length a chunk needs before a short pause closes it, capped at half the window.
+    /// The default length a chunk needs before a short pause closes it, capped at half the window.
     static let shortPauseMinSeconds = 8
     /// A chunk reaching the window is cut at its quietest frame in the last third.
     static let cutSearchFraction = (numerator: 2, denominator: 3)
@@ -65,9 +67,9 @@ struct SpeechChunker {
     private var partial: [Float] = []
     private var partialLanguage: String?
 
-    init(maxChunkSeconds: Int) {
+    init(maxChunkSeconds: Int, shortPauseMinSeconds: Int = SpeechChunker.shortPauseMinSeconds) {
         maxFrames = max(1, maxChunkSeconds) * Self.framesPerSecond
-        shortPauseMinFrames = min(Self.shortPauseMinSeconds * Self.framesPerSecond, maxFrames / 2)
+        shortPauseMinFrames = min(shortPauseMinSeconds * Self.framesPerSecond, maxFrames / 2)
     }
 
     /// Feeds the next samples of the stream; returns the chunks they closed.

@@ -54,6 +54,40 @@ struct SpeechChunkerTests {
         #expect(chunks.last?.end == signal.count)
     }
 
+    /// The live tuning bounds the time to a live line: a 0.6 s pause closes a chunk from 4 s (the batch tuning waits
+    /// for 8 s), and continuous speech is cut into contiguous chunks of at most 12 s, in the last third (8–12 s).
+    @Test func liveChunksCloseAtAShortPauseFrom4SecondsAndNeverExceed12() throws {
+        let paused = Self.noiseFloor(1) + Self.speech(5) + Self.noiseFloor(0.7)
+        var live = SpeechChunker(maxChunkSeconds: 12, shortPauseMinSeconds: 4)
+        var batch = SpeechChunker(maxChunkSeconds: 30)
+
+        let closed = Self.feed(paused, to: &live)
+
+        #expect(closed.count == 1)
+        #expect(Self.feed(paused, to: &batch).isEmpty)
+        let chunk = try #require(closed.first)
+        #expect((Self.at(6)...Self.at(6.2) + 2 * Self.frame).contains(chunk.end))
+        #expect(chunk.samples == Array(paused[chunk.start..<chunk.end]))
+
+        let continuous = Self.noiseFloor(1) + Self.speech(20)
+        live = SpeechChunker(maxChunkSeconds: 12, shortPauseMinSeconds: 4)
+        let cut = Self.feed(continuous, to: &live)
+        let chunks = cut + Self.flush(&live)
+
+        #expect(!cut.isEmpty)
+        for chunk in chunks {
+            #expect(chunk.samples.count <= Self.at(12))
+            #expect(chunk.samples == Array(continuous[chunk.start..<chunk.end]))
+        }
+        for chunk in cut {
+            #expect(chunk.samples.count >= Self.at(8) - Self.frame)
+        }
+        for (chunk, next) in zip(chunks, chunks.dropFirst()) {
+            #expect(next.start == chunk.end)
+        }
+        #expect(chunks.last?.end == continuous.count)
+    }
+
     @Test func flushEmitsTheOpenChunk() {
         let signal = Self.noiseFloor(0.5) + Self.speech(2)
         var chunker = SpeechChunker(maxChunkSeconds: 30)
