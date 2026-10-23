@@ -586,7 +586,9 @@ public sealed partial class ProvidersSettingsPage : UserControl
             _nameCard.Visibility = _authCard.Visibility = _headersCard.Visibility = Show(customApi);
             SetText(_nameBox, config.DisplayName);
             _authCombo.SelectedIndex = Array.IndexOf(AuthStyles, config.AuthStyle);
-            if (!SameHeaders(ParseHeaders(_headersBox.Text), config.ExtraHeaders)) _headersBox.Text = HeadersText(config.ExtraHeaders);
+            // Saved on leaving the field: a half-typed line must not be replaced while the user types it.
+            if (_headersBox.FocusState == FocusState.Unfocused && !SameHeaders(ParseHeaders(_headersBox.Text), config.ExtraHeaders))
+                _headersBox.Text = HeadersText(config.ExtraHeaders);
             _keyCard.Visibility = Show(config.AuthStyle != AuthStyle.None);
             SetText(_baseBox, config.BaseURL);
             _baseBox.PlaceholderText = config.Id == "azure" ? "https://<resource>.openai.azure.com/openai/v1" : "";
