@@ -24,8 +24,9 @@ namespace EchoDiar.App.Views;
 /// tabs (a SelectorBar); on Settings the section's inner tabs after Record; Settings (opens the Settings page, or goes
 /// back from it) and Search everywhere, an icon button that opens the box where the box does not fit. Update and Ask across conversations stay
 /// collapsed until Phases 27 and 26. It also hosts the window's dialogs (it lives as long as the window): the delete
-/// confirmations (of this conversation, and of the library's cards and selection), "Recording problem", the
-/// lost-mic prompt and the Settings pages' confirmations (<see cref="AppViewModel.Confirm"/>), one at a time.
+/// confirmations (of this conversation, and of the library's cards and selection), "Recording problem" and the
+/// Settings pages' confirmations (<see cref="AppViewModel.Confirm"/>), one at a time. The lost-mic question is the
+/// pill's end prompt.
 /// </summary>
 public sealed partial class TitleBarToolbar : UserControl
 {
@@ -47,12 +48,6 @@ public sealed partial class TitleBarToolbar : UserControl
 
     /// <summary>The open dialog: WinUI shows one at a time per window.</summary>
     private ContentDialog? _dialog;
-
-    /// <summary>The lost-mic prompt is open.</summary>
-    private ContentDialog? _routePrompt;
-
-    /// <summary>The mic was lost while another dialog was open: asked once that one closes.</summary>
-    private bool _routePromptPending;
 
     private DispatcherQueueTimer? _blinkTimer;
     private DispatcherQueueTimer? _searchTimer;
@@ -127,7 +122,6 @@ public sealed partial class TitleBarToolbar : UserControl
     {
         _model = model;
         model.PropertyChanged += OnModelChanged;
-        model.MicRouteLostAsk += OnMicRouteLostAsk;
         // Settings pages ask through here too, so the window never has two dialogs.
         model.Confirm = ConfirmAsync;
         model.DeleteFlow = DeleteAsync;
@@ -150,7 +144,6 @@ public sealed partial class TitleBarToolbar : UserControl
     {
         if (_model is null) return;
         _model.PropertyChanged -= OnModelChanged;
-        _model.MicRouteLostAsk -= OnMicRouteLostAsk;
         _model.Confirm = null;
         _model.DeleteFlow = null;
         _model = null;
@@ -265,13 +258,6 @@ public sealed partial class TitleBarToolbar : UserControl
             ToolTipService.SetToolTip(PauseButton, pauseLabel);
         }
         UpdateBlink(recording && !paused);
-        // The recording ended (stopped elsewhere): the lost-mic question no longer applies.
-        if (!recording)
-        {
-            _routePromptPending = false;
-            _routePrompt?.Hide();
-        }
-
         var conversation = ShownConversation();
         var onConversation = conversation is not null;
         TitlePanel.Visibility = Shown(onConversation);
@@ -644,20 +630,11 @@ public sealed partial class TitleBarToolbar : UserControl
 
     // Recording dialogs and indicator
 
-    /// <summary>Shows what waits, unless a dialog is open: a recording problem first, then the lost-mic prompt.</summary>
+    /// <summary>Shows a recording problem that waits, unless a dialog is open.</summary>
     private void ShowNextDialog()
     {
         if (_model is null || _dialog is not null || XamlRoot is null) return;
-        if (_model.RecordingError is { } error)
-        {
-            _ = ShowRecordingProblemAsync(error);
-        }
-        else if (_routePromptPending)
-        {
-            _routePromptPending = false;
-            StartupTrace.Write($"lost-mic prompt: {(_model.IsRecording ? "shown" : "dropped, not recording")}");
-            if (_model.IsRecording) _ = AskRouteLostAsync();
-        }
+        if (_model.RecordingError is { } error) _ = ShowRecordingProblemAsync(error);
     }
 
     /// <summary>
@@ -670,33 +647,6 @@ public sealed partial class TitleBarToolbar : UserControl
         dialog.CloseButtonText = Loc.T("OK");
         dialog.DefaultButton = ContentDialogButton.Close;
         return ShowAsync(dialog, _ => _model?.DismissRecordingError(error));
-    }
-
-    private void OnMicRouteLostAsk()
-    {
-        StartupTrace.Write($"lost-mic prompt asked: open prompt {_routePrompt is not null}, open dialog {_dialog is not null}, XamlRoot {XamlRoot is not null}");
-        if (_routePrompt is not null) return;
-        _routePromptPending = true;
-        ShowNextDialog();
-    }
-
-    /// <summary>
-    /// The lost mic with "Ask to stop" (macOS: the pill's end prompt for inputRouteLost, its countdown comes with
-    /// Phase 19): Stop now stops as Stop does, Keep recording carries on with the default input.
-    /// </summary>
-    private async Task AskRouteLostAsync()
-    {
-        var dialog = NewDialog("Microphone disconnected — stop recording?", null);
-        dialog.PrimaryButtonText = Loc.T("Stop now");
-        dialog.CloseButtonText = Loc.T("Keep recording");
-        dialog.DefaultButton = ContentDialogButton.Primary;
-        _routePrompt = dialog;
-        await ShowAsync(dialog, result =>
-        {
-            StartupTrace.Write($"lost-mic prompt answered: {result}");
-            if (result == ContentDialogResult.Primary && _model is { IsRecording: true } model) _ = model.StopRecordingAsync();
-        });
-        _routePrompt = null;
     }
 
     private ContentDialog NewDialog(string title, string? content) => new()

@@ -181,11 +181,11 @@
                 Foreground="{ThemeResource TextFillColorSecondaryBrush}"
                 TextAlignment="Center"
                 TextWrapping="Wrap" />
-            <!-- Settings comes with Phase 13, which opens the page the reason names. -->
+            <!-- Opens the Settings page the reason names. -->
             <HyperlinkButton
+                x:Name="OpenSettingsLink"
                 HorizontalAlignment="Center"
-                Content="{local:T Text='Open Settings'}"
-                IsEnabled="False" />
+                Content="{local:T Text='Open Settings'}" />
         </StackPanel>
     </Grid>
 </UserControl>

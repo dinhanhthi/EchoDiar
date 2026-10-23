@@ -2,7 +2,7 @@
 <!--
     The floating pill (macOS FloatingPillView.swift): the logo, the recording dot, "Recording <App>" after an automatic
     start, the elapsed time and a level meter; Pause or Resume, Stop and the language menu while the pointer is over it.
-    A prompt (Phase 20) takes the indicator's place. The capsule sizes to its content inside a Canvas, so its size is
+    A meeting prompt takes the indicator's place. The capsule sizes to its content inside a Canvas, so its size is
     the window's, which the controller sets; the window's region clips it to the capsule. Its buttons never take the
     focus: focus would activate the window, which would then take the foreground (and Alt+F4) from the meeting app.
 -->
@@ -103,8 +103,66 @@
                     </Button>
                 </StackPanel>
             </StackPanel>
-            <!-- Phase 20: the meeting prompts. -->
-            <ContentPresenter x:Name="PromptHost" Visibility="Collapsed" />
+            <!--
+                A prompt (macOS detectedPrompt and endPrompt): the logo, the question, the end prompt's countdown and
+                its buttons. The texts and which buttons show are set in code.
+            -->
+            <Grid
+                x:Name="PromptHost"
+                Padding="0,10"
+                ColumnSpacing="10"
+                Visibility="Collapsed">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
+                <Image
+                    Width="32"
+                    Height="32"
+                    VerticalAlignment="Center"
+                    AutomationProperties.AccessibilityView="Raw"
+                    Source="ms-appx:///Assets/Square44x44Logo.png" />
+                <StackPanel Grid.Column="1" Spacing="8">
+                    <TextBlock
+                        x:Name="PromptText"
+                        AutomationProperties.LiveSetting="Polite"
+                        Style="{StaticResource BodyStrongTextBlockStyle}" />
+                    <TextBlock
+                        x:Name="CountdownText"
+                        Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                        Style="{StaticResource CaptionTextBlockStyle}" />
+                    <StackPanel Orientation="Horizontal" Spacing="8">
+                        <!-- Detected: Record, Not now, Always for <App> (not for browsers). -->
+                        <Button
+                            x:Name="RecordPromptButton"
+                            AllowFocusOnInteraction="False"
+                            Content="{local:T Text='Record'}"
+                            IsTabStop="False"
+                            Style="{StaticResource AccentButtonStyle}" />
+                        <Button
+                            x:Name="NotNowButton"
+                            AllowFocusOnInteraction="False"
+                            Content="{local:T Text='Not now'}"
+                            IsTabStop="False" />
+                        <Button
+                            x:Name="AlwaysButton"
+                            AllowFocusOnInteraction="False"
+                            IsTabStop="False" />
+                        <!-- Ended: Keep recording, Stop now (the default: the countdown ends in a stop). -->
+                        <Button
+                            x:Name="KeepRecordingButton"
+                            AllowFocusOnInteraction="False"
+                            Content="{local:T Text='Keep recording'}"
+                            IsTabStop="False" />
+                        <Button
+                            x:Name="StopNowButton"
+                            AllowFocusOnInteraction="False"
+                            Content="{local:T Text='Stop now'}"
+                            IsTabStop="False"
+                            Style="{StaticResource AccentButtonStyle}" />
+                    </StackPanel>
+                </StackPanel>
+            </Grid>
         </Grid>
     </Canvas>
 </Window>

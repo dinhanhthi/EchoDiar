@@ -121,7 +121,9 @@ public sealed partial class AppViewModel : ObservableObject
         {
             // Turning "wait" off releases a job waiting for energy saver.
             _services.Deferral.Enabled = value.DeferTranscriptionWhenConstrained;
-            if (SetProperty(ref _settings, value)) OnPropertyChanged(nameof(RecordingLanguage));
+            if (!SetProperty(ref _settings, value)) return;
+            OnPropertyChanged(nameof(RecordingLanguage));
+            SyncMeetingDetection();
         }
     }
 
@@ -248,6 +250,8 @@ public sealed partial class AppViewModel : ObservableObject
         FollowRouteChanges();
         _recovery = LoadAndRecoverAsync();
         await _recovery;
+        // With the loaded settings (detection on or off).
+        StartMeetingServices();
         // With the settings, before the library (macOS AppModel.start()).
         if (!Settings.OnboardingCompleted && !_closing) OnboardingRequested?.Invoke();
         StartupTrace.Write("begin library load");
@@ -285,6 +289,8 @@ public sealed partial class AppViewModel : ObservableObject
     public bool Shutdown()
     {
         _closing = true;
+        // On the UI thread, before anything waits (the system events' window lives on it); silent, as _closing is set.
+        StopMeetingServices();
         _pollTimer.Stop();
         // A run under way asks before each deletion, and is told every conversation is busy now.
         _retention?.Stop();
@@ -471,10 +477,12 @@ public sealed partial class AppViewModel : ObservableObject
             // Before the engine starts, with the engine's first marker language, so the prior's engine is the one the
             // Stop job resolves to.
             await AttachRecordingTranscriberAsync(language);
+            var target = CaptureTarget.Global;
             _startTask = Task.Run<string?>(() =>
             {
                 if (_closing) return null;
-                var folder = _services.Engine.Start(Resolved(app), language, micEndpointId, root);
+                target = Resolved(app);
+                var folder = _services.Engine.Start(target, language, micEndpointId, root);
                 if (!_closing) return folder;
                 // The window closed while the devices opened: nothing else would stop this recording.
                 _services.Engine.Stop();
@@ -484,7 +492,9 @@ public sealed partial class AppViewModel : ObservableObject
             // The window may have closed while the devices opened: Shutdown stopped the timer for good.
             if (_closing) return;
             _activeFolder = folder;
-            if (_activeFolder is not null) _pollTimer.Start();
+            if (_activeFolder is null) return;
+            _pollTimer.Start();
+            BeginEndWatch(target);
         }
         catch (Exception e)
         {
@@ -492,6 +502,7 @@ public sealed partial class AppViewModel : ObservableObject
             CancelRecordingTranscriber();
             RecordingSourceName = null;
             RecordingSourceRootPid = null;
+            AutoStartedAppName = null;
             RecordingError = e is RecordingDiskFullException
                 ? "There is not enough free disk space to record."
                 : $"The recording could not start ({e.Message}).";
@@ -591,6 +602,7 @@ public sealed partial class AppViewModel : ObservableObject
         RecordingSourceName = null;
         RecordingSourceRootPid = null;
         if (snapshot.EndReason is not { } reason) return;
+        EndEndWatch();
         // The next recording starts with the default language again.
         if (_languageOverride is not null)
         {

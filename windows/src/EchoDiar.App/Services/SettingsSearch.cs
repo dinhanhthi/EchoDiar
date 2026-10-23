@@ -41,6 +41,7 @@ public sealed record SettingsSection(
 public static class SettingsSearch
 {
     public const string General = "general";
+    public const string Recording = "recording";
     public const string Transcription = "transcription";
     public const string Storage = "storage";
     public const string About = "about";
@@ -50,7 +51,9 @@ public static class SettingsSearch
     public static IReadOnlyList<SettingsSection> Sections { get; } =
     [
         new(General, "General", "\uE713", [], GeneralSettingsPage.SearchEntries, model => new GeneralSettingsPage(model)),
-        // Recording comes between General and Transcription (Phase 20).
+        new(
+            Recording, "Recording", "\uE7C8", RecordingSettingsPage.SubTabs, RecordingSettingsPage.SearchEntries,
+            model => new RecordingSettingsPage(model)),
         new(
             Transcription, "Transcription", "\uE8D6", TranscriptionSettingsPage.SubTabs, TranscriptionSettingsPage.SearchEntries,
             model => new TranscriptionSettingsPage(model)),

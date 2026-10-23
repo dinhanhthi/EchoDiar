@@ -1,6 +1,7 @@
 using System.Diagnostics;
 using EchoDiar.App.Services;
 using EchoDiar.App.Views;
+using EchoDiar.Core;
 using EchoDiar.Core.Audio;
 using EchoDiar.Core.Model;
 using EchoDiar.Core.Models;
@@ -56,12 +57,6 @@ public sealed partial class AppViewModel
 
     /// <summary>The window closed: views stop their frame callbacks, since its controls fail every call.</summary>
     internal bool IsClosing => _closing;
-
-    /// <summary>
-    /// The mic in use was lost during the recording (it moved to the default input) and "When the microphone changes"
-    /// is Ask: the window asks whether to stop. Raised on the UI thread.
-    /// </summary>
-    public event Action? MicRouteLostAsk;
 
     /// <summary>The "Recording problem" dialog was closed on <paramref name="shown"/>; a newer error stays.</summary>
     public void DismissRecordingError(string shown)
@@ -135,7 +130,10 @@ public sealed partial class AppViewModel
         _services.Engine.MicRouteLost += behavior => Post(() => OnMicRouteLost(behavior));
     }
 
-    /// <summary>Ask: the window's prompt; Stop: the normal stop; Continue: nothing (macOS micRoutesLost).</summary>
+    /// <summary>
+    /// Ask: the end monitor's input-route-lost trigger (the pill asks, with its countdown); Stop: the stop of the end
+    /// prompt; Continue: nothing (macOS micRoutesLost).
+    /// </summary>
     private void OnMicRouteLost(RouteChangeBehavior behavior)
     {
         StartupTrace.Write($"MicRouteLost on the UI thread: {behavior}, recording {IsRecording}");
@@ -143,10 +141,10 @@ public sealed partial class AppViewModel
         switch (behavior)
         {
             case RouteChangeBehavior.Ask:
-                MicRouteLostAsk?.Invoke();
+                RecordEnd(new MeetingEndMonitor.Input.InputRouteLost());
                 break;
             case RouteChangeBehavior.Stop:
-                _ = StopRecordingAsync();
+                StopFromEndPrompt();
                 break;
         }
     }

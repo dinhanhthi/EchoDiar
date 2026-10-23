@@ -1,0 +1,192 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    Settings › Recording (macOS RecordingSettingsView.swift), one panel per inner tab picked in the title bar:
+    - Microphone: the recording microphone, and what losing it does.
+    - Meetings: attaching the floating indicator to the meeting window, meeting detection and each app's behavior
+      (rows made in code).
+    - Auto-stop: the end monitor's thresholds, each clamped to its range.
+    - After recording: transcribe automatically, tell speakers apart and the number of other speakers (also in
+      Transcription › Diarization model, as on macOS), and waiting while energy saver is on.
+    The floating indicator's other options stay in General, as on macOS. Each searchable element's Tag is its search
+    entry's title (SearchEntries), so a search result can bring it into view.
+-->
+<UserControl
+    x:Class="EchoDiar.App.Views.RecordingSettingsPage"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:controls="using:CommunityToolkit.WinUI.Controls"
+    xmlns:local="using:EchoDiar.App">
+
+    <UserControl.Resources>
+        <Style x:Key="SectionHeaderStyle" TargetType="StackPanel">
+            <Setter Property="Margin" Value="1,24,0,4" />
+            <Setter Property="Spacing" Value="2" />
+        </Style>
+        <Style x:Key="IntroStyle" TargetType="TextBlock">
+            <Setter Property="Margin" Value="1,4,0,4" />
+            <Setter Property="Foreground" Value="{ThemeResource TextFillColorSecondaryBrush}" />
+            <Setter Property="TextWrapping" Value="Wrap" />
+        </Style>
+        <Style x:Key="UnitStyle" TargetType="TextBlock">
+            <Setter Property="MinWidth" Value="26" />
+            <Setter Property="VerticalAlignment" Value="Center" />
+            <Setter Property="Foreground" Value="{ThemeResource TextFillColorSecondaryBrush}" />
+        </Style>
+    </UserControl.Resources>
+
+    <ScrollViewer>
+        <Grid MaxWidth="1000" Margin="24,12,24,24">
+
+            <!-- Microphone -->
+            <StackPanel x:Name="MicrophonePanel" Spacing="4">
+                <controls:SettingsCard Header="{local:T Text='Microphone'}" Tag="Microphone">
+                    <ComboBox
+                        x:Name="MicCombo"
+                        MinWidth="240"
+                        AutomationProperties.Name="{local:T Text='Microphone'}" />
+                </controls:SettingsCard>
+
+                <!-- The description follows the choice (set in code). -->
+                <controls:SettingsCard
+                    x:Name="RouteCard"
+                    Header="{local:T Text='When the microphone disconnects'}"
+                    Tag="When the microphone disconnects">
+                    <ComboBox
+                        x:Name="RouteCombo"
+                        MinWidth="200"
+                        AutomationProperties.Name="{local:T Text='When the microphone disconnects'}">
+                        <ComboBoxItem Content="{local:T Text='Ask to stop'}" />
+                        <ComboBoxItem Content="{local:T Text='Keep recording'}" />
+                        <ComboBoxItem Content="{local:T Text='Stop recording'}" />
+                    </ComboBox>
+                </controls:SettingsCard>
+            </StackPanel>
+
+            <!-- Meetings -->
+            <StackPanel
+                x:Name="MeetingsPanel"
+                Spacing="4"
+                Visibility="Collapsed">
+                <!-- The description is Windows text (macOS also asks for Accessibility access), set in code. -->
+                <controls:SettingsCard
+                    x:Name="AttachCard"
+                    Header="{local:T Text='Attach the indicator to the meeting window'}"
+                    Tag="Attach the indicator to the meeting window">
+                    <ToggleSwitch x:Name="AttachToggle" AutomationProperties.Name="{local:T Text='Attach the indicator to the meeting window'}" />
+                </controls:SettingsCard>
+
+                <controls:SettingsCard
+                    Margin="0,24,0,0"
+                    Description="{local:T Text='Offers to record when a meeting app starts using the microphone.'}"
+                    Header="{local:T Text='Detect meetings'}"
+                    Tag="Detect meetings">
+                    <ToggleSwitch x:Name="DetectToggle" AutomationProperties.Name="{local:T Text='Detect meetings'}" />
+                </controls:SettingsCard>
+
+                <!-- One row per app: Ask, Always record (not for browsers), Ignore. -->
+                <StackPanel x:Name="AppsList" Spacing="4" />
+            </StackPanel>
+
+            <!-- Auto-stop -->
+            <StackPanel
+                x:Name="AutoStopPanel"
+                Spacing="4"
+                Visibility="Collapsed">
+                <TextBlock Style="{StaticResource IntroStyle}" Text="{local:T Text='The indicator asks before stopping, with a 15 s countdown. Reaching the length limit stops at once.'}" />
+
+                <controls:SettingsCard
+                    x:Name="SourceInactiveCard"
+                    Header="{local:T Text='Stop when the app is quiet for'}"
+                    Tag="Stop when the app is quiet for">
+                    <StackPanel Orientation="Horizontal" Spacing="6">
+                        <NumberBox
+                            x:Name="SourceInactiveBox"
+                            MinWidth="120"
+                            AutomationProperties.Name="{local:T Text='Stop when the app is quiet for'}"
+                            SmallChange="1"
+                            SpinButtonPlacementMode="Inline" />
+                        <TextBlock Style="{StaticResource UnitStyle}" Text="s" />
+                    </StackPanel>
+                </controls:SettingsCard>
+
+                <controls:SettingsCard
+                    x:Name="CallEndedCard"
+                    Header="{local:T Text='Stop when the call seems over for'}"
+                    Tag="Stop when the call seems over for">
+                    <StackPanel Orientation="Horizontal" Spacing="6">
+                        <NumberBox
+                            x:Name="CallEndedBox"
+                            MinWidth="120"
+                            AutomationProperties.Name="{local:T Text='Stop when the call seems over for'}"
+                            SmallChange="1"
+                            SpinButtonPlacementMode="Inline" />
+                        <TextBlock Style="{StaticResource UnitStyle}" Text="s" />
+                    </StackPanel>
+                </controls:SettingsCard>
+
+                <controls:SettingsCard
+                    x:Name="SilenceCard"
+                    Header="{local:T Text='Stop after silence of'}"
+                    Tag="Stop after silence of">
+                    <StackPanel Orientation="Horizontal" Spacing="6">
+                        <NumberBox
+                            x:Name="SilenceBox"
+                            MinWidth="120"
+                            AutomationProperties.Name="{local:T Text='Stop after silence of'}"
+                            SmallChange="1"
+                            SpinButtonPlacementMode="Inline" />
+                        <TextBlock Style="{StaticResource UnitStyle}" Text="min" />
+                    </StackPanel>
+                </controls:SettingsCard>
+
+                <controls:SettingsCard
+                    x:Name="MaxDurationCard"
+                    Header="{local:T Text='Stop after a recording length of'}"
+                    Tag="Stop after a recording length of">
+                    <StackPanel Orientation="Horizontal" Spacing="6">
+                        <NumberBox
+                            x:Name="MaxDurationBox"
+                            MinWidth="120"
+                            AutomationProperties.Name="{local:T Text='Stop after a recording length of'}"
+                            SmallChange="1"
+                            SpinButtonPlacementMode="Inline" />
+                        <TextBlock Style="{StaticResource UnitStyle}" Text="min" />
+                    </StackPanel>
+                </controls:SettingsCard>
+            </StackPanel>
+
+            <!-- After recording -->
+            <StackPanel
+                x:Name="AfterRecordingPanel"
+                Spacing="4"
+                Visibility="Collapsed">
+                <controls:SettingsCard Header="{local:T Text='Transcribe automatically'}" Tag="Transcribe automatically">
+                    <ToggleSwitch x:Name="AutoTranscribeToggle" AutomationProperties.Name="{local:T Text='Transcribe automatically'}" />
+                </controls:SettingsCard>
+
+                <controls:SettingsCard
+                    Description="{local:T Text='Labels each voice in the meeting audio: Speaker 1, 2, … Off: the meeting audio is one speaker.'}"
+                    Header="{local:T Text='Tell speakers apart'}"
+                    Tag="Tell speakers apart">
+                    <ToggleSwitch x:Name="DiarizationToggle" AutomationProperties.Name="{local:T Text='Tell speakers apart'}" />
+                </controls:SettingsCard>
+
+                <!-- Shown while Tell speakers apart is on; the description depends on the speaker model (set in code). -->
+                <controls:SettingsCard
+                    x:Name="SpeakerCountCard"
+                    Header="{local:T Text='Number of other speakers'}"
+                    Tag="Number of other speakers">
+                    <ComboBox
+                        x:Name="SpeakerCountCombo"
+                        MinWidth="120"
+                        AutomationProperties.Name="{local:T Text='Number of other speakers'}" />
+                </controls:SettingsCard>
+
+                <!-- Texts set in code (Windows text, not in the catalog). -->
+                <controls:SettingsCard x:Name="DeferCard">
+                    <ToggleSwitch x:Name="DeferToggle" />
+                </controls:SettingsCard>
+            </StackPanel>
+        </Grid>
+    </ScrollViewer>
+</UserControl>

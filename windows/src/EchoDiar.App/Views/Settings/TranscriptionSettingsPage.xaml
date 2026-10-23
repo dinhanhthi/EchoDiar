@@ -2,8 +2,8 @@
 <!--
     Settings › Transcription (macOS ModelsSettingsView.swift), one panel per inner tab picked in the title bar:
     - General: default language, transcribe while recording, free unused models after, delete audio after transcription
-      (the same setting as Storage › Audio); then, until the Recording section exists (Phase 20, macOS Recording › After
-      recording), transcribe automatically and waiting while energy saver is on.
+      (the same setting as Storage › Audio). Transcribe automatically and waiting while energy saver is on are in
+      Recording › After recording, as on macOS.
     - Transcription model: what transcription is, then the speech models by tier, each with its details, Download,
       progress and Cancel, Installed and Delete, Set default.
     - Diarization model: tell speakers apart, the number of other speakers, what diarization is, then the speaker models.
@@ -120,20 +120,6 @@
                         Header="{local:T Text='Delete audio after transcription'}"
                         Tag="Delete audio after transcription">
                         <ToggleSwitch x:Name="DeleteAfterToggle" AutomationProperties.Name="{local:T Text='Delete audio after transcription'}" />
-                    </controls:SettingsCard>
-
-                    <!-- Phase 20 moves these two to Recording › After recording, where macOS has them. -->
-                    <StackPanel Style="{StaticResource SectionHeaderStyle}">
-                        <TextBlock Style="{StaticResource BodyStrongTextBlockStyle}" Text="{local:T Text='After recording'}" />
-                    </StackPanel>
-
-                    <controls:SettingsCard Header="{local:T Text='Transcribe automatically'}" Tag="Transcribe automatically">
-                        <ToggleSwitch x:Name="AutoTranscribeToggle" AutomationProperties.Name="{local:T Text='Transcribe automatically'}" />
-                    </controls:SettingsCard>
-
-                    <!-- Texts set in code (Windows text, not in the catalog). Task 18.2 makes the pipeline wait. -->
-                    <controls:SettingsCard x:Name="DeferCard">
-                        <ToggleSwitch x:Name="DeferToggle" />
                     </controls:SettingsCard>
                 </StackPanel>
 

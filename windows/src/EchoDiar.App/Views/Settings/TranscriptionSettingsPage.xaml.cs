@@ -32,9 +32,8 @@ public sealed partial class TranscriptionSettingsPage : UserControl
     ];
 
     /// <summary>
-    /// The searchable rows (macOS SettingsSearch.swift, Transcription), each the Tag of its element. Transcribe
-    /// automatically and the energy saver wait are here until the Recording section exists (Phase 20); the cloud
-    /// engines, the speech-to-text APIs and cloud diarization come with task 26.3.
+    /// The searchable rows (macOS SettingsSearch.swift, Transcription), each the Tag of its element. The cloud engines,
+    /// the speech-to-text APIs and cloud diarization come with task 26.3.
     /// </summary>
     public static IReadOnlyList<SettingsEntry> SearchEntries { get; } =
     [
@@ -42,21 +41,11 @@ public sealed partial class TranscriptionSettingsPage : UserControl
         new("Transcribe while recording", ["live transcript", "captions", "real-time", "subtitles", "Whisper", "Parakeet"], GeneralTab),
         new("Free unused models after", ["memory", "RAM", "idle", "unload", "pause"], GeneralTab),
         new("Delete audio after transcription", ["remove audio", "Recycle Bin", "trash", "save space"], GeneralTab),
-        new("Transcribe automatically", ["auto transcribe", "after stop"], GeneralTab),
-        new(DeferTitle, ["battery", "battery saver", "energy saver", "power", "defer"], GeneralTab),
         new("Transcription models", ["download", "Whisper", "Parakeet", "fast", "balanced", "quality"], TranscriptionModelsTab),
         new("Diarization models", ["speaker model", "speakers", "pyannote", "download"], DiarizationModelsTab),
         new("Tell speakers apart", ["diarization", "speakers", "who spoke"], DiarizationModelsTab),
         new("Number of other speakers", ["speaker count", "diarization", "people"], DiarizationModelsTab),
     ];
-
-    /// <summary>
-    /// macOS "Wait when the Mac is hot or in Low Power Mode": Windows has no thermal state, only energy saver. Not in the
-    /// catalog (English).
-    /// </summary>
-    private const string DeferTitle = "Wait while energy saver is on";
-
-    private const string DeferDescription = "Transcription starts once energy saver is off.";
 
     /// <summary>
     /// macOS's text with Windows' engines. Not through Loc: its slug (cut at 60 characters) is the macOS text's, which
@@ -89,10 +78,6 @@ public sealed partial class TranscriptionSettingsPage : UserControl
         _models = model.ModelsModel;
         InitializeComponent();
         LiveCard.Description = LiveDescription;
-        DeferCard.Header = Loc.T(DeferTitle);
-        DeferCard.Description = Loc.T(DeferDescription);
-        DeferCard.Tag = DeferTitle;
-        AutomationProperties.SetName(DeferToggle, Loc.T(DeferTitle));
         SpeakerCountCombo.Items.Add(Loc.T("Auto"));
         var (min, max) = AppSettings.SpeakerCountHintRange;
         for (var count = min; count <= max; count++) SpeakerCountCombo.Items.Add(count.ToString(CultureInfo.CurrentCulture));
@@ -111,8 +96,6 @@ public sealed partial class TranscriptionSettingsPage : UserControl
             if (!_syncing && index >= 0 && index < _idleMinutes.Count) _settings.ModelIdleMinutes = _idleMinutes[index];
         };
         DeleteAfterToggle.Toggled += (_, _) => Set(() => _settings.DeleteAudioAfterTranscription = DeleteAfterToggle.IsOn);
-        AutoTranscribeToggle.Toggled += (_, _) => Set(() => _settings.AutoTranscribe = AutoTranscribeToggle.IsOn);
-        DeferToggle.Toggled += (_, _) => Set(() => _settings.DeferTranscriptionWhenConstrained = DeferToggle.IsOn);
         DiarizationToggle.Toggled += (_, _) => Set(() => _settings.Diarization = DiarizationToggle.IsOn);
         SpeakerCountCombo.SelectionChanged += (_, _) =>
         {
@@ -188,8 +171,6 @@ public sealed partial class TranscriptionSettingsPage : UserControl
             LiveToggle.IsOn = _settings.TranscribeWhileRecording;
             RefreshIdleMinutes();
             DeleteAfterToggle.IsOn = _settings.DeleteAudioAfterTranscription;
-            AutoTranscribeToggle.IsOn = _settings.AutoTranscribe;
-            DeferToggle.IsOn = _settings.DeferTranscriptionWhenConstrained;
             DiarizationToggle.IsOn = _settings.Diarization;
             // macOS shows the number only while speakers are told apart.
             SpeakerCountCard.Visibility = _settings.Diarization ? Visibility.Visible : Visibility.Collapsed;

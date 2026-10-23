@@ -1,4 +1,6 @@
+using EchoDiar.Core;
 using EchoDiar.Core.Settings;
+using EchoDiar.Platform.Audio;
 
 namespace EchoDiar.App.ViewModels;
 
@@ -23,8 +25,8 @@ public sealed partial class AppViewModel
     }
 
     /// <summary>
-    /// The app whose detection started the recording: the pill shows "Recording &lt;App&gt;" for its first 10 s, even
-    /// with the indicator off. Set by meeting detection (Phase 20); null until then.
+    /// The app whose detection ("Always") started the recording: the pill shows "Recording &lt;App&gt;" for its first
+    /// 10 s, even with the indicator off.
     /// </summary>
     public string? AutoStartedAppName
     {
@@ -34,7 +36,7 @@ public sealed partial class AppViewModel
 
     /// <summary>
     /// What the pill asks (meeting detected, meeting ended); null = no question. A prompt shows the pill whatever the
-    /// settings. Set by meeting detection (Phase 20); null until then.
+    /// settings.
     /// </summary>
     public PillPrompt? PillPrompt
     {
@@ -46,10 +48,10 @@ public sealed partial class AppViewModel
     }
 
     /// <summary>
-    /// The process tree the pill follows with "Attach to meeting window": the recorded app (Phase 20: the detected app
-    /// while asking).
+    /// The process tree the pill follows with "Attach to meeting window": the detected app while asking, else the
+    /// recorded one (macOS <c>pillAppBundleID</c>).
     /// </summary>
-    public int? PillAppRootPid => RecordingSourceRootPid;
+    public int? PillAppRootPid => PillPrompt is PillPrompt.MeetingDetected asking ? asking.Meeting.RootPid : RecordingSourceRootPid;
 
     /// <summary>Where the pill was dragged on the monitor <paramref name="monitorKey"/>, saved at once.</summary>
     /// <param name="quietly">See <see cref="SavePillSettings"/>.</param>
@@ -84,5 +86,14 @@ public sealed partial class AppViewModel
     }
 }
 
-/// <summary>A question the floating pill asks (macOS <c>PillPrompt</c>); Phase 20 adds the cases.</summary>
-public abstract record PillPrompt;
+/// <summary>A question the floating pill asks (macOS <c>AppModel.PillPrompt</c>).</summary>
+public abstract record PillPrompt
+{
+    private PillPrompt() { }
+
+    /// <summary>"&lt;App&gt; call detected — Record?".</summary>
+    public sealed record MeetingDetected(DetectedMeeting Meeting) : PillPrompt;
+
+    /// <summary>"… — stop recording?": the recording stops at <paramref name="Deadline"/> unless "Keep recording".</summary>
+    public sealed record MeetingEnded(MeetingEndMonitor.Reason Reason, DateTimeOffset Deadline) : PillPrompt;
+}

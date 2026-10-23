@@ -1,6 +1,7 @@
 using System.ComponentModel;
 using EchoDiar.App.Services;
 using EchoDiar.App.ViewModels;
+using EchoDiar.Core;
 using EchoDiar.Core.Audio;
 using EchoDiar.Core.Settings;
 using EchoDiar.Platform.Windowing;
@@ -20,7 +21,7 @@ namespace EchoDiar.App.Views;
 
 /// <summary>
 /// The floating pill's window and content (macOS FloatingPillView.swift and PillHostingView): the recording
-/// indicator, its controls on hover, and the slot for Phase 20's prompts. <see cref="Services.FloatingPillController"/>
+/// indicator, its controls on hover, and the meeting prompts in its place. <see cref="Services.FloatingPillController"/>
 /// owns it: it styles, shows, hides, places and closes it. The window reports its content's size in physical pixels and
 /// the user's drags (pointer capture on the capsule: the window has no title bar). A press may make the pill the
 /// foreground window: once the press is over it gives the foreground back to the window that had it.
@@ -36,11 +37,15 @@ public sealed partial class FloatingPillWindow : Window
     /// <summary>The recording dot dims every other second (macOS RecordingBlink).</summary>
     private static readonly TimeSpan BlinkInterval = TimeSpan.FromSeconds(1);
 
+    /// <summary>The end prompt's "Stopping in N s" is read again this often (macOS: every second).</summary>
+    private static readonly TimeSpan CountdownInterval = TimeSpan.FromMilliseconds(250);
+
     private static readonly UISettings UISettings = new();
 
     private readonly AppViewModel _model;
     private readonly DispatcherQueueTimer _collapseTimer;
     private readonly DispatcherQueueTimer _blinkTimer;
+    private readonly DispatcherQueueTimer _countdownTimer;
     private XamlRoot? _xamlRoot;
     private bool _attached;
     private bool _closing;
@@ -72,9 +77,17 @@ public sealed partial class FloatingPillWindow : Window
         _blinkTimer = DispatcherQueue.CreateTimer();
         _blinkTimer.Interval = BlinkInterval;
         _blinkTimer.Tick += (_, _) => Blink();
+        _countdownTimer = DispatcherQueue.CreateTimer();
+        _countdownTimer.Interval = CountdownInterval;
+        _countdownTimer.Tick += (_, _) => UpdateCountdown();
 
         PauseButton.Click += (_, _) => _ = _model.TogglePauseAsync();
         StopButton.Click += (_, _) => _ = _model.StopRecordingAsync();
+        RecordPromptButton.Click += (_, _) => _model.RecordDetectedMeeting();
+        NotNowButton.Click += (_, _) => _model.DismissMeetingPrompt();
+        AlwaysButton.Click += (_, _) => _model.RecordDetectedMeeting(always: true);
+        KeepRecordingButton.Click += (_, _) => _model.KeepRecording();
+        StopNowButton.Click += (_, _) => _model.StopFromEndPrompt();
         LanguageMenu.Opening += (_, _) =>
         {
             // At once, not at Opened: a hand-back queued by the button's release must not close the menu.
@@ -124,6 +137,7 @@ public sealed partial class FloatingPillWindow : Window
         _model.PropertyChanged -= OnModelChanged;
         _blinkTimer.Stop();
         _collapseTimer.Stop();
+        _countdownTimer.Stop();
         _hovering = false;
         _dragging = false;
         if (!_closing)
@@ -156,9 +170,10 @@ public sealed partial class FloatingPillWindow : Window
         var prompt = _model.PillPrompt;
         Indicator.Visibility = prompt is null ? Visibility.Visible : Visibility.Collapsed;
         PromptHost.Visibility = prompt is null ? Visibility.Collapsed : Visibility.Visible;
-        // Prompts keep one size (Phase 20 fills PromptHost).
+        // Prompts keep one size.
         ApplyScale(prompt is null ? Scale(_model.Settings.PillSize) : 1);
         Capsule.Height = prompt is null ? 28 * _scale : double.NaN;
+        ShowPrompt(prompt);
         if (prompt is not null)
         {
             UpdateBlink(false);
@@ -195,6 +210,69 @@ public sealed partial class FloatingPillWindow : Window
         PauseIcon.Glyph = paused ? ResumeGlyph : PauseGlyph;
         AutomationProperties.SetName(PauseButton, Loc.T(paused ? "Resume" : "Pause"));
         ToolTipService.SetToolTip(PauseButton, Loc.T(paused ? "Resume recording" : "Pause recording"));
+    }
+
+    /// <summary>The prompt's question, countdown and buttons (macOS detectedPrompt and endPrompt).</summary>
+    private void ShowPrompt(PillPrompt? prompt)
+    {
+        switch (prompt)
+        {
+            case PillPrompt.MeetingDetected detected:
+                var name = detected.Meeting.Name;
+                RecordingCard.SetText(PromptText, Loc.Format("%@ call detected — Record?", name));
+                CountdownText.Visibility = Visibility.Collapsed;
+                RecordPromptButton.Visibility = NotNowButton.Visibility = Visibility.Visible;
+                // Not for browsers: any web page using the mic would start a recording.
+                AlwaysButton.Visibility = detected.Meeting.App.IsBrowser ? Visibility.Collapsed : Visibility.Visible;
+                AlwaysButton.Content = Loc.Format("Always for %@", name);
+                KeepRecordingButton.Visibility = StopNowButton.Visibility = Visibility.Collapsed;
+                _countdownTimer.Stop();
+                break;
+            case PillPrompt.MeetingEnded ended:
+                RecordingCard.SetText(PromptText, Question(ended.Reason));
+                CountdownText.Visibility = Visibility.Visible;
+                RecordPromptButton.Visibility = NotNowButton.Visibility = AlwaysButton.Visibility = Visibility.Collapsed;
+                KeepRecordingButton.Visibility = StopNowButton.Visibility = Visibility.Visible;
+                UpdateCountdown();
+                if (!_countdownTimer.IsRunning) _countdownTimer.Start();
+                break;
+            default:
+                _countdownTimer.Stop();
+                break;
+        }
+    }
+
+    /// <summary>"Stopping in N s", the seconds left rounded up.</summary>
+    private void UpdateCountdown()
+    {
+        if (_closing || _model.PillPrompt is not PillPrompt.MeetingEnded ended)
+        {
+            _countdownTimer.Stop();
+            return;
+        }
+        var left = Math.Max(0, (int)Math.Ceiling((ended.Deadline - DateTimeOffset.Now).TotalSeconds));
+        RecordingCard.SetText(CountdownText, Loc.Format("Stopping in %lld s", left));
+    }
+
+    /// <summary>
+    /// The end prompt's question (macOS <c>question(for:)</c>; plain strings there, so English here: not in the
+    /// catalog).
+    /// </summary>
+    private string Question(MeetingEndMonitor.Reason reason)
+    {
+        var app = _model.RecordingSourceName ?? Loc.T("The app");
+        return reason switch
+        {
+            MeetingEndMonitor.Reason.SourceExited => Loc.Format("%@ quit — stop recording?", app),
+            MeetingEndMonitor.Reason.SourceInactive => Loc.Format("%@ stopped using audio — stop recording?", app),
+            MeetingEndMonitor.Reason.CallEnded => Loc.T("The call seems to be over — stop recording?"),
+            MeetingEndMonitor.Reason.Silence => Loc.Format(
+                "No sound for %lld min — stop recording?",
+                Math.Clamp(_model.Settings.EndMonitor.SilenceMinutes, MeetingEndMonitorConfiguration.SilenceRange.Min, MeetingEndMonitorConfiguration.SilenceRange.Max)),
+            MeetingEndMonitor.Reason.ScreenLocked => Loc.T("Screen locked — stop recording?"),
+            MeetingEndMonitor.Reason.InputRouteLost => Loc.T("Microphone disconnected — stop recording?"),
+            _ => Loc.T("Stop recording?"),
+        };
     }
 
     /// <summary>The louder channel's peak (macOS PillMeter), from the levels the model reads at 15 Hz.</summary>
@@ -442,6 +520,7 @@ public sealed partial class FloatingPillWindow : Window
         Detach();
         _collapseTimer.Stop();
         _blinkTimer.Stop();
+        _countdownTimer.Stop();
         RootCanvas.PointerEntered -= OnPointerEntered;
         RootCanvas.PointerExited -= OnPointerExited;
         Capsule.PointerPressed -= OnPointerPressed;

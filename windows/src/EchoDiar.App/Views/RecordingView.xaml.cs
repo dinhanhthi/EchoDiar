@@ -1,4 +1,5 @@
 using System.ComponentModel;
+using EchoDiar.App.Services;
 using EchoDiar.App.ViewModels;
 using EchoDiar.Core.Audio;
 using Microsoft.UI.Xaml;
@@ -45,6 +46,7 @@ public sealed partial class RecordingView : UserControl
         GlobalTapWarning.Message = Loc.T("This app's audio cannot be isolated, so all system audio is being recorded.");
         AutomationProperties.SetName(MicMeter, Loc.Format("%@ level", "Mic"));
         AutomationProperties.SetName(SystemMeter, Loc.Format("%@ level", "System"));
+        OpenSettingsLink.Click += (_, _) => OpenReasonSettings();
         Loaded += (_, _) =>
         {
             _model.PropertyChanged += OnModelChanged;
@@ -122,6 +124,15 @@ public sealed partial class RecordingView : UserControl
             : !settings.TranscribeWhileRecording
                 ? Loc.T("Transcribe while recording is off. Turn it on in Settings › Transcription.")
                 : Loc.T("This engine transcribes after Stop. Whisper and Parakeet models also transcribe while recording.");
+    }
+
+    /// <summary>The Settings page the reason names (macOS <c>openReasonSettings</c>).</summary>
+    private void OpenReasonSettings()
+    {
+        var settings = _model.Settings;
+        if (!settings.AutoTranscribe) _model.OpenSettings(SettingsSearch.Recording, RecordingSettingsPage.AfterRecordingTab);
+        else if (!settings.TranscribeWhileRecording) _model.OpenSettings(SettingsSearch.Transcription, TranscriptionSettingsPage.GeneralTab);
+        else _model.OpenSettings(SettingsSearch.Transcription, TranscriptionSettingsPage.TranscriptionModelsTab);
     }
 
     private void OnTick()
