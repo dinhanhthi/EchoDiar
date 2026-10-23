@@ -16,7 +16,7 @@ struct GlobalChatView: View {
     @State private var chatTitle: String?
     @State private var question = ""
     @FocusState private var questionFocused: Bool
-    @State private var toast: String?
+    @State private var toast: LocalizedStringKey?
     /// Hides the toast 2 s after it shows; replaced by each new toast.
     @State private var toastTask: Task<Void, Never>?
     /// A web link from model output, opened only once its destination is confirmed.
@@ -300,7 +300,7 @@ struct GlobalChatView: View {
         VStack(alignment: .leading, spacing: 2) {
             // The title may come from a model: plain text, never Markdown.
             Text(chatTitle ?? chat.first { $0.role == .user }?.text ?? String(localized: "New chat")).lineLimit(2)
-            (chat.isEmpty ? Text("Current") : Text("Current") + Text(verbatim: " · ") + Text("\(chat.count) messages"))
+            (chat.isEmpty ? Text("Current") : Text("Current · \(chat.count) messages"))
                 .font(.caption)
                 .foregroundStyle(.secondary)
         }
@@ -456,10 +456,9 @@ struct GlobalChatView: View {
     /// A job of a conversation: it blocks asking until it ends, so it says what runs and can be stopped from here.
     @ViewBuilder private var busyElsewhere: some View {
         if let job = model.aiJob, let id = job.conversationID {
-            let title = model.conversations.first { $0.id == id }?.title ?? "another conversation"
             HStack(spacing: 6) {
                 ProgressView().controlSize(.small)
-                Text(job.kind == .summary ? "Summarizing \(title)…" : "Answering about \(title)…")
+                busyText(job, conversationID: id)
                     .lineLimit(1)
                     .truncationMode(.middle)
                 Spacer(minLength: 0)
@@ -469,6 +468,15 @@ struct GlobalChatView: View {
             .font(.caption)
             .foregroundStyle(.secondary)
         }
+    }
+
+    /// What `job` does, in a whole sentence; a conversation no longer in the library is "another conversation".
+    private func busyText(_ job: AppModel.AIJob, conversationID id: UUID) -> Text {
+        if let title = model.conversations.first(where: { $0.id == id })?.title {
+            return job.kind == .summary ? Text("Summarizing \(title)…") : Text("Answering about \(title)…")
+        }
+        return job.kind == .summary ? Text("Summarizing another conversation…")
+            : Text("Answering about another conversation…")
     }
 
     /// While the index is built or still empty: how far it is, or why it waits. Asking stays allowed (the answer uses
@@ -545,7 +553,7 @@ struct GlobalChatView: View {
     }
 
     /// Shows `text` for 2 s; a newer toast replaces it and gets its own 2 s.
-    private func showToast(_ text: String) {
+    private func showToast(_ text: LocalizedStringKey) {
         toastTask?.cancel()
         withAnimation(.snappy(duration: 0.2)) { toast = text }
         toastTask = Task {

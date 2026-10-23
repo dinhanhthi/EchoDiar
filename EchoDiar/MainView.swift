@@ -200,7 +200,7 @@ struct MainView: View {
             Button("Send") { model.resolvePendingCloudRuns(allowed: true) }
             Button("Cancel", role: .cancel) { model.resolvePendingCloudRuns(allowed: false) }
         } message: {
-            Text("Audio leaves this Mac: the recording's mic and system channels are uploaded to \(model.pendingCloudRuns.first?.providerName ?? "the provider") (\(model.pendingCloudRuns.first?.host ?? "")) for transcription and billed by them. The provider may keep the audio under its own retention policy. You are asked once per provider and destination.")
+            Text("Audio leaves this Mac: the recording's mic and system channels are uploaded to \(model.pendingCloudRuns.first?.providerName ?? String(localized: "the provider")) (\(model.pendingCloudRuns.first?.host ?? "")) for transcription and billed by them. The provider may keep the audio under its own retention policy. You are asked once per provider and destination.")
         }
     }
 
@@ -267,8 +267,13 @@ struct MainView: View {
                 if !model.targetGroups.isEmpty {
                     Divider()
                     ForEach(model.targetGroups, id: \.bundleID) { group in
-                        Toggle(group.needsGlobalTap ? "\(group.name) (records all system audio)" : group.name,
-                               isOn: targetBinding(.app(group)))
+                        Toggle(isOn: targetBinding(.app(group))) {
+                            if group.needsGlobalTap {
+                                Text("\(group.name) (records all system audio)")
+                            } else {
+                                Text(verbatim: group.name)
+                            }
+                        }
                     }
                 }
                 Divider()
@@ -492,7 +497,7 @@ struct MainView: View {
 
     private var targetName: String {
         if case .app(let group) = model.selectedTarget { return group.name }
-        return "All system audio"
+        return String(localized: "All system audio")
     }
 
     /// The page switches.

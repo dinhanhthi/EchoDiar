@@ -102,7 +102,7 @@ struct ModelsSettingsView: View {
         ForEach(ModelEntry.Tier.allCases, id: \.self) { tier in
             let entries = Self.entries.filter { $0.kind == kind && $0.tier == tier }
             if !entries.isEmpty {
-                Section(tier.rawValue.capitalized) {
+                Section(ModelRow.tierTitle(tier)) {
                     ForEach(entries) { ModelRow(entry: $0, model: model) }
                 }
             }
@@ -199,22 +199,23 @@ struct ModelRow: View {
                     .lineLimit(1)
                     .truncationMode(.tail)
                     .help(entry.displayName)
-                if isDefault { Badge(text: "Default", color: .accentColor, filled: true) }
+                if isDefault { Badge(text: String(localized: "Default"), color: .accentColor, filled: true) }
                 Spacer(minLength: 8)
                 actions
             }
             HStack(spacing: 4) {
-                Badge(text: entry.tier.rawValue.capitalized, color: Self.tierColor(entry.tier))
-                if entry.kind == .diarization { Badge(text: "Speakers") }
+                Badge(text: Self.tierTitle(entry.tier), color: Self.tierColor(entry.tier))
+                if entry.kind == .diarization { Badge(text: String(localized: "Speakers")) }
                 if entry.repo == nil {
-                    Badge(text: "System")
+                    Badge(text: String(localized: "System"))
                 } else {
                     Badge(text: Self.sizeText(entry.diskMB))
-                    Badge(text: (entry.ramIsEstimate ? "~" : "") + Self.ramText(entry.ramMB) + " RAM")
+                    let ram = (entry.ramIsEstimate ? "~" : "") + Self.ramText(entry.ramMB)
+                    Badge(text: String(localized: "\(ram) RAM"))
                 }
                 Badge(text: Self.languagesText(entry.languages))
                 Badge(text: entry.license)
-                Badge(text: "macOS \(entry.minimumMacOS)+")
+                Badge(text: String(localized: "macOS \(entry.minimumMacOS)+"))
             }
             notes
             if let unsupportedNote {
@@ -255,7 +256,7 @@ struct ModelRow: View {
         guard (!supported.isEmpty && !supported.contains(primary)) || !entry.isSelectable(for: language) else {
             return nil
         }
-        return "No \(LanguageOptions.name(primary))"
+        return String(localized: "No \(LanguageOptions.name(primary))", comment: "A model that cannot transcribe the language, e.g. No Vietnamese")
     }
 
     @ViewBuilder private var actions: some View {
@@ -308,7 +309,11 @@ struct ModelRow: View {
         VStack(alignment: .leading, spacing: 4) {
             Text("System model — language assets installed on demand. Auto uses the default language (no language detection).")
             HStack {
-                Text("Reserved by EchoDiar: \(reserved.isEmpty ? "none" : reserved.joined(separator: ", "))")
+                if reserved.isEmpty {
+                    Text("Reserved by EchoDiar: none")
+                } else {
+                    Text("Reserved by EchoDiar: \(reserved.joined(separator: ", "))")
+                }
                 Spacer(minLength: 8)
                 Button("Remove language assets") { model.releaseAppleSpeechAssets() }
                     .controlSize(.small)
@@ -324,7 +329,9 @@ struct ModelRow: View {
     /// The speaker model's quality does not depend on the language: its English note says so.
     @ViewBuilder private var notes: some View {
         let notes = entry.qualityNotes
-        let rated = [("English", notes.en), ("French", notes.fr), ("Vietnamese", notes.vi)].filter { !$0.1.isEmpty }
+        let rated = [("en", notes.en), ("fr", notes.fr), ("vi", notes.vi)]
+            .filter { !$0.1.isEmpty }
+            .map { (LanguageOptions.name($0.0), $0.1) }
         Group {
             if entry.kind == .diarization {
                 if !notes.en.isEmpty { Text(notes.en) }
@@ -351,6 +358,14 @@ struct ModelRow: View {
             .joined(separator: " · ")
     }
 
+    static func tierTitle(_ tier: ModelEntry.Tier) -> String {
+        switch tier {
+        case .fast: String(localized: "Fast")
+        case .balanced: String(localized: "Balanced")
+        case .quality: String(localized: "Quality")
+        }
+    }
+
     /// Fast is orange (speed), balanced teal, quality purple (best output); none is the accent blue of Default.
     private static func tierColor(_ tier: ModelEntry.Tier) -> Color {
         switch tier {
@@ -361,21 +376,21 @@ struct ModelRow: View {
     }
 
     static func sizeText(_ mib: Int) -> String {
-        mib < 1024 ? "\(mib) MiB" : String(format: "%.1f GB", Double(mib) / 1024)
+        mib < 1024 ? String(localized: "\(mib) MiB") : String(localized: "\(String(format: "%.1f", Double(mib) / 1024)) GB")
     }
 
     private static func ramText(_ mb: Int) -> String {
-        mb < 1024 ? "\(mb) MB" : String(format: "%.1f GB", Double(mb) / 1024)
+        mb < 1024 ? String(localized: "\(mb) MB") : String(localized: "\(String(format: "%.1f", Double(mb) / 1024)) GB")
     }
 
     private static func languagesText(_ languages: ModelEntry.Languages) -> String {
         switch languages {
         case .multilingual:
-            "Multilingual"
+            String(localized: "Multilingual")
         case .codes(let codes) where codes.count == 1:
-            Locale(identifier: "en").localizedString(forLanguageCode: codes[0]) ?? codes[0]
+            LanguageOptions.name(codes[0])
         case .codes(let codes):
-            "\(codes.count) languages"
+            String(localized: "\(codes.count) languages")
         }
     }
 }
@@ -391,7 +406,7 @@ private struct CloudEngineRow: View {
 
     /// Approximate pay-as-you-go prices per audio hour (docs/research/asr-diarization-models.md F, 2026-10-18).
     private static let prices: [String: String] = [
-        "openai": "~$0.36/h", "groq": "~$0.04/h", "mistral": "~$0.18/h", "gemini": "~$0.23/h + output",
+        "openai": "~$0.36/h", "groq": "~$0.04/h", "mistral": "~$0.18/h", "gemini": "~$0.23/h",
         "elevenlabs": "~$0.22/h", "deepgram": "~$0.26/h", "assemblyai": "~$0.23/h",
     ]
 
@@ -413,7 +428,9 @@ private struct CloudEngineRow: View {
                 Text(configured ? name : config.displayName)
                     .lineLimit(1)
                     .truncationMode(.tail)
-                if configured && defaultID == engineID { Badge(text: "Default", color: .accentColor, filled: true) }
+                if configured && defaultID == engineID {
+                    Badge(text: String(localized: "Default"), color: .accentColor, filled: true)
+                }
                 Spacer(minLength: 8)
                 if !configured {
                     Button("Set Up…", action: setUp)
@@ -425,8 +442,12 @@ private struct CloudEngineRow: View {
                 }
             }
             HStack(spacing: 4) {
-                Badge(text: "Cloud")
-                if let price = config.preset.flatMap({ Self.prices[$0] }) { Badge(text: price + " (approx.)") }
+                Badge(text: String(localized: "Cloud"))
+                if let price = config.preset.flatMap({ Self.prices[$0] }) {
+                    // Gemini also bills its output.
+                    Badge(text: config.preset == "gemini" ? String(localized: "\(price) + output (approx.)")
+                          : String(localized: "\(price) (approx.)"))
+                }
             }
             if config.preset == "gemini" {
                 Text(diarization
@@ -499,7 +520,7 @@ private struct CloudModelField: View {
                         : Self.knownModels[config.preset ?? ""] ?? []
                     let choices = Self.unique(known + (loaded ?? []))
                     if !choices.isEmpty {
-                        Menu("\(choices.count) model\(choices.count == 1 ? "" : "s")") {
+                        Menu("\(choices.count) models") {
                             ForEach(choices, id: \.self) { id in
                                 Button(id) { setModel(id) }
                             }
@@ -537,10 +558,10 @@ private struct CloudModelField: View {
     private var prompt: String {
         if diarization {
             let fallback = CloudTranscription.defaultDiarizationModel(for: config)
-            return fallback.isEmpty ? "Diarization model id" : fallback
+            return fallback.isEmpty ? String(localized: "Diarization model id") : fallback
         }
         let fallback = CloudTranscription.defaultModel(for: config)
-        return fallback.isEmpty ? "Transcription model id, e.g. whisper-1" : fallback
+        return fallback.isEmpty ? String(localized: "Transcription model id, e.g. whisper-1") : fallback
     }
 
     private func setModel(_ id: String) {

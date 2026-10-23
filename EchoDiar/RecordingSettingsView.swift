@@ -111,11 +111,11 @@ struct RecordingSettingsView: View {
                 value: model.setting(\.endMonitor.callEndedSeconds),
                 range: MeetingEndMonitor.Configuration.callEndedRange)
             NumberRow(
-                title: "Stop after silence of", unit: "min",
+                title: "Stop after silence of", unit: String(localized: "min"),
                 value: model.setting(\.endMonitor.silenceMinutes),
                 range: MeetingEndMonitor.Configuration.silenceRange)
             NumberRow(
-                title: "Stop after a recording length of", unit: "min",
+                title: "Stop after a recording length of", unit: String(localized: "min"),
                 value: model.setting(\.endMonitor.maxDurationMinutes),
                 range: MeetingEndMonitor.Configuration.maxDurationRange)
         } header: {
@@ -185,7 +185,7 @@ struct SpeakerCountPicker: View {
 
 /// A whole number typed or stepped within `range`.
 struct NumberRow: View {
-    let title: String
+    let title: LocalizedStringKey
     let unit: String
     @Binding var value: Int
     let range: ClosedRange<Int>

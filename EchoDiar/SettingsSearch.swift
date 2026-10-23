@@ -15,7 +15,7 @@ struct SettingsSearchItem: Identifiable {
     func matches(_ term: String) -> Bool {
         let term = term.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !term.isEmpty else { return false }
-        let texts = [String(localized: title), tab.label.title, subTabTitle].compactMap { $0 } + keywords
+        let texts = [String(localized: title), String(localized: tab.label.title), subTabTitle].compactMap { $0 } + keywords
         return texts.contains { $0.localizedStandardContains(term) }
     }
 
@@ -23,7 +23,7 @@ struct SettingsSearchItem: Identifiable {
     var path: String {
         let title = String(localized: title)
         let subTab = subTabTitle == title ? nil : subTabTitle
-        return [tab.label.title, subTab, title].compactMap { $0 }.joined(separator: " › ")
+        return [String(localized: tab.label.title), subTab, title].compactMap { $0 }.joined(separator: " › ")
     }
 
     /// The title of the inner tab `subTab`, as the toolbar shows it.
@@ -36,6 +36,7 @@ struct SettingsSearchItem: Identifiable {
     @MainActor static let all: [SettingsSearchItem] = [
         // General
         .init(title: "Launch at login", keywords: ["startup", "login item", "open at login"], tab: .general),
+        .init(title: "App language", keywords: ["language", "locale", "interface", "relaunch"], tab: .general),
         .init(title: "Show floating indicator while recording", keywords: ["pill", "overlay", "floating"], tab: .general),
         .init(title: "Hide it while an EchoDiar window is in front",
               keywords: ["floating indicator", "pill", "hide"], tab: .general),
@@ -138,7 +139,8 @@ struct SettingsSearchItem: Identifiable {
         .init(title: "Global record shortcut", keywords: ["hotkey", "keyboard", "record from any app"], tab: .shortcuts),
         .init(title: "Global pause shortcut", keywords: ["hotkey", "keyboard", "pause", "resume"], tab: .shortcuts),
         .init(title: "In EchoDiar", keywords: ["keyboard shortcuts", "keys"]
-              + ShortcutsSettingsView.inAppShortcuts.map(\.action), tab: .shortcuts),
+              + ShortcutsSettingsView.inAppShortcuts.flatMap { [$0.action.key, String(localized: $0.action)] },
+              tab: .shortcuts),
 
         // About
         .init(title: "Version", keywords: ["about", "build", "update"], tab: .about),
@@ -167,7 +169,7 @@ struct SettingsSearchResults: View {
         let items = SettingsSearchItem.all.filter { $0.matches(query) }
         Group {
             if items.isEmpty {
-                Text(emptyText)
+                Text("No settings match \"\(query.trimmingCharacters(in: .whitespacesAndNewlines))\"")
                     .foregroundStyle(.secondary)
                     .multilineTextAlignment(.center)
                     .padding(.horizontal, 20)
@@ -188,10 +190,6 @@ struct SettingsSearchResults: View {
             }
         }
         .background(WindowGlass().ignoresSafeArea())
-    }
-
-    private var emptyText: String {
-        "No settings match \"\(query.trimmingCharacters(in: .whitespacesAndNewlines))\""
     }
 
     private func row(_ item: SettingsSearchItem) -> some View {

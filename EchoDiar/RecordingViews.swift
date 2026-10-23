@@ -292,18 +292,22 @@ struct ChannelMeters: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 3) {
-            bar("Mic", feed.mic)
-            bar("System", feed.system)
+            bar("Mic", accessibilityLabel: "Mic level", feed.mic)
+            // Shares the "System" key with the App language picker: the word translates the same in every language.
+            bar("System", accessibilityLabel: "System audio level", feed.system)
         }
         .frame(width: 110)
         .task { await feed.attach() }
     }
 
-    private func bar(_ name: String, _ level: Float) -> some View {
+    private func bar(_ name: LocalizedStringKey, accessibilityLabel: LocalizedStringKey,
+                     _ level: Float) -> some View {
         HStack(spacing: 6) {
             Text(name)
                 .font(.caption2)
                 .foregroundStyle(.secondary)
+                .lineLimit(1)
+                .minimumScaleFactor(0.75)
                 .frame(width: 38, alignment: .leading)
             GeometryReader { proxy in
                 ZStack(alignment: .leading) {
@@ -314,7 +318,7 @@ struct ChannelMeters: View {
             .frame(height: 5)
         }
         .accessibilityElement(children: .ignore)
-        .accessibilityLabel("\(name) level")
+        .accessibilityLabel(accessibilityLabel)
         .accessibilityValue("\(Int((LevelFeed.fraction(level) * 100).rounded())) percent")
     }
 }
