@@ -433,6 +433,8 @@ public sealed class AIService(ModelLoadGate gate)
                 await foreach (var piece in backend.Remote!.StreamAsync(messages, model, maxTokens, cancellationToken))
                 {
                     streamed.Append(piece);
+                    if (streamed.Length > MaxAnswerLength)
+                        throw LLMException.Provider("The answer is longer than 1,000,000 characters.");
                     yield?.Invoke(AIUpdate.Text(piece));
                 }
             }
@@ -447,6 +449,12 @@ public sealed class AIService(ModelLoadGate gate)
         if (answer.Length == 0) throw LLMException.Provider("The model returned an empty answer.");
         return answer;
     }
+
+    /// <summary>
+    /// The longest answer kept from a provider, in characters: answers are capped at 8192 tokens (well under 100K
+    /// characters), so only a host that floods small lines reaches it.
+    /// </summary>
+    internal const int MaxAnswerLength = 1_000_000;
 
     /// <summary>The 20% of the context <see cref="TranscriptChunker"/> keeps for the answer, from 512 to 8192 tokens.</summary>
     internal static int MaxTokens(int context) =>

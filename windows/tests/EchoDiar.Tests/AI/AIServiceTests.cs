@@ -59,6 +59,28 @@ public sealed class AIServiceTests : IDisposable
         public ValueTask<int> ContextWindowAsync(string model, CancellationToken cancellationToken = default) => new(context);
     }
 
+    /// <summary>Sends 64K-character pieces without end.</summary>
+    private sealed class FloodingProvider : ILLMProvider
+    {
+        public async IAsyncEnumerable<string> StreamAsync(
+            IReadOnlyList<LLMMessage> messages, string model, int maxTokens,
+            [EnumeratorCancellation] CancellationToken cancellationToken = default)
+        {
+            var piece = new string('x', 65_536);
+            while (true)
+            {
+                await Task.Yield();
+                cancellationToken.ThrowIfCancellationRequested();
+                yield return piece;
+            }
+        }
+
+        public Task<IReadOnlyList<string>> ListModelsAsync(CancellationToken cancellationToken = default) =>
+            Task.FromResult<IReadOnlyList<string>>(["fake"]);
+
+        public ValueTask<int> ContextWindowAsync(string model, CancellationToken cancellationToken = default) => new(128_000);
+    }
+
     /// <summary>
     /// An in-app model whose generation sends one piece, then waits until cancelled and returns normally; its unload
     /// takes a moment.
@@ -234,6 +256,47 @@ public sealed class AIServiceTests : IDisposable
         Assert.Equal([ChatRole.User, ChatRole.Assistant], messages.Select(m => m.Role));
         Assert.Equal(["What was decided?", "Ship on Friday"], messages.Select(m => m.Text));
         Assert.Equal("fake", messages[^1].Provider);
+    }
+
+    // Cancelling the caller's token (not Stop) ends a remote job with OperationCanceledException and saves nothing.
+    [Fact]
+    public async Task CancelledRemoteQuestionThrowsAndSavesNothing()
+    {
+        var conversation = MakeConversation();
+        var service = new AIService(new ModelLoadGate());
+        using var cancel = CancellationTokenSource.CreateLinkedTokenSource(Ct);
+
+        var error = await Record.ExceptionAsync(async () =>
+        {
+            await foreach (var update in service.Ask(
+                "What was decided?", conversation, MakeTranscript(3), summary: null, history: [], historyLimit: 10,
+                new StallingProvider("Ship on Friday "), providerID: "fake", model: "fake", language: "en",
+                cancellationToken: cancel.Token))
+            {
+                if (update.Kind == AIUpdateKind.Text) await cancel.CancelAsync();
+            }
+        });
+
+        Assert.IsAssignableFrom<OperationCanceledException>(error);
+        Assert.Empty(ChatLog.Read(conversation.Folder).Messages);
+    }
+
+    // A host that floods small pieces cannot grow an answer without limit.
+    [Fact]
+    public async Task EndlessAnswerFails()
+    {
+        var conversation = MakeConversation();
+        var service = new AIService(new ModelLoadGate());
+
+        var error = await Assert.ThrowsAsync<LLMException>(async () =>
+        {
+            await foreach (var _ in service.Ask(
+                "What was decided?", conversation, MakeTranscript(3), summary: null, history: [], historyLimit: 10,
+                new FloodingProvider(), providerID: "fake", model: "fake", language: "en", cancellationToken: Ct)) { }
+        });
+
+        Assert.Equal(LLMErrorKind.Provider, error.Kind);
+        Assert.Empty(ChatLog.Read(conversation.Folder).Messages);
     }
 
     [Theory]

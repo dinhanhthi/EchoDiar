@@ -91,7 +91,8 @@ public sealed class ProviderStreamTests
         }
     }
 
-    // An echoed key must never reach the error text (UI, logs), on the streaming and the JSON path; the body is cut at 2 KB.
+    // An echoed key must never reach the error text (UI, logs), on the streaming and the JSON path; the body is redacted,
+    // then cut at 2048 characters.
     [Theory]
     [InlineData(true)]
     [InlineData(false)]
@@ -113,7 +114,82 @@ public sealed class ProviderStreamTests
         Assert.Equal(401, error.StatusCode);
         Assert.DoesNotContain(Key, error.Message);
         Assert.DoesNotContain(Key, error.Body);
-        Assert.Equal(body[..2048].Replace($"Bearer {Key}", "[redacted]").Replace(Key, "[redacted]"), error.Body);
+        Assert.Equal(body.Replace($"Bearer {Key}", "[redacted]").Replace(Key, "[redacted]")[..2048], error.Body);
+    }
+
+    // A key across the 2048-character cut is read whole and redacted, not kept as a long prefix.
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public async Task KeyAcrossTheCutIsRedacted(bool streaming)
+    {
+        var body = new string('x', 2040) + Key + new string('x', 3000);
+        var provider = Provider(Config("openai", "openai.stub"), new FakeHandler(_ => Respond(401, body)));
+
+        var error = await ThrowsFrom(provider, streaming);
+
+        Assert.DoesNotContain(Key[..6], error.Body);
+        Assert.Equal(new string('x', 2040) + "[redacte", error.Body);
+    }
+
+    // Extra-header values (8+ characters) are keys too, and a key echoed JSON-escaped (\/, \", \\) is redacted as well.
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public async Task ExtraHeaderValuesAndEscapedKeysAreRedacted(bool streaming)
+    {
+        const string key = """sk/te"st\x-1234""";
+        const string escaped = """sk/te\"st\\x-1234""";
+        var config = Config("openai", "openai.stub");
+        config.ExtraHeaders = new() { ["X-Gateway-Token"] = "gw-token-abcdef12", ["X-Flag"] = "on" };
+        var body = $$$"""{"error":{"message":"bad {{{escaped}}} / {{{escaped.Replace("/", "\\/")}}} / gw-token-abcdef12 / on"}}""";
+        var provider = new OpenAICompatibleClient(config, key, new FakeHandler(_ => Respond(401, body)));
+
+        var error = await ThrowsFrom(provider, streaming);
+
+        Assert.Equal("""{"error":{"message":"bad [redacted] / [redacted] / [redacted] / on"}}""", error.Body);
+    }
+
+    // An error the provider reports inside a 200 stream is redacted and cut like an error body.
+    [Theory]
+    [InlineData("openai", """data: {"error":{"message":"MESSAGE"}}""")]
+    [InlineData("anthropic", """data: {"type":"error","error":{"type":"overloaded_error","message":"MESSAGE"}}""")]
+    [InlineData("ollama", """{"error":"MESSAGE"}""")]
+    public async Task InStreamErrorIsRedactedAndCut(string preset, string line)
+    {
+        var body = line.Replace("MESSAGE", $"Bad key {Key} ({Key})" + new string('x', 3000)) + "\n\n";
+        var config = Config(preset, preset + ".stub");
+        config.AuthStyle = AuthStyle.Bearer; // Ollama sends no key by default.
+        var provider = Provider(config, new FakeHandler(_ => Respond(200, body)));
+
+        var error = await ThrowsFrom(provider, streaming: true);
+
+        Assert.Equal(LLMErrorKind.Provider, error.Kind);
+        Assert.Equal(("Bad key [redacted] ([redacted])" + new string('x', 3000))[..2048], error.Message);
+    }
+
+    // A host that never ends its line cannot grow memory without limit: the stream fails at 4 MB.
+    [Fact]
+    public async Task EndlessLineFails()
+    {
+        var provider = Provider(Config("openai", "openai.stub"),
+            new FakeHandler(_ => new HttpResponseMessage(HttpStatusCode.OK) { Content = new StreamContent(new EndlessStream()) }));
+
+        var error = await ThrowsFrom(provider, streaming: true);
+
+        Assert.Equal(LLMErrorKind.Provider, error.Kind);
+    }
+
+    // A JSON response is read up to 32 MB, not without limit.
+    [Fact]
+    public async Task OversizeJsonFails()
+    {
+        var provider = Provider(Config("openai", "openai.stub"),
+            new FakeHandler(_ => new HttpResponseMessage(HttpStatusCode.OK) { Content = new StreamContent(new EndlessStream()) }));
+
+        var error = await ThrowsFrom(provider, streaming: false);
+
+        Assert.Equal(LLMErrorKind.Provider, error.Kind);
     }
 
     // A cross-origin redirect is refused (the 3xx is the error, nothing reaches the other host); a same-origin one is
@@ -216,6 +292,18 @@ public sealed class ProviderStreamTests
         Assert.Equal(["load", "unload"], local.Events);
     }
 
+    /// <summary>The error of a stream (or of a model list, when not <paramref name="streaming"/>).</summary>
+    private static Task<LLMException> ThrowsFrom(ILLMProvider provider, bool streaming) =>
+        Assert.ThrowsAsync<LLMException>(async () =>
+        {
+            if (!streaming)
+            {
+                await provider.ListModelsAsync(TestContext.Current.CancellationToken);
+                return;
+            }
+            await foreach (var _ in provider.StreamAsync([new(LLMRole.User, "x")], "m", 10, TestContext.Current.CancellationToken)) { }
+        });
+
     private static ProviderConfig Config(string preset, string host)
     {
         var config = ProviderConfig.Presets().Single(p => p.Id == preset);
@@ -244,6 +332,26 @@ public sealed class ProviderStreamTests
             var response = await respond(request);
             response.RequestMessage = request;
             return response;
+        }
+    }
+
+    /// <summary>A body of <c>x</c> without end (and without LF).</summary>
+    private sealed class EndlessStream : Stream
+    {
+        public override bool CanRead => true;
+        public override bool CanSeek => false;
+        public override bool CanWrite => false;
+        public override long Length => throw new NotSupportedException();
+        public override long Position { get => throw new NotSupportedException(); set => throw new NotSupportedException(); }
+        public override void Flush() { }
+        public override long Seek(long offset, SeekOrigin origin) => throw new NotSupportedException();
+        public override void SetLength(long value) => throw new NotSupportedException();
+        public override void Write(byte[] buffer, int offset, int count) => throw new NotSupportedException();
+
+        public override int Read(byte[] buffer, int offset, int count)
+        {
+            buffer.AsSpan(offset, count).Fill((byte)'x');
+            return count;
         }
     }
 

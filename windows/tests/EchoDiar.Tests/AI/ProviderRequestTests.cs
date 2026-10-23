@@ -133,6 +133,19 @@ public sealed class ProviderRequestTests
         Assert.Equal(LLMErrorKind.InvalidBaseUrl, error.Kind);
     }
 
+    // The message shows scheme, host, port and path only: user info and query may hold a key.
+    [Theory]
+    [InlineData("ftp://user:secret-pw@host.example:2121/v1?token=abc#frag", "\"ftp://host.example:2121/v1\" is not a valid http(s) base URL.")]
+    [InlineData("secret-pw not a url", "The base URL is not a valid http(s) URL.")]
+    public void InvalidBaseUrlMessageHidesUserInfoAndQuery(string baseURL, string message)
+    {
+        var config = Preset("openai");
+        config.BaseURL = baseURL;
+
+        var error = Assert.Throws<LLMException>(() => OpenAICompatibleClient.MakeRequest(config, Key, Messages, "m", 100));
+        Assert.Equal(message, error.Message);
+    }
+
     [Fact]
     public async Task OpenAICompatibleEmbeddingsRequestPostsModelAndInputs()
     {
