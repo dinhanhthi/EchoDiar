@@ -297,16 +297,20 @@ public sealed class ModelStore(string root, HttpClient http, Func<string, long>?
 
     /// <summary>
     /// Removes <c>Models/&lt;id&gt;/</c> and any partial download. The install is first renamed to <c>.old-&lt;id&gt;</c>,
-    /// so a delete that fails midway leaves no half-installed model.
+    /// so a delete that fails midway leaves no half-installed model. Waits for a <see cref="VerifiedFolder"/> hashing the
+    /// entry (its lock), whose open file Windows would refuse to move.
     /// </summary>
     public void Delete(ModelEntry entry)
     {
-        var old = OldFolder(entry);
-        if (Directory.Exists(old)) Directory.Delete(old, recursive: true);
-        if (Directory.Exists(Folder(entry))) Directory.Move(Folder(entry), old);
-        foreach (var folder in new[] { old, PartialFolder(entry) })
+        lock (_migrations.GetOrAdd(SafeId(entry), _ => new object()))
         {
-            if (Directory.Exists(folder)) Directory.Delete(folder, recursive: true);
+            var old = OldFolder(entry);
+            if (Directory.Exists(old)) Directory.Delete(old, recursive: true);
+            if (Directory.Exists(Folder(entry))) Directory.Move(Folder(entry), old);
+            foreach (var folder in new[] { old, PartialFolder(entry) })
+            {
+                if (Directory.Exists(folder)) Directory.Delete(folder, recursive: true);
+            }
         }
     }
 

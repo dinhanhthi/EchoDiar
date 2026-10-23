@@ -46,25 +46,35 @@ public sealed class NativeLlmSmokeTests
         var provider = new LlamaProvider(Qwen3Small.Id, ModelFile(folder, Qwen3Small));
 
         var pieces = 0;
-        var text = await provider.WithLoadedModelAsync(Qwen3Small.Id, generator => generator.GenerateAsync(
-            [new LLMMessage(LLMRole.User, "Reply with the word hello.")], MaxAnswerTokens, _ => pieces++, Token), Token);
+        GenerationStop? stop = null;
+        var text = await provider.WithLoadedModelAsync(Qwen3Small.Id, async generator =>
+        {
+            var answer = await generator.GenerateAsync(
+                [new LLMMessage(LLMRole.User, "Reply with the word hello.")], MaxAnswerTokens, _ => pieces++, Token);
+            stop = ((LlamaProvider.Generator)generator).LastStop;
+            return answer;
+        }, Token);
 
         NativeSmokeTests.Log($"qwen3-0.6b ({System.Runtime.InteropServices.RuntimeInformation.ProcessArchitecture}): "
-            + $"{pieces} pieces: {text}");
+            + $"{pieces} pieces, stop {stop}: {text}");
         Assert.True(pieces >= 1, "No token was generated.");
         Assert.NotEmpty(text);
-        AssertStopped("qwen3-0.6b", pieces);
+        AssertStopped("qwen3-0.6b", stop);
     }
 
     /// <summary>Room for a one-word answer and then some: an answer that fills it never met its end-of-turn token.</summary>
     private const int MaxAnswerTokens = 32;
 
     /// <summary>
-    /// The answer ended at the model's end-of-turn token, not at <see cref="MaxAnswerTokens"/>: each token gives at most
-    /// one piece, so fewer pieces than the limit means the loop stopped early.
+    /// The answer ended at the model's end-of-turn token, not at <see cref="MaxAnswerTokens"/> nor a full context: the
+    /// generator's own stop reason, as control tokens (a missed <c>&lt;|im_end|&gt;</c> followed by
+    /// <c>&lt;|im_start|&gt;</c>) decode to no visible piece.
     /// </summary>
-    private static void AssertStopped(string id, int pieces) =>
-        Assert.True(pieces < MaxAnswerTokens, $"{id} ran to {MaxAnswerTokens} tokens: no end of turn was detected.");
+    private static void AssertStopped(string id, GenerationStop? stop)
+    {
+        Assert.True(stop is { Reason: StopReason.EndOfTurn }, $"{id} stopped at {stop}: no end of turn was detected.");
+        Assert.True(stop.Value.Tokens < MaxAnswerTokens, $"{id} ran to {stop.Value.Tokens} tokens.");
+    }
 
     // The check after tokenization holds on its own: with no token texts broken first, a body holding a user-defined
     // token (Qwen's <think>, which llama.cpp matches even without special parsing) fails with the short error.
@@ -183,20 +193,23 @@ public sealed class NativeLlmSmokeTests
         var parameters = new ModelParams(path) { ContextSize = 8_192 };
         string text;
         var pieces = 0;
+        GenerationStop? stop;
         using (var weights = await LLamaWeights.LoadFromFileAsync(parameters, Token))
         {
             Assert.Equal(entry.ContextTokens, weights.ContextSize);
-            text = await new LlamaProvider.Generator(weights, parameters).GenerateAsync(
+            var generator = new LlamaProvider.Generator(weights, parameters);
+            text = await generator.GenerateAsync(
                 [new LLMMessage(LLMRole.System, "You are concise."), new LLMMessage(LLMRole.User, "Reply with the word hello.")],
                 MaxAnswerTokens, _ => pieces++, Token);
+            stop = generator.LastStop;
         }
         // The mapped file is released before the folder is deleted.
         GC.Collect();
         GC.WaitForPendingFinalizers();
         NativeSmokeTests.Log($"gguf {entry.Id}: answer in {clock.Elapsed.TotalSeconds:0} s ({entry.ContextTokens} trained, "
-            + $"{pieces} pieces): {text.ReplaceLineEndings(" ")}");
+            + $"{pieces} pieces, stop {stop}): {text.ReplaceLineEndings(" ")}");
         Assert.True(pieces >= 1, $"{entry.Id} generated no token.");
-        AssertStopped(entry.Id, pieces);
+        AssertStopped(entry.Id, stop);
         Assert.Contains("hello", text, StringComparison.OrdinalIgnoreCase);
     }
 

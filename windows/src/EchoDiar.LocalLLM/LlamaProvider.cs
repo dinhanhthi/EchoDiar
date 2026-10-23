@@ -56,11 +56,15 @@ public sealed class LlamaProvider(string entryID, string modelPath) : ILocalLLMP
     {
         private readonly LlamaPrompt _prompt = new(weights);
 
+        /// <summary>Why the last answer ended and how many tokens it took; null until one ends without an error.</summary>
+        internal GenerationStop? LastStop { get; private set; }
+
         /// <summary>Streams the answer through <paramref name="onText"/>; on cancel returns the text so far (22.3).</summary>
         public async Task<string> GenerateAsync(
             IReadOnlyList<LLMMessage> messages, int maxTokens, Action<string> onText,
             CancellationToken cancellationToken = default)
         {
+            LastStop = null;
             var prompt = _prompt.Tokens(messages).Select(t => t.Token).ToList();
             cancellationToken.ThrowIfCancellationRequested();
             using var context = weights.CreateContext(parameters);
@@ -71,18 +75,25 @@ public sealed class LlamaProvider(string entryID, string modelPath) : ILocalLLMP
             var decoder = new StreamingTokenDecoder(context);
             var batch = new LLamaBatch();
             var text = new StringBuilder();
+            var limit = maxTokens < 0 ? int.MaxValue : maxTokens;
+            var tokens = 0;
+            StopReason? reason = null;
             try
             {
                 var (prefill, _, past) = await context.DecodeAsync(prompt, LLamaSeqId.Zero, batch, 0, cancellationToken);
                 if (prefill != DecodeResult.Ok) throw LLMException.Provider($"llama.cpp could not read the prompt ({prefill}).");
-                var limit = maxTokens < 0 ? int.MaxValue : maxTokens;
                 // Ends at the model's end-of-turn token, maxTokens, cancellation or a full context.
                 for (var i = 0; i < limit && past < context.ContextSize; i++)
                 {
                     cancellationToken.ThrowIfCancellationRequested();
                     var token = sampling.Sample(context.NativeHandle, batch.TokenCount - 1);
-                    if (token.IsEndOfGeneration(weights.Vocab)) break;
+                    if (token.IsEndOfGeneration(weights.Vocab))
+                    {
+                        reason = StopReason.EndOfTurn;
+                        break;
+                    }
                     decoder.Add(token);
+                    tokens++;
                     var piece = decoder.Read();
                     if (piece.Length > 0)
                     {
@@ -97,11 +108,28 @@ public sealed class LlamaProvider(string entryID, string modelPath) : ILocalLLMP
             }
             catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
             {
+                reason = StopReason.Cancelled;
             }
+            LastStop = new(reason ?? (tokens >= limit ? StopReason.TokenLimit : StopReason.ContextFull), tokens);
             return text.ToString();
         }
     }
 }
+
+/// <summary>Why an answer of <see cref="LlamaProvider.Generator"/> ended.</summary>
+internal enum StopReason
+{
+    /// <summary>The model's end-of-turn (end-of-generation) token.</summary>
+    EndOfTurn,
+    /// <summary>maxTokens tokens.</summary>
+    TokenLimit,
+    /// <summary>The context (KV cache) was full.</summary>
+    ContextFull,
+    Cancelled,
+}
+
+/// <summary>How an answer ended: <paramref name="Tokens"/> tokens were generated, the end-of-turn token aside.</summary>
+internal readonly record struct GenerationStop(StopReason Reason, int Tokens);
 
 /// <summary>
 /// The prompt of a chat as token ids, laid out so that only the chat template makes control tokens: the template's

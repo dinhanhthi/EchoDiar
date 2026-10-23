@@ -386,8 +386,9 @@ public sealed partial class AppViewModel
     }
 
     /// <summary>
-    /// Deletes the model's folder off the UI thread; a failure is shown on its row. Its default is cleared either way
-    /// (macOS), or every new recording would stop at "Needs model".
+    /// Deletes the model's folder off the UI thread; a failure is shown on its row. Its default is cleared once the
+    /// model is gone (macOS), or every new recording would stop at "Needs model"; a failed delete that left it installed
+    /// keeps it.
     /// </summary>
     private async Task DeleteModelFilesAsync(ModelEntry entry)
     {
@@ -399,6 +400,7 @@ public sealed partial class AppViewModel
         {
             Debug.WriteLine($"EchoDiar: could not delete model {entry.Id}: {e}");
             DownloadErrors = With(DownloadErrors, entry.Id, e.Message);
+            if (await Task.Run(() => _services.Models.IsInstalled(entry))) return;
         }
         if (_closing) return;
         if (Settings.DefaultASRModelID == entry.Id) SaveSettings(Settings with { DefaultASRModelID = null });
