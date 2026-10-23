@@ -111,7 +111,7 @@ public sealed record TranscriptionJob
     /// (re-transcribe); null = the markers.
     /// </summary>
     [JsonPropertyName("language")] public string? Language { get; set; }
-    /// <summary>"Process now": never deferred (Windows has no deferral yet; kept for parity).</summary>
+    /// <summary>"Process now": never deferred (energy saver).</summary>
     [JsonPropertyName("processNow")] public bool ProcessNow { get; set; }
     /// <summary>Speakers expected on the system channel for this run; null = the pipeline's hint.</summary>
     [JsonPropertyName("speakerCountHint")] public int? SpeakerCountHint { get; set; }

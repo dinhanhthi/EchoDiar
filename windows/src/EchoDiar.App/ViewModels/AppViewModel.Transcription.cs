@@ -37,6 +37,16 @@ public sealed partial class AppViewModel
     }
 
     /// <summary>
+    /// The card's "Transcribe now" (macOS <c>processNow</c>): the conversation's job waiting while energy saver is on
+    /// starts now; the pipeline then reports its next step.
+    /// </summary>
+    public void TranscribeNow(Guid id)
+    {
+        if (_closing || !TranscriptionProgress.TryGetValue(id, out var progress) || progress.Step != JobStep.Deferred) return;
+        _services.Pipeline.ProcessNow(id);
+    }
+
+    /// <summary>
     /// Before the engine starts (it reads the sink once at start; the model loads meanwhile): a transcriber for a
     /// recording in <paramref name="language"/>, connected to the engine's live sink, when auto-transcribe and
     /// "Transcribe while recording" are on and the engine the Stop job resolves to is an installed Whisper or Parakeet

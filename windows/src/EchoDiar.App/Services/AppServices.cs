@@ -14,11 +14,13 @@ namespace EchoDiar.App.Services;
 /// The app's long-lived services over one library root: settings, library, models, the model load gate, the
 /// transcription pipeline (reading m4a through the Media Foundation decoder) and its engine factories, the audio
 /// compressor and the recording engine with the Platform capture sources and route monitor. Created once, on launch.
+/// The pipeline's jobs wait while energy saver is on and "wait" is set (<see cref="Deferral"/>).
 /// </summary>
 internal sealed class AppServices : IDisposable
 {
     private readonly HttpClient _http;
     private readonly AudioRouteMonitor _routes = new();
+    private readonly PowerState _power = new();
 
     public AppServices(AppPaths paths)
     {
@@ -29,6 +31,7 @@ internal sealed class AppServices : IDisposable
         _http = new HttpClient { Timeout = Timeout.InfiniteTimeSpan };
         Models = new ModelStore(paths.Models, _http);
         Gate = new ModelLoadGate();
+        Deferral = new EnergySaverDeferral(_power);
         var decoder = new MediaFoundationAudio();
         Compressor = new AudioCompressor(decoder: decoder);
         Engines = new Dictionary<ModelRuntime, TranscriptionPipeline.EngineFactory>
@@ -42,7 +45,8 @@ internal sealed class AppServices : IDisposable
             Models.IsInstalled,
             Models.Folder,
             Gate,
-            decoder: decoder);
+            decoder: decoder,
+            deferral: Deferral);
         Engine = new RecordingEngine(OpenSystem, OpenMic, routes: _routes)
         {
             IsTargetPlayingOutput = IsTargetPlayingOutput,
@@ -61,6 +65,9 @@ internal sealed class AppServices : IDisposable
     public ModelLoadGate Gate { get; }
     public TranscriptionPipeline Pipeline { get; }
 
+    /// <summary>The pipeline's deferral: energy saver on while the app's "wait" setting is on.</summary>
+    public EnergySaverDeferral Deferral { get; }
+
     /// <summary>The pipeline's batch engine factories by runtime; the recording transcriber loads its session from them.</summary>
     public IReadOnlyDictionary<ModelRuntime, TranscriptionPipeline.EngineFactory> Engines { get; }
     public AudioCompressor Compressor { get; }
@@ -69,11 +76,15 @@ internal sealed class AppServices : IDisposable
     /// <summary>Launch at login: a stand-in until task 14.3 adds the startup task.</summary>
     public ILaunchAtLogin LaunchAtLogin { get; } = new LaunchAtLogin();
 
-    /// <summary>Stops a running recording (its CAF is finished), then releases the route monitor and the HTTP client.</summary>
+    /// <summary>
+    /// Stops a running recording (its CAF is finished), then releases the route monitor, the energy saver
+    /// notifications and the HTTP client.
+    /// </summary>
     public void Dispose()
     {
         Engine.Dispose();
         _routes.Dispose();
+        _power.Dispose();
         _http.Dispose();
     }
 
@@ -96,4 +107,37 @@ internal sealed class AppServices : IDisposable
     /// </summary>
     private static bool IsTargetPlayingOutput(CaptureTarget target) =>
         target.App is { } app && AudioSessions.IsPlayingOutput(app.RootPid);
+
+    /// <summary>
+    /// Adapts the Platform's <see cref="PowerState"/> into the pipeline's <see cref="IDeferralSignal"/> (Platform does not
+    /// reference Transcribe): jobs wait while energy saver is on and <see cref="Enabled"/> ("Wait while energy saver is
+    /// on"); turning either off releases them.
+    /// </summary>
+    internal sealed class EnergySaverDeferral : IDeferralSignal
+    {
+        private readonly PowerState _power;
+        private volatile bool _enabled = true;
+
+        public EnergySaverDeferral(PowerState power)
+        {
+            _power = power;
+            _power.Changed += () => Changed?.Invoke();
+        }
+
+        /// <summary>The settings' <c>deferTranscriptionWhenConstrained</c>; a change wakes the waiting job.</summary>
+        public bool Enabled
+        {
+            get => _enabled;
+            set
+            {
+                if (_enabled == value) return;
+                _enabled = value;
+                Changed?.Invoke();
+            }
+        }
+
+        public bool ShouldDefer => _enabled && _power.IsEnergySaverOn;
+
+        public event Action? Changed;
+    }
 }

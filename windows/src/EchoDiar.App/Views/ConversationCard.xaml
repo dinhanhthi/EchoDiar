@@ -182,7 +182,7 @@
                         </DropDownButton>
                     </StackPanel>
 
-                    <!-- A job's ring (or a spinner while queued), its step; the percent on hover. -->
+                    <!-- A job's ring (or a spinner while queued or waiting), its step; the percent on hover. -->
                     <StackPanel
                         x:Name="ProgressPanel"
                         VerticalAlignment="Center"
@@ -203,6 +203,14 @@
                             Style="{StaticResource CaptionTextBlockStyle}"
                             Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
                     </StackPanel>
+
+                    <!-- A job waiting while energy saver is on starts now. -->
+                    <Button
+                        x:Name="TranscribeNowButton"
+                        VerticalAlignment="Center"
+                        Content="{local:T Text='Transcribe now'}"
+                        ToolTipService.ToolTip="{local:T Text='Transcribe now, even with energy saver on'}"
+                        Visibility="Collapsed" />
 
                     <!-- macOS opens Settings > Transcription; Settings comes with a later phase. -->
                     <Border

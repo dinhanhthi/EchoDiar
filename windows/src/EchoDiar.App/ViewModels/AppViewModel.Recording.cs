@@ -170,8 +170,11 @@ public sealed partial class AppViewModel
             var transcribed = prior is null ? null : await prior;
             if (_closing) return;
             var autoTranscribe = Settings.AutoTranscribe;
-            if (session is not null && await Task.Run(() => TranscribesFirst(folder, session, autoTranscribe))
-                && SubmitTranscription(folder, session, deleteAudioAfter: false, prior: transcribed) is { } job)
+            var needsNoModel = NeedsNoModel(transcribed);
+            // Read here, not when the job starts: a deferred job would hold the CAF uncompressed until energy saver is off.
+            var deferred = _services.Deferral.ShouldDefer && !needsNoModel;
+            if (session is not null && !deferred && await Task.Run(() => TranscribesFirst(folder, session, autoTranscribe))
+                && SubmitTranscription(folder, session, deleteAudioAfter: false, prior: transcribed, processNow: needsNoModel) is { } job)
             {
                 var succeeded = await job;
                 if (succeeded && !_closing && Settings.DeleteAudioAfterTranscription) await DeleteAudioAsync(session.Id);
@@ -265,8 +268,17 @@ public sealed partial class AppViewModel
     }
 
     /// <summary>
+    /// The job writes <paramref name="prior"/> without loading a model: no gaps to fill and speakers not told apart. It
+    /// then runs now even while energy saver is on, and is transcribed before compression (macOS <c>needsNoModel</c>);
+    /// should the pipeline find the prior unusable, its full batch runs now too.
+    /// </summary>
+    private bool NeedsNoModel(PriorTranscription? prior) =>
+        prior is not null && prior.MicGaps.Count == 0 && prior.SystemGaps.Count == 0 && !Settings.Diarization;
+
+    /// <summary>
     /// Whether the recording is transcribed from its CAF before compression: auto-transcribe is on, the recording is
-    /// usable and not transcribed (or failed) yet, and its CAF has frames. Reads files: off the UI thread.
+    /// usable and not transcribed (or failed) yet, and its CAF has frames (the caller also checks that energy saver
+    /// does not defer it). Reads files: off the UI thread.
     /// </summary>
     private static bool TranscribesFirst(string folder, RecordingSession session, bool autoTranscribe)
     {

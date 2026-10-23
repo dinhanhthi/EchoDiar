@@ -11,11 +11,12 @@ namespace EchoDiar.Transcribe;
 /// <c>transcript.json</c>. Models are loaded inside each step and unloaded before the next, while the job holds the
 /// <see cref="ModelLoadGate"/> (it waits while a recording transcriber holds it). A job with a usable
 /// <see cref="TranscriptionJob.Prior"/> keeps its segments and transcribes only its gaps, taking the gate only for gap
-/// fill or diarization.
+/// fill or diarization. While <paramref name="deferral"/> says so, a job waits before it takes a model (macOS
+/// <c>waitWhileConstrained</c>), unless <see cref="TranscriptionJob.ProcessNow"/> or <see cref="ProcessNow"/>.
 /// </summary>
 /// <remarks>
-/// Not ported yet: cloud engines and diarizers (Phase 26) and the macOS thermal / Low Power Mode deferral (no Windows
-/// equivalent yet).
+/// Not ported yet: cloud engines and diarizers (Phase 26). The macOS thermal deferral has no Windows API; energy saver
+/// stands in for Low Power Mode.
 /// </remarks>
 /// <param name="engines">Batch engine factories by catalog runtime.</param>
 /// <param name="diarizer">The local diarizer factory; null = none.</param>
@@ -23,6 +24,7 @@ namespace EchoDiar.Transcribe;
 /// <param name="modelFolder">An entry's <c>Models/&lt;id&gt;/</c> folder (<see cref="ModelStore.Folder"/>).</param>
 /// <param name="speakerCountHint">Speakers expected on the system channel when the job sets none.</param>
 /// <param name="decoder">Reads non-CAF (compressed m4a) audio; null = CAF only.</param>
+/// <param name="deferral">Holds jobs back while it says so (energy saver on); null = never.</param>
 public sealed class TranscriptionPipeline(
     IReadOnlyDictionary<ModelRuntime, TranscriptionPipeline.EngineFactory> engines,
     TranscriptionPipeline.DiarizerFactory? diarizer,
@@ -30,7 +32,8 @@ public sealed class TranscriptionPipeline(
     Func<ModelEntry, string> modelFolder,
     ModelLoadGate gate,
     int? speakerCountHint = null,
-    IAudioDecoder? decoder = null)
+    IAudioDecoder? decoder = null,
+    IDeferralSignal? deferral = null)
 {
     public delegate ITranscriptionEngine EngineFactory(ModelEntry entry, string folder);
 
@@ -43,6 +46,9 @@ public sealed class TranscriptionPipeline(
         string extracted, bool isMic, Action<double> progress, CancellationToken cancellationToken);
 
     private readonly SemaphoreSlim _queue = new(1, 1);
+
+    /// <summary>The jobs waiting for <c>deferral</c> by conversation id, each with its "process now" release.</summary>
+    private readonly Dictionary<Guid, TaskCompletionSource> _waiting = [];
 
     /// <summary>Every job's progress; raised on the job's thread.</summary>
     public event Action<JobProgress>? Progress;
@@ -84,8 +90,10 @@ public sealed class TranscriptionPipeline(
             if (job.Prior is { } prior && PriorSources(session, job) is { } priorSources
                 && UsableEntry(prior, job, session) is { } priorEntry)
             {
-                // Only gap fill and diarization need a model, so only they take the gate.
+                // Only gap fill and diarization need a model, so only they take the gate or wait for the deferral.
                 var fillsGaps = prior.MicGaps.Count > 0 || (priorSources.System is not null && prior.SystemGaps.Count > 0);
+                var priorDiarizer = Diarizer(job);
+                var diarizes = priorSources.System is not null && prior.System.Count > 0 && priorDiarizer is not null;
                 ISessionTranscriptionEngine? gapEngine = null;
                 if (fillsGaps)
                 {
@@ -95,12 +103,14 @@ public sealed class TranscriptionPipeline(
                         ? sessions
                         : throw new TranscriptionException(TranscriptionErrorKind.UnknownEngine, priorEntry.Id);
                 }
+                if (fillsGaps || diarizes) await WaitWhileDeferredAsync(job, cancellationToken).ConfigureAwait(false);
                 started = true;
                 var priorPath = await TranscribePriorAsync(
-                    job, prior, session, priorSources, priorEntry, gapEngine, Diarizer(job), cancellationToken).ConfigureAwait(false);
+                    job, prior, session, priorSources, priorEntry, gapEngine, priorDiarizer, cancellationToken).ConfigureAwait(false);
                 Finished(job, session);
                 return priorPath;
             }
+            await WaitWhileDeferredAsync(job, cancellationToken).ConfigureAwait(false);
             // Never written back: the override only applies to this run.
             if (job.Language is { } language) session = session with { LanguageMarkers = [new() { FileTime = 0, Language = language }] };
             var sources = ChannelSources(session, job);
@@ -128,6 +138,11 @@ public sealed class TranscriptionPipeline(
             Finished(job, session);
             return path;
         }
+        catch (OperationCanceledException) when (!started)
+        {
+            // Cancelled while it waited: nothing ran, so the conversation keeps its status.
+            throw;
+        }
         catch (TranscriptionException e) when (e.Kind == TranscriptionErrorKind.NeedsModel)
         {
             if (started) UpdateConversation(job.Folder, stored, c => c.Status = ConversationStatus.Ready);
@@ -141,6 +156,60 @@ public sealed class TranscriptionPipeline(
             Emit(job, JobStep.Failed, 0, e.Message);
             throw;
         }
+    }
+
+    // Deferral
+
+    /// <summary>
+    /// "Transcribe now" (macOS <c>processNow</c>, here for a job already queued): the conversation's job waiting for the
+    /// deferral starts now. False when none of its jobs is waiting.
+    /// </summary>
+    public bool ProcessNow(Guid conversationID)
+    {
+        lock (_waiting)
+        {
+            return _waiting.TryGetValue(conversationID, out var now) && now.TrySetResult();
+        }
+    }
+
+    /// <summary>
+    /// Waits for the deferral's notifications while it says so (no polling), reporting <see cref="JobStep.Deferred"/>;
+    /// returns at once for a "process now" job, ends on <see cref="ProcessNow"/>, and throws on cancellation. A job that
+    /// waited reports <see cref="JobStep.Queued"/> again, until its next step (it may still wait for the gate).
+    /// </summary>
+    private async Task WaitWhileDeferredAsync(TranscriptionJob job, CancellationToken cancellationToken)
+    {
+        if (deferral is null || job.ProcessNow) return;
+        // Run asynchronously: the signal and ProcessNow are raised on other threads, which must not run the job.
+        var now = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        lock (_waiting) _waiting[job.ConversationID] = now;
+        var waited = false;
+        try
+        {
+            while (!now.Task.IsCompleted)
+            {
+                var changed = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+                void OnChanged() => changed.TrySetResult();
+                deferral.Changed += OnChanged;
+                try
+                {
+                    // Read after subscribing, so a change in between is not lost.
+                    if (!deferral.ShouldDefer) break;
+                    Emit(job, JobStep.Deferred, 0);
+                    waited = true;
+                    await Task.WhenAny(changed.Task, now.Task).WaitAsync(cancellationToken).ConfigureAwait(false);
+                }
+                finally
+                {
+                    deferral.Changed -= OnChanged;
+                }
+            }
+        }
+        finally
+        {
+            lock (_waiting) _waiting.Remove(job.ConversationID);
+        }
+        if (waited) Emit(job, JobStep.Queued, 0);
     }
 
     /// <summary>
@@ -567,4 +636,16 @@ public sealed class TranscriptionPipeline(
         try { conversation.Write(); }
         catch (Exception e) when (e is IOException or UnauthorizedAccessException) { }
     }
+}
+
+/// <summary>
+/// Whether transcription jobs should wait (macOS <c>TranscriptionPipeline.isConstrained</c> with "wait" on); the app
+/// adapts the Platform's energy saver state and the setting into it.
+/// </summary>
+public interface IDeferralSignal
+{
+    bool ShouldDefer { get; }
+
+    /// <summary>Raised on any thread when <see cref="ShouldDefer"/> may have changed.</summary>
+    event Action? Changed;
 }

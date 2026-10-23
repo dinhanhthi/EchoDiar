@@ -128,6 +128,56 @@ public sealed class PipelineTests : IDisposable
         Assert.InRange(conversation.Duration, seconds - 0.01, seconds + 0.01);
     }
 
+    // Energy saver on: the job reports Deferred and decodes nothing until the signal clears (its Changed event, no
+    // polling) or "Transcribe now" releases it.
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task ADeferredJobWaitsUntilTheSignalClearsOrTranscribeNow(bool transcribeNow)
+    {
+        var session = new RecordingSession { State = SessionState.Stopped, AudioFileName = "audio.caf" };
+        var folder = session.Folder(Path.Combine(_root, "Conversations"));
+        session.Write(folder);
+        WriteStereo(1, Path.Combine(folder, session.AudioFileName));
+        var engine = new FakeEngine();
+        var signal = new FakeDeferral { ShouldDefer = true };
+        var pipeline = new TranscriptionPipeline(
+            new Dictionary<ModelRuntime, TranscriptionPipeline.EngineFactory> { [ModelRuntime.WhisperNet] = (_, _) => engine },
+            null, e => e.Id == "whisper-base", e => Path.Combine(_root, "Models", e.Id), new ModelLoadGate(),
+            deferral: signal);
+        var deferred = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        pipeline.Progress += p =>
+        {
+            if (p.Step == JobStep.Deferred) deferred.TrySetResult();
+        };
+        var job = new TranscriptionJob { ConversationID = session.Id, Folder = folder, Diarize = false };
+
+        var run = pipeline.TranscribeAsync(job, TestContext.Current.CancellationToken);
+        await deferred.Task.WaitAsync(TestContext.Current.CancellationToken);
+
+        Assert.Empty(engine.SampleCounts);
+        if (transcribeNow)
+        {
+            Assert.True(pipeline.ProcessNow(session.Id));
+        }
+        else
+        {
+            signal.ShouldDefer = false;
+            signal.Raise();
+        }
+        await run.WaitAsync(TestContext.Current.CancellationToken);
+        Assert.Equal([16_000], engine.SampleCounts);
+    }
+
+    private sealed class FakeDeferral : IDeferralSignal
+    {
+        public bool ShouldDefer { get; set; }
+
+        public event Action? Changed;
+
+        public void Raise() => Changed?.Invoke();
+    }
+
     /// <summary>A 16 kHz stereo Int16 CAF, as the recorder writes: silent mic (ch0), a 440 Hz tone on the system channel (ch1).</summary>
     private static void WriteStereo(int seconds, string path)
     {

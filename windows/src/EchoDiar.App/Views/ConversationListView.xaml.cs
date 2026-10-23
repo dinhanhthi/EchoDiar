@@ -455,6 +455,7 @@ internal static class ConversationText
             {
                 JobStep.NeedsModel => "Needs a transcription model",
                 JobStep.Queued => "Waiting to transcribe",
+                JobStep.Deferred => "Waiting: energy saver is on",
                 _ => $"Transcribing {(int)(progress.Fraction * 100)}%",
             };
         }

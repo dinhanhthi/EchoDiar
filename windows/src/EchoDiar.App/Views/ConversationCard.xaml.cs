@@ -78,6 +78,10 @@ public sealed partial class ConversationCard : UserControl
         MenuDeleteConversationItem.Click += (_, _) => _ = _list.DeleteAsync([Conversation], audioOnly: false);
         RetryButton.Click += (_, _) => _ = _model.TranscribeAsync(Conversation.Id);
         TranscribeButton.Click += (_, _) => _ = _model.TranscribeAsync(Conversation.Id);
+        TranscribeNowButton.Click += (_, _) =>
+        {
+            if (!_model.IsClosing) _model.TranscribeNow(Conversation.Id);
+        };
         EngineMenu.Opening += (_, _) => BuildEngineMenu();
 
         Tapped += OnTapped;
@@ -108,6 +112,7 @@ public sealed partial class ConversationCard : UserControl
         UpdateStatus(conversation);
         // Compact cards have no buttons: an empty row would only add space.
         ActionRow.Visibility = Shown(!compact || ProgressPanel.Visibility == Visibility.Visible
+            || TranscribeNowButton.Visibility == Visibility.Visible
             || NeedsModelBadge.Visibility == Visibility.Visible || RetryButton.Visibility == Visibility.Visible
             || TranscribeButton.Visibility == Visibility.Visible);
     }
@@ -154,9 +159,10 @@ public sealed partial class ConversationCard : UserControl
     }
 
     /// <summary>
-    /// macOS TranscriptionStatus: progress first (a queued job's conversation is still ready); "Needs model"; Retry and
-    /// its engine menu after a failed transcription, with the reason above; Transcribe for a ready conversation without
-    /// a transcript (a Transcribing status without a job was left by a quit or crash). A failed recording offers nothing.
+    /// macOS TranscriptionStatus: progress first (a queued job's conversation is still ready), with "Transcribe now" while
+    /// it waits for energy saver; "Needs model"; Retry and its engine menu after a failed transcription, with the reason
+    /// above; Transcribe for a ready conversation without a transcript (a Transcribing status without a job was left by a
+    /// quit or crash). A failed recording offers nothing.
     /// </summary>
     private void UpdateStatus(Conversation c)
     {
@@ -167,6 +173,7 @@ public sealed partial class ConversationCard : UserControl
             && c.Status is ConversationStatus.Ready or ConversationStatus.Transcribing;
 
         ProgressPanel.Visibility = Shown(running);
+        TranscribeNowButton.Visibility = Shown(running && progress!.Step == JobStep.Deferred);
         NeedsModelBadge.Visibility = Shown(progress is not null && !running);
         RetryButton.Visibility = Shown(failed);
         TranscribeButton.Visibility = Shown(transcribe);
@@ -178,7 +185,10 @@ public sealed partial class ConversationCard : UserControl
             JobRing.IsIndeterminate = queued;
             JobRing.Value = queued ? 0 : progress.Fraction;
             RecordingCard.SetText(StepText, StepTitle(progress.Step));
-            SetTip(ProgressPanel, progress.Fraction.ToString("P0", CultureInfo.CurrentCulture), ref _stepTip);
+            // Waiting has no percent: the step says why.
+            SetTip(ProgressPanel, progress.Step == JobStep.Deferred
+                ? StepTitle(progress.Step)
+                : progress.Fraction.ToString("P0", CultureInfo.CurrentCulture), ref _stepTip);
         }
         if (failed)
         {
@@ -198,7 +208,7 @@ public sealed partial class ConversationCard : UserControl
     internal static string StepTitle(JobStep step) => step switch
     {
         JobStep.Queued => Loc.T("Queued"),
-        JobStep.Deferred => Loc.T("Waiting…"),
+        JobStep.Deferred => Loc.T("Waiting: energy saver is on"),
         JobStep.Extracting => Loc.T("Preparing audio…"),
         JobStep.TranscribingMic or JobStep.TranscribingSystem => Loc.T("Transcribing…"),
         JobStep.Diarizing => Loc.T("Identifying speakers…"),

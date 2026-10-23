@@ -119,6 +119,8 @@ public sealed partial class AppViewModel : ObservableObject
         get => _settings;
         private set
         {
+            // Turning "wait" off releases a job waiting for energy saver.
+            _services.Deferral.Enabled = value.DeferTranscriptionWhenConstrained;
             if (SetProperty(ref _settings, value)) OnPropertyChanged(nameof(RecordingLanguage));
         }
     }
@@ -649,12 +651,12 @@ public sealed partial class AppViewModel : ObservableObject
     /// <paramref name="language"/> replaces the recording's language markers. A failed or probe recording is never
     /// transcribed. <paramref name="deleteAudioAfter"/> null = "Delete audio after transcription", read when the job
     /// succeeds (macOS <c>submitTranscription</c>). <paramref name="prior"/>: what the recording's live transcriber
-    /// transcribed (see <see cref="TranscriptionJob.Prior"/>). Returns the job (true when it succeeded), null when none
-    /// was queued.
+    /// transcribed (see <see cref="TranscriptionJob.Prior"/>). <paramref name="processNow"/> runs it even while energy
+    /// saver would defer it. Returns the job (true when it succeeded), null when none was queued.
     /// </summary>
     private Task<bool>? SubmitTranscription(
         string folder, RecordingSession session, string? engineId = null, string? language = null, bool? deleteAudioAfter = null,
-        PriorTranscription? prior = null)
+        PriorTranscription? prior = null, bool processNow = false)
     {
         var id = session.Id;
         if (_closing || session.Probe || session.State == SessionState.Failed || HasJob(id)) return null;
@@ -667,6 +669,7 @@ public sealed partial class AppViewModel : ObservableObject
             SystemFileName = session.AudioFileName == AudioCompressor.MicFileName ? AudioCompressor.SystemFileName : null,
             EngineID = engineId ?? PreferredEngine(firstLanguage),
             Language = language,
+            ProcessNow = processNow,
             SpeakerCountHint = Settings.SpeakerCountHint,
             DiarizerID = Settings.DefaultDiarizerModelID,
             Diarize = Settings.Diarization,
