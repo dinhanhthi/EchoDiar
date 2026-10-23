@@ -44,6 +44,7 @@ public static class SettingsSearch
     public const string Recording = "recording";
     public const string Transcription = "transcription";
     public const string Storage = "storage";
+    public const string Shortcuts = "shortcuts";
     public const string About = "about";
     public const string Acknowledgements = "acknowledgements";
 
@@ -58,6 +59,7 @@ public static class SettingsSearch
             Transcription, "Transcription", "\uE8D6", TranscriptionSettingsPage.SubTabs, TranscriptionSettingsPage.SearchEntries,
             model => new TranscriptionSettingsPage(model)),
         new(Storage, "Storage", "\uEDA2", StorageSettingsPage.SubTabs, StorageSettingsPage.SearchEntries, model => new StorageSettingsPage(model)),
+        new(Shortcuts, "Shortcuts", "\uE765", [], ShortcutsSettingsPage.SearchEntries, model => new ShortcutsSettingsPage(model)),
         new(About, "About", "\uE946", [], AboutSettingsPage.SearchEntries, _ => new AboutSettingsPage()),
         new(Acknowledgements, "Acknowledgements", "\uE8A5", [], AcknowledgementsSettingsPage.SearchEntries, _ => new AcknowledgementsSettingsPage()),
     ];

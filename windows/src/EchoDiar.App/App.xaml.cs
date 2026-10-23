@@ -93,6 +93,12 @@ public partial class App : Application
         _pill = new FloatingPillController(_model, _window, dispatcher);
         // X and Alt+F4 hide the window to the tray (macOS: the menu bar app runs on); Quit closes it.
         _window.AppWindow.Closing += OnMainWindowClosing;
+        // A shortcut recorder in Settings › Shortcuts stops taking keys once the window is not in front (macOS
+        // didResignKey); the global shortcuts come back.
+        _window.Activated += (_, e) =>
+        {
+            if (e.WindowActivationState == WindowActivationState.Deactivated) _model?.SetHotKeyCapture(false);
+        };
         _window.Closed += (_, _) =>
         {
             _quitting = true;

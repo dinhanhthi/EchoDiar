@@ -244,6 +244,36 @@ public sealed partial class SettingsViewModel : ObservableObject
         set => Update(s => s with { DeleteWithoutConfirmation = value });
     }
 
+    // Shortcuts
+
+    /// <summary>"Global record shortcut" on.</summary>
+    public bool GlobalHotKeyEnabled
+    {
+        get => Settings.GlobalHotKeyEnabled;
+        set => Update(s => s with { GlobalHotKeyEnabled = value });
+    }
+
+    /// <summary>The global record shortcut (Ctrl or Alt required, checked by the recorder).</summary>
+    public WindowsHotKey GlobalHotKeyWindows
+    {
+        get => Settings.GlobalHotKeyWindows;
+        set => Update(s => s with { GlobalHotKeyWindows = value });
+    }
+
+    /// <summary>"Global pause shortcut" on.</summary>
+    public bool GlobalPauseHotKeyEnabled
+    {
+        get => Settings.GlobalPauseHotKeyEnabled;
+        set => Update(s => s with { GlobalPauseHotKeyEnabled = value });
+    }
+
+    /// <summary>The global pause shortcut.</summary>
+    public WindowsHotKey GlobalPauseHotKeyWindows
+    {
+        get => Settings.GlobalPauseHotKeyWindows;
+        set => Update(s => s with { GlobalPauseHotKeyWindows = value });
+    }
+
     /// <summary>Every property follows the settings (an empty name refreshes every binding).</summary>
     private void OnAppChanged(object? sender, PropertyChangedEventArgs e)
     {

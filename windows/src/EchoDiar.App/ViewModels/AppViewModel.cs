@@ -252,6 +252,8 @@ public sealed partial class AppViewModel : ObservableObject
         await _recovery;
         // With the loaded settings (detection on or off).
         StartMeetingServices();
+        // With the loaded settings (each shortcut on or off).
+        StartHotKeys();
         // With the settings, before the library (macOS AppModel.start()).
         if (!Settings.OnboardingCompleted && !_closing) OnboardingRequested?.Invoke();
         StartupTrace.Write("begin library load");
@@ -291,6 +293,8 @@ public sealed partial class AppViewModel : ObservableObject
         _closing = true;
         // On the UI thread, before anything waits (the system events' window lives on it); silent, as _closing is set.
         StopMeetingServices();
+        // Same thread rule: the shortcuts' window lives on the UI thread.
+        StopHotKeys();
         _pollTimer.Stop();
         // A run under way asks before each deletion, and is told every conversation is busy now.
         _retention?.Stop();

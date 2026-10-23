@@ -1,0 +1,97 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    Settings › Shortcuts (macOS ShortcutsSettingsView.swift): the global record and pause shortcuts, each with its on/off
+    toggle, its recorder (Views/HotKeyRecorder.cs, made in code) and why Windows refused it; then the shortcuts used
+    inside EchoDiar, read-only. Each searchable element's Tag is its search entry's title (SearchEntries), so a search
+    result can bring it into view.
+-->
+<UserControl
+    x:Class="EchoDiar.App.Views.ShortcutsSettingsPage"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:controls="using:CommunityToolkit.WinUI.Controls"
+    xmlns:local="using:EchoDiar.App">
+
+    <UserControl.Resources>
+        <Style x:Key="SectionHeaderStyle" TargetType="StackPanel">
+            <Setter Property="Margin" Value="1,24,0,4" />
+            <Setter Property="Spacing" Value="2" />
+        </Style>
+        <!-- The recorder's note (why a pressed shortcut was refused). -->
+        <Style
+            x:Key="NoteStyle"
+            BasedOn="{StaticResource CaptionTextBlockStyle}"
+            TargetType="TextBlock">
+            <Setter Property="Foreground" Value="{ThemeResource TextFillColorSecondaryBrush}" />
+            <Setter Property="TextWrapping" Value="Wrap" />
+        </Style>
+        <!-- Why Windows refused a shortcut (macOS: a yellow warning label under it). -->
+        <Style x:Key="ErrorRowStyle" TargetType="StackPanel">
+            <Setter Property="Margin" Value="1,4,0,0" />
+            <Setter Property="Orientation" Value="Horizontal" />
+            <Setter Property="Spacing" Value="6" />
+        </Style>
+        <Style x:Key="CautionIconStyle" TargetType="FontIcon">
+            <Setter Property="FontSize" Value="14" />
+            <Setter Property="Foreground" Value="{ThemeResource SystemFillColorCautionBrush}" />
+        </Style>
+        <Style
+            x:Key="CautionTextStyle"
+            BasedOn="{StaticResource BodyTextBlockStyle}"
+            TargetType="TextBlock">
+            <Setter Property="Foreground" Value="{ThemeResource SystemFillColorCautionBrush}" />
+            <Setter Property="TextWrapping" Value="Wrap" />
+        </Style>
+    </UserControl.Resources>
+
+    <ScrollViewer>
+        <StackPanel
+            MaxWidth="1000"
+            Margin="24,12,24,24"
+            Spacing="4">
+
+            <!-- Record -->
+            <controls:SettingsCard
+                Description="{local:T Text='Starts or stops recording from any app.'}"
+                Header="{local:T Text='Global record shortcut'}"
+                Tag="Global record shortcut">
+                <ToggleSwitch x:Name="RecordToggle" AutomationProperties.Name="{local:T Text='Global record shortcut'}" />
+            </controls:SettingsCard>
+
+            <!-- Content: the recorder, set in code. -->
+            <controls:SettingsCard x:Name="RecordShortcutCard" Header="{local:T Text='Shortcut'}" />
+
+            <StackPanel
+                x:Name="RecordErrorRow"
+                Style="{StaticResource ErrorRowStyle}"
+                Visibility="Collapsed">
+                <FontIcon Style="{StaticResource CautionIconStyle}" Glyph="&#xE7BA;" />
+                <TextBlock x:Name="RecordErrorText" Style="{StaticResource CautionTextStyle}" />
+            </StackPanel>
+
+            <!-- Pause (macOS: a section of its own) -->
+            <controls:SettingsCard
+                Margin="0,24,0,0"
+                Description="{local:T Text='Pauses or resumes the recording from any app.'}"
+                Header="{local:T Text='Global pause shortcut'}"
+                Tag="Global pause shortcut">
+                <ToggleSwitch x:Name="PauseToggle" AutomationProperties.Name="{local:T Text='Global pause shortcut'}" />
+            </controls:SettingsCard>
+
+            <controls:SettingsCard x:Name="PauseShortcutCard" Header="{local:T Text='Shortcut'}" />
+
+            <StackPanel
+                x:Name="PauseErrorRow"
+                Style="{StaticResource ErrorRowStyle}"
+                Visibility="Collapsed">
+                <FontIcon Style="{StaticResource CautionIconStyle}" Glyph="&#xE7BA;" />
+                <TextBlock x:Name="PauseErrorText" Style="{StaticResource CautionTextStyle}" />
+            </StackPanel>
+
+            <!-- The shortcuts inside EchoDiar, read-only: their rows come with the in-app shortcuts (task 21.3). -->
+            <StackPanel Style="{StaticResource SectionHeaderStyle}" Tag="In EchoDiar">
+                <TextBlock Style="{StaticResource BodyStrongTextBlockStyle}" Text="{local:T Text='In EchoDiar'}" />
+            </StackPanel>
+        </StackPanel>
+    </ScrollViewer>
+</UserControl>
