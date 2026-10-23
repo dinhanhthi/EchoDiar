@@ -3,6 +3,7 @@ using System.Text;
 using EchoDiar.AI;
 using EchoDiar.Core.Model;
 using EchoDiar.Core.Settings;
+using EchoDiar.Transcribe;
 using Microsoft.UI.Dispatching;
 
 namespace EchoDiar.App.ViewModels;
@@ -13,9 +14,11 @@ public enum AIJobKind { Summary, Question }
 /// <summary>
 /// The running summary or question (macOS <c>AppModel.AIJob</c>): its conversation (null for a question across the
 /// library, Phase 27), what it does (<see cref="Question"/> is the question asked), what a long summary does before its
-/// text starts, and the answer so far. Replaced at each update, so a change is a new instance.
+/// text starts, and the answer so far; <see cref="UsesLocalModel"/> when an in-app model runs it (one that loads model
+/// files). Replaced at each update, so a change is a new instance.
 /// </summary>
-public sealed record AIJob(Guid? ConversationId, AIJobKind Kind, string? Question, string? Status = null, string Text = "");
+public sealed record AIJob(
+    Guid? ConversationId, AIJobKind Kind, string? Question, string? Status = null, string Text = "", bool UsesLocalModel = false);
 
 /// <summary>Why the last AI job, or chat archive or resume, of a conversation (null: the library chat) failed.</summary>
 public sealed record AIErrorInfo(Guid? ConversationId, string Message);
@@ -132,7 +135,7 @@ public sealed partial class AppViewModel
         _aiPendingText.Clear();
         var cancel = new CancellationTokenSource();
         _aiCancel = cancel;
-        AIJob = new AIJob(conversation.Id, kind, question);
+        AIJob = new AIJob(conversation.Id, kind, question, UsesLocalModel: provider.Kind == AIProviderKind.InApp);
         // Read on the UI thread: the settings and the provider configs belong to it.
         var config = provider.Kind == AIProviderKind.InApp ? null : ProvidersModel.Config(provider.Id);
         var settings = Settings;
@@ -152,6 +155,13 @@ public sealed partial class AppViewModel
             try
             {
                 client = await Task.Run(() => MakeClient(provider, config), cancel.Token);
+            }
+            catch (ModelStoreException e) when (e.Kind == ModelStoreError.ChecksumMismatch)
+            {
+                // The install was deleted (InstallRemoved refreshes its row to Download).
+                Debug.WriteLine($"EchoDiar: {provider.Id} failed its integrity check");
+                if (!_closing) AIError = new AIErrorInfo(id, Loc.Format("%@ failed its integrity check. Download it again.", provider.Name));
+                return;
             }
             catch (Exception e) when (e is not OperationCanceledException)
             {

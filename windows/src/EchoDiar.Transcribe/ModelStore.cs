@@ -39,6 +39,11 @@ public readonly record struct ModelDownloadProgress(long CompletedBytes, long To
 /// before a model is loaded.
 /// </summary>
 /// <remarks>
+/// What the marker guarantees: change and corruption detection, bound to the catalog's SHA-256 and to each file's size
+/// and last write time as hashed. It is not a defense against a local writer who also resets a file's last write time
+/// or rewrites the marker: that trust boundary is the user's own account, which can change the app's files anyway.
+/// </remarks>
+/// <remarks>
 /// Layout: repo files with <see cref="ModelEntry.Subfolder"/> stripped, and <see cref="ModelEntry.ExtraFiles"/>
 /// at their repo paths, all in <c>Models/&lt;id&gt;/</c> (the ggml file and the sherpa-onnx files sit at its root).
 /// The injected <see cref="HttpClient"/> should have <c>Timeout = InfiniteTimeSpan</c>: large models take longer
@@ -63,6 +68,14 @@ public sealed class ModelStore(string root, HttpClient http, Func<string, long>?
 
     private readonly Func<string, long> _freeBytes = freeBytes ?? DefaultFreeBytes;
     private readonly ConcurrentDictionary<string, SemaphoreSlim> _downloads = new();
+    private readonly ConcurrentDictionary<string, object> _migrations = new();
+
+    /// <summary>
+    /// An install failed its check in <see cref="VerifiedFolder"/> and was deleted. Raised on the thread that called
+    /// <see cref="VerifiedFolder"/> (off the UI thread, as it hashes), after its lock is released: marshal before
+    /// touching the UI.
+    /// </summary>
+    public event Action<ModelEntry>? InstallRemoved;
 
     /// <summary>The <c>Models</c> folder (<c>AppPaths.Models</c>).</summary>
     public string Root { get; } = root;
@@ -114,26 +127,57 @@ public sealed class ModelStore(string root, HttpClient http, Func<string, long>?
     /// file's size and last write time. An install without a valid marker (one from before markers, or a file changed
     /// since) is hashed once now: when every file matches the catalog it gets its marker; when one does not, the
     /// install is deleted (unless a download of it runs), so it shows as not installed. Null when not installed or not
-    /// verified. Hashes whole files the first time: call it off the UI thread, before loading the model.
+    /// verified. Hashes whole files the first time: call it off the UI thread, before loading the model. Hashing one
+    /// entry runs once at a time: a second caller waits, then takes the marker the first one wrote.
     /// </summary>
     public string? VerifiedFolder(ModelEntry entry)
     {
+        if (MarkedFolder(entry) is { } folder) return folder;
+        if (!IsInstalled(entry)) return null;
+        bool removed;
+        lock (_migrations.GetOrAdd(SafeId(entry), _ => new object()))
+        {
+            if (MarkedFolder(entry) is { } marked) return marked;
+            if (!IsInstalled(entry)) return null;
+            if (Migrate(entry) is { } migrated) return migrated;
+            removed = !Directory.Exists(Folder(entry));
+        }
+        if (removed) InstallRemoved?.Invoke(entry);
+        return null;
+    }
+
+    /// <summary>
+    /// <c>Models/&lt;id&gt;/</c> when it is installed and its marker matches its files as they are now; null otherwise
+    /// (<see cref="VerifiedFolder"/> then hashes them). Never hashes nor deletes: cheap enough before a recording starts.
+    /// </summary>
+    public string? MarkedFolder(ModelEntry entry)
+    {
         if (!IsInstalled(entry)) return null;
         var folder = Folder(entry);
-        var files = FilesIn(folder);
+        return ReadMarker(folder) is { } marker && Matches(marker, entry, folder, FilesIn(folder), ExpectedHashes(entry))
+            ? folder
+            : null;
+    }
+
+    /// <summary>
+    /// Hashes every file of an install without a valid marker: all match the catalog, the folder with its new marker;
+    /// one does not, null, the install deleted unless a download of it runs. Called inside the entry's migration lock.
+    /// </summary>
+    private string? Migrate(ModelEntry entry)
+    {
+        var folder = Folder(entry);
         var expected = ExpectedHashes(entry);
-        if (ReadMarker(folder) is { } marker && Matches(marker, entry, folder, files, expected)) return folder;
         var checkedFiles = new List<MarkerFile>();
-        foreach (var file in files)
+        foreach (var file in FilesIn(folder))
         {
             if (!expected.TryGetValue(file, out var sha)) return null;
-            var info = new FileInfo(Path.Combine(folder, file));
-            if (!string.Equals(HashOf(info.FullName), sha, StringComparison.OrdinalIgnoreCase))
+            var (hash, bytes, modified) = HashOf(Path.Combine(folder, file));
+            if (!string.Equals(hash, sha, StringComparison.OrdinalIgnoreCase))
             {
                 DeleteUnlessDownloading(entry);
                 return null;
             }
-            checkedFiles.Add(new(file, sha, info.Length, info.LastWriteTimeUtc.Ticks));
+            checkedFiles.Add(new(file, sha, bytes, modified));
         }
         // Written aside, then moved in, so a crash never leaves half a marker (or a stray file) in the folder.
         var temporary = Path.Combine(Root, $".verified-{SafeId(entry)}-{Guid.NewGuid():N}");
@@ -165,17 +209,31 @@ public sealed class ModelStore(string root, HttpClient http, Func<string, long>?
         return hashes;
     }
 
+    /// <summary>
+    /// The marker lists exactly <paramref name="files"/>, each once, with the catalog's hash and its size and last write
+    /// time now. A path listed twice, or a file that cannot be read (gone or changing meanwhile), is no match.
+    /// </summary>
     private static bool Matches(Marker marker, ModelEntry entry, string folder, List<string> files, Dictionary<string, string> expected)
     {
         if (marker.Id != entry.Id || marker.Files is null || marker.Files.Count != files.Count) return false;
-        var listed = marker.Files.Where(f => f?.Path is not null && f.Sha256 is not null)
-            .ToDictionary(f => f.Path, StringComparer.Ordinal);
-        foreach (var file in files)
+        var listed = new Dictionary<string, MarkerFile>(StringComparer.Ordinal);
+        foreach (var record in marker.Files)
         {
-            if (!listed.TryGetValue(file, out var record)) return false;
-            if (expected.TryGetValue(file, out var sha) && !string.Equals(sha, record.Sha256, StringComparison.OrdinalIgnoreCase)) return false;
-            var info = new FileInfo(Path.Combine(folder, file));
-            if (info.Length != record.Bytes || info.LastWriteTimeUtc.Ticks != record.ModifiedTicks) return false;
+            if (record?.Path is null || record.Sha256 is null || !listed.TryAdd(record.Path, record)) return false;
+        }
+        try
+        {
+            foreach (var file in files)
+            {
+                if (!listed.TryGetValue(file, out var record)) return false;
+                if (expected.TryGetValue(file, out var sha) && !string.Equals(sha, record.Sha256, StringComparison.OrdinalIgnoreCase)) return false;
+                var info = new FileInfo(Path.Combine(folder, file));
+                if (info.Length != record.Bytes || info.LastWriteTimeUtc.Ticks != record.ModifiedTicks) return false;
+            }
+        }
+        catch (Exception e) when (e is IOException or UnauthorizedAccessException or ArgumentException)
+        {
+            return false;
         }
         return true;
     }
@@ -196,10 +254,16 @@ public sealed class ModelStore(string root, HttpClient http, Func<string, long>?
 
     private static void WriteMarker(string path, Marker marker) => File.WriteAllBytes(path, JsonSerializer.SerializeToUtf8Bytes(marker, Json));
 
-    private static string HashOf(string path)
+    /// <summary>
+    /// The file's SHA-256, with its size and last write time read from the same handle before hashing (no writer can
+    /// open it meanwhile), so a file swapped in after the hash is never recorded as the one hashed.
+    /// </summary>
+    private static (string Sha256, long Bytes, long ModifiedTicks) HashOf(string path)
     {
         using var stream = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.Read, BufferSize);
-        return Convert.ToHexString(SHA256.HashData(stream));
+        var bytes = stream.Length;
+        var modified = File.GetLastWriteTimeUtc(stream.SafeFileHandle).Ticks;
+        return (Convert.ToHexString(SHA256.HashData(stream)), bytes, modified);
     }
 
     /// <summary>Removes an install that failed its check; left alone while a download of it runs (it replaces it).</summary>

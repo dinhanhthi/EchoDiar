@@ -215,6 +215,85 @@ public sealed class ModelStoreTests : IDisposable
         Assert.Equal(folder, store.VerifiedFolder(entry));
     }
 
+    // A failed check that deletes the install tells the app (its rows show Download again); an install from before
+    // markers that matches only gets its marker, and nothing is raised.
+    [Fact]
+    public void InstallRemovedIsRaisedOnlyWhenAFailedCheckDeletesTheInstall()
+    {
+        byte[] model = [1, 2, 3, 4];
+        var entry = Base(model);
+        var folder = Path.Combine(Models, entry.Id);
+        var path = Path.Combine(folder, "ggml-base.bin");
+        var store = Store();
+        var removed = new List<ModelEntry>();
+        store.InstallRemoved += removed.Add;
+        Directory.CreateDirectory(folder);
+        System.IO.File.WriteAllBytes(path, model);
+
+        Assert.Equal(folder, store.VerifiedFolder(entry));
+        Assert.Equal(folder, store.MarkedFolder(entry));
+        Assert.Empty(removed);
+
+        System.IO.File.WriteAllBytes(path, [6, 6, 6, 6]);
+        System.IO.File.SetLastWriteTimeUtc(path, DateTime.UtcNow.AddMinutes(-5));
+
+        Assert.Null(store.MarkedFolder(entry));
+        Assert.True(Directory.Exists(folder));
+        Assert.Null(store.VerifiedFolder(entry));
+        Assert.False(Directory.Exists(folder));
+        Assert.Same(entry, Assert.Single(removed));
+    }
+
+    // Callers that verify the same marker-less install at once hash it under one lock: each gets the folder, and the
+    // marker is written once without a sharing violation.
+    [Fact]
+    public async Task ConcurrentChecksOfOneInstallAllSucceed()
+    {
+        var model = new byte[1 << 20];
+        new Random(1).NextBytes(model);
+        var entry = Base(model);
+        var folder = Path.Combine(Models, entry.Id);
+        Directory.CreateDirectory(folder);
+        System.IO.File.WriteAllBytes(Path.Combine(folder, "ggml-base.bin"), model);
+        var store = Store();
+
+        var results = await Task.WhenAll(Enumerable.Range(0, 8).Select(_ => Task.Run(() => store.VerifiedFolder(entry))));
+
+        Assert.All(results, r => Assert.Equal(folder, r));
+        Assert.Equal(folder, store.MarkedFolder(entry));
+        Assert.Empty(Directory.EnumerateFiles(Models, ".verified-*"));
+    }
+
+    // A marker that lists a path twice (as many records as files) is no match, never an exception: the files are
+    // hashed again and the marker rewritten.
+    [Fact]
+    public void AMarkerListingAPathTwiceIsNotTrusted()
+    {
+        byte[] model = [1, 2, 3, 4];
+        var entry = ModelCatalog.Entry("whisper-base")! with
+        {
+            Files = ["a.bin", "b.bin"],
+            DiskBytes = 2 * model.Length,
+            Sha256 = new Dictionary<string, string> { ["a.bin"] = Sha(model), ["b.bin"] = Sha(model) },
+        };
+        var folder = Path.Combine(Models, entry.Id);
+        Directory.CreateDirectory(folder);
+        foreach (var name in new[] { "a.bin", "b.bin" }) System.IO.File.WriteAllBytes(Path.Combine(folder, name), model);
+        var record = new
+        {
+            path = "a.bin", sha256 = Sha(model), bytes = model.Length,
+            modifiedTicks = System.IO.File.GetLastWriteTimeUtc(Path.Combine(folder, "a.bin")).Ticks,
+        };
+        System.IO.File.WriteAllBytes(Path.Combine(folder, ModelStore.MarkerName),
+            JsonSerializer.SerializeToUtf8Bytes(new { id = entry.Id, files = new[] { record, record } }));
+        var store = Store();
+
+        Assert.True(store.IsInstalled(entry));
+        Assert.Null(store.MarkedFolder(entry));
+        Assert.Equal(folder, store.VerifiedFolder(entry));
+        Assert.Equal(folder, store.MarkedFolder(entry));
+    }
+
     /// <summary>whisper-base with one fake file whose catalog hash is that of <paramref name="model"/>.</summary>
     private static ModelEntry Base(byte[] model) => ModelCatalog.Entry("whisper-base")! with
     {

@@ -474,8 +474,8 @@ public sealed partial class ProvidersViewModel : ObservableObject
     /// <summary>
     /// The row of <paramref name="entry"/> as it is now (macOS <c>ModelRow</c> for an LLM): the Default badge on the
     /// catalog default (the model menu picks the one used), the download's fraction with Cancel, Installed with Delete, or
-    /// Download. Delete is off while a transcription or the recording's transcriber runs (macOS), and while an AI job runs
-    /// (the menu may have moved on from its model): llama.cpp maps the file, which Windows then refuses to move or delete.
+    /// Download. Delete is off while a transcription or the recording's transcriber runs (macOS), and while an in-app AI job
+    /// runs (the menu may have moved on from its model): llama.cpp maps the file, which Windows then refuses to move or delete.
     /// </summary>
     public ModelRowState LocalModelState(ModelEntry entry)
     {

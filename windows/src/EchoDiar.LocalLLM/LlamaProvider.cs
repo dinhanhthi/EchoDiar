@@ -1,3 +1,4 @@
+using System.Buffers;
 using System.Text;
 using EchoDiar.AI;
 using EchoDiar.Core.Models;
@@ -113,13 +114,27 @@ internal sealed class LlamaPrompt
     private readonly LLamaWeights _weights;
     private readonly string _template;
     private readonly IReadOnlyList<string> _userDefined;
+    private readonly SearchValues<char> _userDefinedStarts;
 
-    internal LlamaPrompt(LLamaWeights weights)
+    internal LlamaPrompt(LLamaWeights weights) : this(weights, UserDefinedTokens(weights.Vocab))
+    {
+    }
+
+    /// <summary>
+    /// With <paramref name="userDefined"/> as the token texts broken in bodies; the NativeLLM tests pass none to reach
+    /// the check after tokenization.
+    /// </summary>
+    internal LlamaPrompt(LLamaWeights weights, IReadOnlyList<string> userDefined)
     {
         _weights = weights;
         _template = weights.NativeHandle.GetTemplate(strict: false)
             ?? throw LLMException.Provider("This model has no chat template.");
-        var vocab = weights.Vocab;
+        _userDefined = userDefined;
+        _userDefinedStarts = LlamaSettings.FirstCharacters(userDefined);
+    }
+
+    private static List<string> UserDefinedTokens(SafeLlamaModelHandle.Vocabulary vocab)
+    {
         var userDefined = new List<string>();
         for (var id = 0; id < vocab.Count; id++)
         {
@@ -130,7 +145,7 @@ internal sealed class LlamaPrompt
                 userDefined.Add(text);
             }
         }
-        _userDefined = userDefined;
+        return userDefined;
     }
 
     /// <summary>
@@ -144,7 +159,7 @@ internal sealed class LlamaPrompt
         foreach (var part in Parts(messages))
         {
             if (part.Text.Length == 0) continue;
-            var text = part.IsBody ? LlamaSettings.Neutralized(part.Text, _userDefined) : part.Text;
+            var text = part.IsBody ? LlamaSettings.Neutralized(part.Text, _userDefined, _userDefinedStarts) : part.Text;
             // BOS only before the first piece, when the model wants one (Gemma yes, Qwen no).
             var ids = _weights.Tokenize(text, add_bos: tokens.Count == 0, special: !part.IsBody, Encoding.UTF8);
             foreach (var id in ids)
@@ -278,8 +293,17 @@ internal static class LlamaSettings
     /// after its first character, again until none is left (at most 8 passes), so the tokenizer cannot match it as
     /// that token.
     /// </summary>
-    internal static string Neutralized(string text, IReadOnlyCollection<string> tokens)
+    internal static string Neutralized(string text, IReadOnlyCollection<string> tokens) =>
+        Neutralized(text, tokens, FirstCharacters(tokens));
+
+    /// <summary>
+    /// <see cref="Neutralized(string, IReadOnlyCollection{string})"/> with the first characters of
+    /// <paramref name="tokens"/> (<see cref="FirstCharacters"/>): a text holding none of them, most of a long transcript's
+    /// bodies, is returned at once instead of scanned once per token.
+    /// </summary>
+    internal static string Neutralized(string text, IReadOnlyCollection<string> tokens, SearchValues<char> firstCharacters)
     {
+        if (!text.AsSpan().ContainsAny(firstCharacters)) return text;
         var changed = true;
         for (var pass = 0; pass < 8 && changed; pass++)
         {
@@ -293,6 +317,10 @@ internal static class LlamaSettings
         }
         return text;
     }
+
+    /// <summary>The first character of each of <paramref name="tokens"/> that <see cref="Neutralized(string, IReadOnlyCollection{string})"/> breaks.</summary>
+    internal static SearchValues<char> FirstCharacters(IEnumerable<string> tokens) =>
+        SearchValues.Create([.. tokens.Where(t => t.Length >= 2).Select(t => t[0]).Distinct()]);
 }
 
 /// <summary>A piece of a prompt: chat template text (special tokens parsed) or a message body (never parsed).</summary>

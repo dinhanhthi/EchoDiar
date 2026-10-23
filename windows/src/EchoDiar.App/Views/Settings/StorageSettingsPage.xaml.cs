@@ -422,7 +422,7 @@ public sealed partial class StorageSettingsPage : UserControl
 
     /// <summary>
     /// Models are removed only while nothing records and no model is in use (<see cref="AppViewModel.ModelsInUse"/>, as
-    /// the Delete of Settings › AI's model rows): an AI job's GGUF file cannot be deleted.
+    /// the Delete of Settings › AI's model rows): an in-app AI job's GGUF file cannot be deleted.
     /// </summary>
     private bool CanDeleteModels() =>
         _model.DeletableModels.Count > 0 && !_model.IsRecording && !_model.ModelsInUse;

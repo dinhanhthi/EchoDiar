@@ -52,7 +52,9 @@ internal sealed class AppServices : IDisposable
             Engines,
             SherpaDiarizer.Create,
             Models.IsInstalled,
-            // Checked again before each load (a planted or changed file is never loaded).
+            // Checked again before each load: a changed or corrupt file (its catalog SHA-256, size and last write time
+            // against the marker) is never loaded. Not a defense against a local writer who also resets the last write
+            // time or rewrites the marker (ModelStore's documented trust boundary).
             entry => Models.VerifiedFolder(entry) ?? throw new TranscriptionException(TranscriptionErrorKind.NeedsModel, entry.Id),
             Gate,
             decoder: decoder,
@@ -140,17 +142,18 @@ internal sealed class AppServices : IDisposable
     /// <see cref="ILocalLLMProvider"/>s, which <see cref="AIService"/> runs inside <see cref="Gate"/> (owner LLM), loaded
     /// for the job and freed when it ends. A GGUF file is checked against its catalog SHA-256 first
     /// (<see cref="ModelStore.VerifiedFolder"/>, which hashes it once when it has no marker): call it off the UI thread.
+    /// Throws <see cref="ModelStoreException"/> (<see cref="ModelStoreError.ChecksumMismatch"/>) when the check failed and
+    /// the install was deleted.
     /// </summary>
     public ILLMProvider? MakeLocalProvider(string entryID)
     {
         if (ModelCatalog.Entry(entryID) is not { Kind: ModelKind.Llm } entry) return null;
-        return entry.Runtime switch
-        {
-            ModelRuntime.WindowsAI => WindowsAI,
-            ModelRuntime.Gguf when entry.Files is [var file] && Models.VerifiedFolder(entry) is { } folder =>
-                new LlamaProvider(entry.Id, Path.Combine(folder, file)),
-            _ => null,
-        };
+        if (entry.Runtime == ModelRuntime.WindowsAI) return WindowsAI;
+        if (entry.Runtime != ModelRuntime.Gguf || entry.Files is not [var file] || !Models.IsInstalled(entry)) return null;
+        if (Models.VerifiedFolder(entry) is { } folder) return new LlamaProvider(entry.Id, Path.Combine(folder, file));
+        if (!Models.IsInstalled(entry))
+            throw new ModelStoreException(ModelStoreError.ChecksumMismatch, $"{entry.Id} failed its integrity check.");
+        return null;
     }
 
     /// <summary>

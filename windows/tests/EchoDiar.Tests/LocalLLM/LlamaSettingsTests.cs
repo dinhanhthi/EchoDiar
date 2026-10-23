@@ -113,6 +113,24 @@ public sealed class LlamaSettingsTests
         Assert.Equal("plain", LlamaSettings.Neutralized("plain", tokens));
     }
 
+    // A long body holding none of the tokens' first characters is returned as it is, without a scan per token; one
+    // holding a token is broken as before, wherever the token sits.
+    [Fact]
+    public void LongBodiesWithoutTokenStartsAreKept()
+    {
+        string[] tokens = ["<think>", "</think>", "[INST]", "x"];
+        var firsts = LlamaSettings.FirstCharacters(tokens);
+        var plain = new string('a', 4 << 20);
+
+        Assert.Same(plain, LlamaSettings.Neutralized(plain, tokens, firsts));
+        Assert.Same(plain, LlamaSettings.Neutralized(plain, [], LlamaSettings.FirstCharacters([])));
+
+        var marked = plain + "<think>" + plain;
+        var broken = LlamaSettings.Neutralized(marked, tokens, firsts);
+        Assert.Equal(plain + "<\u200Bthink>" + plain, broken);
+        Assert.Equal(LlamaSettings.Neutralized(marked, tokens), broken);
+    }
+
     [Fact]
     public void Qwen3EmbeddingPrefixesOnlyQueriesAndPoolsTheLastToken()
     {

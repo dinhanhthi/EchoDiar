@@ -159,17 +159,22 @@ public sealed partial class AppViewModel
 
     /// <summary>
     /// The transcriber for a recording in <paramref name="language"/>: the <see cref="IncrementalEntry"/> of the engine
-    /// the Stop job picks, loaded as a session once its files pass <see cref="ModelStore.VerifiedFolder"/>; idle release
-    /// after "Unload models after" minutes.
+    /// the Stop job picks, loaded as a session when its marker vouches for its files (<see cref="ModelStore.MarkedFolder"/>);
+    /// idle release after "Unload models after" minutes. An install without a valid marker is not hashed here, which
+    /// would hold Record up to a whole model's read: the recording starts without live captions, the model is verified
+    /// in the background, and the Stop job still checks it (<see cref="ModelStore.VerifiedFolder"/>).
     /// </summary>
     private RecordingTranscriber? CreateRecordingTranscriber(string language, AppSettings settings)
     {
-        if (IncrementalEntry(PreferredEngine(language), language) is not { } entry
-            || _services.Models.VerifiedFolder(entry) is not { } folder
-            || _services.Engines[entry.Runtime](entry, folder) is not ISessionTranscriptionEngine engine)
+        if (IncrementalEntry(PreferredEngine(language), language) is not { } entry) return null;
+        if (_services.Models.MarkedFolder(entry) is not { } folder)
         {
+            _ = Task.Run(() => _services.Models.VerifiedFolder(entry)).ContinueWith(
+                t => Debug.WriteLine($"EchoDiar: could not verify model {entry.Id}: {t.Exception?.InnerException?.GetType().Name}"),
+                TaskContinuationOptions.OnlyOnFaulted);
             return null;
         }
+        if (_services.Engines[entry.Runtime](entry, folder) is not ISessionTranscriptionEngine engine) return null;
         return new RecordingTranscriber(
             entry, engine, _services.Gate, TimeSpan.FromMinutes(settings.ModelIdleMinutes), () => _liveLanguage);
     }

@@ -247,6 +247,8 @@ public sealed partial class AppViewModel : ObservableObject
         };
         _services.Pipeline.Progress += progress => Post(() => ApplyProgress(progress));
         _services.Engine.SnapshotChanged += snapshot => Post(() => ApplySnapshot(snapshot));
+        // An install that failed its check was deleted: its rows show Download again.
+        _services.Models.InstallRemoved += removed => Post(() => _ = RefreshInstalledModelsAsync());
         FollowRouteChanges();
         _recovery = LoadAndRecoverAsync();
         await _recovery;
@@ -264,6 +266,35 @@ public sealed partial class AppViewModel : ObservableObject
         _launchScan = CompressLeftoversAsync();
         // Auto-delete's launch run waits for the scan (RunRetentionAsync).
         SyncRetention();
+        _ = VerifyInstalledModelsAsync();
+    }
+
+    /// <summary>
+    /// Once launch has settled (after the leftover scan): each installed model without a valid marker (an install from
+    /// before markers) is hashed now, one at a time on a lowest-priority thread, so a load or a recording start seldom
+    /// has to (<see cref="ModelStore.VerifiedFolder"/>; one that fails is deleted and its row refreshed).
+    /// </summary>
+    private async Task VerifyInstalledModelsAsync()
+    {
+        await _launchScan;
+        var entries = ModelCatalog.All.Where(e => InstalledModelIds.Contains(e.Id) && !Downloads.ContainsKey(e.Id)).ToList();
+        if (entries.Count == 0 || _closing) return;
+        await Task.Factory.StartNew(() =>
+        {
+            Thread.CurrentThread.Priority = ThreadPriority.Lowest;
+            foreach (var entry in entries)
+            {
+                if (_closing) return;
+                try
+                {
+                    _services.Models.VerifiedFolder(entry);
+                }
+                catch (Exception e)
+                {
+                    Debug.WriteLine($"EchoDiar: could not verify model {entry.Id}: {e.GetType().Name}");
+                }
+            }
+        }, CancellationToken.None, TaskCreationOptions.LongRunning, TaskScheduler.Default);
     }
 
     private async Task LoadAndRecoverAsync()

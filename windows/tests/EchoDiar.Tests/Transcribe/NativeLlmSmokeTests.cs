@@ -47,12 +47,38 @@ public sealed class NativeLlmSmokeTests
 
         var pieces = 0;
         var text = await provider.WithLoadedModelAsync(Qwen3Small.Id, generator => generator.GenerateAsync(
-            [new LLMMessage(LLMRole.User, "Reply with the word hello.")], maxTokens: 16, _ => pieces++, Token), Token);
+            [new LLMMessage(LLMRole.User, "Reply with the word hello.")], MaxAnswerTokens, _ => pieces++, Token), Token);
 
         NativeSmokeTests.Log($"qwen3-0.6b ({System.Runtime.InteropServices.RuntimeInformation.ProcessArchitecture}): "
             + $"{pieces} pieces: {text}");
         Assert.True(pieces >= 1, "No token was generated.");
         Assert.NotEmpty(text);
+        AssertStopped("qwen3-0.6b", pieces);
+    }
+
+    /// <summary>Room for a one-word answer and then some: an answer that fills it never met its end-of-turn token.</summary>
+    private const int MaxAnswerTokens = 32;
+
+    /// <summary>
+    /// The answer ended at the model's end-of-turn token, not at <see cref="MaxAnswerTokens"/>: each token gives at most
+    /// one piece, so fewer pieces than the limit means the loop stopped early.
+    /// </summary>
+    private static void AssertStopped(string id, int pieces) =>
+        Assert.True(pieces < MaxAnswerTokens, $"{id} ran to {MaxAnswerTokens} tokens: no end of turn was detected.");
+
+    // The check after tokenization holds on its own: with no token texts broken first, a body holding a user-defined
+    // token (Qwen's <think>, which llama.cpp matches even without special parsing) fails with the short error.
+    [Fact]
+    public async Task AReservedTokenLeftInABodyFails()
+    {
+        SkipUnlessWindows();
+        var folder = await NativeSmokeTests.Installed(Qwen3Small);
+        using var weights = LLamaWeights.LoadFromFile(new ModelParams(ModelFile(folder, Qwen3Small)) { VocabOnly = true });
+
+        var error = Assert.Throws<LLMException>(() => new LlamaPrompt(weights, userDefined: []).Tokens(
+            [new LLMMessage(LLMRole.User, "Notes <think> more notes")]));
+
+        Assert.Equal("The text holds a token the model reserves for its chat format.", error.Message);
     }
 
     // Message text cannot speak the chat format: the template's markers are real control tokens, while control and
@@ -101,7 +127,7 @@ public sealed class NativeLlmSmokeTests
 
     // Opt-in: about 18 GB of downloads. Each catalog GGUF in turn is downloaded into a temp folder (never the cached
     // models), opened header and vocabulary only (llama.cpp knows the architecture), then each chat model loaded with
-    // an 8K context to answer through LlamaProvider's prompt path (its chat template laid out, one token at least) and
+    // an 8K context to answer through LlamaProvider's prompt path (its chat template laid out; "hello", ended by its end-of-turn token) and
     // its training window checked against the catalog, then deleted before the next, so at most one model is on disk.
     [Fact]
     public async Task EveryCatalogGgufLoads()
@@ -162,7 +188,7 @@ public sealed class NativeLlmSmokeTests
             Assert.Equal(entry.ContextTokens, weights.ContextSize);
             text = await new LlamaProvider.Generator(weights, parameters).GenerateAsync(
                 [new LLMMessage(LLMRole.System, "You are concise."), new LLMMessage(LLMRole.User, "Reply with the word hello.")],
-                maxTokens: 12, _ => pieces++, Token);
+                MaxAnswerTokens, _ => pieces++, Token);
         }
         // The mapped file is released before the folder is deleted.
         GC.Collect();
@@ -170,6 +196,8 @@ public sealed class NativeLlmSmokeTests
         NativeSmokeTests.Log($"gguf {entry.Id}: answer in {clock.Elapsed.TotalSeconds:0} s ({entry.ContextTokens} trained, "
             + $"{pieces} pieces): {text.ReplaceLineEndings(" ")}");
         Assert.True(pieces >= 1, $"{entry.Id} generated no token.");
+        AssertStopped(entry.Id, pieces);
+        Assert.Contains("hello", text, StringComparison.OrdinalIgnoreCase);
     }
 
     private static double Dot(float[] a, float[] b)
