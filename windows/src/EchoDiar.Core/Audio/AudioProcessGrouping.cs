@@ -24,22 +24,11 @@ public static class AudioProcessGrouping
         "explorer.exe", "svchost.exe", "audiodg.exe", "system", "services.exe", "csrss.exe",
     };
 
-    /// <summary>Display names of common apps. Phase 19's MeetingApps table supersedes this one.</summary>
-    private static readonly Dictionary<string, string> DisplayNames = new(StringComparer.OrdinalIgnoreCase)
+    /// <summary>Display names of common apps that are not in <see cref="MeetingApps.Known"/>, which names the others.</summary>
+    private static readonly Dictionary<string, string> OtherDisplayNames = new(StringComparer.OrdinalIgnoreCase)
     {
-        ["ms-teams.exe"] = "Microsoft Teams",
-        ["teams.exe"] = "Microsoft Teams (classic)",
-        ["zoom.exe"] = "Zoom",
-        ["chrome.exe"] = "Google Chrome",
-        ["msedge.exe"] = "Microsoft Edge",
-        ["firefox.exe"] = "Firefox",
-        ["brave.exe"] = "Brave",
-        ["slack.exe"] = "Slack",
-        ["discord.exe"] = "Discord",
         ["webex.exe"] = "Webex",
-        ["ciscocollabhost.exe"] = "Webex",
         ["whatsapp.exe"] = "WhatsApp",
-        ["skype.exe"] = "Skype",
     };
 
     /// <summary>
@@ -98,7 +87,8 @@ public static class AudioProcessGrouping
     private static AudioProcessGroup ToGroup(ProcessRow root, List<ProcessRow> rows)
     {
         var exe = root.Exe.ToLowerInvariant();
-        var name = DisplayNames.TryGetValue(exe, out var known) ? known : Path.GetFileNameWithoutExtension(exe);
+        var name = MeetingApps.ForExe(exe)?.Name
+            ?? (OtherDisplayNames.TryGetValue(exe, out var known) ? known : Path.GetFileNameWithoutExtension(exe));
         return new AudioProcessGroup(name, exe, root.Pid, rows.Select(r => r.Pid).Order().ToList(), NeedsGlobalTap: false);
     }
 }

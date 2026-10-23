@@ -16,4 +16,9 @@
   <ItemGroup>
     <ProjectReference Include="..\EchoDiar.Core\EchoDiar.Core.csproj" />
   </ItemGroup>
+
+  <ItemGroup>
+    <!-- MeetingDetection (the detector's state machine) is internal. -->
+    <InternalsVisibleTo Include="EchoDiar.Platform.Tests" />
+  </ItemGroup>
 </Project>

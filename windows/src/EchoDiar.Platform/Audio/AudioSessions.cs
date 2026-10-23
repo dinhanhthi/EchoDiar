@@ -60,7 +60,7 @@ public static class AudioSessions
     /// <summary><paramref name="rootPid"/> and its descendants now (WindowFollower); just the root when the snapshot fails.</summary>
     internal static HashSet<int> ProcessTree(int rootPid) => Tree(rootPid, Snapshot());
 
-    private readonly record struct ProcessEntry(int Pid, int ParentPid, string Exe);
+    internal readonly record struct ProcessEntry(int Pid, int ParentPid, string Exe);
 
     /// <summary>Pid → whether one of its sessions is active, for every pid with a session that has not expired.</summary>
     private static Dictionary<int, bool> SessionStates()
@@ -138,7 +138,7 @@ public static class AudioSessions
     }
 
     /// <summary>Every process (Toolhelp32 snapshot) by pid, with its parent pid and lowercase exe name; empty on failure.</summary>
-    private static unsafe Dictionary<int, ProcessEntry> Snapshot()
+    internal static unsafe Dictionary<int, ProcessEntry> Snapshot()
     {
         var processes = new Dictionary<int, ProcessEntry>();
         using var snapshot = PInvoke.CreateToolhelp32Snapshot_SafeHandle(CREATE_TOOLHELP_SNAPSHOT_FLAGS.TH32CS_SNAPPROCESS, 0);
@@ -157,7 +157,7 @@ public static class AudioSessions
     /// <paramref name="rootPid"/> and its descendants by parent pid. The snapshot has no start times, so a process
     /// whose dead parent's pid was reused by a member counts as a child. Pid reuse can make cycles; each pid is visited once.
     /// </summary>
-    private static HashSet<int> Tree(int rootPid, Dictionary<int, ProcessEntry> processes)
+    internal static HashSet<int> Tree(int rootPid, Dictionary<int, ProcessEntry> processes)
     {
         var children = processes.Values.ToLookup(p => p.ParentPid, p => p.Pid);
         var tree = new HashSet<int> { rootPid };

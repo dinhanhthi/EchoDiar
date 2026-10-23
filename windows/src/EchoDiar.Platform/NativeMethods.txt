@@ -84,3 +84,6 @@ DwmGetWindowAttribute
 IsWindow
 GetForegroundWindow
 SetForegroundWindow
+IAudioSessionNotification
+IAudioSessionEvents
+AudioSessionDisconnectReason
