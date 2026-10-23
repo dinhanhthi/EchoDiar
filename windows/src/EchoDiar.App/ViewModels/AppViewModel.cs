@@ -386,6 +386,14 @@ public sealed partial class AppViewModel : ObservableObject
 
     public void ShowRecording() => Route = Route.Recording;
 
+    /// <summary>The main window was closed to the tray: it opens again on the list, without a search (macOS windowWillClose).</summary>
+    internal void MainWindowHidden()
+    {
+        if (_closing) return;
+        Route = Route.List;
+        SearchTerm = "";
+    }
+
     /// <summary>
     /// The onboarding window should show, from its first step (macOS <c>OnboardingWindow.shared.show</c>): at launch
     /// until it is completed, and from "Show onboarding again". Raised on the UI thread.

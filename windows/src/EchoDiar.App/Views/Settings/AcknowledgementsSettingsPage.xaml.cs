@@ -33,7 +33,6 @@ public sealed partial class AcknowledgementsSettingsPage : UserControl
         new("Windows Community Toolkit", "8.3.260402-preview2", "Settings cards", "MIT", "https://github.com/CommunityToolkit/Windows"),
         new("Windows App SDK", "2.5.1", "WinUI 3 and the app platform", "MIT", "https://github.com/microsoft/WindowsAppSDK",
             "Its runtime files come under the Microsoft Software License Terms."),
-        new("H.NotifyIcon", null, "Notification area icon", "MIT", "https://github.com/HavenDV/H.NotifyIcon"),
     ];
 
     /// <summary>The models EchoDiar downloads (Core ModelCatalog).</summary>

@@ -141,7 +141,7 @@ public sealed partial class MainWindow : Window
     /// <paramref name="key"/>'s colour in the theme dictionary of <paramref name="theme"/> (WinUI keeps Dark under
     /// "Default"). The app-level lookup is the fallback only: it keeps the theme the app started in.
     /// </summary>
-    private static Color ThemeColor(string key, ElementTheme theme)
+    internal static Color ThemeColor(string key, ElementTheme theme)
     {
         string[] names = theme == ElementTheme.Light ? ["Light"] : ["Dark", "Default"];
         if (FindThemeValue(Application.Current.Resources, key, names) is Color color) return color;
@@ -167,6 +167,12 @@ public sealed partial class MainWindow : Window
         }
 
         return null;
+    }
+
+    /// <summary>Saves the frame of the shown layout (the window is hidden to the tray: the process may end before it closes).</summary>
+    internal void SaveFrame()
+    {
+        if (!_closing) _frames.Save();
     }
 
     /// <summary>Saves the frame while the window still answers, then lets go of everything that would call it.</summary>

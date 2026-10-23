@@ -23,6 +23,14 @@ public partial class App : Application
     private AppViewModel? _model;
     private FloatingPillController? _pill;
     private OnboardingWindow? _onboarding;
+    private TrayIcon? _tray;
+    private DispatcherQueue? _dispatcher;
+
+    /// <summary>The main window closes for good (Quit, the session's end): its close is no longer turned into a hide.</summary>
+    private bool _quitting;
+
+    /// <summary><see cref="Shutdown"/> ran: the session's end runs it before the window closes.</summary>
+    private bool _shutDown;
 
 #if DEBUG
     /// <summary>DEBUG <c>--no-backdrop</c>: the window paints the theme's solid background instead of setting a system backdrop (A/B in a VM).</summary>
@@ -72,7 +80,10 @@ public partial class App : Application
             return;
         }
 
+        // Launch at login (Settings › General): only the tray icon, as macOS starts in the menu bar.
+        var atLogin = AppInstance.GetCurrent().GetActivatedEventArgs().Kind == ExtendedActivationKind.StartupTask;
         var dispatcher = DispatcherQueue.GetForCurrentThread();
+        _dispatcher = dispatcher;
         AppInstance.GetCurrent().Activated += (_, _) => dispatcher.TryEnqueue(ShowWindow);
         StartupTrace.Write("begin AppServices");
         _services = new AppServices(Paths);
@@ -80,9 +91,22 @@ public partial class App : Application
         _model = new AppViewModel(_services, dispatcher);
         _window = new MainWindow(_model);
         _pill = new FloatingPillController(_model, _window, dispatcher);
+        // X and Alt+F4 hide the window to the tray (macOS: the menu bar app runs on); Quit closes it.
+        _window.AppWindow.Closing += OnMainWindowClosing;
         _window.Closed += (_, _) =>
         {
-            // Each apart, and neither may stop the recording's stop and the settings write below.
+            _quitting = true;
+            // Each apart, and none may stop the recording's stop and the settings write below.
+            try
+            {
+                // No icon is left in the notification area, and no menu opens on a closing app.
+                _tray?.Dispose();
+            }
+            catch (Exception e)
+            {
+                Debug.WriteLine($"EchoDiar: could not remove the tray icon: {e}");
+            }
+            _tray = null;
             try
             {
                 // First, while the model still answers: a pending drag is saved, and the pill's window closes (an
@@ -108,11 +132,28 @@ public partial class App : Application
             _window = null;
             Shutdown();
         };
+        try
+        {
+            _tray = new TrayIcon(_model, dispatcher, ShowWindow, Quit, EndSession);
+        }
+        catch (Exception e)
+        {
+            // Without the icon the window is the only way back: its close quits, and it shows at login too.
+            Debug.WriteLine($"EchoDiar: could not add the tray icon: {e}");
+            StartupTrace.Write($"tray icon failed: {e.GetType().Name} {e.Message}");
+        }
         // At launch (after the main window shows, once the settings are loaded) and from Settings › General.
         _model.OnboardingRequested += ShowOnboarding;
-        StartupTrace.Write("begin Activate");
-        _window.Activate();
-        StartupTrace.Write("end Activate");
+        if (atLogin && _tray is not null)
+        {
+            StartupTrace.Write("launched at login: tray only");
+        }
+        else
+        {
+            StartupTrace.Write("begin Activate");
+            _window.Activate();
+            StartupTrace.Write("end Activate");
+        }
         try
         {
             await _model.StartAsync();
@@ -125,7 +166,7 @@ public partial class App : Application
         }
     }
 
-    /// <summary>A redirected launch: brings the window back, restored if minimized.</summary>
+    /// <summary>A redirected launch, the tray icon and its menu: brings the window back (shown if hidden, restored if minimized).</summary>
     private void ShowWindow()
     {
         if (_window is null) return;
@@ -162,9 +203,44 @@ public partial class App : Application
         }
     }
 
-    /// <summary>The window closed: a running recording is stopped so its audio file is finished.</summary>
+    /// <summary>
+    /// X or Alt+F4: the window hides and the app runs on in the tray (a recording goes on, the pill too); it opens again
+    /// on the list (macOS windowWillClose). Without a tray icon, or once quitting, the window closes.
+    /// </summary>
+    private void OnMainWindowClosing(AppWindow sender, AppWindowClosingEventArgs args)
+    {
+        if (_quitting || _tray is null || _window is not { } window || _model is not { } model) return;
+        args.Cancel = true;
+        window.SaveFrame();
+        sender.Hide();
+        model.MainWindowHidden();
+    }
+
+    /// <summary>"Quit › Sure to quit": the main window closes for good; its Closed stops everything and the app ends.</summary>
+    private void Quit()
+    {
+        _quitting = true;
+        _window?.Close();
+    }
+
+    /// <summary>
+    /// Sign-out, shutdown or restart (WM_ENDSESSION, inside the tray icon's window procedure): the process may end once
+    /// this returns, so a running recording is stopped now, synchronously (as before sleep), and the settings written;
+    /// the app then quits as usual if it still runs.
+    /// </summary>
+    private void EndSession()
+    {
+        StartupTrace.Write("session ending");
+        _quitting = true;
+        Shutdown();
+        _dispatcher?.TryEnqueue(Quit);
+    }
+
+    /// <summary>Quit or the session's end: a running recording is stopped so its audio file is finished. Runs once.</summary>
     private void Shutdown()
     {
+        if (_shutDown) return;
+        _shutDown = true;
         // A stop that did not end in time still holds the engine: disposing it would block on it.
         if (_model is { } model && !model.Shutdown()) return;
         _services?.Dispose();

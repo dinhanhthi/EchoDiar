@@ -10,6 +10,9 @@ namespace EchoDiar.Platform.SystemServices;
 /// <summary>
 /// A hidden message-only window (parent HWND_MESSAGE): a target for Windows notifications sent to a window handle
 /// (session changes, suspend and resume; Phase 21: hot keys, tray icon callbacks). Handlers are added per message.
+/// With <c>topLevel</c>, a hidden top-level window instead (a popup that is never shown): only those get the messages
+/// Windows broadcasts or sends to every top-level window (WM_QUERYENDSESSION, WM_ENDSESSION, "TaskbarCreated"), and
+/// only such a window can be made the foreground window for a notification icon's menu.
 /// <para>
 /// Threading: create, add or remove handlers and <see cref="Dispose"/> on one thread that pumps messages (the WinUI
 /// UI thread). Windows delivers the window's messages on that thread, so handlers run there too. A handler that
@@ -35,7 +38,8 @@ internal sealed class MessageWindow : IDisposable
 
     /// <summary>Creates the window. Throws <see cref="Win32Exception"/> if Windows refuses.</summary>
     /// <param name="log">Gets failures: handler exceptions, a failed destroy.</param>
-    internal unsafe MessageWindow(Action<string>? log = null)
+    /// <param name="topLevel">A hidden top-level window instead of a message-only one (see the class summary).</param>
+    internal unsafe MessageWindow(Action<string>? log = null, bool topLevel = false)
     {
         _log = log;
         _instance = new HINSTANCE(PInvoke.GetModuleHandle(default(PCWSTR)).Value);
@@ -52,7 +56,10 @@ internal sealed class MessageWindow : IDisposable
             // another window uses it.
             if (PInvoke.RegisterClassEx(windowClass) == 0) throw new Win32Exception();
 
-            Handle = PInvoke.CreateWindowEx(0, className, default(PCWSTR), 0, 0, 0, 0, 0, HWND.HWND_MESSAGE, HMENU.Null, _instance, null);
+            // A tool window: never in the taskbar or Alt+Tab, even if something showed it.
+            Handle = PInvoke.CreateWindowEx(
+                topLevel ? WINDOW_EX_STYLE.WS_EX_TOOLWINDOW : 0, className, default(PCWSTR), topLevel ? WINDOW_STYLE.WS_POPUP : 0,
+                0, 0, 0, 0, topLevel ? HWND.Null : HWND.HWND_MESSAGE, HMENU.Null, _instance, null);
             if (Handle.IsNull)
             {
                 var error = new Win32Exception();

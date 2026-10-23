@@ -98,6 +98,18 @@ public sealed partial class AppViewModel
         if (PillPrompt is PillPrompt.MeetingDetected) PillPrompt = null;
     }
 
+    /// <summary>The detected meeting app's name, for the tray menu's "Detected: &lt;App&gt;"; null when none.</summary>
+    public string? DetectedMeetingName => _detectedMeeting?.Name;
+
+    /// <summary>The tray menu's "Stop asking for this app": the detected app is ignored from now on (macOS <c>stopAskingForDetectedApp</c>).</summary>
+    public void StopAskingForDetectedApp()
+    {
+        if (_closing || _detectedMeeting is not { } meeting) return;
+        SaveSettings(Settings with { PerAppBehavior = new(Settings.PerAppBehavior) { [meeting.App.AppExe] = MeetingBehavior.Ignore } });
+        _detectedMeeting = null;
+        DismissMeetingPrompt();
+    }
+
     /// <summary>"Keep recording" on the end prompt: that trigger stays quiet for 10 min.</summary>
     public void KeepRecording()
     {
