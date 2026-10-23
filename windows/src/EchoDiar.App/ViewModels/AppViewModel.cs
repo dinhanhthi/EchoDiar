@@ -442,6 +442,7 @@ public sealed partial class AppViewModel : ObservableObject
         IsStarting = true;
         RecordingError = null;
         RecordingSourceName = app?.Name;
+        RecordingSourceRootPid = app?.RootPid;
         var root = _services.Paths.Conversations;
         try
         {
@@ -471,6 +472,7 @@ public sealed partial class AppViewModel : ObservableObject
             Debug.WriteLine($"EchoDiar: could not start recording: {e}");
             CancelRecordingTranscriber();
             RecordingSourceName = null;
+            RecordingSourceRootPid = null;
             RecordingError = e is RecordingDiskFullException
                 ? "There is not enough free disk space to record."
                 : $"The recording could not start ({e.Message}).";
@@ -568,6 +570,7 @@ public sealed partial class AppViewModel : ObservableObject
         }
         StopPolling();
         RecordingSourceName = null;
+        RecordingSourceRootPid = null;
         if (snapshot.EndReason is not { } reason) return;
         // The next recording starts with the default language again.
         if (_languageOverride is not null)

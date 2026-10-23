@@ -20,6 +20,7 @@ public partial class App : Application
     private MainWindow? _window;
     private AppServices? _services;
     private AppViewModel? _model;
+    private FloatingPillController? _pill;
 
 #if DEBUG
     /// <summary>DEBUG <c>--no-backdrop</c>: the window paints the theme's solid background instead of setting a system backdrop (A/B in a VM).</summary>
@@ -76,8 +77,13 @@ public partial class App : Application
         StartupTrace.Write("end AppServices");
         _model = new AppViewModel(_services, dispatcher);
         _window = new MainWindow(_model);
+        _pill = new FloatingPillController(_model, _window, dispatcher);
         _window.Closed += (_, _) =>
         {
+            // First, while the model still answers: a pending drag is saved, and the pill's window closes (an open
+            // window, even hidden, would keep the app running).
+            _pill?.Dispose();
+            _pill = null;
             // A closed window fails every call: a redirected launch queued meanwhile finds none.
             _window = null;
             Shutdown();

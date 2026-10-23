@@ -1,0 +1,103 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    The floating pill (macOS FloatingPillView.swift): the logo, the recording dot, "Recording <App>" after an automatic
+    start, the elapsed time and a level meter; Pause or Resume, Stop and the language menu while the pointer is over it.
+    A prompt (Phase 20) takes the indicator's place. The capsule sizes to its content inside a Canvas, so its size is
+    the window's, which the controller sets; the window's region clips it to the capsule.
+-->
+<Window
+    x:Class="EchoDiar.App.Views.FloatingPillWindow"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:local="using:EchoDiar.App"
+    Title="EchoDiar">
+
+    <Canvas x:Name="RootCanvas" Background="{ThemeResource SolidBackgroundFillColorBaseBrush}">
+        <Grid
+            x:Name="Capsule"
+            Background="{ThemeResource SolidBackgroundFillColorBaseBrush}"
+            BorderBrush="{ThemeResource SurfaceStrokeColorFlyoutBrush}"
+            BorderThickness="1">
+            <StackPanel x:Name="Indicator" VerticalAlignment="Center" Orientation="Horizontal">
+                <Image
+                    x:Name="Logo"
+                    VerticalAlignment="Center"
+                    AutomationProperties.AccessibilityView="Raw"
+                    Source="ms-appx:///Assets/Square44x44Logo.png" />
+                <Grid x:Name="DotGrid" VerticalAlignment="Center">
+                    <Ellipse x:Name="RecordingDot" Fill="{ThemeResource SystemFillColorCriticalBrush}" />
+                    <Ellipse
+                        x:Name="PausedDot"
+                        Fill="{ThemeResource SystemFillColorCautionBrush}"
+                        Visibility="Collapsed" />
+                </Grid>
+                <TextBlock
+                    x:Name="SourceText"
+                    VerticalAlignment="Center"
+                    FontWeight="SemiBold"
+                    MaxLines="1"
+                    Visibility="Collapsed" />
+                <TextBlock x:Name="ElapsedText" VerticalAlignment="Center" FontWeight="SemiBold" />
+                <!-- The elapsed time in the paused dot's colour. -->
+                <TextBlock
+                    x:Name="PausedElapsedText"
+                    VerticalAlignment="Center"
+                    FontWeight="SemiBold"
+                    Foreground="{ThemeResource SystemFillColorCautionBrush}"
+                    Visibility="Collapsed" />
+                <!-- The louder channel's peak. -->
+                <Border
+                    x:Name="MeterTrack"
+                    VerticalAlignment="Center"
+                    AutomationProperties.AccessibilityView="Raw"
+                    Background="{ThemeResource ControlStrongFillColorDefaultBrush}">
+                    <Border
+                        x:Name="MeterFill"
+                        Width="0"
+                        HorizontalAlignment="Left"
+                        Background="{ThemeResource AccentFillColorDefaultBrush}" />
+                </Border>
+                <!-- Shown while the pointer is over the pill. -->
+                <StackPanel x:Name="Controls" Orientation="Horizontal" Visibility="Collapsed">
+                    <Button
+                        x:Name="PauseButton"
+                        MinWidth="0"
+                        MinHeight="0"
+                        VerticalAlignment="Center"
+                        Style="{StaticResource SubtleButtonStyle}">
+                        <FontIcon x:Name="PauseIcon" FontFamily="{ThemeResource SymbolThemeFontFamily}" Glyph="&#xE769;" />
+                    </Button>
+                    <Button
+                        x:Name="StopButton"
+                        MinWidth="0"
+                        MinHeight="0"
+                        VerticalAlignment="Center"
+                        Style="{StaticResource SubtleButtonStyle}"
+                        AutomationProperties.Name="{local:T Text='Stop'}"
+                        ToolTipService.ToolTip="{local:T Text='Stop recording'}">
+                        <FontIcon
+                            x:Name="StopIcon"
+                            FontFamily="{ThemeResource SymbolThemeFontFamily}"
+                            Foreground="{ThemeResource SystemFillColorCriticalBrush}"
+                            Glyph="&#xE71A;" />
+                    </Button>
+                    <Button
+                        x:Name="LanguageButton"
+                        MinWidth="0"
+                        MinHeight="0"
+                        VerticalAlignment="Center"
+                        Style="{StaticResource SubtleButtonStyle}"
+                        AutomationProperties.Name="{local:T Text='Language'}"
+                        ToolTipService.ToolTip="{local:T Text='Language from now on'}">
+                        <FontIcon x:Name="GlobeIcon" FontFamily="{ThemeResource SymbolThemeFontFamily}" Glyph="&#xE774;" />
+                        <Button.Flyout>
+                            <MenuFlyout x:Name="LanguageMenu" Placement="Bottom" />
+                        </Button.Flyout>
+                    </Button>
+                </StackPanel>
+            </StackPanel>
+            <!-- Phase 20: the meeting prompts. -->
+            <ContentPresenter x:Name="PromptHost" Visibility="Collapsed" />
+        </Grid>
+    </Canvas>
+</Window>
