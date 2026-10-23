@@ -19,8 +19,12 @@ public sealed record RAGStatus(
 /// <summary>
 /// A cloud embedder's one-time confirmation waiting for the window's dialog (macOS RAGSettingsView "Send transcripts to
 /// …?"): its provider, the destination key it is remembered under, the host shown, and how many conversations would go.
+/// <paramref name="PickProviderId"/>: a provider picked in Settings › RAG and not saved yet, which Understood makes the
+/// embedder with <paramref name="PickModel"/> (macOS <c>pendingCloud</c>: the setting changes only on Understood); null
+/// for the embedder in use.
 /// </summary>
-public sealed record PendingEmbeddingConsent(string ProviderName, string Destination, string Host, int Conversations);
+public sealed record PendingEmbeddingConsent(
+    string ProviderName, string Destination, string Host, int Conversations, string? PickProviderId = null, string PickModel = "");
 
 /// <summary>
 /// The library index and the chat across the library (macOS LibraryChatModel.swift): the index follows the library (a
@@ -405,37 +409,69 @@ public sealed partial class AppViewModel
     /// <c>embedderNeedsConsent</c>). Loopback hosts (<see cref="ProviderInput.IsLoopback"/>, wider than
     /// <see cref="ITextEmbedder.IsLocal"/>) need no confirmation; a base URL with no destination is never confirmed.
     /// </summary>
-    private static bool EmbedderNeedsConsent(AppSettings settings, IReadOnlyList<ProviderConfig> configs)
-    {
-        if (AppServices.EmbeddingConfig(settings, configs) is not { } config || ProviderInput.IsLoopback(config.BaseURL)) return false;
-        return LibraryChat.EmbeddingDestination(config) is not { } destination || !settings.CloudEmbeddingConfirmed.Contains(destination);
-    }
+    private static bool EmbedderNeedsConsent(AppSettings settings, IReadOnlyList<ProviderConfig> configs) =>
+        AppServices.EmbeddingConfig(settings, configs) is { } config && NeedsEmbeddingConsent(settings, config);
 
     /// <summary>
-    /// Asks the window to confirm the current API embedder's destination (Settings › RAG's Confirm… and its pick of an API
-    /// embedder, Phase 27.3); nothing when it needs no confirmation.
+    /// <paramref name="config"/> as an embedder would send transcripts off this PC to a destination not confirmed yet
+    /// (macOS RAGSettingsView <c>needsConsent</c>); a base URL with no destination is never confirmed.
+    /// </summary>
+    public static bool NeedsEmbeddingConsent(AppSettings settings, ProviderConfig config) =>
+        !ProviderInput.IsLoopback(config.BaseURL)
+        && (LibraryChat.EmbeddingDestination(config) is not { } destination || !settings.CloudEmbeddingConfirmed.Contains(destination));
+
+    /// <summary>
+    /// Asks the window to confirm the current API embedder's destination (Settings › RAG's Confirm…); nothing when it
+    /// needs no confirmation.
     /// </summary>
     public void RequestCloudEmbeddingConsent()
     {
         var configs = ProvidersModel.ProviderConfigs;
         if (_closing || !EmbedderNeedsConsent(Settings, configs) || AppServices.EmbeddingConfig(Settings, configs) is not { } config
             || LibraryChat.EmbeddingDestination(config) is not { } destination) return;
-        var host = Uri.TryCreate(config.BaseURL.Trim(), UriKind.Absolute, out var url) ? url.Host : config.BaseURL;
-        PendingEmbeddingConsent = new PendingEmbeddingConsent(
-            config.DisplayName, destination, host, Conversations.Count(c => c.HasTranscript));
+        PendingEmbeddingConsent = EmbeddingConsent(config, destination);
     }
 
     /// <summary>
-    /// The window's answer: Understood remembers the destination in <c>cloudEmbeddingConfirmed</c> and indexes (macOS
-    /// <c>confirmCloudEmbedding</c>); Cancel sends nothing.
+    /// Makes <paramref name="config"/> the embedder with <paramref name="model"/> (Settings › RAG's pick of an API
+    /// embedder, macOS <c>selectAPI</c>): a destination off this PC not confirmed yet asks the window first, and the
+    /// setting changes only on Understood. A base URL with no destination is picked without asking: nothing can be sent
+    /// to it, and the index says why. Nothing when it is the embedder already.
+    /// </summary>
+    public void PickAPIEmbedder(ProviderConfig config, string model)
+    {
+        var id = ModelCatalog.ApiEmbedderPrefix + config.Id;
+        if (_closing || Settings.EmbeddingModelID == id) return;
+        if (NeedsEmbeddingConsent(Settings, config) && LibraryChat.EmbeddingDestination(config) is { } destination)
+        {
+            PendingEmbeddingConsent = EmbeddingConsent(config, destination) with { PickProviderId = config.Id, PickModel = model };
+            return;
+        }
+        ApplySettings(Settings with { EmbeddingModelID = id, EmbeddingAPIModel = model });
+    }
+
+    private PendingEmbeddingConsent EmbeddingConsent(ProviderConfig config, string destination)
+    {
+        var host = Uri.TryCreate(config.BaseURL.Trim(), UriKind.Absolute, out var url) ? url.Host : config.BaseURL;
+        return new PendingEmbeddingConsent(config.DisplayName, destination, host, Conversations.Count(c => c.HasTranscript));
+    }
+
+    /// <summary>
+    /// The window's answer: Understood makes a picked provider the embedder, remembers the destination in
+    /// <c>cloudEmbeddingConfirmed</c> and indexes (macOS <c>confirm</c> and <c>confirmCloudEmbedding</c>), in one change;
+    /// Cancel changes nothing and sends nothing.
     /// </summary>
     public void ResolveCloudEmbeddingConsent(bool allowed)
     {
         if (PendingEmbeddingConsent is not { } pending) return;
         PendingEmbeddingConsent = null;
         if (!allowed || _closing) return;
-        if (!Settings.CloudEmbeddingConfirmed.Contains(pending.Destination))
-            ApplySettings(Settings with { CloudEmbeddingConfirmed = [.. Settings.CloudEmbeddingConfirmed, pending.Destination] });
+        var settings = Settings;
+        if (pending.PickProviderId is { } pick)
+            settings = settings with { EmbeddingModelID = ModelCatalog.ApiEmbedderPrefix + pick, EmbeddingAPIModel = pending.PickModel };
+        if (!settings.CloudEmbeddingConfirmed.Contains(pending.Destination))
+            settings = settings with { CloudEmbeddingConfirmed = [.. settings.CloudEmbeddingConfirmed, pending.Destination] };
+        ApplySettings(settings);
         SyncLibraryIndex();
     }
 

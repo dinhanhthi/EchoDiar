@@ -195,12 +195,15 @@ public sealed partial class ProvidersSettingsPage : UserControl
     }
 
     /// <summary>
-    /// A cloud engine's Set Up in Settings › Transcription (macOS <c>settingsExpandedProvider</c>): its API row on Cloud
-    /// APIs expands and comes into view, and the request is cleared.
+    /// A Set Up in Settings › Transcription or RAG (macOS <c>settingsExpandedProvider</c>): its API row on Cloud APIs, or
+    /// its saved local host's row on On this PC, expands and comes into view, and the request is cleared.
     /// </summary>
     private void ExpandRequestedProvider(string? tab)
     {
-        if (Closing || tab != CloudAPIsTab || _model.SettingsExpandedProvider is not { } id || !_apiRows.TryGetValue(id, out var row)) return;
+        if (Closing || tab is not (CloudAPIsTab or OnThisPCTab) || _model.SettingsExpandedProvider is not { } id
+            || !_apiRows.TryGetValue(id, out var row)) return;
+        // Only on the tab its row is on.
+        if ((tab == OnThisPCTab) != ReferenceEquals(row.Expander.Parent, LocalHostsList)) return;
         _model.SettingsExpandedProvider = null;
         row.Expander.IsExpanded = true;
         // After the panel's layout: a row of a tab just shown has no position yet.

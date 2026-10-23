@@ -229,7 +229,8 @@ public sealed partial class ModelsViewModel : ObservableObject
         return options.Contains(current) ? options : [.. options.Append(current).Order()];
     }
 
-    private static string SizeText(int mib) =>
+    /// <summary>A model's download size as its row shows it ("547 MiB", "2.6 GB"; macOS <c>ModelRow.sizeText</c>).</summary>
+    internal static string SizeText(int mib) =>
         mib < 1024
             ? string.Format(CultureInfo.CurrentCulture, "{0} MiB", mib)
             : string.Format(CultureInfo.CurrentCulture, "{0:0.0} GB", mib / 1024.0);
