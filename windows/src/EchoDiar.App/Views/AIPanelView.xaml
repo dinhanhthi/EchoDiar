@@ -1,0 +1,371 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    The Summary or Chat tab of the open conversation (macOS AIPanelView.swift): Summary shows the kept summaries (the
+    newest first with a menu for the earlier ones) and Summarize / Re-summarize / Stop; Chat shows the questions with
+    their streamed answers, the History panel at the trailing edge, and the question row. The bottom bar has the model
+    and language menus with the "i" (where the data goes), Copy as prompt and the tab's action. Fluent cards in theme
+    resources (Light and Dark); the messages, menus and history rows are built in code.
+-->
+<UserControl
+    x:Class="EchoDiar.App.Views.AIPanelView"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:local="using:EchoDiar.App">
+
+    <UserControl.Resources>
+        <Style x:Key="PaneStyle" TargetType="Border">
+            <Setter Property="Background" Value="{ThemeResource CardBackgroundFillColorDefaultBrush}" />
+            <Setter Property="BorderBrush" Value="{ThemeResource CardStrokeColorDefaultBrush}" />
+            <Setter Property="BorderThickness" Value="1" />
+            <Setter Property="CornerRadius" Value="{StaticResource OverlayCornerRadius}" />
+        </Style>
+        <Style x:Key="EmptyNoteStyle" TargetType="TextBlock" BasedOn="{StaticResource BodyTextBlockStyle}">
+            <Setter Property="Foreground" Value="{ThemeResource TextFillColorSecondaryBrush}" />
+            <Setter Property="HorizontalAlignment" Value="Center" />
+            <Setter Property="VerticalAlignment" Value="Center" />
+            <Setter Property="TextAlignment" Value="Center" />
+            <Setter Property="TextWrapping" Value="Wrap" />
+            <Setter Property="Margin" Value="20" />
+        </Style>
+        <Style x:Key="CaptionStyle" TargetType="TextBlock" BasedOn="{StaticResource CaptionTextBlockStyle}">
+            <Setter Property="Foreground" Value="{ThemeResource TextFillColorSecondaryBrush}" />
+        </Style>
+        <!-- The styles of the elements built in code: theme resources, so they follow a theme switch. -->
+        <Style x:Key="UserBubbleStyle" TargetType="Border">
+            <Setter Property="Background" Value="{ThemeResource SubtleFillColorSecondaryBrush}" />
+            <Setter Property="CornerRadius" Value="8" />
+            <Setter Property="Padding" Value="10,6" />
+            <Setter Property="HorizontalAlignment" Value="Right" />
+        </Style>
+        <Style x:Key="BadgeStyle" TargetType="Border">
+            <Setter Property="Background" Value="{ThemeResource ControlFillColorDefaultBrush}" />
+            <Setter Property="BorderBrush" Value="{ThemeResource ControlStrokeColorDefaultBrush}" />
+            <Setter Property="BorderThickness" Value="1" />
+            <Setter Property="CornerRadius" Value="11" />
+            <Setter Property="Height" Value="22" />
+            <Setter Property="Padding" Value="8,0" />
+        </Style>
+        <Style x:Key="CurrentChatStyle" TargetType="Border">
+            <Setter Property="Background" Value="{ThemeResource SubtleFillColorSecondaryBrush}" />
+            <Setter Property="CornerRadius" Value="{StaticResource ControlCornerRadius}" />
+            <Setter Property="Padding" Value="8,6" />
+        </Style>
+        <Style x:Key="NoteTextStyle" TargetType="TextBlock" BasedOn="{StaticResource BodyTextBlockStyle}">
+            <Setter Property="TextWrapping" Value="Wrap" />
+        </Style>
+        <Style x:Key="NoteIconStyle" TargetType="FontIcon">
+            <Setter Property="FontFamily" Value="{ThemeResource SymbolThemeFontFamily}" />
+            <Setter Property="FontSize" Value="14" />
+            <Setter Property="Foreground" Value="{ThemeResource TextFillColorSecondaryBrush}" />
+            <Setter Property="VerticalAlignment" Value="Top" />
+            <Setter Property="Margin" Value="0,3,0,0" />
+        </Style>
+    </UserControl.Resources>
+
+    <Grid RowSpacing="10">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="*" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+        </Grid.RowDefinitions>
+
+        <!-- Summary: the version menu over the summary, or a note while there is none. -->
+        <Border x:Name="SummaryPane" Style="{StaticResource PaneStyle}">
+            <Grid>
+                <TextBlock x:Name="SummaryEmptyText" Style="{StaticResource EmptyNoteStyle}" />
+                <Grid x:Name="SummaryContent">
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="*" />
+                    </Grid.RowDefinitions>
+                    <DropDownButton
+                        x:Name="VersionButton"
+                        MaxWidth="260"
+                        Margin="14,16,14,0"
+                        ToolTipService.ToolTip="{local:T Text='Earlier summaries of this conversation'}">
+                        <StackPanel Orientation="Horizontal" Spacing="6">
+                            <FontIcon FontFamily="{ThemeResource SymbolThemeFontFamily}" FontSize="14" Glyph="&#xE81C;" />
+                            <TextBlock
+                                x:Name="VersionText"
+                                MaxLines="1"
+                                TextTrimming="CharacterEllipsis"
+                                TextWrapping="NoWrap" />
+                        </StackPanel>
+                        <DropDownButton.Flyout>
+                            <MenuFlyout x:Name="VersionMenu" Placement="BottomEdgeAlignedLeft" />
+                        </DropDownButton.Flyout>
+                    </DropDownButton>
+                    <ScrollViewer x:Name="SummaryScroller" Grid.Row="1">
+                        <StackPanel x:Name="SummaryBody" Padding="14,10,14,16" Spacing="8">
+                            <StackPanel x:Name="SummaryStatusPanel" Orientation="Horizontal" Spacing="6">
+                                <ProgressRing
+                                    Width="16"
+                                    Height="16"
+                                    MinWidth="0"
+                                    MinHeight="0"
+                                    IsActive="True" />
+                                <TextBlock
+                                    x:Name="SummaryStatusText"
+                                    VerticalAlignment="Center"
+                                    Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                            </StackPanel>
+                            <RichTextBlock x:Name="SummaryText" />
+                        </StackPanel>
+                    </ScrollViewer>
+                </Grid>
+            </Grid>
+        </Border>
+
+        <!-- Chat: the messages, or a note while there are none; the History panel over the trailing edge. -->
+        <Border x:Name="ChatPane" Style="{StaticResource PaneStyle}" Visibility="Collapsed">
+            <Grid>
+                <TextBlock x:Name="ChatEmptyText" Style="{StaticResource EmptyNoteStyle}" />
+                <ScrollViewer x:Name="ChatScroller">
+                    <StackPanel x:Name="MessagesPanel" Padding="14,16" Spacing="20" />
+                </ScrollViewer>
+                <Border
+                    x:Name="HistoryPanel"
+                    Width="260"
+                    Margin="8"
+                    HorizontalAlignment="Right"
+                    Background="{ThemeResource AcrylicInAppFillColorDefaultBrush}"
+                    BorderBrush="{ThemeResource SurfaceStrokeColorFlyoutBrush}"
+                    BorderThickness="1"
+                    CornerRadius="{StaticResource OverlayCornerRadius}"
+                    Visibility="Collapsed">
+                    <Grid>
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="*" />
+                        </Grid.RowDefinitions>
+                        <Grid Padding="14,10,6,4" ColumnSpacing="4">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+                            <TextBlock
+                                VerticalAlignment="Center"
+                                Style="{StaticResource BodyStrongTextBlockStyle}"
+                                Text="{local:T Text='History'}" />
+                            <Button
+                                x:Name="ClearHistoryButton"
+                                Grid.Column="1"
+                                Style="{StaticResource SubtleButtonStyle}"
+                                AutomationProperties.Name="{local:T Text='Delete all earlier chats'}"
+                                ToolTipService.ToolTip="{local:T Text='Delete all earlier chats'}">
+                                <FontIcon FontFamily="{ThemeResource SymbolThemeFontFamily}" FontSize="14" Glyph="&#xE74D;" />
+                            </Button>
+                            <Button
+                                x:Name="CloseHistoryButton"
+                                Grid.Column="2"
+                                Style="{StaticResource SubtleButtonStyle}"
+                                AutomationProperties.Name="{local:T Text='Close'}"
+                                ToolTipService.ToolTip="{local:T Text='Close the history'}">
+                                <FontIcon FontFamily="{ThemeResource SymbolThemeFontFamily}" FontSize="14" Glyph="&#xE711;" />
+                            </Button>
+                        </Grid>
+                        <ScrollViewer Grid.Row="1">
+                            <StackPanel x:Name="HistoryList" Padding="6" Spacing="2" />
+                        </ScrollViewer>
+                    </Grid>
+                </Border>
+            </Grid>
+        </Border>
+
+        <!-- Why this conversation's last job failed. -->
+        <TextBlock
+            x:Name="ErrorText"
+            Grid.Row="1"
+            Margin="4,0"
+            Style="{StaticResource BodyTextBlockStyle}"
+            Foreground="{ThemeResource SystemFillColorCriticalBrush}"
+            IsTextSelectionEnabled="True"
+            MaxLines="4"
+            TextTrimming="CharacterEllipsis"
+            TextWrapping="Wrap"
+            Visibility="Collapsed" />
+
+        <!-- The bottom bar: a job running elsewhere, the menus and the tab's action, the question row, setup hints. -->
+        <Border Grid.Row="2" Padding="14,10" Style="{StaticResource PaneStyle}">
+            <StackPanel Spacing="8">
+                <Grid x:Name="BusyRow" ColumnSpacing="6" Visibility="Collapsed">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
+                    <ProgressRing
+                        Width="14"
+                        Height="14"
+                        MinWidth="0"
+                        MinHeight="0"
+                        IsActive="True" />
+                    <TextBlock
+                        x:Name="BusyText"
+                        Grid.Column="1"
+                        VerticalAlignment="Center"
+                        Style="{StaticResource CaptionStyle}"
+                        MaxLines="1"
+                        TextTrimming="CharacterEllipsis"
+                        TextWrapping="NoWrap" />
+                    <Button
+                        x:Name="BusyStopButton"
+                        Grid.Column="2"
+                        Content="{local:T Text='Stop'}" />
+                </Grid>
+
+                <Grid ColumnSpacing="8">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
+                    <StackPanel x:Name="MenusPanel" Orientation="Horizontal" Spacing="8">
+                        <DropDownButton
+                            x:Name="ModelButton"
+                            MaxWidth="220"
+                            ToolTipService.ToolTip="{local:T Text='Model for summaries and questions'}">
+                            <StackPanel Orientation="Horizontal" Spacing="6">
+                                <FontIcon FontFamily="{ThemeResource SymbolThemeFontFamily}" FontSize="14" Glyph="&#xE950;" />
+                                <TextBlock
+                                    x:Name="ModelText"
+                                    MaxLines="1"
+                                    TextTrimming="CharacterEllipsis"
+                                    TextWrapping="NoWrap" />
+                            </StackPanel>
+                            <DropDownButton.Flyout>
+                                <MenuFlyout x:Name="ModelMenu" Placement="TopEdgeAlignedLeft" />
+                            </DropDownButton.Flyout>
+                        </DropDownButton>
+                        <DropDownButton x:Name="LanguageButton">
+                            <StackPanel Orientation="Horizontal" Spacing="6">
+                                <FontIcon FontFamily="{ThemeResource SymbolThemeFontFamily}" FontSize="14" Glyph="&#xE774;" />
+                                <TextBlock x:Name="LanguageText" />
+                            </StackPanel>
+                            <DropDownButton.Flyout>
+                                <MenuFlyout x:Name="LanguageMenu" Placement="TopEdgeAlignedLeft" />
+                            </DropDownButton.Flyout>
+                        </DropDownButton>
+                        <Button
+                            x:Name="DataNotesButton"
+                            AutomationProperties.Name="{local:T Text='About where data goes'}"
+                            ToolTipService.ToolTip="{local:T Text='About where data goes'}">
+                            <FontIcon FontFamily="{ThemeResource SymbolThemeFontFamily}" FontSize="14" Glyph="&#xE946;" />
+                            <Button.Flyout>
+                                <Flyout x:Name="DataNotesFlyout" Placement="Top">
+                                    <StackPanel x:Name="DataNotesPanel" MaxWidth="280" Spacing="8" />
+                                </Flyout>
+                            </Button.Flyout>
+                        </Button>
+                        <Button
+                            x:Name="FreshChatButton"
+                            AutomationProperties.Name="{local:T Text='Start a fresh chat'}"
+                            ToolTipService.ToolTip="{local:T Text='Start a fresh chat'}">
+                            <FontIcon FontFamily="{ThemeResource SymbolThemeFontFamily}" FontSize="14" Glyph="&#xE710;" />
+                        </Button>
+                        <ToggleButton
+                            x:Name="HistoryButton"
+                            AutomationProperties.Name="{local:T Text='History'}"
+                            ToolTipService.ToolTip="{local:T Text='Earlier chats of this conversation'}">
+                            <FontIcon FontFamily="{ThemeResource SymbolThemeFontFamily}" FontSize="14" Glyph="&#xE81C;" />
+                        </ToggleButton>
+                    </StackPanel>
+                    <!-- Summary's actions: Copy as prompt, then Summarize, Re-summarize or Stop. -->
+                    <StackPanel
+                        x:Name="SummaryActions"
+                        Grid.Column="1"
+                        Orientation="Horizontal"
+                        Spacing="8">
+                        <Button
+                            x:Name="SummaryCopyButton"
+                            AutomationProperties.Name="{local:T Text='Copy as prompt'}"
+                            ToolTipService.ToolTip="{local:T Text='Copy the transcript as a summary prompt for any chat app'}">
+                            <FontIcon FontFamily="{ThemeResource SymbolThemeFontFamily}" FontSize="14" Glyph="&#xE8C8;" />
+                        </Button>
+                        <Button x:Name="SummarizeButton" Style="{StaticResource AccentButtonStyle}" />
+                        <Button
+                            x:Name="SummaryStopButton"
+                            Style="{StaticResource AccentButtonStyle}"
+                            ToolTipService.ToolTip="{local:T Text='Stop the summary and keep what is written so far'}">
+                            <StackPanel Orientation="Horizontal" Spacing="6">
+                                <FontIcon FontFamily="{ThemeResource SymbolThemeFontFamily}" FontSize="12" Glyph="&#xE71A;" />
+                                <TextBlock Text="{local:T Text='Summarizing'}" />
+                            </StackPanel>
+                        </Button>
+                    </StackPanel>
+                </Grid>
+
+                <!-- Chat's question (Enter sends, Shift+Enter starts a new line), Copy as prompt and Send or Stop. -->
+                <Grid x:Name="QuestionRow" ColumnSpacing="8">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
+                    <TextBox
+                        x:Name="QuestionBox"
+                        MaxHeight="152"
+                        AcceptsReturn="True"
+                        AutomationProperties.Name="{local:T Text='Ask about this conversation'}"
+                        PlaceholderText="{local:T Text='Ask about this conversation'}"
+                        ScrollViewer.VerticalScrollBarVisibility="Auto"
+                        TextWrapping="Wrap" />
+                    <Button
+                        x:Name="ChatCopyButton"
+                        Grid.Column="1"
+                        VerticalAlignment="Bottom"
+                        AutomationProperties.Name="{local:T Text='Copy as prompt'}"
+                        ToolTipService.ToolTip="{local:T Text='Copy the transcript and the question as a prompt for any chat app'}">
+                        <FontIcon FontFamily="{ThemeResource SymbolThemeFontFamily}" FontSize="14" Glyph="&#xE8C8;" />
+                    </Button>
+                    <Button
+                        x:Name="SendButton"
+                        Grid.Column="2"
+                        VerticalAlignment="Bottom"
+                        Style="{StaticResource AccentButtonStyle}"
+                        Content="{local:T Text='Send'}" />
+                    <Button
+                        x:Name="AskStopButton"
+                        Grid.Column="2"
+                        VerticalAlignment="Bottom"
+                        Style="{StaticResource AccentButtonStyle}"
+                        AutomationProperties.Name="{local:T Text='Stop'}"
+                        ToolTipService.ToolTip="{local:T Text='Stop the answer'}"
+                        Visibility="Collapsed">
+                        <FontIcon FontFamily="{ThemeResource SymbolThemeFontFamily}" FontSize="12" Glyph="&#xE71A;" />
+                    </Button>
+                </Grid>
+
+                <!-- Why no model can run. -->
+                <StackPanel x:Name="SetupHints" Spacing="4" Visibility="Collapsed">
+                    <TextBlock
+                        Style="{StaticResource CaptionStyle}"
+                        Text="{local:T Text='No AI model: set up a provider or download a model in Settings › AI.'}"
+                        TextWrapping="Wrap" />
+                    <TextBlock
+                        x:Name="WindowsAIHint"
+                        Style="{StaticResource CaptionStyle}"
+                        TextWrapping="Wrap"
+                        Visibility="Collapsed" />
+                </StackPanel>
+            </StackPanel>
+        </Border>
+
+        <!-- "Copied": 2 s over the bottom bar. -->
+        <Border
+            x:Name="Toast"
+            Grid.RowSpan="3"
+            Margin="0,0,0,110"
+            Padding="14,8"
+            HorizontalAlignment="Center"
+            VerticalAlignment="Bottom"
+            Background="{ThemeResource AcrylicInAppFillColorDefaultBrush}"
+            BorderBrush="{ThemeResource SurfaceStrokeColorFlyoutBrush}"
+            BorderThickness="1"
+            CornerRadius="{StaticResource OverlayCornerRadius}"
+            IsHitTestVisible="False"
+            Visibility="Collapsed">
+            <TextBlock x:Name="ToastText" />
+        </Border>
+    </Grid>
+</UserControl>

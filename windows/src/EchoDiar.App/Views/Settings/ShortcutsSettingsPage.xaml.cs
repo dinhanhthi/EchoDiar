@@ -11,9 +11,10 @@ namespace EchoDiar.App.Views;
 
 /// <summary>
 /// What an in-app shortcut does (macOS EchoDiarApp.swift: the main menu's actions, and Esc and Space).
-/// <see cref="DeleteSelection"/> is Windows' Delete key, not one of the page's shortcuts (<see cref="MainWindow"/>).
+/// <see cref="CopyPrompt"/> is Windows only (the AI panel's Copy as prompt). <see cref="DeleteSelection"/> is Windows'
+/// Delete key, not one of the page's shortcuts (<see cref="MainWindow"/>).
 /// </summary>
-public enum InAppAction { RecordStop, PauseResume, ShowRecording, ShowList, OpenChat, Search, Settings, Back, PlayPause, DeleteSelection }
+public enum InAppAction { RecordStop, PauseResume, ShowRecording, ShowList, OpenChat, CopyPrompt, Search, Settings, Back, PlayPause, DeleteSelection }
 
 /// <summary>
 /// A shortcut used inside EchoDiar: its action, its title on the Shortcuts page, and its keys (Ctrl for macOS ⌘; Esc and
@@ -33,7 +34,10 @@ public sealed record InAppShortcut(InAppAction Action, string Title, IReadOnlyLi
 /// </summary>
 public sealed partial class ShortcutsSettingsPage : UserControl
 {
-    /// <summary>The shortcuts used inside EchoDiar (macOS <c>inAppShortcuts</c>, in its order and with its titles).</summary>
+    /// <summary>
+    /// The shortcuts used inside EchoDiar (macOS <c>inAppShortcuts</c>, in its order and with its titles), plus Windows'
+    /// Ctrl+Shift+C for the AI panel's Copy as prompt.
+    /// </summary>
     public static IReadOnlyList<InAppShortcut> InAppShortcuts { get; } =
     [
         new(InAppAction.RecordStop, "Record / Stop", [Key('R', WindowsHotKey.ModControl)]),
@@ -41,6 +45,7 @@ public sealed partial class ShortcutsSettingsPage : UserControl
         new(InAppAction.ShowRecording, "Show the recording", [Key('1', WindowsHotKey.ModControl)]),
         new(InAppAction.ShowList, "Show the recordings list", [Key('2', WindowsHotKey.ModControl)]),
         new(InAppAction.OpenChat, "Open the chat of the open conversation", [Key('I', WindowsHotKey.ModControl)]),
+        new(InAppAction.CopyPrompt, "Copy as prompt", [Key('C', WindowsHotKey.ModControl | WindowsHotKey.ModShift)]),
         new(InAppAction.Search, "Search conversations or settings", [Key('F', WindowsHotKey.ModControl)]),
         new(InAppAction.Settings, "Settings", [Key(0xBC, WindowsHotKey.ModControl)]), // VK_OEM_COMMA
         new(InAppAction.Back, "Back", [Key(0xDB, WindowsHotKey.ModControl), Key(0x1B, 0)]), // VK_OEM_4 ([), VK_ESCAPE

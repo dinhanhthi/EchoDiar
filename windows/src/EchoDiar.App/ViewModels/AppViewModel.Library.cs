@@ -227,9 +227,9 @@ public sealed partial class AppViewModel
     /// <summary>
     /// macOS <c>busyConversationIDs</c>: a transcription queued, running or waiting for a model, or still between its
     /// recording's end (or the launch scan) and its last step (compressing). Recording and compressing conversations are
-    /// not transcribed, so auto-delete never picks them. No AI or cloud jobs yet (Phases 24 and 26 add theirs).
+    /// not transcribed, so auto-delete never picks them. An AI job's conversation too; no cloud jobs yet (Phase 26).
     /// </summary>
-    private bool IsBusy(Guid id) => _finishing.Contains(id) || TranscriptionProgress.ContainsKey(id);
+    private bool IsBusy(Guid id) => _finishing.Contains(id) || TranscriptionProgress.ContainsKey(id) || AIJob?.ConversationId == id;
 
     /// <summary>
     /// Auto-delete on: schedules the daily run and runs it once now (launch, or when turned on). Off: stops it (macOS

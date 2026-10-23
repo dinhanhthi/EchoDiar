@@ -5,6 +5,7 @@ using EchoDiar.App.ViewModels;
 using EchoDiar.Core.Model;
 using EchoDiar.Core.Models;
 using EchoDiar.Transcribe;
+using Microsoft.UI.Dispatching;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Automation;
 using Microsoft.UI.Xaml.Controls;
@@ -95,6 +96,18 @@ public sealed partial class TranscriptView : UserControl
         UpdateChips();
         Update();
     }
+
+    /// <summary>
+    /// A clicked AI citation (macOS <c>scrollTarget</c>): scrolls to the segment <paramref name="id"/>, once the list is laid
+    /// out (its tab has just shown).
+    /// </summary>
+    internal void ShowSegment(Guid id) => DispatcherQueue.TryEnqueue(DispatcherQueuePriority.Low, () =>
+    {
+        if (_model is { IsClosing: false } && _lines.FirstOrDefault(l => l.Id == id) is { } line)
+        {
+            LineList.ScrollIntoView(line, ScrollIntoViewAlignment.Leading);
+        }
+    });
 
     /// <summary>Stops following the models; call when the page goes.</summary>
     public void Detach()

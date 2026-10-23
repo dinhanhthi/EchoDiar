@@ -446,6 +446,10 @@ public sealed partial class MainWindow : Window
             case InAppAction.OpenChat when route == RouteKind.Conversation:
                 _model.DetailTab = DetailTab.Chat;
                 return true;
+            // Where the AI panel's Copy as prompt button is: Summary and Chat.
+            case InAppAction.CopyPrompt when route == RouteKind.Conversation && _model.DetailTab != DetailTab.Transcript
+                && RouteHost.Content is ConversationView conversation:
+                return conversation.CopyPrompt();
             case InAppAction.Search:
                 Toolbar.FocusSearch();
                 return true;
@@ -460,6 +464,10 @@ public sealed partial class MainWindow : Window
             // Delete deletes a selection of cards (asking first), wherever the focus is, as Esc ends it.
             case InAppAction.DeleteSelection when plain && ListHost.Visibility == Visibility.Visible && _library.HasSelection:
                 _library.DeleteSelection();
+                return true;
+            // Esc on Chat closes its History panel before going back (macOS: the panel's Close is the cancel action).
+            case InAppAction.Back when plain && route == RouteKind.Conversation && RouteHost.Content is ConversationView conversation
+                && conversation.CloseHistory():
                 return true;
             case InAppAction.Back when route != RouteKind.List:
                 _model.GoBack();

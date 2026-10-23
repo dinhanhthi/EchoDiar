@@ -295,6 +295,8 @@ public sealed partial class AppViewModel : ObservableObject
         StopMeetingServices();
         // Same thread rule: the shortcuts' window lives on the UI thread.
         StopHotKeys();
+        // The AI job stops and keeps what it streamed; nothing waits for it.
+        ShutdownAI();
         _pollTimer.Stop();
         // A run under way asks before each deletion, and is told every conversation is busy now.
         _retention?.Stop();
@@ -444,11 +446,15 @@ public sealed partial class AppViewModel : ObservableObject
     /// </summary>
     public event Action<Guid>? ReleasingAudio;
 
-    /// <summary>Moves the conversation to the Recycle Bin; its page goes back to the list first.</summary>
+    /// <summary>
+    /// Moves the conversation to the Recycle Bin; its page goes back to the list first, and its AI job is cancelled first
+    /// so it does not write into the moved folder.
+    /// </summary>
     public async Task DeleteConversationAsync(Guid id)
     {
         ReleasingAudio?.Invoke(id);
         if (Route.ConversationId == id) Route = Route.List;
+        await CancelAIJobAsync(id);
         try
         {
             await _services.Library.DeleteAsync(id);

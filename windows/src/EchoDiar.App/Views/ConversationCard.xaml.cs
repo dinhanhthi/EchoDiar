@@ -61,6 +61,8 @@ public sealed partial class ConversationCard : UserControl
         RevealItem.Text = reveal;
         AutomationProperties.SetName(RevealButton, reveal);
         ToolTipService.SetToolTip(RevealButton, reveal);
+        AIButton.Click += (_, _) => _list.Open(this, DetailTab.Chat);
+        SummaryButton.Click += (_, _) => _list.Open(this, DetailTab.Summary);
         RevealItem.Click += (_, _) => AppViewModel.RevealInExplorer(Conversation);
         RevealButton.Click += (_, _) => AppViewModel.RevealInExplorer(Conversation);
         RenameItem.Click += (_, _) => _renameAfterMenu = true;
@@ -109,6 +111,7 @@ public sealed partial class ConversationCard : UserControl
         SetTip(TitleText, conversation.Title, ref _titleTip);
         UpdateDetails(conversation);
         DeleteButton.IsEnabled = _model.CanDelete(conversation);
+        SummaryButton.Visibility = Shown(conversation.HasSummary);
         UpdateStatus(conversation);
         // Compact cards have no buttons: an empty row would only add space.
         ActionRow.Visibility = Shown(!compact || ProgressPanel.Visibility == Visibility.Visible

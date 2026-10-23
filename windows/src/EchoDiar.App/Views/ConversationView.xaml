@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!--
     One conversation beside the wide layout's sidebar: its title (double-click to rename) and details, then the
-    toolbar's tab. Transcript is TranscriptView with playback; Summary and Chat say how to set up AI until Phase 24.
+    toolbar's tab. Transcript is TranscriptView with playback; Summary and Chat are AIPanelView.
 -->
 <UserControl
     x:Class="EchoDiar.App.Views.ConversationView"
@@ -42,38 +42,10 @@
 
         <views:TranscriptView x:Name="TranscriptPane" Grid.Row="1" />
 
-        <!-- Summary and Chat: Phase 24 brings the AI panel. -->
-        <Border
-            x:Name="AIPane"
+        <!-- Summary and Chat: the AI panel; the transcript and its player stay while it shows, so playback goes on. -->
+        <views:AIPanelView
+            x:Name="AIPanel"
             Grid.Row="1"
-            Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
-            BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
-            BorderThickness="1"
-            CornerRadius="{StaticResource OverlayCornerRadius}"
-            Visibility="Collapsed">
-            <Grid
-                MaxWidth="480"
-                Padding="20"
-                HorizontalAlignment="Center"
-                VerticalAlignment="Center"
-                ColumnSpacing="8">
-                <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="Auto" />
-                    <ColumnDefinition Width="*" />
-                </Grid.ColumnDefinitions>
-                <FontIcon
-                    Margin="0,3,0,0"
-                    VerticalAlignment="Top"
-                    FontFamily="{ThemeResource SymbolThemeFontFamily}"
-                    FontSize="14"
-                    Foreground="{ThemeResource TextFillColorSecondaryBrush}"
-                    Glyph="&#xE7BA;" />
-                <TextBlock
-                    Grid.Column="1"
-                    Style="{StaticResource BodyTextBlockStyle}"
-                    Foreground="{ThemeResource TextFillColorSecondaryBrush}"
-                    Text="{local:T Text='No AI model: set up a provider or download a model in Settings › AI.'}" />
-            </Grid>
-        </Border>
+            Visibility="Collapsed" />
     </Grid>
 </UserControl>

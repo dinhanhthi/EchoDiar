@@ -33,6 +33,12 @@ public sealed partial class ConversationView : UserControl
     /// <summary>The title is being renamed in its field.</summary>
     private bool _editing;
 
+    /// <summary>A clicked AI citation's time, shown once the transcript is read (macOS <c>pendingTranscriptTime</c>).</summary>
+    private double? _pendingTime;
+
+    /// <summary>The citation's play head, set once the player has opened the audio.</summary>
+    private double? _pendingSeek;
+
     public ConversationView(AppViewModel model, Guid id)
     {
         _model = model;
@@ -54,6 +60,7 @@ public sealed partial class ConversationView : UserControl
             _transcript.PropertyChanged += OnTranscriptChanged;
             _transcript.Attach();
             TranscriptPane.Attach(_model, _transcript, _playback);
+            AIPanel.Attach(_model, _id, OpenCitation);
             Update();
             UpdateTab();
         };
@@ -63,6 +70,7 @@ public sealed partial class ConversationView : UserControl
             _model.ReleasingAudio -= OnReleasingAudio;
             _transcript.PropertyChanged -= OnTranscriptChanged;
             TranscriptPane.Detach();
+            AIPanel.Detach();
             _transcript.Detach();
             _loadGeneration++; // a lookup still running must not open a player after this
             _audioFor = null;
@@ -73,6 +81,12 @@ public sealed partial class ConversationView : UserControl
 
     /// <summary>Space on the Transcript tab (macOS <c>togglePlayback</c>): what the playback bar's play button does.</summary>
     internal void TogglePlayback() => _playback.TogglePlay();
+
+    /// <summary>Ctrl+Shift+C on Summary or Chat: the AI panel's Copy as prompt; false when it copied nothing.</summary>
+    internal bool CopyPrompt() => _model.DetailTab != DetailTab.Transcript && AIPanel.CopyPrompt();
+
+    /// <summary>Esc on Chat closes the History panel first; false when it was not open.</summary>
+    internal bool CloseHistory() => _model.DetailTab == DetailTab.Chat && AIPanel.CloseHistory();
 
     private void OnModelChanged(object? sender, PropertyChangedEventArgs e)
     {
@@ -92,10 +106,11 @@ public sealed partial class ConversationView : UserControl
         }
     }
 
-    /// <summary>Another version shows: the same audio highlights its segments.</summary>
+    /// <summary>Another version shows: the same audio highlights its segments. A citation waits for the transcript.</summary>
     private void OnTranscriptChanged(object? sender, PropertyChangedEventArgs e)
     {
         if (e.PropertyName == nameof(TranscriptViewModel.Lines)) LoadPlayback();
+        ShowPendingTime();
     }
 
     /// <summary>Its audio is about to be deleted: closes the file now; a lookup still running must not reopen it.</summary>
@@ -127,12 +142,46 @@ public sealed partial class ConversationView : UserControl
         }
     }
 
-    /// <summary>Transcript shows the transcript and playback; Summary and Chat their placeholder (playback goes on).</summary>
+    /// <summary>Transcript shows the transcript and playback; Summary and Chat the AI panel (playback goes on).</summary>
     private void UpdateTab()
     {
         var transcript = _model.DetailTab == DetailTab.Transcript;
         TranscriptPane.Visibility = transcript ? Visibility.Visible : Visibility.Collapsed;
-        AIPane.Visibility = transcript ? Visibility.Collapsed : Visibility.Visible;
+        AIPanel.Visibility = transcript ? Visibility.Collapsed : Visibility.Visible;
+    }
+
+    /// <summary>
+    /// A <c>[mm:ss]</c> citation of an answer (macOS <c>openTranscript(conversationID:at:)</c>): the Transcript tab, at
+    /// that time once the transcript is read.
+    /// </summary>
+    private void OpenCitation(double seconds)
+    {
+        if (_model.IsClosing) return;
+        _pendingTime = seconds;
+        _model.DetailTab = DetailTab.Transcript;
+        ShowPendingTime();
+    }
+
+    /// <summary>
+    /// The citation's time once the transcript is read (macOS TranscriptView <c>showPendingTime</c>): the newest version
+    /// (citations point into it), scrolled to the segment containing the time (or the last one starting before it), with
+    /// the play head there, inside that segment so it is highlighted, without playing. Cleared even without segments.
+    /// </summary>
+    private void ShowPendingTime()
+    {
+        if (_pendingTime is not { } time || _transcript.IsLoading) return;
+        _pendingTime = null;
+        if (_transcript.IsViewingOlderVersion && _transcript.Versions.Count > 0)
+        {
+            _transcript.ShowVersion(_transcript.Versions.Max(v => v.Number));
+        }
+        if (_transcript.Transcript?.Segments is not { Count: > 0 } segments) return;
+        var ordered = segments.OrderBy(s => s.Start).ToList();
+        var segment = ordered.LastOrDefault(s => s.Start <= time) ?? ordered[0];
+        var at = Math.Max(segment.Start, Math.Min(time, segment.End));
+        if (_playback.IsReady) _playback.Seek(at);
+        else _pendingSeek = at;
+        TranscriptPane.ShowSegment(segment.Id);
     }
 
     /// <summary>
@@ -151,9 +200,14 @@ public sealed partial class ConversationView : UserControl
         LoadPlayback();
     }
 
-    /// <summary>The player for the audio, with the shown version's segments and the channels setting.</summary>
-    private void LoadPlayback() =>
+    /// <summary>The player for the audio, with the shown version's segments and the channels setting; then a citation's seek.</summary>
+    private void LoadPlayback()
+    {
         _playback.Load(_audioPath, _transcript.ShownTranscript?.Segments ?? [], _model.Settings.PlaybackChannels);
+        if (_pendingSeek is not { } at || !_playback.IsReady) return;
+        _pendingSeek = null;
+        _playback.Seek(at);
+    }
 
     // Title
 

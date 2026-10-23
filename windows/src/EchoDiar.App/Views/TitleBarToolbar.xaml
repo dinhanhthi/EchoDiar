@@ -231,7 +231,7 @@
             <FontIcon FontFamily="{ThemeResource SymbolThemeFontFamily}" FontSize="16" Glyph="&#xE721;" />
         </Button>
 
-        <!-- The conversation page's tab (AppViewModel.DetailTab); Summary and Chat say how to set up AI until Phase 24. -->
+        <!-- The conversation page's tab (AppViewModel.DetailTab): Transcript, or Summary and Chat (the AI panel). -->
         <SelectorBar
             x:Name="TabsBar"
             Grid.Column="4"

@@ -2,10 +2,10 @@
 <!--
     One conversation of the library (macOS ConversationCard.swift): the source icon, the title (double-click to rename),
     the source app's name, the date, duration, size, status pill and "Audio has been removed" marker, the reason of a
-    failed transcription, then a row with Reveal in Explorer, the Delete menu and the transcription progress or its
-    action. A Fluent card (card fill and stroke, overlay corners, 16 px padding) in theme resources (Light and Dark).
-    Compact (the wide layout's sidebar) drops the buttons, which stay in the context menu. Selected adds the accent
-    fill and edge. The AI and Summary buttons come with Phase 23.
+    failed transcription, then a row with AI (the Chat tab), Summary (with a summary), Reveal in Explorer, the Delete
+    menu and the transcription progress or its action. A Fluent card (card fill and stroke, overlay corners, 16 px
+    padding) in theme resources (Light and Dark). Compact (the wide layout's sidebar) drops the buttons, which stay in
+    the context menu and the detail. Selected adds the accent fill and edge.
 -->
 <UserControl
     x:Class="EchoDiar.App.Views.ConversationCard"
@@ -158,13 +158,26 @@
                     TextWrapping="Wrap"
                     Visibility="Collapsed" />
 
-                <!-- Reveal and Delete (not compact), then the transcription progress or its action. -->
+                <!-- AI, Summary, Reveal and Delete (not compact), then the transcription progress or its action. -->
                 <StackPanel
                     x:Name="ActionRow"
                     Margin="0,6,0,0"
                     Orientation="Horizontal"
                     Spacing="12">
                     <StackPanel x:Name="ButtonsPanel" Orientation="Horizontal" Spacing="4">
+                        <Button
+                            x:Name="AIButton"
+                            AutomationProperties.Name="{local:T Text='Ask AI about this conversation'}"
+                            ToolTipService.ToolTip="{local:T Text='Ask AI about this conversation'}">
+                            <FontIcon FontFamily="{ThemeResource SymbolThemeFontFamily}" FontSize="14" Glyph="&#xE99A;" />
+                        </Button>
+                        <Button
+                            x:Name="SummaryButton"
+                            AutomationProperties.Name="{local:T Text='Show the summary'}"
+                            ToolTipService.ToolTip="{local:T Text='Show the summary'}"
+                            Visibility="Collapsed">
+                            <FontIcon FontFamily="{ThemeResource SymbolThemeFontFamily}" FontSize="14" Glyph="&#xE8E4;" />
+                        </Button>
                         <Button x:Name="RevealButton">
                             <FontIcon FontFamily="{ThemeResource SymbolThemeFontFamily}" FontSize="14" Glyph="&#xE8B7;" />
                         </Button>
