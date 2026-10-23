@@ -94,6 +94,17 @@ scripts/measure-transcribe.sh report <result dir>...                  # one Mark
 
 Never pass `-derivedDataPath` to local `xcodebuild` builds and tests. The default DerivedData folder is the one Xcode uses, so Xcode's Run reuses the CLI build, and the app path stays stable so the permission grants survive rebuilds.
 
+## Localization
+
+The UI is in English (source), Vietnamese, French, Spanish and Simplified Chinese (`vi`, `fr`, `es`, `zh-Hans`). The user picks one in Settings › General › App language, which applies after a relaunch.
+
+- `EchoDiar/Localizable.xcstrings` is the source of truth. Keys are the English text; write whole sentences (`String(localized: "Delete \(count) conversations?")`), not English words spliced into other sentences.
+- SwiftUI string literals are localized; a `String` passed to `Text`, `Label` or `Section`, an `NSMenuItem` title or an `NSAlert` text is not, so use `String(localized:)`, `LocalizedStringKey` or `LocalizedStringResource` there.
+- CLI `xcodebuild` builds never add new keys to the catalog (only Xcode IDE builds do). After a Debug CLI build, run `scripts/sync-strings.sh` to add them, as Xcode would. Never add keys by hand.
+- `xcstringstool` sorts a few keys differently from Xcode (punctuation and case), so a sync after an IDE build, or the other way round, can reorder them without changing their content.
+- To try a language without the picker: `defaults write dinh.thi.EchoDiar AppleLanguages '("fr")'`, relaunch, then `defaults delete dinh.thi.EchoDiar AppleLanguages` (and `AppleLocale`, which the picker also sets).
+- EchoKit's error texts, Info.plist permission prompts and the default conversation titles stay English.
+
 ## Code layout
 
 - `EchoDiar/`: the app target (SwiftUI and AppKit): window, menu bar item, onboarding, library list, settings. `EchoDiar/Info.plist` holds the permission prompts.

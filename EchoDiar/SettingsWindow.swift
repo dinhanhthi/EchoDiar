@@ -8,17 +8,18 @@ enum SettingsTab: CaseIterable, Identifiable {
 
     var id: Self { self }
 
-    var label: (title: String, icon: String) {
+    /// With `return`: from a switch expression of tuples, only the first title reaches the string catalog.
+    var label: (title: LocalizedStringResource, icon: String) {
         switch self {
-        case .general: ("General", "gearshape")
-        case .recording: ("Recording", "record.circle")
-        case .transcription: ("Transcription", "waveform")
-        case .providers: ("AI", "sparkles")
-        case .rag: ("RAG", "sparkle.magnifyingglass")
-        case .storage: ("Storage", "internaldrive")
-        case .shortcuts: ("Shortcuts", "keyboard")
-        case .about: ("About", "info.circle")
-        case .acknowledgements: ("Acknowledgements", "doc.text")
+        case .general: return ("General", "gearshape")
+        case .recording: return ("Recording", "record.circle")
+        case .transcription: return ("Transcription", "waveform")
+        case .providers: return ("AI", "sparkles")
+        case .rag: return ("RAG", "sparkle.magnifyingglass")
+        case .storage: return ("Storage", "internaldrive")
+        case .shortcuts: return ("Shortcuts", "keyboard")
+        case .about: return ("About", "info.circle")
+        case .acknowledgements: return ("Acknowledgements", "doc.text")
         }
     }
 
@@ -83,7 +84,7 @@ struct SettingsView: View {
         HStack(spacing: 0) {
             List(selection: selection) {
                 ForEach(visibleTabs) { tab in
-                    Label(tab.label.title, systemImage: tab.label.icon).tag(tab)
+                    Label { Text(tab.label.title) } icon: { Image(systemName: tab.label.icon) }.tag(tab)
                 }
             }
             .listStyle(.sidebar)

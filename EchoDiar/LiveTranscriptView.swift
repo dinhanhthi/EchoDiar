@@ -17,7 +17,7 @@ struct LiveTranscriptView: View {
                     ScrollView {
                         LazyVStack(alignment: .leading, spacing: 4) {
                             ForEach(snapshot.lines) { line in
-                                Text("\(Text(line.speaker.rawValue).bold().foregroundStyle(Self.color(line.speaker))): \(line.text)")
+                                Text("\(Text(Self.name(line.speaker)).bold().foregroundStyle(Self.color(line.speaker))): \(line.text)")
                                     .frame(maxWidth: .infinity, alignment: .leading)
                                     .id(line.id)
                             }
@@ -35,7 +35,7 @@ struct LiveTranscriptView: View {
         .modifier(GlassCard(cornerRadius: 14))
     }
 
-    private var statusText: String {
+    private var statusText: LocalizedStringKey {
         switch snapshot.state {
         case .loading: "Live transcript: loading the model…"
         case .paused: "Live transcript: paused"
@@ -55,6 +55,14 @@ struct LiveTranscriptView: View {
         switch snapshot.state {
         case .failed: true
         case .loading, .listening, .paused: false
+        }
+    }
+
+    /// The line's label; `Speaker` raw values stay English.
+    private static func name(_ speaker: RecordingTranscriber.Speaker) -> LocalizedStringKey {
+        switch speaker {
+        case .me: "Me"
+        case .others: "Others"
         }
     }
 

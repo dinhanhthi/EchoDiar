@@ -3,17 +3,16 @@ import EchoAudio
 import EchoCore
 import SwiftUI
 
-/// The recording in the entry list, above the first day: the recorded app's icon, "Recording…" (or "Paused"), the
-/// elapsed clock and mini meters, then a bottom row with Stop, Pause or Resume and the language. Compact (the wide
-/// layout's sidebar) drops the row; selected adds the accent fill and stroke of `ConversationCard`. A click opens the
-/// recording page.
+/// The recording in the sidebar, above the first day: the recorded app's icon, "Recording…" (or "Paused"), the elapsed
+/// clock and mini meters, then a bottom row with Stop, Pause or Resume, Mute or Unmute and the language; selected adds
+/// the accent fill and stroke of `ConversationCard`. A click opens the recording page.
 struct RecordingCard: View {
     let model: AppModel
-    var compact = false
     var selected = false
 
     var body: some View {
         let paused = model.snapshot.state == .paused
+        let muted = model.micMuted
         HStack(spacing: 12) {
             AppIcon(bundleID: model.sourceApp?.appBundleID)
             VStack(alignment: .leading, spacing: 4) {
@@ -37,24 +36,26 @@ struct RecordingCard: View {
                 }
                 .font(.caption)
                 .foregroundStyle(.secondary)
-                if !compact {
-                    // The buttons have their own row under the title and details, from the same leading edge.
-                    HStack(spacing: 12) {
-                        rowButton("Stop", systemImage: "stop.circle", action: model.stopRecording)
-                            .disabled(model.isStarting)
-                            .help("Stop recording (⌘R)")
-                        rowButton(paused ? "Resume" : "Pause", systemImage: paused ? "play.circle" : "pause.circle",
-                                  action: model.togglePause)
-                            .help(paused ? "Resume recording (⇧⌘P)" : "Pause recording (⇧⌘P)")
-                        languageMenu
-                        Spacer(minLength: 0)
-                    }
-                    .padding(.top, 4)
+                // The buttons have their own row under the title and details, from the same leading edge.
+                HStack(spacing: 12) {
+                    rowButton("Stop", systemImage: "stop.circle", action: model.stopRecording)
+                        .disabled(model.isStarting)
+                        .help("Stop recording (⌘R)")
+                    rowButton(paused ? "Resume" : "Pause", systemImage: paused ? "play.circle" : "pause.circle",
+                              action: model.togglePause)
+                        .help(paused ? "Resume recording (⇧⌘P)" : "Pause recording (⇧⌘P)")
+                    rowButton(muted ? "Unmute microphone" : "Mute microphone",
+                              systemImage: muted ? "mic.slash.circle" : "mic.circle", action: model.toggleMicMute)
+                        .help(muted ? "Unmute microphone" : "Mute microphone")
+                    languageMenu
+                    Spacer(minLength: 0)
                 }
+                .padding(.top, 4)
             }
         }
-        .padding(.horizontal, compact ? 10 : 14)
-        .padding(.vertical, compact ? 8 : 10)
+        // As the sidebar's conversation cards.
+        .padding(.horizontal, 10)
+        .padding(.vertical, 8)
         // The fill sits under the content, on the surface; the stroke on top.
         .background {
             if selected { Self.shape.fill(Color.accentColor.opacity(0.18)) }
@@ -66,18 +67,20 @@ struct RecordingCard: View {
         // Buttons and the menu take their own clicks.
         .contentShape(Rectangle())
         .onTapGesture { model.route = .recording }
-        // The compact card has no button row: Stop and Pause stay here.
+        // Stop, Pause and Mute also from the context menu, as the conversation cards' actions.
         .contextMenu {
             Button("Stop", action: model.stopRecording)
                 .disabled(model.isStarting)
             Button(paused ? "Resume" : "Pause", action: model.togglePause)
+            Button(muted ? "Unmute Microphone" : "Mute Microphone", action: model.toggleMicMute)
         }
     }
 
     /// The `GlassCard` shape, for the selection.
     private static let shape = RoundedRectangle(cornerRadius: 20, style: .continuous)
 
-    private func rowButton(_ title: String, systemImage: String, action: @escaping () -> Void) -> some View {
+    private func rowButton(_ title: LocalizedStringKey, systemImage: String,
+                           action: @escaping () -> Void) -> some View {
         Button(action: action) {
             Label(title, systemImage: systemImage)
                 .labelStyle(.iconOnly)
@@ -114,7 +117,7 @@ struct RecordingCard: View {
     }
 }
 
-/// The recording page (layout_1's detail): the header, then the live transcript, or the wave and why there is none
+/// The recording in the library page's detail: the header, then the live transcript, or the wave and why there is none
 /// (the conditions of `AppModel.startRecordingTranscriber`, read from the settings), with the Settings page that
 /// changes it.
 struct RecordingDetailView: View {
@@ -289,18 +292,22 @@ struct ChannelMeters: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 3) {
-            bar("Mic", feed.mic)
-            bar("System", feed.system)
+            bar("Mic", accessibilityLabel: "Mic level", feed.mic)
+            // Shares the "System" key with the App language picker: the word translates the same in every language.
+            bar("System", accessibilityLabel: "System audio level", feed.system)
         }
         .frame(width: 110)
         .task { await feed.attach() }
     }
 
-    private func bar(_ name: String, _ level: Float) -> some View {
+    private func bar(_ name: LocalizedStringKey, accessibilityLabel: LocalizedStringKey,
+                     _ level: Float) -> some View {
         HStack(spacing: 6) {
             Text(name)
                 .font(.caption2)
                 .foregroundStyle(.secondary)
+                .lineLimit(1)
+                .minimumScaleFactor(0.75)
                 .frame(width: 38, alignment: .leading)
             GeometryReader { proxy in
                 ZStack(alignment: .leading) {
@@ -311,7 +318,7 @@ struct ChannelMeters: View {
             .frame(height: 5)
         }
         .accessibilityElement(children: .ignore)
-        .accessibilityLabel("\(name) level")
+        .accessibilityLabel(accessibilityLabel)
         .accessibilityValue("\(Int((LevelFeed.fraction(level) * 100).rounded())) percent")
     }
 }

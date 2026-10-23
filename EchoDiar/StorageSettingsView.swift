@@ -55,7 +55,7 @@ struct StorageSettingsView: View {
             preview = await model.retentionPreview(settings: model.settings)
         }
         .alert(
-            "Delete the audio of \(transcribedWithAudio.count) transcribed conversation\(transcribedWithAudio.count == 1 ? "" : "s")?",
+            "Delete the audio of \(transcribedWithAudio.count) transcribed conversations?",
             isPresented: $confirmingAudioDelete
         ) {
             Button("Move to Trash", role: .destructive, action: deleteTranscribedAudio)
@@ -142,7 +142,7 @@ struct StorageSettingsView: View {
     private static let trashWidth: CGFloat = 16
 
     private func usageRow(
-        _ title: String, _ bytes: Int64, color: Color, delete: BulkDeletion, disabled: Bool
+        _ title: LocalizedStringKey, _ bytes: Int64, color: Color, delete: BulkDeletion, disabled: Bool
     ) -> some View {
         LabeledContent {
             HStack(spacing: 10) {
@@ -239,7 +239,7 @@ struct StorageSettingsView: View {
         }
     }
 
-    private static func deleteHelp(_ deletion: BulkDeletion) -> String {
+    private static func deleteHelp(_ deletion: BulkDeletion) -> LocalizedStringKey {
         switch deletion {
         case .audio: "Delete the audio of every conversation"
         case .transcriptsAndAI: "Delete every transcript, summary and chat"
@@ -247,13 +247,11 @@ struct StorageSettingsView: View {
         }
     }
 
-    private var bulkTitle: String {
+    private var bulkTitle: LocalizedStringKey {
         switch bulkDeletion {
-        case .audio?: "Delete the audio of \(countText(audioCandidates.count))?"
-        case .transcriptsAndAI?: "Delete the transcripts, summaries and chats of \(countText(transcriptCandidates.count))?"
-        case .models?:
-            model.deletableModelIDs.count == 1 ? "Delete 1 downloaded model?"
-                : "Delete \(model.deletableModelIDs.count) downloaded models?"
+        case .audio?: "Delete the audio of \(audioCandidates.count) conversations?"
+        case .transcriptsAndAI?: "Delete the transcripts, summaries and chats of \(transcriptCandidates.count) conversations?"
+        case .models?: "Delete \(model.deletableModelIDs.count) downloaded models?"
         case nil: ""
         }
     }
@@ -263,15 +261,15 @@ struct StorageSettingsView: View {
         case .audio:
             let untranscribed = audioCandidates.filter { !$0.hasTranscript }.count
             let note = untranscribed == 0 ? ""
-                : "\n\n\(untranscribed == 1 ? "1 of them has" : "\(untranscribed) of them have") no transcript yet: nothing of it will be left to read."
-            return "The audio files are moved to the Trash. Transcripts, summaries and chats stay; playback and re-transcribing are no longer possible." + note
+                : "\n\n" + String(localized: "\(untranscribed) of them have no transcript yet: nothing of it will be left to read.")
+            return String(localized: "The audio files are moved to the Trash. Transcripts, summaries and chats stay; playback and re-transcribing are no longer possible.") + note
         case .transcriptsAndAI:
             let withoutAudio = transcriptCandidates.filter { !$0.hasAudio }.count
             let note = withoutAudio == 0 ? ""
-                : "\n\n\(countText(withoutAudio)) without audio would be left empty: \(withoutAudio == 1 ? "it is" : "they are") moved to the Trash entirely."
-            return "They are moved to the Trash. The audio stays, so the conversations can be transcribed again." + note
+                : "\n\n" + String(localized: "\(withoutAudio) conversations without audio would be left empty: they are moved to the Trash entirely.")
+            return String(localized: "They are moved to the Trash. The audio stays, so the conversations can be transcribed again.") + note
         case .models:
-            return "The transcription, speaker and AI models are removed from this Mac (not moved to the Trash). Download them again in Settings › Transcription and Settings › AI."
+            return String(localized: "The transcription, speaker and AI models are removed from this Mac (not moved to the Trash). Download them again in Settings › Transcription and Settings › AI.")
         }
     }
 
@@ -322,7 +320,7 @@ struct StorageSettingsView: View {
                 Text("Once a day, moves transcribed conversations older than the age below to the Trash.")
             }
             NumberRow(
-                title: "Older than", unit: "days", value: autoDeleteDays,
+                title: "Older than", unit: String(localized: "days"), value: autoDeleteDays,
                 range: AppSettings.autoDeleteDaysRange)
             Picker("Delete", selection: autoDeleteMode) {
                 Text("Audio only (keep transcript, summary and chat)").tag(RetentionMode.audioOnly)
@@ -334,8 +332,8 @@ struct StorageSettingsView: View {
                     .foregroundStyle(.secondary)
             } else {
                 DisclosureGroup(model.settings.autoDeleteEnabled
-                                ? "Next run: \(countText(preview.count))"
-                                : "Would delete now: \(countText(preview.count))") {
+                                ? "Next run: \(preview.count) conversations"
+                                : "Would delete now: \(preview.count) conversations") {
                     VStack(alignment: .leading, spacing: 8) {
                         ForEach(preview, id: \.conversationID) { deletion in
                             Text(title(of: deletion))
@@ -414,26 +412,32 @@ struct StorageSettingsView: View {
     }
 
     private var autoDeleteMessage: String {
-        let what = model.settings.autoDeleteMode == .audioOnly ? "The audio of" : "All files of"
+        let audioOnly = model.settings.autoDeleteMode == .audioOnly
+        let days = model.settings.autoDeleteAfterDays
         guard !preview.isEmpty else {
-            return "\(what) transcribed conversations older than \(model.settings.autoDeleteAfterDays) days will be moved to the Trash once a day. Nothing matches now."
+            return audioOnly
+                ? String(localized: "The audio of transcribed conversations older than \(days) days will be moved to the Trash once a day. Nothing matches now.")
+                : String(localized: "All files of transcribed conversations older than \(days) days will be moved to the Trash once a day. Nothing matches now.")
         }
-        return "\(what) \(countText(preview.count)) will be moved to the Trash now, then daily for older ones:\n\n\(titleList(preview))"
+        let count = preview.count
+        let sentence = audioOnly
+            ? String(localized: "The audio of \(count) conversations will be moved to the Trash now, then daily for older ones:")
+            : String(localized: "All files of \(count) conversations will be moved to the Trash now, then daily for older ones:")
+        return "\(sentence)\n\n\(titleList(preview))"
     }
 
     private func changeMessage(_ change: PendingChange) -> String {
-        let what = change.mode == .audioOnly ? "The audio of" : "All files of"
-        return "\(what) \(countText(change.preview.count)) will be moved to the Trash at the next run (at launch or within a day):\n\n\(titleList(change.preview))"
+        let count = change.preview.count
+        let sentence = change.mode == .audioOnly
+            ? String(localized: "The audio of \(count) conversations will be moved to the Trash at the next run (at launch or within a day):")
+            : String(localized: "All files of \(count) conversations will be moved to the Trash at the next run (at launch or within a day):")
+        return "\(sentence)\n\n\(titleList(change.preview))"
     }
 
     private func titleList(_ deletions: [RetentionPolicy.Deletion]) -> String {
         let titles = deletions.prefix(10).map { "• \(title(of: $0))" }.joined(separator: "\n")
-        let more = deletions.count > 10 ? "\n…and \(deletions.count - 10) more" : ""
+        let more = deletions.count > 10 ? "\n" + String(localized: "…and \(deletions.count - 10) more") : ""
         return titles + more
-    }
-
-    private func countText(_ count: Int) -> String {
-        count == 1 ? "1 conversation" : "\(count) conversations"
     }
 
     private func title(of deletion: RetentionPolicy.Deletion) -> String {

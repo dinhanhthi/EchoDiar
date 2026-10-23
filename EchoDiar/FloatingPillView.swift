@@ -9,8 +9,9 @@ final class PillHover {
     var isHovering = false
 }
 
-/// The pill's content: the recording indicator (dot, elapsed time, level meter; Pause/Resume, Stop and Language on
-/// hover) or a prompt. Created each time the pill shows, so its clock and meter run only while it is visible.
+/// The pill's content: the recording indicator (dot, elapsed time, level meter, a muted mic's glyph; Pause/Resume,
+/// Mute/Unmute, Stop and Language on hover) or a prompt. Created each time the pill shows, so its clock and meter run
+/// only while it is visible.
 struct FloatingPillView: View {
     let model: AppModel
     let hover: PillHover
@@ -63,7 +64,7 @@ struct FloatingPillView: View {
                 .modifier(RecordingBlink(isActive: !paused && !reduceMotion))
                 .accessibilityLabel(paused ? "Paused" : "Recording")
             if let name = model.autoStartedAppName {
-                Text("Recording \(name)")
+                Text("Recording \(name)", comment: "Floating pill: the name of the app being recorded")
                     .font(.system(size: 12 * scale, weight: .semibold))
             }
             if paused {
@@ -71,6 +72,13 @@ struct FloatingPillView: View {
             } else {
                 TimelineView(.periodic(from: .now, by: 1)) { _ in elapsed }
                 PillMeter(feed: model.levels, scale: scale)
+            }
+            // Expanded, the Mute button shows it.
+            if model.micMuted && !expanded {
+                Image(systemName: "mic.slash")
+                    .font(.system(size: 11 * scale))
+                    .foregroundStyle(.secondary)
+                    .accessibilityLabel("Microphone muted")
             }
             if expanded {
                 controls(paused: paused)
@@ -93,6 +101,11 @@ struct FloatingPillView: View {
                 Label(paused ? "Resume" : "Pause", systemImage: paused ? "play.fill" : "pause.fill")
             }
             .help(paused ? "Resume recording" : "Pause recording")
+            Button(action: model.toggleMicMute) {
+                Label(model.micMuted ? "Unmute microphone" : "Mute microphone",
+                      systemImage: model.micMuted ? "mic.slash.fill" : "mic.fill")
+            }
+            .help(model.micMuted ? "Unmute microphone" : "Mute microphone")
             Button(action: model.stopRecording) {
                 Label("Stop", systemImage: "stop.fill")
             }
@@ -175,15 +188,21 @@ struct FloatingPillView: View {
     }
 
     private func question(for reason: MeetingEndMonitor.Reason) -> String {
-        let app = model.sourceApp?.name ?? "The app"
+        let app = model.sourceApp?.name
         switch reason {
-        case .sourceExited: return "\(app) quit — stop recording?"
-        case .sourceInactive: return "\(app) stopped using audio — stop recording?"
-        case .callEnded: return "The call seems to be over — stop recording?"
-        case .silence: return "No sound for \(model.settings.endMonitor.effectiveSilenceMinutes) min — stop recording?"
-        case .screenLocked: return "Screen locked — stop recording?"
-        case .inputRouteLost: return "Microphone disconnected — stop recording?"
-        case .systemSleep, .diskFull, .maxDuration: return "Stop recording?"
+        case .sourceExited:
+            if let app { return String(localized: "\(app) quit — stop recording?") }
+            return String(localized: "The app quit — stop recording?")
+        case .sourceInactive:
+            if let app { return String(localized: "\(app) stopped using audio — stop recording?") }
+            return String(localized: "The app stopped using audio — stop recording?")
+        case .callEnded: return String(localized: "The call seems to be over — stop recording?")
+        case .silence:
+            return String(
+                localized: "No sound for \(model.settings.endMonitor.effectiveSilenceMinutes) min — stop recording?")
+        case .screenLocked: return String(localized: "Screen locked — stop recording?")
+        case .inputRouteLost: return String(localized: "Microphone disconnected — stop recording?")
+        case .systemSleep, .diskFull, .maxDuration: return String(localized: "Stop recording?")
         }
     }
 }

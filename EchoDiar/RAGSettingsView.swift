@@ -98,7 +98,7 @@ struct RAGSettingsView: View {
                 .id(entry.id)
             }
             HStack(alignment: .firstTextBaseline, spacing: 8) {
-                radio("apple-nl", name: "Apple (Basic, built-in)")
+                radio("apple-nl", name: String(localized: "Apple (Basic, built-in)"))
                 VStack(alignment: .leading, spacing: 2) {
                     Text("Apple (Basic, built-in)")
                     Text("Nothing to download. Rougher ranking than the models above.")
@@ -139,7 +139,7 @@ struct RAGSettingsView: View {
                         .disabled(!config.enabled)
                     VStack(alignment: .leading, spacing: 2) {
                         Text(config.displayName)
-                        Text(Self.host(config).isEmpty ? "Base URL not set" : Self.host(config))
+                        Text(Self.host(config).isEmpty ? String(localized: "Base URL not set") : Self.host(config))
                             .font(.caption)
                             .foregroundStyle(.secondary)
                     }
@@ -192,11 +192,11 @@ struct RAGSettingsView: View {
         VStack(alignment: .leading, spacing: 4) {
             HStack(spacing: 8) {
                 TextField("Model", text: $apiModel,
-                          prompt: Text(Self.suggestedModels[config.preset ?? ""] ?? "Embedding model id"))
+                          prompt: Text(Self.suggestedModels[config.preset ?? ""] ?? String(localized: "Embedding model id")))
                     .focused($apiModelFocused)
                     .onSubmit(saveAPIModel)
                 if let loadedModels, !loadedModels.isEmpty {
-                    Menu("\(loadedModels.count) model\(loadedModels.count == 1 ? "" : "s")") {
+                    Menu("\(loadedModels.count) models") {
                         ForEach(loadedModels, id: \.self) { id in
                             Button(id) {
                                 apiModel = id
@@ -311,7 +311,7 @@ struct RAGSettingsView: View {
 
     private func consentMessage(_ config: ProviderConfig) -> String {
         let count = model.conversations.filter(\.hasTranscript).count
-        return "Transcripts and summaries of \(count) conversation\(count == 1 ? "" : "s"), and your questions, will be sent to \(Self.host(config)) to build and search the index, and billed by \(config.displayName). The provider may keep them under its own retention policy. You are asked once per provider and destination."
+        return String(localized: "Transcripts and summaries of \(count) conversations, and your questions, will be sent to \(Self.host(config)) to build and search the index, and billed by \(config.displayName). The provider may keep them under its own retention policy. You are asked once per provider and destination.")
     }
 
     private func saveAPIModel() {

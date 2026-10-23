@@ -213,6 +213,9 @@ final class AppModel {
 
     var isRecording: Bool { snapshot.state != .idle }
 
+    /// The mic is muted in the current recording (its channel written as silence); false when idle.
+    var micMuted: Bool { snapshot.micMuted }
+
     /// Library indexing waits while any of these runs, so it never competes with them for the model gate or the CPU.
     var indexingPaused: Bool { isRecording || compressionJobs > 0 || transcriptionJobs > 0 || aiJob != nil }
 
@@ -304,6 +307,8 @@ final class AppModel {
             silentTapSuspected: { [weak self] in self?.snapshot.silentTapSuspected ?? false },
             toggleRecording: { [weak self] in self?.toggleRecording() },
             togglePause: { [weak self] in self?.togglePause() },
+            micMuted: { [weak self] in self?.micMuted ?? false },
+            toggleMicMute: { [weak self] in self?.toggleMicMute() },
             stop: { [weak self] in self?.stopRecording() },
             language: { [weak self] in self?.recordingLanguage ?? LanguageOptions.auto },
             languageGroups: { [weak self] in
@@ -395,7 +400,9 @@ final class AppModel {
                 Task { await transcriber?.cancel() }
                 NSLog("EchoDiar: could not start recording: \(error)")
                 autoStartedAppName = nil
-                recordingError = Self.captureFailureMessage(error, action: "start")
+                recordingError = Self.captureFailureMessage(error, action: .start)
+                // The welcome pane's Record opens the recording page before the start; nothing to show there now.
+                if route == .recording { route = .list }
             }
             isStarting = false
         }
@@ -465,8 +472,17 @@ final class AppModel {
             }.value
             if let failure {
                 NSLog("EchoDiar: could not resume recording: \(failure)")
-                recordingError = Self.captureFailureMessage(failure, action: "resume")
+                recordingError = Self.captureFailureMessage(failure, action: .resume)
             }
+        }
+    }
+
+    /// The engine flips its own state on its queue (quick toggles stay in order) and publishes it, which `snapshot`
+    /// picks up.
+    func toggleMicMute() {
+        guard isRecording else { return }
+        Task.detached(priority: .userInitiated) { [engine] in
+            engine.toggleMicMuted()
         }
     }
 
@@ -577,52 +593,71 @@ final class AppModel {
     private static func stopMessage(_ reason: RecordingEngine.EndReason) -> String? {
         switch reason {
         case .user: nil
-        case .diskFull: "Recording stopped: disk is full."
-        case .writeFailed: "Recording stopped: could not write audio."
-        case .captureFailed: "Recording stopped: audio capture failed."
+        case .diskFull: String(localized: "Recording stopped: disk is full.")
+        case .writeFailed: String(localized: "Recording stopped: could not write audio.")
+        case .captureFailed: String(localized: "Recording stopped: audio capture failed.")
+        }
+    }
+
+    /// The failed action of `captureFailureMessage`, with its whole sentences.
+    private enum CaptureAction {
+        case start, resume
+
+        var couldNot: String {
+            switch self {
+            case .start: String(localized: "The recording could not start.")
+            case .resume: String(localized: "The recording could not resume.")
+            }
+        }
+
+        var appStopped: String {
+            switch self {
+            case .start: String(localized: "The selected app stopped playing audio before recording could start.")
+            case .resume: String(localized: "The selected app stopped playing audio before recording could resume.")
+            }
         }
     }
 
     /// A readable sentence for a failed start or resume (`action`), with the error itself in parentheses.
-    private static func captureFailureMessage(_ error: any Error, action: String) -> String {
+    private static func captureFailureMessage(_ error: any Error, action: CaptureAction) -> String {
         let sentence: String
         switch error {
         case ProcessTapError.noProcesses:
-            sentence = "The selected app stopped playing audio before recording could \(action)."
+            sentence = action.appStopped
         case RecordingEngineError.diskFull:
-            sentence = "There is not enough free disk space to record."
+            sentence = String(localized: "There is not enough free disk space to record.")
         case ProcessTapError.unsupportedFormat:
-            sentence = "The system audio format is not supported."
+            sentence = String(localized: "The system audio format is not supported.")
         case let error as ProcessTapError:
             sentence = coreAudioSentence(error, action: action)
         default:
-            sentence = "The recording could not \(action)."
+            sentence = action.couldNot
         }
         return "\(sentence) (\(error))"
     }
 
-    private static func coreAudioSentence(_ error: ProcessTapError, action: String) -> String {
+    private static func coreAudioSentence(_ error: ProcessTapError, action: CaptureAction) -> String {
         let status: OSStatus
         switch error {
         case .createTap(let code), .createAggregateDevice(let code), .addFormatListener(let code),
              .readFormat(let code), .createIOProc(let code), .startDevice(let code):
             status = code
         case .noProcesses, .unsupportedFormat:
-            return "The recording could not \(action)."
+            return action.couldNot
         }
         switch status {
         case kAudioHardwareBadObjectError:
-            return "The selected app stopped playing audio before recording could \(action)."
+            return action.appStopped
         case kAudioHardwareNotRunningError:
-            return "The audio system is not running. Try again in a moment."
+            return String(localized: "The audio system is not running. Try again in a moment.")
         case kAudioHardwareBadDeviceError:
-            return "The audio device changed while recording was starting. Try again."
+            return String(localized: "The audio device changed while recording was starting. Try again.")
         case kAudioDevicePermissionsError:
-            return "Another app is using the audio device exclusively."
+            return String(localized: "Another app is using the audio device exclusively.")
         case kAudioHardwareIllegalOperationError:
-            return "macOS refused to capture system audio."
+            return String(localized: "macOS refused to capture system audio.")
         default:
-            return "The recording could not \(action)."
+            return action.couldNot
         }
     }
 
@@ -1423,7 +1458,7 @@ final class AppModel {
     nonisolated func makeProvider(for config: ProviderConfig) throws -> (any LLMProvider)? {
         let apiKey = config.authStyle == .none ? nil : try KeychainStore.apiKey(forProvider: config.id)
         if config.preset != nil, config.authStyle != .none, apiKey?.isEmpty ?? true {
-            throw LLMError.provider("Save a key first.")
+            throw LLMError.provider(String(localized: "Save a key first."))
         }
         switch config.kind {
         case .cli:
@@ -1505,7 +1540,7 @@ extension AppModel {
 
     static var foundationModelsUnavailableReason: String? {
         if #available(macOS 26, *) { return AppleFoundationModelProvider.unavailableReason }
-        return "Apple Foundation Models need macOS 26."
+        return String(localized: "Apple Foundation Models need macOS 26.")
     }
 
     /// The default provider when it can run, else the first one that can.
@@ -1556,7 +1591,7 @@ extension AppModel {
             return
         }
         guard let client else {
-            aiError = (conversation.id, "\(provider.name) is not available.")
+            aiError = (conversation.id, String(localized: "\(provider.name) is not available."))
             return
         }
         let stream = switch kind {

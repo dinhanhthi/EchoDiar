@@ -52,6 +52,9 @@ let package = Package(
                 .product(name: "FluidAudio", package: "FluidAudio"),
                 .product(name: "Qwen3ASR", package: "speech-swift"),
             ],
+            // FluidAudio's Silero VAD (FluidInference/silero-vad-coreml), loaded from Bundle.module; .copy keeps the
+            // compiled .mlmodelc folder as is.
+            resources: [.copy("Resources/silero-vad-unified-256ms-v6.2.1.mlmodelc")],
             swiftSettings: [.swiftLanguageMode(.v6)]
         ),
         .testTarget(
