@@ -2,6 +2,7 @@ using System.ComponentModel;
 using System.Diagnostics;
 using System.Globalization;
 using CommunityToolkit.Mvvm.ComponentModel;
+using EchoDiar.AI;
 using EchoDiar.Core.Model;
 using EchoDiar.Core.Models;
 
@@ -273,12 +274,11 @@ public sealed partial class TranscriptViewModel : ObservableObject
         return Math.Max(index, 0) % SpeakerColorCount;
     }
 
-    /// <summary>"mm:ss"; minutes go past 59 in recordings longer than an hour.</summary>
-    public static string Timestamp(double seconds)
-    {
-        var whole = (long)Math.Max(0, Math.Floor(seconds));
-        return string.Create(CultureInfo.InvariantCulture, $"{whole / 60:00}:{whole % 60:00}");
-    }
+    /// <summary>
+    /// "mm:ss"; minutes go past 59 in recordings longer than an hour. Rounded to the nearest second like the prompts, so
+    /// a cited [00:07] shows as 00:07 (macOS uses the same Duration format for both).
+    /// </summary>
+    public static string Timestamp(double seconds) => PromptBuilder.Timestamp(seconds);
 
     /// <summary>Silent once the window closed, like <see cref="AppViewModel"/>.</summary>
     protected override void OnPropertyChanged(PropertyChangedEventArgs e)
