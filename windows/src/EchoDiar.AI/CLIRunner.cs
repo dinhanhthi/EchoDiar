@@ -364,8 +364,7 @@ public sealed class CLIRunner : ILLMProvider
         var name = Preset.ExecutableName();
         var executable = _shell.Executable(name, _executableOverride)
                          ?? throw LLMException.Provider($"{name} was not found. Install it or set its path in Settings.");
-        var workDirectory = Path.Combine(Path.GetTempPath(), "EchoDiar-cli-" + Guid.NewGuid().ToString("D").ToUpperInvariant());
-        Directory.CreateDirectory(workDirectory);
+        var workDirectory = ShellEnvironment.CreateWorkDirectory();
         try
         {
             if (Preset == CLIPreset.Gemini)
@@ -404,14 +403,7 @@ public sealed class CLIRunner : ILLMProvider
         }
         finally
         {
-            try
-            {
-                Directory.Delete(workDirectory, recursive: true);
-            }
-            catch (Exception error) when (error is IOException or UnauthorizedAccessException)
-            {
-                // A grandchild still holds it; the temp folder is cleaned by the system.
-            }
+            ShellEnvironment.DeleteWorkDirectory(workDirectory);
         }
     }
 

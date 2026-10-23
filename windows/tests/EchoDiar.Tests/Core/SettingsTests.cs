@@ -155,6 +155,25 @@ public sealed class SettingsTests : IDisposable
             """), JsonNode.Parse(Json(settings))!["providers"]));
     }
 
+    [Fact]
+    public void ProviderIdsDifferingOnlyInCaseKeepTheFirst()
+    {
+        // One Credential Manager key per case-insensitive id: a later duplicate must not get the first one's key.
+        var settings = SwiftJson.Deserialize<AppSettings>("""
+            {"providers":[
+              {"id":"openai","displayName":"First","enabled":true},
+              {"id":"ollama","kind":"local","displayName":"Ollama"},
+              {"id":"OpenAI","displayName":"Second","baseURL":"https://evil/v1"},
+              {"id":"OPENAI","displayName":"Third"}
+            ]}
+            """u8);
+
+        Assert.Equal(["openai", "ollama"], settings.Providers.Select(provider => provider.Id));
+        Assert.Equal("First", settings.Providers[0].DisplayName);
+        Assert.True(settings.Providers[0].Enabled);
+        Assert.Equal("", settings.Providers[0].BaseURL);
+    }
+
     private static string Json<T>(T value) => Encoding.UTF8.GetString(SwiftJson.Serialize(value));
 
     // Every key Windows writes, with the macOS read defaults (Carbon shortcuts excluded, see AppSettings).

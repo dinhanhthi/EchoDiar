@@ -127,22 +127,30 @@ public static partial class LocalHostDiscovery
         try
         {
             if (shell.Executable("foundry") is not { } executable) return null;
-            var info = ShellEnvironment.StartInfo(
-                executable, ["service", "status"], ShellEnvironment.BaseEnvironment(shell.Path, shell.Variable), Path.GetTempPath());
-            info.RedirectStandardError = false;
-            using var process = Process.Start(info)!;
+            var workDirectory = ShellEnvironment.CreateWorkDirectory();
             try
             {
-                onStarted?.Invoke(process);
-                process.StandardInput.Close();
-                using var limit = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
-                limit.CancelAfter(timeout);
-                var output = await process.StandardOutput.BaseStream.ReadPrefixAsync(64 * 1024).WaitAsync(limit.Token);
-                return Encoding.UTF8.GetString(output);
+                var info = ShellEnvironment.StartInfo(
+                    executable, ["service", "status"], ShellEnvironment.BaseEnvironment(shell.Path, shell.Variable), workDirectory);
+                info.RedirectStandardError = false;
+                using var process = Process.Start(info)!;
+                try
+                {
+                    onStarted?.Invoke(process);
+                    process.StandardInput.Close();
+                    using var limit = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+                    limit.CancelAfter(timeout);
+                    var output = await process.StandardOutput.BaseStream.ReadPrefixAsync(64 * 1024).WaitAsync(limit.Token);
+                    return Encoding.UTF8.GetString(output);
+                }
+                finally
+                {
+                    if (!process.HasExited) process.Kill(entireProcessTree: true);
+                }
             }
             finally
             {
-                if (!process.HasExited) process.Kill(entireProcessTree: true);
+                ShellEnvironment.DeleteWorkDirectory(workDirectory);
             }
         }
         catch (Exception error) when (error is not OperationCanceledException || !cancellationToken.IsCancellationRequested)

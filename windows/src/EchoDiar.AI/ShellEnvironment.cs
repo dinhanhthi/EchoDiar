@@ -81,21 +81,29 @@ public sealed partial class ShellEnvironment
     {
         try
         {
-            var info = StartInfo(executable, ["--version"], BaseEnvironment(Path, Variable), System.IO.Path.GetTempPath());
-            info.RedirectStandardError = false;
-            using var process = Process.Start(info)!;
-            process.StandardInput.Close();
-            using var timeout = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
-            timeout.CancelAfter(TimeSpan.FromSeconds(5));
+            var workDirectory = CreateWorkDirectory();
             try
             {
-                var output = await process.StandardOutput.BaseStream.ReadPrefixAsync(64 * 1024).WaitAsync(timeout.Token);
-                var line = Encoding.UTF8.GetString(output).Split('\n', '\r').FirstOrDefault(text => text.Length > 0);
-                return line?.Trim(' ', '\t');
+                var info = StartInfo(executable, ["--version"], BaseEnvironment(Path, Variable), workDirectory);
+                info.RedirectStandardError = false;
+                using var process = Process.Start(info)!;
+                process.StandardInput.Close();
+                using var timeout = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+                timeout.CancelAfter(TimeSpan.FromSeconds(5));
+                try
+                {
+                    var output = await process.StandardOutput.BaseStream.ReadPrefixAsync(64 * 1024).WaitAsync(timeout.Token);
+                    var line = Encoding.UTF8.GetString(output).Split('\n', '\r').FirstOrDefault(text => text.Length > 0);
+                    return line?.Trim(' ', '\t');
+                }
+                finally
+                {
+                    if (!process.HasExited) process.Kill(entireProcessTree: true);
+                }
             }
             finally
             {
-                if (!process.HasExited) process.Kill(entireProcessTree: true);
+                DeleteWorkDirectory(workDirectory);
             }
         }
         catch (Exception error) when (error is not OperationCanceledException || !cancellationToken.IsCancellationRequested)
@@ -130,6 +138,28 @@ public sealed partial class ShellEnvironment
         info.Environment.Clear();
         foreach (var (name, value) in environment) info.Environment[name] = value;
         return info;
+    }
+
+    /// <summary>A new empty folder only this run uses, <c>%TEMP%\EchoDiar-cli-&lt;GUID&gt;</c>, as a CLI's working directory.</summary>
+    internal static string CreateWorkDirectory()
+    {
+        var workDirectory = System.IO.Path.Combine(
+            System.IO.Path.GetTempPath(), "EchoDiar-cli-" + Guid.NewGuid().ToString("D").ToUpperInvariant());
+        Directory.CreateDirectory(workDirectory);
+        return workDirectory;
+    }
+
+    /// <summary>Deletes a <see cref="CreateWorkDirectory"/> folder; one still in use is left for the system to clean.</summary>
+    internal static void DeleteWorkDirectory(string workDirectory)
+    {
+        try
+        {
+            Directory.Delete(workDirectory, recursive: true);
+        }
+        catch (Exception error) when (error is IOException or UnauthorizedAccessException)
+        {
+            // A grandchild still holds it; the temp folder is cleaned by the system.
+        }
     }
 
     /// <summary>
@@ -230,10 +260,12 @@ public sealed partial class ShellEnvironment
             return null;
         }
         if (ShimScript(text) is not { } script) return null;
-        var directory = System.IO.Path.GetDirectoryName(shimPath)!;
+        var directory = System.IO.Path.GetFullPath(System.IO.Path.GetDirectoryName(shimPath)!);
         var scriptPath = System.IO.Path.GetFullPath(
             System.IO.Path.Combine(directory, script.Replace('\\', System.IO.Path.DirectorySeparatorChar)));
-        if (!File.Exists(scriptPath)) return null;
+        // The script must stay inside the shim's folder (no `..` out of it); the separator keeps C:\npm2 out of C:\npm.
+        var inside = System.IO.Path.TrimEndingDirectorySeparator(directory) + System.IO.Path.DirectorySeparatorChar;
+        if (!scriptPath.StartsWith(inside, StringComparison.OrdinalIgnoreCase) || !File.Exists(scriptPath)) return null;
         var node = Native(System.IO.Path.Combine(directory, "node.exe"))
                    ?? Directories(Path).Select(entry => Native(System.IO.Path.Combine(entry, "node.exe"))).FirstOrDefault(found => found is not null);
         return node is null ? null : new(node.FileName, [scriptPath], shimPath);
@@ -248,7 +280,8 @@ public sealed partial class ShellEnvironment
     /// <c>... &amp; "%_prog%"  "%dp0%\&lt;script&gt;" %*</c>.</item>
     /// </list>
     /// Null for anything else: another program (a bash or pwsh shebang), shebang arguments, text after <c>%*</c>, more
-    /// than one script, or a script path with cmd metacharacters. Nothing in the shim is ever run.
+    /// than one script, a script path with cmd metacharacters, or a rooted, drive or UNC script path. Nothing in the
+    /// shim is ever run.
     /// </summary>
     internal static string? ShimScript(string text)
     {
@@ -264,6 +297,8 @@ public sealed partial class ShellEnvironment
         if (scripts.Count == 0 || scripts.Distinct(StringComparer.Ordinal).Count() != 1) return null;
         var script = scripts[0];
         if (script.Length == 0 || script.Any(c => char.IsControl(c) || "\"%!^&|<>".Contains(c))) return null;
+        // Path.Combine would drop the shim's folder for a drive-rooted, rooted or UNC script (an NTLM leak for UNC).
+        if (script.Contains(':') || script[0] is '\\' or '/') return null;
         return script;
     }
 

@@ -8,7 +8,15 @@ using Windows.ApplicationModel;
 namespace EchoDiar.Platform.AI;
 
 /// <summary>A Limited Access Feature unlock (Microsoft issues all three strings with the token).</summary>
-public sealed record LimitedAccessFeatureToken(string FeatureId, string Token, string Attestation);
+public sealed record LimitedAccessFeatureToken(string FeatureId, string Token, string Attestation)
+{
+    // ToString (logs, exceptions, the debugger) never shows the token or the attestation.
+    private bool PrintMembers(StringBuilder builder)
+    {
+        builder.Append("FeatureId = ").Append(FeatureId).Append(", Token = [redacted], Attestation = [redacted]");
+        return true;
+    }
+}
 
 /// <summary>
 /// Phi Silica through Windows AI (Copilot+ PCs), the Windows counterpart of Swift <c>AppleFoundationModelProvider</c>.

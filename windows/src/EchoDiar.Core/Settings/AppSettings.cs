@@ -99,6 +99,9 @@ public sealed record AppSettings : IJsonOnDeserialized
         // A shortcut the recorder refuses (a hand-edited or synced file) would take keys away from every app.
         if (!GlobalHotKeyWindows.IsAllowedGlobal) GlobalHotKeyWindows = WindowsHotKey.DefaultRecord;
         if (!GlobalPauseHotKeyWindows.IsAllowedGlobal) GlobalPauseHotKeyWindows = WindowsHotKey.DefaultPause;
+        // Credential Manager names keys case-insensitively: ids differing only in case would share one API key and send
+        // it to each other's host. The first wins, like Swift's uniquingKeysWith { first, _ in first }.
+        Providers = Providers.DistinctBy(provider => provider.Id, StringComparer.OrdinalIgnoreCase).ToList();
     }
 
     internal static int Clamp(int value, (int Min, int Max) range) => Math.Clamp(value, range.Min, range.Max);

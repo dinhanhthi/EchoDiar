@@ -20,4 +20,15 @@ public sealed class WindowsAIProviderTests
         Assert.True(hidden);
         Assert.Equal(reason, error.Message);
     }
+
+    [Fact]
+    public void TokenToStringRedactsTheSecrets()
+    {
+        var text = new LimitedAccessFeatureToken("com.microsoft.windows.ai.languagemodel", "TOKEN-SECRET", "ATTESTATION-SECRET").ToString();
+
+        Assert.Equal(
+            "LimitedAccessFeatureToken { FeatureId = com.microsoft.windows.ai.languagemodel, Token = [redacted], Attestation = [redacted] }",
+            text);
+        Assert.DoesNotContain("SECRET", text);
+    }
 }

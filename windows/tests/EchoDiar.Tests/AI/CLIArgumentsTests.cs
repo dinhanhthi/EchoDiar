@@ -327,6 +327,13 @@ public sealed class CLIArgumentsTests : IDisposable
         { "plain cmd", "@echo off\r\ncmd /c \"%~dp0\\x.js\" %*\r\n" },
         { "two scripts", OldShim.Replace("  node  \"%~dp0\\node_modules", "  \"%~dp0\\node.exe\"  \"%~dp0\\other") },
         { "extra _prog", NewShim().Replace("SETLOCAL\r\n", "SETLOCAL\r\nSET \"_prog=cmd.exe\"\r\n") },
+        { "drive script", NewShim(@"C:\x.js") },
+        { "old drive script", OldShim.Replace(@"node_modules\@anthropic-ai\claude-code\cli.js", @"C:\x.js") },
+        { "drive-relative script", NewShim(@"node_modules\C:x.js") },
+        { "UNC script", NewShim(@"\\host\share\x.js") },
+        { "old UNC script", OldShim.Replace(@"node_modules\@anthropic-ai\claude-code\cli.js", @"\\host\share\x.js") },
+        { "rooted script", NewShim(@"\x.js") },
+        { "slash-rooted script", NewShim("/x.js") },
         { "empty", "" },
     };
 
@@ -355,6 +362,21 @@ public sealed class CLIArgumentsTests : IDisposable
         Assert.Equal(Path.Combine(npm, "claude.cmd"), executable.DisplayPath);
         Assert.DoesNotContain(executable.LeadingArguments.Append(executable.FileName), part =>
             part.EndsWith(".cmd", StringComparison.OrdinalIgnoreCase) || part.EndsWith("cmd.exe", StringComparison.OrdinalIgnoreCase));
+    }
+
+    [Fact]
+    public void ShimScriptOutsideItsFolderIsRefused()
+    {
+        // `..` leaves the shim's folder; npm2 shares npm's prefix, so only a separator-aware check refuses it.
+        var npm = Directory.CreateDirectory(Path.Combine(root, "npm")).FullName;
+        Touch(npm, "node.exe");
+        Touch(root, "npm2", "x.js");
+        Touch(root, "x.js");
+        File.WriteAllText(Path.Combine(npm, "claude.cmd"), NewShim(@"..\npm2\x.js"));
+        File.WriteAllText(Path.Combine(npm, "codex.cmd"), NewShim(@"node_modules\..\..\x.js"));
+
+        Assert.Null(Shell(npm).Executable("claude"));
+        Assert.Null(Shell(npm).Executable("codex"));
     }
 
     [Fact]
