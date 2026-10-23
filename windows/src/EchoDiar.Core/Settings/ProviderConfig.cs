@@ -92,6 +92,8 @@ public sealed record ProviderConfig
         // Older builds and Docker listen on :8080 instead.
         Local("llamacpp", "llama.cpp server", "http://127.0.0.1:9931/v1"),
         Local("vllm", "vLLM", "http://127.0.0.1:8000/v1"),
+        // Windows only (macOS hides a saved preset it does not know). The port varies: discovery sets the real one.
+        Local("foundry-local", "Foundry Local", "http://127.0.0.1:5273/v1"),
         Other("claude-cli", "Claude Code", ProviderKind.Cli),
         Other("codex-cli", "Codex", ProviderKind.Cli),
         Other("opencode-cli", "OpenCode", ProviderKind.Cli),
