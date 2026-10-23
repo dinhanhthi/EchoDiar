@@ -13,6 +13,7 @@ namespace EchoDiar.App.Services;
 /// (<see cref="CloudDestination.ConsentKey"/>), before anything is uploaded, and remembered in the settings'
 /// <c>cloudSTTConfirmed</c>. A changed base URL is a new destination, so it asks again; an invalid one is never
 /// confirmed. <see cref="AppViewModel.PendingCloudRuns"/> holds the runs that wait; the main window shows the dialog.
+/// A cloud embedder of the library index asks the same way (<see cref="EmbeddingDialog"/>, <c>cloudEmbeddingConfirmed</c>).
 /// </summary>
 internal static class CloudConsent
 {
@@ -40,6 +41,31 @@ internal static class CloudConsent
                 run.ProviderName, run.Host),
         },
         PrimaryButtonText = Loc.T("Send"),
+        CloseButtonText = Loc.T("Cancel"),
+        DefaultButton = ContentDialogButton.Close,
+    };
+
+    /// <summary>
+    /// The one-time "transcripts leave this PC" confirmation of a cloud embedder (macOS RAGSettingsView.swift's "Send
+    /// transcripts to …?" alert and its <c>consentMessage</c>): Understood (allowed, remembered in
+    /// <c>cloudEmbeddingConfirmed</c>) or Cancel (nothing is sent), Cancel the default.
+    /// </summary>
+    public static ContentDialog EmbeddingDialog(XamlRoot root, PendingEmbeddingConsent consent) => new()
+    {
+        XamlRoot = root,
+        Style = Application.Current.Resources["DefaultContentDialogStyle"] as Style,
+        Title = Loc.Format("Send transcripts to %@?", consent.ProviderName),
+        Content = new TextBlock
+        {
+            TextWrapping = TextWrapping.Wrap,
+            Text = string.Format(
+                CultureInfo.CurrentCulture,
+                "Transcripts and summaries of {0} conversation{1}, and your questions, will be sent to {2} to build and "
+                + "search the index, and billed by {3}. The provider may keep them under its own retention policy. You are "
+                + "asked once per provider and destination.",
+                consent.Conversations, consent.Conversations == 1 ? "" : "s", consent.Host, consent.ProviderName),
+        },
+        PrimaryButtonText = Loc.T("Understood"),
         CloseButtonText = Loc.T("Cancel"),
         DefaultButton = ContentDialogButton.Close,
     };

@@ -151,43 +151,12 @@ public sealed partial class AppViewModel
         var id = conversation.Id;
         try
         {
-            ILLMProvider? client;
-            try
-            {
-                client = await Task.Run(() => MakeClient(provider, config), cancel.Token);
-            }
-            catch (ModelStoreException e) when (e.Kind == ModelStoreError.ChecksumMismatch)
-            {
-                // The install was deleted (InstallRemoved refreshes its row to Download).
-                Debug.WriteLine($"EchoDiar: {provider.Id} failed its integrity check");
-                if (!_closing) AIError = new AIErrorInfo(id, Loc.Format("%@ failed its integrity check. Download it again.", provider.Name));
-                return;
-            }
-            catch (Exception e) when (e is not OperationCanceledException)
-            {
-                Debug.WriteLine($"EchoDiar: could not make the client of {provider.Id}: {e.GetType().Name}");
-                if (!_closing) AIError = new AIErrorInfo(id, Loc.Format("%@: %@", provider.Name, ProvidersViewModel.ShortMessage(e)));
-                return;
-            }
-            if (_closing || cancel.IsCancellationRequested) return;
-            if (client is null)
-            {
-                AIError = new AIErrorInfo(id, Loc.Format("%@ is not available.", provider.Name));
-                return;
-            }
+            if (await MakeJobClientAsync(provider, config, id, cancel.Token) is not { } client) return;
             var stream = kind == AIJobKind.Summary
                 ? _services.AI.Summarize(conversation, transcript, client, provider.Id, model, language, cancel.Token)
                 : _services.AI.Ask(question!, conversation, transcript, summary, history, historyLimit, client, provider.Id,
                     model, language, cancel.Token);
-            await using var updates = stream.GetAsyncEnumerator(cancel.Token);
-            // The first MoveNextAsync registers the job, so Stop sees it from here; a Stop asked before stops it now.
-            var next = updates.MoveNextAsync();
-            if (_aiStopRequested) _services.AI.Stop();
-            while (await next)
-            {
-                ApplyAIUpdate(updates.Current);
-                next = updates.MoveNextAsync();
-            }
+            await StreamAIJobAsync(stream, cancel.Token);
         }
         catch (OperationCanceledException) when (cancel.IsCancellationRequested)
         {
@@ -212,6 +181,50 @@ public sealed partial class AppViewModel
         if (_closing) return;
         // A new summary sets hasSummary: the card shows its Summary button.
         await ReloadAsync(id);
+    }
+
+    /// <summary>
+    /// The job's client, made off the UI thread; null with the AI error of conversation <paramref name="id"/> (null: the
+    /// library chat) when it cannot be made, or when the job was cancelled or the window closed meanwhile.
+    /// </summary>
+    private async Task<ILLMProvider?> MakeJobClientAsync(
+        AIProviderInfo provider, ProviderConfig? config, Guid? id, CancellationToken cancellationToken)
+    {
+        ILLMProvider? client;
+        try
+        {
+            client = await Task.Run(() => MakeClient(provider, config), cancellationToken);
+        }
+        catch (ModelStoreException e) when (e.Kind == ModelStoreError.ChecksumMismatch)
+        {
+            // The install was deleted (InstallRemoved refreshes its row to Download).
+            Debug.WriteLine($"EchoDiar: {provider.Id} failed its integrity check");
+            if (!_closing) AIError = new AIErrorInfo(id, Loc.Format("%@ failed its integrity check. Download it again.", provider.Name));
+            return null;
+        }
+        catch (Exception e) when (e is not OperationCanceledException)
+        {
+            Debug.WriteLine($"EchoDiar: could not make the client of {provider.Id}: {e.GetType().Name}");
+            if (!_closing) AIError = new AIErrorInfo(id, Loc.Format("%@: %@", provider.Name, ProvidersViewModel.ShortMessage(e)));
+            return null;
+        }
+        if (_closing || cancellationToken.IsCancellationRequested) return null;
+        if (client is null) AIError = new AIErrorInfo(id, Loc.Format("%@ is not available.", provider.Name));
+        return client;
+    }
+
+    /// <summary>Applies the job's updates on the UI thread until its stream ends.</summary>
+    private async Task StreamAIJobAsync(IAsyncEnumerable<AIUpdate> stream, CancellationToken cancellationToken)
+    {
+        await using var updates = stream.GetAsyncEnumerator(cancellationToken);
+        // The first MoveNextAsync registers the job, so Stop sees it from here; a Stop asked before stops it now.
+        var next = updates.MoveNextAsync();
+        if (_aiStopRequested) _services.AI.Stop();
+        while (await next)
+        {
+            ApplyAIUpdate(updates.Current);
+            next = updates.MoveNextAsync();
+        }
     }
 
     /// <summary>
@@ -264,11 +277,23 @@ public sealed partial class AppViewModel
 
     /// <summary>
     /// Ends the job early: the answer or summary streamed until then is saved (a summary marked stopped), then it ends as
-    /// usual (macOS <c>stopAIJob</c>). Nothing is saved when nothing was streamed yet.
+    /// usual (macOS <c>stopAIJob</c>). Nothing is saved when nothing was streamed yet; a library question without text
+    /// yet (still searching) is cancelled outright.
     /// </summary>
     public void StopAIJob()
     {
-        if (AIJob is null) return;
+        if (AIJob is not { } job) return;
+        if (job is { ConversationId: null, Text.Length: 0 })
+        {
+            try
+            {
+                _aiCancel?.Cancel();
+            }
+            catch (ObjectDisposedException)
+            {
+                // The job ended meanwhile.
+            }
+        }
         _aiStopRequested = true;
         _services.AI.Stop();
     }

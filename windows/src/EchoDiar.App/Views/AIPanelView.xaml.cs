@@ -25,10 +25,6 @@ namespace EchoDiar.App.Views;
 /// </summary>
 public sealed partial class AIPanelView : UserControl
 {
-    /// <summary>The summary languages offered (macOS <c>AILanguageMenu</c>), plus a hand-edited one.</summary>
-    private static readonly (string Code, string Name)[] Languages =
-        [("auto", "Auto"), ("en", "English"), ("fr", "French"), ("vi", "Vietnamese")];
-
     private readonly DispatcherQueueTimer _toastTimer;
     private readonly DispatcherQueueTimer _focusTimer;
 
@@ -482,9 +478,7 @@ public sealed partial class AIPanelView : UserControl
         if (_panel is null || _model is null) return;
         var providers = _panel.Providers;
         var current = providers.CurrentAIProvider;
-        var title = current is null ? Loc.T("No AI model")
-            : current.Kind == AIProviderKind.InApp ? current.Name
-            : _panel.CurrentModel is { Length: > 0 } model ? model : current.Name;
+        var title = AIMenus.ModelTitle(providers);
         ModelText.Text = title;
         AutomationProperties.SetName(ModelButton, title);
         var language = _model.Settings.SummaryLanguage;
@@ -492,7 +486,7 @@ public sealed partial class AIPanelView : UserControl
         DataNotesButton.Visibility = Shown(DataNotes().Count > 0);
 
         SetupHints.Visibility = Shown(current is null);
-        var windowsAI = providers.WindowsAI is { Hidden: false, Reason: { } reason } ? Loc.T(reason) : null;
+        var windowsAI = AIMenus.WindowsAIHint(providers);
         WindowsAIHint.Text = windowsAI ?? "";
         WindowsAIHint.Visibility = Shown(current is null && windowsAI is not null);
 
@@ -535,75 +529,26 @@ public sealed partial class AIPanelView : UserControl
         ChatCopyButton.IsEnabled = hasTranscript;
     }
 
-    /// <summary>
-    /// Every provider with the models it offers (macOS <c>AIModelMenu</c>): on this PC first, then the hosts, then the
-    /// ones whose data leaves this PC; a provider without a model says to choose one in Settings, one that cannot run now
-    /// is off with why; then "Choose Models…" (Settings › AI).
-    /// </summary>
+    /// <summary>The providers and their models (<see cref="AIMenus.FillModelMenu"/>), then "Choose Models…" (Settings › AI).</summary>
     private void BuildModelMenu()
     {
-        ModelMenu.Items.Clear();
-        if (_panel is null || _model is null) return;
-        var providers = _panel.Providers;
-        var all = providers.AIProviders;
-        var current = providers.CurrentAIProvider;
-        var currentModel = _panel.CurrentModel;
-        var inApp = all.Where(p => p.Kind == AIProviderKind.InApp).ToList();
-        var hosts = all.Where(p => p.Kind != AIProviderKind.InApp && !p.LeavesPC).Concat(all.Where(p => p.LeavesPC)).ToList();
-        if (inApp.Count > 0)
+        if (_panel is null || _model is null)
         {
-            ModelMenu.Items.Add(Header(Loc.T("On this PC")));
-            foreach (var provider in inApp) ModelMenu.Items.Add(ModelItem(provider, provider.DefaultModel, provider.Name, current, currentModel));
+            ModelMenu.Items.Clear();
+            return;
         }
-        foreach (var provider in hosts)
-        {
-            if (ModelMenu.Items.Count > 0) ModelMenu.Items.Add(new MenuFlyoutSeparator());
-            ModelMenu.Items.Add(Header(provider.LeavesPC ? Loc.Format("%@ (leaves this PC)", provider.Name) : provider.Name));
-            if (provider.Models.Count == 0) ModelMenu.Items.Add(new MenuFlyoutItem { Text = Loc.T("No model: choose one in Settings"), IsEnabled = false });
-            foreach (var id in provider.Models)
-            {
-                ModelMenu.Items.Add(ModelItem(provider, id, id.Length == 0 ? Loc.T("Default") : id, current, currentModel));
-            }
-        }
-        if (ModelMenu.Items.Count > 0) ModelMenu.Items.Add(new MenuFlyoutSeparator());
-        var choose = new MenuFlyoutItem { Text = Loc.T("Choose Models…") };
-        choose.Click += (_, _) => _model?.OpenSettings(Services.SettingsSearch.Providers);
-        ModelMenu.Items.Add(choose);
+        AIMenus.FillModelMenu(ModelMenu, _panel.Providers, () => _model?.OpenSettings(Services.SettingsSearch.Providers));
     }
 
-    private static MenuFlyoutItem Header(string text) => new() { Text = text, IsEnabled = false, FontWeight = Microsoft.UI.Text.FontWeights.SemiBold };
-
-    private MenuFlyoutItemBase ModelItem(AIProviderInfo provider, string id, string title, AIProviderInfo? current, string? currentModel)
-    {
-        var item = new RadioMenuFlyoutItem
-        {
-            Text = title,
-            GroupName = "AIModel",
-            IsChecked = current?.Id == provider.Id && currentModel == id,
-            IsEnabled = provider.UnavailableReason is null,
-        };
-        if (provider.UnavailableReason is { } reason) ToolTipService.SetToolTip(item, reason);
-        item.Click += (_, _) => _panel?.Providers.SetAIModel(id, provider);
-        return item;
-    }
-
-    /// <summary>Auto, English, French, Vietnamese, and a hand-edited code (macOS <c>AILanguageMenu</c>).</summary>
+    /// <summary>The summary and answer languages (<see cref="AIMenus.FillLanguageMenu"/>).</summary>
     private void BuildLanguageMenu()
     {
-        LanguageMenu.Items.Clear();
-        if (_panel is null || _model is null) return;
-        var selection = _model.Settings.SummaryLanguage;
-        var choices = Languages.Select(l => (l.Code, Name: Loc.T(l.Name))).ToList();
-        if (choices.All(c => c.Code != selection)) choices.Add((selection, selection));
-        foreach (var (code, name) in choices)
+        if (_panel is null || _model is null)
         {
-            var item = new RadioMenuFlyoutItem { Text = name, GroupName = "SummaryLanguage", IsChecked = code == selection };
-            item.Click += (_, _) =>
-            {
-                if (_panel is { } panel && panel.Providers.SummaryLanguage != code) panel.Providers.SummaryLanguage = code;
-            };
-            LanguageMenu.Items.Add(item);
+            LanguageMenu.Items.Clear();
+            return;
         }
+        AIMenus.FillLanguageMenu(LanguageMenu, _panel.Providers, _model.Settings.SummaryLanguage);
     }
 
     /// <summary>

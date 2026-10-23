@@ -181,7 +181,7 @@
                 </Button>
             </StackPanel>
 
-            <!-- Settings opens the Settings page, or goes back from it; Ask across conversations comes with Phase 26. -->
+            <!-- Settings opens the Settings page, or goes back from it; Ask across conversations opens or closes the library chat. -->
             <StackPanel x:Name="AppGroup" Orientation="Horizontal" Spacing="4" VerticalAlignment="Center">
                 <Button
                     x:Name="SettingsButton"
@@ -200,8 +200,7 @@
                     Padding="0"
                     Style="{StaticResource SubtleButtonStyle}"
                     AutomationProperties.Name="{local:T Text='Ask across conversations'}"
-                    ToolTipService.ToolTip="{local:T Text='Ask across conversations'}"
-                    Visibility="Collapsed">
+                    ToolTipService.ToolTip="{local:T Text='Ask across conversations'}">
                     <FontIcon FontFamily="{ThemeResource SymbolThemeFontFamily}" FontSize="16" Glyph="&#xE8BD;" />
                 </Button>
             </StackPanel>

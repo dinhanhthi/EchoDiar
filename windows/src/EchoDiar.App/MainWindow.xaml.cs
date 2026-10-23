@@ -24,6 +24,9 @@ public sealed partial class MainWindow : Window
     private readonly AppViewModel _model;
     private readonly WindowFrames _frames;
     private readonly ConversationListView _library;
+
+    /// <summary>The library chat, made when first opened and kept (its typed question too) while the window lives.</summary>
+    private GlobalChatView? _globalChat;
     private IReadOnlyList<RectInt32> _passthrough = [];
 
     /// <summary>
@@ -310,6 +313,9 @@ public sealed partial class MainWindow : Window
             case nameof(AppViewModel.Route):
                 ShowRoute();
                 break;
+            case nameof(AppViewModel.GlobalChatOpen):
+                ShowLibraryOrChat();
+                break;
             case nameof(AppViewModel.SelectedTarget):
             case nameof(AppViewModel.RecordingSnapshot):
                 UpdateGlobalTapNote();
@@ -353,7 +359,18 @@ public sealed partial class MainWindow : Window
         ListHost.Visibility = settings ? Visibility.Collapsed : Visibility.Visible;
         RouteHost.Visibility = wide ? Visibility.Visible : Visibility.Collapsed;
         _library.ShowAsSidebar(wide, route.ConversationId);
+        ShowLibraryOrChat();
         _frames.SwitchTo(layout);
+    }
+
+    /// <summary>
+    /// The library chat in place of the cards while it is open (macOS MainView.swift <c>chatOr</c>): the whole list page,
+    /// or the sidebar beside a conversation or the recording.
+    /// </summary>
+    private void ShowLibraryOrChat()
+    {
+        UIElement content = _model.GlobalChatOpen ? _globalChat ??= new GlobalChatView(_model) : _library;
+        if (!ReferenceEquals(ListHost.Content, content)) ListHost.Content = content;
     }
 
     // In-app shortcuts
@@ -469,7 +486,12 @@ public sealed partial class MainWindow : Window
             case InAppAction.Back when plain && route == RouteKind.Conversation && RouteHost.Content is ConversationView conversation
                 && conversation.CloseHistory():
                 return true;
-            case InAppAction.Back when route != RouteKind.List:
+            // The library chat's History panel too.
+            case InAppAction.Back when plain && route != RouteKind.Settings && ListHost.Content is GlobalChatView chat
+                && chat.CloseHistory():
+                return true;
+            // Back from the list closes the library chat.
+            case InAppAction.Back when route != RouteKind.List || _model.GlobalChatOpen:
                 _model.GoBack();
                 return true;
             case InAppAction.PlayPause when route == RouteKind.Conversation && _model.DetailTab == DetailTab.Transcript

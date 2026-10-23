@@ -19,14 +19,15 @@ using Windows.UI.ViewManagement;
 namespace EchoDiar.App.Views;
 
 /// <summary>
-/// The title bar's button groups (macOS MainView.swift toolbar), shown by route: Back off the list; Record with its menu of
-/// targets and the language (Stop, blinking, and Pause or Resume while recording); on a conversation its title, Reveal, Delete and the
-/// tabs (a SelectorBar); on Settings the section's inner tabs after Record; Settings (opens the Settings page, or goes
-/// back from it) and Search everywhere, an icon button that opens the box where the box does not fit. Update and Ask across conversations stay
-/// collapsed until Phases 27 and 26. It also hosts the window's dialogs (it lives as long as the window): the delete
-/// confirmations (of this conversation, and of the library's cards and selection), "Recording problem" and the
-/// Settings pages' confirmations (<see cref="AppViewModel.Confirm"/>), one at a time. The lost-mic question is the
-/// pill's end prompt.
+/// The title bar's button groups (macOS MainView.swift toolbar), shown by route: Back off the list (and on it while the
+/// library chat shows); Record with its menu of targets and the language (Stop, blinking, and Pause or Resume while
+/// recording); on a conversation its title, Reveal, Delete and the tabs (a SelectorBar); on Settings the section's inner
+/// tabs after Record; Settings (opens the Settings page, or goes back from it), Ask across conversations (opens or
+/// closes the library chat) and Search everywhere, an icon button that opens the box where the box does not fit. Update
+/// stays collapsed until Phase 28. It also hosts the window's dialogs (it lives as long as the window): the delete
+/// confirmations (of this conversation, and of the library's cards and selection), "Recording problem", the cloud
+/// confirmations (audio for transcription, transcripts for the library index) and the Settings pages' confirmations
+/// (<see cref="AppViewModel.Confirm"/>), one at a time. The lost-mic question is the pill's end prompt.
 /// </summary>
 public sealed partial class TitleBarToolbar : UserControl
 {
@@ -94,6 +95,7 @@ public sealed partial class TitleBarToolbar : UserControl
         InitializeComponent();
         BackButton.Click += (_, _) => _model?.GoBack();
         SettingsButton.Click += (_, _) => ToggleSettings();
+        AskButton.Click += (_, _) => ToggleGlobalChat();
         RecordSplitButton.Click += (_, _) => _ = _model?.StartRecordingAsync(_model.SelectedTarget);
         TargetMenu.Items.Add(_languageSeparator);
         TargetMenu.Items.Add(_languageItem);
@@ -108,6 +110,12 @@ public sealed partial class TitleBarToolbar : UserControl
         // The inner text field handles Esc first.
         SearchBox.AddHandler(KeyDownEvent, new KeyEventHandler(OnSearchKeyDown), handledEventsToo: true);
         SearchBox.LostFocus += (_, _) => OnSearchLostFocus();
+        // Search filters the cards: they come back in place of the library chat. Settings search keeps it, for the page
+        // Settings returns to (macOS searchPresented).
+        SearchBox.GotFocus += (_, _) =>
+        {
+            if (_model is { Route.Kind: not RouteKind.Settings }) _model.GlobalChatOpen = false;
+        };
         SearchButton.Click += (_, _) => OpenSearch();
         LayoutUpdated += (_, _) => UpdateSearchMode();
         TabsBar.SelectedItem = TranscriptTab;
@@ -193,6 +201,7 @@ public sealed partial class TitleBarToolbar : UserControl
                 Update();
                 break;
             case nameof(AppViewModel.Route):
+            case nameof(AppViewModel.GlobalChatOpen):
             case nameof(AppViewModel.RecordingSnapshot):
             case nameof(AppViewModel.IsStarting):
             case nameof(AppViewModel.TranscriptionProgress):
@@ -202,6 +211,7 @@ public sealed partial class TitleBarToolbar : UserControl
                 break;
             case nameof(AppViewModel.RecordingError):
             case nameof(AppViewModel.PendingCloudRuns):
+            case nameof(AppViewModel.PendingEmbeddingConsent):
                 ShowNextDialog();
                 break;
             case nameof(AppViewModel.DetailTab):
@@ -224,7 +234,7 @@ public sealed partial class TitleBarToolbar : UserControl
     private void Update()
     {
         if (_model is null) return;
-        BackButton.Visibility = Shown(_model.Route.Kind != RouteKind.List);
+        BackButton.Visibility = Shown(_model.Route.Kind != RouteKind.List || _model.GlobalChatOpen);
         // Another page (list, entry, Settings) clears the search (the model has cleared the term: AppViewModel.Route);
         // another conversation keeps it, for the sidebar it filters. Typing not applied yet is dropped too.
         var page = AppViewModel.PageOf(_model.Route);
@@ -348,6 +358,25 @@ public sealed partial class TitleBarToolbar : UserControl
     {
         if (_syncingSettingsTabs || _model is null || SettingsTabsBar.SelectedItem is not { Tag: string id }) return;
         _model.SetSettingsSubTab(_model.SettingsSection, id);
+    }
+
+    // Library chat
+
+    /// <summary>
+    /// macOS's Ask across conversations toggle: on Settings it goes back first; opening the chat clears the search, which
+    /// would filter the cards it replaces.
+    /// </summary>
+    private void ToggleGlobalChat()
+    {
+        if (_model is null) return;
+        var open = _model.Route.Kind == RouteKind.Settings || !_model.GlobalChatOpen;
+        if (_model.Route.Kind == RouteKind.Settings) _model.GoBack();
+        _model.GlobalChatOpen = open;
+        if (!open) return;
+        _searchTimer?.Stop();
+        CloseSearch();
+        SearchBox.Text = "";
+        _model.SearchTerm = "";
     }
 
     // Record menu
@@ -644,7 +673,16 @@ public sealed partial class TitleBarToolbar : UserControl
         if (_model is null || _dialog is not null || XamlRoot is null) return;
         if (_model.RecordingError is { } error) _ = ShowRecordingProblemAsync(error);
         else if (_model.PendingCloudRuns.FirstOrDefault() is { } run) _ = ShowCloudConsentAsync(run);
+        else if (_model.PendingEmbeddingConsent is { } consent) _ = ShowEmbeddingConsentAsync(consent);
     }
+
+    /// <summary>
+    /// "Send transcripts to …?" (macOS RAGSettingsView alert): Understood remembers the destination and indexes; Cancel
+    /// sends nothing.
+    /// </summary>
+    private Task ShowEmbeddingConsentAsync(PendingEmbeddingConsent consent) =>
+        ShowAsync(CloudConsent.EmbeddingDialog(XamlRoot, consent),
+            result => _model?.ResolveCloudEmbeddingConsent(result == ContentDialogResult.Primary));
 
     /// <summary>
     /// "Send audio to …?" (macOS MainView.swift alert on pendingCloudRuns): Send submits every run for that destination

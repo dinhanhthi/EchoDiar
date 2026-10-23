@@ -348,12 +348,13 @@ public sealed partial class AppViewModel
     }
 
     /// <summary>
-    /// A model may be loaded: a transcription, the recording's transcriber or an AI job of an in-app model runs (a cloud,
-    /// CLI or local-host job holds no model file). Model files are not deleted meanwhile: llama.cpp maps a GGUF file
-    /// while loaded, which Windows then refuses to move or delete.
+    /// A model may be loaded: a transcription, the recording's transcriber, an AI job of an in-app model or an in-app
+    /// embedder runs (a cloud, CLI or local-host job holds no model file). Model files are not deleted meanwhile: llama.cpp
+    /// maps a GGUF file while loaded, which Windows then refuses to move or delete.
     /// </summary>
     public bool ModelsInUse =>
-        TranscriptionProgress.Keys.Any(IsTranscribing) || RecordingCaptions is not null || AIJob is { UsesLocalModel: true };
+        TranscriptionProgress.Keys.Any(IsTranscribing) || RecordingCaptions is not null || AIJob is { UsesLocalModel: true }
+        || IsEmbedderLoaded;
 
     /// <summary>The downloaded models (not one still downloading), which "Delete all" removes.</summary>
     public IReadOnlyList<ModelEntry> DeletableModels =>

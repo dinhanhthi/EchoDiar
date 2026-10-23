@@ -212,9 +212,11 @@ public sealed partial class AppViewModel : ObservableObject
         get => _installedModelIds;
         private set
         {
+            var old = _installedModelIds;
             if (!SetProperty(ref _installedModelIds, value)) return;
             OnPropertyChanged(nameof(HasTranscriptionModel));
             OnPropertyChanged(nameof(NeedsDiarizer));
+            if (EmbeddingInstallChanged(old, value)) SyncLibraryIndex();
         }
     }
 
@@ -245,6 +247,7 @@ public sealed partial class AppViewModel : ObservableObject
                 StartupTrace.Write($"begin Conversations = {list.Count}");
                 Conversations = list;
                 StartupTrace.Write("end Conversations");
+                OnLibraryListed();
             });
         };
         _services.Pipeline.Progress += progress => Post(() => ApplyProgress(progress));
@@ -332,6 +335,8 @@ public sealed partial class AppViewModel : ObservableObject
         StopHotKeys();
         // The AI job stops and keeps what it streamed; nothing waits for it.
         ShutdownAI();
+        // The index pass stops; nothing waits for it either.
+        ShutdownRAG();
         _pollTimer.Stop();
         // A run under way asks before each deletion, and is told every conversation is busy now.
         _retention?.Stop();
@@ -427,8 +432,12 @@ public sealed partial class AppViewModel : ObservableObject
 
     public void ShowRecording() => Route = Route.Recording;
 
-    /// <summary>The library list, from any page (macOS showLibrary, ⌘2).</summary>
-    public void ShowLibrary() => Route = Route.List;
+    /// <summary>The library list, from any page, without the library chat (macOS showLibrary, ⌘2).</summary>
+    public void ShowLibrary()
+    {
+        Route = Route.List;
+        GlobalChatOpen = false;
+    }
 
     /// <summary>The main window was closed to the tray: it opens again on the list, without a search (macOS windowWillClose).</summary>
     internal void MainWindowHidden()
@@ -456,10 +465,15 @@ public sealed partial class AppViewModel : ObservableObject
     public void CompleteOnboarding() => ApplySettings(Settings with { OnboardingCompleted = true });
 
     /// <summary>
-    /// Back: a conversation or the recording goes to the list; Settings goes to the page it was opened from, or the list
-    /// when that conversation is gone or that recording has ended (macOS AppModel <c>goBack</c>).
+    /// Back: a conversation or the recording goes to the list (the library chat stays open), the list closes the library
+    /// chat; Settings goes to the page it was opened from, or the list when that conversation is gone or that recording has
+    /// ended (macOS AppModel <c>goBack</c>).
     /// </summary>
-    public void GoBack() => Route = Route.Kind == RouteKind.Settings ? SettingsReturnRoute() : Route.List;
+    public void GoBack()
+    {
+        if (Route.Kind == RouteKind.List) GlobalChatOpen = false;
+        else Route = Route.Kind == RouteKind.Settings ? SettingsReturnRoute() : Route.List;
+    }
 
     /// <summary>The pages that slide on macOS (MainView.swift <c>Page</c>): a conversation and the recording share one.</summary>
     public static int PageOf(Route route) => route.Kind switch

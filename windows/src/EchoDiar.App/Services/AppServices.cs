@@ -42,6 +42,7 @@ internal sealed class AppServices : IDisposable
         Models = new ModelStore(paths.Models, _http);
         Gate = new ModelLoadGate();
         AI = new AIService(Gate);
+        Index = new LibraryIndex(paths.Rag);
         Deferral = new EnergySaverDeferral(_power);
         var decoder = new MediaFoundationAudio();
         Compressor = new AudioCompressor(decoder: decoder);
@@ -101,6 +102,12 @@ internal sealed class AppServices : IDisposable
     public AIService AI { get; }
 
     /// <summary>
+    /// The RAG index of the library, in its own folder beside the conversations (it deletes the other folders inside
+    /// it). Its calls run one at a time on the thread pool.
+    /// </summary>
+    public LibraryIndex Index { get; }
+
+    /// <summary>
     /// Phi Silica, made on first use; <see cref="WindowsAIProvider.Availability"/> asks Windows AI, so call it off the UI
     /// thread.
     /// </summary>
@@ -157,6 +164,68 @@ internal sealed class AppServices : IDisposable
         if (!Models.IsInstalled(entry))
             throw new ModelStoreException(ModelStoreError.ChecksumMismatch, $"{entry.Id} failed its integrity check.");
         return null;
+    }
+
+    /// <summary>
+    /// The embedder picked by <paramref name="settings"/>' <c>embeddingModelID</c> (macOS <c>AppModel.resolveEmbedder</c>):
+    /// <c>api:&lt;provider id&gt;</c> is the enabled OpenAI-compatible or local-host config of <paramref name="configs"/>
+    /// with <c>embeddingAPIModel</c> and its saved key; anything else is an embedding catalog entry (a macOS MLX id maps to
+    /// its GGUF entry), downloaded and checked against its catalog SHA-256 (<see cref="ModelStore.VerifiedFolder"/>), run
+    /// with llama.cpp. Null with why when there is none. An in-app embedder loads nothing here: its caller holds
+    /// <see cref="Gate"/> (owner Embedder) around <see cref="ITextEmbedder.WithLoadedAsync{T}"/>. Reads Credential Manager
+    /// and may hash the model file: call it off the UI thread, with settings and configs the UI no longer changes.
+    /// </summary>
+    public (ITextEmbedder? Embedder, string? Problem) MakeEmbedder(AppSettings settings, IReadOnlyList<ProviderConfig> configs)
+    {
+        var id = settings.EmbeddingModelID;
+        if (id.StartsWith(ModelCatalog.ApiEmbedderPrefix, StringComparison.Ordinal))
+        {
+            var providerId = id[ModelCatalog.ApiEmbedderPrefix.Length..];
+            if (EmbeddingConfig(settings, configs) is not { } config)
+                return (null, Loc.T("Pick an enabled provider in Settings › RAG"));
+            var model = settings.EmbeddingAPIModel.Trim();
+            if (model.Length == 0)
+                return (null, Loc.Format("Enter the embedding model of %@ in Settings › RAG", config.DisplayName));
+            string? apiKey = null;
+            if (config.AuthStyle != AuthStyle.None)
+            {
+                try
+                {
+                    apiKey = Secrets.ApiKey(config.Id);
+                }
+                catch (Exception e)
+                {
+                    // As macOS's try?: no key.
+                    Debug.WriteLine($"EchoDiar: could not read the key of {providerId}: {e.GetType().Name}");
+                }
+            }
+            // As MakeProvider: sent without a key, a preset only answers HTTP 401.
+            if (config.Preset is not null && config.AuthStyle != AuthStyle.None && string.IsNullOrEmpty(apiKey))
+                return (null, Loc.Format("Save a key for %@ in Settings › AI", config.DisplayName));
+            var copy = config with { ExtraHeaders = new(config.ExtraHeaders), ShownModels = [.. config.ShownModels] };
+            return (new APITextEmbedder(copy, apiKey, model), null);
+        }
+        if (ModelCatalog.EmbeddingEntry(id) is not { Runtime: ModelRuntime.Gguf, Files: [var file] } entry)
+            return (null, Loc.T("Pick an embedding model in Settings › RAG"));
+        if (!Models.IsInstalled(entry)) return (null, Loc.T("Download the embedding model in Settings › RAG"));
+        if (Models.VerifiedFolder(entry) is { } folder) return (new LlamaEmbedder(entry.Id, Path.Combine(folder, file)), null);
+        // The check failed and the install was deleted (InstallRemoved refreshes its row).
+        return (null, Models.IsInstalled(entry)
+            ? Loc.T("Download the embedding model in Settings › RAG")
+            : Loc.Format("%@ failed its integrity check. Download it again.", entry.DisplayName));
+    }
+
+    /// <summary>
+    /// The enabled OpenAI-compatible or local-host config (Ollama included) of an <c>api:&lt;provider id&gt;</c> embedder
+    /// (macOS <c>embeddingProviderConfig</c>); null for an in-app embedder. Ids compare as Credential Manager names keys.
+    /// </summary>
+    public static ProviderConfig? EmbeddingConfig(AppSettings settings, IReadOnlyList<ProviderConfig> configs)
+    {
+        var id = settings.EmbeddingModelID;
+        if (!id.StartsWith(ModelCatalog.ApiEmbedderPrefix, StringComparison.Ordinal)) return null;
+        var providerId = id[ModelCatalog.ApiEmbedderPrefix.Length..];
+        return configs.FirstOrDefault(c => string.Equals(c.Id, providerId, StringComparison.OrdinalIgnoreCase)
+            && c.Enabled && c.Kind is ProviderKind.OpenAICompatible or ProviderKind.Local);
     }
 
     /// <summary>

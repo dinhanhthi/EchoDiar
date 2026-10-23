@@ -112,6 +112,7 @@ public sealed partial class ProvidersViewModel : ObservableObject
             case nameof(AppViewModel.TranscriptionProgress):
             case nameof(AppViewModel.RecordingCaptions):
             case nameof(AppViewModel.AIJob):
+            case nameof(AppViewModel.IsEmbedderLoaded):
                 LocalModelStatesChanged?.Invoke();
                 break;
         }
@@ -260,6 +261,7 @@ public sealed partial class ProvidersViewModel : ObservableObject
             Debug.WriteLine($"EchoDiar: could not save the key of {id}: {e.GetType().Name}");
             error = ShortMessage(e);
         }
+        _app.EmbeddingKeyChanged();
         await RefreshKeysAsync();
         return error;
     }
@@ -278,6 +280,7 @@ public sealed partial class ProvidersViewModel : ObservableObject
             Debug.WriteLine($"EchoDiar: could not delete the key of {id}: {e.GetType().Name}");
             error = ShortMessage(e);
         }
+        _app.EmbeddingKeyChanged();
         await RefreshKeysAsync();
         return error;
     }

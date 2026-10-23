@@ -64,6 +64,7 @@ public sealed partial class ConversationView : UserControl
             AIPanel.Attach(_model, _id, OpenCitation);
             Update();
             UpdateTab();
+            OpenLibraryCitation();
         };
         Unloaded += (_, _) =>
         {
@@ -104,7 +105,16 @@ public sealed partial class ConversationView : UserControl
             case nameof(AppViewModel.DetailTab):
                 UpdateTab();
                 break;
+            case nameof(AppViewModel.PendingTranscriptTime):
+                OpenLibraryCitation();
+                break;
         }
+    }
+
+    /// <summary>A library chat citation of this conversation (<see cref="AppViewModel.OpenReference"/>), taken once.</summary>
+    private void OpenLibraryCitation()
+    {
+        if (_model.TakePendingTranscriptTime(_id) is { } seconds) OpenCitation(seconds);
     }
 
     /// <summary>Another version shows: the same audio highlights its segments. A citation waits for the transcript.</summary>

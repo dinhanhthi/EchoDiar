@@ -180,6 +180,7 @@ public sealed partial class StorageSettingsPage : UserControl
             case nameof(AppViewModel.IsRecording):
             case nameof(AppViewModel.RecordingCaptions):
             case nameof(AppViewModel.AIJob):
+            case nameof(AppViewModel.IsEmbedderLoaded):
             case nameof(AppViewModel.Downloads):
                 UpdateDeleteButtons();
                 break;
