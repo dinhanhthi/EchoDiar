@@ -37,6 +37,7 @@
   </ItemGroup>
 
   <ItemGroup>
+    <ProjectReference Include="..\EchoDiar.AI\EchoDiar.AI.csproj" />
     <ProjectReference Include="..\EchoDiar.Platform\EchoDiar.Platform.csproj" />
     <ProjectReference Include="..\EchoDiar.Transcribe\EchoDiar.Transcribe.csproj" />
   </ItemGroup>

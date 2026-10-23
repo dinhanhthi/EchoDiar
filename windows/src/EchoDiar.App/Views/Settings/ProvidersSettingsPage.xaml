@@ -1,0 +1,231 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    Settings › AI (macOS ProvidersSettingsView.swift), one panel per inner tab picked in the title bar:
+    - On this PC: the AI models for summaries and chat (Windows AI's state, hidden when this PC can never run it; the
+      default model and the language of summaries and answers), the chat context, and the local hosts (a scan finds
+      them, Foundry Local included; a host is added, or typed by URL).
+    - Cloud APIs: the API presets, then the custom OpenAI-compatible endpoints and Add Endpoint.
+    - CLIs: the subscription CLIs found on this PC.
+    The provider rows are made in code (ProvidersSettingsPage.*Row): an expander with the Enabled switch, and its fields
+    below. API keys go to Credential Manager only. Each searchable element's Tag is its search entry's title
+    (SearchEntries), so a search result can bring it into view.
+-->
+<UserControl
+    x:Class="EchoDiar.App.Views.ProvidersSettingsPage"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:controls="using:CommunityToolkit.WinUI.Controls"
+    xmlns:local="using:EchoDiar.App">
+
+    <UserControl.Resources>
+        <Style x:Key="SectionHeaderStyle" TargetType="StackPanel">
+            <Setter Property="Margin" Value="1,24,0,4" />
+            <Setter Property="Spacing" Value="2" />
+        </Style>
+        <Style x:Key="SectionDescriptionStyle" TargetType="TextBlock">
+            <Setter Property="Foreground" Value="{ThemeResource TextFillColorSecondaryBrush}" />
+            <Setter Property="TextWrapping" Value="Wrap" />
+        </Style>
+        <!-- The parts of the rows made in code, in theme colours. -->
+        <Style
+            x:Key="NoteStyle"
+            BasedOn="{StaticResource CaptionTextBlockStyle}"
+            TargetType="TextBlock">
+            <Setter Property="Foreground" Value="{ThemeResource TextFillColorSecondaryBrush}" />
+            <Setter Property="TextWrapping" Value="Wrap" />
+        </Style>
+        <Style
+            x:Key="CautionNoteStyle"
+            BasedOn="{StaticResource NoteStyle}"
+            TargetType="TextBlock">
+            <Setter Property="Foreground" Value="{ThemeResource SystemFillColorCautionBrush}" />
+        </Style>
+        <Style
+            x:Key="CriticalNoteStyle"
+            BasedOn="{StaticResource NoteStyle}"
+            TargetType="TextBlock">
+            <Setter Property="Foreground" Value="{ThemeResource SystemFillColorCriticalBrush}" />
+        </Style>
+        <Style
+            x:Key="SuccessNoteStyle"
+            BasedOn="{StaticResource NoteStyle}"
+            TargetType="TextBlock">
+            <Setter Property="Foreground" Value="{ThemeResource SystemFillColorSuccessBrush}" />
+            <Setter Property="VerticalAlignment" Value="Center" />
+        </Style>
+        <Style x:Key="SuccessIconStyle" TargetType="FontIcon">
+            <Setter Property="FontSize" Value="14" />
+            <Setter Property="VerticalAlignment" Value="Center" />
+            <Setter Property="Foreground" Value="{ThemeResource SystemFillColorSuccessBrush}" />
+        </Style>
+        <Style x:Key="NoticeIconStyle" TargetType="FontIcon">
+            <Setter Property="FontSize" Value="14" />
+            <Setter Property="VerticalAlignment" Value="Center" />
+            <Setter Property="Foreground" Value="{ThemeResource TextFillColorSecondaryBrush}" />
+        </Style>
+    </UserControl.Resources>
+
+    <ScrollViewer>
+        <Grid MaxWidth="1000" Margin="24,12,24,24">
+
+            <!-- On this PC -->
+            <StackPanel x:Name="OnThisPCPanel" Spacing="4">
+                <StackPanel Margin="1,4,0,4" Tag="AI models (summaries and chat)">
+                    <TextBlock Style="{StaticResource BodyStrongTextBlockStyle}" Text="{local:T Text='AI models (summaries and chat)'}" />
+                </StackPanel>
+
+                <!-- Hidden when this PC can never run Windows AI; else why it cannot run now, or Available. -->
+                <controls:SettingsCard
+                    x:Name="WindowsAICard"
+                    Header="{local:T Text='Windows AI (system)'}"
+                    Visibility="Collapsed">
+                    <StackPanel Orientation="Horizontal" Spacing="8">
+                        <FontIcon
+                            x:Name="WindowsAIIcon"
+                            Glyph="&#xE73E;"
+                            Style="{StaticResource SuccessIconStyle}" />
+                        <TextBlock
+                            x:Name="WindowsAIText"
+                            MaxWidth="420"
+                            VerticalAlignment="Center"
+                            TextWrapping="Wrap" />
+                        <Button x:Name="WindowsAICheckButton" Content="{local:T Text='Check Again'}" />
+                    </StackPanel>
+                </controls:SettingsCard>
+
+                <!-- The AI pane's model menu and language menu, also here (Windows: the task puts them in Settings). -->
+                <controls:SettingsCard
+                    x:Name="ModelCard"
+                    Description="{local:T Text='Used for summaries and questions. The model of each enabled provider below, as checked in its row.'}"
+                    Header="{local:T Text='Model for summaries and questions'}">
+                    <ComboBox
+                        x:Name="ModelCombo"
+                        MinWidth="260"
+                        MaxWidth="420"
+                        AutomationProperties.Name="{local:T Text='Model for summaries and questions'}"
+                        PlaceholderText="{local:T Text='No AI model'}" />
+                </controls:SettingsCard>
+
+                <!-- The description has apostrophes: set in code. -->
+                <controls:SettingsCard x:Name="LanguageCard" Header="{local:T Text='Language of summaries and answers'}">
+                    <ComboBox
+                        x:Name="LanguageCombo"
+                        MinWidth="160"
+                        AutomationProperties.Name="{local:T Text='Language of summaries and answers'}" />
+                </controls:SettingsCard>
+
+                <StackPanel Style="{StaticResource SectionHeaderStyle}">
+                    <TextBlock Style="{StaticResource BodyStrongTextBlockStyle}" Text="{local:T Text='Chat'}" />
+                    <TextBlock Style="{StaticResource SectionDescriptionStyle}" Text="{local:T Text='Earlier messages sent with each question.'}" />
+                </StackPanel>
+                <controls:SettingsCard Header="{local:T Text='Chat context'}" Tag="Chat context">
+                    <ComboBox
+                        x:Name="ChatContextCombo"
+                        MinWidth="160"
+                        AutomationProperties.Name="{local:T Text='Chat context'}" />
+                </controls:SettingsCard>
+
+                <!-- Scan sits on the header's line, at its trailing edge (macOS). -->
+                <Grid
+                    Margin="1,24,0,4"
+                    ColumnSpacing="8"
+                    Tag="Local hosts">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
+                    <TextBlock
+                        VerticalAlignment="Center"
+                        Style="{StaticResource BodyStrongTextBlockStyle}"
+                        Text="{local:T Text='Local hosts'}" />
+                    <ProgressRing
+                        x:Name="ScanRing"
+                        Grid.Column="1"
+                        Width="16"
+                        Height="16"
+                        IsActive="False"
+                        Visibility="Collapsed" />
+                    <TextBlock
+                        x:Name="NoneFoundText"
+                        Grid.Column="1"
+                        VerticalAlignment="Center"
+                        Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                        Text="{local:T Text='None found'}"
+                        Visibility="Collapsed" />
+                    <Button
+                        x:Name="ScanButton"
+                        Grid.Column="2"
+                        Content="{local:T Text='Scan'}" />
+                </Grid>
+
+                <!-- The hosts the scan found, then the saved local hosts (rows made in code). -->
+                <StackPanel x:Name="FoundHostsList" Spacing="4" />
+                <StackPanel x:Name="LocalHostsList" Spacing="4" />
+
+                <controls:SettingsCard Header="{local:T Text='Custom URL'}">
+                    <StackPanel Orientation="Horizontal" Spacing="8">
+                        <TextBox
+                            x:Name="CustomUrlBox"
+                            MinWidth="260"
+                            AutomationProperties.Name="{local:T Text='Custom URL'}"
+                            PlaceholderText="http://127.0.0.1:8080/v1" />
+                        <Button
+                            x:Name="AddCustomButton"
+                            Content="{local:T Text='Add'}"
+                            IsEnabled="False" />
+                    </StackPanel>
+                </controls:SettingsCard>
+            </StackPanel>
+
+            <!-- Cloud APIs -->
+            <StackPanel
+                x:Name="CloudPanel"
+                Spacing="4"
+                Visibility="Collapsed">
+                <StackPanel
+                    Margin="1,4,0,8"
+                    Orientation="Horizontal"
+                    Spacing="8"
+                    Tag="Cloud APIs">
+                    <FontIcon Glyph="&#xE946;" Style="{StaticResource NoticeIconStyle}" />
+                    <TextBlock
+                        Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                        Text="{local:T Text='Data sent to cloud providers or CLIs leaves this PC.'}"
+                        TextWrapping="Wrap" />
+                </StackPanel>
+
+                <StackPanel x:Name="CloudPresetsList" Spacing="4" />
+
+                <StackPanel Style="{StaticResource SectionHeaderStyle}" Tag="Custom OpenAI-compatible endpoints">
+                    <TextBlock Style="{StaticResource BodyStrongTextBlockStyle}" Text="{local:T Text='Custom OpenAI-compatible endpoints'}" />
+                </StackPanel>
+                <StackPanel x:Name="CustomList" Spacing="4" />
+                <Button
+                    x:Name="AddEndpointButton"
+                    Margin="0,4,0,0"
+                    Content="{local:T Text='Add Endpoint'}" />
+            </StackPanel>
+
+            <!-- CLIs -->
+            <StackPanel
+                x:Name="CliPanel"
+                Spacing="4"
+                Visibility="Collapsed">
+                <StackPanel
+                    Margin="1,4,0,8"
+                    Orientation="Horizontal"
+                    Spacing="8"
+                    Tag="CLIs">
+                    <FontIcon Glyph="&#xE946;" Style="{StaticResource NoticeIconStyle}" />
+                    <TextBlock
+                        Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                        Text="{local:T Text='Data sent to cloud providers or CLIs leaves this PC.'}"
+                        TextWrapping="Wrap" />
+                </StackPanel>
+
+                <StackPanel x:Name="CliList" Spacing="4" />
+            </StackPanel>
+        </Grid>
+    </ScrollViewer>
+</UserControl>

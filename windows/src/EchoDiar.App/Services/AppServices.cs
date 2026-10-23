@@ -1,8 +1,11 @@
+using System.Diagnostics;
+using EchoDiar.AI;
 using EchoDiar.Core;
 using EchoDiar.Core.Audio;
 using EchoDiar.Core.Model;
 using EchoDiar.Core.Models;
 using EchoDiar.Core.Settings;
+using EchoDiar.Platform.AI;
 using EchoDiar.Platform.Audio;
 using EchoDiar.Platform.SystemServices;
 using EchoDiar.Transcribe;
@@ -14,13 +17,16 @@ namespace EchoDiar.App.Services;
 /// The app's long-lived services over one library root: settings, library, models, the model load gate, the
 /// transcription pipeline (reading m4a through the Media Foundation decoder) and its engine factories, the audio
 /// compressor and the recording engine with the Platform capture sources and route monitor. Created once, on launch.
-/// The pipeline's jobs wait while energy saver is on and "wait" is set (<see cref="Deferral"/>).
+/// The pipeline's jobs wait while energy saver is on and "wait" is set (<see cref="Deferral"/>). The AI pieces: the API
+/// keys (<see cref="Secrets"/>), Windows AI, the AI jobs (sharing the load gate with transcription), local host
+/// discovery and <see cref="MakeProvider"/>; every child process they start joins <see cref="ChildProcessJob.Shared"/>.
 /// </summary>
 internal sealed class AppServices : IDisposable
 {
     private readonly HttpClient _http;
     private readonly AudioRouteMonitor _routes = new();
     private readonly PowerState _power = new();
+    private readonly Lazy<WindowsAIProvider> _windowsAI = new(() => new WindowsAIProvider());
 
     public AppServices(AppPaths paths)
     {
@@ -31,6 +37,7 @@ internal sealed class AppServices : IDisposable
         _http = new HttpClient { Timeout = Timeout.InfiniteTimeSpan };
         Models = new ModelStore(paths.Models, _http);
         Gate = new ModelLoadGate();
+        AI = new AIService(Gate);
         Deferral = new EnergySaverDeferral(_power);
         var decoder = new MediaFoundationAudio();
         Compressor = new AudioCompressor(decoder: decoder);
@@ -73,8 +80,56 @@ internal sealed class AppServices : IDisposable
     public AudioCompressor Compressor { get; }
     public RecordingEngine Engine { get; }
 
-    /// <summary>Launch at login: a stand-in until task 14.3 adds the startup task.</summary>
+    /// <summary>Launch at login: the package's startup task.</summary>
     public ILaunchAtLogin LaunchAtLogin { get; } = new LaunchAtLogin();
+
+    /// <summary>
+    /// The provider API keys, in Credential Manager only (never in settings.json). Every call reads or writes the
+    /// credential store: call it off the UI thread. A provider has a key when <c>ApiKey(id) is not null</c>.
+    /// </summary>
+    public ISecretStore Secrets { get; } = new CredentialStore();
+
+    /// <summary>Summaries and questions (Phase 24.3), in <see cref="Gate"/> with transcription: one heavy model at a time.</summary>
+    public AIService AI { get; }
+
+    /// <summary>
+    /// Phi Silica, made on first use; <see cref="WindowsAIProvider.Availability"/> asks Windows AI, so call it off the UI
+    /// thread.
+    /// </summary>
+    public WindowsAIProvider WindowsAI => _windowsAI.Value;
+
+    /// <summary>
+    /// The <c>onStarted</c> hook of every CLI run and of the Foundry Local status check: the process joins the app's job,
+    /// so it dies with EchoDiar. Throws when it cannot (the caller then kills the process tree).
+    /// </summary>
+    public static void OnChildStarted(Process process) => ChildProcessJob.Shared.Assign(process);
+
+    /// <summary>The local hosts that answer now, Foundry Local included, scanned off the UI thread.</summary>
+    public static Task<IReadOnlyList<DiscoveredHost>> ScanLocalHostsAsync(CancellationToken cancellationToken = default) =>
+        Task.Run(() => LocalHostDiscovery.ScanAsync(OnChildStarted, cancellationToken), cancellationToken);
+
+    /// <summary>
+    /// The client for <paramref name="config"/> with its saved key (macOS <c>AppModel.makeProvider</c>); null for an
+    /// unknown CLI and for speech-to-text APIs. Throws when the store refuses the key, or when a preset that needs one has
+    /// none: sent without it, the provider only answers HTTP 401. CLIs join the app's job (<see cref="OnChildStarted"/>).
+    /// Reads Credential Manager: call it off the UI thread. The client gets its own copy of the config.
+    /// </summary>
+    public ILLMProvider? MakeProvider(ProviderConfig config)
+    {
+        var apiKey = config.AuthStyle == AuthStyle.None ? null : Secrets.ApiKey(config.Id);
+        if (config.Preset is not null && config.AuthStyle != AuthStyle.None && string.IsNullOrEmpty(apiKey))
+            throw LLMException.Provider(Loc.T("Save a key first."));
+        var copy = config with { ExtraHeaders = new(config.ExtraHeaders), ShownModels = [.. config.ShownModels] };
+        return config.Kind switch
+        {
+            ProviderKind.Cli => CLIPresets.FromSlug(config.Preset) is { } preset
+                ? new CLIRunner(preset, config.BaseURL, onStarted: OnChildStarted)
+                : null,
+            ProviderKind.Anthropic => new AnthropicClient(copy, apiKey),
+            ProviderKind.OpenAICompatible or ProviderKind.Local => new OpenAICompatibleClient(copy, apiKey),
+            _ => null,
+        };
+    }
 
     /// <summary>
     /// Stops a running recording (its CAF is finished), then releases the route monitor, the energy saver
