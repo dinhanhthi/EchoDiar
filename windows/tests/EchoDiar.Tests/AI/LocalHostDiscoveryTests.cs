@@ -171,10 +171,10 @@ public sealed class LocalHostDiscoveryTests : IDisposable
     [Fact]
     public async Task FoundryThatIsMissingOrANonNpmCmdIsNotFound()
     {
-        Assert.Null(await LocalHostDiscovery.FoundryStatusAsync(Shell(root), TimeSpan.FromSeconds(3), Token));
+        Assert.Null(await LocalHostDiscovery.FoundryStatusAsync(Shell(root), TimeSpan.FromSeconds(3), null, Token));
 
         File.WriteAllText(Path.Combine(root, "foundry.cmd"), "@echo off\r\n\"%~dp0\\real\\foundry.exe\" %*\r\n");
-        Assert.Null(await LocalHostDiscovery.FoundryStatusAsync(Shell(root), TimeSpan.FromSeconds(3), Token));
+        Assert.Null(await LocalHostDiscovery.FoundryStatusAsync(Shell(root), TimeSpan.FromSeconds(3), null, Token));
     }
 
     [Fact]
@@ -183,7 +183,7 @@ public sealed class LocalHostDiscoveryTests : IDisposable
         SkipOnWindows();
         var shell = FakeFoundry("""printf '%s %s|%s|%s\n' "$1" "$2" "${USER-unset}" "$HOME" """);
 
-        var output = await LocalHostDiscovery.FoundryStatusAsync(shell, TimeSpan.FromSeconds(3), Token);
+        var output = await LocalHostDiscovery.FoundryStatusAsync(shell, TimeSpan.FromSeconds(3), null, Token);
 
         Assert.Equal($"service status|unset|{Path.Combine(root, "home")}\n", output);
     }
@@ -195,7 +195,7 @@ public sealed class LocalHostDiscoveryTests : IDisposable
         var shell = FakeFoundry("exec /bin/sleep 600");
         var clock = Stopwatch.StartNew();
 
-        Assert.Null(await LocalHostDiscovery.FoundryStatusAsync(shell, TimeSpan.FromSeconds(0.5), Token));
+        Assert.Null(await LocalHostDiscovery.FoundryStatusAsync(shell, TimeSpan.FromSeconds(0.5), null, Token));
 
         Assert.True(clock.Elapsed < TimeSpan.FromSeconds(10), clock.Elapsed.ToString());
     }

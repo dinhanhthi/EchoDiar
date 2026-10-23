@@ -36,8 +36,13 @@ public static partial class LocalHostDiscovery
     /// Any error or non-2xx = not found. Call it off the UI thread: finding <c>foundry</c> reads the disk.
     /// </summary>
     public static Task<IReadOnlyList<DiscoveredHost>> ScanAsync(CancellationToken cancellationToken = default) =>
-        ScanAsync(DefaultTimeout, null, token => FoundryStatusAsync(ShellEnvironment.Shared, FoundryStatusTimeout, token),
-            cancellationToken);
+        ScanAsync(null, cancellationToken);
+
+    /// <param name="onStarted">Called with the <c>foundry</c> process right after it starts, like CLIRunner's hook (the
+    /// App passes <c>ChildProcessJob.Shared.Assign</c>); if it throws, the process tree is killed and Foundry is skipped.</param>
+    public static Task<IReadOnlyList<DiscoveredHost>> ScanAsync(Action<Process>? onStarted, CancellationToken cancellationToken = default) =>
+        ScanAsync(DefaultTimeout, null,
+            token => FoundryStatusAsync(ShellEnvironment.Shared, FoundryStatusTimeout, onStarted, token), cancellationToken);
 
     /// <param name="handler">Null for the shared transport; a test seam otherwise (still behind the redirect guard).</param>
     /// <param name="foundryStatus">The output of <c>foundry service status</c>; null when it is not installed or failed.</param>
@@ -116,7 +121,8 @@ public static partial class LocalHostDiscovery
     /// cmd.exe) with the allowlisted environment, killed after <paramref name="timeout"/>. Null when it is not
     /// installed, cannot start or times out.
     /// </summary>
-    internal static async Task<string?> FoundryStatusAsync(ShellEnvironment shell, TimeSpan timeout, CancellationToken cancellationToken)
+    internal static async Task<string?> FoundryStatusAsync(
+        ShellEnvironment shell, TimeSpan timeout, Action<Process>? onStarted, CancellationToken cancellationToken)
     {
         try
         {
@@ -125,11 +131,12 @@ public static partial class LocalHostDiscovery
                 executable, ["service", "status"], ShellEnvironment.BaseEnvironment(shell.Path, shell.Variable), Path.GetTempPath());
             info.RedirectStandardError = false;
             using var process = Process.Start(info)!;
-            process.StandardInput.Close();
-            using var limit = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
-            limit.CancelAfter(timeout);
             try
             {
+                onStarted?.Invoke(process);
+                process.StandardInput.Close();
+                using var limit = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+                limit.CancelAfter(timeout);
                 var output = await process.StandardOutput.BaseStream.ReadPrefixAsync(64 * 1024).WaitAsync(limit.Token);
                 return Encoding.UTF8.GetString(output);
             }
