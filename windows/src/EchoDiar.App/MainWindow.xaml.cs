@@ -2,15 +2,20 @@ using System.ComponentModel;
 using EchoDiar.App.Services;
 using EchoDiar.App.ViewModels;
 using EchoDiar.App.Views;
+using EchoDiar.Core.Settings;
 using Microsoft.UI.Composition.SystemBackdrops;
 using Microsoft.UI.Dispatching;
 using Microsoft.UI.Input;
 using Microsoft.UI.Windowing;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
+using Microsoft.UI.Xaml.Controls.Primitives;
+using Microsoft.UI.Xaml.Input;
 using Microsoft.UI.Xaml.Media;
 using Windows.Graphics;
 using Windows.UI;
+using VirtualKey = Windows.System.VirtualKey;
+using VirtualKeyModifiers = Windows.System.VirtualKeyModifiers;
 
 namespace EchoDiar.App;
 
@@ -77,6 +82,7 @@ public sealed partial class MainWindow : Window
         // toolbar, which shows the window's dialogs one at a time.
         _library = new ConversationListView(_model) { Delete = Toolbar.DeleteAsync };
         ListHost.Content = _library;
+        AddAccelerators();
 
         _frames = new WindowFrames(AppWindow);
         StartupTrace.Write("begin Place");
@@ -342,6 +348,104 @@ public sealed partial class MainWindow : Window
         RouteHost.Visibility = wide ? Visibility.Visible : Visibility.Collapsed;
         _library.ShowAsSidebar(wide, route.ConversationId);
         _frames.SwitchTo(layout);
+    }
+
+    // In-app shortcuts
+
+    /// <summary>
+    /// The in-app shortcuts (<see cref="ShortcutsSettingsPage.InAppShortcuts"/>: the macOS main menu's keys with Ctrl for
+    /// ⌘, and its main window's Esc and Space) as the window's keyboard accelerators.
+    /// </summary>
+    private void AddAccelerators()
+    {
+        RootGrid.KeyboardAcceleratorPlacementMode = KeyboardAcceleratorPlacementMode.Hidden;
+        foreach (var shortcut in ShortcutsSettingsPage.InAppShortcuts)
+        {
+            foreach (var key in shortcut.Keys)
+            {
+                var accelerator = new KeyboardAccelerator { Key = (VirtualKey)key.VirtualKey, Modifiers = Modifiers(key.Modifiers) };
+                var action = shortcut.Action;
+                var plain = key.Modifiers == 0;
+                accelerator.Invoked += (_, args) => args.Handled = Run(action, plain);
+                RootGrid.KeyboardAccelerators.Add(accelerator);
+            }
+        }
+    }
+
+    private static VirtualKeyModifiers Modifiers(uint modifiers)
+    {
+        var result = VirtualKeyModifiers.None;
+        if ((modifiers & WindowsHotKey.ModControl) != 0) result |= VirtualKeyModifiers.Control;
+        if ((modifiers & WindowsHotKey.ModAlt) != 0) result |= VirtualKeyModifiers.Menu;
+        if ((modifiers & WindowsHotKey.ModShift) != 0) result |= VirtualKeyModifiers.Shift;
+        if ((modifiers & WindowsHotKey.ModWin) != 0) result |= VirtualKeyModifiers.Windows;
+        return result;
+    }
+
+    /// <summary>
+    /// Runs <paramref name="action"/> where it applies (macOS validateMenuItem and handleKey); false passes the key on to
+    /// the focused control. Nothing runs while a recorder in Settings › Shortcuts takes a new global shortcut, or while a
+    /// dialog, menu or flyout is open; Esc and Space (<paramref name="plain"/>) are a text field's while it has the focus.
+    /// </summary>
+    private bool Run(InAppAction action, bool plain)
+    {
+        if (_closing || _model.IsCapturingHotKey || PopupOpen()) return false;
+        var focused = RootGrid.XamlRoot is { } root ? FocusManager.GetFocusedElement(root) : null;
+        if (plain && focused is TextBox) return false;
+        var route = _model.Route.Kind;
+        switch (action)
+        {
+            case InAppAction.RecordStop:
+                _model.ToggleRecording();
+                return true;
+            case InAppAction.PauseResume when _model.IsRecording:
+                _ = _model.TogglePauseAsync();
+                return true;
+            case InAppAction.ShowRecording when _model.IsRecording:
+                _model.ShowRecording();
+                return true;
+            case InAppAction.ShowList:
+                _model.ShowLibrary();
+                return true;
+            case InAppAction.OpenChat when route == RouteKind.Conversation:
+                _model.DetailTab = DetailTab.Chat;
+                return true;
+            case InAppAction.Search:
+                Toolbar.FocusSearch();
+                return true;
+            case InAppAction.Settings:
+                _model.OpenSettings();
+                return true;
+            // Esc first ends a selection of cards (the library's own Esc).
+            case InAppAction.Back when route != RouteKind.List && !(plain && ListHost.Visibility == Visibility.Visible && _library.HasSelection):
+                _model.GoBack();
+                return true;
+            case InAppAction.PlayPause when route == RouteKind.Conversation && _model.DetailTab == DetailTab.Transcript
+                && RouteHost.Content is ConversationView conversation && !TakesSpace(focused):
+                conversation.TogglePlayback();
+                return true;
+            default:
+                return false;
+        }
+    }
+
+    /// <summary>A dialog, menu or flyout is open on the window (tooltips are popups too, and do not count).</summary>
+    private bool PopupOpen() =>
+        RootGrid.XamlRoot is { } root && VisualTreeHelper.GetOpenPopupsForXamlRoot(root).Any(p => p.Child is not ToolTip);
+
+    /// <summary>
+    /// A control reached with the keyboard that Space clicks, switches or opens (a button, a switch, a tab, a library card)
+    /// keeps Space. One that was clicked does not: Space plays, as on macOS, whose buttons take no focus.
+    /// </summary>
+    private bool TakesSpace(object? focused)
+    {
+        if (focused is not Control { FocusState: FocusState.Keyboard } control) return false;
+        if (control is ButtonBase or ToggleSwitch or ComboBox or SelectorBarItem) return true;
+        for (DependencyObject? e = control; e is not null; e = VisualTreeHelper.GetParent(e))
+        {
+            if (e == _library) return true;
+        }
+        return false;
     }
 
     private void OnTitleBarSizeChanged(object sender, SizeChangedEventArgs e) => UpdateTitleBarRegions();

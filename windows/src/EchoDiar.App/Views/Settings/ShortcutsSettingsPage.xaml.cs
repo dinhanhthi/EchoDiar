@@ -1,10 +1,27 @@
 using System.ComponentModel;
+using CommunityToolkit.WinUI.Controls;
 using EchoDiar.App.Services;
 using EchoDiar.App.ViewModels;
+using EchoDiar.Core.Settings;
+using EchoDiar.Platform.SystemServices;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 
 namespace EchoDiar.App.Views;
+
+/// <summary>What an in-app shortcut does (macOS EchoDiarApp.swift: the main menu's actions, and Esc and Space).</summary>
+public enum InAppAction { RecordStop, PauseResume, ShowRecording, ShowList, OpenChat, Search, Settings, Back, PlayPause }
+
+/// <summary>
+/// A shortcut used inside EchoDiar: its action, its title on the Shortcuts page, and its keys (Ctrl for macOS ⌘; Esc and
+/// Space without modifiers). <see cref="MainWindow"/> makes them its keyboard accelerators, and a global shortcut may not
+/// take one with Ctrl or Alt (<see cref="HotKeyRecorder"/>).
+/// </summary>
+public sealed record InAppShortcut(InAppAction Action, string Title, IReadOnlyList<WindowsHotKey> Keys)
+{
+    /// <summary>The keys as the page shows them, e.g. "Ctrl+[ / Esc".</summary>
+    public string KeysText => string.Join(" / ", Keys.Select(GlobalHotKeys.Describe));
+}
 
 /// <summary>
 /// Settings › Shortcuts (macOS ShortcutsSettingsView.swift). The toggles show <see cref="SettingsViewModel"/> and change
@@ -13,12 +30,26 @@ namespace EchoDiar.App.Views;
 /// </summary>
 public sealed partial class ShortcutsSettingsPage : UserControl
 {
+    /// <summary>The shortcuts used inside EchoDiar (macOS <c>inAppShortcuts</c>, in its order and with its titles).</summary>
+    public static IReadOnlyList<InAppShortcut> InAppShortcuts { get; } =
+    [
+        new(InAppAction.RecordStop, "Record / Stop", [Key('R', WindowsHotKey.ModControl)]),
+        new(InAppAction.PauseResume, "Pause / Resume", [Key('P', WindowsHotKey.ModControl | WindowsHotKey.ModShift)]),
+        new(InAppAction.ShowRecording, "Show the recording", [Key('1', WindowsHotKey.ModControl)]),
+        new(InAppAction.ShowList, "Show the recordings list", [Key('2', WindowsHotKey.ModControl)]),
+        new(InAppAction.OpenChat, "Open the chat of the open conversation", [Key('I', WindowsHotKey.ModControl)]),
+        new(InAppAction.Search, "Search conversations or settings", [Key('F', WindowsHotKey.ModControl)]),
+        new(InAppAction.Settings, "Settings", [Key(0xBC, WindowsHotKey.ModControl)]), // VK_OEM_COMMA
+        new(InAppAction.Back, "Back", [Key(0xDB, WindowsHotKey.ModControl), Key(0x1B, 0)]), // VK_OEM_4 ([), VK_ESCAPE
+        new(InAppAction.PlayPause, "Play / Pause the transcript audio", [Key(0x20, 0)]), // VK_SPACE
+    ];
+
     /// <summary>The searchable rows (macOS SettingsSearch.swift, Shortcuts), each the Tag of its element.</summary>
     public static IReadOnlyList<SettingsEntry> SearchEntries { get; } =
     [
         new("Global record shortcut", ["hotkey", "keyboard", "record from any app"]),
         new("Global pause shortcut", ["hotkey", "keyboard", "pause", "resume"]),
-        new("In EchoDiar", ["keyboard shortcuts", "keys"]),
+        new("In EchoDiar", ["keyboard shortcuts", "keys", .. InAppShortcuts.Select(s => s.Title)]),
     ];
 
     private readonly AppViewModel _model;
@@ -35,6 +66,15 @@ public sealed partial class ShortcutsSettingsPage : UserControl
         var noteStyle = (Style)Resources["NoteStyle"];
         RecordShortcutCard.Content = new HotKeyRecorder(model, pause: false, noteStyle);
         PauseShortcutCard.Content = new HotKeyRecorder(model, pause: true, noteStyle);
+        var keysStyle = (Style)Resources["KeysTextStyle"];
+        foreach (var shortcut in InAppShortcuts)
+        {
+            InAppList.Children.Add(new SettingsCard
+            {
+                Header = Loc.T(shortcut.Title),
+                Content = new TextBlock { Style = keysStyle, Text = shortcut.KeysText },
+            });
+        }
 
         RecordToggle.Toggled += (_, _) => Set(() => _settings.GlobalHotKeyEnabled = RecordToggle.IsOn);
         PauseToggle.Toggled += (_, _) => Set(() => _settings.GlobalPauseHotKeyEnabled = PauseToggle.IsOn);
@@ -46,6 +86,8 @@ public sealed partial class ShortcutsSettingsPage : UserControl
         };
         Unloaded += (_, _) => _model.PropertyChanged -= OnModelChanged;
     }
+
+    private static WindowsHotKey Key(uint virtualKey, uint modifiers) => new() { VirtualKey = virtualKey, Modifiers = modifiers };
 
     private void OnModelChanged(object? sender, PropertyChangedEventArgs e)
     {

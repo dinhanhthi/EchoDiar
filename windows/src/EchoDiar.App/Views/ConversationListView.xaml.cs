@@ -363,6 +363,9 @@ public sealed partial class ConversationListView : UserControl
         }
     }
 
+    /// <summary>Cards are selected: Esc ends the selection instead of going back (macOS <c>listSelectionActive</c>).</summary>
+    internal bool HasSelection => !_selection.IsEmpty;
+
     /// <summary>The card whose list item has the keyboard focus (the key came from it).</summary>
     private static ConversationCard? FocusedCard(KeyRoutedEventArgs e) =>
         e.OriginalSource is ListViewItem { Content: ConversationCard card } ? card : null;

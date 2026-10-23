@@ -2,8 +2,8 @@
 <!--
     Settings › Shortcuts (macOS ShortcutsSettingsView.swift): the global record and pause shortcuts, each with its on/off
     toggle, its recorder (Views/HotKeyRecorder.cs, made in code) and why Windows refused it; then the shortcuts used
-    inside EchoDiar, read-only. Each searchable element's Tag is its search entry's title (SearchEntries), so a search
-    result can bring it into view.
+    inside EchoDiar, read-only (InAppShortcuts). Each searchable element's Tag is its search entry's title
+    (SearchEntries), so a search result can bring it into view.
 -->
 <UserControl
     x:Class="EchoDiar.App.Views.ShortcutsSettingsPage"
@@ -24,6 +24,13 @@
             TargetType="TextBlock">
             <Setter Property="Foreground" Value="{ThemeResource TextFillColorSecondaryBrush}" />
             <Setter Property="TextWrapping" Value="Wrap" />
+        </Style>
+        <!-- An in-app shortcut's keys. -->
+        <Style
+            x:Key="KeysTextStyle"
+            BasedOn="{StaticResource BodyTextBlockStyle}"
+            TargetType="TextBlock">
+            <Setter Property="Foreground" Value="{ThemeResource TextFillColorSecondaryBrush}" />
         </Style>
         <!-- Why Windows refused a shortcut (macOS: a yellow warning label under it). -->
         <Style x:Key="ErrorRowStyle" TargetType="StackPanel">
@@ -88,10 +95,12 @@
                 <TextBlock x:Name="PauseErrorText" Style="{StaticResource CautionTextStyle}" />
             </StackPanel>
 
-            <!-- The shortcuts inside EchoDiar, read-only: their rows come with the in-app shortcuts (task 21.3). -->
+            <!-- The shortcuts inside EchoDiar, read-only: one card per ShortcutsSettingsPage.InAppShortcuts row, set in code. -->
             <StackPanel Style="{StaticResource SectionHeaderStyle}" Tag="In EchoDiar">
                 <TextBlock Style="{StaticResource BodyStrongTextBlockStyle}" Text="{local:T Text='In EchoDiar'}" />
             </StackPanel>
+
+            <StackPanel x:Name="InAppList" Spacing="4" />
         </StackPanel>
     </ScrollViewer>
 </UserControl>

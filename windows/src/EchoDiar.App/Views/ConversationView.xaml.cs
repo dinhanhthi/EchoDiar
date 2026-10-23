@@ -71,6 +71,9 @@ public sealed partial class ConversationView : UserControl
         };
     }
 
+    /// <summary>Space on the Transcript tab (macOS <c>togglePlayback</c>): what the playback bar's play button does.</summary>
+    internal void TogglePlayback() => _playback.TogglePlay();
+
     private void OnModelChanged(object? sender, PropertyChangedEventArgs e)
     {
         switch (e.PropertyName)

@@ -12,16 +12,19 @@ namespace EchoDiar.App.Views;
 
 /// <summary>
 /// Click, then press the new global record or pause shortcut; Esc cancels (macOS ShortcutsSettingsView.swift
-/// <c>HotKeyRecorder</c>). The shortcut needs Ctrl or Alt, may not be the other global shortcut or a standard edit or
-/// window shortcut, and is saved at once. "Reset" shows while it is not the default. The registered shortcuts are off
-/// while it records (<see cref="AppViewModel.SetHotKeyCapture"/>), so pressing one lands here instead of toggling a
-/// recording; one recorder records at a time. Recording stops when the button loses the focus, the page goes away, or
-/// the window is deactivated (the model ends the capture). Built in code; the page passes its note style, so the colours
-/// follow the theme.
+/// <c>HotKeyRecorder</c>). The shortcut needs Ctrl or Alt, may not be the other global shortcut, a standard edit or
+/// window shortcut or an in-app one, and is saved at once. "Reset" shows while it is not the default. The registered
+/// shortcuts are off while it records (<see cref="AppViewModel.SetHotKeyCapture"/>), so pressing one lands here instead
+/// of toggling a recording; one recorder records at a time. Recording stops when the button loses the focus, the page
+/// goes away, or the window is deactivated (the model ends the capture). Built in code; the page passes its note style,
+/// so the colours follow the theme.
 /// </summary>
 public sealed partial class HotKeyRecorder : UserControl
 {
-    /// <summary>Standard shortcuts a global one would take from every app (macOS refuses the menu shortcuts).</summary>
+    /// <summary>
+    /// Standard shortcuts and EchoDiar's own (with Ctrl or Alt) that a global one would take from every app (macOS refuses
+    /// the menu shortcuts).
+    /// </summary>
     private static readonly (WindowsHotKey Key, string Title)[] Standard =
     [
         (Ctrl('C'), "Copy"),
@@ -31,6 +34,7 @@ public sealed partial class HotKeyRecorder : UserControl
         (Ctrl('Y'), "Redo"),
         (Ctrl('A'), "Select All"),
         (new() { VirtualKey = (uint)VirtualKey.F4, Modifiers = WindowsHotKey.ModAlt }, "Close"),
+        .. ShortcutsSettingsPage.InAppShortcuts.SelectMany(s => s.Keys.Where(k => k.HasCtrlOrAlt).Select(k => (k, s.Title))),
     ];
 
     private readonly AppViewModel _model;

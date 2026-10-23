@@ -390,6 +390,9 @@ public sealed partial class AppViewModel : ObservableObject
 
     public void ShowRecording() => Route = Route.Recording;
 
+    /// <summary>The library list, from any page (macOS showLibrary, ⌘2).</summary>
+    public void ShowLibrary() => Route = Route.List;
+
     /// <summary>The main window was closed to the tray: it opens again on the list, without a search (macOS windowWillClose).</summary>
     internal void MainWindowHidden()
     {
@@ -523,6 +526,13 @@ public sealed partial class AppViewModel : ObservableObject
         {
             IsStarting = false;
         }
+    }
+
+    /// <summary>Stops the recording, else records the picked target (macOS <c>toggleRecording</c>).</summary>
+    public void ToggleRecording()
+    {
+        if (IsRecording) _ = StopRecordingAsync();
+        else _ = StartRecordingAsync(SelectedTarget);
     }
 
     /// <summary>Pauses (both devices closed) or resumes the recording.</summary>

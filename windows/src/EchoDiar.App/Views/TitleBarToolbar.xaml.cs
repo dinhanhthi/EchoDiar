@@ -590,6 +590,13 @@ public sealed partial class TitleBarToolbar : UserControl
         TrailingPanel.Visibility = Shown(!_searchOpened);
     }
 
+    /// <summary>Ctrl+F (macOS <c>showSearch</c>): the focus goes to the page's search box, opened first where Search is an icon.</summary>
+    public void FocusSearch()
+    {
+        if (SearchBox.Visibility == Visibility.Visible) SearchBox.Focus(FocusState.Programmatic);
+        else OpenSearch();
+    }
+
     private void OpenSearch()
     {
         _searchOpened = true;

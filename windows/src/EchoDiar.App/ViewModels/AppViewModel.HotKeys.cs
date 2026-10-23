@@ -122,11 +122,8 @@ public sealed partial class AppViewModel
         {
             switch (id)
             {
-                case RecordHotKeyId when IsRecording:
-                    _ = StopRecordingAsync();
-                    break;
                 case RecordHotKeyId:
-                    _ = StartRecordingAsync(SelectedTarget);
+                    ToggleRecording();
                     break;
                 case PauseHotKeyId:
                     _ = TogglePauseAsync();
