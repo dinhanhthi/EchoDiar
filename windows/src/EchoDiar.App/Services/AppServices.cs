@@ -1,5 +1,6 @@
 using System.Diagnostics;
 using EchoDiar.AI;
+using EchoDiar.AI.Cloud;
 using EchoDiar.Core;
 using EchoDiar.Core.Audio;
 using EchoDiar.Core.Model;
@@ -21,7 +22,8 @@ namespace EchoDiar.App.Services;
 /// The pipeline's jobs wait while energy saver is on and "wait" is set (<see cref="Deferral"/>). The AI pieces: the API
 /// keys (<see cref="Secrets"/>), Windows AI, the AI jobs (sharing the load gate with transcription), local host
 /// discovery, <see cref="MakeProvider"/> and <see cref="MakeLocalProvider"/>; every child process they start joins
-/// <see cref="ChildProcessJob.Shared"/>.
+/// <see cref="ChildProcessJob.Shared"/>. Cloud transcription: the pipeline exports uploads through the same Media
+/// Foundation object, and <see cref="MakeCloudEngine"/> makes a job's cloud engines with their keys.
 /// </summary>
 internal sealed class AppServices : IDisposable
 {
@@ -58,7 +60,8 @@ internal sealed class AppServices : IDisposable
             entry => Models.VerifiedFolder(entry) ?? throw new TranscriptionException(TranscriptionErrorKind.NeedsModel, entry.Id),
             Gate,
             decoder: decoder,
-            deferral: Deferral);
+            deferral: Deferral,
+            exporter: decoder);
         Engine = new RecordingEngine(OpenSystem, OpenMic, routes: _routes)
         {
             IsTargetPlayingOutput = IsTargetPlayingOutput,
@@ -154,6 +157,31 @@ internal sealed class AppServices : IDisposable
         if (!Models.IsInstalled(entry))
             throw new ModelStoreException(ModelStoreError.ChecksumMismatch, $"{entry.Id} failed its integrity check.");
         return null;
+    }
+
+    /// <summary>
+    /// A cloud engine of <paramref name="config"/> with its saved key (macOS <c>AppModel.makeCloudEngine</c>);
+    /// <paramref name="model"/>: a cloud diarizer's diarization model, null = the transcription model. A key the store
+    /// cannot read is sent as none, as macOS's <c>try?</c>: the provider then answers "invalid API key". Reads
+    /// Credential Manager: call it off the UI thread, with a config the UI no longer changes (a copy).
+    /// </summary>
+    public CloudEngine MakeCloudEngine(ProviderConfig config, string? model = null)
+    {
+        string? apiKey = null;
+        if (CloudTranscription.NeedsKey(config))
+        {
+            try
+            {
+                apiKey = Secrets.ApiKey(config.Id);
+            }
+            catch (Exception e)
+            {
+                Debug.WriteLine($"EchoDiar: could not read the key of {config.Id}: {e.GetType().Name}");
+            }
+        }
+        return new CloudEngine(
+            CloudTranscription.EngineId(config.Id), config.DisplayName, model ?? CloudTranscription.Model(config),
+            CloudTranscription.MakeTranscriber(config, apiKey, model));
     }
 
     /// <summary>

@@ -153,7 +153,7 @@ public sealed partial class AppViewModel
 
     /// <summary>
     /// The post-stop sequence for one folder (macOS AppModel <c>finishRecording</c>). A recording auto-transcribed now
-    /// (usable, not transcribed yet, its CAF has frames) is transcribed from the CAF first; then its audio goes to the
+    /// (usable, not transcribed yet, its CAF has frames, no cloud confirmation pending) is transcribed from the CAF first; then its audio goes to the
     /// Recycle Bin (success with "Delete audio after transcription") or is compressed. Otherwise it is compressed first,
     /// then transcribed when "Transcribe automatically" is on. <paramref name="prior"/> (what the live transcriber
     /// transcribed, once it drained and unloaded its model) goes to the job either way.
@@ -169,9 +169,11 @@ public sealed partial class AppViewModel
             if (_closing) return;
             var autoTranscribe = Settings.AutoTranscribe;
             var needsNoModel = NeedsNoModel(transcribed);
-            // Read here, not when the job starts: a deferred job would hold the CAF uncompressed until energy saver is off.
+            // Read here, not when the job starts: a deferred job would hold the CAF uncompressed until energy saver is off,
+            // and a cloud confirmation (macOS consentPending) until it is answered.
             var deferred = _services.Deferral.ShouldDefer && !needsNoModel;
-            if (session is not null && !deferred && await Task.Run(() => TranscribesFirst(folder, session, autoTranscribe))
+            var consentPending = AutoEngine() == AutoEngineKind.ConsentPending;
+            if (session is not null && !deferred && !consentPending && await Task.Run(() => TranscribesFirst(folder, session, autoTranscribe))
                 && SubmitTranscription(folder, session, deleteAudioAfter: false, prior: transcribed, processNow: needsNoModel) is { } job)
             {
                 var succeeded = await job;

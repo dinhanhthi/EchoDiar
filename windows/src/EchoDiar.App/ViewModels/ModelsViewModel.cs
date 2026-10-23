@@ -30,7 +30,8 @@ public sealed record ModelRowState(
 /// The local models of Settings › Transcription (macOS ModelsSettingsView.swift and AppModel's model functions): the
 /// catalog's speech and speaker models by tier, their state, Download, Cancel, Delete and Set default, and the size of
 /// every installed model. Downloads run in <see cref="AppViewModel.DownloadModel"/> (off the UI thread, progress
-/// posted back). The cloud engines and the speech-to-text APIs (task 26.3) are not here yet. Lives as long as the app
+/// posted back). The cloud engines' rows read <see cref="AppViewModel.CloudEngineConfigs"/> and set their default with
+/// <see cref="SetDefault(string, bool)"/>. Lives as long as the app
 /// (<see cref="AppViewModel.ModelsModel"/>); on the UI thread.
 /// </summary>
 public sealed partial class ModelsViewModel : ObservableObject
@@ -74,8 +75,9 @@ public sealed partial class ModelsViewModel : ObservableObject
     public string InstalledText =>
         _installedBytes is { } bytes ? Loc.Format("Installed: %@", ConversationCard.FileSize(bytes)) : "";
 
-    /// <summary>A speaker model is installed (macOS <c>diarizerAvailable</c>, without cloud diarizers until 26.3).</summary>
-    public bool DiarizerAvailable => ModelCatalog.Diarization.Any(e => _app.InstalledModelIds.Contains(e.Id));
+    /// <summary>A speaker model is installed, or the default diarizer is a configured cloud one (macOS <c>diarizerAvailable</c>).</summary>
+    public bool DiarizerAvailable =>
+        ModelCatalog.Diarization.Any(e => _app.InstalledModelIds.Contains(e.Id)) || _app.CloudDiarizerAvailable;
 
     /// <summary>The speech model new recordings use: the one set here, else the catalog default (macOS <c>defaultASRModelID</c>).</summary>
     public string DefaultASRModelID => _app.Settings.DefaultASRModelID ?? ModelCatalog.DefaultASR.Id;
@@ -149,6 +151,16 @@ public sealed partial class ModelsViewModel : ObservableObject
             var id = entry.Id == ModelCatalog.DefaultDiarizer.Id ? null : entry.Id;
             settings.Update(s => s with { DefaultDiarizerModelID = id });
         }
+    }
+
+    /// <summary>
+    /// Makes the engine <paramref name="engineId"/> (a cloud engine id) the default transcription model, or with
+    /// <paramref name="diarization"/> the default diarizer (macOS <c>setDefaultASRModel</c>, <c>setDefaultDiarizer</c>).
+    /// </summary>
+    public void SetDefault(string engineId, bool diarization)
+    {
+        if (diarization) _app.SettingsModel.Update(s => s with { DefaultDiarizerModelID = engineId });
+        else _app.SettingsModel.Update(s => s with { DefaultASRModelID = engineId });
     }
 
     /// <summary>
@@ -250,6 +262,11 @@ public sealed partial class ModelsViewModel : ObservableObject
                 _ = MeasureAsync();
                 break;
             case nameof(AppViewModel.Settings):
+            case nameof(AppViewModel.CloudEngineConfigs):
+                // The default may be a cloud diarizer, configured or not.
+                StatesChanged?.Invoke();
+                OnPropertyChanged(nameof(DiarizerAvailable));
+                break;
             case nameof(AppViewModel.Downloads):
             case nameof(AppViewModel.DownloadErrors):
             case nameof(AppViewModel.TranscriptionProgress):

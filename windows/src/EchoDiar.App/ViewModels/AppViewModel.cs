@@ -2,6 +2,7 @@ using System.ComponentModel;
 using System.Diagnostics;
 using System.Runtime.InteropServices;
 using CommunityToolkit.Mvvm.ComponentModel;
+using EchoDiar.AI.Cloud;
 using EchoDiar.App.Services;
 using EchoDiar.Core.Audio;
 using EchoDiar.Core.Model;
@@ -220,8 +221,9 @@ public sealed partial class AppViewModel : ObservableObject
     /// <summary>At least one speech recognition model is installed.</summary>
     public bool HasTranscriptionModel => ModelCatalog.Asr.Any(e => InstalledModelIds.Contains(e.Id));
 
-    /// <summary>"Tell speakers apart" is on but no diarization model is installed.</summary>
-    public bool NeedsDiarizer => Settings.Diarization && !ModelCatalog.Diarization.Any(e => InstalledModelIds.Contains(e.Id));
+    /// <summary>"Tell speakers apart" is on but no diarization model is installed and the default diarizer is no configured cloud one.</summary>
+    public bool NeedsDiarizer =>
+        Settings.Diarization && !ModelCatalog.Diarization.Any(e => InstalledModelIds.Contains(e.Id)) && !CloudDiarizerAvailable;
 
     /// <summary>The apps that can be recorded on their own, from the last refresh.</summary>
     public IReadOnlyList<AudioProcessGroup> RecordTargets
@@ -252,6 +254,8 @@ public sealed partial class AppViewModel : ObservableObject
         FollowRouteChanges();
         _recovery = LoadAndRecoverAsync();
         await _recovery;
+        // Made with the loaded settings, so the cloud engines' keys are read for every saved provider (off the UI thread).
+        ProvidersModel.Changed += OnProvidersChanged;
         // With the loaded settings (detection on or off).
         StartMeetingServices();
         // With the loaded settings (each shortcut on or off).
@@ -725,7 +729,7 @@ public sealed partial class AppViewModel : ObservableObject
 
     /// <summary>
     /// The conversation's Transcribe and Retry, and the transcript's Re-transcribe (<paramref name="engineId"/>: a
-    /// catalog id from "Retry with another engine" or "Transcribe again with", null = the default resolution;
+    /// catalog or cloud engine id from "Retry with another engine" or "Transcribe again with", null = the default resolution;
     /// <paramref name="language"/> replaces the recording's language markers, null keeps them): queues it unless a job
     /// for it is active or it has no audio.
     /// </summary>
@@ -745,7 +749,9 @@ public sealed partial class AppViewModel : ObservableObject
     /// transcribed. <paramref name="deleteAudioAfter"/> null = "Delete audio after transcription", read when the job
     /// succeeds (macOS <c>submitTranscription</c>). <paramref name="prior"/>: what the recording's live transcriber
     /// transcribed (see <see cref="TranscriptionJob.Prior"/>). <paramref name="processNow"/> runs it even while energy
-    /// saver would defer it. Returns the job (true when it succeeded), null when none was queued.
+    /// saver would defer it. A cloud engine or diarizer runs as <see cref="PlanCloud"/> decides; the first run per
+    /// provider and destination waits for the main window's confirmation instead (nothing is queued or uploaded then).
+    /// Returns the job (true when it succeeded), null when none was queued.
     /// </summary>
     private Task<bool>? SubmitTranscription(
         string folder, RecordingSession session, string? engineId = null, string? language = null, bool? deleteAudioAfter = null,
@@ -753,6 +759,8 @@ public sealed partial class AppViewModel : ObservableObject
     {
         var id = session.Id;
         if (_closing || session.Probe || session.State == SessionState.Failed || HasJob(id)) return null;
+        if (PlanCloud(engineId, id, folder, language) is not { } cloud) return null;
+        engineId = cloud.EngineId;
         var firstLanguage = language ?? session.LanguageMarkers.MinBy(m => m.FileTime)?.Language ?? "auto";
         var job = new TranscriptionJob
         {
@@ -771,17 +779,32 @@ public sealed partial class AppViewModel : ObservableObject
         TranscriptionErrors = Without(TranscriptionErrors, id);
         // Set now so the screens show the job before the pipeline's first event arrives.
         TranscriptionProgress = With(TranscriptionProgress, id, new JobProgress(id, JobStep.Queued, 0));
-        return RunTranscriptionAsync(job, deleteAudioAfter);
+        return RunTranscriptionAsync(job, deleteAudioAfter, cloud);
     }
 
-    /// <summary>True when the job succeeded; its audio then goes to the Recycle Bin when asked, before the reload.</summary>
-    private async Task<bool> RunTranscriptionAsync(TranscriptionJob job, bool? deleteAudioAfter)
+    /// <summary>
+    /// True when the job succeeded; its audio then goes to the Recycle Bin when asked, before the reload. The cloud
+    /// engines of <paramref name="cloud"/> are made with their keys off the UI thread.
+    /// </summary>
+    private async Task<bool> RunTranscriptionAsync(TranscriptionJob job, bool? deleteAudioAfter, CloudPlan cloud)
     {
         var succeeded = false;
         try
         {
-            await Task.Run(() => _services.Pipeline.TranscribeAsync(job));
+            await Task.Run(() =>
+            {
+                var asr = cloud.Asr is { } config ? _services.MakeCloudEngine(config) : null;
+                var diarizer = cloud.Diarizer is { } diarizerConfig
+                    ? _services.MakeCloudEngine(diarizerConfig, CloudTranscription.DiarizationModel(diarizerConfig))
+                    : null;
+                return _services.Pipeline.TranscribeAsync(job, asr, diarizer);
+            });
             succeeded = true;
+        }
+        catch (TranscriptionException e) when (e.Kind == TranscriptionErrorKind.Cloud)
+        {
+            // The kind only ("HTTP 400", "invalid API key"): the reason can quote the provider's error body.
+            Debug.WriteLine($"EchoDiar: cloud transcription failed for {job.Folder}: {e.Detail.Split(':').Take(2).LastOrDefault()?.Trim()}");
         }
         catch (Exception e)
         {

@@ -164,9 +164,6 @@ public sealed partial class AppViewModel
         return ConversationSearch.Build(conversation.Title, transcript, Conversation.ReadSummary(conversation.Folder), chat);
     }
 
-    /// <summary>The installed local speech engines, in catalog order, for the card's "Retry with another engine".</summary>
-    public IReadOnlyList<ModelEntry> InstalledBatchEngines => ModelCatalog.Asr.Where(e => InstalledModelIds.Contains(e.Id)).ToList();
-
     /// <summary>Sets a custom title (<c>customTitle: true</c> in conversation.json); a blank title is ignored.</summary>
     public async Task RenameConversationAsync(Guid id, string title)
     {
@@ -227,9 +224,12 @@ public sealed partial class AppViewModel
     /// <summary>
     /// macOS <c>busyConversationIDs</c>: a transcription queued, running or waiting for a model, or still between its
     /// recording's end (or the launch scan) and its last step (compressing). Recording and compressing conversations are
-    /// not transcribed, so auto-delete never picks them. An AI job's conversation too; no cloud jobs yet (Phase 26).
+    /// not transcribed, so auto-delete never picks them. A transcription waiting for its cloud confirmation, and an AI
+    /// job's conversation, too.
     /// </summary>
-    private bool IsBusy(Guid id) => _finishing.Contains(id) || TranscriptionProgress.ContainsKey(id) || AIJob?.ConversationId == id;
+    private bool IsBusy(Guid id) =>
+        _finishing.Contains(id) || TranscriptionProgress.ContainsKey(id) || PendingCloudRuns.Any(r => r.ConversationId == id)
+        || AIJob?.ConversationId == id;
 
     /// <summary>
     /// Auto-delete on: schedules the daily run and runs it once now (launch, or when turned on). Off: stops it (macOS

@@ -1,3 +1,5 @@
+using System.Diagnostics;
+using EchoDiar.AI.Cloud;
 using EchoDiar.Core;
 using EchoDiar.Core.Audio;
 using EchoDiar.Core.Model;
@@ -13,10 +15,12 @@ namespace EchoDiar.Transcribe;
 /// <see cref="TranscriptionJob.Prior"/> keeps its segments and transcribes only its gaps, taking the gate only for gap
 /// fill or diarization. While <paramref name="deferral"/> says so, a job waits before it takes a model (macOS
 /// <c>waitWhileConstrained</c>), unless <see cref="TranscriptionJob.ProcessNow"/> or <see cref="ProcessNow"/>.
+/// A job with a <see cref="CloudEngine"/> sends each channel to its API instead (no ASR model, so no gate); a cloud
+/// diarizer labels the system channel first, the local diarizer after its failure. The app resolves both, keys
+/// included, and asks the one-time confirmation before it submits the job.
 /// </summary>
 /// <remarks>
-/// Not ported yet: cloud engines and diarizers (Phase 26). The macOS thermal deferral has no Windows API; energy saver
-/// stands in for Low Power Mode.
+/// The macOS thermal deferral has no Windows API; energy saver stands in for Low Power Mode.
 /// </remarks>
 /// <param name="engines">Batch engine factories by catalog runtime.</param>
 /// <param name="diarizer">The local diarizer factory; null = none.</param>
@@ -28,6 +32,7 @@ namespace EchoDiar.Transcribe;
 /// <param name="speakerCountHint">Speakers expected on the system channel when the job sets none.</param>
 /// <param name="decoder">Reads non-CAF (compressed m4a) audio; null = CAF only.</param>
 /// <param name="deferral">Holds jobs back while it says so (energy saver on); null = never.</param>
+/// <param name="exporter">Writes a channel as the mono m4a a cloud API gets; null = cloud jobs fail.</param>
 public sealed class TranscriptionPipeline(
     IReadOnlyDictionary<ModelRuntime, TranscriptionPipeline.EngineFactory> engines,
     TranscriptionPipeline.DiarizerFactory? diarizer,
@@ -36,7 +41,8 @@ public sealed class TranscriptionPipeline(
     ModelLoadGate gate,
     int? speakerCountHint = null,
     IAudioDecoder? decoder = null,
-    IDeferralSignal? deferral = null)
+    IDeferralSignal? deferral = null,
+    IAudioExporter? exporter = null)
 {
     public delegate ITranscriptionEngine EngineFactory(ModelEntry entry, string folder);
 
@@ -44,9 +50,12 @@ public sealed class TranscriptionPipeline(
 
     private sealed record ChannelSource(string Path, int Channel);
 
-    /// <summary>Transcribes one channel's 16 kHz extract; <paramref name="isMic"/> tells which channel it is.</summary>
+    /// <summary>
+    /// Transcribes one channel: its 16 kHz extract, or its <paramref name="source"/> (a cloud API gets the compressed
+    /// audio, not the extract); <paramref name="isMic"/> tells which channel it is.
+    /// </summary>
     private delegate Task<IReadOnlyList<RawSegment>> ChannelAsr(
-        string extracted, bool isMic, Action<double> progress, CancellationToken cancellationToken);
+        string extracted, ChannelSource source, bool isMic, Action<double> progress, CancellationToken cancellationToken);
 
     private readonly SemaphoreSlim _queue = new(1, 1);
 
@@ -57,13 +66,24 @@ public sealed class TranscriptionPipeline(
     public event Action<JobProgress>? Progress;
 
     /// <summary>Runs after every job queued before it; returns the <c>transcript.json</c> path.</summary>
-    public async Task<string> TranscribeAsync(TranscriptionJob job, CancellationToken cancellationToken = default)
+    public Task<string> TranscribeAsync(TranscriptionJob job, CancellationToken cancellationToken = default) =>
+        TranscribeAsync(job, null, null, cancellationToken);
+
+    /// <summary>
+    /// Runs after every job queued before it; returns the <c>transcript.json</c> path. <paramref name="cloud"/>: the
+    /// job's cloud engine, which replaces <see cref="TranscriptionJob.EngineID"/>'s resolution.
+    /// <paramref name="cloudDiarizer"/>: labels the system channel's speakers when the ASR does not (its text is
+    /// dropped); unused when <see cref="TranscriptionJob.Diarize"/> is false. Both are resolved by the app, whose
+    /// one-time confirmation of their destination comes first: the pipeline uploads to whatever it is given.
+    /// </summary>
+    public async Task<string> TranscribeAsync(
+        TranscriptionJob job, CloudEngine? cloud, CloudEngine? cloudDiarizer, CancellationToken cancellationToken = default)
     {
         Emit(job, JobStep.Queued, 0);
         await _queue.WaitAsync(cancellationToken).ConfigureAwait(false);
         try
         {
-            return await RunAsync(job, cancellationToken).ConfigureAwait(false);
+            return await RunAsync(job, cloud, job.Diarize ? cloudDiarizer : null, cancellationToken).ConfigureAwait(false);
         }
         finally
         {
@@ -73,7 +93,8 @@ public sealed class TranscriptionPipeline(
 
     // Job
 
-    private async Task<string> RunAsync(TranscriptionJob job, CancellationToken cancellationToken)
+    private async Task<string> RunAsync(
+        TranscriptionJob job, CloudEngine? cloud, CloudEngine? cloudDiarizer, CancellationToken cancellationToken)
     {
         var started = false;
         // Creates conversation.json when missing (transcribed before compression); null while unreadable.
@@ -90,13 +111,14 @@ public sealed class TranscriptionPipeline(
                 throw new TranscriptionException(TranscriptionErrorKind.SessionUnreadable, inner: e);
             }
             stored = session;
-            if (job.Prior is { } prior && PriorSources(session, job) is { } priorSources
+            if (cloud is null && job.Prior is { } prior && PriorSources(session, job) is { } priorSources
                 && UsableEntry(prior, job, session) is { } priorEntry)
             {
                 // Only gap fill and diarization need a model, so only they take the gate or wait for the deferral.
                 var fillsGaps = prior.MicGaps.Count > 0 || (priorSources.System is not null && prior.SystemGaps.Count > 0);
                 var priorDiarizer = Diarizer(job);
-                var diarizes = priorSources.System is not null && prior.System.Count > 0 && priorDiarizer is not null;
+                var diarizes = priorSources.System is not null && prior.System.Count > 0
+                    && (priorDiarizer is not null || cloudDiarizer is not null);
                 ISessionTranscriptionEngine? gapEngine = null;
                 if (fillsGaps)
                 {
@@ -109,7 +131,8 @@ public sealed class TranscriptionPipeline(
                 if (fillsGaps || diarizes) await WaitWhileDeferredAsync(job, cancellationToken).ConfigureAwait(false);
                 started = true;
                 var priorPath = await TranscribePriorAsync(
-                    job, prior, session, priorSources, priorEntry, gapEngine, priorDiarizer, cancellationToken).ConfigureAwait(false);
+                    job, prior, session, priorSources, priorEntry, gapEngine, priorDiarizer, cloudDiarizer, cancellationToken)
+                    .ConfigureAwait(false);
                 Finished(job, session);
                 return priorPath;
             }
@@ -119,6 +142,21 @@ public sealed class TranscriptionPipeline(
             var sources = ChannelSources(session, job);
             var ranges = LanguageRange.Ranges(session.LanguageMarkers);
             var localDiarizer = Diarizer(job);
+
+            if (cloud is not null)
+            {
+                // No local ASR model: only a local diarization takes the gate (inside ProcessAsync).
+                started = true;
+                UpdateConversation(job.Folder, session, c => c.Status = ConversationStatus.Transcribing);
+                var cloudLanguage = CloudLanguage(ranges);
+                var cloudPath = await ProcessAsync(
+                    job, session, sources, cloud.EngineID, cloud.Model.Length == 0 ? null : cloud.Model, null, localDiarizer,
+                    cloudDiarizer, gateDiarization: true, prior: null,
+                    (_, source, isMic, _, t) => CloudSegmentsAsync(cloud, source, cloudLanguage, job.Diarize && !isMic, t),
+                    cancellationToken).ConfigureAwait(false);
+                Finished(job, session);
+                return cloudPath;
+            }
 
             var firstLanguage = session.LanguageMarkers.MinBy(m => m.FileTime)?.Language ?? "auto";
             var selected = ResolveEngine(job.EngineID, firstLanguage);
@@ -134,8 +172,9 @@ public sealed class TranscriptionPipeline(
             {
                 UpdateConversation(job.Folder, session, c => c.Status = ConversationStatus.Transcribing);
                 return ProcessAsync(
-                    job, session, sources, entry.Id, ModelID(entry), engineFallback, localDiarizer, gateDiarization: false,
-                    prior: null, (extracted, _, progress, t) => engine.TranscribeAsync(extracted, ranges, progress, t), token);
+                    job, session, sources, entry.Id, ModelID(entry), engineFallback, localDiarizer, cloudDiarizer,
+                    gateDiarization: false, prior: null,
+                    (extracted, _, _, progress, t) => engine.TranscribeAsync(extracted, ranges, progress, t), token);
             }, cancellationToken).ConfigureAwait(false);
 
             Finished(job, session);
@@ -223,15 +262,15 @@ public sealed class TranscriptionPipeline(
     private async Task<string> TranscribePriorAsync(
         TranscriptionJob job, PriorTranscription prior, RecordingSession session,
         (ChannelSource? Mic, ChannelSource? System) sources, ModelEntry entry, ISessionTranscriptionEngine? engine,
-        ISpeakerDiarizer? localDiarizer, CancellationToken cancellationToken)
+        ISpeakerDiarizer? localDiarizer, CloudEngine? cloudDiarizer, CancellationToken cancellationToken)
     {
         var modelID = ModelID(entry);
         UpdateConversation(job.Folder, session, c => c.Status = ConversationStatus.Transcribing);
         if (engine is null)
         {
             return await ProcessAsync(
-                job, session, sources, entry.Id, modelID, null, localDiarizer, gateDiarization: true, prior,
-                (_, _, _, _) => Task.FromResult<IReadOnlyList<RawSegment>>([]), cancellationToken).ConfigureAwait(false);
+                job, session, sources, entry.Id, modelID, null, localDiarizer, cloudDiarizer, gateDiarization: true, prior,
+                (_, _, _, _, _) => Task.FromResult<IReadOnlyList<RawSegment>>([]), cancellationToken).ConfigureAwait(false);
         }
         return await gate.WithExclusiveModelAsync(ModelLoadGate.Owner.TranscriptionJob, async token =>
         {
@@ -243,8 +282,8 @@ public sealed class TranscriptionPipeline(
             try
             {
                 return await ProcessAsync(
-                    job, session, sources, entry.Id, modelID, null, localDiarizer, gateDiarization: false, prior,
-                    async (extracted, isMic, progress, t) => await FillGapsAsync(
+                    job, session, sources, entry.Id, modelID, null, localDiarizer, cloudDiarizer, gateDiarization: false, prior,
+                    async (extracted, _, isMic, progress, t) => await FillGapsAsync(
                         isMic ? prior.MicGaps : prior.SystemGaps, extracted, entry, ranges, Session, progress, t).ConfigureAwait(false),
                     token).ConfigureAwait(false);
             }
@@ -354,14 +393,17 @@ public sealed class TranscriptionPipeline(
     /// <summary>
     /// Extracts each channel (skipping silent ones), runs <paramref name="asr"/> on it, diarizes the system channel
     /// unless <paramref name="asr"/> returned speaker labels, merges and writes <c>transcript.json</c> (keeping the one
-    /// it replaces). <paramref name="gateDiarization"/>: the caller does not hold the <see cref="ModelLoadGate"/>, so the
-    /// local diarizer takes it. With <paramref name="prior"/>, each channel is its segments plus <paramref name="asr"/>
-    /// of its gaps: a channel is extracted only when it has gaps, or for the system channel's diarization.
+    /// it replaces). Diarization: <paramref name="cloudDiarizer"/> first (it never takes the gate); the local diarizer
+    /// when there is none, or after it failed or labeled no speaker (<see cref="Transcript.CloudDiarizationFailedNote"/>).
+    /// <paramref name="gateDiarization"/>: the caller does not hold the <see cref="ModelLoadGate"/> (cloud ASR, or a
+    /// prior without gaps), so the local diarizer takes it. With <paramref name="prior"/>, each channel is its segments
+    /// plus <paramref name="asr"/> of its gaps: a channel is extracted only when it has gaps, or for the system
+    /// channel's diarization.
     /// </summary>
     private async Task<string> ProcessAsync(
         TranscriptionJob job, RecordingSession session, (ChannelSource? Mic, ChannelSource? System) sources,
-        string engineID, string? modelID, string? engineFallback, ISpeakerDiarizer? localDiarizer, bool gateDiarization,
-        PriorTranscription? prior, ChannelAsr asr, CancellationToken cancellationToken)
+        string engineID, string? modelID, string? engineFallback, ISpeakerDiarizer? localDiarizer, CloudEngine? cloudDiarizer,
+        bool gateDiarization, PriorTranscription? prior, ChannelAsr asr, CancellationToken cancellationToken)
     {
         var work = Path.Combine(Path.GetTempPath(), "EchoDiar-transcribe-" + Guid.NewGuid().ToString("N"));
         Directory.CreateDirectory(work);
@@ -375,15 +417,16 @@ public sealed class TranscriptionPipeline(
                 {
                     Emit(job, JobStep.TranscribingMic, 0.05);
                     mic.AddRange(await asr(
-                        path, true, f => Emit(job, JobStep.TranscribingMic, 0.05 + 0.35 * f), cancellationToken).ConfigureAwait(false));
+                        path, micSource, true, f => Emit(job, JobStep.TranscribingMic, 0.05 + 0.35 * f), cancellationToken).ConfigureAwait(false));
                     TryDelete(path);
                 }
             }
 
             var system = new List<RawSegment>(prior?.System ?? []);
             var turns = new List<DiarizationTurn>();
+            var notes = new List<string>();
             var fillsSystem = prior is null || prior.SystemGaps.Count > 0;
-            var diarizes = system.Count > 0 && localDiarizer is not null;
+            var diarizes = system.Count > 0 && (localDiarizer is not null || cloudDiarizer is not null);
             if (sources.System is { } systemSource && (fillsSystem || diarizes))
             {
                 Emit(job, JobStep.Extracting, 0.4);
@@ -393,9 +436,30 @@ public sealed class TranscriptionPipeline(
                     {
                         Emit(job, JobStep.TranscribingSystem, 0.45);
                         system.AddRange(await asr(
-                            path, false, f => Emit(job, JobStep.TranscribingSystem, 0.45 + 0.35 * f), cancellationToken).ConfigureAwait(false));
+                            path, systemSource, false, f => Emit(job, JobStep.TranscribingSystem, 0.45 + 0.35 * f), cancellationToken).ConfigureAwait(false));
                     }
-                    if (system.Count > 0 && !system.Any(s => s.Speaker is not null) && localDiarizer is not null)
+                    var unlabeled = system.Count > 0 && !system.Any(s => s.Speaker is not null);
+                    if (unlabeled && cloudDiarizer is not null)
+                    {
+                        Emit(job, JobStep.Diarizing, 0.8);
+                        try
+                        {
+                            turns.AddRange(await CloudTurnsAsync(
+                                cloudDiarizer, systemSource, CloudLanguage(LanguageRange.Ranges(session.LanguageMarkers)),
+                                cancellationToken).ConfigureAwait(false));
+                        }
+                        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+                        {
+                            throw;
+                        }
+                        catch (Exception e)
+                        {
+                            // The type only: a provider message can carry the request or response body.
+                            Debug.WriteLine($"EchoDiar: cloud diarization ({cloudDiarizer.Name}) failed: {e.GetType().Name}");
+                        }
+                        if (turns.Count == 0) notes.Add(Transcript.CloudDiarizationFailedNote);
+                    }
+                    if (unlabeled && turns.Count == 0 && localDiarizer is not null)
                     {
                         Emit(job, JobStep.Diarizing, 0.8);
                         Task<IReadOnlyList<DiarizationTurn>> Diarize(CancellationToken t) =>
@@ -413,7 +477,6 @@ public sealed class TranscriptionPipeline(
                 system.Sort((a, b) => a.Start.CompareTo(b.Start));
             }
             Emit(job, JobStep.Merging, 0.95);
-            var notes = new List<string>();
             var providerSpeakers = system.Any(s => s.Speaker is not null);
             if (job.Diarize && localDiarizer is null && turns.Count == 0 && system.Count > 0 && !providerSpeakers)
             {
@@ -436,6 +499,53 @@ public sealed class TranscriptionPipeline(
             try { Directory.Delete(work, recursive: true); }
             catch (Exception e) when (e is IOException or UnauthorizedAccessException) { }
         }
+    }
+
+    /// <summary>
+    /// One channel through a cloud API, from its source (the compressed audio, not the 16 kHz extract); errors other
+    /// than a cancellation become <see cref="TranscriptionErrorKind.Cloud"/> with a short, key-free reason.
+    /// </summary>
+    private async Task<IReadOnlyList<RawSegment>> CloudSegmentsAsync(
+        CloudEngine cloud, ChannelSource source, string? language, bool diarize, CancellationToken cancellationToken)
+    {
+        List<CloudSegment> segments;
+        try
+        {
+            segments = await CloudTranscription.TranscribeAsync(
+                source.Path, source.Channel, cloud.Transcriber, Exporter, language, diarize, cancellationToken).ConfigureAwait(false);
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            throw;
+        }
+        catch (Exception e)
+        {
+            // Not kept as the inner exception: a provider message can carry the request or response body.
+            throw new TranscriptionException(TranscriptionErrorKind.Cloud, $"{cloud.Name}: {CloudTranscription.FailureReason(e)}");
+        }
+        return [.. segments.Select(s => new RawSegment(s.Start, s.End, s.Text, s.Language, diarize ? s.Speaker : null))];
+    }
+
+    /// <summary>The system channel's speaker turns from a cloud diarizer, from its source; the text it returns is dropped.</summary>
+    private async Task<IReadOnlyList<DiarizationTurn>> CloudTurnsAsync(
+        CloudEngine cloud, ChannelSource source, string? language, CancellationToken cancellationToken)
+    {
+        var segments = await CloudTranscription.TranscribeAsync(
+            source.Path, source.Channel, cloud.Transcriber, Exporter, language, diarize: true, cancellationToken).ConfigureAwait(false);
+        return CloudTranscription.Turns(segments);
+    }
+
+    private IAudioExporter Exporter =>
+        exporter ?? throw new InvalidOperationException("No audio exporter: cloud transcription is not available.");
+
+    /// <summary>
+    /// The language sent to a cloud API for the whole recording: the single language of <paramref name="ranges"/>,
+    /// null (detect) when it is Auto or the recording switches languages.
+    /// </summary>
+    public static string? CloudLanguage(IReadOnlyList<LanguageRange> ranges)
+    {
+        var languages = ranges.Select(r => r.Language).Distinct().ToList();
+        return languages.Count == 1 ? languages[0] : null;
     }
 
     /// <summary>The extracted file, or null when the channel is silent.</summary>
@@ -652,3 +762,9 @@ public interface IDeferralSignal
     /// <summary>Raised on any thread when <see cref="ShouldDefer"/> may have changed.</summary>
     event Action? Changed;
 }
+
+/// <summary>A cloud transcription engine for one job, resolved by the app from its settings and Credential Manager (Swift <c>CloudEngine</c>).</summary>
+/// <param name="EngineID"><c>cloud:&lt;provider id&gt;</c>, written as the transcript's <c>engineID</c>.</param>
+/// <param name="Name">The provider name, for error reasons ("Deepgram: invalid API key").</param>
+/// <param name="Model">Written as the transcript's <c>modelID</c>; empty when the provider picks it.</param>
+public sealed record CloudEngine(string EngineID, string Name, string Model, ICloudTranscriber Transcriber);

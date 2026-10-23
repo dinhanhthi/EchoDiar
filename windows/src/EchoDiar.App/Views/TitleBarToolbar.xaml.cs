@@ -201,6 +201,7 @@ public sealed partial class TitleBarToolbar : UserControl
                 Update();
                 break;
             case nameof(AppViewModel.RecordingError):
+            case nameof(AppViewModel.PendingCloudRuns):
                 ShowNextDialog();
                 break;
             case nameof(AppViewModel.DetailTab):
@@ -637,12 +638,20 @@ public sealed partial class TitleBarToolbar : UserControl
 
     // Recording dialogs and indicator
 
-    /// <summary>Shows a recording problem that waits, unless a dialog is open.</summary>
+    /// <summary>Shows a recording problem that waits, else a cloud confirmation that waits, unless a dialog is open.</summary>
     private void ShowNextDialog()
     {
         if (_model is null || _dialog is not null || XamlRoot is null) return;
         if (_model.RecordingError is { } error) _ = ShowRecordingProblemAsync(error);
+        else if (_model.PendingCloudRuns.FirstOrDefault() is { } run) _ = ShowCloudConsentAsync(run);
     }
+
+    /// <summary>
+    /// "Send audio to …?" (macOS MainView.swift alert on pendingCloudRuns): Send submits every run for that destination
+    /// and remembers it; Cancel drops them, uploading nothing.
+    /// </summary>
+    private Task ShowCloudConsentAsync(PendingCloudRun run) =>
+        ShowAsync(CloudConsent.Dialog(XamlRoot, run), result => _model?.ResolvePendingCloudRuns(result == ContentDialogResult.Primary));
 
     /// <summary>
     /// "Recording problem" (macOS MainView.swift alert on recordingError): the only UI for a start or resume that

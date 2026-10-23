@@ -6,6 +6,8 @@
 
   <ItemGroup>
     <ProjectReference Include="..\EchoDiar.Core\EchoDiar.Core.csproj" />
+    <!-- Cloud speech-to-text (Phase 26): the cloud transcribers and the audio export contract. -->
+    <ProjectReference Include="..\EchoDiar.AI\EchoDiar.AI.csproj" />
   </ItemGroup>
 
   <ItemGroup>

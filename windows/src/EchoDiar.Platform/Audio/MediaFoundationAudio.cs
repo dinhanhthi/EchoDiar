@@ -1,4 +1,5 @@
 using System.Runtime.InteropServices;
+using EchoDiar.AI.Cloud;
 using EchoDiar.Core.Audio;
 using NAudio.Dsp;
 using NAudio.MediaFoundation;
@@ -27,11 +28,12 @@ public sealed class AudioEncodeException(AudioEncodeFailure failure, string mess
 
 /// <summary>
 /// m4a through Media Foundation (NAudio's sink writer and source reader wrappers): AAC-LC encoding of a recording's
-/// CAF, and decoding to 16 kHz mono for transcription. Media Foundation starts once, on first use, and stays up for
-/// the process (playback's <c>MediaFoundationReader</c> shares it). The objects are free-threaded; call from a
-/// background thread, as encoding and decoding take seconds.
+/// CAF, decoding to 16 kHz mono for transcription, and the mono uploads of cloud transcription
+/// (<see cref="IAudioExporter"/>). Media Foundation starts once, on first use, and stays up for the process (playback's
+/// <c>MediaFoundationReader</c> shares it). The objects are free-threaded; call from a background thread, as encoding
+/// and decoding take seconds.
 /// </summary>
-public sealed class MediaFoundationAudio : IAudioDecoder
+public sealed class MediaFoundationAudio : IAudioDecoder, IAudioExporter
 {
     /// <summary>The m4a rate (decision 6): at 16 kHz the Media Foundation AAC encoder offers at most 32 kbps.</summary>
     public const int EncodeSampleRate = 48_000;
@@ -166,6 +168,81 @@ public sealed class MediaFoundationAudio : IAudioDecoder
         return result.ToArray();
     });
 
+    /// <summary>
+    /// Cloud upload (Swift <c>exportM4A</c>): <paramref name="channel"/> of <paramref name="source"/> (a CAF, or an m4a
+    /// the compressor wrote), from <paramref name="range"/> (null = all), as mono AAC-LC at 48 kHz and
+    /// <see cref="CloudTranscription.ExportBitRate"/> (the encoder offers no less there, decision 6). Returns the
+    /// written length in seconds (the source frames sent). Throws <see cref="AudioEncodeException"/>, or
+    /// <see cref="OperationCanceledException"/>; a partial output may be left behind.
+    /// </summary>
+    public double ExportMonoAac(string source, int channel, TimeRange? range, string destination, CancellationToken cancellationToken)
+    {
+        var kbps = CloudTranscription.ExportBitRate / 1000;
+        try
+        {
+            using var input = OpenMono(source, channel, range);
+            EnsureStarted();
+            using var outputType = AacType(1, kbps)
+                ?? throw new AudioEncodeException(
+                    AudioEncodeFailure.SettingRejected, $"No AAC encoder output for {EncodeSampleRate} Hz, 1 ch, {kbps} kbps");
+            using var encoder = new MediaFoundationEncoder(outputType);
+            var pcm = new MonoPcm16Source(input, cancellationToken);
+            encoder.Encode(destination, pcm);
+            cancellationToken.ThrowIfCancellationRequested();
+            return (double)pcm.SourceFrames / input.SampleRate;
+        }
+        catch (Exception e) when (e is AudioEncodeException or OperationCanceledException)
+        {
+            throw;
+        }
+        catch (Exception e) when (IsSourceFailure(e))
+        {
+            throw new AudioEncodeException(AudioEncodeFailure.SourceUnreadable, $"{Path.GetFileName(source)}: {e.Message}", e);
+        }
+        catch (Exception e) when (e is COMException or InvalidOperationException or ArgumentException)
+        {
+            throw new AudioEncodeException(AudioEncodeFailure.Encode, e.Message, e);
+        }
+    }
+
+    /// <summary>
+    /// The RMS of <paramref name="channel"/> of <paramref name="source"/> per <paramref name="window"/>-second slot from
+    /// the start (Swift <c>levels(of:channel:)</c>; the last slot may be shorter), for the quietest cut of a long upload.
+    /// </summary>
+    public float[] Levels(string source, int channel, double window, CancellationToken cancellationToken)
+    {
+        try
+        {
+            using var input = OpenMono(source, channel, null);
+            var slot = (int)Math.Max(1, Math.Round(input.SampleRate * window));
+            var buffer = new float[slot];
+            var levels = new List<float>();
+            while (true)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                var filled = 0;
+                int read;
+                while (filled < slot && (read = input.Read(buffer.AsSpan(filled))) > 0) filled += read;
+                if (filled == 0) break;
+                double sum = 0;
+                for (var i = 0; i < filled; i++) sum += (double)buffer[i] * buffer[i];
+                levels.Add((float)Math.Sqrt(sum / filled));
+                if (filled < slot) break;
+            }
+            return [.. levels];
+        }
+        catch (Exception e) when (IsSourceFailure(e) || e is COMException or InvalidOperationException or ArgumentException)
+        {
+            throw new AudioEncodeException(AudioEncodeFailure.SourceUnreadable, $"{Path.GetFileName(source)}: {e.Message}", e);
+        }
+    }
+
+    /// <summary>One channel of a CAF (by extension) or of a Media Foundation file, from <paramref name="range"/>.</summary>
+    private static MonoReader OpenMono(string path, int channel, TimeRange? range) =>
+        Path.GetExtension(path).Equals(".caf", StringComparison.OrdinalIgnoreCase)
+            ? new CafMonoReader(path, channel, range)
+            : new MediaFoundationMonoReader(path, channel, range);
+
     private static void EnsureStarted()
     {
         lock (StartupLock)
@@ -261,6 +338,193 @@ public sealed class MediaFoundationAudio : IAudioDecoder
             _wdl.ResamplePrepare(1, _channels, out _);
             var produced = _wdl.ResampleOut(_output, 0, _output.Length / _channels, _channels);
             return _output.AsSpan(0, produced * _channels);
+        }
+    }
+
+    /// <summary>
+    /// One channel of a file as Float32 frames at its own rate, from a start frame to an end frame (Swift: the range's
+    /// bounds times the rate, truncated, capped at the file's length).
+    /// </summary>
+    private abstract class MonoReader : IDisposable
+    {
+        public abstract double SampleRate { get; }
+
+        /// <summary>Fills the start of <paramref name="output"/>; returns the frames written, 0 only at the end.</summary>
+        public abstract int Read(Span<float> output);
+
+        public abstract void Dispose();
+
+        /// <summary>The first frame and the frame after the last of <paramref name="range"/> in a file of <paramref name="frames"/> frames.</summary>
+        protected static (long First, long Last) Frames(TimeRange? range, double rate, long frames)
+        {
+            if (range is not { } r) return (0, frames);
+            var first = Math.Min(frames, (long)(Math.Max(0, r.Start) * rate));
+            var last = Math.Min(frames, (long)(Math.Max(0, r.End) * rate));
+            return (first, Math.Max(first, last));
+        }
+    }
+
+    private sealed class CafMonoReader : MonoReader
+    {
+        private readonly CafFile.Reader _caf;
+        private readonly int _channel;
+        private readonly long _last;
+        private long _frame;
+
+        public CafMonoReader(string path, int channel, TimeRange? range)
+        {
+            _caf = new CafFile.Reader(path);
+            if (channel < 0 || channel >= _caf.Channels)
+            {
+                _caf.Dispose();
+                throw new InvalidDataException($"{Path.GetFileName(path)} has no channel {channel}");
+            }
+            _channel = channel;
+            (_frame, _last) = Frames(range, _caf.SampleRate, _caf.Frames);
+        }
+
+        public override double SampleRate => _caf.SampleRate;
+
+        public override int Read(Span<float> output)
+        {
+            var count = (int)Math.Min(Math.Min(output.Length, ChunkFrames), _last - _frame);
+            if (count <= 0) return 0;
+            var chunk = _caf.Read(_frame, count);
+            var frames = chunk.Length / _caf.Channels;
+            for (var i = 0; i < frames; i++) output[i] = chunk[i * _caf.Channels + _channel];
+            _frame += frames;
+            return frames;
+        }
+
+        public override void Dispose() => _caf.Dispose();
+    }
+
+    /// <summary>Decodes from the start (exact, unlike an AAC seek) and drops the frames before the range.</summary>
+    private sealed class MediaFoundationMonoReader : MonoReader
+    {
+        private readonly MediaFoundationReader _reader;
+        private readonly WaveFormat _format;
+        private readonly int _channel;
+        private readonly bool _isFloat;
+        private readonly long _first;
+        private readonly long _last;
+        private readonly byte[] _bytes;
+        private long _frame;
+
+        public MediaFoundationMonoReader(string path, int channel, TimeRange? range)
+        {
+            _reader = Open(path);
+            _format = _reader.WaveFormat;
+            _isFloat = _format.Encoding == WaveFormatEncoding.IeeeFloat && _format.BitsPerSample == 32;
+            if (channel < 0 || channel >= _format.Channels
+                || !_isFloat && !(_format.Encoding == WaveFormatEncoding.Pcm && _format.BitsPerSample == 16))
+            {
+                _reader.Dispose();
+                throw new InvalidDataException($"{Path.GetFileName(path)} has no channel {channel} as 16- or 32-bit samples");
+            }
+            _channel = channel;
+            // The end is only known by decoding, so the range is not capped here: reading stops at the end anyway.
+            (_first, _last) = Frames(range, _format.SampleRate, long.MaxValue);
+            _bytes = new byte[ChunkFrames * _format.BlockAlign];
+        }
+
+        public override double SampleRate => _format.SampleRate;
+
+        public override int Read(Span<float> output)
+        {
+            while (_frame < _last)
+            {
+                var wanted = (int)Math.Min(Math.Min(output.Length, ChunkFrames), _last - _frame);
+                var read = _reader.Read(_bytes, 0, wanted * _format.BlockAlign) / _format.BlockAlign;
+                if (read == 0) return 0;
+                var skip = (int)Math.Clamp(_first - _frame, 0, read);
+                _frame += read;
+                if (skip == read) continue;
+                var frames = read - skip;
+                if (_isFloat)
+                {
+                    var samples = MemoryMarshal.Cast<byte, float>(_bytes.AsSpan(0, read * _format.BlockAlign));
+                    for (var i = 0; i < frames; i++) output[i] = samples[(skip + i) * _format.Channels + _channel];
+                }
+                else
+                {
+                    var samples = MemoryMarshal.Cast<byte, short>(_bytes.AsSpan(0, read * _format.BlockAlign));
+                    for (var i = 0; i < frames; i++) output[i] = samples[(skip + i) * _format.Channels + _channel] / 32768f;
+                }
+                return frames;
+            }
+            return 0;
+        }
+
+        public override void Dispose() => _reader.Dispose();
+    }
+
+    /// <summary>
+    /// A <see cref="MonoReader"/> as 48 kHz mono PCM16 for the encoder, resampled a chunk at a time (only when its rate
+    /// differs). Counts the source frames it sent; a cancellation stops the encode at the next read.
+    /// </summary>
+    private sealed class MonoPcm16Source : IWaveProvider
+    {
+        private readonly MonoReader _input;
+        private readonly CancellationToken _cancellation;
+        private readonly Resampler? _resampler;
+        private readonly float[] _chunk = new float[ChunkFrames];
+        private byte[] _pending = [];
+        private int _offset;
+        private int _count;
+        private bool _ended;
+
+        public MonoPcm16Source(MonoReader input, CancellationToken cancellation)
+        {
+            _input = input;
+            _cancellation = cancellation;
+            if (input.SampleRate != EncodeSampleRate) _resampler = new Resampler(input.SampleRate, EncodeSampleRate, 1, ChunkFrames);
+            WaveFormat = new WaveFormat(EncodeSampleRate, 16, 1);
+        }
+
+        public WaveFormat WaveFormat { get; }
+
+        public long SourceFrames { get; private set; }
+
+        public int Read(Span<byte> buffer)
+        {
+            var written = 0;
+            while (written < buffer.Length)
+            {
+                if (_count == 0 && !Fill()) break;
+                var n = Math.Min(_count, buffer.Length - written);
+                _pending.AsSpan(_offset, n).CopyTo(buffer[written..]);
+                _offset += n;
+                _count -= n;
+                written += n;
+            }
+            return written;
+        }
+
+        private bool Fill()
+        {
+            if (_ended) return false;
+            _cancellation.ThrowIfCancellationRequested();
+            var frames = _input.Read(_chunk);
+            if (frames == 0)
+            {
+                _ended = true;
+                Stage(_resampler is null ? [] : _resampler.Flush());
+                return true;
+            }
+            SourceFrames += frames;
+            ReadOnlySpan<float> samples = _chunk.AsSpan(0, frames);
+            Stage(_resampler is null ? samples : _resampler.Process(samples));
+            return true;
+        }
+
+        private void Stage(ReadOnlySpan<float> samples)
+        {
+            if (_pending.Length < samples.Length * 2) _pending = new byte[samples.Length * 2];
+            var pcm = MemoryMarshal.Cast<byte, short>(_pending.AsSpan(0, samples.Length * 2));
+            for (var i = 0; i < samples.Length; i++) pcm[i] = (short)Math.Clamp(MathF.Round(samples[i] * 32768f), short.MinValue, short.MaxValue);
+            _offset = 0;
+            _count = samples.Length * 2;
         }
     }
 

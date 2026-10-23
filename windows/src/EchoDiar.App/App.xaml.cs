@@ -150,6 +150,8 @@ public partial class App : Application
         }
         // At launch (after the main window shows, once the settings are loaded) and from Settings › General.
         _model.OnboardingRequested += ShowOnboarding;
+        // A cloud confirmation waits: the window that asks comes back from the tray.
+        _model.MainWindowRequested += ShowWindow;
         if (atLogin && _tray is not null)
         {
             StartupTrace.Write("launched at login: tray only");

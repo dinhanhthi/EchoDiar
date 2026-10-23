@@ -3,6 +3,7 @@ using System.Diagnostics;
 using System.Text;
 using CommunityToolkit.Mvvm.ComponentModel;
 using EchoDiar.AI;
+using EchoDiar.AI.Cloud;
 using EchoDiar.App.Services;
 using EchoDiar.Core.Models;
 using EchoDiar.Core.Settings;
@@ -326,6 +327,29 @@ public sealed partial class ProvidersViewModel : ObservableObject
                 await provider.ListModelsAsync(cancellationToken);
             }
             cancellationToken.ThrowIfCancellationRequested();
+        }, cancellationToken);
+    }
+
+    /// <summary>
+    /// Test of a speech-to-text API (macOS <c>SpeechProviderRow</c>): one free body-less GET that needs a valid key and
+    /// uploads no audio, with the saved key read off the UI thread. Throws the error to show: "Save a key first.", or a
+    /// short, key-free reason (<see cref="CloudTranscription.FailureReason"/>).
+    /// </summary>
+    public Task TestSpeechKeyAsync(ProviderConfig config, CancellationToken cancellationToken)
+    {
+        var copy = Copy(config);
+        var secrets = _services.Secrets;
+        return Task.Run(async () =>
+        {
+            var key = secrets.ApiKey(copy.Id) ?? throw LLMException.Provider(Loc.T("Save a key first."));
+            try
+            {
+                await CloudTranscription.CheckKeyAsync(copy, key, cancellationToken: cancellationToken);
+            }
+            catch (Exception e) when (e is not OperationCanceledException || !cancellationToken.IsCancellationRequested)
+            {
+                throw LLMException.Provider(CloudTranscription.FailureReason(e));
+            }
         }, cancellationToken);
     }
 

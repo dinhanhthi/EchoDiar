@@ -3,6 +3,7 @@ using System.Diagnostics;
 using System.Globalization;
 using CommunityToolkit.Mvvm.ComponentModel;
 using EchoDiar.AI;
+using EchoDiar.AI.Cloud;
 using EchoDiar.Core.Model;
 using EchoDiar.Core.Models;
 
@@ -174,8 +175,8 @@ public sealed partial class TranscriptViewModel : ObservableObject
         _conversation is { HasAudio: true } c && !IsTranscribing
         && c.Status is not (ConversationStatus.Recording or ConversationStatus.Compressing or ConversationStatus.Failed);
 
-    /// <summary>The engines of "Transcribe again with": the installed local speech engines, in catalog order.</summary>
-    public IReadOnlyList<ModelEntry> RetranscribeEngines => _model.InstalledBatchEngines;
+    /// <summary>The engines of "Transcribe again with": the installed local speech engines in catalog order, then the configured cloud ones.</summary>
+    public IReadOnlyList<EngineChoice> RetranscribeEngines => _model.InstalledBatchEngines;
 
     /// <summary>The language of the next Re-transcribe; "" keeps the recording's language markers.</summary>
     public string RetranscribeLanguage
@@ -297,6 +298,7 @@ public sealed partial class TranscriptViewModel : ObservableObject
                 NotifyJobState();
                 break;
             case nameof(AppViewModel.InstalledModelIds):
+            case nameof(AppViewModel.CloudEngineConfigs):
                 OnPropertyChanged(nameof(RetranscribeEngines));
                 break;
         }
@@ -376,12 +378,20 @@ public sealed partial class TranscriptViewModel : ObservableObject
     private static string VersionTitle(int number) => Loc.Format("Version %lld", number);
 
     /// <summary>The engine and the date of a version, for its menu entry.</summary>
-    private static string VersionDetails(Transcript transcript) =>
+    private string VersionDetails(Transcript transcript) =>
         string.Join(" · ", new[] { EngineName(transcript), transcript.CreatedAt.ToLocalTime().ToString("g", CultureInfo.CurrentCulture) }.OfType<string>());
 
-    /// <summary>The catalog name of the engine that made <paramref name="transcript"/>, the raw id when the entry is gone, null when unknown.</summary>
-    private static string? EngineName(Transcript transcript) =>
-        transcript.EngineID is { Length: > 0 } id ? ModelCatalog.Entry(id)?.DisplayName ?? id : null;
+    /// <summary>
+    /// The engine that made <paramref name="transcript"/> (macOS <c>transcriptEngineName</c>): "OpenAI (whisper-1)" with
+    /// the stored model, or the catalog name; the raw id when the provider or entry is gone, null when unknown.
+    /// </summary>
+    private string? EngineName(Transcript transcript)
+    {
+        if (transcript.EngineID is not { Length: > 0 } id) return null;
+        if (CloudTranscription.ProviderId(id) is not { } providerId) return ModelCatalog.Entry(id)?.DisplayName ?? id;
+        var name = _model.ProvidersModel.Config(providerId)?.DisplayName ?? providerId;
+        return transcript.ModelID is { Length: > 0 } model ? $"{name} ({model})" : name;
+    }
 
     /// <summary>me, then s1, s2… by number, then any other id (macOS <c>speakers(in:)</c>).</summary>
     private static List<string> SpeakerIds(Transcript transcript) =>

@@ -5,9 +5,12 @@
       (the same setting as Storage › Audio). Transcribe automatically and waiting while energy saver is on are in
       Recording › After recording, as on macOS.
     - Transcription model: what transcription is, then the speech models by tier, each with its details, Download,
-      progress and Cancel, Installed and Delete, Set default.
-    - Diarization model: tell speakers apart, the number of other speakers, what diarization is, then the speaker models.
-    The model rows are made in code (TranscriptionSettingsPage.CreateRow). The footer gives every installed model's size.
+      progress and Cancel, Installed and Delete, Set default; then Cloud (the default cloud engine's model, then every
+      provider that transcribes, with Set default or Set Up) and the speech-to-text APIs (key, model, Test).
+    - Diarization model: tell speakers apart, the number of other speakers, what diarization is, then the speaker
+      models, then Cloud (the default cloud diarizer's model, then the providers that label speakers).
+    The model, cloud and API rows are made in code (TranscriptionSettingsPage.CreateRow, CloudSection,
+    SpeechProviderRow). The footer gives every installed model's size.
     Each searchable element's Tag is its search entry's title (SearchEntries), so a search result can bring it into view.
 -->
 <UserControl
@@ -136,11 +139,9 @@
                     <!-- A header per tier, then its rows (made in code). -->
                     <StackPanel x:Name="TranscriptionList" Spacing="4" />
 
-                    <!--
-                        Task 26.3: the "Cloud" section (the default cloud engine's model, then every provider that
-                        transcribes, with Set default or Set Up) and the "Speech-to-text APIs" section go here, after
-                        the local tiers (macOS cloudSection(diarization: false) and speechToTextSection).
-                    -->
+                    <!-- After the local tiers: macOS cloudSection(diarization: false), then speechToTextSection. -->
+                    <StackPanel x:Name="TranscriptionCloudList" Spacing="4" />
+                    <StackPanel x:Name="SpeechToTextList" Spacing="4" />
                 </StackPanel>
 
                 <!-- Diarization model -->
@@ -173,10 +174,8 @@
 
                     <StackPanel x:Name="DiarizationList" Spacing="4" />
 
-                    <!--
-                        Task 26.3: the "Cloud" section of the diarizers (the default cloud diarizer's model, then the
-                        providers that label speakers) goes here (macOS cloudSection(diarization: true)).
-                    -->
+                    <!-- macOS cloudSection(diarization: true). -->
+                    <StackPanel x:Name="DiarizationCloudList" Spacing="4" />
                 </StackPanel>
             </Grid>
         </ScrollViewer>

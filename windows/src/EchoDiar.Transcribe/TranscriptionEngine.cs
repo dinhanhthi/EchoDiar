@@ -211,6 +211,8 @@ public enum TranscriptionErrorKind
     SessionUnreadable,
     AudioUnreadable,
     EngineFailed,
+    /// <summary>A cloud API failed; <see cref="TranscriptionException.Detail"/> is "Provider: short reason" (Swift <c>.cloud</c>).</summary>
+    Cloud,
 }
 
 /// <summary>Swift <c>TranscriptionError</c>; <see cref="Detail"/> is its associated value.</summary>
@@ -226,6 +228,7 @@ public sealed class TranscriptionException(TranscriptionErrorKind kind, string d
         TranscriptionErrorKind.UnknownEngine => $"{detail} is not a registered transcription engine.",
         TranscriptionErrorKind.SessionUnreadable => "The recording's session.json is missing or unreadable.",
         TranscriptionErrorKind.AudioUnreadable => $"Could not read the audio ({detail}).",
+        TranscriptionErrorKind.Cloud => detail,
         _ => $"Transcription failed ({detail}).",
     };
 }

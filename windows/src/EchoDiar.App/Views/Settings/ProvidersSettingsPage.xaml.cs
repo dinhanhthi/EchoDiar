@@ -2,6 +2,7 @@ using System.ComponentModel;
 using System.Globalization;
 using CommunityToolkit.WinUI.Controls;
 using EchoDiar.AI;
+using EchoDiar.AI.Cloud;
 using EchoDiar.App.Services;
 using EchoDiar.App.ViewModels;
 using EchoDiar.Core.Models;
@@ -166,7 +167,7 @@ public sealed partial class ProvidersSettingsPage : UserControl
 
     private void OnModelChanged(object? sender, PropertyChangedEventArgs e)
     {
-        if (e.PropertyName == nameof(AppViewModel.SettingsSubTab)) ShowTab();
+        if (e.PropertyName is nameof(AppViewModel.SettingsSubTab) or nameof(AppViewModel.SettingsExpandedProvider)) ShowTab();
     }
 
     private void OnProvidersPropertyChanged(object? sender, PropertyChangedEventArgs e)
@@ -190,6 +191,23 @@ public sealed partial class ProvidersSettingsPage : UserControl
         OnThisPCPanel.Visibility = Show(tab == OnThisPCTab);
         CloudPanel.Visibility = Show(tab == CloudAPIsTab);
         CliPanel.Visibility = Show(tab == CliTab);
+        ExpandRequestedProvider(tab);
+    }
+
+    /// <summary>
+    /// A cloud engine's Set Up in Settings › Transcription (macOS <c>settingsExpandedProvider</c>): its API row on Cloud
+    /// APIs expands and comes into view, and the request is cleared.
+    /// </summary>
+    private void ExpandRequestedProvider(string? tab)
+    {
+        if (Closing || tab != CloudAPIsTab || _model.SettingsExpandedProvider is not { } id || !_apiRows.TryGetValue(id, out var row)) return;
+        _model.SettingsExpandedProvider = null;
+        row.Expander.IsExpanded = true;
+        // After the panel's layout: a row of a tab just shown has no position yet.
+        DispatcherQueue.TryEnqueue(() =>
+        {
+            if (!Closing) row.Expander.StartBringIntoView(new BringIntoViewOptions { AnimationDesired = true, VerticalAlignmentRatio = 0 });
+        });
     }
 
     /// <summary>Every control shows the current settings, keys and states.</summary>
@@ -592,7 +610,8 @@ public sealed partial class ProvidersSettingsPage : UserControl
     /// <summary>
     /// A cloud preset, local host or custom endpoint (macOS <c>APIProviderRow</c>): the Enabled switch; expanded, its
     /// name and authentication (custom endpoints), extra headers (custom endpoints), API key, base URL, model, the
-    /// models shown in the AI pane's menu, Test, and Remove (local hosts and custom endpoints).
+    /// models shown in the AI pane's menu, the transcription model (the APIs that transcribe too), Test, and Remove
+    /// (local hosts and custom endpoints).
     /// </summary>
     private sealed class ApiRow
     {
@@ -618,6 +637,7 @@ public sealed partial class ProvidersSettingsPage : UserControl
         private readonly TextBlock _azureNote;
         private readonly TextBlock _httpWarning;
         private readonly ModelField _modelField;
+        private readonly TranscriptionModelField _transcriptionField;
         private readonly TestField _test;
         private readonly Button _removeButton = new() { Visibility = Visibility.Collapsed };
         private ProviderConfig? _config;
@@ -706,6 +726,7 @@ public sealed partial class ProvidersSettingsPage : UserControl
 
             _modelField = new ModelField(page, id, id == "azure" ? "Deployment name" : "Model id",
                 ProviderLinks.TryGetValue(id, out var modelLinks) ? modelLinks.Models : null);
+            _transcriptionField = new TranscriptionModelField(page._providers, id, () => page._syncing || page.Closing);
 
             _removeButton.Content = Loc.T("Remove");
             _removeButton.Click += (_, _) => _ = _page._providers.RemoveProviderAsync(_id);
@@ -718,6 +739,7 @@ public sealed partial class ProvidersSettingsPage : UserControl
             Expander.Items.Add(baseCard);
             Expander.Items.Add(_modelField.ModelCard);
             Expander.Items.Add(_modelField.ShownCard);
+            Expander.Items.Add(_transcriptionField.Card);
             Expander.Items.Add(_test.Card);
         }
 
@@ -749,6 +771,8 @@ public sealed partial class ProvidersSettingsPage : UserControl
             _azureNote.Visibility = Show(config.Id == "azure");
             UpdateKey();
             _modelField.Update(config);
+            _transcriptionField.Card.Visibility = Show(CloudTranscription.Supports(config));
+            _transcriptionField.Update(config);
             _removeButton.Visibility = Show(config.Kind == ProviderKind.Local || IsCustom);
             _test.Update(config);
         }
