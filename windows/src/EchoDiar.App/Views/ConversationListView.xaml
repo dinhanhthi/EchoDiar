@@ -51,6 +51,11 @@
         </InfoBar>
 
         <Grid Grid.Row="2">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="*" />
+            </Grid.RowDefinitions>
+
             <!--
                 Day headers and conversation cards (ListViewItems made in code), newest first; the header is the
                 recording's card while recording. No ListView selection: the cards draw the open conversation and the
@@ -58,12 +63,14 @@
             -->
             <ListView
                 x:Name="ConversationList"
+                Grid.Row="1"
                 IsItemClickEnabled="False"
                 SelectionMode="None" />
 
             <!-- Why there are no cards: an empty library, or a search without results. -->
             <TextBlock
                 x:Name="EmptyText"
+                Grid.Row="1"
                 Margin="20,12"
                 HorizontalAlignment="Center"
                 VerticalAlignment="Center"
@@ -74,16 +81,14 @@
                 Visibility="Collapsed" />
 
             <!--
-                While cards are selected (Ctrl-click, Shift-click): their count, Delete and Cancel, as a command bar over
-                the top of the list (acrylic, so the cards under it do not show through), so the list does not move
-                under the pointer when it appears.
+                While cards are selected (Ctrl-click, Shift-click): their count, Delete and Cancel, as a command bar above
+                the list, which moves down to make room (macOS SelectionBar).
             -->
             <Border
                 x:Name="SelectionBar"
+                Margin="0,0,0,8"
                 Padding="12,4,4,4"
-                VerticalAlignment="Top"
-                Canvas.ZIndex="1"
-                Background="{ThemeResource AcrylicInAppFillColorDefaultBrush}"
+                Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
                 BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
                 BorderThickness="1"
                 CornerRadius="{StaticResource OverlayCornerRadius}"
