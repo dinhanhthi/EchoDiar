@@ -11,6 +11,25 @@ struct CalendarView: View {
     /// Record is offered this long before an event starts.
     private static let recordLead: TimeInterval = 15 * 60
 
+    @State private var editor: EditorState?
+
+    /// The event editor: a new event or one of EchoDiar's own.
+    private enum EditorState: Identifiable {
+        case new
+        case edit(CalendarEvent)
+
+        var id: String {
+            switch self {
+            case .new: "new"
+            case .edit(let event): event.id
+            }
+        }
+
+        var event: CalendarEvent? {
+            if case .edit(let event) = self { event } else { nil }
+        }
+    }
+
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 12) {
@@ -32,15 +51,23 @@ struct CalendarView: View {
         .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in
             model.refreshCalendarAccess()
         }
+        .sheet(item: $editor) { EventEditorSheet(model: model, editing: $0.event) }
     }
 
     private var header: some View {
-        HStack {
-            Text("Calendar")
-                .font(.title2.weight(.semibold))
-                .accessibilityAddTraits(.isHeader)
-            Spacer()
-            Button("Calendar settings…") { model.openSettings(tab: .recording, subTab: "calendar") }
+        VStack(alignment: .leading, spacing: 4) {
+            HStack {
+                Text("Calendar")
+                    .font(.title2.weight(.semibold))
+                    .accessibilityAddTraits(.isHeader)
+                Spacer()
+                Button("New Event…") { editor = .new }
+                    .disabled(!model.calendarAuthorized)
+                Button("Calendar settings…") { model.openSettings(tab: .recording, subTab: "calendar") }
+            }
+            Text("Showing meetings in the next 7 days. The list updates automatically.")
+                .font(.callout)
+                .foregroundStyle(.secondary)
         }
     }
 
@@ -82,7 +109,7 @@ struct CalendarView: View {
             VStack(spacing: 6) {
                 Text("No upcoming meetings in the next 7 days.")
                 if !model.settings.calendar.allTimedEvents {
-                    Text("Only events with a meeting link are shown.")
+                    Text("Only events with a meeting link, or in the EchoDiar calendar, are shown.")
                         .font(.callout)
                         .foregroundStyle(.secondary)
                 }
@@ -129,6 +156,9 @@ struct CalendarView: View {
             }
             .opacity(skipped ? 0.5 : 1)
             Spacer(minLength: 8)
+            if model.isOwnEvent(event) {
+                Button("Edit…") { editor = .edit(event) }
+            }
             if event.link != nil {
                 Button("Join") { model.openMeetingLink(event) }
                     .help("Open the meeting link")

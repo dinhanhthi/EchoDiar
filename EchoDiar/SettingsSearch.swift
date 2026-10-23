@@ -87,6 +87,9 @@ struct SettingsSearchItem: Identifiable {
         // Transcription
         .init(title: "Default language", keywords: ["language", "English", "French", "Vietnamese"],
               tab: .transcription, subTab: "general"),
+        .init(title: "Remember last record language",
+              keywords: ["language", "remember", "last", "record", "chevron", "menu"],
+              tab: .transcription, subTab: "general"),
         .init(title: "Transcribe while recording",
               keywords: ["live transcript", "captions", "real-time", "subtitles", "WhisperKit", "Parakeet"],
               tab: .transcription, subTab: "general"),

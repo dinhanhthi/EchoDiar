@@ -30,6 +30,17 @@ struct CalendarSchedulerTests {
         #expect(scheduler.upcoming(after: start, limit: 10).map(\.id) == ["call", "noLink"])
     }
 
+    @Test func ownCalendarEventsCountWithoutALinkUnlessIgnored() {
+        let events = [event("own", link: false, calendarID: "echo")]
+        var scheduler = CalendarScheduler()
+        scheduler.update(events, configuration: .init(ownCalendarID: "echo"))
+        #expect(scheduler.upcoming(after: start, limit: 10).map(\.id) == ["own"])
+        #expect(scheduler.evaluate(now: start) == .start(events[0], late: false))
+
+        scheduler.update(events, configuration: .init(ignoredCalendarIDs: ["echo"], ownCalendarID: "echo"))
+        #expect(scheduler.upcoming(after: start, limit: 10).isEmpty)
+    }
+
     @Test func anEventTriggersOnceAtItsStart() {
         let events = [event("call")]
         var scheduler = CalendarScheduler()

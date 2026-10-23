@@ -9,6 +9,11 @@ public struct AppSettings: Codable, Equatable, Sendable {
     public var defaultLanguage: String
     /// Languages picked for recordings and re-transcriptions, most recent first, at most 5.
     public var recentLanguages: [String]
+    /// Start recordings in the language last picked from the record button's menu instead of `defaultLanguage`.
+    public var rememberRecordingLanguage: Bool
+    /// The language last picked from the record button's menu while `rememberRecordingLanguage` is on (a code or
+    /// "auto"); kept, but ignored, once it is turned off.
+    public var lastRecordingLanguage: String?
     /// Total AAC bitrate of the compressed 2-channel `audio.m4a`.
     public var compressionBitrateKbps: Int
     /// Keep the uncompressed CAF next to the m4a after compression.
@@ -106,6 +111,8 @@ public struct AppSettings: Codable, Equatable, Sendable {
         launchAtLogin: Bool = false,
         defaultLanguage: String = "auto",
         recentLanguages: [String] = [],
+        rememberRecordingLanguage: Bool = false,
+        lastRecordingLanguage: String? = nil,
         compressionBitrateKbps: Int = 64,
         keepUncompressedAudio: Bool = false,
         playbackChannels: PlaybackChannels = .mixed,
@@ -154,6 +161,8 @@ public struct AppSettings: Codable, Equatable, Sendable {
         self.launchAtLogin = launchAtLogin
         self.defaultLanguage = defaultLanguage
         self.recentLanguages = recentLanguages
+        self.rememberRecordingLanguage = rememberRecordingLanguage
+        self.lastRecordingLanguage = lastRecordingLanguage
         self.compressionBitrateKbps = compressionBitrateKbps
         self.keepUncompressedAudio = keepUncompressedAudio
         self.playbackChannels = playbackChannels
@@ -210,6 +219,7 @@ public struct AppSettings: Codable, Equatable, Sendable {
 
     private enum CodingKeys: String, CodingKey {
         case version, launchAtLogin, defaultLanguage, recentLanguages, compressionBitrateKbps, keepUncompressedAudio
+        case rememberRecordingLanguage, lastRecordingLanguage
         case playbackChannels, onboardingCompleted, modelIdleMinutes
         case defaultASRModelID, defaultDiarizerModelID, providers
         case cloudSTTConfirmed, defaultAIProviderID, defaultAIModel, summaryLanguage, chatContextMessages
@@ -228,6 +238,9 @@ public struct AppSettings: Codable, Equatable, Sendable {
         launchAtLogin = try container.decodeIfPresent(Bool.self, forKey: .launchAtLogin) ?? false
         defaultLanguage = try container.decodeIfPresent(String.self, forKey: .defaultLanguage) ?? "auto"
         recentLanguages = try container.decodeIfPresent([String].self, forKey: .recentLanguages) ?? []
+        rememberRecordingLanguage = try container.decodeIfPresent(
+            Bool.self, forKey: .rememberRecordingLanguage) ?? false
+        lastRecordingLanguage = try container.decodeIfPresent(String.self, forKey: .lastRecordingLanguage)
         compressionBitrateKbps = try container.decodeIfPresent(Int.self, forKey: .compressionBitrateKbps) ?? 64
         keepUncompressedAudio = try container.decodeIfPresent(Bool.self, forKey: .keepUncompressedAudio) ?? false
         playbackChannels = try container.decodeIfPresent(PlaybackChannels.self, forKey: .playbackChannels) ?? .mixed

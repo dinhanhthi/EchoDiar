@@ -78,8 +78,10 @@ struct MainView: View {
             ZStack {
                 switch Page(shownRoute) {
                 case .library: libraryPage.transition(pageTransition)
-                case .settings: SettingsView(model: model, query: $query).transition(pageTransition)
-                case .calendar: CalendarView(model: model).transition(pageTransition)
+                // Capsule buttons on these two pages only; the toolbar and the library keep their own styles.
+                case .settings:
+                    SettingsView(model: model, query: $query).buttonBorderShape(.capsule).transition(pageTransition)
+                case .calendar: CalendarView(model: model).buttonBorderShape(.capsule).transition(pageTransition)
                 }
             }
         }

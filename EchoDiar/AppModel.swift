@@ -46,7 +46,8 @@ final class AppModel {
     /// Apps with running audio input or output, for the Record target menu.
     private(set) var targetGroups: [AudioProcessGroup] = []
     private(set) var isStarting = false
-    /// Picked in the Record menu or while recording; nil = `settings.defaultLanguage`. Cleared when a recording ends.
+    /// Picked in the Record menu or while recording; nil = the remembered or default language. Cleared when a recording
+    /// ends.
     private var languageOverride: String?
     var recordingError: String?
     private var compressionJobs = 0
@@ -510,15 +511,28 @@ final class AppModel {
         }
     }
 
-    /// The language the next recording starts with, or the current one while recording.
-    var recordingLanguage: String { languageOverride ?? settings.defaultLanguage }
+    /// The language the next recording starts with, or the current one while recording: the pick, else the remembered
+    /// pick when that setting is on, else the default language.
+    var recordingLanguage: String {
+        languageOverride ?? (settings.rememberRecordingLanguage ? settings.lastRecordingLanguage : nil)
+            ?? settings.defaultLanguage
+    }
 
-    /// Before recording: the next session's language. While recording: a language marker at the current time.
+    /// Before recording: the next session's language, remembered when that setting is on. While recording (or
+    /// starting): a language marker at the current time, never remembered.
     func setRecordingLanguage(_ language: String) {
-        guard language != recordingLanguage else { return }
+        // Picking the current language is remembered too, so a later default change doesn't override it.
+        let remembers = !isRecording && !isStarting && settings.rememberRecordingLanguage
+        guard language != recordingLanguage else {
+            if remembers { updateSettings { $0.lastRecordingLanguage = language } }
+            return
+        }
         languageOverride = language
         if isRecording { engine.setLanguage(language) }
-        rememberLanguage(language)
+        updateSettings {
+            if remembers { $0.lastRecordingLanguage = language }
+            Self.addRecentLanguage(language, to: &$0)
+        }
     }
 
     /// Codes the engine accepts (`engineID` nil = the catalog default), sorted by name. Later engines only
@@ -537,11 +551,13 @@ final class AppModel {
 
     /// Most recent first; Auto and the pinned languages are always listed, so they are not kept.
     private func rememberLanguage(_ language: String) {
+        updateSettings { Self.addRecentLanguage(language, to: &$0) }
+    }
+
+    private static func addRecentLanguage(_ language: String, to settings: inout AppSettings) {
         guard language != LanguageOptions.auto, !LanguageOptions.pinned.contains(language) else { return }
-        updateSettings {
-            let recent = [language] + $0.recentLanguages.filter { $0 != language }
-            $0.recentLanguages = Array(recent.prefix(LanguageOptions.maxRecent))
-        }
+        let recent = [language] + settings.recentLanguages.filter { $0 != language }
+        settings.recentLanguages = Array(recent.prefix(LanguageOptions.maxRecent))
     }
 
     /// Reloads the running apps for the target menu, off the main thread.
@@ -1387,6 +1403,7 @@ final class AppModel {
             || updated.calendar.ignoredCalendarIDs != settings.calendar.ignoredCalendarIDs
             || updated.calendar.allTimedEvents != settings.calendar.allTimedEvents
             || updated.calendar.skippedEvents != settings.calendar.skippedEvents
+            || updated.calendar.ownCalendarID != settings.calendar.ownCalendarID
         let retentionChanged = updated.autoDeleteEnabled != settings.autoDeleteEnabled
         let hotKeyChanged = updated.globalHotKey != settings.globalHotKey
             || updated.globalHotKeyEnabled != settings.globalHotKeyEnabled
@@ -2248,6 +2265,47 @@ extension AppModel {
     func openMeetingLink(_ event: CalendarEvent) {
         guard let url = event.link?.url else { return }
         NSWorkspace.shared.open(url)
+    }
+
+    /// Saves a new event, or edits an occurrence, in EchoDiar's calendar. Returns an error message to show, or nil.
+    func saveCalendarEvent(_ draft: CalendarEventDraft, editing: CalendarEvent?, span: EKSpan) -> String? {
+        do {
+            let id = try calendarStore.saveEvent(
+                draft, editing: editing, span: span, storedCalendarID: settings.calendar.ownCalendarID)
+            // A new id syncs through `updateSettings` (it changes eligibility); the same id syncs here.
+            if id != settings.calendar.ownCalendarID {
+                updateSettings { $0.calendar.ownCalendarID = id }
+            } else {
+                syncCalendar()
+            }
+            return nil
+        } catch {
+            NSLog("EchoDiar: could not save the calendar event: \(error)")
+            return error.localizedDescription
+        }
+    }
+
+    /// Deletes an occurrence (or the series from it, per `span`) of EchoDiar's calendar. Returns an error message to
+    /// show, or nil.
+    func deleteCalendarEvent(_ event: CalendarEvent, span: EKSpan) -> String? {
+        do {
+            try calendarStore.deleteEvent(event, span: span, storedCalendarID: settings.calendar.ownCalendarID)
+            syncCalendar()
+            return nil
+        } catch {
+            NSLog("EchoDiar: could not delete the calendar event: \(error)")
+            return error.localizedDescription
+        }
+    }
+
+    /// The editor's values for an event of EchoDiar's calendar, and whether it repeats; nil when it is not found.
+    func calendarDraft(for event: CalendarEvent) -> (draft: CalendarEventDraft, isRecurring: Bool)? {
+        calendarStore.draft(for: event, storedCalendarID: settings.calendar.ownCalendarID)
+    }
+
+    /// Whether the event is in EchoDiar's calendar, so it can be edited.
+    func isOwnEvent(_ event: CalendarEvent) -> Bool {
+        settings.calendar.ownCalendarID != nil && event.calendarID == settings.calendar.ownCalendarID
     }
 
     /// "Keep recording" on the end prompt: that trigger stays quiet for 10 min.

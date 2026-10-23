@@ -28,6 +28,9 @@ struct SettingsStoreTests {
             #expect(store.load().calendar.mode == .ask)
             #expect(store.load().calendar.stopAtEventEnd)
             #expect(store.load().calendar.stopAfterEndMinutes == 10)
+            #expect(store.load().calendar.ownCalendarID == nil)
+            #expect(store.load().rememberRecordingLanguage == false)
+            #expect(store.load().lastRecordingLanguage == nil)
             #expect(FileManager.default.fileExists(atPath: store.fileURL.path))
         }
     }

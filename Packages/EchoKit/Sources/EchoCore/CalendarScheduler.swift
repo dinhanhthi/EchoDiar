@@ -68,6 +68,8 @@ public struct CalendarScheduler: Sendable {
         public var stopAfterEndMinutes: Int
         /// Occurrences the user chose to skip, mapped to their end so past ones can be pruned.
         public var skippedEvents: [String: Date]
+        /// Identifier of EchoDiar's own "EchoDiar" calendar, set when the first event is saved; nil = not created yet.
+        public var ownCalendarID: String?
 
         public static let stopAfterEndRange = 0...120
 
@@ -78,7 +80,8 @@ public struct CalendarScheduler: Sendable {
 
         public init(
             mode: Mode = .ask, ignoredCalendarIDs: [String] = [], allTimedEvents: Bool = false,
-            stopAtEventEnd: Bool = true, stopAfterEndMinutes: Int = 10, skippedEvents: [String: Date] = [:]
+            stopAtEventEnd: Bool = true, stopAfterEndMinutes: Int = 10, skippedEvents: [String: Date] = [:],
+            ownCalendarID: String? = nil
         ) {
             self.mode = mode
             self.ignoredCalendarIDs = ignoredCalendarIDs
@@ -86,10 +89,12 @@ public struct CalendarScheduler: Sendable {
             self.stopAtEventEnd = stopAtEventEnd
             self.stopAfterEndMinutes = stopAfterEndMinutes
             self.skippedEvents = skippedEvents
+            self.ownCalendarID = ownCalendarID
         }
 
         private enum CodingKeys: String, CodingKey {
             case mode, ignoredCalendarIDs, allTimedEvents, stopAtEventEnd, stopAfterEndMinutes, skippedEvents
+            case ownCalendarID
         }
 
         public init(from decoder: Decoder) throws {
@@ -101,6 +106,7 @@ public struct CalendarScheduler: Sendable {
             let minutes = try container.decodeIfPresent(Int.self, forKey: .stopAfterEndMinutes) ?? 10
             stopAfterEndMinutes = min(max(minutes, Self.stopAfterEndRange.lowerBound), Self.stopAfterEndRange.upperBound)
             skippedEvents = try container.decodeIfPresent([String: Date].self, forKey: .skippedEvents) ?? [:]
+            ownCalendarID = try container.decodeIfPresent(String.self, forKey: .ownCalendarID)
         }
 
         /// A copy without skipped occurrences that have ended.
@@ -127,13 +133,15 @@ public struct CalendarScheduler: Sendable {
     public init() {}
 
     /// Replaces the events and settings, keeping only eligible events, sorted by start (then id).
+    /// Events in EchoDiar's own calendar count without a meeting link.
     public mutating func update(_ events: [CalendarEvent], configuration: Configuration) {
         self.configuration = configuration
         let ignored = Set(configuration.ignoredCalendarIDs)
         self.events = events
             .filter {
                 !$0.isAllDay && !$0.declined && !$0.canceled && !ignored.contains($0.calendarID)
-                    && ($0.link != nil || configuration.allTimedEvents)
+                    && ($0.link != nil || configuration.allTimedEvents
+                        || (configuration.ownCalendarID != nil && $0.calendarID == configuration.ownCalendarID))
             }
             .sorted { ($0.start, $0.id) < ($1.start, $1.id) }
     }
