@@ -79,6 +79,7 @@
               <li><a href="#permissions">Permissions</a></li>
               <li><a href="#recording">Recording</a></li>
               <li><a href="#meetings">Meeting detection</a></li>
+              <li><a href="#calendar">Calendar</a></li>
               <li><a href="#transcription">Transcription</a></li>
               <li><a href="#how-it-works">How it works</a></li>
               <li><a href="#cloud-transcription">Cloud transcription</a></li>
@@ -107,6 +108,7 @@
             <li><strong>Microphone:</strong> records your voice.</li>
             <li><strong>System Audio Recording:</strong> records the meeting's audio. The first-run onboarding tests it and opens the right Privacy &amp; Security pane.</li>
             <li><strong>Accessibility</strong> (optional): only to keep the floating indicator on the meeting window.</li>
+            <li><strong>Calendars</strong> (optional): reads your meetings from macOS Calendar to offer recording when they start and to name the recording.</li>
             <li>Tell the people you record. Onboarding and Settings &gt; General have a <strong>Copy consent message</strong> button.</li>
 </ul>
           </section>
@@ -130,6 +132,20 @@
             <li>Per app: <strong>Ask</strong>, <strong>Always record</strong> or <strong>Ignore</strong> (browsers: Ask or Ignore).</li>
             <li>A floating indicator shows while recording. Drag it, hide it while EchoDiar is in front, or attach it to the meeting window.</li>
             <li>Auto-stop: when the meeting app quits, the call goes quiet or the screen locks, the indicator asks before stopping, with a 15 s countdown.</li>
+</ul>
+          </section>
+
+          <section id="calendar" class="doc">
+            <h2>Calendar</h2>
+<ul class="list">
+            <li>Works with any account added to macOS Calendar: iCloud, Google, Outlook/Exchange, CalDAV. Set it up in <strong>Settings &gt; Recording &gt; Calendar</strong>, with the optional Calendars permission.</li>
+            <li><strong>When a meeting starts:</strong> <strong>Off</strong>, <strong>Ask</strong> (the default: the floating indicator offers <strong>Record</strong>, <strong>Join</strong> or <strong>Not now</strong>), <strong>Wait for the call</strong> (records the meeting app as soon as the call starts) or <strong>Record at start</strong> (records all system audio and the mic at the start time).</li>
+            <li>The automatic modes start without asking only for events you organize or accepted. Other invites ask.</li>
+            <li>Choose the calendars to watch, and keep only events with a meeting link (Zoom, Google Meet, Microsoft Teams, Webex).</li>
+            <li><strong>Stop when the event ends</strong>, plus a few minutes (10 by default). The indicator asks before stopping, with a 15 s countdown.</li>
+            <li>A recording started from an event is named after it.</li>
+            <li>The <strong>Calendar</strong> page (toolbar button next to Settings) lists the meetings of the next 7 days with <strong>Join</strong>, <strong>Record</strong> and <strong>Skip</strong>. The menu bar menu lists upcoming meetings.</li>
+            <li>Works while EchoDiar runs, so turn on <strong>Launch at login</strong> in <strong>Settings &gt; General</strong>.</li>
 </ul>
           </section>
 

@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- Calendar triggers (Settings > Recording > Calendar), with any account added to macOS Calendar (iCloud, Google, Outlook/Exchange, CalDAV) and the optional Calendars permission. "When a meeting starts": Off, Ask (default: the floating indicator offers Record, Join or Not now), Wait for the call (records the meeting app as soon as the call starts) or Record at start (records all system audio and the microphone at the start time). Automatic modes start without asking only for events you organize or accepted; other invites ask. Choose the calendars to watch, keep only events with a meeting link (Zoom, Google Meet, Microsoft Teams, Webex), and stop when the event ends plus a few minutes (10 by default, asked with a countdown). Works while EchoDiar runs, so Launch at login is recommended.
+- A recording started from a calendar event is named after the event.
+- A Calendar page (toolbar button next to Settings) lists the meetings of the next 7 days with Join, Record and Skip, and the menu bar menu lists upcoming meetings.
+
 ## [1.0.2] - 2026-10-21
 
 ### Added
