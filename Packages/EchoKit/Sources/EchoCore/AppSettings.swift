@@ -70,6 +70,8 @@ public struct AppSettings: Codable, Equatable, Sendable {
     public var pillSize: PillSize
     /// Auto-stop thresholds.
     public var endMonitor: MeetingEndMonitor.Configuration
+    /// Calendar auto-record: trigger mode, watched calendars, event-end stop and skipped occurrences.
+    public var calendar: CalendarScheduler.Configuration
     /// What losing the recording microphone does.
     public var routeChangeBehavior: RouteChangeBehavior
     /// Queue the batch transcription when a recording stops (after compression).
@@ -132,6 +134,7 @@ public struct AppSettings: Codable, Equatable, Sendable {
         pillWindowOffset: PillPosition? = nil,
         pillSize: PillSize = .medium,
         endMonitor: MeetingEndMonitor.Configuration = MeetingEndMonitor.Configuration(),
+        calendar: CalendarScheduler.Configuration = CalendarScheduler.Configuration(),
         routeChangeBehavior: RouteChangeBehavior = .ask,
         autoTranscribe: Bool = true,
         transcribeWhileRecording: Bool = true,
@@ -179,6 +182,7 @@ public struct AppSettings: Codable, Equatable, Sendable {
         self.pillWindowOffset = pillWindowOffset
         self.pillSize = pillSize
         self.endMonitor = endMonitor
+        self.calendar = calendar
         self.routeChangeBehavior = routeChangeBehavior
         self.autoTranscribe = autoTranscribe
         self.transcribeWhileRecording = transcribeWhileRecording
@@ -212,6 +216,7 @@ public struct AppSettings: Codable, Equatable, Sendable {
         case ragEnabled, embeddingModelID, embeddingAPIModel, cloudEmbeddingConfirmed
         case micDeviceUID, meetingDetection, perAppBehavior, pillPositions, showPill, hidePillWhenAppActive
         case showPillInScreenCaptures, attachPillToWindow, pillWindowOffset, pillSize, endMonitor, routeChangeBehavior
+        case calendar
         case autoTranscribe, transcribeWhileRecording, speakerCountHint, diarization, deferTranscriptionWhenConstrained
         case autoDeleteEnabled, autoDeleteAfterDays, autoDeleteMode, deleteAudioAfterTranscription
         case deleteWithoutConfirmation, globalHotKey, globalHotKeyEnabled, globalPauseHotKey, globalPauseHotKeyEnabled
@@ -254,6 +259,8 @@ public struct AppSettings: Codable, Equatable, Sendable {
         pillSize = try container.decodeIfPresent(PillSize.self, forKey: .pillSize) ?? .medium
         endMonitor = try container.decodeIfPresent(MeetingEndMonitor.Configuration.self, forKey: .endMonitor)
             ?? MeetingEndMonitor.Configuration()
+        calendar = try container.decodeIfPresent(CalendarScheduler.Configuration.self, forKey: .calendar)
+            ?? CalendarScheduler.Configuration()
         routeChangeBehavior = try container.decodeIfPresent(RouteChangeBehavior.self, forKey: .routeChangeBehavior) ?? .ask
         autoTranscribe = try container.decodeIfPresent(Bool.self, forKey: .autoTranscribe) ?? true
         transcribeWhileRecording = try container.decodeIfPresent(Bool.self, forKey: .transcribeWhileRecording) ?? true

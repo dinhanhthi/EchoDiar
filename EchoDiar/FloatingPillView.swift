@@ -202,6 +202,7 @@ struct FloatingPillView: View {
                 localized: "No sound for \(model.settings.endMonitor.effectiveSilenceMinutes) min — stop recording?")
         case .screenLocked: return String(localized: "Screen locked — stop recording?")
         case .inputRouteLost: return String(localized: "Microphone disconnected — stop recording?")
+        case .eventEnded: return String(localized: "The meeting has ended — stop recording?")
         case .systemSleep, .diskFull, .maxDuration: return String(localized: "Stop recording?")
         }
     }

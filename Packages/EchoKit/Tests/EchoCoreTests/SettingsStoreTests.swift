@@ -25,7 +25,23 @@ struct SettingsStoreTests {
             #expect(store.load().modelIdleMinutes == 2)
             #expect(!store.load().diarization)
             #expect(store.load().transcribeWhileRecording)
+            #expect(store.load().calendar.mode == .ask)
+            #expect(store.load().calendar.stopAtEventEnd)
+            #expect(store.load().calendar.stopAfterEndMinutes == 10)
             #expect(FileManager.default.fileExists(atPath: store.fileURL.path))
+        }
+    }
+
+    /// An unknown calendar mode (another build) asks instead of discarding the whole file; skipped events survive a save.
+    @Test func calendarUnknownModeAsksAndSkippedEventsRoundTrip() throws {
+        try withTemporaryStore { store in
+            try Data(#"{"calendar":{"mode":"bogus"}}"#.utf8).write(to: store.fileURL)
+            #expect(store.load().calendar.mode == .ask)
+            #expect(FileManager.default.fileExists(atPath: store.fileURL.path))
+
+            let end = Date(timeIntervalSinceReferenceDate: 800_000_000)
+            try store.save(AppSettings(calendar: CalendarScheduler.Configuration(skippedEvents: ["event-1": end])))
+            #expect(store.load().calendar.skippedEvents == ["event-1": end])
         }
     }
 
