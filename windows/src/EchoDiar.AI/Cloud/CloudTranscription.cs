@@ -499,7 +499,8 @@ public static partial class CloudTranscription
         OperationCanceledException => "cancelled",
         HttpRequestException { HttpRequestError: HttpRequestError.NameResolutionError or HttpRequestError.ConnectionError } =>
             "no internet connection",
-        HttpRequestException or IOException => "network error",
+        // Transport failures only: a local file error (an IOException too) keeps its own message.
+        HttpRequestException or HttpIOException => "network error",
         _ => ShortLine(error.Message),
     };
 

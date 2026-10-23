@@ -382,6 +382,8 @@ public sealed class CloudTranscriptionRequestTests : IDisposable
         Assert.Equal("cancelled", CloudTranscription.FailureReason(new OperationCanceledException()));
         Assert.Equal("no internet connection", CloudTranscription.FailureReason(
             new HttpRequestException(HttpRequestError.NameResolutionError, "No such host is known. (api.deepgram.com:443)")));
+        Assert.Equal("network error", CloudTranscription.FailureReason(new HttpIOException(HttpRequestError.ResponseEnded)));
+        Assert.Equal("Could not find the part.", CloudTranscription.FailureReason(new FileNotFoundException("Could not find the part.")));
     }
 
     [Fact]
