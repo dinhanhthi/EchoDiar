@@ -139,9 +139,10 @@ DISCARD="git push origin :refs/tags/$TAG && git tag -d $TAG"
 
 echo "==> Waiting for the $WORKFLOW run of $TAG"
 RUN=""
+# gh answers 404 until the first run exists while the workflow is not on the default branch: keep polling.
 for _ in $(seq 1 20); do
   RUN="$(gh run list --repo "$GH_REPO" --workflow "$WORKFLOW" --event push --limit 20 \
-    --json databaseId,headBranch -q ".[] | select(.headBranch == \"$TAG\") | .databaseId" | head -1)"
+    --json databaseId,headBranch -q ".[] | select(.headBranch == \"$TAG\") | .databaseId" 2>/dev/null | head -1)" || RUN=""
   [[ -n "$RUN" ]] && break
   sleep 15
 done
