@@ -65,6 +65,9 @@ public sealed class NativeLlmSmokeTests
     /// <summary>Room for a one-word answer and then some: an answer that fills it never met its end-of-turn token.</summary>
     private const int MaxAnswerTokens = 32;
 
+    /// <summary>More than a one-word answer needs: an end of turn reached past it came from a later end token, not the first.</summary>
+    private const int OneWordAnswerTokens = 12;
+
     /// <summary>
     /// The answer ended at the model's end-of-turn token, not at <see cref="MaxAnswerTokens"/> nor a full context: the
     /// generator's own stop reason, as control tokens (a missed <c>&lt;|im_end|&gt;</c> followed by
@@ -73,7 +76,7 @@ public sealed class NativeLlmSmokeTests
     private static void AssertStopped(string id, GenerationStop? stop)
     {
         Assert.True(stop is { Reason: StopReason.EndOfTurn }, $"{id} stopped at {stop}: no end of turn was detected.");
-        Assert.True(stop.Value.Tokens < MaxAnswerTokens, $"{id} ran to {stop.Value.Tokens} tokens.");
+        Assert.True(stop.Value.Tokens < OneWordAnswerTokens, $"{id} ran to {stop.Value.Tokens} tokens before its end of turn.");
     }
 
     // The check after tokenization holds on its own: with no token texts broken first, a body holding a user-defined

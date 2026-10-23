@@ -400,7 +400,15 @@ public sealed partial class AppViewModel
         {
             Debug.WriteLine($"EchoDiar: could not delete model {entry.Id}: {e}");
             DownloadErrors = With(DownloadErrors, entry.Id, e.Message);
-            if (await Task.Run(() => _services.Models.IsInstalled(entry))) return;
+            try
+            {
+                if (await Task.Run(() => _services.Models.IsInstalled(entry))) return;
+            }
+            catch (IOException)
+            {
+                // The folder moved during the check (a download replacing it): it is still there, keep the default.
+                return;
+            }
         }
         if (_closing) return;
         if (Settings.DefaultASRModelID == entry.Id) SaveSettings(Settings with { DefaultASRModelID = null });
