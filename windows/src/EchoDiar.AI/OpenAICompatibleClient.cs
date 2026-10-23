@@ -42,8 +42,8 @@ public sealed class OpenAICompatibleClient : ILLMProvider
     {
         using var request = MakeModelsRequest(Config, _apiKey);
         if (IsOllama(Config))
-            return (await ProviderHttp.GetJsonAsync<OllamaTags>(_http, request, cancellationToken)).Models.Select(m => m.Name).ToList();
-        return (await ProviderHttp.GetJsonAsync<ModelList>(_http, request, cancellationToken)).Data.Select(m => m.Id).ToList();
+            return (await ProviderHttp.GetJsonAsync<OllamaTags>(_http, request, cancellationToken, ProviderHttp.SmallJsonLimit)).Models.Select(m => m.Name).ToList();
+        return (await ProviderHttp.GetJsonAsync<ModelList>(_http, request, cancellationToken, ProviderHttp.SmallJsonLimit)).Data.Select(m => m.Id).ToList();
     }
 
     public ValueTask<int> ContextWindowAsync(string model, CancellationToken cancellationToken = default) =>

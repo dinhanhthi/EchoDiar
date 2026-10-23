@@ -168,28 +168,65 @@ public sealed class ProviderStreamTests
         Assert.Equal(("Bad key [redacted] ([redacted])" + new string('x', 3000))[..2048], error.Message);
     }
 
-    // A host that never ends its line cannot grow memory without limit: the stream fails at 4 MB.
-    [Fact]
-    public async Task EndlessLineFails()
+    // A host that never ends its line, or a model list without end, cannot grow memory without limit: a stream line
+    // fails at 4 MB, a model list at 4 MB (embeddings and transcripts keep the 32 MB JSON cap).
+    [Theory]
+    [InlineData(true, "The provider sent a line longer than 4 MB.")]
+    [InlineData(false, "The provider's response is larger than 4 MB.")]
+    public async Task EndlessBodyFails(bool streaming, string message)
     {
         var provider = Provider(Config("openai", "openai.stub"),
             new FakeHandler(_ => new HttpResponseMessage(HttpStatusCode.OK) { Content = new StreamContent(new EndlessStream()) }));
 
-        var error = await ThrowsFrom(provider, streaming: true);
+        var error = await ThrowsFrom(provider, streaming);
 
         Assert.Equal(LLMErrorKind.Provider, error.Kind);
+        Assert.Equal(message, error.Message);
     }
 
-    // A JSON response is read up to 32 MB, not without limit.
-    [Fact]
-    public async Task OversizeJsonFails()
+    // A key echoed with some characters \u-escaped (a .NET or Java JSON writer escapes + and =) or percent-encoded (a
+    // URL echoed back), in either hex case, is redacted; the rest of the body is kept as is.
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public async Task UnicodeEscapedAndPercentEncodedKeysAreRedacted(bool streaming)
     {
-        var provider = Provider(Config("openai", "openai.stub"),
-            new FakeHandler(_ => new HttpResponseMessage(HttpStatusCode.OK) { Content = new StreamContent(new EndlessStream()) }));
+        const string key = "sk+test/key=1234";
+        const string body = """{"error":{"message":"a sk\u002Btest\/key\u003d1234 b sk%2btest%2Fkey%3D1234 c sk+test%2fkey\u003D1234 d \u002B"}}""";
+        var provider = new OpenAICompatibleClient(Config("openai", "openai.stub"), key, new FakeHandler(_ => Respond(401, body)));
+
+        var error = await ThrowsFrom(provider, streaming);
+
+        Assert.Equal("""{"error":{"message":"a [redacted] b [redacted] c [redacted] d \u002B"}}""", error.Body);
+    }
+
+    // A key in the base URL's query (a gateway taking ?key=) is a secret too, also when the body echoes it decoded.
+    [Fact]
+    public async Task BaseUrlQueryValuesAreRedacted()
+    {
+        var config = Config("openai", "openai.stub");
+        config.BaseURL = "https://openai.stub/v1?api-key=gw%2Fsecret-0001&v=1";
+        var body = """{"error":{"message":"key gw/secret-0001 gw%2Fsecret-0001 v=1"}}""";
+        var provider = new OpenAICompatibleClient(config, null, new FakeHandler(_ => Respond(401, body)));
 
         var error = await ThrowsFrom(provider, streaming: false);
 
-        Assert.Equal(LLMErrorKind.Provider, error.Kind);
+        Assert.Equal("""{"error":{"message":"key [redacted] [redacted] v=1"}}""", error.Body);
+    }
+
+    // A key cut off by the end of the read is dropped also after a multi-byte body ("é" is 2 UTF-8 bytes, 1 character).
+    [Theory]
+    [InlineData("")]
+    [InlineData("\\u0073k-te")]
+    [InlineData("sk-test-se")]
+    [InlineData("%73%6B-test-secret-12")]
+    public void RedactedPrefixDropsAKeyCutOffAfterAMultiByteBody(string cutKey)
+    {
+        using var request = OpenAICompatibleClient.MakeModelsRequest(Config("openai", "openai.stub"), Key);
+        var body = new string('é', 1030);
+
+        Assert.Equal(body, ProviderHttp.RedactedPrefix(body + cutKey, request, truncated: true));
+        Assert.Equal(body + cutKey, ProviderHttp.RedactedPrefix(body + cutKey, request, truncated: false));
     }
 
     // A cross-origin redirect is refused (the 3xx is the error, nothing reaches the other host); a same-origin one is

@@ -133,9 +133,9 @@ public sealed class ProviderRequestTests
         Assert.Equal(LLMErrorKind.InvalidBaseUrl, error.Kind);
     }
 
-    // The message shows scheme, host, port and path only: user info and query may hold a key.
+    // The message shows scheme, host and port only: user info, path and query may hold a key.
     [Theory]
-    [InlineData("ftp://user:secret-pw@host.example:2121/v1?token=abc#frag", "\"ftp://host.example:2121/v1\" is not a valid http(s) base URL.")]
+    [InlineData("ftp://user:secret-pw@host.example:2121/v1/secret-path?token=abc#frag", "\"ftp://host.example:2121\" is not a valid http(s) base URL.")]
     [InlineData("secret-pw not a url", "The base URL is not a valid http(s) URL.")]
     public void InvalidBaseUrlMessageHidesUserInfoAndQuery(string baseURL, string message)
     {

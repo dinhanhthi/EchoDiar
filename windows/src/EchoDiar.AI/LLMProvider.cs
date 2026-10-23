@@ -1,4 +1,6 @@
+using System.Diagnostics;
 using System.Net;
+using System.Net.Http.Headers;
 using System.Runtime.CompilerServices;
 using System.Text;
 using System.Text.Encodings.Web;
@@ -110,13 +112,13 @@ public sealed class LLMException : Exception
     public string Body { get; }
 
     /// <summary>
-    /// Shows only scheme, host, port and path of <paramref name="url"/>: its user info or query may hold a key. The query
-    /// and fragment are cut before parsing, as some schemes (ftp) would keep a <c>?</c> in the path.
+    /// Shows only the scheme, host and port of <paramref name="url"/>: its user info, path or query may hold a key. The
+    /// query and fragment are cut before parsing, as some schemes (ftp) would keep a <c>?</c> in the path.
     /// </summary>
     public static LLMException InvalidBaseUrl(string url) =>
         new(LLMErrorKind.InvalidBaseUrl,
             Uri.TryCreate(url.Split('?', '#')[0], UriKind.Absolute, out var parsed) && parsed.Host.Length > 0
-                ? $"\"{parsed.Scheme}://{parsed.Host}{(parsed.IsDefaultPort ? "" : ":" + parsed.Port)}{parsed.AbsolutePath}\" is not a valid http(s) base URL."
+                ? $"\"{parsed.Scheme}://{parsed.Host}{(parsed.IsDefaultPort ? "" : ":" + parsed.Port)}\" is not a valid http(s) base URL."
                 : "The base URL is not a valid http(s) URL.");
 
     public static LLMException HttpStatus(int statusCode, string body) =>
@@ -169,6 +171,12 @@ internal static class ProviderHttp
     /// characters per number is ~5 MB (~10 MB at 8192 dims), so 32 MB leaves a 3x margin; model lists are far smaller.
     /// </summary>
     public const int JsonLimit = 32 * 1024 * 1024;
+    /// <summary>The largest small JSON response (a model list, a key check, an upload answer), in bytes.</summary>
+    public const int SmallJsonLimit = 4 * 1024 * 1024;
+    /// <summary>Total time one request may take however steadily it moves, so a host that trickles bytes cannot hold it.</summary>
+    public static readonly TimeSpan RequestCeiling = TimeSpan.FromHours(2);
+    /// <summary>The pause before the one retry of <see cref="SendAsync{T}"/>.</summary>
+    public static readonly TimeSpan RetryDelay = TimeSpan.FromSeconds(2);
 
     /// <summary>Where <see cref="Request"/> stores the request's timeout.</summary>
     public static readonly HttpRequestOptionsKey<TimeSpan> TimeoutOption = new("EchoDiar.ProviderHttp.Timeout");
@@ -229,8 +237,10 @@ internal static class ProviderHttp
     {
         var request = new HttpRequestMessage(HttpMethod.Get, url);
         request.Options.Set(TimeoutOption, timeout);
-        // Custom headers may carry a key too (a gateway token); short values (a version, a flag) are not secrets.
-        request.Options.Set(ExtraSecretsOption, config.ExtraHeaders.Values.Where(value => value.Length >= 8).ToArray());
+        // Custom headers and the base URL's query may carry a key too (a gateway token); short values (a version, a
+        // flag) are not secrets.
+        request.Options.Set(ExtraSecretsOption,
+            config.ExtraHeaders.Values.Concat(QueryValues(config.BaseURL)).Where(value => value.Length >= 8).ToArray());
         foreach (var (name, value) in config.ExtraHeaders) SetHeader(request, name, value);
         if (!string.IsNullOrEmpty(apiKey))
         {
@@ -243,6 +253,15 @@ internal static class ProviderHttp
             }
         }
         return request;
+    }
+
+    /// <summary>The percent-decoded values of <paramref name="url"/>'s query (<c>?key=value&amp;...</c>), however malformed the URL.</summary>
+    internal static IEnumerable<string> QueryValues(string url)
+    {
+        var query = url.Split('#')[0];
+        var mark = query.IndexOf('?');
+        if (mark < 0) return [];
+        return query[(mark + 1)..].Split('&').Select(pair => Uri.UnescapeDataString(pair[(pair.IndexOf('=') + 1)..]));
     }
 
     /// <summary>
@@ -275,13 +294,27 @@ internal static class ProviderHttp
 
     /// <summary>
     /// <paramref name="body"/> with every key the request carries (auth header values, also without their
-    /// <c>Bearer</c>/<c>Token</c> scheme, and extra-header values) replaced, also in their JSON-escaped forms, so an
-    /// echoed key never reaches an error, the UI or a log.
+    /// <c>Bearer</c>/<c>Token</c> scheme, extra-header values and base-URL query values) replaced, so an echoed key never
+    /// reaches an error, the UI or a log. A key is also found escaped, even partly: any of its characters may be
+    /// JSON-escaped (<c>\"</c>, <c>\\</c>, <c>\/</c>, <c>\u00XX</c>) or percent-encoded (<c>%XX</c>), in either hex case.
+    /// The rest of the body is kept as is.
     /// </summary>
     public static string Redacted(string body, HttpRequestMessage request)
     {
-        foreach (var secret in Secrets(request)) body = body.Replace(secret, "[redacted]", StringComparison.Ordinal);
-        return body;
+        var secrets = Secrets(request);
+        StringBuilder? result = null;
+        var copied = 0;
+        for (var i = 0; i < body.Length; i++)
+        {
+            var end = -1;
+            foreach (var secret in secrets)
+                if ((end = Match(body, i, secret, 0).End) > i) break;
+            if (end <= i) continue;
+            (result ??= new()).Append(body, copied, i - copied).Append("[redacted]");
+            copied = end;
+            i = end - 1;
+        }
+        return result is null ? body : result.Append(body, copied, body.Length - copied).ToString();
     }
 
     /// <summary>
@@ -293,15 +326,13 @@ internal static class ProviderHttp
         text = Redacted(text, request);
         if (truncated)
         {
-            // A key cut off by the read can still be in the text after earlier, longer keys were replaced.
-            foreach (var secret in Secrets(request))
+            // A key cut off by the read (in any form, after a body of any script) is the longest tail that starts one.
+            var secrets = Secrets(request);
+            for (var start = Math.Max(0, text.Length - MaxEscapedLength(secrets)); start < text.Length; start++)
             {
-                for (var length = Math.Min(secret.Length - 1, text.Length); length > 0; length--)
-                {
-                    if (!text.EndsWith(secret[..length], StringComparison.Ordinal)) continue;
-                    text = text[..^length];
-                    break;
-                }
+                if (!secrets.Any(secret => Match(text, start, secret, 0).Partial)) continue;
+                text = text[..start];
+                break;
             }
         }
         if (text.Length <= ErrorBodyLimit) return text;
@@ -309,7 +340,7 @@ internal static class ProviderHttp
         return text[..cut];
     }
 
-    /// <summary>Every form of every key in <paramref name="request"/>, longest first.</summary>
+    /// <summary>Every key in <paramref name="request"/>, longest first.</summary>
     private static List<string> Secrets(HttpRequestMessage request)
     {
         string[] headers = ["Authorization", "x-goog-api-key", "xi-api-key", "api-key", "x-api-key"];
@@ -322,16 +353,66 @@ internal static class ProviderHttp
             })
             .Where(secret => secret.Length >= 4);
         var extra = request.Options.TryGetValue(ExtraSecretsOption, out var values) ? values : [];
-        return auth.Concat(extra)
-            .SelectMany(secret =>
+        return auth.Concat(extra).Distinct().OrderByDescending(secret => secret.Length).ToList();
+    }
+
+    /// <summary>The most characters a key can take in a body: <c>%XX%XX%XX</c> for a 3-byte UTF-8 character.</summary>
+    private static int MaxEscapedLength(List<string> secrets) => 9 * secrets.Select(secret => secret.Length).DefaultIfEmpty(0).Max();
+
+    /// <summary>
+    /// Where a match of <paramref name="secret"/> from its character <paramref name="k"/> on, starting at
+    /// <paramref name="text"/>[<paramref name="i"/>], ends (-1 when there is none). <c>Partial</c>: the text ends
+    /// inside a match.
+    /// </summary>
+    private static (int End, bool Partial) Match(string text, int i, string secret, int k)
+    {
+        var partial = false;
+        for (; k < secret.Length; k++)
+        {
+            if (i == text.Length) return (-1, true);
+            var c = secret[k];
+            var (length, cut) = EscapedLength(text, i, c);
+            partial |= cut;
+            if (length > 0)
             {
-                // As a JSON string echoes it: \ and " escaped, and / also as \/.
-                var escaped = secret.Replace("\\", "\\\\").Replace("\"", "\\\"");
-                return new[] { secret, escaped, escaped.Replace("/", "\\/") };
-            })
-            .Distinct()
-            .OrderByDescending(secret => secret.Length)
-            .ToList();
+                if (text[i] != c)
+                {
+                    i += length;
+                    continue;
+                }
+                // A literal \ or % that also starts an escape of itself: try the escape, then the literal.
+                var escaped = Match(text, i + length, secret, k + 1);
+                if (escaped.End >= 0) return escaped;
+                partial |= escaped.Partial;
+            }
+            if (text[i] != c) return (-1, partial);
+            i++;
+        }
+        return (i, false);
+    }
+
+    /// <summary>
+    /// The length of an escape of <paramref name="c"/> at <paramref name="text"/>[<paramref name="i"/>] (0 when there is
+    /// none); <c>Cut</c>: the text ends inside one.
+    /// </summary>
+    private static (int Length, bool Cut) EscapedLength(string text, int i, char c)
+    {
+        string[] forms = text[i] switch
+        {
+            '\\' when c is '"' or '\\' or '/' => ["\\" + c, $"\\u{(int)c:X4}"],
+            '\\' => [$"\\u{(int)c:X4}"],
+            '%' when !char.IsSurrogate(c) => [string.Concat(Encoding.UTF8.GetBytes(c.ToString()).Select(b => $"%{b:X2}"))],
+            _ => [],
+        };
+        var cut = false;
+        foreach (var form in forms)
+        {
+            var available = Math.Min(form.Length, text.Length - i);
+            if (string.Compare(text, i, form, 0, available, StringComparison.OrdinalIgnoreCase) != 0) continue;
+            if (available == form.Length) return (form.Length, false);
+            cut = true;
+        }
+        return (0, cut);
     }
 
     /// <summary>
@@ -405,11 +486,12 @@ internal static class ProviderHttp
     }
 
     /// <summary>
-    /// Sends the request and decodes a 2xx JSON body of at most <see cref="JsonLimit"/> bytes; any other status throws
+    /// Sends the request and decodes a 2xx JSON body of at most <paramref name="limit"/> bytes; any other status throws
     /// as in <see cref="StreamAsync"/>. Unlike a stream's idle timeout, the request's timeout here is total (headers
     /// and body): an accepted difference, as these bodies are small and come at once.
     /// </summary>
-    public static async Task<T> GetJsonAsync<T>(HttpClient client, HttpRequestMessage request, CancellationToken cancellationToken)
+    public static async Task<T> GetJsonAsync<T>(
+        HttpClient client, HttpRequestMessage request, CancellationToken cancellationToken, int limit = JsonLimit)
         where T : class
     {
         using var timeout = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
@@ -418,34 +500,126 @@ internal static class ProviderHttp
         {
             using var response = await client.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, timeout.Token);
             await using var body = await response.Content.ReadAsStreamAsync(timeout.Token);
-            if (response.IsSuccessStatusCode) return await ReadJsonAsync(body, timeout.Token);
+            if (response.IsSuccessStatusCode) return await ReadJsonAsync(body, limit, null, timeout.Token);
             var (prefix, truncated) = await ReadErrorAsync(body, request, timeout.Token);
             throw LLMException.HttpStatus((int)response.StatusCode, RedactedPrefix(prefix, request, truncated));
         }, cancellationToken);
         return JsonSerializer.Deserialize<T>(data, Json) ?? throw new JsonException("Expected a JSON object.");
     }
 
-    /// <summary>The whole body; past <see cref="JsonLimit"/> the response is refused.</summary>
-    private static async Task<byte[]> ReadJsonAsync(Stream body, CancellationToken cancellationToken)
+    /// <summary>
+    /// Sends the request <paramref name="makeRequest"/> builds and passes a 2xx body of at most <paramref name="limit"/>
+    /// bytes and the headers to <paramref name="read"/>; any other status throws as in <see cref="StreamAsync"/>, and a
+    /// provider error <paramref name="read"/> throws (a message from the vendor) is redacted and cut like an error body.
+    /// The request's timeout is an idle timeout, as in Swift: it restarts with every chunk of the upload and of the
+    /// answer, within <see cref="RequestCeiling"/> in all. With <paramref name="retry"/>, one retry after
+    /// <see cref="RetryDelay"/> following a 5xx or a timeout when <see cref="MayRetry"/> (never a billed request); never
+    /// after a 4xx or a cancellation. <paramref name="makeRequest"/> runs again for the retry (a sent request and its
+    /// file stream cannot be sent twice).
+    /// </summary>
+    public static async Task<T> SendAsync<T>(
+        HttpClient client, Func<HttpRequestMessage> makeRequest, bool retry, int limit,
+        Func<byte[], HttpResponseHeaders, T> read, CancellationToken cancellationToken)
+    {
+        using var request = makeRequest();
+        try
+        {
+            return await SendOnceAsync(client, request, limit, read, cancellationToken);
+        }
+        catch (Exception error) when (retry && MayRetry(request) && IsRetryable(error) && !cancellationToken.IsCancellationRequested)
+        {
+            await Task.Delay(RetryDelay, cancellationToken);
+            using var again = makeRequest();
+            return await SendOnceAsync(client, again, limit, read, cancellationToken);
+        }
+    }
+
+    /// <summary>
+    /// Whether sending <paramref name="request"/> twice costs nothing: GETs (polls, key checks) and audio uploads
+    /// (AssemblyAI <c>/v2/upload</c>, Gemini Files API). Billed one-shot POSTs (transcription requests,
+    /// <c>generateContent</c>, AssemblyAI <c>/v2/transcript</c>) are sent once, since a retry after a lost answer could
+    /// start a second paid job. Pure, for tests.
+    /// </summary>
+    public static bool MayRetry(HttpRequestMessage request)
+    {
+        if (request.Method == HttpMethod.Get || request.Method == HttpMethod.Head) return true;
+        if (request.Method != HttpMethod.Post) return false;
+        var path = request.RequestUri?.AbsolutePath ?? "";
+        return path is "/v2/upload" or "/upload/v1beta/files";
+    }
+
+    /// <summary>A 5xx or a timeout (not a connection failure, as in Swift).</summary>
+    private static bool IsRetryable(Exception error) =>
+        error is TimeoutException || error is LLMException { Kind: LLMErrorKind.HttpStatus, StatusCode: >= 500 and < 600 };
+
+    private static async Task<T> SendOnceAsync<T>(
+        HttpClient client, HttpRequestMessage request, int limit, Func<byte[], HttpResponseHeaders, T> read,
+        CancellationToken cancellationToken)
+    {
+        var idle = TimeoutOf(request);
+        var elapsed = Stopwatch.StartNew();
+        using var timeout = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        void Restart()
+        {
+            var left = RequestCeiling - elapsed.Elapsed;
+            try
+            {
+                timeout.CancelAfter(left < idle ? (left > TimeSpan.Zero ? left : TimeSpan.Zero) : idle);
+            }
+            catch (ObjectDisposedException)
+            {
+                // The handler may still write the body after the answer came (an early error status).
+            }
+        }
+        Restart();
+        if (request.Content is { } content) request.Content = new ProgressContent(content, Restart);
+        return await Timed(async () =>
+        {
+            using var response = await client.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, timeout.Token);
+            await using var body = await response.Content.ReadAsStreamAsync(timeout.Token);
+            if (!response.IsSuccessStatusCode)
+            {
+                var (prefix, truncated) = await ReadErrorAsync(body, request, timeout.Token);
+                throw LLMException.HttpStatus((int)response.StatusCode, RedactedPrefix(prefix, request, truncated));
+            }
+            var data = await ReadJsonAsync(body, limit, Restart, timeout.Token);
+            try
+            {
+                return read(data, response.Headers);
+            }
+            catch (LLMException error) when (error.Kind == LLMErrorKind.Provider)
+            {
+                throw LLMException.Provider(RedactedPrefix(error.Message, request));
+            }
+        }, cancellationToken);
+    }
+
+    /// <summary>
+    /// The whole body; past <paramref name="limit"/> the response is refused. <paramref name="progress"/> runs after each
+    /// chunk.
+    /// </summary>
+    private static async Task<byte[]> ReadJsonAsync(Stream body, int limit, Action? progress, CancellationToken cancellationToken)
     {
         var buffer = new byte[16 * 1024];
         using var data = new MemoryStream();
         while (await body.ReadAsync(buffer, cancellationToken) is var count and > 0)
         {
             data.Write(buffer, 0, count);
-            if (data.Length > JsonLimit) throw LLMException.Provider("The provider's response is larger than 32 MB.");
+            if (data.Length > limit) throw LLMException.Provider($"The provider's response is larger than {limit / (1024 * 1024)} MB.");
+            progress?.Invoke();
         }
         return data.ToArray();
     }
 
     /// <summary>
-    /// The start of an error body: <see cref="ErrorBodyLimit"/> plus the longest key, so a key that starts within the
-    /// kept part is read whole and redacted; and whether the body went on.
+    /// The start of an error body: <see cref="ErrorBodyLimit"/> plus the longest form a key can take, so a key that
+    /// starts within the kept part is read whole and redacted; and whether the body went on (then a key cut off at the
+    /// end of the read, in any form and after a body of any script, is dropped by <see cref="RedactedPrefix"/>).
     /// </summary>
     private static async Task<(string Text, bool Truncated)> ReadErrorAsync(
         Stream body, HttpRequestMessage request, CancellationToken cancellationToken)
     {
-        var limit = ErrorBodyLimit + Secrets(request).Select(Encoding.UTF8.GetByteCount).DefaultIfEmpty(0).Max();
+        var limit = ErrorBodyLimit + MaxEscapedLength(Secrets(request));
         var text = await ReadPrefixAsync(body, limit, cancellationToken);
         return (text.Text, text.Length == limit);
     }
@@ -491,6 +665,69 @@ internal static class ProviderHttp
     }
 
     private static string Utf8(byte[] bytes, int length) => Encoding.UTF8.GetString(bytes, 0, length);
+
+    /// <summary><paramref name="inner"/>, calling <paramref name="progress"/> after each chunk the handler sends.</summary>
+    private sealed class ProgressContent : HttpContent
+    {
+        private readonly HttpContent _inner;
+        private readonly Action _progress;
+
+        public ProgressContent(HttpContent inner, Action progress)
+        {
+            _inner = inner;
+            _progress = progress;
+            foreach (var (name, values) in inner.Headers)
+                if (name != "Content-Length") Headers.TryAddWithoutValidation(name, values);
+        }
+
+        protected override Task SerializeToStreamAsync(Stream stream, TransportContext? context) =>
+            SerializeToStreamAsync(stream, context, CancellationToken.None);
+
+        protected override Task SerializeToStreamAsync(Stream stream, TransportContext? context, CancellationToken cancellationToken) =>
+            _inner.CopyToAsync(new ProgressStream(stream, _progress), context, cancellationToken);
+
+        protected override bool TryComputeLength(out long length)
+        {
+            length = _inner.Headers.ContentLength ?? -1;
+            return length >= 0;
+        }
+
+        protected override void Dispose(bool disposing)
+        {
+            if (disposing) _inner.Dispose();
+            base.Dispose(disposing);
+        }
+    }
+
+    /// <summary>A write-only view of <paramref name="inner"/> that calls <paramref name="progress"/> after each write.</summary>
+    private sealed class ProgressStream(Stream inner, Action progress) : Stream
+    {
+        public override bool CanRead => false;
+        public override bool CanSeek => false;
+        public override bool CanWrite => true;
+        public override long Length => throw new NotSupportedException();
+        public override long Position { get => throw new NotSupportedException(); set => throw new NotSupportedException(); }
+        public override void Flush() => inner.Flush();
+        public override Task FlushAsync(CancellationToken cancellationToken) => inner.FlushAsync(cancellationToken);
+        public override int Read(byte[] buffer, int offset, int count) => throw new NotSupportedException();
+        public override long Seek(long offset, SeekOrigin origin) => throw new NotSupportedException();
+        public override void SetLength(long value) => throw new NotSupportedException();
+
+        public override void Write(byte[] buffer, int offset, int count)
+        {
+            inner.Write(buffer, offset, count);
+            progress();
+        }
+
+        public override async ValueTask WriteAsync(ReadOnlyMemory<byte> buffer, CancellationToken cancellationToken = default)
+        {
+            await inner.WriteAsync(buffer, cancellationToken);
+            progress();
+        }
+
+        public override Task WriteAsync(byte[] buffer, int offset, int count, CancellationToken cancellationToken) =>
+            WriteAsync(buffer.AsMemory(offset, count), cancellationToken).AsTask();
+    }
 }
 
 /// <summary>

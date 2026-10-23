@@ -30,7 +30,7 @@ public sealed class AnthropicClient : ILLMProvider
     public async Task<IReadOnlyList<string>> ListModelsAsync(CancellationToken cancellationToken = default)
     {
         using var request = MakeModelsRequest(Config, _apiKey);
-        return (await ProviderHttp.GetJsonAsync<ModelList>(_http, request, cancellationToken)).Data.Select(m => m.Id).ToList();
+        return (await ProviderHttp.GetJsonAsync<ModelList>(_http, request, cancellationToken, ProviderHttp.SmallJsonLimit)).Data.Select(m => m.Id).ToList();
     }
 
     public ValueTask<int> ContextWindowAsync(string model, CancellationToken cancellationToken = default) =>
