@@ -57,6 +57,9 @@ public static class AudioSessions
         }
     }
 
+    /// <summary><paramref name="rootPid"/> and its descendants now (WindowFollower); just the root when the snapshot fails.</summary>
+    internal static HashSet<int> ProcessTree(int rootPid) => Tree(rootPid, Snapshot());
+
     private readonly record struct ProcessEntry(int Pid, int ParentPid, string Exe);
 
     /// <summary>Pid → whether one of its sessions is active, for every pid with a session that has not expired.</summary>
