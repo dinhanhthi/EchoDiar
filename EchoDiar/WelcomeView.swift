@@ -4,7 +4,7 @@ import SwiftUI
 /// ended): the logo, "Welcome to EchoDiar" and a hint to pick a conversation in the sidebar. With an empty library and
 /// nothing recording, it invites the first recording instead: the shortcut that starts one and a Record button
 /// ("Starting…" while the recording starts).
-/// Straight on the window's glass, like Settings' About section; padded like `TranscriptView`'s panes.
+/// In a card filling the detail, like `TranscriptView`'s panes.
 struct WelcomeView: View {
     let model: AppModel
 
@@ -48,8 +48,10 @@ struct WelcomeView: View {
         }
         .multilineTextAlignment(.center)
         .frame(maxWidth: 360)
-        .padding(12)
+        .padding(20)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .modifier(GlassCard(cornerRadius: 20))
+        .padding(12)
     }
 
     /// The library is empty and no recording runs (one starting keeps the invite, as the sidebar is still empty).
