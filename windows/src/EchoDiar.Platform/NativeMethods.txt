@@ -81,3 +81,10 @@ IsIconic
 GetWindowThreadProcessId
 GetAncestor
 DwmGetWindowAttribute
+IsWindow
+SetWindowsHookEx
+UnhookWindowsHookEx
+CallNextHookEx
+HOOKPROC
+HCBT_ACTIVATE
+GetCurrentThreadId

@@ -19,7 +19,10 @@ namespace EchoDiar.App.Services;
 /// prompt (Phase 20). Its top-right corner stays put while its content grows or shrinks. Drags are saved per monitor
 /// (default: the work area's top-right corner); with "Attach to meeting window" it follows the recorded app's largest
 /// window instead, at the offset it was dragged to from that window's top-right corner (default: just inside it).
-/// <para>UI thread only. <see cref="Dispose"/> closes the window: call it when the main window closes.</para>
+/// <para>
+/// UI thread only. Only <see cref="Dispose"/> closes the window: call it when the main window closes. A close by the
+/// user or the system (Alt+F4) is cancelled; a window destroyed anyway is dropped and made again on the next show.
+/// </para>
 /// </summary>
 internal sealed class FloatingPillController : IDisposable
 {
@@ -30,6 +33,7 @@ internal sealed class FloatingPillController : IDisposable
     private readonly Window _mainWindow;
     private readonly DispatcherQueueTimer _saveTimer;
     private FloatingPillWindow? _window;
+    private AppWindow? _appWindow;
     private nint _hwnd;
     private bool _shown;
     private bool _mainActive;
@@ -40,6 +44,12 @@ internal sealed class FloatingPillController : IDisposable
 
     /// <summary>The window's frame was set once: later shows start from the monitor it is on.</summary>
     private bool _placed;
+
+    /// <summary>The size the window's capsule region was last made for.</summary>
+    private SizeInt32 _shapedSize;
+
+    /// <summary>A refused activation of the pill was traced (once per launch, with its stack).</summary>
+    private bool _activationTraced;
 
     /// <summary>The next <see cref="Place"/> starts from the saved spot; otherwise it keeps the top-right corner.</summary>
     private bool _restoreSaved = true;
@@ -62,46 +72,51 @@ internal sealed class FloatingPillController : IDisposable
         _saveTimer.Tick += (_, _) => SavePosition();
         _model.PropertyChanged += OnModelChanged;
         _mainWindow.Activated += OnMainActivated;
+        PillWindowStyle.ActivationRefused += OnActivationRefused;
         Evaluate();
     }
 
     /// <summary>
     /// Saves a drag still waiting for its delay (quietly: the main window is closing), lets go of the meeting window,
-    /// and closes the pill's window.
+    /// and closes the pill's window, even when one of the steps before fails (an open window keeps the app alive).
     /// </summary>
     public void Dispose()
     {
         if (_disposed) return;
         _disposed = true;
-        _model.PropertyChanged -= OnModelChanged;
+        var window = _window;
         try
         {
-            _mainWindow.Activated -= OnMainActivated;
+            _model.PropertyChanged -= OnModelChanged;
+            PillWindowStyle.ActivationRefused -= OnActivationRefused;
+            try
+            {
+                _mainWindow.Activated -= OnMainActivated;
+            }
+            catch (Exception e)
+            {
+                // The main window is closing and may refuse calls; the handler checks _disposed anyway.
+                Debug.WriteLine($"EchoDiar: could not detach from the main window: {e.Message}");
+            }
+            if (_saveTimer.IsRunning)
+            {
+                _saveTimer.Stop();
+                SavePosition(quietly: true);
+            }
+            StopFollowing();
         }
-        catch (Exception e)
+        finally
         {
-            // The main window is closing and may refuse calls; the handler checks _disposed anyway.
-            Debug.WriteLine($"EchoDiar: could not detach from the main window: {e.Message}");
-        }
-        if (_saveTimer.IsRunning)
-        {
-            _saveTimer.Stop();
-            SavePosition(quietly: true);
-        }
-        StopFollowing();
-        if (_window is not { } window) return;
-        window.ContentSizeChanged -= OnContentSizeChanged;
-        window.Dragged -= OnDragged;
-        window.AppWindow.Changed -= OnAppWindowChanged;
-        window.Detach();
-        _window = null;
-        try
-        {
-            window.Close();
-        }
-        catch (Exception e)
-        {
-            Debug.WriteLine($"EchoDiar: could not close the pill: {e}");
+            DropWindow();
+            try
+            {
+                // _disposed is set: OnClosing lets this close through.
+                window?.Close();
+            }
+            catch (Exception e)
+            {
+                Debug.WriteLine($"EchoDiar: could not close the pill: {e}");
+            }
         }
     }
 
@@ -138,6 +153,8 @@ internal sealed class FloatingPillController : IDisposable
     /// </summary>
     private void Evaluate()
     {
+        // Never style, show or hide a destroyed window: a new one is made below when the pill shows.
+        if (_window is not null && !PillWindowStyle.IsAlive(_hwnd)) DropWindow();
         var settings = _model.Settings;
         var showPill = settings.ShowPill || _model.AutoStartedAppName is not null;
         var indicator = _model.IsRecording && showPill && !(settings.HidePillWhenAppActive && _mainActive);
@@ -158,8 +175,8 @@ internal sealed class FloatingPillController : IDisposable
     }
 
     /// <summary>
-    /// The window, made once: no border or title bar, not resizable, then the pill style (tool window, no activation,
-    /// topmost), before it is first shown.
+    /// The window, made once (again after it was destroyed): no border or title bar, not resizable, then the pill
+    /// style (tool window, never activated, topmost), before it is first shown.
     /// </summary>
     private void EnsureWindow()
     {
@@ -174,9 +191,71 @@ internal sealed class FloatingPillController : IDisposable
         _hwnd = Win32Interop.GetWindowFromWindowId(appWindow.Id);
         if (!PillWindowStyle.Apply(_hwnd)) Debug.WriteLine("EchoDiar: the pill's window style was not fully applied.");
         appWindow.Changed += OnAppWindowChanged;
+        appWindow.Closing += OnClosing;
+        window.Closed += OnWindowClosed;
         window.ContentSizeChanged += OnContentSizeChanged;
         window.Dragged += OnDragged;
         _window = window;
+        _appWindow = appWindow;
+    }
+
+    /// <summary>
+    /// Lets go of the window (closed, destroyed, or the controller is disposing): the next show makes a new one, placed
+    /// from the main window's monitor at the saved spot. Never throws.
+    /// </summary>
+    private void DropWindow()
+    {
+        if (_window is not { } window) return;
+        _window = null;
+        _saveTimer.Stop();
+        StopFollowing();
+        PillWindowStyle.Release(_hwnd);
+        _hwnd = 0;
+        _shown = false;
+        _placed = false;
+        _shapedSize = default;
+        try
+        {
+            window.Closed -= OnWindowClosed;
+            window.ContentSizeChanged -= OnContentSizeChanged;
+            window.Dragged -= OnDragged;
+            // Detach unsubscribes from the model before it touches the content, which may be gone.
+            window.Detach();
+            if (_appWindow is { } appWindow)
+            {
+                appWindow.Changed -= OnAppWindowChanged;
+                appWindow.Closing -= OnClosing;
+            }
+        }
+        catch (Exception e)
+        {
+            Debug.WriteLine($"EchoDiar: could not let go of the pill's window: {e.Message}");
+        }
+        _appWindow = null;
+    }
+
+    /// <summary>Alt+F4 or the system asked the pill to close: only <see cref="Dispose"/> closes it.</summary>
+    private void OnClosing(AppWindow sender, AppWindowClosingEventArgs args)
+    {
+        if (_disposed) return;
+        args.Cancel = true;
+        Debug.WriteLine("EchoDiar: refused to close the pill.");
+    }
+
+    /// <summary>The window closed anyway (not by <see cref="Dispose"/>): a new one shows next time.</summary>
+    private void OnWindowClosed(object sender, WindowEventArgs args)
+    {
+        if (_disposed || !ReferenceEquals(sender, _window)) return;
+        StartupTrace.Write("The pill's window closed: a new one shows next time.");
+        DropWindow();
+    }
+
+    /// <summary>Traces the first refused activation with its stack (the caller's), which tells what asked for it.</summary>
+    private void OnActivationRefused()
+    {
+        if (_disposed || _activationTraced) return;
+        _activationTraced = true;
+        StartupTrace.Write($"Refused to activate the pill (traced once):{Environment.NewLine}{Environment.StackTrace}");
     }
 
     /// <summary>
@@ -191,7 +270,9 @@ internal sealed class FloatingPillController : IDisposable
             _captureRefused = refused;
             var message = refused
                 ? "Windows refused to leave the pill out of screen captures: the pill stays hidden."
-                : "The pill is left out of screen captures again.";
+                : shown
+                    ? "The pill shows in screen captures, as set."
+                    : "The pill is left out of screen captures again.";
             Debug.WriteLine($"EchoDiar: {message}");
             StartupTrace.Write(message);
         }
@@ -264,8 +345,10 @@ internal sealed class FloatingPillController : IDisposable
         _placed = true;
         window.AppWindow.MoveAndResize(frame);
         // At once, not only in AppWindow.Changed: until then the old capsule clips the grown window and leaves stale
-        // pixels where the new content goes. The region's redraw repaints the whole window.
-        PillWindowStyle.UpdateShape(_hwnd);
+        // pixels where the new content goes. Only when the size changed: the region's redraw repaints the whole
+        // window, and following a window moves it on every LOCATIONCHANGE.
+        var size = new SizeInt32(frame.Width, frame.Height);
+        if (!size.Equals(_shapedSize) && PillWindowStyle.UpdateShape(_hwnd)) _shapedSize = size;
     }
 
     /// <summary>The pill's frame once placed; before that the main window's, whose monitor it first shows on.</summary>

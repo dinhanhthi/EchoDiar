@@ -3,7 +3,8 @@
     The floating pill (macOS FloatingPillView.swift): the logo, the recording dot, "Recording <App>" after an automatic
     start, the elapsed time and a level meter; Pause or Resume, Stop and the language menu while the pointer is over it.
     A prompt (Phase 20) takes the indicator's place. The capsule sizes to its content inside a Canvas, so its size is
-    the window's, which the controller sets; the window's region clips it to the capsule.
+    the window's, which the controller sets; the window's region clips it to the capsule. Its buttons never take the
+    focus: focus would activate the window, which would then take the foreground (and Alt+F4) from the meeting app.
 -->
 <Window
     x:Class="EchoDiar.App.Views.FloatingPillWindow"
@@ -61,6 +62,8 @@
                 <StackPanel x:Name="Controls" Orientation="Horizontal" Visibility="Collapsed">
                     <Button
                         x:Name="PauseButton"
+                        AllowFocusOnInteraction="False"
+                        IsTabStop="False"
                         MinWidth="0"
                         MinHeight="0"
                         VerticalAlignment="Center"
@@ -69,6 +72,8 @@
                     </Button>
                     <Button
                         x:Name="StopButton"
+                        AllowFocusOnInteraction="False"
+                        IsTabStop="False"
                         MinWidth="0"
                         MinHeight="0"
                         VerticalAlignment="Center"
@@ -83,6 +88,8 @@
                     </Button>
                     <Button
                         x:Name="LanguageButton"
+                        AllowFocusOnInteraction="False"
+                        IsTabStop="False"
                         MinWidth="0"
                         MinHeight="0"
                         VerticalAlignment="Center"

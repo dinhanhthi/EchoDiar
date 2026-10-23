@@ -42,13 +42,31 @@ public static class PillWindowStyle
     /// <summary>Gap between the pill and the work area's or the meeting window's corner, in DIPs (macOS <c>inset</c>).</summary>
     public const double Inset = 8;
 
+    /// <summary>Rooted for the process's life: a collected delegate behind a live hook would crash.</summary>
+    private static readonly HOOKPROC CbtCallback = OnCbt;
+
+    /// <summary>The pill windows whose activation is refused. UI thread only.</summary>
+    private static readonly HashSet<HWND> Guarded = [];
+
+    /// <summary>The UI thread's CBT hook while <see cref="Guarded"/> has a window.</summary>
+    private static HHOOK _cbtHook;
+
+    /// <summary>
+    /// Something on the UI thread tried to activate a pill and was refused; raised on the stack that asked for it:
+    /// WS_EX_NOACTIVATE only stops activation by a click, not by <c>SetFocus</c> or <c>SetWindowPos</c>.
+    /// </summary>
+    public static event Action? ActivationRefused;
+
     /// <summary>
     /// WS_EX_TOOLWINDOW, WS_EX_NOACTIVATE and topmost (through <c>SetWindowPos(HWND_TOPMOST)</c>: setting
-    /// WS_EX_TOPMOST alone does not take), plus the DWM round corner preference. False when Windows refused.
+    /// WS_EX_TOPMOST alone does not take), plus the DWM round corner preference; from then on the UI thread refuses to
+    /// activate the window, so it never takes the foreground (or Alt+F4) from the meeting app or the main window.
+    /// Call it on the window's thread; <see cref="Release"/> when the window closes. False when Windows refused.
     /// </summary>
     public static unsafe bool Apply(nint hwnd)
     {
         var window = (HWND)hwnd;
+        var guarded = Guard(window);
         var style = (WINDOW_EX_STYLE)PInvoke.GetWindowLong(window, WINDOW_LONG_PTR_INDEX.GWL_EXSTYLE);
         style = (style | WINDOW_EX_STYLE.WS_EX_TOOLWINDOW | WINDOW_EX_STYLE.WS_EX_NOACTIVATE | WINDOW_EX_STYLE.WS_EX_TOPMOST)
             & ~WINDOW_EX_STYLE.WS_EX_APPWINDOW;
@@ -60,7 +78,52 @@ public static class PillWindowStyle
         var corner = DWM_WINDOW_CORNER_PREFERENCE.DWMWCP_ROUND;
         var rounded = PInvoke.DwmSetWindowAttribute(
             window, DWMWINDOWATTRIBUTE.DWMWA_WINDOW_CORNER_PREFERENCE, &corner, (uint)sizeof(DWM_WINDOW_CORNER_PREFERENCE));
-        return placed && rounded.Succeeded;
+        return guarded && placed && rounded.Succeeded;
+    }
+
+    /// <summary>The window closed or is being dropped: its activation is no longer refused (handles are reused).</summary>
+    public static void Release(nint hwnd)
+    {
+        if (!Guarded.Remove((HWND)hwnd) || Guarded.Count > 0 || _cbtHook.IsNull) return;
+        PInvoke.UnhookWindowsHookEx(_cbtHook);
+        _cbtHook = default;
+    }
+
+    /// <summary>False once the window is destroyed (closed by the system or the user).</summary>
+    public static bool IsAlive(nint hwnd) => hwnd != 0 && PInvoke.IsWindow((HWND)hwnd);
+
+    /// <summary>
+    /// Refuses the window's activation through a CBT hook on the calling thread, which sees every activation of its
+    /// windows before it happens, whatever asks for it (XAML focusing its content on a press, a move without
+    /// SWP_NOACTIVATE). False when the hook could not be set.
+    /// </summary>
+    private static bool Guard(HWND window)
+    {
+        if (_cbtHook.IsNull)
+        {
+            _cbtHook = PInvoke.SetWindowsHookEx(WINDOWS_HOOK_ID.WH_CBT, CbtCallback, HINSTANCE.Null, PInvoke.GetCurrentThreadId());
+            if (_cbtHook.IsNull) return false;
+        }
+        Guarded.Add(window);
+        return true;
+    }
+
+    /// <summary>A nonzero result for HCBT_ACTIVATE prevents the activation. Never throws (a native callback).</summary>
+    private static LRESULT OnCbt(int code, WPARAM wParam, LPARAM lParam)
+    {
+        if (code == PInvoke.HCBT_ACTIVATE && Guarded.Contains((HWND)(nint)(nuint)wParam))
+        {
+            try
+            {
+                ActivationRefused?.Invoke();
+            }
+            catch
+            {
+                // A logging failure must not reach native code; the activation is refused anyway.
+            }
+            return (LRESULT)1;
+        }
+        return PInvoke.CallNextHookEx(HHOOK.Null, code, wParam, lParam);
     }
 
     /// <summary>
