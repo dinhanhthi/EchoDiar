@@ -17,7 +17,7 @@ public sealed partial class GeneralSettingsPage : UserControl
 {
     /// <summary>
     /// The consent message people are told (macOS <c>consentMessage</c>, "on my Mac" made "on my PC"); the onboarding's
-    /// consent step (task 19.4) shows the same text.
+    /// consent step shows the same text.
     /// </summary>
     public const string ConsentMessage = "Heads up: I'm recording this call to take notes. The recording stays on my PC.";
 
@@ -31,6 +31,7 @@ public sealed partial class GeneralSettingsPage : UserControl
         new("Indicator size", ["floating indicator", "pill", "small", "medium", "large"]),
         new("Delete conversations without confirmation", ["confirm", "Recycle Bin", "trash", "library"]),
         new("Copy consent message", ["consent", "privacy", "tell people"]),
+        new("Show onboarding again", ["permissions", "welcome", "setup"]),
     ];
 
     private readonly AppViewModel _model;
@@ -56,6 +57,7 @@ public sealed partial class GeneralSettingsPage : UserControl
         };
         DeleteToggle.Toggled += (_, _) => Set(() => _settings.DeleteWithoutConfirmation = DeleteToggle.IsOn);
         CopyConsentButton.Click += (_, _) => CopyConsent();
+        ShowOnboardingButton.Click += (_, _) => _model.ShowOnboarding();
 
         Loaded += (_, _) =>
         {
@@ -114,18 +116,25 @@ public sealed partial class GeneralSettingsPage : UserControl
     /// <summary>The message on the clipboard; the button says "Copied" from then on (macOS).</summary>
     private void CopyConsent()
     {
+        if (!CopyConsentMessage()) return;
+        CopyConsentText.Text = Loc.T("Copied");
+        CopyConsentIcon.Glyph = "";
+    }
+
+    /// <summary>Puts <see cref="ConsentMessage"/> on the clipboard (here and in the onboarding); false when it failed.</summary>
+    internal static bool CopyConsentMessage()
+    {
         var package = new DataPackage();
         package.SetText(Loc.T(ConsentMessage));
         try
         {
             Clipboard.SetContent(package);
+            return true;
         }
         catch (Exception e)
         {
             System.Diagnostics.Debug.WriteLine($"EchoDiar: could not copy the consent message: {e}");
-            return;
+            return false;
         }
-        CopyConsentText.Text = Loc.T("Copied");
-        CopyConsentIcon.Glyph = "";
     }
 }

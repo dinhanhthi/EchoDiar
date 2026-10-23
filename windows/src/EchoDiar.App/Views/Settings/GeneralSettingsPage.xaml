@@ -1,9 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!--
     Settings › General (macOS GeneralSettingsView.swift): launch at login, the floating indicator, deleting without
-    confirmation and the consent message, as Windows 11 Settings cards under section headers. The "Permissions and
-    consent" section's "Show onboarding again" comes with the onboarding (task 19.4). Each searchable card's Tag is its search entry's title
-    (SearchEntries), so a search result can bring it into view.
+    confirmation, the consent message and "Show onboarding again", as Windows 11 Settings cards under section headers.
+    Each searchable card's Tag is its search entry's title (SearchEntries), so a search result can bring it into view.
 -->
 <UserControl
     x:Class="EchoDiar.App.Views.GeneralSettingsPage"
@@ -107,6 +106,14 @@
                         <TextBlock x:Name="CopyConsentText" Text="{local:T Text='Copy consent message'}" />
                     </StackPanel>
                 </Button>
+            </controls:SettingsCard>
+
+            <!-- macOS: a section of its own, without a header. -->
+            <controls:SettingsCard
+                Margin="0,24,0,0"
+                Header="{local:T Text='Permissions and consent'}"
+                Tag="Show onboarding again">
+                <Button x:Name="ShowOnboardingButton" Content="{local:T Text='Show onboarding again'}" />
             </controls:SettingsCard>
         </StackPanel>
     </ScrollViewer>

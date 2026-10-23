@@ -1,6 +1,7 @@
 using System.Diagnostics;
 using EchoDiar.App.Services;
 using EchoDiar.App.ViewModels;
+using EchoDiar.App.Views;
 using EchoDiar.Core;
 using Microsoft.UI.Dispatching;
 using Microsoft.UI.Windowing;
@@ -21,6 +22,7 @@ public partial class App : Application
     private AppServices? _services;
     private AppViewModel? _model;
     private FloatingPillController? _pill;
+    private OnboardingWindow? _onboarding;
 
 #if DEBUG
     /// <summary>DEBUG <c>--no-backdrop</c>: the window paints the theme's solid background instead of setting a system backdrop (A/B in a VM).</summary>
@@ -84,10 +86,15 @@ public partial class App : Application
             // window, even hidden, would keep the app running).
             _pill?.Dispose();
             _pill = null;
+            // An open onboarding window would keep the app running too; closing it lets go of its mic and loopback.
+            _onboarding?.Close();
+            _onboarding = null;
             // A closed window fails every call: a redirected launch queued meanwhile finds none.
             _window = null;
             Shutdown();
         };
+        // At launch (after the main window shows, once the settings are loaded) and from Settings › General.
+        _model.OnboardingRequested += ShowOnboarding;
         StartupTrace.Write("begin Activate");
         _window.Activate();
         StartupTrace.Write("end Activate");
@@ -113,6 +120,31 @@ public partial class App : Application
         }
         _window.AppWindow.Show();
         _window.Activate();
+    }
+
+    /// <summary>The onboarding in front: a new window from its first step, or the open one brought back.</summary>
+    private void ShowOnboarding()
+    {
+        if (_window is null || _model is null) return;
+        // Raised inside the launch: a failure here must not stop the library from loading.
+        try
+        {
+            if (_onboarding is null)
+            {
+                var onboarding = new OnboardingWindow(_model, _window.AppWindow.Id);
+                onboarding.Closed += (_, _) =>
+                {
+                    if (_onboarding == onboarding) _onboarding = null;
+                };
+                _onboarding = onboarding;
+            }
+            _onboarding.Activate();
+        }
+        catch (Exception e)
+        {
+            Debug.WriteLine($"EchoDiar: could not show the onboarding: {e}");
+            StartupTrace.Write($"onboarding failed: {e.GetType().Name} {e.Message}");
+        }
     }
 
     /// <summary>The window closed: a running recording is stopped so its audio file is finished.</summary>

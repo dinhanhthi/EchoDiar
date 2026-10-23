@@ -248,6 +248,8 @@ public sealed partial class AppViewModel : ObservableObject
         FollowRouteChanges();
         _recovery = LoadAndRecoverAsync();
         await _recovery;
+        // With the settings, before the library (macOS AppModel.start()).
+        if (!Settings.OnboardingCompleted && !_closing) OnboardingRequested?.Invoke();
         StartupTrace.Write("begin library load");
         var list = await _services.Library.RefreshAsync();
         StartupTrace.Write($"end library load ({list.Count} conversations)");
@@ -377,6 +379,23 @@ public sealed partial class AppViewModel : ObservableObject
     }
 
     public void ShowRecording() => Route = Route.Recording;
+
+    /// <summary>
+    /// The onboarding window should show, from its first step (macOS <c>OnboardingWindow.shared.show</c>): at launch
+    /// until it is completed, and from "Show onboarding again". Raised on the UI thread.
+    /// </summary>
+    public event Action? OnboardingRequested;
+
+    /// <summary>"Show onboarding again" in General: not completed until Done again (macOS AppModel <c>showOnboarding</c>).</summary>
+    public void ShowOnboarding()
+    {
+        if (_closing) return;
+        ApplySettings(Settings with { OnboardingCompleted = false });
+        OnboardingRequested?.Invoke();
+    }
+
+    /// <summary>The onboarding's Done: saved through the settings queue like every settings change.</summary>
+    public void CompleteOnboarding() => ApplySettings(Settings with { OnboardingCompleted = true });
 
     /// <summary>
     /// Back: a conversation or the recording goes to the list; Settings goes to the page it was opened from, or the list
