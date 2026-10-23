@@ -79,7 +79,8 @@ public sealed class CLIRunner : ILLMProvider
     private readonly ShellEnvironment _shell;
 
     /// <param name="executableOverride">The path set in settings (a <c>.exe</c> or npm <c>.cmd</c>); null or empty to search PATH.</param>
-    /// <param name="onStarted">Called with the CLI's process right after it starts (Phase 23.4 puts it in the job object).</param>
+    /// <param name="onStarted">Called with the CLI's process right after it starts (Phase 23.4 puts it in the job object). It must
+    /// not wait for the process to exit: the run owns the one WaitForExitAsync (a second concurrent one can hang).</param>
     public CLIRunner(CLIPreset preset, string? executableOverride = null, TimeSpan? timeout = null, Action<Process>? onStarted = null)
         : this(preset, executableOverride, timeout, onStarted, ShellEnvironment.Shared)
     {
