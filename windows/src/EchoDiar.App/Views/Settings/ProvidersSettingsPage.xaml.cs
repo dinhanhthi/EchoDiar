@@ -1,8 +1,10 @@
 using System.ComponentModel;
+using System.Globalization;
 using CommunityToolkit.WinUI.Controls;
 using EchoDiar.AI;
 using EchoDiar.App.Services;
 using EchoDiar.App.ViewModels;
+using EchoDiar.Core.Models;
 using EchoDiar.Core.Settings;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Automation;
@@ -16,7 +18,8 @@ namespace EchoDiar.App.Views;
 /// Settings › AI (macOS ProvidersSettingsView.swift), the On this PC, Cloud APIs and CLIs inner tabs; the title bar
 /// picks the tab (<see cref="AppViewModel.SubTabOf"/>). Every change goes through <see cref="ProvidersViewModel"/> and
 /// is saved after the settings delay; API keys go to Credential Manager only and are never read back into the UI. The
-/// provider rows are made in code and updated in place, so typing in a field never rebuilds the row it is in. The local
+/// provider rows are made in code and updated in place, so typing in a field never rebuilds the row it is in; so are the
+/// GGUF model rows, whose state a download changes often. The local
 /// hosts are scanned and the CLIs looked up once, when the page first shows (macOS: once per window), then on Scan or
 /// on a new path override.
 /// </summary>
@@ -39,7 +42,8 @@ public sealed partial class ProvidersSettingsPage : UserControl
     public static IReadOnlyList<SettingsEntry> SearchEntries { get; } =
     [
         new("AI models (summaries and chat)",
-            ["LLM", "Windows AI", "Phi Silica", "local", "summary", "chat", "default model", "language"], OnThisPCTab),
+            ["LLM", "Windows AI", "Phi Silica", "local", "summary", "chat", "default model", "language", "download",
+             "GGUF", "Qwen", "Gemma", "offline"], OnThisPCTab),
         new("Chat context", ["chat", "history", "context", "messages", "memory"], OnThisPCTab),
         new("Local hosts", ["scan", "custom URL", "server", .. PresetNames(ProviderKind.Local)], OnThisPCTab),
         new("Cloud APIs",
@@ -76,6 +80,9 @@ public sealed partial class ProvidersSettingsPage : UserControl
     private readonly Dictionary<string, ApiRow> _apiRows = new(StringComparer.OrdinalIgnoreCase);
     private readonly Dictionary<CLIPreset, CliRow> _cliRows = [];
 
+    /// <summary>One row per GGUF model, made once and updated in place.</summary>
+    private readonly List<LocalModelRow> _modelRows = [];
+
     /// <summary>The controls are being set from the settings: their change events are not the user's.</summary>
     private bool _syncing;
 
@@ -93,6 +100,7 @@ public sealed partial class ProvidersSettingsPage : UserControl
         _providers = model.ProvidersModel;
         InitializeComponent();
         LanguageCard.Description = Loc.T("Auto = the transcript's language for summaries, the question's for answers.");
+        foreach (var entry in ProvidersViewModel.LocalModelEntries) LocalModelsList.Children.Add(CreateModelRow(entry));
 
         WindowsAICheckButton.Click += (_, _) => _ = _providers.RefreshWindowsAIAsync();
         ModelCombo.SelectionChanged += (_, _) => OnModelPicked();
@@ -126,11 +134,14 @@ public sealed partial class ProvidersSettingsPage : UserControl
             _providers.PropertyChanged += OnProvidersPropertyChanged;
             _providers.Changed += Refresh;
             _providers.CliStatusChanged += UpdateCliStatus;
+            _providers.LocalModelStatesChanged += UpdateModelRows;
             Refresh();
             ShowTab();
             UpdateScan();
             UpdateCliStatus();
+            UpdateModelRows();
             _ = _providers.RefreshKeysAsync();
+            _ = _providers.RefreshLocalModelsAsync();
             if (!_scanned)
             {
                 _scanned = true;
@@ -144,6 +155,7 @@ public sealed partial class ProvidersSettingsPage : UserControl
             _providers.PropertyChanged -= OnProvidersPropertyChanged;
             _providers.Changed -= Refresh;
             _providers.CliStatusChanged -= UpdateCliStatus;
+            _providers.LocalModelStatesChanged -= UpdateModelRows;
             // macOS: a test or a model list stops when its row goes away.
             foreach (var row in _apiRows.Values) row.Cancel();
             foreach (var row in _cliRows.Values) row.Cancel();
@@ -263,6 +275,117 @@ public sealed partial class ProvidersSettingsPage : UserControl
         var current = _providers.CurrentAIProvider;
         var model = current is null ? null : _providers.AIModelFor(current);
         ModelCombo.SelectedIndex = current is null ? -1 : choices.FindIndex(c => c.Provider.Id == current.Id && c.Model == model);
+    }
+
+    /// <summary>The parts of a GGUF model's row that change with its state.</summary>
+    private sealed record LocalModelRow(
+        ModelEntry Entry,
+        Border DefaultBadge,
+        TextBlock ErrorText,
+        ProgressBar Progress,
+        TextBlock PercentText,
+        Button CancelButton,
+        StackPanel InstalledLabel,
+        Button DeleteButton,
+        Button DownloadButton);
+
+    /// <summary>
+    /// A GGUF model's card (macOS <c>ModelRow</c> of an LLM): its name and Default badge (the catalog default; the model
+    /// menu below picks the one used); its details, quality, memory warning and last error below; its actions on the
+    /// right. No Set default: macOS offers it for speech and speaker models only.
+    /// </summary>
+    private SettingsCard CreateModelRow(ModelEntry entry)
+    {
+        var name = new TextBlock
+        {
+            Text = entry.DisplayName,
+            TextTrimming = TextTrimming.CharacterEllipsis,
+            TextWrapping = TextWrapping.NoWrap,
+            VerticalAlignment = VerticalAlignment.Center,
+        };
+        ToolTipService.SetToolTip(name, entry.DisplayName);
+        var badge = new Border
+        {
+            Style = (Style)Resources["DefaultBadgeStyle"],
+            Child = new TextBlock { Style = (Style)Resources["DefaultBadgeTextStyle"], Text = Loc.T("Default") },
+            Visibility = Visibility.Collapsed,
+        };
+        var header = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 8 };
+        header.Children.Add(name);
+        header.Children.Add(badge);
+
+        var description = new StackPanel { Spacing = 2 };
+        description.Children.Add(Note("NoteStyle", ModelsViewModel.Details(entry)));
+        if (ModelsViewModel.QualityNote(entry) is { } quality) description.Children.Add(Note("NoteStyle", quality));
+        if (ModelsViewModel.NeedsMuchMemory(entry))
+        {
+            // A warning only, as on macOS: the model still downloads and runs.
+            var warning = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 4 };
+            warning.Children.Add(new FontIcon { Style = (Style)Resources["CautionIconStyle"], Glyph = "\uE7BA" });
+            warning.Children.Add(Note("CautionNoteStyle", Loc.T("Needs more than half of this PC's memory.")));
+            description.Children.Add(warning);
+        }
+        var error = Note("CriticalNoteStyle");
+        error.Visibility = Visibility.Collapsed;
+        description.Children.Add(error);
+
+        var progress = new ProgressBar { Width = 90, Maximum = 1, VerticalAlignment = VerticalAlignment.Center };
+        AutomationProperties.SetName(progress, entry.DisplayName);
+        var percent = new TextBlock
+        {
+            Style = (Style)Resources["NoteStyle"],
+            VerticalAlignment = VerticalAlignment.Center,
+            MinWidth = 32,
+            TextAlignment = TextAlignment.Right,
+        };
+        var cancel = ModelButton("Cancel", entry, () => _providers.CancelLocalModelDownload(entry));
+        var installed = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 4 };
+        installed.Children.Add(new FontIcon { Style = (Style)Resources["SuccessIconStyle"], Glyph = "\uE930" });
+        installed.Children.Add(new TextBlock { Style = (Style)Resources["SuccessNoteStyle"], Text = Loc.T("Installed") });
+        var delete = ModelButton("Delete", entry, () => _ = _providers.DeleteLocalModelAsync(entry));
+        var download = ModelButton("Download", entry, () => _providers.DownloadLocalModel(entry));
+        var actions = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 8 };
+        foreach (var part in new UIElement[] { progress, percent, cancel, installed, delete, download })
+        {
+            part.Visibility = Visibility.Collapsed;
+            actions.Children.Add(part);
+        }
+
+        _modelRows.Add(new LocalModelRow(entry, badge, error, progress, percent, cancel, installed, delete, download));
+        return new SettingsCard { Header = header, Description = description, Content = actions };
+    }
+
+    /// <summary>A model row's button, named with its model for screen readers ("Download, Qwen3.5 2B").</summary>
+    private static Button ModelButton(string text, ModelEntry entry, Action click)
+    {
+        var button = new Button { Content = Loc.T(text) };
+        AutomationProperties.SetName(button, $"{Loc.T(text)}, {entry.DisplayName}");
+        button.Click += (_, _) => click();
+        return button;
+    }
+
+    /// <summary>Every GGUF row shows its model's state (macOS <c>ModelRow.actions</c>).</summary>
+    private void UpdateModelRows()
+    {
+        if (Closing) return;
+        foreach (var row in _modelRows)
+        {
+            var state = _providers.LocalModelState(row.Entry);
+            var downloading = state.Download is not null;
+            var installed = !downloading && state.IsInstalled;
+            row.DefaultBadge.Visibility = Show(state.IsDefault);
+            row.Progress.Visibility = row.PercentText.Visibility = row.CancelButton.Visibility = Show(downloading);
+            if (state.Download is { } fraction)
+            {
+                row.Progress.Value = fraction;
+                row.PercentText.Text = fraction.ToString("P0", CultureInfo.CurrentCulture);
+            }
+            row.InstalledLabel.Visibility = row.DeleteButton.Visibility = Show(installed);
+            row.DeleteButton.IsEnabled = state.CanDelete;
+            row.DownloadButton.Visibility = Show(!downloading && !state.IsInstalled);
+            row.ErrorText.Text = state.Error ?? "";
+            row.ErrorText.Visibility = Show(state.Error is not null);
+        }
     }
 
     private void OnModelPicked()

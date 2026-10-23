@@ -44,7 +44,8 @@ public sealed record CLIStatus(CLIState State, string? Path = null, string? Vers
 /// <summary>
 /// The AI providers of Settings › AI and the AI pickers (macOS ProvidersSettingsView.swift state and AppModel's provider
 /// functions): the provider configs, their API keys (Credential Manager), Windows AI's availability, the local hosts
-/// found by a scan, the subscription CLIs found on PATH, the providers the pickers offer and the default one. Registry,
+/// found by a scan, the subscription CLIs found on PATH, the GGUF models of "On this PC" (macOS <c>mlxEntries</c>: download,
+/// cancel, delete), the providers the pickers offer and the default one. Registry,
 /// disk, process, credential and HTTP work runs off the UI thread; results come back on it. Lives as long as the app
 /// (<see cref="AppViewModel.ProvidersModel"/>); on the UI thread.
 /// </summary>
@@ -69,6 +70,9 @@ public sealed partial class ProvidersViewModel : ObservableObject
     private readonly Dictionary<CLIPreset, CLIStatus> _cliStatus = [];
     private readonly Dictionary<CLIPreset, int> _cliGeneration = [];
 
+    /// <summary>Models whose Delete is under way: their Delete is off.</summary>
+    private readonly HashSet<string> _deleting = [];
+
     internal ProvidersViewModel(AppViewModel app, AppServices services)
     {
         _app = app;
@@ -85,12 +89,31 @@ public sealed partial class ProvidersViewModel : ObservableObject
     /// <summary>A CLI's lookup changed.</summary>
     public event Action? CliStatusChanged;
 
+    /// <summary>A GGUF model row's state may have changed (installs, downloads, errors, jobs).</summary>
+    public event Action? LocalModelStatesChanged;
+
     private AppSettings Settings => _app.Settings;
 
     private void OnAppChanged(object? sender, PropertyChangedEventArgs e)
     {
-        if (e.PropertyName != nameof(AppViewModel.Settings)) return;
-        RaiseChanged();
+        switch (e.PropertyName)
+        {
+            case nameof(AppViewModel.Settings):
+                RaiseChanged();
+                break;
+            case nameof(AppViewModel.InstalledModelIds):
+                // An installed GGUF model joins the pickers; a deleted one leaves them.
+                RaiseChanged();
+                LocalModelStatesChanged?.Invoke();
+                break;
+            case nameof(AppViewModel.Downloads):
+            case nameof(AppViewModel.DownloadErrors):
+            case nameof(AppViewModel.TranscriptionProgress):
+            case nameof(AppViewModel.RecordingCaptions):
+            case nameof(AppViewModel.AIJob):
+                LocalModelStatesChanged?.Invoke();
+                break;
+        }
     }
 
     private void RaiseChanged()
@@ -439,12 +462,68 @@ public sealed partial class ProvidersViewModel : ObservableObject
         CliStatusChanged?.Invoke();
     }
 
+    // In-app models
+
+    /// <summary>
+    /// The GGUF chat models "On this PC" lists, in catalog order (macOS <c>mlxEntries</c>); the embedding models are
+    /// Phase 27's (macOS lists them in RAG, not here).
+    /// </summary>
+    public static IReadOnlyList<ModelEntry> LocalModelEntries { get; } =
+        [.. ModelCatalog.Llm.Where(e => e.Runtime == ModelRuntime.Gguf)];
+
+    /// <summary>
+    /// The row of <paramref name="entry"/> as it is now (macOS <c>ModelRow</c> for an LLM): the Default badge on the
+    /// catalog default (the model menu picks the one used), the download's fraction with Cancel, Installed with Delete, or
+    /// Download. Delete is off while a transcription or the recording's transcriber runs (macOS), and while an AI job runs
+    /// (the menu may have moved on from its model): llama.cpp maps the file, which Windows then refuses to move or delete.
+    /// </summary>
+    public ModelRowState LocalModelState(ModelEntry entry)
+    {
+        var installed = _app.InstalledModelIds.Contains(entry.Id);
+        double? download = _app.Downloads.TryGetValue(entry.Id, out var fraction) ? fraction : null;
+        var busy = _app.TranscriptionProgress.Keys.Any(_app.IsTranscribing) || _app.RecordingCaptions is not null
+            || _app.AIJob is not null;
+        return new ModelRowState(
+            entry.IsDefault,
+            installed,
+            download,
+            _app.DownloadErrors.GetValueOrDefault(entry.Id),
+            UnsupportedNote: null,
+            ShowSetDefault: false,
+            CanSetDefault: false,
+            CanDownload: true,
+            CanDelete: !busy && !_deleting.Contains(entry.Id));
+    }
+
+    /// <summary>The installed models read again (macOS <c>refreshInstalledModels</c> when the tab shows).</summary>
+    public Task RefreshLocalModelsAsync() => _app.RefreshModelsAsync();
+
+    /// <summary>Downloads the model off the UI thread, SHA-256 checked, its progress on its row.</summary>
+    public void DownloadLocalModel(ModelEntry entry) => _app.DownloadModel(entry.Id);
+
+    public void CancelLocalModelDownload(ModelEntry entry) => _app.CancelDownload(entry.Id);
+
+    /// <summary>Removes the model's files, without confirmation (macOS); its Delete is off meanwhile.</summary>
+    public async Task DeleteLocalModelAsync(ModelEntry entry)
+    {
+        if (!_deleting.Add(entry.Id)) return;
+        LocalModelStatesChanged?.Invoke();
+        try
+        {
+            await _app.DeleteModelAsync(entry.Id);
+        }
+        finally
+        {
+            _deleting.Remove(entry.Id);
+            if (!_app.IsClosing) LocalModelStatesChanged?.Invoke();
+        }
+    }
+
     // The pickers
 
     /// <summary>
-    /// Windows AI (unless this PC can never run it; with why it cannot run now), then the enabled providers with what
-    /// they need: a base URL and, when they send one, a saved key (macOS <c>aiProviders</c>). The in-app GGUF models come
-    /// with Phase 25.
+    /// Windows AI (unless this PC can never run it; with why it cannot run now), the installed GGUF models, then the
+    /// enabled providers with what they need: a base URL and, when they send one, a saved key (macOS <c>aiProviders</c>).
     /// </summary>
     public IReadOnlyList<AIProviderInfo> AIProviders
     {
@@ -457,6 +536,10 @@ public sealed partial class ProvidersViewModel : ObservableObject
                 providers.Add(new AIProviderInfo(
                     entry.Id, entry.DisplayName, AIProviderKind.InApp, entry.Id, [entry.Id],
                     windowsAI.Reason is { } reason ? Loc.T(reason) : null));
+            }
+            foreach (var model in LocalModelEntries.Where(e => _app.InstalledModelIds.Contains(e.Id)))
+            {
+                providers.Add(new AIProviderInfo(model.Id, model.DisplayName, AIProviderKind.InApp, model.Id, [model.Id]));
             }
             foreach (var config in ProviderConfigs)
             {

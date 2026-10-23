@@ -2,8 +2,9 @@
 <!--
     Settings › AI (macOS ProvidersSettingsView.swift), one panel per inner tab picked in the title bar:
     - On this PC: the AI models for summaries and chat (Windows AI's state, hidden when this PC can never run it; the
-      default model and the language of summaries and answers), the chat context, and the local hosts (a scan finds
-      them, Foundry Local included; a host is added, or typed by URL).
+      GGUF models with Download, progress and Cancel, Installed and Delete; the default model and the language of
+      summaries and answers), the chat context, and the local hosts (a scan finds them, Foundry Local included; a host
+      is added, or typed by URL).
     - Cloud APIs: the API presets, then the custom OpenAI-compatible endpoints and Add Endpoint.
     - CLIs: the subscription CLIs found on this PC.
     The provider rows are made in code (ProvidersSettingsPage.*Row): an expander with the Enabled switch, and its fields
@@ -59,6 +60,23 @@
             <Setter Property="VerticalAlignment" Value="Center" />
             <Setter Property="Foreground" Value="{ThemeResource SystemFillColorSuccessBrush}" />
         </Style>
+        <Style x:Key="CautionIconStyle" TargetType="FontIcon">
+            <Setter Property="FontSize" Value="12" />
+            <Setter Property="Foreground" Value="{ThemeResource SystemFillColorCautionBrush}" />
+        </Style>
+        <!-- The one badge that must stand out: Default, in the accent colour. -->
+        <Style x:Key="DefaultBadgeStyle" TargetType="Border">
+            <Setter Property="Padding" Value="6,1,6,2" />
+            <Setter Property="VerticalAlignment" Value="Center" />
+            <Setter Property="CornerRadius" Value="{ThemeResource ControlCornerRadius}" />
+            <Setter Property="Background" Value="{ThemeResource AccentFillColorDefaultBrush}" />
+        </Style>
+        <Style
+            x:Key="DefaultBadgeTextStyle"
+            BasedOn="{StaticResource CaptionTextBlockStyle}"
+            TargetType="TextBlock">
+            <Setter Property="Foreground" Value="{ThemeResource TextOnAccentFillColorPrimaryBrush}" />
+        </Style>
         <Style x:Key="NoticeIconStyle" TargetType="FontIcon">
             <Setter Property="FontSize" Value="14" />
             <Setter Property="VerticalAlignment" Value="Center" />
@@ -93,6 +111,9 @@
                         <Button x:Name="WindowsAICheckButton" Content="{local:T Text='Check Again'}" />
                     </StackPanel>
                 </controls:SettingsCard>
+
+                <!-- The GGUF models (macOS mlxEntries' ModelRow), made in code. -->
+                <StackPanel x:Name="LocalModelsList" Spacing="4" />
 
                 <!-- The AI pane's model menu and language menu, also here (Windows: the task puts them in Settings). -->
                 <controls:SettingsCard

@@ -5,6 +5,7 @@ using EchoDiar.Core.Audio;
 using EchoDiar.Core.Model;
 using EchoDiar.Core.Models;
 using EchoDiar.Core.Settings;
+using EchoDiar.LocalLLM;
 using EchoDiar.Platform.AI;
 using EchoDiar.Platform.Audio;
 using EchoDiar.Platform.SystemServices;
@@ -19,7 +20,8 @@ namespace EchoDiar.App.Services;
 /// compressor and the recording engine with the Platform capture sources and route monitor. Created once, on launch.
 /// The pipeline's jobs wait while energy saver is on and "wait" is set (<see cref="Deferral"/>). The AI pieces: the API
 /// keys (<see cref="Secrets"/>), Windows AI, the AI jobs (sharing the load gate with transcription), local host
-/// discovery and <see cref="MakeProvider"/>; every child process they start joins <see cref="ChildProcessJob.Shared"/>.
+/// discovery, <see cref="MakeProvider"/> and <see cref="MakeLocalProvider"/>; every child process they start joins
+/// <see cref="ChildProcessJob.Shared"/>.
 /// </summary>
 internal sealed class AppServices : IDisposable
 {
@@ -127,6 +129,24 @@ internal sealed class AppServices : IDisposable
                 : null,
             ProviderKind.Anthropic => new AnthropicClient(copy, apiKey),
             ProviderKind.OpenAICompatible or ProviderKind.Local => new OpenAICompatibleClient(copy, apiKey),
+            _ => null,
+        };
+    }
+
+    /// <summary>
+    /// The in-app model of LLM catalog entry <paramref name="entryID"/> (macOS <c>AppModel.makeLocalProvider</c>): Windows
+    /// AI, or a downloaded GGUF model run with llama.cpp; null when it is not installed or not an LLM. Both are
+    /// <see cref="ILocalLLMProvider"/>s, which <see cref="AIService"/> runs inside <see cref="Gate"/> (owner LLM), loaded
+    /// for the job and freed when it ends. Checks the model's files: call it off the UI thread.
+    /// </summary>
+    public ILLMProvider? MakeLocalProvider(string entryID)
+    {
+        if (ModelCatalog.Entry(entryID) is not { Kind: ModelKind.Llm } entry) return null;
+        return entry.Runtime switch
+        {
+            ModelRuntime.WindowsAI => WindowsAI,
+            ModelRuntime.Gguf when entry.Files is [var file] && Models.IsInstalled(entry) =>
+                new LlamaProvider(entry.Id, Path.Combine(Models.Folder(entry), file)),
             _ => null,
         };
     }

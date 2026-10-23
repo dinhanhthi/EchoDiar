@@ -2,7 +2,6 @@ using System.Diagnostics;
 using System.Text;
 using EchoDiar.AI;
 using EchoDiar.Core.Model;
-using EchoDiar.Core.Models;
 using EchoDiar.Core.Settings;
 using Microsoft.UI.Dispatching;
 
@@ -206,15 +205,13 @@ public sealed partial class AppViewModel
     }
 
     /// <summary>
-    /// The client for <paramref name="provider"/> (macOS <c>llmClient(for:)</c>): Windows AI for the in-app entry, else the
-    /// client of its config with its saved key; null when it is gone. Reads Credential Manager: off the UI thread.
+    /// The client for <paramref name="provider"/> (macOS <c>llmClient(for:)</c>): the in-app model of its catalog entry
+    /// (Windows AI or a downloaded GGUF model), else the client of its config with its saved key; null when it is gone.
+    /// Reads Credential Manager and the model's files: off the UI thread.
     /// </summary>
     private ILLMProvider? MakeClient(AIProviderInfo provider, ProviderConfig? config)
     {
-        if (provider.Kind == AIProviderKind.InApp)
-        {
-            return ModelCatalog.Entry(provider.Id) is { Runtime: ModelRuntime.WindowsAI } ? _services.WindowsAI : null;
-        }
+        if (provider.Kind == AIProviderKind.InApp) return _services.MakeLocalProvider(provider.Id);
         return config is null ? null : _services.MakeProvider(config);
     }
 
