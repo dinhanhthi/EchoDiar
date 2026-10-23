@@ -237,6 +237,45 @@ public static partial class CloudTranscription
 
     private sealed record UploadPart(string File, double Start, double Duration);
 
+    // Requests.
+
+    /// <summary>A request to a vendor's native API: <paramref name="header"/> carries the key; the timeout as Swift's.</summary>
+    internal static HttpRequestMessage Request(HttpMethod method, Uri url, TimeSpan timeout, string header, string value)
+    {
+        var request = new HttpRequestMessage(method, url);
+        request.Options.Set(ProviderHttp.TimeoutOption, timeout);
+        ProviderHttp.SetHeader(request, header, value);
+        return request;
+    }
+
+    /// <summary>The audio file as a body streamed from disk (memory stays flat whatever its size).</summary>
+    internal static StreamContent FileContent(string file, string? mimeType)
+    {
+        var content = new StreamContent(new FileStream(
+            file, FileMode.Open, FileAccess.Read, FileShare.Read, 81_920, FileOptions.Asynchronous | FileOptions.SequentialScan));
+        if (mimeType is not null) content.Headers.ContentType = new(mimeType);
+        return content;
+    }
+
+    /// <summary>
+    /// A multipart/form-data body: the audio file part <c>file</c> (streamed from disk, with its name and MIME type),
+    /// then <paramref name="fields"/> in order. Names are quoted as Swift's <c>MultipartForm</c> writes them.
+    /// </summary>
+    internal static MultipartFormDataContent MultipartForm(string file, IEnumerable<(string Name, string Value)> fields)
+    {
+        var form = new MultipartFormDataContent("EchoDiar-" + Guid.NewGuid().ToString("D").ToUpperInvariant());
+        var audio = FileContent(file, MimeType(file));
+        audio.Headers.ContentDisposition = new("form-data") { Name = $"\"file\"", FileName = $"\"{Path.GetFileName(file)}\"" };
+        form.Add(audio);
+        foreach (var (name, value) in fields)
+        {
+            var part = new ByteArrayContent(System.Text.Encoding.UTF8.GetBytes(value));
+            part.Headers.ContentDisposition = new("form-data") { Name = $"\"{name}\"" };
+            form.Add(part);
+        }
+        return form;
+    }
+
     /// <summary>The whole channel as one m4a, or parts when it is over <paramref name="maxBytes"/>.</summary>
     private static List<UploadPart> UploadParts(
         IAudioExporter exporter, string source, int channel, int? maxBytes, string work, CancellationToken cancellationToken)
@@ -325,6 +364,113 @@ public static partial class CloudTranscription
 
     /// <summary>Whether requests carry a key: always, except custom endpoints set to no authentication.</summary>
     public static bool NeedsKey(ProviderConfig config) => config.Kind == ProviderKind.SpeechToText || config.AuthStyle != AuthStyle.None;
+
+    /// <summary>The model used when <c>TranscriptionModel</c> is empty; "" when AssemblyAI picks it or for custom endpoints.</summary>
+    public static string DefaultModel(ProviderConfig config) => config.Preset switch
+    {
+        "gemini" => GeminiAudioTranscriber.DefaultModel,
+        "elevenlabs" => ElevenLabsTranscriber.DefaultModel,
+        "deepgram" => DeepgramTranscriber.DefaultModel,
+        { } preset => OpenAICompatibleTranscriber.PresetModels.TryGetValue(preset, out var models) ? models[0] : "",
+        null => "",
+    };
+
+    public static string Model(ProviderConfig config)
+    {
+        var model = config.TranscriptionModel.Trim();
+        return model.Length == 0 ? DefaultModel(config) : model;
+    }
+
+    /// <summary>The model used when <c>DiarizationModel</c> is empty; "" when AssemblyAI picks it or the preset cannot diarize.</summary>
+    public static string DefaultDiarizationModel(ProviderConfig config) => config.Preset switch
+    {
+        "openai" => OpenAICompatibleTranscriber.PresetModels["openai"].FirstOrDefault(model => model.EndsWith("-diarize", StringComparison.Ordinal)) ?? "",
+        "gemini" => GeminiAudioTranscriber.DefaultModel,
+        "elevenlabs" => ElevenLabsTranscriber.DefaultModel,
+        "deepgram" => DeepgramTranscriber.DefaultModel,
+        _ => "",
+    };
+
+    public static string DiarizationModel(ProviderConfig config)
+    {
+        var model = config.DiarizationModel.Trim();
+        return model.Length == 0 ? DefaultDiarizationModel(config) : model;
+    }
+
+    /// <summary>
+    /// Whether <paramref name="config"/> (enabled or not) has what a request needs besides its key: a model (AssemblyAI
+    /// excepted) and a valid destination (the base URL, unless the preset has a native API).
+    /// </summary>
+    public static bool IsComplete(ProviderConfig config)
+    {
+        if (!Supports(config)) return false;
+        if (config.Preset == "assemblyai") return true;
+        return Model(config).Length > 0 && Destination(config) is not null;
+    }
+
+    /// <summary>
+    /// <paramref name="model"/>: null for the transcription model (<see cref="Model"/>); a cloud diarizer passes its
+    /// diarization model. <paramref name="handler"/>: null for the shared transport (a test seam otherwise).
+    /// </summary>
+    public static ICloudTranscriber MakeTranscriber(
+        ProviderConfig config, string? apiKey, string? model = null, HttpMessageHandler? handler = null)
+    {
+        model ??= Model(config);
+        var key = apiKey ?? "";
+        return config.Preset switch
+        {
+            "gemini" => new GeminiAudioTranscriber(key, model, handler),
+            "elevenlabs" => new ElevenLabsTranscriber(key, model, handler),
+            "deepgram" => new DeepgramTranscriber(key, model, handler),
+            "assemblyai" => new AssemblyAITranscriber(key, handler),
+            _ => new OpenAICompatibleTranscriber(config, model, apiKey, handler),
+        };
+    }
+
+    /// <summary>
+    /// Where <paramref name="config"/>'s audio and key go, for the one-time confirmation (see <see cref="CloudDestination"/>).
+    /// The presets with a native API use its fixed origin, whatever their base URL says. Null for an invalid base URL.
+    /// </summary>
+    public static CloudDestination? Destination(ProviderConfig config)
+    {
+        Uri url;
+        switch (config.Preset)
+        {
+            case "gemini": url = GeminiAudioTranscriber.BaseUrl; break;
+            case "elevenlabs": url = ElevenLabsTranscriber.Endpoint; break;
+            case "deepgram": url = DeepgramTranscriber.Endpoint; break;
+            case "assemblyai": url = AssemblyAITranscriber.BaseUrl; break;
+            default:
+                try
+                {
+                    url = ProviderHttp.BaseUrl(config);
+                }
+                catch (LLMException)
+                {
+                    return null;
+                }
+                break;
+        }
+        return Destination(config.Id, url);
+    }
+
+    /// <summary>
+    /// Settings' Test for the speech-to-text presets: one free body-less GET that needs a valid key and uploads no audio.
+    /// Throws like a transcription request (<see cref="LLMErrorKind.HttpStatus"/> for a refused key).
+    /// </summary>
+    public static async Task CheckKeyAsync(
+        ProviderConfig config, string apiKey, HttpMessageHandler? handler = null, CancellationToken cancellationToken = default)
+    {
+        Func<HttpRequestMessage> makeRequest = config.Preset switch
+        {
+            "elevenlabs" => () => ElevenLabsTranscriber.MakeKeyCheckRequest(apiKey),
+            "deepgram" => () => DeepgramTranscriber.MakeKeyCheckRequest(apiKey),
+            "assemblyai" => () => AssemblyAITranscriber.MakeKeyCheckRequest(apiKey),
+            _ => throw LLMException.Provider($"No key check for {config.DisplayName}."),
+        };
+        await ProviderHttp.SendAsync(
+            ProviderHttp.Client(handler), makeRequest, retry: true, ProviderHttp.SmallJsonLimit, (_, _) => true, cancellationToken);
+    }
 
     /// <summary>
     /// The destination of <paramref name="url"/> for provider <paramref name="providerId"/>: the consent key

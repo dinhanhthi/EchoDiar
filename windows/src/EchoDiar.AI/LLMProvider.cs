@@ -284,6 +284,9 @@ internal static class ProviderHttp
     public static T Decode<T>(string json) where T : class =>
         JsonSerializer.Deserialize<T>(json, Json) ?? throw new JsonException("Expected a JSON object.");
 
+    public static T Decode<T>(ReadOnlySpan<byte> json, JsonSerializerOptions? options = null) where T : class =>
+        JsonSerializer.Deserialize<T>(json, options ?? Json) ?? throw new JsonException("Expected a JSON object.");
+
     /// <summary>The payload of an SSE <c>data:</c> line; null for <c>event:</c>, <c>:</c> comment and blank lines.</summary>
     public static string? SseData(string line)
     {
