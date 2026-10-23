@@ -270,6 +270,8 @@ public sealed partial class AppViewModel
         await _services.Index.RemoveAllExceptAsync(key);
         if (_indexKey != key)
         {
+            // A cancelled load leaves no key loaded: forget the old one until this one is in.
+            _indexKey = null;
             await _services.Index.LoadAsync(key, token);
             _indexKey = key;
         }
@@ -563,6 +565,8 @@ public sealed partial class AppViewModel
         var key = embedder.Key;
         if (_indexKey != key)
         {
+            // A cancelled load leaves no key loaded: forget the old one until this one is in.
+            _indexKey = null;
             await _services.Index.LoadAsync(key, token);
             _indexKey = key;
         }

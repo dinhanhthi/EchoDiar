@@ -111,6 +111,49 @@ public sealed class LibraryIndexTests : IDisposable
         Assert.False(Directory.Exists(shards));
     }
 
+    // A load cancelled while it reads shards leaves no key loaded (IndexAsync refuses), and the next load works again.
+    [Fact]
+    public async Task CancelledLoadLeavesNoKeyAndNextLoadIndexesAgain()
+    {
+        var (conversation, transcript) = MakeConversation(turns: 5);
+        var index = new LibraryIndex(Rag);
+        await index.LoadAsync(Key, Token);
+        await index.IndexAsync(conversation, transcript, null, new KeywordEmbedder(), Token);
+        // Copies of the shard give the load work to be cancelled in.
+        const int copies = 300;
+        var shard = Path.Combine(Rag, Key, LibraryIndex.ShardFileName(conversation.Id));
+        for (var i = 0; i < copies; i++)
+            File.Copy(shard, Path.Combine(Rag, Key, LibraryIndex.ShardFileName(Guid.NewGuid())));
+
+        // Retries until the cancel lands inside the loop: not before the load starts (the old shards stay), not after it ends.
+        var midway = false;
+        for (var attempt = 0; attempt < 20 && !midway; attempt++)
+        {
+            using var cancel = new CancellationTokenSource();
+            var load = index.LoadAsync(Key, cancel.Token);
+            await Task.Yield();
+            cancel.Cancel();
+            try
+            {
+                await load;
+            }
+            catch (OperationCanceledException)
+            {
+                midway = await index.CountAsync() == 0;
+            }
+        }
+        Assert.True(midway, "no cancel landed while the load read shards");
+
+        var refused = await Assert.ThrowsAsync<LibraryIndexException>(
+            () => index.IndexAsync(conversation, transcript, null, new KeywordEmbedder(), Token));
+        Assert.Equal(LibraryIndexErrorKind.InvalidKey, refused.Kind);
+        await index.LoadAsync(Key, Token);
+        Assert.Equal(copies + 1, await index.CountAsync());
+        var (added, addedTranscript) = MakeConversation(turns: 5);
+        await index.IndexAsync(added, addedTranscript, null, new KeywordEmbedder(), Token);
+        Assert.Equal(copies + 2, await index.CountAsync());
+    }
+
     // Fixtures/macos-shard.json is Swift's JSONEncoder output for LibraryIndex.Shard (keys in Swift's arbitrary order),
     // macos-shard-sorted.json the same shard with .sortedKeys: ours must read the first and write the second's bytes.
     [Fact]
