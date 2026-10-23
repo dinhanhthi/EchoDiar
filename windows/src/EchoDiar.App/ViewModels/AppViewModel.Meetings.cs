@@ -27,6 +27,12 @@ public sealed partial class AppViewModel
     /// <summary>Group exes of the meeting apps whose mic is on, per the detector (every known app, ignored ones too).</summary>
     private readonly HashSet<string> _meetingMics = new(StringComparer.OrdinalIgnoreCase);
 
+    /// <summary>
+    /// Group exes the detector reports in use, updated as it raises its events (its thread), before they are posted:
+    /// a Detected whose Ended is already queued behind it neither starts a recording nor asks. Guarded by itself.
+    /// </summary>
+    private readonly HashSet<string> _raisedMeetings = new(StringComparer.OrdinalIgnoreCase);
+
     /// <summary>The meeting app whose mic use was detected last; null once its mic is off.</summary>
     private DetectedMeeting? _detectedMeeting;
 
@@ -131,8 +137,16 @@ public sealed partial class AppViewModel
 #if DEBUG
         detector.Log = message => StartupTrace.Write(message);
 #endif
-        detector.Detected += meeting => Post(() => OnMeetingDetected(meeting));
-        detector.Ended += meeting => Post(() => OnMeetingEnded(meeting));
+        detector.Detected += meeting =>
+        {
+            lock (_raisedMeetings) _raisedMeetings.Add(meeting.Exe);
+            Post(() => OnMeetingDetected(meeting));
+        };
+        detector.Ended += meeting =>
+        {
+            lock (_raisedMeetings) _raisedMeetings.Remove(meeting.Exe);
+            Post(() => OnMeetingEnded(meeting));
+        };
         _meetingDetector = detector;
         SyncMeetingDetection();
     }
@@ -151,6 +165,7 @@ public sealed partial class AppViewModel
             Debug.WriteLine($"EchoDiar: could not stop meeting detection: {e}");
         }
         _meetingDetector = null;
+        _detectorRunning = false;
         try
         {
             _systemEvents?.Dispose();
@@ -168,15 +183,21 @@ public sealed partial class AppViewModel
         if (_meetingDetector is not { } detector || _closing) return;
         var wanted = Settings.MeetingDetection;
         if (wanted == _detectorRunning) return;
-        _detectorRunning = wanted;
-        if (wanted)
+        try
         {
-            detector.Start();
+            if (wanted) detector.Start();
+            else detector.Stop();
+        }
+        catch (Exception e)
+        {
+            Debug.WriteLine($"EchoDiar: could not {(wanted ? "start" : "stop")} meeting detection: {e}");
             return;
         }
-        detector.Stop();
+        _detectorRunning = wanted;
+        if (wanted) return;
         // The stopped detector raises no Ended: the monitor keeps the last mic state.
         _meetingMics.Clear();
+        lock (_raisedMeetings) _raisedMeetings.Clear();
         _detectedMeeting = null;
         DismissMeetingPrompt();
     }
@@ -196,6 +217,11 @@ public sealed partial class AppViewModel
         if (behavior == MeetingBehavior.Always && meeting.App.IsBrowser) behavior = MeetingBehavior.Ask;
         _detectedMeeting = meeting;
         if (IsRecording || IsStarting) return;
+        // Its mic went off before this post ran (its Ended is queued): nothing to record.
+        lock (_raisedMeetings)
+        {
+            if (!_raisedMeetings.Contains(meeting.Exe)) return;
+        }
         if (behavior == MeetingBehavior.Always)
         {
             AutoStartedAppName = meeting.Name;

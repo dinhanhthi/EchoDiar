@@ -36,6 +36,45 @@ public sealed class MeetingEndMonitorTests
     }
 
     [Fact]
+    public void LostMicPromptsAndKeepRecordingIgnoresItForTenMinutes()
+    {
+        var monitor = Monitor();
+        monitor.Record(new Input.InputRouteLost(), At(60));
+        Assert.Equal(Prompt(Reason.InputRouteLost), monitor.Evaluate(At(60)));
+
+        monitor.KeepRecording(Reason.InputRouteLost, At(70));
+        Assert.Equal(Decision.None, monitor.Evaluate(At(70)));
+        monitor.Record(new Input.InputRouteLost(), At(370));
+        Assert.Equal(Decision.None, monitor.Evaluate(At(370)));
+        monitor.Record(new Input.InputRouteLost(), At(70 + 600));
+        Assert.Equal(Prompt(Reason.InputRouteLost), monitor.Evaluate(At(70 + 600)));
+    }
+
+    [Fact]
+    public void ScreenLockPromptsAndUnlockClearsIt()
+    {
+        var monitor = Monitor();
+        monitor.Record(new Input.ScreenLocked(true), At(60));
+        Assert.Equal(Prompt(Reason.ScreenLocked), monitor.Evaluate(At(60)));
+        monitor.Record(new Input.ScreenLocked(false), At(90));
+        Assert.Equal(Decision.None, monitor.Evaluate(At(90)));
+    }
+
+    [Fact]
+    public void SourceInactivityIsIgnoredOnceTheSourceQuit()
+    {
+        var inactive = Monitor();
+        inactive.Record(new Input.SourceActive(false), At(60));
+        Assert.Equal(Prompt(Reason.SourceInactive), inactive.Evaluate(At(85)));
+
+        var exited = Monitor();
+        exited.Record(new Input.SourceExited(), At(60));
+        exited.KeepRecording(Reason.SourceExited, At(60));
+        exited.Record(new Input.SourceActive(false), At(60));
+        Assert.Equal(Decision.None, exited.Evaluate(At(85)));
+    }
+
+    [Fact]
     public void SilencePastThresholdPrompts()
     {
         var monitor = Monitor();

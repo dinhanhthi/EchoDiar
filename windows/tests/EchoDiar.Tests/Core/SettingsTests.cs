@@ -76,6 +76,7 @@ public sealed class SettingsTests : IDisposable
     [InlineData("""{"playbackChannels":"surround"}""", "playbackChannels", "\"mixed\"")]
     [InlineData("""{"autoDeleteMode":"shred"}""", "autoDeleteMode", "\"audioOnly\"")]
     [InlineData("""{"pillSize":"huge"}""", "pillSize", "\"medium\"")]
+    [InlineData("""{"perAppBehavior":null}""", "perAppBehavior", "{}")]
     [InlineData("""{"globalHotKeyWindows":{"virtualKey":65,"modifiers":4}}""", "globalHotKeyWindows",
         """{"virtualKey":82,"modifiers":3}""")]
     [InlineData("""{"globalPauseHotKeyWindows":{"virtualKey":65,"modifiers":8}}""", "globalPauseHotKeyWindows",
