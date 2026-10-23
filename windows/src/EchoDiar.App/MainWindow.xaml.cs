@@ -41,7 +41,7 @@ public sealed partial class MainWindow : Window
     private DispatcherQueueTimer? _presentedTimer;
     private DispatcherQueueTimer? _backstopTimer;
 
-    /// <summary>The in-app shortcuts without modifiers (Esc, Space), run from <see cref="OnRootPreviewKeyDown"/>.</summary>
+    /// <summary>The in-app shortcuts without modifiers (Esc, Space, Delete), run from <see cref="OnRootPreviewKeyDown"/>.</summary>
     private readonly Dictionary<VirtualKey, InAppAction> _plainKeys = [];
 
     /// <summary>The last press of a <see cref="_plainKeys"/> key ran its action: its repeats are taken too.</summary>
@@ -361,7 +361,7 @@ public sealed partial class MainWindow : Window
     /// <summary>
     /// The in-app shortcuts (<see cref="ShortcutsSettingsPage.InAppShortcuts"/>: the macOS main menu's keys with Ctrl for
     /// ⌘, and its main window's Esc and Space) as the window's keyboard accelerators; Esc and Space in
-    /// <see cref="OnRootPreviewKeyDown"/> instead.
+    /// <see cref="OnRootPreviewKeyDown"/> instead, with Delete (Windows only: not on the Shortcuts page).
     /// </summary>
     private void AddAccelerators()
     {
@@ -381,11 +381,12 @@ public sealed partial class MainWindow : Window
                 RootGrid.KeyboardAccelerators.Add(accelerator);
             }
         }
+        _plainKeys[VirtualKey.Delete] = InAppAction.DeleteSelection;
         RootGrid.PreviewKeyDown += OnRootPreviewKeyDown;
     }
 
     /// <summary>
-    /// Esc and Space before the focused control sees them: a list item or a button marks them handled in its KeyDown,
+    /// Esc, Space and Delete before the focused control sees them: a list item or a button marks them handled in its KeyDown,
     /// which comes before keyboard accelerators, so a clicked card or button kept Space (<see cref="TakesSpace"/> decides
     /// which control keeps it). Not with a modifier held; a held key's repeats do what its press did, once.
     /// </summary>
@@ -419,7 +420,8 @@ public sealed partial class MainWindow : Window
     /// <summary>
     /// Runs <paramref name="action"/> where it applies (macOS validateMenuItem and handleKey); false passes the key on to
     /// the focused control. Nothing runs while a recorder in Settings › Shortcuts takes a new global shortcut, or while a
-    /// dialog, menu or flyout is open; Esc and Space (<paramref name="plain"/>) are a text field's while it has the focus.
+    /// dialog, menu or flyout is open; Esc, Space and Delete (<paramref name="plain"/>) are a text field's while it has the
+    /// focus.
     /// </summary>
     private bool Run(InAppAction action, bool plain)
     {
@@ -454,6 +456,10 @@ public sealed partial class MainWindow : Window
             // not move the focus into the list.
             case InAppAction.Back when plain && ListHost.Visibility == Visibility.Visible && _library.HasSelection:
                 _library.ClearSelection();
+                return true;
+            // Delete deletes a selection of cards (asking first), wherever the focus is, as Esc ends it.
+            case InAppAction.DeleteSelection when plain && ListHost.Visibility == Visibility.Visible && _library.HasSelection:
+                _library.DeleteSelection();
                 return true;
             case InAppAction.Back when route != RouteKind.List:
                 _model.GoBack();

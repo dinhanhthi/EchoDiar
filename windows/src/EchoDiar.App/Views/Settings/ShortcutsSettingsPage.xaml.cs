@@ -9,8 +9,11 @@ using Microsoft.UI.Xaml.Controls;
 
 namespace EchoDiar.App.Views;
 
-/// <summary>What an in-app shortcut does (macOS EchoDiarApp.swift: the main menu's actions, and Esc and Space).</summary>
-public enum InAppAction { RecordStop, PauseResume, ShowRecording, ShowList, OpenChat, Search, Settings, Back, PlayPause }
+/// <summary>
+/// What an in-app shortcut does (macOS EchoDiarApp.swift: the main menu's actions, and Esc and Space).
+/// <see cref="DeleteSelection"/> is Windows' Delete key, not one of the page's shortcuts (<see cref="MainWindow"/>).
+/// </summary>
+public enum InAppAction { RecordStop, PauseResume, ShowRecording, ShowList, OpenChat, Search, Settings, Back, PlayPause, DeleteSelection }
 
 /// <summary>
 /// A shortcut used inside EchoDiar: its action, its title on the Shortcuts page, and its keys (Ctrl for macOS ⌘; Esc and

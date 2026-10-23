@@ -23,8 +23,8 @@ namespace EchoDiar.App.Views;
 /// (Today, Yesterday, then the date), filtered by the toolbar's search, with the model download banner (MVP). While
 /// recording, the recording's card sits above them and the recording's own entry is left out. Ctrl-click and
 /// Shift-click select cards (from the open entry in the sidebar, as in Mail); the selection bar then shows over the top
-/// of the list with Delete and Cancel (Esc, the window's: <see cref="MainWindow"/>). Delete deletes the selection, else
-/// the focused card. The ListView itself never selects: the cards draw the open conversation and the selection, so the
+/// of the list with Delete and Cancel (Esc, the window's: <see cref="MainWindow"/>). Delete deletes the selection (the
+/// window's key too), else the focused card. The ListView itself never selects: the cards draw the open conversation and the selection, so the
 /// arrow keys only move the focus.
 /// </summary>
 public sealed partial class ConversationListView : UserControl
@@ -292,6 +292,9 @@ public sealed partial class ConversationListView : UserControl
         UpdateCards();
     }
 
+    /// <summary>Deletes the selection, asking first: the Delete key (<see cref="MainWindow"/>, wherever the focus is).</summary>
+    internal void DeleteSelection() => _ = DeleteSelectionAsync(audioOnly: false);
+
     /// <summary>Ends the selection: the bar's Cancel, and Esc (<see cref="MainWindow"/>, wherever the focus is).</summary>
     internal void ClearSelection()
     {
@@ -337,8 +340,8 @@ public sealed partial class ConversationListView : UserControl
 
     /// <summary>
     /// Enter opens the focused card, Space only one reached with the keyboard (a clicked card leaves Space to the
-    /// window: <see cref="MainWindow"/> plays); Delete deletes the selection, else the focused card. Not from a text
-    /// field (the title being renamed) or a button.
+    /// window: <see cref="MainWindow"/> plays); Delete deletes the focused card when no card is selected (the window
+    /// deletes a selection). Not from a text field (the title being renamed) or a button.
     /// </summary>
     private void OnKeyDown(object sender, KeyRoutedEventArgs e)
     {
@@ -352,12 +355,9 @@ public sealed partial class ConversationListView : UserControl
                 Open(card);
                 break;
             case VirtualKey.Delete:
-                List<Conversation> targets = !_selection.IsEmpty ? SelectedConversations()
-                    : FocusedCard(e) is { } focused ? [focused.Conversation] : [];
-                if (targets.Count == 0) return;
+                if (!_selection.IsEmpty || FocusedCard(e) is not { } focused) return;
                 e.Handled = true;
-                if (_selection.IsEmpty) _ = DeleteAsync(targets, audioOnly: false);
-                else _ = DeleteSelectionAsync(audioOnly: false);
+                _ = DeleteAsync([focused.Conversation], audioOnly: false);
                 break;
         }
     }
