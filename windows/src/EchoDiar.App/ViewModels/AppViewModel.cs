@@ -91,6 +91,7 @@ public sealed partial class AppViewModel : ObservableObject
         _pollTimer = dispatcher.CreateTimer();
         _pollTimer.Interval = PollInterval;
         _pollTimer.Tick += (_, _) => PollRecording();
+        Updater = new Updater(dispatcher);
     }
 
     // State
@@ -274,6 +275,8 @@ public sealed partial class AppViewModel : ObservableObject
         // Auto-delete's launch run waits for the scan (RunRetentionAsync).
         SyncRetention();
         _ = VerifyInstalledModelsAsync();
+        // After the library, so its check does not compete with the launch.
+        if (!_closing) Updater.Start();
     }
 
     /// <summary>
@@ -337,6 +340,8 @@ public sealed partial class AppViewModel : ObservableObject
         ShutdownAI();
         // The index pass stops; nothing waits for it either.
         ShutdownRAG();
+        // An update check under way is cancelled (an install goes on: Windows quits the app for it).
+        Updater.Dispose();
         _pollTimer.Stop();
         // A run under way asks before each deletion, and is told every conversation is busy now.
         _retention?.Stop();

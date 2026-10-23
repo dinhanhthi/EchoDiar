@@ -1,7 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!--
-    Settings › About (macOS SettingsWindow.swift AboutSettingsView): the logo, name and version, the license and the
-    GitHub link, as Windows 11 Settings cards. Each searchable card's Tag is its search entry's title (SearchEntries).
+    Settings › About (macOS SettingsWindow.swift AboutSettingsView): the logo, name and version, the updates (Windows
+    only: the last check and Check now), the license and the GitHub link, as Windows 11 Settings cards. Each searchable
+    card's Tag is its search entry's title (SearchEntries).
 -->
 <UserControl
     x:Class="EchoDiar.App.Views.AboutSettingsPage"
@@ -23,6 +24,17 @@
                 <controls:SettingsCard.HeaderIcon>
                     <ImageIcon Source="ms-appx:///Assets/Square44x44Logo.png" />
                 </controls:SettingsCard.HeaderIcon>
+            </controls:SettingsCard>
+
+            <!-- App Installer updates: the last check, Check now; why there are none for a copy installed another way. -->
+            <controls:SettingsCard
+                x:Name="UpdatesCard"
+                Header="{local:T Text='Updates'}"
+                Tag="Updates">
+                <controls:SettingsCard.HeaderIcon>
+                    <FontIcon FontFamily="{ThemeResource SymbolThemeFontFamily}" Glyph="&#xE895;" />
+                </controls:SettingsCard.HeaderIcon>
+                <Button x:Name="CheckUpdatesButton" Content="{local:T Text='Check now'}" />
             </controls:SettingsCard>
 
             <controls:SettingsCard

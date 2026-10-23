@@ -152,7 +152,7 @@ internal sealed class TrayIcon : IDisposable
         ]));
 #endif
         items.Add(NotifyIconMenuItem.Separator);
-        // Check for updates: Phase 28 (App Installer).
+        items.Add(UpdateItem());
         items.Add(Item(Loc.T("About EchoDiar"), () =>
         {
             _model.OpenSettings(SettingsSearch.About);
@@ -161,6 +161,23 @@ internal sealed class TrayIcon : IDisposable
         items.Add(NotifyIconMenuItem.Separator);
         items.Add(new NotifyIconMenuItem(Loc.T("Quit"), Submenu: [Item(Loc.T("Sure to quit"), _quit)]));
         return items;
+    }
+
+    /// <summary>
+    /// macOS's update item: "Check for updates…" checks and shows the answer in the window; "Update available…" asks to
+    /// install it there. Off while recording (installing closes the app), while a check or the install runs, and for a
+    /// copy not installed from an .appinstaller (its text says so).
+    /// </summary>
+    private NotifyIconMenuItem UpdateItem()
+    {
+        var updater = _model.Updater;
+        var enabled = updater.IsActive && !updater.IsChecking && !updater.IsInstalling && !_model.IsRecording && !_model.IsStarting;
+        return Item(updater.MenuTitle, () =>
+        {
+            _openMain();
+            if (updater.UpdateAvailable) updater.OfferUpdate();
+            else _ = updater.CheckNowAsync();
+        }, enabled);
     }
 
     /// <summary>Elapsed time, Pause/Resume, Stop, Language and the silent-tap item (macOS addRecordingItems).</summary>

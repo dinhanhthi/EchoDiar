@@ -86,6 +86,8 @@
   <Capabilities>
     <rescap:Capability Name="runFullTrust" />
     <rescap:Capability Name="unvirtualizedResources" />
+    <!-- Settings › About and the Update button install the update from the .appinstaller (PackageManager). -->
+    <rescap:Capability Name="packageManagement" />
     <!-- Phi Silica (Windows AI) on Copilot+ PCs. -->
     <systemai:Capability Name="systemAIModels" />
     <DeviceCapability Name="microphone" />

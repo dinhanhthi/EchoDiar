@@ -130,7 +130,10 @@
             Orientation="Horizontal"
             Spacing="8"
             VerticalAlignment="Center">
-            <!-- Phase 27 shows it while an update is available. -->
+            <!--
+                Shown while an update is available and nothing runs that installing would cut off; while it installs,
+                a ring shows how far (code-behind).
+            -->
             <Button
                 x:Name="UpdateButton"
                 Width="32"
@@ -140,11 +143,21 @@
                 AutomationProperties.Name="{local:T Text='Update'}"
                 ToolTipService.ToolTip="{local:T Text='Install the available update'}"
                 Visibility="Collapsed">
-                <FontIcon
-                    FontFamily="{ThemeResource SymbolThemeFontFamily}"
-                    FontSize="16"
-                    Foreground="{ThemeResource SystemFillColorSuccessBrush}"
-                    Glyph="&#xE896;" />
+                <Grid>
+                    <FontIcon
+                        x:Name="UpdateIcon"
+                        FontFamily="{ThemeResource SymbolThemeFontFamily}"
+                        FontSize="16"
+                        Foreground="{ThemeResource SystemFillColorSuccessBrush}"
+                        Glyph="&#xE896;" />
+                    <ProgressRing
+                        x:Name="UpdateProgress"
+                        Width="16"
+                        Height="16"
+                        IsIndeterminate="False"
+                        Maximum="100"
+                        Visibility="Collapsed" />
+                </Grid>
             </Button>
 
             <StackPanel

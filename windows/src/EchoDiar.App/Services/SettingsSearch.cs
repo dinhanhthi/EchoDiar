@@ -66,7 +66,7 @@ public static class SettingsSearch
         new(Rag, "RAG", "\uE773", [], RAGSettingsPage.SearchEntries, model => new RAGSettingsPage(model)),
         new(Storage, "Storage", "\uEDA2", StorageSettingsPage.SubTabs, StorageSettingsPage.SearchEntries, model => new StorageSettingsPage(model)),
         new(Shortcuts, "Shortcuts", "\uE765", [], ShortcutsSettingsPage.SearchEntries, model => new ShortcutsSettingsPage(model)),
-        new(About, "About", "\uE946", [], AboutSettingsPage.SearchEntries, _ => new AboutSettingsPage()),
+        new(About, "About", "\uE946", [], AboutSettingsPage.SearchEntries, model => new AboutSettingsPage(model)),
         new(Acknowledgements, "Acknowledgements", "\uE8A5", [], AcknowledgementsSettingsPage.SearchEntries, _ => new AcknowledgementsSettingsPage()),
     ];
 

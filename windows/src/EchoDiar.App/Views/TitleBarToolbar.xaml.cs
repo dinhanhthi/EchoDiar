@@ -24,10 +24,11 @@ namespace EchoDiar.App.Views;
 /// recording); on a conversation its title, Reveal, Delete and the tabs (a SelectorBar); on Settings the section's inner
 /// tabs after Record; Settings (opens the Settings page, or goes back from it), Ask across conversations (opens or
 /// closes the library chat) and Search everywhere, an icon button that opens the box where the box does not fit. Update
-/// stays collapsed until Phase 28. It also hosts the window's dialogs (it lives as long as the window): the delete
-/// confirmations (of this conversation, and of the library's cards and selection), "Recording problem", the cloud
-/// confirmations (audio for transcription, transcripts for the library index) and the Settings pages' confirmations
-/// (<see cref="AppViewModel.Confirm"/>), one at a time. The lost-mic question is the pill's end prompt.
+/// shows while an App Installer update is available and nothing runs that installing would cut off (macOS hides it while
+/// recording). It also hosts the window's dialogs (it lives as long as the window): the delete confirmations (of this
+/// conversation, and of the library's cards and selection), "Recording problem", the cloud confirmations (audio for
+/// transcription, transcripts for the library index), the update's confirmation and answers, and the Settings pages'
+/// confirmations (<see cref="AppViewModel.Confirm"/>), one at a time. The lost-mic question is the pill's end prompt.
 /// </summary>
 public sealed partial class TitleBarToolbar : UserControl
 {
@@ -103,6 +104,7 @@ public sealed partial class TitleBarToolbar : UserControl
         StopButton.Click += (_, _) => _ = _model?.StopRecordingAsync();
         PauseButton.Click += (_, _) => _ = _model?.TogglePauseAsync();
         RevealButton.Click += (_, _) => Reveal();
+        UpdateButton.Click += (_, _) => _ = ConfirmUpdateAsync();
         DeleteMenu.Opening += (_, _) => UpdateDeleteMenu();
         DeleteAudioItem.Click += async (_, _) => await DeleteShownAsync(audioOnly: true);
         DeleteConversationItem.Click += async (_, _) => await DeleteShownAsync(audioOnly: false);
@@ -130,6 +132,7 @@ public sealed partial class TitleBarToolbar : UserControl
     {
         _model = model;
         model.PropertyChanged += OnModelChanged;
+        model.Updater.PropertyChanged += OnUpdaterChanged;
         // Settings pages ask through here too, so the window never has two dialogs.
         model.Confirm = ConfirmAsync;
         model.DeleteFlow = DeleteAsync;
@@ -152,6 +155,7 @@ public sealed partial class TitleBarToolbar : UserControl
     {
         if (_model is null) return;
         _model.PropertyChanged -= OnModelChanged;
+        _model.Updater.PropertyChanged -= OnUpdaterChanged;
         _model.Confirm = null;
         _model.DeleteFlow = null;
         _model = null;
@@ -217,6 +221,9 @@ public sealed partial class TitleBarToolbar : UserControl
             case nameof(AppViewModel.DetailTab):
                 UpdateTabs();
                 break;
+            case nameof(AppViewModel.AIJob):
+                UpdateUpdateButton();
+                break;
             case nameof(AppViewModel.SettingsSection):
             case nameof(AppViewModel.SettingsSubTab):
                 UpdateSettingsTabs();
@@ -269,6 +276,7 @@ public sealed partial class TitleBarToolbar : UserControl
             ToolTipService.SetToolTip(PauseButton, pauseLabel);
         }
         UpdateBlink(recording && !paused);
+        UpdateUpdateButton();
         var conversation = ShownConversation();
         var onConversation = conversation is not null;
         TitlePanel.Visibility = Shown(onConversation);
@@ -311,6 +319,86 @@ public sealed partial class TitleBarToolbar : UserControl
         _model.DetailTab = TabsBar.SelectedItem == SummaryTab ? DetailTab.Summary
             : TabsBar.SelectedItem == ChatTab ? DetailTab.Chat
             : DetailTab.Transcript;
+    }
+
+    // Update
+
+    private void OnUpdaterChanged(object? sender, PropertyChangedEventArgs e)
+    {
+        if (e.PropertyName == nameof(Updater.Report)) ShowNextDialog();
+        else UpdateUpdateButton();
+    }
+
+    /// <summary>
+    /// macOS <c>showsUpdate</c>, also hidden while work runs that installing would cut off; shown while installing, with
+    /// a ring for how far it is.
+    /// </summary>
+    private void UpdateUpdateButton()
+    {
+        if (_model is null) return;
+        var updater = _model.Updater;
+        var installing = updater.IsInstalling;
+        UpdateButton.Visibility = Shown(installing || updater.UpdateAvailable && !_model.UpdateBlocked);
+        UpdateIcon.Visibility = Shown(!installing);
+        UpdateProgress.Visibility = Shown(installing);
+        UpdateProgress.Value = updater.InstallPercent;
+        var tip = installing ? Loc.Format("Installing the update… %lld%%", updater.InstallPercent) : Loc.T("Install the available update");
+        if (ToolTipService.GetToolTip(UpdateButton) as string != tip) ToolTipService.SetToolTip(UpdateButton, tip);
+    }
+
+    /// <summary>
+    /// Update: asks first, then installs (Windows closes EchoDiar and opens the new version). Work that started meanwhile
+    /// is not cut off: it is said instead.
+    /// </summary>
+    private async Task ConfirmUpdateAsync()
+    {
+        if (_model is not { } model || _dialog is not null || XamlRoot is null || model.Updater.IsInstalling) return;
+        if (model.UpdateBlocked)
+        {
+            await ShowUpdateBlockedAsync();
+            return;
+        }
+        var dialog = NewDialog(Loc.T("Install the update?"), Loc.T("EchoDiar closes, installs the new version and opens again."));
+        dialog.PrimaryButtonText = Loc.T("Install and Relaunch");
+        dialog.CloseButtonText = Loc.T("Cancel");
+        dialog.DefaultButton = ContentDialogButton.Primary;
+        var confirmed = false;
+        await ShowAsync(dialog, result => confirmed = result == ContentDialogResult.Primary);
+        if (!confirmed || _model is null) return;
+        if (!await model.InstallUpdateAsync() && _model is not null) await ShowUpdateBlockedAsync();
+    }
+
+    /// <summary>A recording or a job runs: the update waits (macOS hides Update while recording).</summary>
+    private Task ShowUpdateBlockedAsync()
+    {
+        if (_dialog is not null || XamlRoot is null) return Task.CompletedTask;
+        var dialog = NewDialog(Loc.T("Update after the recording"),
+            Loc.T("EchoDiar installs the update once the recording, transcriptions and AI answers have finished."));
+        dialog.CloseButtonText = Loc.T("OK");
+        dialog.DefaultButton = ContentDialogButton.Close;
+        return ShowAsync(dialog, _ => { });
+    }
+
+    /// <summary>The answer to the user's check or a failed install; a found update is offered at once.</summary>
+    private Task ShowUpdateReportAsync(UpdateReport report)
+    {
+        if (_model is not { } model) return Task.CompletedTask;
+        if (report.Kind == UpdateReportKind.Available)
+        {
+            model.Updater.DismissReport();
+            return ConfirmUpdateAsync();
+        }
+        var (title, message) = report.Kind switch
+        {
+            UpdateReportKind.UpToDate => (Loc.T("You're up to date!"),
+                Loc.Format("EchoDiar %@ is currently the newest version available.", AboutSettingsPage.Version)),
+            UpdateReportKind.CheckFailed => (Loc.T("Could not check for updates"), report.Reason ?? Loc.T("Try again later.")),
+            _ => (Loc.T("Could not install the update"), report.Reason ?? Loc.T("Try again later.")),
+        };
+        var dialog = NewDialog(title, message);
+        dialog.CloseButtonText = Loc.T("OK");
+        dialog.DefaultButton = ContentDialogButton.Close;
+        return ShowAsync(dialog, _ => _model?.Updater.DismissReport());
     }
 
     // Settings
@@ -667,13 +755,17 @@ public sealed partial class TitleBarToolbar : UserControl
 
     // Recording dialogs and indicator
 
-    /// <summary>Shows a recording problem that waits, else a cloud confirmation that waits, unless a dialog is open.</summary>
+    /// <summary>
+    /// Shows a recording problem that waits, else a cloud confirmation that waits, else the update's answer, unless a
+    /// dialog is open.
+    /// </summary>
     private void ShowNextDialog()
     {
         if (_model is null || _dialog is not null || XamlRoot is null) return;
         if (_model.RecordingError is { } error) _ = ShowRecordingProblemAsync(error);
         else if (_model.PendingCloudRuns.FirstOrDefault() is { } run) _ = ShowCloudConsentAsync(run);
         else if (_model.PendingEmbeddingConsent is { } consent) _ = ShowEmbeddingConsentAsync(consent);
+        else if (_model.Updater.Report is { } report) _ = ShowUpdateReportAsync(report);
     }
 
     /// <summary>

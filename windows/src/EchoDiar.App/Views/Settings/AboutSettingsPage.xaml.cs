@@ -1,11 +1,18 @@
+using System.ComponentModel;
+using System.Globalization;
 using EchoDiar.App.Services;
+using EchoDiar.App.ViewModels;
+using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 using Windows.ApplicationModel;
 using Windows.System;
 
 namespace EchoDiar.App.Views;
 
-/// <summary>Settings › About (macOS SettingsWindow.swift <c>AboutSettingsView</c> and <c>AboutInfo</c>).</summary>
+/// <summary>
+/// Settings › About (macOS SettingsWindow.swift <c>AboutSettingsView</c> and <c>AboutInfo</c>), plus the App Installer
+/// updates (<see cref="Updater"/>): the last check and Check now, or why this copy does not update itself.
+/// </summary>
 public sealed partial class AboutSettingsPage : UserControl
 {
     /// <summary>macOS <c>AboutInfo.repository</c>.</summary>
@@ -15,19 +22,30 @@ public sealed partial class AboutSettingsPage : UserControl
     public static IReadOnlyList<SettingsEntry> SearchEntries { get; } =
     [
         new("Version", ["about", "build", "update"]),
+        new("Updates", ["update", "check for updates", "App Installer", "appinstaller", "last check"]),
         new("Licensed under AGPL-3.0", ["license", "open source"]),
         new("github.com/dinhanhthi/EchoDiar", ["GitHub", "source code", "repository"]),
     ];
 
-    public AboutSettingsPage()
+    private readonly AppViewModel _model;
+
+    public AboutSettingsPage(AppViewModel model)
     {
+        _model = model;
         InitializeComponent();
         VersionCard.Description = Loc.Format("Version %@", Version);
         RepositoryCard.Click += (_, _) => _ = Launcher.LaunchUriAsync(Repository);
+        CheckUpdatesButton.Click += (_, _) => _ = _model.Updater.CheckNowAsync();
+        Loaded += (_, _) =>
+        {
+            _model.Updater.PropertyChanged += OnUpdaterChanged;
+            RefreshUpdates();
+        };
+        Unloaded += (_, _) => _model.Updater.PropertyChanged -= OnUpdaterChanged;
     }
 
     /// <summary>The package version ("0.0.12.0", set by CI), or the app's assembly version when run without a package.</summary>
-    private static string Version
+    internal static string Version
     {
         get
         {
@@ -42,5 +60,21 @@ public sealed partial class AboutSettingsPage : UserControl
                 return typeof(AboutSettingsPage).Assembly.GetName().Version?.ToString() ?? "?";
             }
         }
+    }
+
+    private void OnUpdaterChanged(object? sender, PropertyChangedEventArgs e) => RefreshUpdates();
+
+    private void RefreshUpdates()
+    {
+        var updater = _model.Updater;
+        CheckUpdatesButton.Visibility = updater.IsActive ? Visibility.Visible : Visibility.Collapsed;
+        CheckUpdatesButton.IsEnabled = !updater.IsChecking && !updater.IsInstalling;
+        UpdatesCard.Description = !updater.IsActive
+            ? Loc.T("This copy was not installed from an .appinstaller file, so it does not update itself.")
+            : updater.IsInstalling ? Loc.Format("Installing the update… %lld%%", updater.InstallPercent)
+            : updater.IsChecking ? Loc.T("Checking for updates…")
+            : updater.UpdateAvailable ? Loc.T("An update is available: Update in the toolbar installs it.")
+            : updater.LastCheck is { } last ? Loc.Format("Last checked %@", last.ToString("g", CultureInfo.CurrentCulture))
+            : Loc.T("Not checked yet");
     }
 }
