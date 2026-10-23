@@ -218,7 +218,7 @@ public static partial class PromptBuilder
     /// <summary>Swift <c>components(separatedBy: .newlines)</c> joined by spaces: each line break character is one space.</summary>
     private static string OneLine(string text) => string.Join(" ", text.Split(NewlineCharacters));
 
-    private static readonly char[] NewlineCharacters = ['\n', '\u000B', '\u000C', '\r', '\u0085', '\u2028', '\u2029'];
+    internal static readonly char[] NewlineCharacters = ['\n', '\u000B', '\u000C', '\r', '\u0085', '\u2028', '\u2029'];
 
     /// <summary>Title, date and participants: user data, so in the user message.</summary>
     private static string MeetingHeader(Conversation conversation, Transcript transcript)
@@ -241,7 +241,7 @@ public static partial class PromptBuilder
         (history ?? []).Where(m => m.Role != LLMRole.System).Select(m => new LLMMessage(m.Role, Escape(m.Content)));
 
     /// <summary>The first <paramref name="count"/> user-perceived characters (grapheme clusters), like Swift's <c>prefix</c>.</summary>
-    private static string PrefixCharacters(string text, int count)
+    internal static string PrefixCharacters(string text, int count)
     {
         var length = 0;
         for (var i = 0; i < count && length < text.Length; i++) length += StringInfo.GetNextTextElementLength(text, length);
