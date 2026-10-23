@@ -22,8 +22,8 @@ namespace EchoDiar.App.Views;
 /// The library (macOS ConversationListView.swift and MainView.swift libraryPane): conversation cards under day headers
 /// (Today, Yesterday, then the date), filtered by the toolbar's search, with the model download banner (MVP). While
 /// recording, the recording's card sits above them and the recording's own entry is left out. Ctrl-click and
-/// Shift-click select cards (from the open entry in the sidebar, as in Mail); the selection bar then shows over the top
-/// of the list with Delete and Cancel (Esc, the window's: <see cref="MainWindow"/>). Delete deletes the selection (the
+/// Shift-click select cards (from the open entry in the sidebar, as in Mail); the selection bar then shows above the
+/// list, which moves down, with Delete and Cancel (Esc, the window's: <see cref="MainWindow"/>). Delete deletes the selection (the
 /// window's key too), else the focused card. The ListView itself never selects: the cards draw the open conversation and the selection, so the
 /// arrow keys only move the focus.
 /// </summary>
