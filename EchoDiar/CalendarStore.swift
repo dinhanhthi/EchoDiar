@@ -67,16 +67,20 @@ final class CalendarStore {
             .sorted { ($0.sourceTitle, $0.title) < ($1.sourceTitle, $1.title) }
     }
 
-    /// Occurrences overlapping `from..<to` in every calendar; empty when not authorized.
-    func events(from: Date, to: Date) -> [CalendarEvent] {
+    /// Occurrences overlapping `from..<to` in every calendar; empty when not authorized. `ownCalendarID` is
+    /// EchoDiar's calendar, whose events without invitees count as the user's.
+    func events(from: Date, to: Date, ownCalendarID: String?) -> [CalendarEvent] {
         guard isAuthorized else { return [] }
         let predicate = store.predicateForEvents(withStart: from, end: to, calendars: nil)
         return store.events(matching: predicate).map { event in
             let status = event.attendees?.first(where: \.isCurrentUser)?.participantStatus
-            // Subscribed, birthday and read-only calendars hold events the user never answered: there "no attendees"
-            // does not confirm.
-            let ownCalendar = event.calendar.type != .subscription && event.calendar.type != .birthday
+            // "No attendees" confirms only where no one else can add events: "On My Mac" (never shared) and EchoDiar's
+            // calendar. EventKit has no shared flag, and a writable calendar may be someone's share, so those ask.
+            // Subscribed, birthday and read-only calendars never confirm this way.
+            let trustedCalendar = event.calendar.type != .subscription && event.calendar.type != .birthday
                 && event.calendar.allowsContentModifications
+                && (event.calendar.source?.sourceType == .local
+                    || (ownCalendarID != nil && event.calendar.calendarIdentifier == ownCalendarID))
             return CalendarEvent(
                 id: occurrenceID(event),
                 title: Self.displayTitle(event.title),
@@ -88,7 +92,7 @@ final class CalendarStore {
                 declined: status == .declined,
                 canceled: event.status == .canceled,
                 // An invite added without the user's answer (one from a stranger too) never starts silently.
-                confirmed: ((event.attendees ?? []).isEmpty && ownCalendar) || event.organizer?.isCurrentUser == true
+                confirmed: ((event.attendees ?? []).isEmpty && trustedCalendar) || event.organizer?.isCurrentUser == true
                     || status == .accepted || status == .tentative
             )
         }

@@ -2368,7 +2368,9 @@ extension AppModel {
             return
         }
         // Events in progress overlap `now` and are returned too.
-        scheduler.update(calendarStore.events(from: now, to: now + 7 * 86_400), configuration: settings.calendar)
+        let events = calendarStore.events(
+            from: now, to: now + 7 * 86_400, ownCalendarID: settings.calendar.ownCalendarID)
+        scheduler.update(events, configuration: settings.calendar)
         upcomingEvents = scheduler.upcoming(after: now, limit: 50)
         // Ended, deleted, moved or skipped since: drop its prompt and wait (and the wait in another mode).
         func isActive(_ event: CalendarEvent) -> Bool {
