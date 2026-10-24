@@ -73,7 +73,7 @@ With the variable set, the output must show the writer tests ran, not "skipped".
 [.github/workflows/windows.yml](../.github/workflows/windows.yml) runs on pushes to `plan/2026-10-21-windows-port` and `main` that touch `windows/**` or the workflow file, on pull requests touching the same paths, and on `workflow_dispatch`. Jobs:
 
 - `test` (windows-latest) and `test-arm64` (windows-11-arm): the same `dotnet test` and filter as above, run from `windows/` so `global.json` applies.
-- `package` (matrix x64, arm64): builds the Debug MSIX with MSBuild (`SideloadOnly`, no bundle, manifest Version `0.0.<run number>.0`) and signs it with the dev certificate (pull requests from forks build unsigned). A package contents check then fails the job unless every native DLL (Whisper.net, sherpa-onnx, LLamaSharp) is in the `.msix` for the job's architecture, and the only `onnxruntime.dll` is sherpa-onnx's (the Windows App SDK metapackage is not used for this reason: its ML component ships another `onnxruntime.dll`).
+- `package` (matrix x64, arm64): builds the Debug MSIX with MSBuild (`SideloadOnly`, no bundle, manifest Version `0.0.<run number>.0`) and signs it with the dev certificate from the `windows-dev-signing` environment (pull requests run without the environment and build unsigned). A package contents check then fails the job unless every native DLL (Whisper.net, sherpa-onnx, LLamaSharp) is in the `.msix` for the job's architecture, and the only `onnxruntime.dll` is sherpa-onnx's (the Windows App SDK metapackage is not used for this reason: its ML component ships another `onnxruntime.dll`).
 
 Each `package` job uploads the artifact `EchoDiar-win-<arch>` (kept 14 days): the `.msix`, the public `EchoDiarDev.cer` and `vm-install.ps1`. The private key never leaves the runner; staging fails if a `.pfx` or `.p12` lands in the artifact.
 
@@ -148,7 +148,7 @@ The library lives at the real `%LOCALAPPDATA%\EchoDiar`, with the same layout an
 
 ## Dev signing certificate (one-time)
 
-CI signs the MSIX with a self-signed dev certificate stored in two repository secrets, `WINDOWS_DEV_CERT_PFX` (the base64 PFX) and `WINDOWS_DEV_CERT_PASSWORD`. Its subject must be exactly `CN=EchoDiar Dev`, the `Publisher` of the manifest `Identity`, or signing fails. To create or rotate it, on the Mac:
+CI signs the MSIX with a self-signed dev certificate stored in two secrets of the GitHub environment `windows-dev-signing`, `WINDOWS_DEV_CERT_PFX` (the base64 PFX) and `WINDOWS_DEV_CERT_PASSWORD` ([docs/RELEASING.md, Protect the signing secrets](../docs/RELEASING.md#protect-the-signing-secrets)). They are not repository secrets. The certificate subject must be exactly `CN=EchoDiar Dev`, the `Publisher` of the manifest `Identity`, or signing fails. To create or rotate it, on the Mac:
 
 ```sh
 cd "$(mktemp -d)"
@@ -165,12 +165,12 @@ rm key.pem cert.pem
 # Keep the password in the Keychain (read it back with: security find-generic-password -s echodiar-windows-dev-cert -a ci -w)
 security add-generic-password -U -s echodiar-windows-dev-cert -a ci -w "$PFX_PASSWORD"
 
-base64 -i ~/.config/echodiar/windows-dev-cert.pfx | gh secret set WINDOWS_DEV_CERT_PFX
-printf '%s' "$PFX_PASSWORD" | gh secret set WINDOWS_DEV_CERT_PASSWORD
+base64 -i ~/.config/echodiar/windows-dev-cert.pfx | gh secret set WINDOWS_DEV_CERT_PFX --env windows-dev-signing
+printf '%s' "$PFX_PASSWORD" | gh secret set WINDOWS_DEV_CERT_PASSWORD --env windows-dev-signing
 unset PFX_PASSWORD
 ```
 
-Check with `gh secret list` and:
+Check with `gh secret list --env windows-dev-signing` and:
 
 ```sh
 PFX_PASSWORD="$(security find-generic-password -s echodiar-windows-dev-cert -a ci -w)" \

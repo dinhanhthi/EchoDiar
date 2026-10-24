@@ -226,17 +226,20 @@ Never paste passwords, client secrets or private keys into an AI chat. Run the c
 
 #### Dev certificate
 
-The repository secrets `WINDOWS_DEV_CERT_PFX` (base64 PFX) and `WINDOWS_DEV_CERT_PASSWORD` hold the dev certificate, subject exactly `CN=EchoDiar Dev`. They also sign the CI builds of `windows.yml`. Create or rotate them as in [windows/README.md, Dev signing certificate](../windows/README.md#dev-signing-certificate-one-time).
+The secrets `WINDOWS_DEV_CERT_PFX` (base64 PFX) and `WINDOWS_DEV_CERT_PASSWORD` of the environment `windows-dev-signing` hold the dev certificate, subject exactly `CN=EchoDiar Dev`. They also sign the CI builds of `windows.yml`. Create or rotate them as in [windows/README.md, Dev signing certificate](../windows/README.md#dev-signing-certificate-one-time).
 
-#### Protect the signing secrets (recommended)
+#### Protect the signing secrets
 
-Repository secrets reach every workflow run of the repository. Moving the signing secrets into GitHub Environments limits them to the runs you allow. Set it up once in the GitHub UI (Settings > Environments, Settings > Rules); no workflow sets it up for you:
+Repository secrets reach every workflow run of the repository, so the dev certificate lives in a GitHub Environment instead (set up 2026-10-24, Settings > Environments and Settings > Rules):
 
-1. A tag ruleset on `windows-v*` (Settings > Rules > Rulesets, target tags): only you may create, update or delete these tags, so nobody else can start a release run.
-2. An environment `windows-dev-signing` with "Deployment branches and tags" set to selected branches and tags (`main`, `plan/*` for the CI builds and the `windows-v*` tags), or with yourself as a required reviewer. Move `WINDOWS_DEV_CERT_PFX` and `WINDOWS_DEV_CERT_PASSWORD` into it as environment secrets, then delete the repository secrets.
-3. The same for the public channel: an environment (e.g. `windows-public-signing`) restricted to the `windows-v*` tags with a required reviewer, holding the Trusted Signing secrets. Prefer OpenID Connect (a federated credential on the app registration, `azure/login` with `id-token: write`) over `AZURE_CLIENT_SECRET`, so no long-lived secret is stored at all.
+1. The tag ruleset "windows release tags" (target tags, `refs/tags/windows-v*`, active): it blocks creating, updating and deleting these tags for everyone but the repository admin role (bypass always), so only you can start a release run; `release.sh` keeps working for you.
+2. The environment `windows-dev-signing`, "Deployment branches and tags" = selected: the tags `windows-v*` and the branches `main` and `plan/2026-10-21-windows-port`. It holds `WINDOWS_DEV_CERT_PFX` and `WINDOWS_DEV_CERT_PASSWORD` as environment secrets; there are no repository secrets of that name. The jobs that read the dev certificate name it: `package` in `windows.yml` (except on pull requests, which are not allowed by the policy and build unsigned), `package` and `bundle` in `windows-release.yml` (dev channel only).
 
-Only once an environment exists, change the workflows: add `environment: windows-dev-signing` to the jobs that read the dev certificate (`package` and `bundle` in `windows-release.yml`, `package` in `windows.yml`) and `environment: windows-public-signing` to the job that signs with Trusted Signing. Do not add it before: a job naming a missing environment creates it, unprotected.
+Consequences: a CI build of another branch (for example a new `plan/*` branch, or `workflow_dispatch` on one) fails at the environment check of `package` until you add the branch to the environment (Settings > Environments > `windows-dev-signing` > Deployment branches and tags, or `gh api -X POST repos/dinhanhthi/EchoDiar/environments/windows-dev-signing/deployment-branch-policies -f name='<branch>' -f type=branch`). Each signing job shows up as a deployment of the environment.
+
+Rotate the certificate as in [windows/README.md, Dev signing certificate](../windows/README.md#dev-signing-certificate-one-time): it sets the two environment secrets (`gh secret set ... --env windows-dev-signing`, value on stdin). Check with `gh secret list --env windows-dev-signing`.
+
+Still to do, for the public channel: an environment `windows-public-signing` restricted to the `windows-v*` tags with a required reviewer, holding the Trusted Signing secrets, and named by the job that signs with Trusted Signing (`windows-release.yml` has a comment where). Create the environment first: a job naming a missing environment creates it, unprotected. Prefer OpenID Connect (a federated credential on the app registration, `azure/login` with `id-token: write`) over `AZURE_CLIENT_SECRET`, so no long-lived secret is stored at all.
 
 #### Trusted Signing (public channel)
 
