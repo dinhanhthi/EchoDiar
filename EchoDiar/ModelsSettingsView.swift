@@ -72,6 +72,10 @@ struct ModelsSettingsView: View {
     private var generalSection: some View {
         Section {
             LanguagePicker(title: "Default language", selection: defaultLanguage, model: model)
+            Toggle(isOn: model.setting(\.rememberRecordingLanguage)) {
+                Text("Remember last record language")
+                Text("Uses the language picked in the Record menu for the next recordings instead of the default language. Languages changed during a recording don't count.")
+            }
             Toggle(isOn: model.setting(\.transcribeWhileRecording)) {
                 Text("Transcribe while recording")
                 Text("Shows the transcript during the recording and keeps it, so it is ready within seconds of Stop. Uses more CPU and memory while recording. WhisperKit and Parakeet models only; other engines transcribe after Stop.")
@@ -247,9 +251,10 @@ struct ModelRow: View {
         }
     }
 
-    /// Set for an ASR row that cannot transcribe the default language (e.g. "No Vietnamese"); Auto never disables.
+    /// Set for an ASR row that cannot transcribe the next recording's language (e.g. "No Vietnamese"); Auto never
+    /// disables.
     private var unsupportedNote: String? {
-        let language = model.settings.defaultLanguage
+        let language = model.recordingLanguage
         guard entry.kind == .asr, language != LanguageOptions.auto, !language.isEmpty else { return nil }
         let primary = String(language.lowercased().split(whereSeparator: { $0 == "-" || $0 == "_" }).first ?? "")
         let supported = TranscriptionPipeline.supportedLanguages(for: entry)

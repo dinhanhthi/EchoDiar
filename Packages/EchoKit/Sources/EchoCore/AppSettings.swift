@@ -9,6 +9,11 @@ public struct AppSettings: Codable, Equatable, Sendable {
     public var defaultLanguage: String
     /// Languages picked for recordings and re-transcriptions, most recent first, at most 5.
     public var recentLanguages: [String]
+    /// Start recordings in the language last picked from the record button's menu instead of `defaultLanguage`.
+    public var rememberRecordingLanguage: Bool
+    /// The language last picked from the record button's menu while `rememberRecordingLanguage` is on (a code or
+    /// "auto"); kept, but ignored, once it is turned off.
+    public var lastRecordingLanguage: String?
     /// Total AAC bitrate of the compressed 2-channel `audio.m4a`.
     public var compressionBitrateKbps: Int
     /// Keep the uncompressed CAF next to the m4a after compression.
@@ -70,6 +75,8 @@ public struct AppSettings: Codable, Equatable, Sendable {
     public var pillSize: PillSize
     /// Auto-stop thresholds.
     public var endMonitor: MeetingEndMonitor.Configuration
+    /// Calendar auto-record: trigger mode, watched calendars, event-end stop and skipped occurrences.
+    public var calendar: CalendarScheduler.Configuration
     /// What losing the recording microphone does.
     public var routeChangeBehavior: RouteChangeBehavior
     /// Queue the batch transcription when a recording stops (after compression).
@@ -104,6 +111,8 @@ public struct AppSettings: Codable, Equatable, Sendable {
         launchAtLogin: Bool = false,
         defaultLanguage: String = "auto",
         recentLanguages: [String] = [],
+        rememberRecordingLanguage: Bool = false,
+        lastRecordingLanguage: String? = nil,
         compressionBitrateKbps: Int = 64,
         keepUncompressedAudio: Bool = false,
         playbackChannels: PlaybackChannels = .mixed,
@@ -132,6 +141,7 @@ public struct AppSettings: Codable, Equatable, Sendable {
         pillWindowOffset: PillPosition? = nil,
         pillSize: PillSize = .medium,
         endMonitor: MeetingEndMonitor.Configuration = MeetingEndMonitor.Configuration(),
+        calendar: CalendarScheduler.Configuration = CalendarScheduler.Configuration(),
         routeChangeBehavior: RouteChangeBehavior = .ask,
         autoTranscribe: Bool = true,
         transcribeWhileRecording: Bool = true,
@@ -151,6 +161,8 @@ public struct AppSettings: Codable, Equatable, Sendable {
         self.launchAtLogin = launchAtLogin
         self.defaultLanguage = defaultLanguage
         self.recentLanguages = recentLanguages
+        self.rememberRecordingLanguage = rememberRecordingLanguage
+        self.lastRecordingLanguage = lastRecordingLanguage
         self.compressionBitrateKbps = compressionBitrateKbps
         self.keepUncompressedAudio = keepUncompressedAudio
         self.playbackChannels = playbackChannels
@@ -179,6 +191,7 @@ public struct AppSettings: Codable, Equatable, Sendable {
         self.pillWindowOffset = pillWindowOffset
         self.pillSize = pillSize
         self.endMonitor = endMonitor
+        self.calendar = calendar
         self.routeChangeBehavior = routeChangeBehavior
         self.autoTranscribe = autoTranscribe
         self.transcribeWhileRecording = transcribeWhileRecording
@@ -206,12 +219,14 @@ public struct AppSettings: Codable, Equatable, Sendable {
 
     private enum CodingKeys: String, CodingKey {
         case version, launchAtLogin, defaultLanguage, recentLanguages, compressionBitrateKbps, keepUncompressedAudio
+        case rememberRecordingLanguage, lastRecordingLanguage
         case playbackChannels, onboardingCompleted, modelIdleMinutes
         case defaultASRModelID, defaultDiarizerModelID, providers
         case cloudSTTConfirmed, defaultAIProviderID, defaultAIModel, summaryLanguage, chatContextMessages
         case ragEnabled, embeddingModelID, embeddingAPIModel, cloudEmbeddingConfirmed
         case micDeviceUID, meetingDetection, perAppBehavior, pillPositions, showPill, hidePillWhenAppActive
         case showPillInScreenCaptures, attachPillToWindow, pillWindowOffset, pillSize, endMonitor, routeChangeBehavior
+        case calendar
         case autoTranscribe, transcribeWhileRecording, speakerCountHint, diarization, deferTranscriptionWhenConstrained
         case autoDeleteEnabled, autoDeleteAfterDays, autoDeleteMode, deleteAudioAfterTranscription
         case deleteWithoutConfirmation, globalHotKey, globalHotKeyEnabled, globalPauseHotKey, globalPauseHotKeyEnabled
@@ -223,6 +238,9 @@ public struct AppSettings: Codable, Equatable, Sendable {
         launchAtLogin = try container.decodeIfPresent(Bool.self, forKey: .launchAtLogin) ?? false
         defaultLanguage = try container.decodeIfPresent(String.self, forKey: .defaultLanguage) ?? "auto"
         recentLanguages = try container.decodeIfPresent([String].self, forKey: .recentLanguages) ?? []
+        rememberRecordingLanguage = try container.decodeIfPresent(
+            Bool.self, forKey: .rememberRecordingLanguage) ?? false
+        lastRecordingLanguage = try container.decodeIfPresent(String.self, forKey: .lastRecordingLanguage)
         compressionBitrateKbps = try container.decodeIfPresent(Int.self, forKey: .compressionBitrateKbps) ?? 64
         keepUncompressedAudio = try container.decodeIfPresent(Bool.self, forKey: .keepUncompressedAudio) ?? false
         playbackChannels = try container.decodeIfPresent(PlaybackChannels.self, forKey: .playbackChannels) ?? .mixed
@@ -254,6 +272,8 @@ public struct AppSettings: Codable, Equatable, Sendable {
         pillSize = try container.decodeIfPresent(PillSize.self, forKey: .pillSize) ?? .medium
         endMonitor = try container.decodeIfPresent(MeetingEndMonitor.Configuration.self, forKey: .endMonitor)
             ?? MeetingEndMonitor.Configuration()
+        calendar = try container.decodeIfPresent(CalendarScheduler.Configuration.self, forKey: .calendar)
+            ?? CalendarScheduler.Configuration()
         routeChangeBehavior = try container.decodeIfPresent(RouteChangeBehavior.self, forKey: .routeChangeBehavior) ?? .ask
         autoTranscribe = try container.decodeIfPresent(Bool.self, forKey: .autoTranscribe) ?? true
         transcribeWhileRecording = try container.decodeIfPresent(Bool.self, forKey: .transcribeWhileRecording) ?? true

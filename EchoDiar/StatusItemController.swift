@@ -1,4 +1,5 @@
 import AppKit
+import EchoCore
 
 /// What the menu bar icon shows.
 enum IndicatorState: CaseIterable {
@@ -39,6 +40,9 @@ struct RecordingMenuControls {
     /// The detected meeting app's name ("Detected: Zoom"); nil when none.
     var detectedApp: @MainActor () -> String?
     var stopAskingForDetectedApp: @MainActor () -> Void
+    /// Eligible calendar events not yet ended, by start; empty without calendar access.
+    var upcoming: @MainActor () -> [CalendarEvent]
+    var openMeetingLink: @MainActor (CalendarEvent) -> Void
 }
 
 /// Menu bar item with a plain AppKit menu (no SwiftUI, for footprint). The menu is rebuilt each time it opens.
@@ -184,6 +188,7 @@ final class StatusItemController: NSObject, NSMenuDelegate {
             menu.addItem(item(String(localized: "Stop asking for this app"), #selector(stopAskingForDetectedApp)))
             menu.addItem(.separator())
         }
+        if let controls = Self.controls { addUpcomingItems(controls) }
         menu.addItem(item(String(localized: "Settings…"), #selector(openSettings)))
         #if DEBUG
         let simulate = NSMenuItem(title: "Simulate state", action: nil, keyEquivalent: "")
@@ -236,6 +241,28 @@ final class StatusItemController: NSObject, NSMenuDelegate {
         menu.addItem(.separator())
     }
 
+    /// Up to 3 events in progress or starting within 12 h, as "14:00 Weekly sync"; one with a link opens it.
+    private func addUpcomingItems(_ controls: RecordingMenuControls) {
+        let now = Date()
+        let events = controls.upcoming()
+            .filter { $0.end > now && $0.start <= now.addingTimeInterval(12 * 3_600) }
+            .prefix(3)
+        guard !events.isEmpty else { return }
+        let header = NSMenuItem(title: String(localized: "Upcoming"), action: nil, keyEquivalent: "")
+        header.isEnabled = false
+        menu.addItem(header)
+        for event in events {
+            let time = event.start.formatted(date: .omitted, time: .shortened)
+            // The title comes from the invite: cut so a long one cannot widen the menu.
+            let title = event.title.count > 60 ? String(event.title.prefix(59)) + "…" : event.title
+            let entry = item("\(time) \(title)", #selector(openMeetingLink(_:)))
+            entry.representedObject = event
+            entry.isEnabled = event.link != nil
+            menu.addItem(entry)
+        }
+        menu.addItem(.separator())
+    }
+
     /// A submenu in `LanguageOptions` order; picking a language adds a marker at the current recording time.
     private func languageItem(_ controls: RecordingMenuControls) -> NSMenuItem {
         let current = controls.language()
@@ -271,6 +298,9 @@ final class StatusItemController: NSObject, NSMenuDelegate {
         if let code = sender.representedObject as? String { Self.controls?.setLanguage(code) }
     }
     @objc private func stopAskingForDetectedApp() { Self.controls?.stopAskingForDetectedApp() }
+    @objc private func openMeetingLink(_ sender: NSMenuItem) {
+        if let event = sender.representedObject as? CalendarEvent { Self.controls?.openMeetingLink(event) }
+    }
     @objc private func fixSilentTap() { PrivacySettings.openSystemAudioRecording() }
     @objc private func openSettings() { onOpenSettings() }
     @objc private func checkForUpdates() { updater.checkForUpdates() }

@@ -47,6 +47,7 @@ struct FloatingPillView: View {
         switch model.pillPrompt {
         case .meetingDetected(let meeting)?: detectedPrompt(meeting)
         case .meetingEnded(let reason, let deadline)?: endPrompt(reason: reason, deadline: deadline)
+        case .calendarEvent(let event)?: calendarPrompt(event)
         case nil: indicator
         }
     }
@@ -66,6 +67,9 @@ struct FloatingPillView: View {
             if let name = model.autoStartedAppName {
                 Text("Recording \(name)", comment: "Floating pill: the name of the app being recorded")
                     .font(.system(size: 12 * scale, weight: .semibold))
+                    .lineLimit(1)
+                    .truncationMode(.middle)
+                    .frame(maxWidth: 320, alignment: .leading)
             }
             if paused {
                 elapsed.foregroundStyle(tint)
@@ -162,6 +166,31 @@ struct FloatingPillView: View {
         .padding(.vertical, 10)
     }
 
+    /// The title comes from the invite: one line, truncated, so a long one cannot widen the pill.
+    private func calendarPrompt(_ event: CalendarEvent) -> some View {
+        HStack(spacing: 10) {
+            PillLogo(size: 32)
+            VStack(alignment: .leading, spacing: 8) {
+                Text("\(event.title) is starting", comment: "Floating pill: a calendar event's title")
+                    .font(.callout.weight(.semibold))
+                    .lineLimit(1)
+                    .truncationMode(.middle)
+                    .frame(maxWidth: 320, alignment: .leading)
+                HStack(spacing: 8) {
+                    Button("Record", action: model.recordCalendarEvent)
+                        .buttonStyle(.borderedProminent)
+                        .tint(.red)
+                    if event.link != nil {
+                        Button("Join", action: model.joinCalendarEvent)
+                    }
+                    Button("Not now", action: model.dismissCalendarPrompt)
+                }
+                .controlSize(.small)
+            }
+        }
+        .padding(.vertical, 10)
+    }
+
     /// The default action is Stop: the recording stops when the countdown ends.
     private func endPrompt(reason: MeetingEndMonitor.Reason, deadline: Date) -> some View {
         HStack(spacing: 10) {
@@ -202,6 +231,7 @@ struct FloatingPillView: View {
                 localized: "No sound for \(model.settings.endMonitor.effectiveSilenceMinutes) min — stop recording?")
         case .screenLocked: return String(localized: "Screen locked — stop recording?")
         case .inputRouteLost: return String(localized: "Microphone disconnected — stop recording?")
+        case .eventEnded: return String(localized: "The meeting has ended — stop recording?")
         case .systemSleep, .diskFull, .maxDuration: return String(localized: "Stop recording?")
         }
     }

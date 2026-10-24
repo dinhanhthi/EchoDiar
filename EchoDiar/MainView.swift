@@ -3,10 +3,10 @@ import EchoAudio
 import EchoCore
 import SwiftUI
 
-/// The main window, two pages: the library (the cards as a sidebar, then a conversation, the open recording while
-/// recording, or the welcome pane) and Settings. Back, Record (or Stop and Pause) and a conversation's title on the
-/// leading side; a conversation's Reveal in Finder, Settings, the library chat and Search, then the conversation's tabs
-/// on the trailing side. The library chat takes the sidebar's place.
+/// The main window, three pages: the library (the cards as a sidebar, then a conversation, the open recording while
+/// recording, or the welcome pane), Settings and the Calendar. Back, Record (or Stop and Pause) and a conversation's
+/// title on the leading side; a conversation's Reveal in Finder, Settings, Calendar, the library chat and Search, then
+/// the conversation's tabs on the trailing side. The library chat takes the sidebar's place.
 struct MainView: View {
     let model: AppModel
     let updater: Updater
@@ -26,7 +26,7 @@ struct MainView: View {
     @State private var searchBarGhost: CGRect?
     /// The route on screen; it follows `model.route`, with a slide when the page changes.
     @State private var shownRoute = AppModel.Route.list
-    /// The last page change went to a page further right (library, Settings).
+    /// The last page change went to a page further right (library, Settings, Calendar).
     @State private var forward = true
     /// The toolbar title's rename popover is open, with `titleDraft` in its field.
     @State private var renamingTitle = false
@@ -52,10 +52,14 @@ struct MainView: View {
     /// The pages that slide, left to right; moving between the list, conversations and the recording stays on the
     /// library page, only its detail changes.
     private enum Page: Int {
-        case library, settings
+        case library, settings, calendar
 
         init(_ route: AppModel.Route) {
-            self = route == .settings ? .settings : .library
+            switch route {
+            case .settings: self = .settings
+            case .calendar: self = .calendar
+            default: self = .library
+            }
         }
     }
 
@@ -74,7 +78,10 @@ struct MainView: View {
             ZStack {
                 switch Page(shownRoute) {
                 case .library: libraryPage.transition(pageTransition)
-                case .settings: SettingsView(model: model, query: $query).transition(pageTransition)
+                // Capsule buttons on these two pages only; the toolbar and the library keep their own styles.
+                case .settings:
+                    SettingsView(model: model, query: $query).buttonBorderShape(.capsule).transition(pageTransition)
+                case .calendar: CalendarView(model: model).buttonBorderShape(.capsule).transition(pageTransition)
                 }
             }
         }
@@ -88,8 +95,10 @@ struct MainView: View {
             forward = Page(new).rawValue >= Page(old).rawValue
             withAnimation(Self.paneAnimation) { shownRoute = new }
             // Another page closes the search bar back into the Search button and clears the query; another entry or
-            // the welcome pane keeps it, for the sidebar it filters.
+            // the welcome pane keeps it, for the sidebar it filters. Search on the Calendar page (which never has the
+            // bar open) goes back to the library to open it there.
             query = ""
+            guard !(Page(old) == .calendar && model.searchPresented) else { return }
             model.searchPresented = false
             searchExpanded = false
         }
@@ -122,8 +131,8 @@ struct MainView: View {
             if !query.isEmpty { try? await Task.sleep(for: .milliseconds(200)) }
             if !Task.isCancelled { debouncedQuery = query }
         }
-        // Settings search filters the settings, not the library: no documents to read there.
-        .task(id: debouncedQuery.isEmpty || model.route == .settings
+        // Settings search filters the settings, not the library: no documents to read there (nor on the Calendar).
+        .task(id: debouncedQuery.isEmpty || Page(model.route) != .library
                 ? nil : SearchLoadKey(conversations: model.conversations, jobsEnded: model.aiJobsEnded,
                                 transcriptEdits: model.transcriptEdits, chatChanges: model.chatHistoryChanges)) {
             await loadSearchDocuments()
@@ -158,9 +167,18 @@ struct MainView: View {
                     }
                     .help("Settings")
                     Toggle(isOn: Binding(
-                        get: { model.globalChatOpen && model.route != .settings },
+                        get: { model.route == .calendar },
+                        set: { if $0 { model.openCalendar() } else { model.goBack() } }
+                    )) {
+                        Label("Calendar", systemImage: "calendar")
+                    }
+                    .help("Calendar")
+                    Toggle(isOn: Binding(
+                        get: { model.globalChatOpen && Page(model.route) == .library },
                         set: { open in
+                            // Settings opened from the Calendar page goes back twice, to the library.
                             if model.route == .settings { model.goBack() }
+                            if model.route == .calendar { model.goBack() }
                             model.globalChatOpen = open
                             guard open else { return }
                             query = ""
@@ -374,10 +392,10 @@ struct MainView: View {
     private static let titleMaxWidth: CGFloat = 360
     private static let titleMinWidth: CGFloat = 120
     /// Approximate widths of the other items: the traffic lights, Back and the record capsule; the tabs; Reveal in
-    /// Finder with Delete, Settings, the library chat and Search.
+    /// Finder with Delete, Settings, Calendar, the library chat and Search.
     private static let leadingWidth: CGFloat = 250
     private static let tabsWidth: CGFloat = 240
-    private static let trailingButtonsWidth: CGFloat = 240
+    private static let trailingButtonsWidth: CGFloat = 280
 
     private var updateWidth: CGFloat { showsUpdate ? 52 : 0 }
 
@@ -658,7 +676,7 @@ struct MainView: View {
             return cached?.size != conversation.sizeBytes || cached?.jobsEnded != jobsEnded
                 || cached?.edits != transcriptEdits[conversation.id, default: 0] || cached?.chatChanges != chatChanges
         }
-        guard !debouncedQuery.isEmpty, model.route != .settings, !stale.isEmpty else { return }
+        guard !debouncedQuery.isEmpty, Page(model.route) == .library, !stale.isEmpty else { return }
         let loaded = await Task.detached(priority: .utility) {
             stale.map { conversation in
                 let document = ConversationSearch.document(
