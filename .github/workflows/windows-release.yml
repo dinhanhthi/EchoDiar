@@ -15,7 +15,8 @@ name: Windows release
 # maps to the same version. Dev releases use 0.0.N (N above the 0.0.<run>.0 of windows.yml CI builds), public
 # releases the macOS marketing version.
 # Signing:
-#   - dev: the dev certificate (WINDOWS_DEV_CERT_PFX / WINDOWS_DEV_CERT_PASSWORD), Publisher CN=EchoDiar Dev.
+#   - dev: the dev certificate (WINDOWS_DEV_CERT_PFX / WINDOWS_DEV_CERT_PASSWORD, secrets of the windows-dev-signing
+#     environment), Publisher CN=EchoDiar Dev.
 #   - public: Trusted Signing, not implemented yet. The run fails at once unless the secrets AZURE_TENANT_ID,
 #     AZURE_CLIENT_ID, AZURE_CLIENT_SECRET, TRUSTED_SIGNING_ENDPOINT, TRUSTED_SIGNING_ACCOUNT,
 #     TRUSTED_SIGNING_CERT_PROFILE and the variable WINDOWS_PUBLIC_PUBLISHER (the Trusted Signing certificate
@@ -146,6 +147,9 @@ jobs:
   package:
     needs: prepare
     runs-on: windows-latest
+    # Dev channel only. The public channel runs without an environment for now; move its Trusted Signing secrets
+    # into a windows-public-signing environment (docs/RELEASING.md) and name it here and in bundle.
+    environment: ${{ needs.prepare.outputs.channel == 'dev' && 'windows-dev-signing' || '' }}
     timeout-minutes: 45
     defaults:
       run:
@@ -316,6 +320,8 @@ jobs:
   bundle:
     needs: [prepare, package]
     runs-on: windows-latest
+    # Same as package: the dev certificate comes from windows-dev-signing; windows-public-signing to come.
+    environment: ${{ needs.prepare.outputs.channel == 'dev' && 'windows-dev-signing' || '' }}
     timeout-minutes: 20
     defaults:
       run:

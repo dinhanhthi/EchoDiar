@@ -3,8 +3,9 @@ name: Windows
 # Builds the Windows port (windows/): runs the unit tests once they exist, the native engine smoke
 # tests on x64 and ARM64, and packages a signed sideload MSIX per architecture for the QA VM
 # (artifact EchoDiar-win-<arch>).
-# Signing uses the dev certificate in the WINDOWS_DEV_CERT_PFX / WINDOWS_DEV_CERT_PASSWORD
-# secrets; pull requests from forks get no secrets and build an unsigned package.
+# Signing uses the dev certificate in the WINDOWS_DEV_CERT_PFX / WINDOWS_DEV_CERT_PASSWORD secrets of the
+# windows-dev-signing environment, which only allows the branches above (and windows-v* tags); pull requests
+# do not use the environment and build an unsigned package.
 
 on:
   push:
@@ -160,6 +161,8 @@ jobs:
 
   package:
     runs-on: windows-latest
+    # Pull request refs are not allowed by the environment's deployment policy: they build unsigned without it.
+    environment: ${{ github.event_name != 'pull_request' && 'windows-dev-signing' || '' }}
     strategy:
       fail-fast: false
       matrix:
@@ -197,7 +200,7 @@ jobs:
           Select-String -Path $path -Pattern 'Version="0\.0\.' | ForEach-Object { $_.Line.Trim() }
 
       - name: Decode signing certificate
-        if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
+        if: github.event_name != 'pull_request'
         env:
           PFX_BASE64: ${{ secrets.WINDOWS_DEV_CERT_PFX }}
         run: |
@@ -224,7 +227,7 @@ jobs:
             $props += "/p:PackageCertificateKeyFile=$env:PFX_PATH"
             $props += "/p:PackageCertificatePassword=$env:PFX_PASSWORD"
           } else {
-            Write-Host 'No signing certificate (fork pull request): building an unsigned package.'
+            Write-Host 'No signing certificate (pull request): building an unsigned package.'
             $props += '/p:AppxPackageSigningEnabled=false'
           }
           msbuild windows/src/EchoDiar.App/EchoDiar.App.csproj /restore /nologo /v:minimal @props
