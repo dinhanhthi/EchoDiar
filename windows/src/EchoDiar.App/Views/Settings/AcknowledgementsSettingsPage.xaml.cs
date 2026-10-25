@@ -26,6 +26,7 @@ public sealed partial class AcknowledgementsSettingsPage : UserControl
         new("whisper.cpp", "Whisper.net.Runtime 1.9.1", "Used by Whisper.net", "MIT", "https://github.com/ggml-org/whisper.cpp"),
         new("sherpa-onnx", "1.13.8", "Parakeet transcription and speaker diarization", "Apache-2.0", "https://github.com/k2-fsa/sherpa-onnx"),
         new("ONNX Runtime", "sherpa-onnx 1.13.8", "Used by sherpa-onnx", "MIT", "https://github.com/microsoft/onnxruntime"),
+        new("Silero VAD", "6.2.1", "Speech detection for Whisper transcription", "MIT", "https://github.com/snakers4/silero-vad"),
         new("LLamaSharp", "0.30.0", "Local language and embedding models", "MIT", "https://github.com/SciSharp/LLamaSharp"),
         new("llama.cpp", "LLamaSharp.Backend.Cpu 0.30.0", "Used by LLamaSharp", "MIT", "https://github.com/ggml-org/llama.cpp"),
         new("NAudio", "3.3.0", "Audio capture and playback", "MIT", "https://github.com/naudio/NAudio"),

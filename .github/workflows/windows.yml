@@ -243,7 +243,7 @@ jobs:
           msbuild windows/src/EchoDiar.App/EchoDiar.App.csproj /restore /nologo /v:minimal @props
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
-      # Fails unless every native library ships in the .msix for this architecture, and the only
+      # Fails unless every native library (and the Silero model) ships in the .msix for this architecture, and the only
       # onnxruntime.dll is sherpa-onnx's (a WASDK ML copy winning would break diarization).
       - name: Check package contents
         run: |
@@ -287,6 +287,14 @@ jobs:
             $rel = $file.FullName.Substring($root.Length + 1)
             '{0,-50} 0x{1:X4}' -f $rel, $machine
             if ($machine -ne $expected) { $errors += ('{0}: machine 0x{1:X4}, expected 0x{2:X4}' -f $rel, $machine, $expected) }
+          }
+          # The Whisper speech gate's Silero model (Transcribe's Content, not a PE file): the pinned v6.2.1 file.
+          $vad = Join-Path $root 'Models/silero_vad.onnx'
+          if (-not (Test-Path -LiteralPath $vad)) { $errors += 'Missing Models/silero_vad.onnx' }
+          else {
+            $vadHash = (Get-FileHash -LiteralPath $vad -Algorithm SHA256).Hash
+            "Models/silero_vad.onnx SHA-256 $vadHash"
+            if ($vadHash -ne '1A153A22F4509E292A94E67D6F9B85E8DEB25B4988682B7E174C65279D8788E3') { $errors += "Models/silero_vad.onnx SHA-256 $vadHash is not the pinned v6.2.1 file" }
           }
           $ort = @(Get-ChildItem -LiteralPath $root -Recurse -File -Filter 'onnxruntime.dll')
           if ($ort.Count -ne 1) {

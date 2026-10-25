@@ -17,6 +17,14 @@
   </ItemGroup>
 
   <ItemGroup>
+    <!-- Silero VAD 6.2.1 (MIT) for the Whisper speech gate, one file for every architecture. Copied to the output of
+         every project that references this one, so it reaches the App's MSIX and the tests.
+         Source: https://github.com/snakers4/silero-vad/raw/v6.2.1/src/silero_vad/data/silero_vad.onnx (tag v6.2.1)
+         SHA-256: 1a153a22f4509e292a94e67d6f9b85e8deb25b4988682b7e174c65279d8788e3 (2,327,524 bytes) -->
+    <Content Include="Models\silero_vad.onnx" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+
+  <ItemGroup>
     <InternalsVisibleTo Include="EchoDiar.Tests" />
   </ItemGroup>
 </Project>
