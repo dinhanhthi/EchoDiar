@@ -1,8 +1,10 @@
 #!/usr/bin/env bash
-# Generates the Windows app's MSIX visual assets and EchoDiar.ico from assets/logo.png (the macOS app keeps its
-# own icon). Runs on the Mac with sips and python3 (stdlib, for the ICO container) only.
+# Generates the Windows app's MSIX visual assets and EchoDiar.ico from assets/logo_square.png (the green square
+# app icon, the same as macOS). Runs on the Mac with sips and python3 (stdlib, for the ICO container) only.
 #
-# Usage: bash windows/tools/make-icons.sh [--check]
+# Usage: bash windows/tools/make-icons.sh [--src <png>] [--check]
+#   --src      the source PNG (default assets/logo_square.png). Pass a copy of the committed file
+#              (git show HEAD:assets/logo_square.png > <tmp>) when the working tree has uncommitted logo edits.
 #   (no flag)  replaces every .png and the .ico in windows/src/EchoDiar.App/Assets with a fresh set.
 #   --check    generates into a temp dir and compares byte for byte with the committed Assets; exit 1 on any
 #              difference, missing or extra file. sips output is deterministic on one macOS version but may change
@@ -14,21 +16,24 @@
 set -euo pipefail
 
 root=$(cd "$(dirname "$0")/../.." && pwd)
-src="$root/assets/logo.png"
+src="$root/assets/logo_square.png"
 assets="$root/windows/src/EchoDiar.App/Assets"
 check=0
-case "${1:-}" in
-  --check) check=1 ;;
-  "") ;;
-  *) echo "usage: $0 [--check]" >&2; exit 2 ;;
-esac
+while (( $# )); do
+  case "$1" in
+    --check) check=1; shift ;;
+    --src) [[ $# -ge 2 ]] || { echo "usage: $0 [--src <png>] [--check]" >&2; exit 2; }; src=$2; shift 2 ;;
+    *) echo "usage: $0 [--src <png>] [--check]" >&2; exit 2 ;;
+  esac
+done
+[[ -f "$src" ]] || { echo "no source PNG at $src" >&2; exit 2; }
 
 work=$(mktemp -d)
 trap 'rm -rf "$work"' EXIT
 out="$work/out"
 mkdir -p "$out"
 
-# The source is a palette PNG: one RGBA master to resample from.
+# One RGBA master to resample from (the source may be a palette PNG).
 master="$work/master.png"
 sips -s format png "$src" --out "$master" >/dev/null
 src_size=$(sips -g pixelHeight "$master" | awk '/pixelHeight/ { print $2 }')
@@ -94,7 +99,7 @@ if (( check )); then
   if diff -rq "$out" "$assets"; then
     echo "Assets are up to date."
   else
-    echo "Assets differ from assets/logo.png: run bash windows/tools/make-icons.sh" >&2
+    echo "Assets differ from $src: run bash windows/tools/make-icons.sh" >&2
     exit 1
   fi
 else
