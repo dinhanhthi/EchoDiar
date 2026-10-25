@@ -15,4 +15,8 @@
     <PackageReference Include="Whisper.net.Runtime" />
     <PackageReference Include="org.k2fsa.sherpa.onnx" />
   </ItemGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="EchoDiar.Tests" />
+  </ItemGroup>
 </Project>

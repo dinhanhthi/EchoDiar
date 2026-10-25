@@ -1,3 +1,4 @@
+using System.Globalization;
 using System.Text.RegularExpressions;
 using EchoDiar.Core;
 using EchoDiar.Core.Models;
@@ -18,6 +19,40 @@ public sealed partial class WhisperEngine(ModelEntry entry, string folder) : ISe
     /// <see cref="IsSilent"/>: Whisper makes up "Thank you." from near silence.
     /// </summary>
     public const float SpeechRMS = 0.003f;
+
+    /// <summary>
+    /// Subtitle credits and video outros Whisper learned from subtitled videos and prints over silence or noise, even
+    /// next to speech. A segment that starts with one is always dropped: the credits Whisper prints start their
+    /// segment, while speech may mention subtitles mid-sentence ("on doit prévoir le sous-titrage de la vidéo").
+    /// Each entry is the parts that must all appear, matched without case or diacritics: the first starts the
+    /// segment, after leading whitespace and punctuation (quotes, dashes), the others are anywhere.
+    /// </summary>
+    private static readonly string[][] SubtitleCredits =
+    [
+        // French credits ("Sous-titrage Société Radio-Canada", "Sous-titrage ST' 501") and outro.
+        ["sous-titres réalisés par"], ["sous-titrage"], ["merci d'avoir regardé"],
+        // English outros and credits.
+        ["thanks for watching"], ["thank you for watching"], ["subtitles by"], ["subtitled by"],
+        // Vietnamese YouTube subscribe calls only: a real talk can end with "cảm ơn các bạn đã theo dõi".
+        ["hãy subscribe cho kênh"], ["hãy đăng ký kênh"],
+        // Spanish credit and outro.
+        ["subtítulos realizados por"], ["gracias por ver el video"],
+        // Chinese community credit ("字幕由Amara.org社区提供", not "字幕由谁提供？") and a channel's like-and-subscribe
+        // outro ("请不吝点赞 订阅 转发 打赏支持明镜与点点栏目").
+        ["字幕由", "社区提供"], ["请不吝点赞 订阅 转发 打赏"], ["明镜与点点栏目"],
+    ];
+
+    /// <summary>
+    /// Subtitle credit parts nobody says in a meeting, even mid-sentence: a segment containing one anywhere is
+    /// dropped, matched without case or diacritics.
+    /// </summary>
+    private static readonly string[] SubtitleCreditsAnywhere =
+    [
+        // The community subtitles credit, in any language ("Subtítulos por la comunidad de Amara.org").
+        "amara.org",
+    ];
+
+    private const CompareOptions CreditCompare = CompareOptions.IgnoreCase | CompareOptions.IgnoreNonSpace;
 
     private const int SampleRate = (int)MonoAudio.SampleRate;
 
@@ -86,8 +121,8 @@ public sealed partial class WhisperEngine(ModelEntry entry, string folder) : ISe
 
     /// <summary>
     /// One loaded model for many chunks, decoded like WhisperKit's batch windows (Swift <c>WhisperKitEngine.Session</c>):
-    /// a chunk longer than the window is split at silences, and each window is filtered by <see cref="SpeechText"/> and
-    /// <see cref="IsSilent"/>. Not thread-safe.
+    /// a chunk longer than the window is split at silences, and each window is filtered by <see cref="SpeechText"/>,
+    /// <see cref="IsSubtitleCredit"/> and <see cref="IsSilent"/>. Not thread-safe.
     /// </summary>
     public sealed class Session(WhisperFactory factory, int windowSamples) : ITranscriptionSession
     {
@@ -112,7 +147,7 @@ public sealed partial class WhisperEngine(ModelEntry entry, string folder) : ISe
                 await foreach (var segment in processor.ProcessAsync(window, cancellationToken).ConfigureAwait(false))
                 {
                     var text = SpeechText(segment.Text);
-                    if (text.Length == 0 || IsSilent(window.Span, (float)segment.Start.TotalSeconds, (float)segment.End.TotalSeconds)) continue;
+                    if (text.Length == 0 || IsSubtitleCredit(text) || IsSilent(window.Span, (float)segment.Start.TotalSeconds, (float)segment.End.TotalSeconds)) continue;
                     segments.Add(new RawSegment(
                         offset + segment.Start.TotalSeconds, offset + segment.End.TotalSeconds, text,
                         code is null ? segment.Language : null));
@@ -188,10 +223,12 @@ public sealed partial class WhisperEngine(ModelEntry entry, string folder) : ISe
     /// <summary>
     /// True when no 100 ms frame of <paramref name="samples"/> from <paramref name="start"/> to <paramref name="end"/>
     /// (seconds) reaches <see cref="SpeechRMS"/>: Whisper made the segment up from silence. The range is clamped to the
-    /// buffer, as Whisper's timestamps can run past the audio.
+    /// buffer, as Whisper's timestamps can run past the audio; a NaN or infinite timestamp has no audio, so the segment
+    /// is silent.
     /// </summary>
     public static bool IsSilent(ReadOnlySpan<float> samples, float start, float end, int sampleRate = SampleRate)
     {
+        if (!float.IsFinite(start) || !float.IsFinite(end)) return true;
         float rate = sampleRate;
         var lower = (int)Math.Min(samples.Length, Math.Max(0, Math.Floor((double)(start * rate))));
         var upper = (int)Math.Min(samples.Length, Math.Max(lower, Math.Ceiling((double)(end * rate))));
@@ -201,6 +238,28 @@ public sealed partial class WhisperEngine(ModelEntry entry, string folder) : ISe
             if (Rms(samples[first..Math.Min(first + frame, upper)]) >= SpeechRMS) return false;
         }
         return true;
+    }
+
+    /// <summary>
+    /// True when <paramref name="text"/> starts with one of the <see cref="SubtitleCredits"/>, after leading whitespace
+    /// and punctuation, or contains one of the <see cref="SubtitleCreditsAnywhere"/>.
+    /// </summary>
+    internal static bool IsSubtitleCredit(string text)
+    {
+        var compare = CultureInfo.InvariantCulture.CompareInfo;
+        var skip = 0;
+        while (skip < text.Length && (char.IsWhiteSpace(text[skip]) || char.IsPunctuation(text[skip]))) skip++;
+        var start = text[skip..];
+        foreach (var part in SubtitleCreditsAnywhere)
+        {
+            if (compare.IndexOf(text, part, CreditCompare) >= 0) return true;
+        }
+        foreach (var parts in SubtitleCredits)
+        {
+            if (compare.IsPrefix(start, parts[0], CreditCompare)
+                && parts.Skip(1).All(part => compare.IndexOf(start, part, CreditCompare) >= 0)) return true;
+        }
+        return false;
     }
 
     private static float Rms(ReadOnlySpan<float> samples)

@@ -21,7 +21,8 @@ public sealed class WhisperSpeechTextTests
         Assert.Equal("Hello there", WhisperEngine.SpeechText("[Music] Hello there (laughs)"));
     }
 
-    // Guards the "Thank you." hallucinations: a segment over near silence is dropped, one over speech is kept.
+    // Guards the "Thank you." hallucinations: a segment over near silence is dropped, one over speech is kept, and a
+    // NaN or infinite timestamp counts as silent.
     [Fact]
     public void DropsSegmentsOverNearSilence()
     {
@@ -31,5 +32,32 @@ public sealed class WhisperSpeechTextTests
 
         Assert.True(WhisperEngine.IsSilent(quiet, 0, 2, rate));
         Assert.False(WhisperEngine.IsSilent([.. quiet, .. speech], 1.5f, 5, rate));
+        Assert.True(WhisperEngine.IsSilent([.. quiet, .. speech], float.NaN, 5, rate));
+        Assert.True(WhisperEngine.IsSilent([.. quiet, .. speech], 0, float.PositiveInfinity, rate));
+    }
+
+    // Guards the subtitle-credit list ("Merci." / "Sous-titrage ST' 501" on silence): Whisper's credits are dropped,
+    // the meeting's speech is kept, also when it mentions subtitles mid-sentence.
+    [Fact]
+    public void DropsSubtitleCreditsAndKeepsSpeech()
+    {
+        foreach (var (text, credit) in new[]
+        {
+            ("Sous-titrage Société Radio-Canada", true),
+            ("- Sous-titrage ST' 501", true),
+            ("Sous-titres réalisés par la communauté d'Amara.org", true),
+            ("sous-titres realises par la communaute", true),
+            ("Thanks for watching!", true),
+            ("Hãy đăng ký kênh để ủng hộ kênh nhé!", true),
+            ("Subtítulos por la comunidad de Amara.org", true),
+            ("字幕由志愿者社区提供", true),
+            ("Bonjour, on commence la réunion.", false),
+            ("Can we enable subtitles by default?", false),
+            ("On doit prévoir le sous-titrage de la vidéo.", false),
+            ("字幕由谁提供？", false),
+        })
+        {
+            Assert.True(WhisperEngine.IsSubtitleCredit(text) == credit, text);
+        }
     }
 }
