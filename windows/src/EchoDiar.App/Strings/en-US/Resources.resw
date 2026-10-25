@@ -1027,7 +1027,7 @@
     <comment>Index</comment>
   </data>
   <data name="IndexedLldOfLldConversations" xml:space="preserve">
-    <value>Indexed {0} of {1}conversations@</value>
+    <value>Indexed {0} of {1} conversations</value>
     <comment>Indexed %lld of %lld conversations</comment>
   </data>
   <data name="IndexingLldOfLld" xml:space="preserve">

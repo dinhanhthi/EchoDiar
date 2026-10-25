@@ -12,7 +12,7 @@ namespace EchoDiar.App;
 /// calendar (never the app's "EchoDiar" one), saves a one-off and a weekly appointment, reads them back, waits for
 /// StoreChanged, deletes one weekly instance, then removes everything it made. Each line goes to
 /// <c>Probes\calendar-probe-&lt;stamp&gt;.log</c>, stdout and the debugger; the last is the <c>CALENDAR-PROBE</c>
-/// summary. Exit code 0 when own-create, save and read-back pass, else 1.
+/// summary. Exit code 0 when own-create, save, read-back and store-changed pass, else 1.
 /// </summary>
 internal static class CalendarProbe
 {
@@ -179,7 +179,7 @@ internal static class CalendarProbe
 
         Log($"CALENDAR-PROBE read-all={readAll} own-create={ownCreate} save={save} read-back={readBack} "
             + $"store-changed={storeChanged} delete-instance={deleteInstance} cleanup={cleanup}");
-        return ownCreate == "OK" && save == "OK" && readBack == "OK" ? 0 : 1;
+        return ownCreate == "OK" && save == "OK" && readBack == "OK" && storeChanged == "OK" ? 0 : 1;
     }
 
     /// <summary>A fresh "EchoDiar Probe" calendar: one left by an earlier run is deleted first, so its appointments do not count.</summary>

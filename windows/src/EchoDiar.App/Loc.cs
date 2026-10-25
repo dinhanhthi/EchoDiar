@@ -11,11 +11,13 @@ namespace EchoDiar.App;
 /// windows/tools/xcstrings_to_resw.py. Pass the macOS source text (the xcstrings key, printf placeholders and
 /// all): <c>Loc.T("Delete conversation")</c>, <c>Loc.Format("Step %lld of %lld", step, total)</c>.
 /// <para>
-/// The resource name is <see cref="Slug"/> of that text. When two source texts share a slug the generator
-/// names the later ones (sorted by source text) <c>_2</c>, <c>_3</c>…, and writes every member of such a group,
-/// by exact source text, to <c>CollisionKeys</c> in the generated Strings/LocKeys.g.cs, which <see cref="T"/>
-/// and <see cref="Format"/> look up before the slug: callers never need the suffixes. <see cref="Key"/> stays
-/// for an explicit resource name. Each resw entry carries its source text as the comment.
+/// Only the catalog's source texts, listed in <c>KnownTexts</c> in the generated Strings/LocKeys.g.cs, are looked
+/// up: any other text is returned as is (by <see cref="Format"/> with its placeholders converted), even when its
+/// slug matches a catalog text's. The resource name is <see cref="Slug"/> of that text. When two source texts
+/// share a slug the generator names the later ones (sorted by source text) <c>_2</c>, <c>_3</c>…, and writes every
+/// member of such a group, by exact source text, to <c>CollisionKeys</c>, which <see cref="T"/> and
+/// <see cref="Format"/> look up before the slug: callers never need the suffixes. <see cref="Key"/> stays for an
+/// explicit resource name. Each resw entry carries its source text as the comment.
 /// </para>
 /// </summary>
 public static partial class Loc
@@ -41,7 +43,7 @@ public static partial class Loc
     });
 
     /// <summary>The localized string for a macOS source text, or the text itself when it is not found.</summary>
-    public static string T(string text) => Lookup(KeyOf(text)) ?? text;
+    public static string T(string text) => Find(text) ?? text;
 
     /// <summary>The localized string for an explicit resource name, or the name itself when it is not found.</summary>
     public static string Key(string key) => Lookup(key) ?? key;
@@ -51,10 +53,16 @@ public static partial class Loc
     /// found its printf placeholders are converted the same way, so the fallback is formatted too.
     /// </summary>
     public static string Format(string text, params object[] args) =>
-        string.Format(CultureInfo.CurrentCulture, Lookup(KeyOf(text)) ?? ToNetFormat(text), args);
+        string.Format(CultureInfo.CurrentCulture, Find(text) ?? ToNetFormat(text), args);
 
-    /// <summary>The resource name of a source text: its entry in the generated CollisionKeys, else its <see cref="Slug"/>.</summary>
-    internal static string KeyOf(string text) => CollisionKeys.TryGetValue(text, out var key) ? key : Slug(text);
+    private static string? Find(string text) => KeyOf(text) is { } key ? Lookup(key) : null;
+
+    /// <summary>
+    /// The resource name of a source text: null when it is not in the generated KnownTexts, else its entry in the
+    /// generated CollisionKeys, else its <see cref="Slug"/>.
+    /// </summary>
+    internal static string? KeyOf(string text) =>
+        !KnownTexts.Contains(text) ? null : CollisionKeys.TryGetValue(text, out var key) ? key : Slug(text);
 
     /// <summary>
     /// The resource name of a source text: PascalCase of its ASCII alphanumeric runs, cut to 60 characters, with

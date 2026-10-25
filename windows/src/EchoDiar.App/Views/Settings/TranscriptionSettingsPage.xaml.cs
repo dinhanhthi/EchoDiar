@@ -627,7 +627,7 @@ public sealed partial class TranscriptionSettingsPage : UserControl
                     ? Loc.Format("Add the key of %@ in Transcription models", config.DisplayName)
                     : Loc.Format("Add the key of %@ below", config.DisplayName));
             List<string> details = [Loc.T("Cloud")];
-            if (config.Preset is { } preset && Prices.TryGetValue(preset, out var price)) details.Add(price + " " + Loc.T("(approx.)"));
+            if (config.Preset is { } preset && Prices.TryGetValue(preset, out var price)) details.Add(Loc.Format("%@ (approx.)", price));
             _details.Text = string.Join(" · ", details);
             _geminiNote.Visibility = Show(config.Preset == "gemini");
         }
