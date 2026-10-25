@@ -154,6 +154,37 @@ public sealed class AppleDateConverter : JsonConverter<DateTimeOffset>
         writer.WriteNumberValue((value.UtcTicks - ReferenceTicks) / (double)TimeSpan.TicksPerSecond);
 }
 
+/// <summary>Swift's <c>[String: Date]</c> with the default date coding: an object of <see cref="AppleDateConverter"/> values.</summary>
+public sealed class AppleDateDictionaryConverter : JsonConverter<Dictionary<string, DateTimeOffset>>
+{
+    private static readonly AppleDateConverter Date = new();
+
+    public override Dictionary<string, DateTimeOffset> Read(
+        ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
+    {
+        if (reader.TokenType != JsonTokenType.StartObject) throw new JsonException("Expected an object of dates.");
+        var result = new Dictionary<string, DateTimeOffset>(StringComparer.Ordinal);
+        while (reader.Read() && reader.TokenType != JsonTokenType.EndObject)
+        {
+            var key = reader.GetString()!;
+            reader.Read();
+            result[key] = Date.Read(ref reader, typeof(DateTimeOffset), options);
+        }
+        return result;
+    }
+
+    public override void Write(Utf8JsonWriter writer, Dictionary<string, DateTimeOffset> value, JsonSerializerOptions options)
+    {
+        writer.WriteStartObject();
+        foreach (var (key, date) in value)
+        {
+            writer.WritePropertyName(key);
+            Date.Write(writer, date, options);
+        }
+        writer.WriteEndObject();
+    }
+}
+
 /// <summary>
 /// Swift's <c>.iso8601</c> date strategy: writes <c>yyyy-MM-ddTHH:mm:ssZ</c> in UTC, fractions truncated; reads
 /// with or without fractions, with <c>Z</c> or an offset. A date without a zone is rejected.
