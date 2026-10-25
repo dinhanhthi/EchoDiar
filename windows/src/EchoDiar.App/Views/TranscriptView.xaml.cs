@@ -394,8 +394,8 @@ public sealed partial class TranscriptView : UserControl
         {
             NoticeIcon.Glyph = "";
             text = Loc.T(localMissing
-                ? "Cloud diarization failed and no diarization model is installed on this Mac."
-                : "Cloud diarization failed; speakers were told apart on this Mac.");
+                ? "Cloud diarization failed and no diarization model is installed on this PC."
+                : "Cloud diarization failed; speakers were told apart on this PC.");
             download = localMissing;
         }
         else if (localMissing && _model is not null)

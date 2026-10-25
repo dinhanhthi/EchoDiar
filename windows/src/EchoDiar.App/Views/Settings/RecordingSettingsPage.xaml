@@ -135,7 +135,7 @@
                             AutomationProperties.Name="{local:T Text='Stop after silence of'}"
                             SmallChange="1"
                             SpinButtonPlacementMode="Inline" />
-                        <TextBlock Style="{StaticResource UnitStyle}" Text="min" />
+                        <TextBlock Style="{StaticResource UnitStyle}" Text="{local:T Text='min'}" />
                     </StackPanel>
                 </controls:SettingsCard>
 
@@ -150,7 +150,7 @@
                             AutomationProperties.Name="{local:T Text='Stop after a recording length of'}"
                             SmallChange="1"
                             SpinButtonPlacementMode="Inline" />
-                        <TextBlock Style="{StaticResource UnitStyle}" Text="min" />
+                        <TextBlock Style="{StaticResource UnitStyle}" Text="{local:T Text='min'}" />
                     </StackPanel>
                 </controls:SettingsCard>
             </StackPanel>
@@ -182,7 +182,7 @@
                         AutomationProperties.Name="{local:T Text='Number of other speakers'}" />
                 </controls:SettingsCard>
 
-                <!-- Texts set in code (Windows text, not in the catalog). -->
+                <!-- Texts set in code (Windows-only keys). -->
                 <controls:SettingsCard x:Name="DeferCard">
                     <ToggleSwitch x:Name="DeferToggle" />
                 </controls:SettingsCard>

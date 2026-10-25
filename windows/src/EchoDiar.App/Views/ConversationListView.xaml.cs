@@ -231,8 +231,7 @@ public sealed partial class ConversationListView : UserControl
         {
             text = anyListed
                 ? Loc.Format("No conversations match \"%@\"", _model.SearchTerm)
-                // Ctrl+R for ⌘R: the main window's shortcuts come with Phase 20.
-                : Loc.T("No conversations yet — press ⌘R to record").Replace("⌘R", "Ctrl+R", StringComparison.Ordinal);
+                : Loc.T("No conversations yet — press Ctrl+R to record");
         }
         EmptyText.Visibility = text is null ? Visibility.Collapsed : Visibility.Visible;
         if (text is not null) RecordingCard.SetText(EmptyText, text);
@@ -380,7 +379,7 @@ public sealed partial class ConversationListView : UserControl
         ModelBanner.IsOpen = visible;
         if (!visible) return;
 
-        // Windows-only texts (no macOS catalog entry): Loc.T returns them as is.
+        // Windows-only texts (Strings/Windows.xcstrings).
         ModelBanner.Title = Loc.T(needsSpeech ? "Download a transcription model" : "Download a speaker model");
         ModelBanner.Message = Loc.T(needsSpeech
             ? "Recordings are transcribed on this PC. Pick a speech recognition model to download."
@@ -452,32 +451,35 @@ internal static class ConversationText
         return $"{created} · {Clock(conversation.Duration)} · {Status(conversation, model)}";
     }
 
-    /// <summary>The job's step and percent while one is queued or running, else the stored status.</summary>
+    /// <summary>
+    /// The job's step and percent while one is queued or running, else the stored status. The macOS texts where macOS
+    /// has one (ConversationCard.swift <c>stepText</c>, <c>StatusBadge</c>), else Windows-only ones.
+    /// </summary>
     public static string Status(Conversation conversation, AppViewModel model)
     {
         if (model.TranscriptionProgress.TryGetValue(conversation.Id, out var progress))
         {
             return progress.Step switch
             {
-                JobStep.NeedsModel => "Needs a transcription model",
-                JobStep.Queued => "Waiting to transcribe",
-                JobStep.Deferred => "Waiting: energy saver is on",
-                _ => $"Transcribing {(int)(progress.Fraction * 100)}%",
+                JobStep.NeedsModel => Loc.T("Needs model"),
+                JobStep.Queued => Loc.T("Queued"),
+                JobStep.Deferred => Loc.T("Waiting: energy saver is on"),
+                _ => Loc.Format("Transcribing %lld%%", (int)(progress.Fraction * 100)),
             };
         }
-        if (model.TranscriptionErrors.ContainsKey(conversation.Id)) return "Transcription failed";
-        return conversation.Status switch
+        if (model.TranscriptionErrors.ContainsKey(conversation.Id)) return Loc.T("Transcription failed");
+        return Loc.T(conversation.Status switch
         {
             ConversationStatus.Recording => "Recording",
             ConversationStatus.Recovered => "Recovered",
-            ConversationStatus.Compressing => "Compressing",
+            ConversationStatus.Compressing => "Compressing…",
             ConversationStatus.CompressionFailed => "Compression failed",
             ConversationStatus.Ready => "Ready",
-            ConversationStatus.Transcribing => "Transcribing",
+            ConversationStatus.Transcribing => "Transcribing…",
             ConversationStatus.Transcribed => "Transcribed",
-            ConversationStatus.Failed => "Recording failed",
+            ConversationStatus.Failed => "Failed",
             ConversationStatus.TranscriptionFailed => "Transcription failed",
             _ => conversation.HasTranscript ? "Transcribed" : "Not transcribed",
-        };
+        });
     }
 }

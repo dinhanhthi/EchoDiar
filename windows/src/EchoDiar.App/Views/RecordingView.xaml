@@ -90,7 +90,7 @@
                             Style="{StaticResource CaptionTextBlockStyle}"
                             Foreground="{ThemeResource TextFillColorSecondaryBrush}"
                             TextWrapping="NoWrap"
-                            Text="Mic" />
+                            Text="{local:T Text='Mic'}" />
                         <Border
                             x:Name="MicTrack"
                             Grid.Column="1"
@@ -116,7 +116,7 @@
                             Style="{StaticResource CaptionTextBlockStyle}"
                             Foreground="{ThemeResource TextFillColorSecondaryBrush}"
                             TextWrapping="NoWrap"
-                            Text="System" />
+                            Text="{local:T Text='System'}" />
                         <Border
                             x:Name="SystemTrack"
                             Grid.Column="1"

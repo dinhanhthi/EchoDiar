@@ -126,6 +126,22 @@
     <value>After recording</value>
     <comment>After recording</comment>
   </data>
+  <data name="AllFilesOfLldConversationsWillBeMovedToTheRecycleBinAtTheNex" xml:space="preserve">
+    <value>All files of {0} conversations will be moved to the Recycle Bin at the next run (at launch or within a day):</value>
+    <comment>All files of %lld conversations will be moved to the Recycle Bin at the next run (at launch or within a day):</comment>
+  </data>
+  <data name="AllFilesOfLldConversationsWillBeMovedToTheRecycleBinAtTheNex__One" xml:space="preserve">
+    <value>All files of {0} conversation will be moved to the Recycle Bin at the next run (at launch or within a day):</value>
+    <comment>All files of %lld conversations will be moved to the Recycle Bin at the next run (at launch or within a day):</comment>
+  </data>
+  <data name="AllFilesOfLldConversationsWillBeMovedToTheRecycleBinNowThenD" xml:space="preserve">
+    <value>All files of {0} conversations will be moved to the Recycle Bin now, then daily for older ones:</value>
+    <comment>All files of %lld conversations will be moved to the Recycle Bin now, then daily for older ones:</comment>
+  </data>
+  <data name="AllFilesOfLldConversationsWillBeMovedToTheRecycleBinNowThenD__One" xml:space="preserve">
+    <value>All files of {0} conversation will be moved to the Recycle Bin now, then daily for older ones:</value>
+    <comment>All files of %lld conversations will be moved to the Recycle Bin now, then daily for older ones:</comment>
+  </data>
   <data name="AllFilesOfLldConversationsWillBeMovedToTheTrashAtTheNextRunA" xml:space="preserve">
     <value>All files of {0} conversations will be moved to the Trash at the next run (at launch or within a day):</value>
     <comment>All files of %lld conversations will be moved to the Trash at the next run (at launch or within a day):</comment>
@@ -143,12 +159,20 @@
     <comment>All files of %lld conversations will be moved to the Trash now, then daily for older ones:</comment>
   </data>
   <data name="AllFilesOfTranscribedConversationsOlderThanLldDaysWillBeMove" xml:space="preserve">
+    <value>All files of transcribed conversations older than {0} days will be moved to the Recycle Bin once a day. Nothing matches now.</value>
+    <comment>All files of transcribed conversations older than %lld days will be moved to the Recycle Bin once a day. Nothing matches now.</comment>
+  </data>
+  <data name="AllFilesOfTranscribedConversationsOlderThanLldDaysWillBeMove_2" xml:space="preserve">
     <value>All files of transcribed conversations older than {0} days will be moved to the Trash once a day. Nothing matches now.</value>
     <comment>All files of transcribed conversations older than %lld days will be moved to the Trash once a day. Nothing matches now.</comment>
   </data>
-  <data name="AllFilesOfTranscribedConversationsOlderThanLldDaysWillBeMove__One" xml:space="preserve">
+  <data name="AllFilesOfTranscribedConversationsOlderThanLldDaysWillBeMove_2__One" xml:space="preserve">
     <value>All files of transcribed conversations older than {0} day will be moved to the Trash once a day. Nothing matches now.</value>
     <comment>All files of transcribed conversations older than %lld days will be moved to the Trash once a day. Nothing matches now.</comment>
+  </data>
+  <data name="AllFilesOfTranscribedConversationsOlderThanLldDaysWillBeMove__One" xml:space="preserve">
+    <value>All files of transcribed conversations older than {0} day will be moved to the Recycle Bin once a day. Nothing matches now.</value>
+    <comment>All files of transcribed conversations older than %lld days will be moved to the Recycle Bin once a day. Nothing matches now.</comment>
   </data>
   <data name="AllSystemAudio" xml:space="preserve">
     <value>All system audio</value>
@@ -198,6 +222,10 @@
     <value>Answers questions about all your transcribed conversations, citing the conversation and the moment. The index stays on this Mac unless you pick an API embedder.</value>
     <comment>Answers questions about all your transcribed conversations, citing the conversation and the moment. The index stays on this Mac unless you pick an API embedder.</comment>
   </data>
+  <data name="AnswersQuestionsAboutAllYourTranscribedConversationsCitingTh_2" xml:space="preserve">
+    <value>Answers questions about all your transcribed conversations, citing the conversation and the moment. The index stays on this PC unless you pick an API embedder.</value>
+    <comment>Answers questions about all your transcribed conversations, citing the conversation and the moment. The index stays on this PC unless you pick an API embedder.</comment>
+  </data>
   <data name="ApiKeyHeader" xml:space="preserve">
     <value>api-key header</value>
     <comment>api-key header</comment>
@@ -205,6 +233,10 @@
   <data name="AppLanguage" xml:space="preserve">
     <value>App language</value>
     <comment>App language</comment>
+  </data>
+  <data name="AppStructureMVVM" xml:space="preserve">
+    <value>App structure (MVVM)</value>
+    <comment>App structure (MVVM)</comment>
   </data>
   <data name="AppleBasicBuiltIn" xml:space="preserve">
     <value>Apple (Basic, built-in)</value>
@@ -282,6 +314,10 @@
     <value>Audio and transcripts stay on this PC.</value>
     <comment>Audio and transcripts stay on this PC.</comment>
   </data>
+  <data name="AudioCaptureAndPlayback" xml:space="preserve">
+    <value>Audio capture and playback</value>
+    <comment>Audio capture and playback</comment>
+  </data>
   <data name="AudioHasBeenRemoved" xml:space="preserve">
     <value>Audio has been removed</value>
     <comment>Audio has been removed</comment>
@@ -297,6 +333,14 @@
   <data name="AudioLeavesThisMacTheRecordingSMicAndSystemChannelsAreUpload" xml:space="preserve">
     <value>Audio leaves this Mac: the recording's mic and system channels are uploaded to {0} ({1}) for transcription and billed by them. The provider may keep the audio under its own retention policy. You are asked once per provider and destination.</value>
     <comment>Audio leaves this Mac: the recording's mic and system channels are uploaded to %@ (%@) for transcription and billed by them. The provider may keep the audio under its own retention policy. You are asked once per provider and destination.</comment>
+  </data>
+  <data name="AudioLeavesThisPCCloudEnginesUploadTheRecordingToTheProvider" xml:space="preserve">
+    <value>Audio leaves this PC: cloud engines upload the recording to the provider.</value>
+    <comment>Audio leaves this PC: cloud engines upload the recording to the provider.</comment>
+  </data>
+  <data name="AudioLeavesThisPCTheCloudDiarizerUploadsTheSystemChannelToTh" xml:space="preserve">
+    <value>Audio leaves this PC: the cloud diarizer uploads the system channel to the provider.</value>
+    <comment>Audio leaves this PC: the cloud diarizer uploads the system channel to the provider.</comment>
   </data>
   <data name="AudioOnlyKeepTranscriptSummaryAndChat" xml:space="preserve">
     <value>Audio only (keep transcript, summary and chat)</value>
@@ -490,9 +534,17 @@
     <value>Cloud diarization failed and no diarization model is installed on this Mac.</value>
     <comment>Cloud diarization failed and no diarization model is installed on this Mac.</comment>
   </data>
+  <data name="CloudDiarizationFailedAndNoDiarizationModelIsInstalledOnThis_2" xml:space="preserve">
+    <value>Cloud diarization failed and no diarization model is installed on this PC.</value>
+    <comment>Cloud diarization failed and no diarization model is installed on this PC.</comment>
+  </data>
   <data name="CloudDiarizationFailedSpeakersWereToldApartOnThisMac" xml:space="preserve">
     <value>Cloud diarization failed; speakers were told apart on this Mac.</value>
     <comment>Cloud diarization failed; speakers were told apart on this Mac.</comment>
+  </data>
+  <data name="CloudDiarizationFailedSpeakersWereToldApartOnThisPC" xml:space="preserve">
+    <value>Cloud diarization failed; speakers were told apart on this PC.</value>
+    <comment>Cloud diarization failed; speakers were told apart on this PC.</comment>
   </data>
   <data name="CloudTranscriptionEngines" xml:space="preserve">
     <value>Cloud transcription engines</value>
@@ -914,6 +966,10 @@
     <value>EchoDiar heard only silence.</value>
     <comment>EchoDiar heard only silence.</comment>
   </data>
+  <data name="EchoDiarHearsNothingFromPickAnotherSourceOrCheckThatTheAppIs" xml:space="preserve">
+    <value>EchoDiar hears nothing from {0}. Pick another source or check that the app is playing.</value>
+    <comment>EchoDiar hears nothing from %@. Pick another source or check that the app is playing.</comment>
+  </data>
   <data name="EchoDiarIncludesThisOpenSourceSoftwareChooseOneToReadItsLice" xml:space="preserve">
     <value>EchoDiar includes this open-source software. Choose one to read its license.</value>
     <comment>EchoDiar includes this open-source software. Choose one to read its license.</comment>
@@ -1106,6 +1162,10 @@
     <value>Heads up: I'm recording this call to take notes. The recording stays on my Mac.</value>
     <comment>Heads up: I'm recording this call to take notes. The recording stays on my Mac.</comment>
   </data>
+  <data name="HeadsUpIMRecordingThisCallToTakeNotesTheRecordingStaysOnMyPC" xml:space="preserve">
+    <value>Heads up: I'm recording this call to take notes. The recording stays on my PC.</value>
+    <comment>Heads up: I'm recording this call to take notes. The recording stays on my PC.</comment>
+  </data>
   <data name="HideEchoDiar" xml:space="preserve">
     <value>Hide EchoDiar</value>
     <comment>Hide EchoDiar</comment>
@@ -1238,10 +1298,6 @@
     <value>{0} is starting</value>
     <comment>%@ is starting</comment>
   </data>
-  <data name="IsThe" xml:space="preserve">
-    <value>{0} is the {1}.</value>
-    <comment>%@ is the %@.</comment>
-  </data>
   <data name="IsTheGlobalPauseShortcut" xml:space="preserve">
     <value>{0} is the global pause shortcut.</value>
     <comment>%@ is the global pause shortcut.</comment>
@@ -1266,6 +1322,10 @@
     <value>It needs an index of your transcripts, built on this PC by default.</value>
     <comment>It needs an index of your transcripts, built on this PC by default.</comment>
   </data>
+  <data name="ItsRuntimeFilesComeUnderTheMicrosoftSoftwareLicenseTerms" xml:space="preserve">
+    <value>Its runtime files come under the Microsoft Software License Terms.</value>
+    <comment>Its runtime files come under the Microsoft Software License Terms.</comment>
+  </data>
   <data name="Join" xml:space="preserve">
     <value>Join</value>
     <comment>Join</comment>
@@ -1277,6 +1337,10 @@
   <data name="KeepUncompressedAudio" xml:space="preserve">
     <value>Keep uncompressed audio</value>
     <comment>Keep uncompressed audio</comment>
+  </data>
+  <data name="KeepsItAtTheWindowSTopRightCorner" xml:space="preserve">
+    <value>Keeps it at the window's top-right corner.</value>
+    <comment>Keeps it at the window's top-right corner.</comment>
   </data>
   <data name="KeepsItAtTheWindowSTopRightCornerNeedsAccessibilityAccess" xml:space="preserve">
     <value>Keeps it at the window's top-right corner. Needs Accessibility access.</value>
@@ -1386,13 +1450,29 @@
     <value>{0}</value>
     <comment>%lld</comment>
   </data>
+  <data name="LldBytes" xml:space="preserve">
+    <value>{0} bytes</value>
+    <comment>%lld bytes</comment>
+  </data>
+  <data name="LldBytes__One" xml:space="preserve">
+    <value>{0} byte</value>
+    <comment>%lld bytes</comment>
+  </data>
   <data name="LldConversationsWithoutAudioWouldBeLeftEmptyTheyAreMovedToTh" xml:space="preserve">
+    <value>{0} conversations without audio would be left empty: they are moved to the Recycle Bin entirely.</value>
+    <comment>%lld conversations without audio would be left empty: they are moved to the Recycle Bin entirely.</comment>
+  </data>
+  <data name="LldConversationsWithoutAudioWouldBeLeftEmptyTheyAreMovedToTh_2" xml:space="preserve">
     <value>{0} conversations without audio would be left empty: they are moved to the Trash entirely.</value>
     <comment>%lld conversations without audio would be left empty: they are moved to the Trash entirely.</comment>
   </data>
-  <data name="LldConversationsWithoutAudioWouldBeLeftEmptyTheyAreMovedToTh__One" xml:space="preserve">
+  <data name="LldConversationsWithoutAudioWouldBeLeftEmptyTheyAreMovedToTh_2__One" xml:space="preserve">
     <value>{0} conversation without audio would be left empty: it is moved to the Trash entirely.</value>
     <comment>%lld conversations without audio would be left empty: they are moved to the Trash entirely.</comment>
+  </data>
+  <data name="LldConversationsWithoutAudioWouldBeLeftEmptyTheyAreMovedToTh__One" xml:space="preserve">
+    <value>{0} conversation without audio would be left empty: it is moved to the Recycle Bin entirely.</value>
+    <comment>%lld conversations without audio would be left empty: they are moved to the Recycle Bin entirely.</comment>
   </data>
   <data name="LldKbps" xml:space="preserve">
     <value>{0} kbps</value>
@@ -1545,6 +1625,10 @@
   <data name="MicrophoneAccessIsBlockedOnThisMac" xml:space="preserve">
     <value>Microphone access is blocked on this Mac.</value>
     <comment>Microphone access is blocked on this Mac.</comment>
+  </data>
+  <data name="MicrophoneAccessIsBlockedOnThisPC" xml:space="preserve">
+    <value>Microphone access is blocked on this PC.</value>
+    <comment>Microphone access is blocked on this PC.</comment>
   </data>
   <data name="MicrophoneAccessIsOff" xml:space="preserve">
     <value>Microphone access is off.</value>
@@ -1726,9 +1810,9 @@
     <value>No conversations yet</value>
     <comment>No conversations yet</comment>
   </data>
-  <data name="NoConversationsYetPressRToRecord" xml:space="preserve">
-    <value>No conversations yet — press ⌘R to record</value>
-    <comment>No conversations yet — press ⌘R to record</comment>
+  <data name="NoConversationsYetPressCtrlRToRecord" xml:space="preserve">
+    <value>No conversations yet — press Ctrl+R to record</value>
+    <comment>No conversations yet — press Ctrl+R to record</comment>
   </data>
   <data name="NoDiarizationModelsListedTypeTheModelId" xml:space="preserve">
     <value>No diarization models listed; type the model id.</value>
@@ -1822,6 +1906,10 @@
     <value>{0} not saved: put the key in the API key field, which keeps it in Credential Manager.</value>
     <comment>%@ not saved: put the key in the API key field, which keeps it in Credential Manager.</comment>
   </data>
+  <data name="NotTranscribed" xml:space="preserve">
+    <value>Not transcribed</value>
+    <comment>Not transcribed</comment>
+  </data>
   <data name="NothingIsSentToUntilYouConfirm" xml:space="preserve">
     <value>Nothing is sent to {0} until you confirm.</value>
     <comment>Nothing is sent to %@ until you confirm.</comment>
@@ -1867,6 +1955,10 @@
     <comment>On this PC</comment>
   </data>
   <data name="OnceADayMovesTranscribedConversationsOlderThanTheAgeBelowToT" xml:space="preserve">
+    <value>Once a day, moves transcribed conversations older than the age below to the Recycle Bin.</value>
+    <comment>Once a day, moves transcribed conversations older than the age below to the Recycle Bin.</comment>
+  </data>
+  <data name="OnceADayMovesTranscribedConversationsOlderThanTheAgeBelowToT_2" xml:space="preserve">
     <value>Once a day, moves transcribed conversations older than the age below to the Trash.</value>
     <comment>Once a day, moves transcribed conversations older than the age below to the Trash.</comment>
   </data>
@@ -1965,6 +2057,10 @@
   <data name="OutputApprox" xml:space="preserve">
     <value>{0} + output (approx.)</value>
     <comment>%@ + output (approx.)</comment>
+  </data>
+  <data name="ParakeetTranscription" xml:space="preserve">
+    <value>Parakeet transcription</value>
+    <comment>Parakeet transcription</comment>
   </data>
   <data name="ParakeetTranscriptionAndSpeakerDiarization" xml:space="preserve">
     <value>Parakeet transcription and speaker diarization</value>
@@ -2158,6 +2254,10 @@
     <value>Re-transcribe with another model or language</value>
     <comment>Re-transcribe with another model or language</comment>
   </data>
+  <data name="Ready" xml:space="preserve">
+    <value>Ready</value>
+    <comment>Ready</comment>
+  </data>
   <data name="Rebuild" xml:space="preserve">
     <value>Rebuild</value>
     <comment>Rebuild</comment>
@@ -2189,6 +2289,10 @@
   <data name="RecordYourFirstConversation" xml:space="preserve">
     <value>Record your first conversation</value>
     <comment>Record your first conversation</comment>
+  </data>
+  <data name="Record_2" xml:space="preserve">
+    <value>Record {0}</value>
+    <comment>Record %@</comment>
   </data>
   <data name="Recording" xml:space="preserve">
     <value>Recording</value>
@@ -2261,6 +2365,10 @@
   <data name="Recovered" xml:space="preserve">
     <value>Recovered</value>
     <comment>Recovered</comment>
+  </data>
+  <data name="Redo" xml:space="preserve">
+    <value>Redo</value>
+    <comment>Redo</comment>
   </data>
   <data name="RelaunchNow" xml:space="preserve">
     <value>Relaunch now</value>
@@ -2454,6 +2562,10 @@
     <value>Settings</value>
     <comment>Settings</comment>
   </data>
+  <data name="SettingsCards" xml:space="preserve">
+    <value>Settings cards</value>
+    <comment>Settings cards</comment>
+  </data>
   <data name="Settings_2" xml:space="preserve">
     <value>Settings…</value>
     <comment>Settings…</comment>
@@ -2495,6 +2607,10 @@
     <comment>Showing meetings in the next 7 days. The list updates automatically.</comment>
   </data>
   <data name="ShowsTheTranscriptDuringTheRecordingAndKeepsItSoItIsReadyWit" xml:space="preserve">
+    <value>Shows the transcript during the recording and keeps it, so it is ready within seconds of Stop. Uses more CPU and memory while recording. Whisper and Parakeet models only; other engines transcribe after Stop.</value>
+    <comment>Shows the transcript during the recording and keeps it, so it is ready within seconds of Stop. Uses more CPU and memory while recording. Whisper and Parakeet models only; other engines transcribe after Stop.</comment>
+  </data>
+  <data name="ShowsTheTranscriptDuringTheRecordingAndKeepsItSoItIsReadyWit_2" xml:space="preserve">
     <value>Shows the transcript during the recording and keeps it, so it is ready within seconds of Stop. Uses more CPU and memory while recording. WhisperKit and Parakeet models only; other engines transcribe after Stop.</value>
     <comment>Shows the transcript during the recording and keeps it, so it is ready within seconds of Stop. Uses more CPU and memory while recording. WhisperKit and Parakeet models only; other engines transcribe after Stop.</comment>
   </data>
@@ -2525,6 +2641,10 @@
   <data name="Space" xml:space="preserve">
     <value>Space</value>
     <comment>Space</comment>
+  </data>
+  <data name="SpeakerDiarization" xml:space="preserve">
+    <value>Speaker diarization</value>
+    <comment>Speaker diarization</comment>
   </data>
   <data name="SpeakerLld" xml:space="preserve">
     <value>Speaker {0}</value>
@@ -2758,6 +2878,10 @@
     <value>The app stopped using audio — stop recording?</value>
     <comment>The app stopped using audio — stop recording?</comment>
   </data>
+  <data name="TheApp_2" xml:space="preserve">
+    <value>the app</value>
+    <comment>the app</comment>
+  </data>
   <data name="TheAudioDeviceChangedWhileRecordingWasStartingTryAgain" xml:space="preserve">
     <value>The audio device changed while recording was starting. Try again.</value>
     <comment>The audio device changed while recording was starting. Try again.</comment>
@@ -2765,6 +2889,10 @@
   <data name="TheAudioFilesAreMovedToTheRecycleBinTranscriptsSummariesAndC" xml:space="preserve">
     <value>The audio files are moved to the Recycle Bin. Transcripts, summaries and chats stay.</value>
     <comment>The audio files are moved to the Recycle Bin. Transcripts, summaries and chats stay.</comment>
+  </data>
+  <data name="TheAudioFilesAreMovedToTheRecycleBinTranscriptsSummariesAndC_2" xml:space="preserve">
+    <value>The audio files are moved to the Recycle Bin. Transcripts, summaries and chats stay; playback and re-transcribing are no longer possible.</value>
+    <comment>The audio files are moved to the Recycle Bin. Transcripts, summaries and chats stay; playback and re-transcribing are no longer possible.</comment>
   </data>
   <data name="TheAudioFilesAreMovedToTheTrashTranscriptsSummariesAndChatsS" xml:space="preserve">
     <value>The audio files are moved to the Trash. Transcripts, summaries and chats stay.</value>
@@ -2781,6 +2909,22 @@
   <data name="TheAudioIsMovedToTheTrashTheTranscriptSummaryAndChatStayPlay" xml:space="preserve">
     <value>The audio is moved to the Trash. The transcript, summary and chat stay; playback and re-transcribing are no longer possible.</value>
     <comment>The audio is moved to the Trash. The transcript, summary and chat stay; playback and re-transcribing are no longer possible.</comment>
+  </data>
+  <data name="TheAudioOfLldConversationsWillBeMovedToTheRecycleBinAtTheNex" xml:space="preserve">
+    <value>The audio of {0} conversations will be moved to the Recycle Bin at the next run (at launch or within a day):</value>
+    <comment>The audio of %lld conversations will be moved to the Recycle Bin at the next run (at launch or within a day):</comment>
+  </data>
+  <data name="TheAudioOfLldConversationsWillBeMovedToTheRecycleBinAtTheNex__One" xml:space="preserve">
+    <value>The audio of {0} conversation will be moved to the Recycle Bin at the next run (at launch or within a day):</value>
+    <comment>The audio of %lld conversations will be moved to the Recycle Bin at the next run (at launch or within a day):</comment>
+  </data>
+  <data name="TheAudioOfLldConversationsWillBeMovedToTheRecycleBinNowThenD" xml:space="preserve">
+    <value>The audio of {0} conversations will be moved to the Recycle Bin now, then daily for older ones:</value>
+    <comment>The audio of %lld conversations will be moved to the Recycle Bin now, then daily for older ones:</comment>
+  </data>
+  <data name="TheAudioOfLldConversationsWillBeMovedToTheRecycleBinNowThenD__One" xml:space="preserve">
+    <value>The audio of {0} conversation will be moved to the Recycle Bin now, then daily for older ones:</value>
+    <comment>The audio of %lld conversations will be moved to the Recycle Bin now, then daily for older ones:</comment>
   </data>
   <data name="TheAudioOfLldConversationsWillBeMovedToTheTrashAtTheNextRunA" xml:space="preserve">
     <value>The audio of {0} conversations will be moved to the Trash at the next run (at launch or within a day):</value>
@@ -2799,12 +2943,20 @@
     <comment>The audio of %lld conversations will be moved to the Trash now, then daily for older ones:</comment>
   </data>
   <data name="TheAudioOfTranscribedConversationsOlderThanLldDaysWillBeMove" xml:space="preserve">
+    <value>The audio of transcribed conversations older than {0} days will be moved to the Recycle Bin once a day. Nothing matches now.</value>
+    <comment>The audio of transcribed conversations older than %lld days will be moved to the Recycle Bin once a day. Nothing matches now.</comment>
+  </data>
+  <data name="TheAudioOfTranscribedConversationsOlderThanLldDaysWillBeMove_2" xml:space="preserve">
     <value>The audio of transcribed conversations older than {0} days will be moved to the Trash once a day. Nothing matches now.</value>
     <comment>The audio of transcribed conversations older than %lld days will be moved to the Trash once a day. Nothing matches now.</comment>
   </data>
-  <data name="TheAudioOfTranscribedConversationsOlderThanLldDaysWillBeMove__One" xml:space="preserve">
+  <data name="TheAudioOfTranscribedConversationsOlderThanLldDaysWillBeMove_2__One" xml:space="preserve">
     <value>The audio of transcribed conversations older than {0} day will be moved to the Trash once a day. Nothing matches now.</value>
     <comment>The audio of transcribed conversations older than %lld days will be moved to the Trash once a day. Nothing matches now.</comment>
+  </data>
+  <data name="TheAudioOfTranscribedConversationsOlderThanLldDaysWillBeMove__One" xml:space="preserve">
+    <value>The audio of transcribed conversations older than {0} day will be moved to the Recycle Bin once a day. Nothing matches now.</value>
+    <comment>The audio of transcribed conversations older than %lld days will be moved to the Recycle Bin once a day. Nothing matches now.</comment>
   </data>
   <data name="TheAudioSystemIsNotRunningTryAgainInAMoment" xml:space="preserve">
     <value>The audio system is not running. Try again in a moment.</value>
@@ -2829,6 +2981,10 @@
   <data name="TheEventNoLongerExists" xml:space="preserve">
     <value>The event no longer exists.</value>
     <comment>The event no longer exists.</comment>
+  </data>
+  <data name="TheGgmlConversionSModelCardSaysApache20TheOriginalWeightsByV" xml:space="preserve">
+    <value>The ggml conversion's model card says Apache-2.0; the original weights by VinAI are BSD-3-Clause.</value>
+    <comment>The ggml conversion's model card says Apache-2.0; the original weights by VinAI are BSD-3-Clause.</comment>
   </data>
   <data name="TheIndicatorAsksBeforeStoppingWithA15SCountdownLikeTheOtherA" xml:space="preserve">
     <value>The indicator asks before stopping, with a 15 s countdown, like the other auto-stops.</value>
@@ -2914,9 +3070,17 @@
     <value>The transcription, speaker and AI models are removed from this Mac (not moved to the Trash). Download them again in Settings › Transcription and Settings › AI.</value>
     <comment>The transcription, speaker and AI models are removed from this Mac (not moved to the Trash). Download them again in Settings › Transcription and Settings › AI.</comment>
   </data>
+  <data name="TheTranscriptionSpeakerAndAIModelsAreRemovedFromThisPCNotMov" xml:space="preserve">
+    <value>The transcription, speaker and AI models are removed from this PC (not moved to the Recycle Bin). Download them again in Settings › Transcription and Settings › AI.</value>
+    <comment>The transcription, speaker and AI models are removed from this PC (not moved to the Recycle Bin). Download them again in Settings › Transcription and Settings › AI.</comment>
+  </data>
   <data name="ThereIsNotEnoughFreeDiskSpaceToRecord" xml:space="preserve">
     <value>There is not enough free disk space to record.</value>
     <comment>There is not enough free disk space to record.</comment>
+  </data>
+  <data name="TheyAreMovedToTheRecycleBinTheAudioStaysSoTheConversationsCa" xml:space="preserve">
+    <value>They are moved to the Recycle Bin. The audio stays, so the conversations can be transcribed again.</value>
+    <comment>They are moved to the Recycle Bin. The audio stays, so the conversations can be transcribed again.</comment>
   </data>
   <data name="TheyAreMovedToTheTrashTheAudioStaysSoTheConversationsCanBeTr" xml:space="preserve">
     <value>They are moved to the Trash. The audio stays, so the conversations can be transcribed again.</value>
@@ -2945,6 +3109,10 @@
   <data name="ThisConversationHasNoTranscriptYet" xml:space="preserve">
     <value>This conversation has no transcript yet.</value>
     <comment>This conversation has no transcript yet.</comment>
+  </data>
+  <data name="ThisConversationIsNotInTheLibrary" xml:space="preserve">
+    <value>This conversation is not in the library.</value>
+    <comment>This conversation is not in the library.</comment>
   </data>
   <data name="ThisConversationWasDeleted" xml:space="preserve">
     <value>This conversation was deleted</value>
@@ -2985,6 +3153,10 @@
   <data name="ThisModelDoesNotLabelSpeakersAModelOnThisMacIsUsedInstead" xml:space="preserve">
     <value>This model does not label speakers; a model on this Mac is used instead.</value>
     <comment>This model does not label speakers; a model on this Mac is used instead.</comment>
+  </data>
+  <data name="ThisModelDoesNotLabelSpeakersAModelOnThisPCIsUsedInstead" xml:space="preserve">
+    <value>This model does not label speakers; a model on this PC is used instead.</value>
+    <comment>This model does not label speakers; a model on this PC is used instead.</comment>
   </data>
   <data name="ThisPC" xml:space="preserve">
     <value>This PC</value>
@@ -3042,9 +3214,17 @@
     <value>Transcribe while recording is off. Turn it on in Settings › Transcription.</value>
     <comment>Transcribe while recording is off. Turn it on in Settings › Transcription.</comment>
   </data>
+  <data name="Transcribed" xml:space="preserve">
+    <value>Transcribed</value>
+    <comment>Transcribed</comment>
+  </data>
   <data name="Transcribing" xml:space="preserve">
     <value>Transcribing…</value>
     <comment>Transcribing…</comment>
+  </data>
+  <data name="TranscribingLld" xml:space="preserve">
+    <value>Transcribing {0}%</value>
+    <comment>Transcribing %lld%%</comment>
   </data>
   <data name="Transcript" xml:space="preserve">
     <value>Transcript</value>
@@ -3077,6 +3257,10 @@
   <data name="TranscriptionModels" xml:space="preserve">
     <value>Transcription models</value>
     <comment>Transcription models</comment>
+  </data>
+  <data name="TranscriptionStartsOnceEnergySaverIsOff" xml:space="preserve">
+    <value>Transcription starts once energy saver is off.</value>
+    <comment>Transcription starts once energy saver is off.</comment>
   </data>
   <data name="TranscriptionStartsOnceTheMacIsReady" xml:space="preserve">
     <value>Transcription starts once the Mac is ready.</value>
@@ -3158,6 +3342,10 @@
     <value>Understood</value>
     <comment>Understood</comment>
   </data>
+  <data name="Undo" xml:space="preserve">
+    <value>Undo</value>
+    <comment>Undo</comment>
+  </data>
   <data name="UnmuteMicrophone" xml:space="preserve">
     <value>Unmute Microphone</value>
     <comment>Unmute Microphone</comment>
@@ -3222,9 +3410,17 @@
     <value>Use ⌘, ⌥ or ⌃ with the key.</value>
     <comment>Use ⌘, ⌥ or ⌃ with the key.</comment>
   </data>
+  <data name="UsedByLLamaSharp" xml:space="preserve">
+    <value>Used by LLamaSharp</value>
+    <comment>Used by LLamaSharp</comment>
+  </data>
   <data name="UsedByMLXSwift" xml:space="preserve">
     <value>Used by MLX Swift</value>
     <comment>Used by MLX Swift</comment>
+  </data>
+  <data name="UsedBySherpaOnnx" xml:space="preserve">
+    <value>Used by sherpa-onnx</value>
+    <comment>Used by sherpa-onnx</comment>
   </data>
   <data name="UsedBySwiftHuggingface" xml:space="preserve">
     <value>Used by swift-huggingface</value>
@@ -3233,6 +3429,10 @@
   <data name="UsedBySwiftTransformers" xml:space="preserve">
     <value>Used by swift-transformers</value>
     <comment>Used by swift-transformers</comment>
+  </data>
+  <data name="UsedByWhisperNet" xml:space="preserve">
+    <value>Used by Whisper.net</value>
+    <comment>Used by Whisper.net</comment>
   </data>
   <data name="UsedForSummariesAndQuestionsTheModelOfEachEnabledProviderBel" xml:space="preserve">
     <value>Used for summaries and questions. The model of each enabled provider below, as checked in its row.</value>
@@ -3262,6 +3462,10 @@
     <value>Vietnamese</value>
     <comment>Vietnamese</comment>
   </data>
+  <data name="VietnameseTranscription" xml:space="preserve">
+    <value>Vietnamese transcription</value>
+    <comment>Vietnamese transcription</comment>
+  </data>
   <data name="View" xml:space="preserve">
     <value>View</value>
     <comment>View</comment>
@@ -3277,6 +3481,10 @@
   <data name="WaitWhenTheMacIsHotOrInLowPowerMode" xml:space="preserve">
     <value>Wait when the Mac is hot or in Low Power Mode</value>
     <comment>Wait when the Mac is hot or in Low Power Mode</comment>
+  </data>
+  <data name="WaitWhileEnergySaverIsOn" xml:space="preserve">
+    <value>Wait while energy saver is on</value>
+    <comment>Wait while energy saver is on</comment>
   </data>
   <data name="Waiting" xml:space="preserve">
     <value>Waiting…</value>
@@ -3341,6 +3549,10 @@
   <data name="WholeConversation" xml:space="preserve">
     <value>Whole conversation</value>
     <comment>Whole conversation</comment>
+  </data>
+  <data name="WinUI3AndTheAppPlatform" xml:space="preserve">
+    <value>WinUI 3 and the app platform</value>
+    <comment>WinUI 3 and the app platform</comment>
   </data>
   <data name="Window" xml:space="preserve">
     <value>Window</value>

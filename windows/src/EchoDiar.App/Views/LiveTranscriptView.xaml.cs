@@ -133,7 +133,7 @@ public sealed partial class LiveTranscriptView : UserControl
         var me = line.Speaker == RecordingTranscriber.Speaker.Me;
         var speaker = new TextBlock
         {
-            Text = line.Speaker + ":",
+            Text = Loc.T(me ? "Me" : "Others") + ":",
             Style = (Style)Resources[me ? "LiveSpeakerMe" : "LiveSpeakerOthers"],
         };
         var text = new TextBlock { Text = line.Text.Trim(), Style = (Style)Resources["LiveLineText"] };

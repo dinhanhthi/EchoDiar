@@ -169,7 +169,7 @@ public sealed partial class ConversationView : UserControl
         {
             // Not listed yet (the launch refresh), or deleted.
             TitleText.Text = "";
-            DetailText.Text = "This conversation is not in the library.";
+            DetailText.Text = Loc.T("This conversation is not in the library.");
             return;
         }
         if (!_editing) TitleText.Text = conversation.Title;

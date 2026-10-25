@@ -330,7 +330,7 @@ public sealed partial class ConversationCard : UserControl
     internal static string FileSize(long bytes)
     {
         var culture = CultureInfo.CurrentCulture;
-        if (bytes < 1_000) return string.Format(culture, "{0} bytes", bytes);
+        if (bytes < 1_000) return Loc.Plural("%lld bytes", bytes);
         if (bytes < 1_000_000) return string.Format(culture, "{0:0} KB", bytes / 1e3);
         if (bytes < 1_000_000_000) return string.Format(culture, "{0:0.#} MB", bytes / 1e6);
         return string.Format(culture, "{0:0.##} GB", bytes / 1e9);

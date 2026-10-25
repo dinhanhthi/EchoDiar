@@ -142,11 +142,11 @@
     <value>Todos los archivos de {0} conversación se trasladarán a la Papelera ahora y, después, a diario los de las más antiguas:</value>
     <comment>All files of %lld conversations will be moved to the Trash now, then daily for older ones:</comment>
   </data>
-  <data name="AllFilesOfTranscribedConversationsOlderThanLldDaysWillBeMove" xml:space="preserve">
+  <data name="AllFilesOfTranscribedConversationsOlderThanLldDaysWillBeMove_2" xml:space="preserve">
     <value>Todos los archivos de las conversaciones transcritas con más de {0} días se trasladarán a la Papelera una vez al día. Ahora no hay coincidencias.</value>
     <comment>All files of transcribed conversations older than %lld days will be moved to the Trash once a day. Nothing matches now.</comment>
   </data>
-  <data name="AllFilesOfTranscribedConversationsOlderThanLldDaysWillBeMove__One" xml:space="preserve">
+  <data name="AllFilesOfTranscribedConversationsOlderThanLldDaysWillBeMove_2__One" xml:space="preserve">
     <value>Todos los archivos de las conversaciones transcritas con más de {0} día se trasladarán a la Papelera una vez al día. Ahora no hay coincidencias.</value>
     <comment>All files of transcribed conversations older than %lld days will be moved to the Trash once a day. Nothing matches now.</comment>
   </data>
@@ -1242,11 +1242,11 @@
     <value>La transcripción en directo se ha detenido. La transcripción se hará después de Detener.</value>
     <comment>Live transcript stopped. The transcript is made after Stop.</comment>
   </data>
-  <data name="LldConversationsWithoutAudioWouldBeLeftEmptyTheyAreMovedToTh" xml:space="preserve">
+  <data name="LldConversationsWithoutAudioWouldBeLeftEmptyTheyAreMovedToTh_2" xml:space="preserve">
     <value>{0} conversaciones sin audio quedarían vacías: se trasladan enteras a la Papelera.</value>
     <comment>%lld conversations without audio would be left empty: they are moved to the Trash entirely.</comment>
   </data>
-  <data name="LldConversationsWithoutAudioWouldBeLeftEmptyTheyAreMovedToTh__One" xml:space="preserve">
+  <data name="LldConversationsWithoutAudioWouldBeLeftEmptyTheyAreMovedToTh_2__One" xml:space="preserve">
     <value>{0} conversación sin audio quedaría vacía: se traslada entera a la Papelera.</value>
     <comment>%lld conversations without audio would be left empty: they are moved to the Trash entirely.</comment>
   </data>
@@ -1678,7 +1678,7 @@
     <value>En este Mac</value>
     <comment>On this Mac</comment>
   </data>
-  <data name="OnceADayMovesTranscribedConversationsOlderThanTheAgeBelowToT" xml:space="preserve">
+  <data name="OnceADayMovesTranscribedConversationsOlderThanTheAgeBelowToT_2" xml:space="preserve">
     <value>Una vez al día, traslada a la Papelera las conversaciones transcritas con más antigüedad que la indicada abajo.</value>
     <comment>Once a day, moves transcribed conversations older than the age below to the Trash.</comment>
   </data>
@@ -2266,7 +2266,7 @@
     <value>Se muestran las reuniones de los próximos 7 días. La lista se actualiza automáticamente.</value>
     <comment>Showing meetings in the next 7 days. The list updates automatically.</comment>
   </data>
-  <data name="ShowsTheTranscriptDuringTheRecordingAndKeepsItSoItIsReadyWit" xml:space="preserve">
+  <data name="ShowsTheTranscriptDuringTheRecordingAndKeepsItSoItIsReadyWit_2" xml:space="preserve">
     <value>Muestra la transcripción durante la grabación y la conserva, para que esté lista segundos después de Detener. Usa más CPU y memoria al grabar. Solo modelos WhisperKit y Parakeet; los demás motores transcriben después de Detener.</value>
     <comment>Shows the transcript during the recording and keeps it, so it is ready within seconds of Stop. Uses more CPU and memory while recording. WhisperKit and Parakeet models only; other engines transcribe after Stop.</comment>
   </data>
@@ -2538,11 +2538,11 @@
     <value>El audio de {0} conversación se trasladará a la Papelera ahora y, después, a diario el de las más antiguas:</value>
     <comment>The audio of %lld conversations will be moved to the Trash now, then daily for older ones:</comment>
   </data>
-  <data name="TheAudioOfTranscribedConversationsOlderThanLldDaysWillBeMove" xml:space="preserve">
+  <data name="TheAudioOfTranscribedConversationsOlderThanLldDaysWillBeMove_2" xml:space="preserve">
     <value>El audio de las conversaciones transcritas con más de {0} días se trasladará a la Papelera una vez al día. Ahora no hay coincidencias.</value>
     <comment>The audio of transcribed conversations older than %lld days will be moved to the Trash once a day. Nothing matches now.</comment>
   </data>
-  <data name="TheAudioOfTranscribedConversationsOlderThanLldDaysWillBeMove__One" xml:space="preserve">
+  <data name="TheAudioOfTranscribedConversationsOlderThanLldDaysWillBeMove_2__One" xml:space="preserve">
     <value>El audio de las conversaciones transcritas con más de {0} día se trasladará a la Papelera una vez al día. Ahora no hay coincidencias.</value>
     <comment>The audio of transcribed conversations older than %lld days will be moved to the Trash once a day. Nothing matches now.</comment>
   </data>

@@ -93,7 +93,8 @@ public sealed partial class HotKeyRecorder : UserControl
     /// <summary>The other global shortcut, which this one may not equal.</summary>
     private WindowsHotKey Other => _pause ? _model.Settings.GlobalHotKeyWindows : _model.Settings.GlobalPauseHotKeyWindows;
 
-    private string OtherName => _pause ? "global record shortcut" : "global pause shortcut";
+    /// <summary>"%@ is the global … shortcut." for the other global shortcut (the macOS texts).</summary>
+    private string OtherNote => _pause ? "%@ is the global record shortcut." : "%@ is the global pause shortcut.";
 
     private void OnModelChanged(object? sender, PropertyChangedEventArgs e)
     {
@@ -162,7 +163,7 @@ public sealed partial class HotKeyRecorder : UserControl
         }
         if (pressed == Other)
         {
-            ShowNote(Loc.Format("%@ is the %@.", GlobalHotKeys.Describe(pressed), OtherName));
+            ShowNote(Loc.Format(OtherNote, GlobalHotKeys.Describe(pressed)));
             return;
         }
         // Saved while still recording, so only the new shortcut is registered when the recording ends.
@@ -175,7 +176,7 @@ public sealed partial class HotKeyRecorder : UserControl
     {
         if (DefaultKey == Other)
         {
-            ShowNote(Loc.Format("%@ is the %@.", GlobalHotKeys.Describe(DefaultKey), OtherName));
+            ShowNote(Loc.Format(OtherNote, GlobalHotKeys.Describe(DefaultKey)));
             return;
         }
         ShowNote(null);

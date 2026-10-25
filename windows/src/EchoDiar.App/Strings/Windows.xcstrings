@@ -21,20 +21,156 @@
       "comment" : "Windows only: Views/HotKeyRecorder.cs.",
       "extractionState" : "manual"
     },
-    "%@ is the %@." : {
-      "comment" : "Windows only: Views/HotKeyRecorder.cs.",
-      "extractionState" : "manual"
-    },
     "%@ not saved: put the key in the API key field, which keeps it in Credential Manager." : {
       "comment" : "Windows only: Views/Settings/ProvidersSettingsPage.xaml.cs.",
       "extractionState" : "manual"
+    },
+    "%lld bytes" : {
+      "comment" : "Windows only: Views/ConversationCard.xaml.cs.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld byte"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld bytes"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "%lld conversations without audio would be left empty: they are moved to the Recycle Bin entirely." : {
+      "comment" : "Windows only: Views/Settings/StorageSettingsPage.xaml.cs.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld conversation without audio would be left empty: it is moved to the Recycle Bin entirely."
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld conversations without audio would be left empty: they are moved to the Recycle Bin entirely."
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "All files of %lld conversations will be moved to the Recycle Bin at the next run (at launch or within a day):" : {
+      "comment" : "Windows only: Views/Settings/StorageSettingsPage.xaml.cs.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "All files of %lld conversation will be moved to the Recycle Bin at the next run (at launch or within a day):"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "All files of %lld conversations will be moved to the Recycle Bin at the next run (at launch or within a day):"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "All files of %lld conversations will be moved to the Recycle Bin now, then daily for older ones:" : {
+      "comment" : "Windows only: Views/Settings/StorageSettingsPage.xaml.cs.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "All files of %lld conversation will be moved to the Recycle Bin now, then daily for older ones:"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "All files of %lld conversations will be moved to the Recycle Bin now, then daily for older ones:"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "All files of transcribed conversations older than %lld days will be moved to the Recycle Bin once a day. Nothing matches now." : {
+      "comment" : "Windows only: Views/Settings/StorageSettingsPage.xaml.cs.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "All files of transcribed conversations older than %lld day will be moved to the Recycle Bin once a day. Nothing matches now."
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "All files of transcribed conversations older than %lld days will be moved to the Recycle Bin once a day. Nothing matches now."
+                }
+              }
+            }
+          }
+        }
+      }
     },
     "An update is available: Update in the toolbar installs it." : {
       "comment" : "Windows only: Views/Settings/AboutSettingsPage.xaml.cs.",
       "extractionState" : "manual"
     },
+    "Answers questions about all your transcribed conversations, citing the conversation and the moment. The index stays on this PC unless you pick an API embedder." : {
+      "comment" : "Windows only: Views/Settings/RAGSettingsPage.xaml.cs.",
+      "extractionState" : "manual"
+    },
+    "App structure (MVVM)" : {
+      "comment" : "Windows only: Views/Settings/AcknowledgementsSettingsPage.xaml.cs.",
+      "extractionState" : "manual"
+    },
     "Audio and transcripts stay on this PC." : {
       "comment" : "Windows only: Views/OnboardingWindow.xaml.",
+      "extractionState" : "manual"
+    },
+    "Audio capture and playback" : {
+      "comment" : "Windows only: Views/Settings/AcknowledgementsSettingsPage.xaml.cs.",
+      "extractionState" : "manual"
+    },
+    "Audio leaves this PC: cloud engines upload the recording to the provider." : {
+      "comment" : "Windows only: Views/Settings/TranscriptionSettingsPage.xaml.cs.",
+      "extractionState" : "manual"
+    },
+    "Audio leaves this PC: the cloud diarizer uploads the system channel to the provider." : {
+      "comment" : "Windows only: Views/Settings/TranscriptionSettingsPage.xaml.cs.",
       "extractionState" : "manual"
     },
     "Auto = the transcript's language for summaries, the question's for answers." : {
@@ -59,6 +195,14 @@
     },
     "Checking for updates…" : {
       "comment" : "Windows only: Views/Settings/AboutSettingsPage.xaml.cs.",
+      "extractionState" : "manual"
+    },
+    "Cloud diarization failed and no diarization model is installed on this PC." : {
+      "comment" : "Windows only: Views/TranscriptView.xaml.cs.",
+      "extractionState" : "manual"
+    },
+    "Cloud diarization failed; speakers were told apart on this PC." : {
+      "comment" : "Windows only: Views/TranscriptView.xaml.cs.",
       "extractionState" : "manual"
     },
     "Could not check for updates" : {
@@ -93,6 +237,10 @@
       "comment" : "Windows only: Views/TitleBarToolbar.xaml.cs.",
       "extractionState" : "manual"
     },
+    "EchoDiar hears nothing from %@. Pick another source or check that the app is playing." : {
+      "comment" : "Windows only: Views/RecordingView.xaml.cs.",
+      "extractionState" : "manual"
+    },
     "EchoDiar installs the update once the recording, transcriptions and AI answers have finished." : {
       "comment" : "Windows only: Views/TitleBarToolbar.xaml.cs.",
       "extractionState" : "manual"
@@ -107,6 +255,10 @@
     },
     "Extra headers" : {
       "comment" : "Windows only: Views/Settings/ProvidersSettingsPage.xaml.cs.",
+      "extractionState" : "manual"
+    },
+    "Heads up: I'm recording this call to take notes. The recording stays on my PC." : {
+      "comment" : "Windows only: Views/Settings/GeneralSettingsPage.xaml.cs, Views/OnboardingWindow.xaml.cs.",
       "extractionState" : "manual"
     },
     "Indexing your conversations on this PC needs this embedding model (%@). You can also pick another model below." : {
@@ -133,6 +285,14 @@
       "comment" : "Windows only: Views/GlobalChatView.xaml.",
       "extractionState" : "manual"
     },
+    "Its runtime files come under the Microsoft Software License Terms." : {
+      "comment" : "Windows only: Views/Settings/AcknowledgementsSettingsPage.xaml.cs.",
+      "extractionState" : "manual"
+    },
+    "Keeps it at the window's top-right corner." : {
+      "comment" : "Windows only: Views/Settings/RecordingSettingsPage.xaml.cs.",
+      "extractionState" : "manual"
+    },
     "Language of summaries and answers" : {
       "comment" : "Windows only: Views/Settings/ProvidersSettingsPage.xaml.",
       "extractionState" : "manual"
@@ -143,6 +303,10 @@
     },
     "Leaves this PC" : {
       "comment" : "Windows only: Views/Settings/RAGSettingsPage.xaml.cs.",
+      "extractionState" : "manual"
+    },
+    "Microphone access is blocked on this PC." : {
+      "comment" : "Windows only: Views/OnboardingWindow.xaml.cs.",
       "extractionState" : "manual"
     },
     "Microphone level" : {
@@ -165,7 +329,7 @@
       "comment" : "Windows only: Views/Settings/ProvidersSettingsPage.xaml.cs, Views/Settings/RAGSettingsPage.xaml.cs.",
       "extractionState" : "manual"
     },
-    "No conversations yet — press ⌘R to record" : {
+    "No conversations yet — press Ctrl+R to record" : {
       "comment" : "Windows only: Views/ConversationListView.xaml.cs.",
       "extractionState" : "manual"
     },
@@ -177,8 +341,16 @@
       "comment" : "Windows only: Views/Settings/ProvidersSettingsPage.xaml.cs.",
       "extractionState" : "manual"
     },
+    "Not transcribed" : {
+      "comment" : "Windows only: Views/ConversationListView.xaml.cs.",
+      "extractionState" : "manual"
+    },
     "On this PC" : {
       "comment" : "Windows only: Views/AIMenus.cs, Views/Settings/RAGSettingsPage.xaml.",
+      "extractionState" : "manual"
+    },
+    "Once a day, moves transcribed conversations older than the age below to the Recycle Bin." : {
+      "comment" : "Windows only: Views/Settings/StorageSettingsPage.xaml.cs.",
       "extractionState" : "manual"
     },
     "One per line, Name: value. Saved in the settings file: put API keys in the API key field." : {
@@ -197,20 +369,48 @@
       "comment" : "Windows only: Views/Settings/StorageSettingsPage.xaml.",
       "extractionState" : "manual"
     },
+    "Parakeet transcription" : {
+      "comment" : "Windows only: Views/Settings/AcknowledgementsSettingsPage.xaml.cs.",
+      "extractionState" : "manual"
+    },
     "Press Ctrl+R to start recording." : {
       "comment" : "Windows only: Views/WelcomeView.xaml.cs.",
+      "extractionState" : "manual"
+    },
+    "Ready" : {
+      "comment" : "Windows only: Views/ConversationListView.xaml.cs.",
+      "extractionState" : "manual"
+    },
+    "Record %@" : {
+      "comment" : "Windows only: Views/TitleBarToolbar.xaml.cs.",
       "extractionState" : "manual"
     },
     "Recordings are transcribed on this PC. Pick a speech recognition model to download." : {
       "comment" : "Windows only: Views/ConversationListView.xaml.cs.",
       "extractionState" : "manual"
     },
+    "Redo" : {
+      "comment" : "Windows only: Views/HotKeyRecorder.cs.",
+      "extractionState" : "manual"
+    },
     "Reveal in Explorer" : {
       "comment" : "Windows only: Views/ConversationCard.xaml.cs.",
       "extractionState" : "manual"
     },
+    "Settings cards" : {
+      "comment" : "Windows only: Views/Settings/AcknowledgementsSettingsPage.xaml.cs.",
+      "extractionState" : "manual"
+    },
+    "Shows the transcript during the recording and keeps it, so it is ready within seconds of Stop. Uses more CPU and memory while recording. Whisper and Parakeet models only; other engines transcribe after Stop." : {
+      "comment" : "Windows only: Views/Settings/TranscriptionSettingsPage.xaml.cs.",
+      "extractionState" : "manual"
+    },
     "Simulate state" : {
       "comment" : "Windows only: Services/TrayIcon.cs.",
+      "extractionState" : "manual"
+    },
+    "Speaker diarization" : {
+      "comment" : "Windows only: Views/Settings/AcknowledgementsSettingsPage.xaml.cs.",
       "extractionState" : "manual"
     },
     "Start recording" : {
@@ -233,12 +433,92 @@
       "comment" : "Windows only: Views/Settings/StorageSettingsPage.xaml.cs.",
       "extractionState" : "manual"
     },
+    "The audio files are moved to the Recycle Bin. Transcripts, summaries and chats stay; playback and re-transcribing are no longer possible." : {
+      "comment" : "Windows only: Views/Settings/StorageSettingsPage.xaml.cs.",
+      "extractionState" : "manual"
+    },
     "The audio is moved to the Recycle Bin. The transcript, summary and chat stay; playback and re-transcribing are no longer possible." : {
       "comment" : "Windows only: Views/TitleBarToolbar.xaml.cs.",
       "extractionState" : "manual"
     },
+    "The audio of %lld conversations will be moved to the Recycle Bin at the next run (at launch or within a day):" : {
+      "comment" : "Windows only: Views/Settings/StorageSettingsPage.xaml.cs.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "The audio of %lld conversation will be moved to the Recycle Bin at the next run (at launch or within a day):"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "The audio of %lld conversations will be moved to the Recycle Bin at the next run (at launch or within a day):"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "The audio of %lld conversations will be moved to the Recycle Bin now, then daily for older ones:" : {
+      "comment" : "Windows only: Views/Settings/StorageSettingsPage.xaml.cs.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "The audio of %lld conversation will be moved to the Recycle Bin now, then daily for older ones:"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "The audio of %lld conversations will be moved to the Recycle Bin now, then daily for older ones:"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "The audio of transcribed conversations older than %lld days will be moved to the Recycle Bin once a day. Nothing matches now." : {
+      "comment" : "Windows only: Views/Settings/StorageSettingsPage.xaml.cs.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "The audio of transcribed conversations older than %lld day will be moved to the Recycle Bin once a day. Nothing matches now."
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "The audio of transcribed conversations older than %lld days will be moved to the Recycle Bin once a day. Nothing matches now."
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "The download failed: %@" : {
       "comment" : "Windows only: Views/ConversationListView.xaml.cs.",
+      "extractionState" : "manual"
+    },
+    "The ggml conversion's model card says Apache-2.0; the original weights by VinAI are BSD-3-Clause." : {
+      "comment" : "Windows only: Views/Settings/AcknowledgementsSettingsPage.xaml.cs.",
       "extractionState" : "manual"
     },
     "The recording and its files are moved to the Recycle Bin." : {
@@ -247,6 +527,14 @@
     },
     "The recordings and their files are moved to the Recycle Bin." : {
       "comment" : "Windows only: Views/TitleBarToolbar.xaml.cs.",
+      "extractionState" : "manual"
+    },
+    "The transcription, speaker and AI models are removed from this PC (not moved to the Recycle Bin). Download them again in Settings › Transcription and Settings › AI." : {
+      "comment" : "Windows only: Views/Settings/StorageSettingsPage.xaml.cs.",
+      "extractionState" : "manual"
+    },
+    "They are moved to the Recycle Bin. The audio stays, so the conversations can be transcribed again." : {
+      "comment" : "Windows only: Views/Settings/StorageSettingsPage.xaml.cs.",
       "extractionState" : "manual"
     },
     "They still go to the Recycle Bin." : {
@@ -261,6 +549,10 @@
       "comment" : "Windows only: Views/Settings/RAGSettingsPage.xaml.cs.",
       "extractionState" : "manual"
     },
+    "This conversation is not in the library." : {
+      "comment" : "Windows only: Views/ConversationView.xaml.cs.",
+      "extractionState" : "manual"
+    },
     "This copy was not installed from an .appinstaller file, so it does not update itself." : {
       "comment" : "Windows only: Views/Settings/AboutSettingsPage.xaml.cs.",
       "extractionState" : "manual"
@@ -273,12 +565,28 @@
       "comment" : "Windows only: Views/RecordingView.xaml.cs.",
       "extractionState" : "manual"
     },
+    "This model does not label speakers; a model on this PC is used instead." : {
+      "comment" : "Windows only: Views/Settings/TranscriptionSettingsPage.xaml.cs.",
+      "extractionState" : "manual"
+    },
     "Transcribe now" : {
       "comment" : "Windows only: Views/ConversationCard.xaml.",
       "extractionState" : "manual"
     },
     "Transcribe now, even with energy saver on" : {
       "comment" : "Windows only: Views/ConversationCard.xaml.",
+      "extractionState" : "manual"
+    },
+    "Transcribed" : {
+      "comment" : "Windows only: Views/ConversationListView.xaml.cs.",
+      "extractionState" : "manual"
+    },
+    "Transcribing %lld%%" : {
+      "comment" : "Windows only: Views/ConversationListView.xaml.cs.",
+      "extractionState" : "manual"
+    },
+    "Transcription starts once energy saver is off." : {
+      "comment" : "Windows only: Views/Settings/RecordingSettingsPage.xaml.cs.",
       "extractionState" : "manual"
     },
     "Try again later." : {
@@ -301,6 +609,10 @@
       "comment" : "Windows only: ViewModels/SettingsViewModel.cs.",
       "extractionState" : "manual"
     },
+    "Undo" : {
+      "comment" : "Windows only: Views/HotKeyRecorder.cs.",
+      "extractionState" : "manual"
+    },
     "Update after the current work" : {
       "comment" : "Windows only: Views/TitleBarToolbar.xaml.cs.",
       "extractionState" : "manual"
@@ -321,16 +633,40 @@
       "comment" : "Windows only: Views/HotKeyRecorder.cs.",
       "extractionState" : "manual"
     },
+    "Used by LLamaSharp" : {
+      "comment" : "Windows only: Views/Settings/AcknowledgementsSettingsPage.xaml.cs.",
+      "extractionState" : "manual"
+    },
+    "Used by Whisper.net" : {
+      "comment" : "Windows only: Views/Settings/AcknowledgementsSettingsPage.xaml.cs.",
+      "extractionState" : "manual"
+    },
+    "Used by sherpa-onnx" : {
+      "comment" : "Windows only: Views/Settings/AcknowledgementsSettingsPage.xaml.cs.",
+      "extractionState" : "manual"
+    },
     "Used for summaries and questions. The model of each enabled provider below, as checked in its row." : {
       "comment" : "Windows only: Views/Settings/ProvidersSettingsPage.xaml.",
+      "extractionState" : "manual"
+    },
+    "Vietnamese transcription" : {
+      "comment" : "Windows only: Views/Settings/AcknowledgementsSettingsPage.xaml.cs.",
       "extractionState" : "manual"
     },
     "Wait for the transcriptions and AI answers to finish" : {
       "comment" : "Windows only: Views/Settings/GeneralSettingsPage.xaml.cs.",
       "extractionState" : "manual"
     },
+    "Wait while energy saver is on" : {
+      "comment" : "Windows only: Views/Settings/RecordingSettingsPage.xaml.cs.",
+      "extractionState" : "manual"
+    },
     "Waiting: energy saver is on" : {
       "comment" : "Windows only: Views/ConversationCard.xaml.cs.",
+      "extractionState" : "manual"
+    },
+    "WinUI 3 and the app platform" : {
+      "comment" : "Windows only: Views/Settings/AcknowledgementsSettingsPage.xaml.cs.",
       "extractionState" : "manual"
     },
     "Windows AI (system)" : {
@@ -343,6 +679,10 @@
     },
     "another conversation" : {
       "comment" : "Windows only: Views/AIPanelView.xaml.cs, Views/GlobalChatView.xaml.cs.",
+      "extractionState" : "manual"
+    },
+    "the app" : {
+      "comment" : "Windows only: Views/RecordingView.xaml.cs.",
       "extractionState" : "manual"
     },
     "this link" : {

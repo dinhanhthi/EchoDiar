@@ -53,10 +53,7 @@ public sealed partial class TranscriptionSettingsPage : UserControl
         new("Number of other speakers", ["speaker count", "diarization", "people"], DiarizationModelsTab),
     ];
 
-    /// <summary>
-    /// macOS's text with Windows' engines. Not through Loc: its slug (cut at 60 characters) is the macOS text's, which
-    /// names WhisperKit.
-    /// </summary>
+    /// <summary>macOS's text with Windows' engines (a Windows-only key: the macOS text names WhisperKit).</summary>
     private const string LiveDescription =
         "Shows the transcript during the recording and keeps it, so it is ready within seconds of Stop. Uses more CPU and "
         + "memory while recording. Whisper and Parakeet models only; other engines transcribe after Stop.";
@@ -96,7 +93,7 @@ public sealed partial class TranscriptionSettingsPage : UserControl
             "Speech-to-text APIs",
             "OpenAI, Groq, Mistral, Google Gemini and custom endpoints transcribe too, with their transcription model: set them up in Settings › AI.",
             "Speech-to-text APIs"));
-        LiveCard.Description = LiveDescription;
+        LiveCard.Description = Loc.T(LiveDescription);
         SpeakerCountCombo.Items.Add(Loc.T("Auto"));
         var (min, max) = AppSettings.SpeakerCountHintRange;
         for (var count = min; count <= max; count++) SpeakerCountCombo.Items.Add(count.ToString(CultureInfo.CurrentCulture));
@@ -406,7 +403,7 @@ public sealed partial class TranscriptionSettingsPage : UserControl
     /// <summary>Approximate pay-as-you-go prices per audio hour (macOS <c>CloudEngineRow.prices</c>, 2026-10-18).</summary>
     private static readonly Dictionary<string, string> Prices = new()
     {
-        ["openai"] = "~$0.36/h", ["groq"] = "~$0.04/h", ["mistral"] = "~$0.18/h", ["gemini"] = "~$0.23/h + output",
+        ["openai"] = "~$0.36/h", ["groq"] = "~$0.04/h", ["mistral"] = "~$0.18/h", ["gemini"] = "~$0.23/h",
         ["elevenlabs"] = "~$0.22/h", ["deepgram"] = "~$0.26/h", ["assemblyai"] = "~$0.23/h",
     };
 
@@ -516,9 +513,9 @@ public sealed partial class TranscriptionSettingsPage : UserControl
             {
                 Style = (Style)page.Resources["CautionNoteStyle"],
                 // The macOS text, with "this PC" for "this Mac".
-                Text = diarization
+                Text = Loc.T(diarization
                     ? "Audio leaves this PC: the cloud diarizer uploads the system channel to the provider."
-                    : "Audio leaves this PC: cloud engines upload the recording to the provider.",
+                    : "Audio leaves this PC: cloud engines upload the recording to the provider."),
             });
             _caution = caution;
         }
@@ -627,7 +624,10 @@ public sealed partial class TranscriptionSettingsPage : UserControl
                     ? Loc.Format("Add the key of %@ in Transcription models", config.DisplayName)
                     : Loc.Format("Add the key of %@ below", config.DisplayName));
             List<string> details = [Loc.T("Cloud")];
-            if (config.Preset is { } preset && Prices.TryGetValue(preset, out var price)) details.Add(Loc.Format("%@ (approx.)", price));
+            if (config.Preset is { } preset && Prices.TryGetValue(preset, out var price))
+            {
+                details.Add(Loc.Format(preset == "gemini" ? "%@ + output (approx.)" : "%@ (approx.)", price));
+            }
             _details.Text = string.Join(" · ", details);
             _geminiNote.Visibility = Show(config.Preset == "gemini");
         }
@@ -709,7 +709,7 @@ public sealed partial class TranscriptionSettingsPage : UserControl
             _noSpeakers = new TextBlock
             {
                 Style = (Style)page.Resources["CautionNoteStyle"],
-                Text = "This model does not label speakers; a model on this PC is used instead.",
+                Text = Loc.T("This model does not label speakers; a model on this PC is used instead."),
             };
             var notes = new StackPanel { Spacing = 2 };
             notes.Children.Add(_error);

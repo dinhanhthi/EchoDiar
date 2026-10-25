@@ -172,8 +172,8 @@
                     Height="32"
                     Padding="0"
                     Style="{StaticResource SubtleButtonStyle}"
-                    AutomationProperties.Name="Reveal in Explorer"
-                    ToolTipService.ToolTip="Reveal in Explorer">
+                    AutomationProperties.Name="{local:T Text='Reveal in Explorer'}"
+                    ToolTipService.ToolTip="{local:T Text='Reveal in Explorer'}">
                     <FontIcon FontFamily="{ThemeResource SymbolThemeFontFamily}" FontSize="16" Glyph="&#xE8B7;" />
                 </Button>
                 <Button

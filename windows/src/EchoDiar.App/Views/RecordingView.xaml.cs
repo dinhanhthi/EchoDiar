@@ -92,7 +92,9 @@ public sealed partial class RecordingView : UserControl
 
         GlobalTapWarning.IsOpen = recording && snapshot.GlobalTapFallback;
         SilentTapBanner.IsOpen = recording && snapshot.SilentTapSuspected;
-        var silentTap = $"EchoDiar hears nothing from {_model.RecordingSourceName ?? "the app"}. Pick another source or check that the app is playing.";
+        var silentTap = Loc.Format(
+            "EchoDiar hears nothing from %@. Pick another source or check that the app is playing.",
+            _model.RecordingSourceName ?? Loc.T("the app"));
         if (SilentTapBanner.Message != silentTap) SilentTapBanner.Message = silentTap;
 
         var live = recording && !paused;

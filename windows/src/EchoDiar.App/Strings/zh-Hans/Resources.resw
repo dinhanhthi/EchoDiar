@@ -134,7 +134,7 @@
     <value>{0} 个对话的所有文件将立即移到废纸篓，之后每天处理更旧的对话：</value>
     <comment>All files of %lld conversations will be moved to the Trash now, then daily for older ones:</comment>
   </data>
-  <data name="AllFilesOfTranscribedConversationsOlderThanLldDaysWillBeMove" xml:space="preserve">
+  <data name="AllFilesOfTranscribedConversationsOlderThanLldDaysWillBeMove_2" xml:space="preserve">
     <value>超过 {0} 天的已转写对话的所有文件将每天移到废纸篓一次。目前没有匹配项。</value>
     <comment>All files of transcribed conversations older than %lld days will be moved to the Trash once a day. Nothing matches now.</comment>
   </data>
@@ -1202,7 +1202,7 @@
     <value>实时转写已停止。转写文本会在停止后生成。</value>
     <comment>Live transcript stopped. The transcript is made after Stop.</comment>
   </data>
-  <data name="LldConversationsWithoutAudioWouldBeLeftEmptyTheyAreMovedToTh" xml:space="preserve">
+  <data name="LldConversationsWithoutAudioWouldBeLeftEmptyTheyAreMovedToTh_2" xml:space="preserve">
     <value>{0} 个没有音频的对话将变为空：它们会被整个移到废纸篓。</value>
     <comment>%lld conversations without audio would be left empty: they are moved to the Trash entirely.</comment>
   </data>
@@ -1606,7 +1606,7 @@
     <value>在这台 Mac 上</value>
     <comment>On this Mac</comment>
   </data>
-  <data name="OnceADayMovesTranscribedConversationsOlderThanTheAgeBelowToT" xml:space="preserve">
+  <data name="OnceADayMovesTranscribedConversationsOlderThanTheAgeBelowToT_2" xml:space="preserve">
     <value>每天一次，将超过以下时长的已转写对话移到废纸篓。</value>
     <comment>Once a day, moves transcribed conversations older than the age below to the Trash.</comment>
   </data>
@@ -2194,7 +2194,7 @@
     <value>显示未来 7 天内的会议。列表会自动更新。</value>
     <comment>Showing meetings in the next 7 days. The list updates automatically.</comment>
   </data>
-  <data name="ShowsTheTranscriptDuringTheRecordingAndKeepsItSoItIsReadyWit" xml:space="preserve">
+  <data name="ShowsTheTranscriptDuringTheRecordingAndKeepsItSoItIsReadyWit_2" xml:space="preserve">
     <value>在录音期间显示转写文本并保留下来，因此停止后几秒内即可就绪。录音时会占用更多 CPU 和内存。仅限 WhisperKit 和 Parakeet 模型；其他引擎会在停止后转写。</value>
     <comment>Shows the transcript during the recording and keeps it, so it is ready within seconds of Stop. Uses more CPU and memory while recording. WhisperKit and Parakeet models only; other engines transcribe after Stop.</comment>
   </data>
@@ -2458,7 +2458,7 @@
     <value>{0} 个对话的音频将立即移到废纸篓，之后每天处理更旧的对话：</value>
     <comment>The audio of %lld conversations will be moved to the Trash now, then daily for older ones:</comment>
   </data>
-  <data name="TheAudioOfTranscribedConversationsOlderThanLldDaysWillBeMove" xml:space="preserve">
+  <data name="TheAudioOfTranscribedConversationsOlderThanLldDaysWillBeMove_2" xml:space="preserve">
     <value>超过 {0} 天的已转写对话的音频将每天移到废纸篓一次。目前没有匹配项。</value>
     <comment>The audio of transcribed conversations older than %lld days will be moved to the Trash once a day. Nothing matches now.</comment>
   </data>

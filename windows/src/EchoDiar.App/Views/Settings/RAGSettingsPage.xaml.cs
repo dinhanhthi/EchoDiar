@@ -74,9 +74,8 @@ public sealed partial class RAGSettingsPage : UserControl
         _model = model;
         _providers = model.ProvidersModel;
         InitializeComponent();
-        // Not through Loc: the text is not in the catalog, and its slug (cut at 60 characters) finds the macOS text.
-        EnableCard.Description =
-            "Answers questions about all your transcribed conversations, citing the conversation and the moment. The index stays on this PC unless you pick an API embedder.";
+        EnableCard.Description = Loc.T(
+            "Answers questions about all your transcribed conversations, citing the conversation and the moment. The index stays on this PC unless you pick an API embedder.");
         foreach (var entry in ModelCatalog.Embedding)
         {
             var row = new EmbedderRow(this, entry);

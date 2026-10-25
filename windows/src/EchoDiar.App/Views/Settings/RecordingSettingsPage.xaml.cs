@@ -53,8 +53,8 @@ public sealed partial class RecordingSettingsPage : UserControl
     ];
 
     /// <summary>
-    /// macOS "Wait when the Mac is hot or in Low Power Mode": Windows has no thermal state, only energy saver. Not in the
-    /// catalog (English).
+    /// macOS "Wait when the Mac is hot or in Low Power Mode": Windows has no thermal state, only energy saver (Windows-only
+    /// keys).
     /// </summary>
     private const string DeferTitle = "Wait while energy saver is on";
 
@@ -342,7 +342,7 @@ public sealed partial class RecordingSettingsPage : UserControl
     {
         box.Minimum = range.Min;
         box.Maximum = range.Max;
-        ToolTipService.SetToolTip(card, $"{range.Min}–{range.Max} {unit}");
+        ToolTipService.SetToolTip(card, $"{range.Min}–{range.Max} {Loc.T(unit)}");
         box.ValueChanged += (_, args) =>
         {
             if (_syncing) return;

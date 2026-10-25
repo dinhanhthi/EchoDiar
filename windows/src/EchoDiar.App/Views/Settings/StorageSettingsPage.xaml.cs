@@ -87,8 +87,7 @@ public sealed partial class StorageSettingsPage : UserControl
         InitializeComponent();
         DataFolderText.Text = _model.ConversationsFolder;
         PlaybackCard.Description = Loc.T("How the transcript plays your microphone and the meeting's sound.");
-        // Not through Loc: the text is not in the catalog, and its slug (cut at 60 characters) finds the catalog's Trash text.
-        AutoDeleteCard.Description = "Once a day, moves transcribed conversations older than the age below to the Recycle Bin.";
+        AutoDeleteCard.Description = Loc.T("Once a day, moves transcribed conversations older than the age below to the Recycle Bin.");
         foreach (var kbps in MediaFoundationAudio.BitratesKbps) BitrateCombo.Items.Add(Loc.Format("%lld kbps", kbps));
         DaysBox.Minimum = AppSettings.AutoDeleteDaysRange.Min;
         DaysBox.Maximum = AppSettings.AutoDeleteDaysRange.Max;
@@ -442,7 +441,7 @@ public sealed partial class StorageSettingsPage : UserControl
 
     /// <summary>
     /// A usage row's Delete: asks with what it removes, then removes it from what qualifies when confirmed (busy ones
-    /// are skipped). Texts as macOS (not in its catalog), with the Recycle Bin for the Trash.
+    /// are skipped). Texts as macOS, with the Recycle Bin for the Trash.
     /// </summary>
     private async Task DeleteAllAsync(Kind kind)
     {
@@ -455,10 +454,10 @@ public sealed partial class StorageSettingsPage : UserControl
                 var candidates = AudioCandidates();
                 if (candidates.Count == 0) return;
                 var untranscribed = candidates.Count(c => !c.HasTranscript);
-                title = $"Delete the audio of {CountText(candidates.Count)}?";
-                message = "The audio files are moved to the Recycle Bin. Transcripts, summaries and chats stay; playback and re-transcribing are no longer possible."
+                title = Loc.Plural("Delete the audio of %lld conversations?", candidates.Count);
+                message = Loc.T("The audio files are moved to the Recycle Bin. Transcripts, summaries and chats stay; playback and re-transcribing are no longer possible.")
                     + (untranscribed == 0 ? ""
-                        : $"\n\n{(untranscribed == 1 ? "1 of them has" : $"{untranscribed} of them have")} no transcript yet: nothing of it will be left to read.");
+                        : "\n\n" + Loc.Plural("%lld of them have no transcript yet: nothing of it will be left to read.", untranscribed));
                 break;
             }
             case Kind.TranscriptsAndAI:
@@ -466,18 +465,18 @@ public sealed partial class StorageSettingsPage : UserControl
                 var candidates = TranscriptCandidates();
                 if (candidates.Count == 0) return;
                 var withoutAudio = candidates.Count(c => !c.HasAudio);
-                title = $"Delete the transcripts, summaries and chats of {CountText(candidates.Count)}?";
-                message = "They are moved to the Recycle Bin. The audio stays, so the conversations can be transcribed again."
+                title = Loc.Plural("Delete the transcripts, summaries and chats of %lld conversations?", candidates.Count);
+                message = Loc.T("They are moved to the Recycle Bin. The audio stays, so the conversations can be transcribed again.")
                     + (withoutAudio == 0 ? ""
-                        : $"\n\n{CountText(withoutAudio)} without audio would be left empty: {(withoutAudio == 1 ? "it is" : "they are")} moved to the Recycle Bin entirely.");
+                        : "\n\n" + Loc.Plural("%lld conversations without audio would be left empty: they are moved to the Recycle Bin entirely.", withoutAudio));
                 break;
             }
             default:
             {
                 var count = _model.DeletableModels.Count;
                 if (count == 0) return;
-                title = count == 1 ? "Delete 1 downloaded model?" : $"Delete {count} downloaded models?";
-                message = "The transcription, speaker and AI models are removed from this PC (not moved to the Recycle Bin). Download them again in Settings › Transcription and Settings › AI.";
+                title = Loc.Plural("Delete %lld downloaded models?", count);
+                message = Loc.T("The transcription, speaker and AI models are removed from this PC (not moved to the Recycle Bin). Download them again in Settings › Transcription and Settings › AI.");
                 break;
             }
         }
@@ -672,29 +671,42 @@ public sealed partial class StorageSettingsPage : UserControl
             || (mode == RetentionMode.AudioOnly && deletion.Mode == RetentionMode.WholeConversation));
     }
 
-    // The auto-delete messages: as macOS (not in its catalog), with the Recycle Bin for the Trash.
+    // The auto-delete messages: as macOS, with the Recycle Bin for the Trash.
 
     private string TurnOnMessage(AppSettings settings, IReadOnlyList<RetentionPolicy.Deletion> preview)
     {
-        var what = settings.AutoDeleteMode == RetentionMode.AudioOnly ? "The audio of" : "All files of";
-        return preview.Count == 0
-            ? $"{what} transcribed conversations older than {settings.AutoDeleteAfterDays} days will be moved to the Recycle Bin once a day. Nothing matches now."
-            : $"{what} {CountText(preview.Count)} will be moved to the Recycle Bin now, then daily for older ones:\n\n{TitleList(preview)}";
+        var audio = settings.AutoDeleteMode == RetentionMode.AudioOnly;
+        if (preview.Count == 0)
+        {
+            return Loc.Plural(
+                audio
+                    ? "The audio of transcribed conversations older than %lld days will be moved to the Recycle Bin once a day. Nothing matches now."
+                    : "All files of transcribed conversations older than %lld days will be moved to the Recycle Bin once a day. Nothing matches now.",
+                settings.AutoDeleteAfterDays);
+        }
+        var head = Loc.Plural(
+            audio
+                ? "The audio of %lld conversations will be moved to the Recycle Bin now, then daily for older ones:"
+                : "All files of %lld conversations will be moved to the Recycle Bin now, then daily for older ones:",
+            preview.Count);
+        return $"{head}\n\n{TitleList(preview)}";
     }
 
     private string ChangeMessage(AppSettings settings, IReadOnlyList<RetentionPolicy.Deletion> preview)
     {
-        var what = settings.AutoDeleteMode == RetentionMode.AudioOnly ? "The audio of" : "All files of";
-        return $"{what} {CountText(preview.Count)} will be moved to the Recycle Bin at the next run (at launch or within a day):\n\n{TitleList(preview)}";
+        var head = Loc.Plural(
+            settings.AutoDeleteMode == RetentionMode.AudioOnly
+                ? "The audio of %lld conversations will be moved to the Recycle Bin at the next run (at launch or within a day):"
+                : "All files of %lld conversations will be moved to the Recycle Bin at the next run (at launch or within a day):",
+            preview.Count);
+        return $"{head}\n\n{TitleList(preview)}";
     }
 
     private string TitleList(IReadOnlyList<RetentionPolicy.Deletion> deletions)
     {
         var titles = string.Join("\n", deletions.Take(ListedTitles).Select(d => $"• {Title(d)}"));
-        return deletions.Count > ListedTitles ? $"{titles}\n…and {deletions.Count - ListedTitles} more" : titles;
+        return deletions.Count > ListedTitles ? $"{titles}\n{Loc.Format("…and %lld more", deletions.Count - ListedTitles)}" : titles;
     }
-
-    private static string CountText(int count) => count == 1 ? "1 conversation" : $"{count} conversations";
 
     private string Title(RetentionPolicy.Deletion deletion) =>
         _model.Conversations.FirstOrDefault(c => c.Id == deletion.ConversationId)?.Title
@@ -707,6 +719,7 @@ public sealed partial class StorageSettingsPage : UserControl
     /// <summary>A tooltip and the same accessible name (macOS <c>help</c> and <c>accessibilityLabel</c>).</summary>
     private static void SetHelp(Button button, string text)
     {
+        text = Loc.T(text);
         ToolTipService.SetToolTip(button, text);
         AutomationProperties.SetName(button, text);
     }

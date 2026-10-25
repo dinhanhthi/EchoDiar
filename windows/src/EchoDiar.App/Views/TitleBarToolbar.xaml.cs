@@ -263,7 +263,7 @@ public sealed partial class TitleBarToolbar : UserControl
         // Installing the update closes the app: no recording starts meanwhile.
         var installing = _model.Updater.IsInstalling;
         RecordSplitButton.IsEnabled = !_model.IsStarting && !installing;
-        var recordTip = installing ? Loc.T("Installing the update…") : $"Record {_model.SelectedTarget?.Name ?? Loc.T("All system audio")}";
+        var recordTip = installing ? Loc.T("Installing the update…") : Loc.Format("Record %@", _model.SelectedTarget?.Name ?? Loc.T("All system audio"));
         if (recordTip != _recordTip) ToolTipService.SetToolTip(RecordSplitButton, _recordTip = recordTip);
         StopButton.Visibility = Shown(recording);
         StopButton.IsEnabled = !_model.IsStarting;
@@ -495,7 +495,7 @@ public sealed partial class TitleBarToolbar : UserControl
         TargetMenu.Items.Insert(index++, new MenuFlyoutSeparator());
         foreach (var group in _model.RecordTargets)
         {
-            TargetMenu.Items.Insert(index++, TargetItem(group.NeedsGlobalTap ? $"{group.Name} (records all system audio)" : group.Name, group));
+            TargetMenu.Items.Insert(index++, TargetItem(group.NeedsGlobalTap ? Loc.Format("%@ (records all system audio)", group.Name) : group.Name, group));
         }
     }
 
@@ -586,8 +586,7 @@ public sealed partial class TitleBarToolbar : UserControl
         var title = (one, audioOnly) switch
         {
             ({ } c, true) => Loc.Format("Delete the audio of \"%@\"?", c.Title),
-            // Not through Loc: the text is not in the catalog, and its slug finds the catalog's "Delete".
-            ({ } c, false) => $"Delete \"{c.Title}\"?",
+            ({ } c, false) => Loc.Format("Delete \"%@\"?", c.Title),
             (null, true) => Loc.Plural("Delete the audio of %lld conversations?", conversations.Count),
             (null, false) => Loc.Plural("Delete %lld conversations?", conversations.Count),
         };
