@@ -35,4 +35,18 @@ public sealed class AppLanguageTests
         }
         Assert.Equal(["", "en-US", "vi", "fr", "es", "zh-Hans"], AppLanguages.All.Select(l => l.OverrideTag()));
     }
+
+    // Loc.Plural's "one" form: CLDR integer rules of the five resw languages.
+    [Theory]
+    [InlineData("en-US", 1, true)]
+    [InlineData("en-US", 0, false)]
+    [InlineData("en-US", 2, false)]
+    [InlineData("es", 1, true)]
+    [InlineData("fr", 0, true)]
+    [InlineData("fr", 1, true)]
+    [InlineData("fr", 2, false)]
+    [InlineData("vi", 1, false)]
+    [InlineData("zh-Hans", 1, false)]
+    public void PluralOneFollowsTheLanguageRule(string tag, long count, bool expected) =>
+        Assert.Equal(expected, AppLanguages.Matching(tag).IsPluralOne(count));
 }

@@ -55,6 +55,18 @@ public static class AppLanguages
         _ => systemName,
     };
 
+    /// <summary>
+    /// Whether <paramref name="count"/> takes the CLDR "one" plural form in <paramref name="language"/> (Loc.Plural):
+    /// French for 0 and 1, Vietnamese and Chinese never (they have only "other"), English, Spanish and System (MRT
+    /// falls back to en-US) for 1.
+    /// </summary>
+    public static bool IsPluralOne(this AppLanguage language, long count) => language switch
+    {
+        AppLanguage.Fr => count is 0 or 1,
+        AppLanguage.Vi or AppLanguage.ZhHans => false,
+        _ => count == 1,
+    };
+
     // Swift's raw values: the prefix a tag of the language starts with.
     private static string Code(AppLanguage language) => language switch
     {
