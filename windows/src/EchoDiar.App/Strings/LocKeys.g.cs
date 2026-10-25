@@ -783,6 +783,7 @@ public static partial class Loc
         "Vietnamese",
         "View",
         "Wait for the call",
+        "Wait for the transcriptions and AI answers to finish",
         "Wait when the Mac is hot or in Low Power Mode",
         "Waiting while the Mac is hot or in Low Power Mode",
         "Waiting: energy saver is on",

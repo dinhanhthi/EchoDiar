@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using System.Globalization;
 using EchoDiar.App.Services;
 using EchoDiar.App.ViewModels;
 using EchoDiar.App.Views;
@@ -18,6 +19,12 @@ public partial class App : Application
     /// <summary>The library root (<see cref="Paths"/>), for the DEBUG harnesses.</summary>
     internal static string DataRoot => Paths.Root;
 
+    /// <summary>
+    /// The app language in effect for this run (macOS <c>AppLanguage.atLaunch</c>): read before anything writes the
+    /// override; Settings › General offers a relaunch while its choice differs.
+    /// </summary>
+    internal static AppLanguage LanguageAtLaunch { get; private set; }
+
     private MainWindow? _window;
     private AppServices? _services;
     private AppViewModel? _model;
@@ -32,6 +39,9 @@ public partial class App : Application
     /// <summary><see cref="Shutdown"/> ran: the session's end runs it before the window closes.</summary>
     private bool _shutDown;
 
+    /// <summary>"Relaunch now" (Settings › General): the app starts again once the window's Closed has stopped everything.</summary>
+    private bool _relaunching;
+
 #if DEBUG
     /// <summary>DEBUG <c>--no-backdrop</c>: the window paints the theme's solid background instead of setting a system backdrop (A/B in a VM).</summary>
     internal static bool NoBackdrop { get; } = Environment.GetCommandLineArgs().Contains("--no-backdrop");
@@ -41,6 +51,7 @@ public partial class App : Application
     {
         StartupTrace.Start(Paths.Root);
         StartupTrace.Write("App ctor");
+        ApplyLanguageOverride();
         InitializeComponent();
         // Logged, not handled: the app still ends as it would.
         UnhandledException += (_, e) => CrashLog.Write(Paths.Root, $"Application.UnhandledException: {e.Message}", e.Exception);
@@ -138,6 +149,7 @@ public partial class App : Application
             // A closed window fails every call: a redirected launch queued meanwhile finds none.
             _window = null;
             Shutdown();
+            if (_relaunching) Restart();
         };
         try
         {
@@ -230,6 +242,68 @@ public partial class App : Application
     {
         _quitting = true;
         _window?.Close();
+    }
+
+    /// <summary>
+    /// "Relaunch now" (Settings › General, macOS <c>AppLanguage.relaunch</c>): quits as Quit does, so the window's Closed
+    /// stops everything and writes the settings, then <see cref="Restart"/> starts the app again. The caller has checked
+    /// that no recording, transcription, AI answer or update install runs.
+    /// </summary>
+    internal void Relaunch()
+    {
+        _relaunching = true;
+        Quit();
+    }
+
+    /// <summary>
+    /// The new instance must not find this one's single-instance key (it would redirect to it and exit), so the key goes
+    /// first; Restart then ends this process and starts the app again. Should it fail, the app just quits.
+    /// </summary>
+    private static void Restart()
+    {
+        try
+        {
+            AppInstance.GetCurrent().UnregisterKey();
+            var failure = AppInstance.Restart("");
+            StartupTrace.Write($"relaunch failed: {failure}");
+        }
+        catch (Exception e)
+        {
+            Debug.WriteLine($"EchoDiar: could not relaunch: {e}");
+            StartupTrace.Write($"relaunch failed: {e.GetType().Name} {e.Message}");
+        }
+    }
+
+    /// <summary>
+    /// The app language at launch (<see cref="LanguageAtLaunch"/>); a chosen one also sets the culture of every thread,
+    /// so dates and numbers follow it (macOS <c>AppleLocale</c>). System leaves the culture to Windows.
+    /// </summary>
+    private static void ApplyLanguageOverride()
+    {
+        string tag;
+        try
+        {
+            tag = Windows.Globalization.ApplicationLanguages.PrimaryLanguageOverride;
+        }
+        catch (Exception e)
+        {
+            Debug.WriteLine($"EchoDiar: could not read the app language: {e}");
+            return;
+        }
+        LanguageAtLaunch = AppLanguages.Matching(tag);
+        if (LanguageAtLaunch == AppLanguage.System) return;
+        try
+        {
+            var culture = new CultureInfo(LanguageAtLaunch.OverrideTag());
+            CultureInfo.DefaultThreadCurrentCulture = culture;
+            CultureInfo.DefaultThreadCurrentUICulture = culture;
+            CultureInfo.CurrentCulture = culture;
+            CultureInfo.CurrentUICulture = culture;
+        }
+        catch (CultureNotFoundException e)
+        {
+            Debug.WriteLine($"EchoDiar: no culture for the app language: {e}");
+        }
     }
 
     /// <summary>

@@ -349,6 +349,10 @@
       "comment" : "Windows only: Views/Settings/ProvidersSettingsPage.xaml.",
       "extractionState" : "manual"
     },
+    "Wait for the transcriptions and AI answers to finish" : {
+      "comment" : "Windows only: Views/Settings/GeneralSettingsPage.xaml.cs.",
+      "extractionState" : "manual"
+    },
     "Waiting: energy saver is on" : {
       "comment" : "Windows only: Views/ConversationCard.xaml.cs.",
       "extractionState" : "manual"

@@ -3294,6 +3294,10 @@
     <value>Wait for the call</value>
     <comment>Wait for the call</comment>
   </data>
+  <data name="WaitForTheTranscriptionsAndAIAnswersToFinish" xml:space="preserve">
+    <value>Wait for the transcriptions and AI answers to finish</value>
+    <comment>Wait for the transcriptions and AI answers to finish</comment>
+  </data>
   <data name="WaitWhenTheMacIsHotOrInLowPowerMode" xml:space="preserve">
     <value>Wait when the Mac is hot or in Low Power Mode</value>
     <comment>Wait when the Mac is hot or in Low Power Mode</comment>

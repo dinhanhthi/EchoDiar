@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!--
-    Settings › General (macOS GeneralSettingsView.swift): launch at login, the floating indicator, deleting without
-    confirmation, the consent message and "Show onboarding again", as Windows 11 Settings cards under section headers.
+    Settings › General (macOS GeneralSettingsView.swift): launch at login, the app language, the floating indicator,
+    deleting without confirmation, the consent message and "Show onboarding again", as Windows 11 Settings cards under section headers.
     Each searchable card's Tag is its search entry's title (SearchEntries), so a search result can bring it into view.
 -->
 <UserControl
@@ -29,6 +29,24 @@
                 Header="{local:T Text='Launch at login'}"
                 Tag="Launch at login">
                 <ToggleSwitch x:Name="LaunchToggle" AutomationProperties.Name="{local:T Text='Launch at login'}" />
+            </controls:SettingsCard>
+
+            <!-- macOS: a section of its own, without a header; the relaunch row shows while the choice differs from this run's. -->
+            <controls:SettingsCard
+                Margin="0,24,0,0"
+                Header="{local:T Text='App language'}"
+                Tag="App language">
+                <ComboBox
+                    x:Name="LanguageCombo"
+                    MinWidth="200"
+                    AutomationProperties.Name="{local:T Text='App language'}" />
+            </controls:SettingsCard>
+
+            <controls:SettingsCard
+                x:Name="RelaunchCard"
+                Header="{local:T Text='Restart EchoDiar to apply.'}"
+                Visibility="Collapsed">
+                <Button x:Name="RelaunchButton" Content="{local:T Text='Relaunch now'}" />
             </controls:SettingsCard>
 
             <StackPanel Style="{StaticResource SectionHeaderStyle}">
