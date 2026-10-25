@@ -1,0 +1,378 @@
+{
+  "sourceLanguage" : "en",
+  "strings" : {
+    "\"Tell speakers apart\" is on. Download a model to tell the other speakers apart." : {
+      "comment" : "Windows only: Views/ConversationListView.xaml.cs.",
+      "extractionState" : "manual"
+    },
+    "%@ (leaves this PC)" : {
+      "comment" : "Windows only: Views/AIMenus.cs, Views/Settings/ProvidersSettingsPage.xaml.cs.",
+      "extractionState" : "manual"
+    },
+    "%@ - %lld model%@" : {
+      "comment" : "Windows only: Views/Settings/ProvidersSettingsPage.xaml.cs.",
+      "extractionState" : "manual"
+    },
+    "%@ could not be registered (error %lld)." : {
+      "comment" : "Windows only: ViewModels/AppViewModel.HotKeys.cs.",
+      "extractionState" : "manual"
+    },
+    "%@ failed its integrity check. Download it again." : {
+      "comment" : "Windows only: Services/AppServices.cs, ViewModels/AppViewModel.AI.cs.",
+      "extractionState" : "manual"
+    },
+    "%@ is the \"%@\" shortcut." : {
+      "comment" : "Windows only: Views/HotKeyRecorder.cs.",
+      "extractionState" : "manual"
+    },
+    "%@ is the %@." : {
+      "comment" : "Windows only: Views/HotKeyRecorder.cs.",
+      "extractionState" : "manual"
+    },
+    "%@ level" : {
+      "comment" : "Windows only: Views/RecordingView.xaml.cs.",
+      "extractionState" : "manual"
+    },
+    "%@ not saved: put the key in the API key field, which keeps it in Credential Manager." : {
+      "comment" : "Windows only: Views/Settings/ProvidersSettingsPage.xaml.cs.",
+      "extractionState" : "manual"
+    },
+    "%lld model%@" : {
+      "comment" : "Windows only: Views/Settings/ProvidersSettingsPage.xaml.cs, Views/Settings/RAGSettingsPage.xaml.cs.",
+      "extractionState" : "manual"
+    },
+    "1 model" : {
+      "comment" : "Windows only: Views/Settings/TranscriptionSettingsPage.xaml.cs.",
+      "extractionState" : "manual"
+    },
+    "An update is available: Update in the toolbar installs it." : {
+      "comment" : "Windows only: Views/Settings/AboutSettingsPage.xaml.cs.",
+      "extractionState" : "manual"
+    },
+    "Audio and transcripts stay on this PC." : {
+      "comment" : "Windows only: Views/OnboardingWindow.xaml.",
+      "extractionState" : "manual"
+    },
+    "Auto = the transcript's language for summaries, the question's for answers." : {
+      "comment" : "Windows only: Views/Settings/ProvidersSettingsPage.xaml.cs.",
+      "extractionState" : "manual"
+    },
+    "Check for updates…" : {
+      "comment" : "Windows only: Services/Updater.cs.",
+      "extractionState" : "manual"
+    },
+    "Check now" : {
+      "comment" : "Windows only: Views/Settings/AboutSettingsPage.xaml.",
+      "extractionState" : "manual"
+    },
+    "Check that the base URL ends with /v1." : {
+      "comment" : "Windows only: Views/Settings/ProvidersSettingsPage.xaml.cs.",
+      "extractionState" : "manual"
+    },
+    "Check that your speakers or headphones are on and not muted, then test again." : {
+      "comment" : "Windows only: Views/OnboardingWindow.xaml.cs.",
+      "extractionState" : "manual"
+    },
+    "Checking for updates…" : {
+      "comment" : "Windows only: Views/Settings/AboutSettingsPage.xaml.cs.",
+      "extractionState" : "manual"
+    },
+    "Could not check for updates" : {
+      "comment" : "Windows only: Views/TitleBarToolbar.xaml.cs.",
+      "extractionState" : "manual"
+    },
+    "Could not install the update" : {
+      "comment" : "Windows only: Views/TitleBarToolbar.xaml.cs.",
+      "extractionState" : "manual"
+    },
+    "Data sent to %@ leaves this PC." : {
+      "comment" : "Windows only: Views/AIPanelView.xaml.cs.",
+      "extractionState" : "manual"
+    },
+    "Data sent to cloud providers or CLIs leaves this PC." : {
+      "comment" : "Windows only: Views/Settings/ProvidersSettingsPage.xaml.",
+      "extractionState" : "manual"
+    },
+    "Delete the audio of %lld transcribed conversation%@?" : {
+      "comment" : "Windows only: Views/Settings/StorageSettingsPage.xaml.cs.",
+      "extractionState" : "manual"
+    },
+    "Download a speaker model" : {
+      "comment" : "Windows only: Views/ConversationListView.xaml.cs.",
+      "extractionState" : "manual"
+    },
+    "Download a transcription model" : {
+      "comment" : "Windows only: Views/ConversationListView.xaml.cs.",
+      "extractionState" : "manual"
+    },
+    "EchoDiar %@ is currently the newest version available." : {
+      "comment" : "Windows only: Views/TitleBarToolbar.xaml.cs.",
+      "extractionState" : "manual"
+    },
+    "EchoDiar closes, installs the new version and opens again." : {
+      "comment" : "Windows only: Views/TitleBarToolbar.xaml.cs.",
+      "extractionState" : "manual"
+    },
+    "EchoDiar installs the update once the recording, transcriptions and AI answers have finished." : {
+      "comment" : "Windows only: Views/TitleBarToolbar.xaml.cs.",
+      "extractionState" : "manual"
+    },
+    "EchoDiar records the other people on the call from your PC's audio. The test plays a short sound and listens for it." : {
+      "comment" : "Windows only: Views/OnboardingWindow.xaml.cs.",
+      "extractionState" : "manual"
+    },
+    "Every license above in one text file." : {
+      "comment" : "Windows only: Views/Settings/AcknowledgementsSettingsPage.xaml.",
+      "extractionState" : "manual"
+    },
+    "Extra headers" : {
+      "comment" : "Windows only: Views/Settings/ProvidersSettingsPage.xaml.cs.",
+      "extractionState" : "manual"
+    },
+    "Indexing your conversations on this PC needs this embedding model (%@). You can also pick another model below." : {
+      "comment" : "Windows only: Views/Settings/RAGSettingsPage.xaml.cs.",
+      "extractionState" : "manual"
+    },
+    "Install and Relaunch" : {
+      "comment" : "Windows only: Views/TitleBarToolbar.xaml.cs.",
+      "extractionState" : "manual"
+    },
+    "Install the update?" : {
+      "comment" : "Windows only: Views/TitleBarToolbar.xaml.cs.",
+      "extractionState" : "manual"
+    },
+    "Installing the update…" : {
+      "comment" : "Windows only: Services/Updater.cs, ViewModels/AppViewModel.Updates.cs, Views/TitleBarToolbar.xaml.cs.",
+      "extractionState" : "manual"
+    },
+    "Installing the update… %lld%%" : {
+      "comment" : "Windows only: Views/Settings/AboutSettingsPage.xaml.cs, Views/TitleBarToolbar.xaml.cs.",
+      "extractionState" : "manual"
+    },
+    "It needs an index of your transcripts, built on this PC by default." : {
+      "comment" : "Windows only: Views/GlobalChatView.xaml.",
+      "extractionState" : "manual"
+    },
+    "Language of summaries and answers" : {
+      "comment" : "Windows only: Views/Settings/ProvidersSettingsPage.xaml.",
+      "extractionState" : "manual"
+    },
+    "Last checked %@" : {
+      "comment" : "Windows only: Views/Settings/AboutSettingsPage.xaml.cs.",
+      "extractionState" : "manual"
+    },
+    "Leaves this PC" : {
+      "comment" : "Windows only: Views/Settings/RAGSettingsPage.xaml.cs.",
+      "extractionState" : "manual"
+    },
+    "Microphone level" : {
+      "comment" : "Windows only: Views/OnboardingWindow.xaml.",
+      "extractionState" : "manual"
+    },
+    "Models EchoDiar downloads when you choose them. Choose one to read its license." : {
+      "comment" : "Windows only: Views/Settings/AcknowledgementsSettingsPage.xaml.",
+      "extractionState" : "manual"
+    },
+    "Move to Recycle Bin" : {
+      "comment" : "Windows only: Views/Settings/StorageSettingsPage.xaml.cs.",
+      "extractionState" : "manual"
+    },
+    "Moves the audio to the Recycle Bin once a transcription succeeds." : {
+      "comment" : "Windows only: Views/Settings/StorageSettingsPage.xaml, Views/Settings/TranscriptionSettingsPage.xaml.",
+      "extractionState" : "manual"
+    },
+    "Needs more than half of this PC's memory." : {
+      "comment" : "Windows only: Views/Settings/ProvidersSettingsPage.xaml.cs, Views/Settings/RAGSettingsPage.xaml.cs.",
+      "extractionState" : "manual"
+    },
+    "Next run: %@" : {
+      "comment" : "Windows only: Views/Settings/StorageSettingsPage.xaml.cs.",
+      "extractionState" : "manual"
+    },
+    "No conversations yet — press ⌘R to record" : {
+      "comment" : "Windows only: Views/ConversationListView.xaml.cs.",
+      "extractionState" : "manual"
+    },
+    "Not checked yet" : {
+      "comment" : "Windows only: Views/Settings/AboutSettingsPage.xaml.cs.",
+      "extractionState" : "manual"
+    },
+    "Not found: give the full path to a .exe, or to an npm .cmd shim." : {
+      "comment" : "Windows only: Views/Settings/ProvidersSettingsPage.xaml.cs.",
+      "extractionState" : "manual"
+    },
+    "On this PC" : {
+      "comment" : "Windows only: Views/AIMenus.cs, Views/Settings/RAGSettingsPage.xaml.",
+      "extractionState" : "manual"
+    },
+    "One per line, Name: value. Saved in the settings file: put API keys in the API key field." : {
+      "comment" : "Windows only: Views/Settings/ProvidersSettingsPage.xaml.cs.",
+      "extractionState" : "manual"
+    },
+    "Open Windows microphone settings" : {
+      "comment" : "Windows only: Views/OnboardingWindow.xaml.",
+      "extractionState" : "manual"
+    },
+    "Open full notices" : {
+      "comment" : "Windows only: Views/Settings/AcknowledgementsSettingsPage.xaml.",
+      "extractionState" : "manual"
+    },
+    "Open in File Explorer" : {
+      "comment" : "Windows only: Views/Settings/StorageSettingsPage.xaml.",
+      "extractionState" : "manual"
+    },
+    "Press Ctrl+R to start recording." : {
+      "comment" : "Windows only: Views/WelcomeView.xaml.cs.",
+      "extractionState" : "manual"
+    },
+    "Recordings are transcribed on this PC. Pick a speech recognition model to download." : {
+      "comment" : "Windows only: Views/ConversationListView.xaml.cs.",
+      "extractionState" : "manual"
+    },
+    "Reveal in Explorer" : {
+      "comment" : "Windows only: Views/ConversationCard.xaml.cs.",
+      "extractionState" : "manual"
+    },
+    "Simulate state" : {
+      "comment" : "Windows only: Services/TrayIcon.cs.",
+      "extractionState" : "manual"
+    },
+    "Start recording" : {
+      "comment" : "Windows only: Services/TrayIcon.cs.",
+      "extractionState" : "manual"
+    },
+    "The API key is longer than %lld bytes, the most Credential Manager keeps." : {
+      "comment" : "Windows only: ViewModels/ProvidersViewModel.cs.",
+      "extractionState" : "manual"
+    },
+    "The API key is sent unencrypted over http to %@. Use https, or a host on this PC." : {
+      "comment" : "Windows only: Views/Settings/ProvidersSettingsPage.xaml.cs.",
+      "extractionState" : "manual"
+    },
+    "The app" : {
+      "comment" : "Windows only: Views/FloatingPillWindow.xaml.cs.",
+      "extractionState" : "manual"
+    },
+    "The audio files are moved to the Recycle Bin. Transcripts, summaries and chats stay." : {
+      "comment" : "Windows only: Views/Settings/StorageSettingsPage.xaml.cs.",
+      "extractionState" : "manual"
+    },
+    "The audio is moved to the Recycle Bin. The transcript, summary and chat stay; playback and re-transcribing are no longer possible." : {
+      "comment" : "Windows only: Views/TitleBarToolbar.xaml.cs.",
+      "extractionState" : "manual"
+    },
+    "The download failed: %@" : {
+      "comment" : "Windows only: Views/ConversationListView.xaml.cs.",
+      "extractionState" : "manual"
+    },
+    "The recording and its files are moved to the Recycle Bin." : {
+      "comment" : "Windows only: Views/TitleBarToolbar.xaml.cs.",
+      "extractionState" : "manual"
+    },
+    "The recordings and their files are moved to the Recycle Bin." : {
+      "comment" : "Windows only: Views/TitleBarToolbar.xaml.cs.",
+      "extractionState" : "manual"
+    },
+    "They still go to the Recycle Bin." : {
+      "comment" : "Windows only: Views/Settings/GeneralSettingsPage.xaml.",
+      "extractionState" : "manual"
+    },
+    "Third-party notices" : {
+      "comment" : "Windows only: Views/Settings/AcknowledgementsSettingsPage.xaml.",
+      "extractionState" : "manual"
+    },
+    "This PC" : {
+      "comment" : "Windows only: Views/Settings/RAGSettingsPage.xaml.cs.",
+      "extractionState" : "manual"
+    },
+    "This copy was not installed from an .appinstaller file, so it does not update itself." : {
+      "comment" : "Windows only: Views/Settings/AboutSettingsPage.xaml.cs.",
+      "extractionState" : "manual"
+    },
+    "This copy was not installed from an .appinstaller file." : {
+      "comment" : "Windows only: Services/Updater.cs.",
+      "extractionState" : "manual"
+    },
+    "This engine transcribes after Stop. Whisper and Parakeet models also transcribe while recording." : {
+      "comment" : "Windows only: Views/RecordingView.xaml.cs.",
+      "extractionState" : "manual"
+    },
+    "Transcribe now" : {
+      "comment" : "Windows only: Views/ConversationCard.xaml.",
+      "extractionState" : "manual"
+    },
+    "Transcribe now, even with energy saver on" : {
+      "comment" : "Windows only: Views/ConversationCard.xaml.",
+      "extractionState" : "manual"
+    },
+    "Try again later." : {
+      "comment" : "Windows only: Views/TitleBarToolbar.xaml.cs.",
+      "extractionState" : "manual"
+    },
+    "Turn on EchoDiar in Windows Settings › Privacy & security › Microphone." : {
+      "comment" : "Windows only: Views/OnboardingWindow.xaml.cs.",
+      "extractionState" : "manual"
+    },
+    "Turned off by your organization." : {
+      "comment" : "Windows only: ViewModels/SettingsViewModel.cs.",
+      "extractionState" : "manual"
+    },
+    "Turned off in Windows Settings > Apps > Startup. Turn EchoDiar on there." : {
+      "comment" : "Windows only: ViewModels/SettingsViewModel.cs.",
+      "extractionState" : "manual"
+    },
+    "Turned on by your organization." : {
+      "comment" : "Windows only: ViewModels/SettingsViewModel.cs.",
+      "extractionState" : "manual"
+    },
+    "Update after the current work" : {
+      "comment" : "Windows only: Views/TitleBarToolbar.xaml.cs.",
+      "extractionState" : "manual"
+    },
+    "Update available…" : {
+      "comment" : "Windows only: Services/Updater.cs.",
+      "extractionState" : "manual"
+    },
+    "Updates" : {
+      "comment" : "Windows only: Views/Settings/AboutSettingsPage.xaml.",
+      "extractionState" : "manual"
+    },
+    "Updates need an .appinstaller install" : {
+      "comment" : "Windows only: Services/Updater.cs.",
+      "extractionState" : "manual"
+    },
+    "Use Ctrl or Alt with the key." : {
+      "comment" : "Windows only: Views/HotKeyRecorder.cs.",
+      "extractionState" : "manual"
+    },
+    "Used for summaries and questions. The model of each enabled provider below, as checked in its row." : {
+      "comment" : "Windows only: Views/Settings/ProvidersSettingsPage.xaml.",
+      "extractionState" : "manual"
+    },
+    "Waiting: energy saver is on" : {
+      "comment" : "Windows only: Views/ConversationCard.xaml.cs.",
+      "extractionState" : "manual"
+    },
+    "Windows AI (system)" : {
+      "comment" : "Windows only: Views/Settings/ProvidersSettingsPage.xaml.",
+      "extractionState" : "manual"
+    },
+    "Would delete now: %@" : {
+      "comment" : "Windows only: Views/Settings/StorageSettingsPage.xaml.cs.",
+      "extractionState" : "manual"
+    },
+    "You're up to date!" : {
+      "comment" : "Windows only: Views/TitleBarToolbar.xaml.cs.",
+      "extractionState" : "manual"
+    },
+    "another conversation" : {
+      "comment" : "Windows only: Views/AIPanelView.xaml.cs, Views/GlobalChatView.xaml.cs.",
+      "extractionState" : "manual"
+    },
+    "this link" : {
+      "comment" : "Windows only: Views/AIPanelView.xaml.cs, Views/GlobalChatView.xaml.cs.",
+      "extractionState" : "manual"
+    }
+  },
+  "version" : "1.1"
+}

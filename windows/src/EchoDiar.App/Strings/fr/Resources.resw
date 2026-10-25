@@ -1,0 +1,3017 @@
+<?xml version="1.0" encoding="utf-8"?>
+<root>
+  <xsd:schema id="root" xmlns="" xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:msdata="urn:schemas-microsoft-com:xml-msdata">
+    <xsd:import namespace="http://www.w3.org/XML/1998/namespace" />
+    <xsd:element name="root" msdata:IsDataSet="true">
+      <xsd:complexType>
+        <xsd:choice maxOccurs="unbounded">
+          <xsd:element name="metadata">
+            <xsd:complexType>
+              <xsd:sequence>
+                <xsd:element name="value" type="xsd:string" minOccurs="0" />
+              </xsd:sequence>
+              <xsd:attribute name="name" use="required" type="xsd:string" />
+              <xsd:attribute name="type" type="xsd:string" />
+              <xsd:attribute name="mimetype" type="xsd:string" />
+              <xsd:attribute ref="xml:space" />
+            </xsd:complexType>
+          </xsd:element>
+          <xsd:element name="assembly">
+            <xsd:complexType>
+              <xsd:attribute name="alias" type="xsd:string" />
+              <xsd:attribute name="name" type="xsd:string" />
+            </xsd:complexType>
+          </xsd:element>
+          <xsd:element name="data">
+            <xsd:complexType>
+              <xsd:sequence>
+                <xsd:element name="value" type="xsd:string" minOccurs="0" msdata:Ordinal="1" />
+                <xsd:element name="comment" type="xsd:string" minOccurs="0" msdata:Ordinal="2" />
+              </xsd:sequence>
+              <xsd:attribute name="name" type="xsd:string" use="required" msdata:Ordinal="1" />
+              <xsd:attribute name="type" type="xsd:string" msdata:Ordinal="3" />
+              <xsd:attribute name="mimetype" type="xsd:string" msdata:Ordinal="4" />
+              <xsd:attribute ref="xml:space" />
+            </xsd:complexType>
+          </xsd:element>
+          <xsd:element name="resheader">
+            <xsd:complexType>
+              <xsd:sequence>
+                <xsd:element name="value" type="xsd:string" minOccurs="0" msdata:Ordinal="1" />
+              </xsd:sequence>
+              <xsd:attribute name="name" type="xsd:string" use="required" />
+            </xsd:complexType>
+          </xsd:element>
+        </xsd:choice>
+      </xsd:complexType>
+    </xsd:element>
+  </xsd:schema>
+  <resheader name="resmimetype">
+    <value>text/microsoft-resx</value>
+  </resheader>
+  <resheader name="version">
+    <value>2.0</value>
+  </resheader>
+  <resheader name="reader">
+    <value>System.Resources.ResXResourceReader, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
+  </resheader>
+  <resheader name="writer">
+    <value>System.Resources.ResXResourceWriter, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
+  </resheader>
+  <data name="ACloudProviderReceivesTheTranscriptsAndSummariesToIndexAndEa" xml:space="preserve">
+    <value>Un fournisseur cloud reçoit les transcriptions et les résumés à indexer, ainsi que chaque question.</value>
+    <comment>A cloud provider receives the transcripts and summaries to index, and each question.</comment>
+  </data>
+  <data name="AHintForTellingTheSystemAudioSSpeakersApart" xml:space="preserve">
+    <value>Une indication pour distinguer les intervenants de l’audio du système.</value>
+    <comment>A hint for telling the system audio's speakers apart.</comment>
+  </data>
+  <data name="AI" xml:space="preserve">
+    <value>IA</value>
+    <comment>AI</comment>
+  </data>
+  <data name="AIModelsSummariesAndChat" xml:space="preserve">
+    <value>Modèles d’IA (résumés et discussion)</value>
+    <comment>AI models (summaries and chat)</comment>
+  </data>
+  <data name="APIKey" xml:space="preserve">
+    <value>Clé API</value>
+    <comment>API key</comment>
+  </data>
+  <data name="About" xml:space="preserve">
+    <value>À propos</value>
+    <comment>About</comment>
+  </data>
+  <data name="AboutEchoDiar" xml:space="preserve">
+    <value>À propos d’EchoDiar</value>
+    <comment>About EchoDiar</comment>
+  </data>
+  <data name="AboutWhereDataGoes" xml:space="preserve">
+    <value>Où vont les données</value>
+    <comment>About where data goes</comment>
+  </data>
+  <data name="Acknowledgements" xml:space="preserve">
+    <value>Remerciements</value>
+    <comment>Acknowledgements</comment>
+  </data>
+  <data name="Add" xml:space="preserve">
+    <value>Ajouter</value>
+    <comment>Add</comment>
+  </data>
+  <data name="AddAModel" xml:space="preserve">
+    <value>Ajouter un modèle</value>
+    <comment>Add a model</comment>
+  </data>
+  <data name="AddAModelId" xml:space="preserve">
+    <value>Ajouter un identifiant de modèle</value>
+    <comment>Add a model id</comment>
+  </data>
+  <data name="AddEndpoint" xml:space="preserve">
+    <value>Ajouter un point de terminaison</value>
+    <comment>Add Endpoint</comment>
+  </data>
+  <data name="AddTheKeyOfBelow" xml:space="preserve">
+    <value>Ajoutez la clé de {0} ci-dessous</value>
+    <comment>Add the key of %@ below</comment>
+  </data>
+  <data name="AddTheKeyOfInTranscriptionModels" xml:space="preserve">
+    <value>Ajoutez la clé de {0} dans Modèles de transcription</value>
+    <comment>Add the key of %@ in Transcription models</comment>
+  </data>
+  <data name="Added" xml:space="preserve">
+    <value>Ajouté</value>
+    <comment>Added</comment>
+  </data>
+  <data name="AfterRecording" xml:space="preserve">
+    <value>Après l’enregistrement</value>
+    <comment>After recording</comment>
+  </data>
+  <data name="AllFilesOfLldConversationsWillBeMovedToTheTrashAtTheNextRunA" xml:space="preserve">
+    <value>Tous les fichiers de {0} conversations seront placés dans la Corbeille au prochain passage (au lancement ou dans la journée) :</value>
+    <comment>All files of %lld conversations will be moved to the Trash at the next run (at launch or within a day):</comment>
+  </data>
+  <data name="AllFilesOfLldConversationsWillBeMovedToTheTrashAtTheNextRunA__One" xml:space="preserve">
+    <value>Tous les fichiers de {0} conversation seront placés dans la Corbeille au prochain passage (au lancement ou dans la journée) :</value>
+    <comment>All files of %lld conversations will be moved to the Trash at the next run (at launch or within a day):</comment>
+  </data>
+  <data name="AllFilesOfLldConversationsWillBeMovedToTheTrashNowThenDailyF" xml:space="preserve">
+    <value>Tous les fichiers de {0} conversations seront placés dans la Corbeille maintenant, puis chaque jour pour les plus anciennes :</value>
+    <comment>All files of %lld conversations will be moved to the Trash now, then daily for older ones:</comment>
+  </data>
+  <data name="AllFilesOfLldConversationsWillBeMovedToTheTrashNowThenDailyF__One" xml:space="preserve">
+    <value>Tous les fichiers de {0} conversation seront placés dans la Corbeille maintenant, puis chaque jour pour les plus anciennes :</value>
+    <comment>All files of %lld conversations will be moved to the Trash now, then daily for older ones:</comment>
+  </data>
+  <data name="AllFilesOfTranscribedConversationsOlderThanLldDaysWillBeMove" xml:space="preserve">
+    <value>Tous les fichiers des conversations transcrites de plus de {0} jours seront placés dans la Corbeille une fois par jour. Rien ne correspond pour l’instant.</value>
+    <comment>All files of transcribed conversations older than %lld days will be moved to the Trash once a day. Nothing matches now.</comment>
+  </data>
+  <data name="AllFilesOfTranscribedConversationsOlderThanLldDaysWillBeMove__One" xml:space="preserve">
+    <value>Tous les fichiers des conversations transcrites de plus de {0} jour seront placés dans la Corbeille une fois par jour. Rien ne correspond pour l’instant.</value>
+    <comment>All files of transcribed conversations older than %lld days will be moved to the Trash once a day. Nothing matches now.</comment>
+  </data>
+  <data name="AllSystemAudio" xml:space="preserve">
+    <value>Tout l’audio du système</value>
+    <comment>All system audio</comment>
+  </data>
+  <data name="AllowMicrophone" xml:space="preserve">
+    <value>Autoriser le microphone</value>
+    <comment>Allow Microphone</comment>
+  </data>
+  <data name="AlwaysFor" xml:space="preserve">
+    <value>Toujours pour {0}</value>
+    <comment>Always for %@</comment>
+  </data>
+  <data name="AlwaysRecord" xml:space="preserve">
+    <value>Toujours enregistrer</value>
+    <comment>Always record</comment>
+  </data>
+  <data name="AndLldMore" xml:space="preserve">
+    <value>…et {0} de plus</value>
+    <comment>…and %lld more</comment>
+  </data>
+  <data name="AnotherAppIsUsingTheAudioDeviceExclusively" xml:space="preserve">
+    <value>Une autre app utilise le périphérique audio en exclusivité.</value>
+    <comment>Another app is using the audio device exclusively.</comment>
+  </data>
+  <data name="AnsweringAQuestionAboutYourConversations" xml:space="preserve">
+    <value>Réponse à une question sur vos conversations…</value>
+    <comment>Answering a question about your conversations…</comment>
+  </data>
+  <data name="AnsweringAbout" xml:space="preserve">
+    <value>Réponse à propos de {0}…</value>
+    <comment>Answering about %@…</comment>
+  </data>
+  <data name="AnsweringAboutAnotherConversation" xml:space="preserve">
+    <value>Réponse à propos d’une autre conversation…</value>
+    <comment>Answering about another conversation…</comment>
+  </data>
+  <data name="AnswersQuestionsAboutAllYourTranscribedConversationsCitingTh" xml:space="preserve">
+    <value>Répond aux questions sur toutes vos conversations transcrites, en citant la conversation et le moment. L’index reste sur ce Mac, sauf si vous choisissez un modèle d’embedding via API.</value>
+    <comment>Answers questions about all your transcribed conversations, citing the conversation and the moment. The index stays on this Mac unless you pick an API embedder.</comment>
+  </data>
+  <data name="ApiKeyHeader" xml:space="preserve">
+    <value>En-tête api-key</value>
+    <comment>api-key header</comment>
+  </data>
+  <data name="AppLanguage" xml:space="preserve">
+    <value>Langue de l’app</value>
+    <comment>App language</comment>
+  </data>
+  <data name="AppleBasicBuiltIn" xml:space="preserve">
+    <value>Apple (basique, intégré)</value>
+    <comment>Apple (Basic, built-in)</comment>
+  </data>
+  <data name="AppleFoundationModelsNeedMacOS26" xml:space="preserve">
+    <value>Les Apple Foundation Models nécessitent macOS 26.</value>
+    <comment>Apple Foundation Models need macOS 26.</comment>
+  </data>
+  <data name="AppleFoundationModelsSystem" xml:space="preserve">
+    <value>Apple Foundation Models (système)</value>
+    <comment>Apple Foundation Models (system)</comment>
+  </data>
+  <data name="ApproveEchoDiarInSystemSettingsGeneralLoginItems" xml:space="preserve">
+    <value>Approuvez EchoDiar dans Réglages Système &gt; Général &gt; Ouverture.</value>
+    <comment>Approve EchoDiar in System Settings &gt; General &gt; Login Items.</comment>
+  </data>
+  <data name="Approx" xml:space="preserve">
+    <value>{0} (env.)</value>
+    <comment>%@ (approx.)</comment>
+  </data>
+  <data name="AsRecorded" xml:space="preserve">
+    <value>Comme enregistré</value>
+    <comment>As recorded</comment>
+  </data>
+  <data name="Ask" xml:space="preserve">
+    <value>Demander</value>
+    <comment>Ask</comment>
+  </data>
+  <data name="AskAQuestionAboutAllYourConversationsBelow" xml:space="preserve">
+    <value>Posez une question sur toutes vos conversations ci-dessous.</value>
+    <comment>Ask a question about all your conversations below.</comment>
+  </data>
+  <data name="AskAQuestionAboutAllYourConversationsTheAnswerComesFromThePa" xml:space="preserve">
+    <value>Posez une question sur toutes vos conversations : la réponse vient des passages qui y correspondent, avec des liens vers les moments qu’elle cite.</value>
+    <comment>Ask a question about all your conversations: the answer comes from the passages that match it, with links to the moments it cites.</comment>
+  </data>
+  <data name="AskAQuestionAboutThisConversationBelow" xml:space="preserve">
+    <value>Posez une question sur cette conversation ci-dessous.</value>
+    <comment>Ask a question about this conversation below.</comment>
+  </data>
+  <data name="AskAboutThisConversation" xml:space="preserve">
+    <value>Poser une question sur cette conversation</value>
+    <comment>Ask about this conversation</comment>
+  </data>
+  <data name="AskAcrossConversations" xml:space="preserve">
+    <value>Interroger toutes les conversations</value>
+    <comment>Ask across conversations</comment>
+  </data>
+  <data name="AskAnything" xml:space="preserve">
+    <value>Posez votre question…</value>
+    <comment>Ask anything…</comment>
+  </data>
+  <data name="AskToStop" xml:space="preserve">
+    <value>Demander s’il faut arrêter</value>
+    <comment>Ask to stop</comment>
+  </data>
+  <data name="AssemblyAIPicksItsModelForTheLanguageUniversal" xml:space="preserve">
+    <value>AssemblyAI choisit son modèle selon la langue (Universal).</value>
+    <comment>AssemblyAI picks its model for the language (Universal).</comment>
+  </data>
+  <data name="AttachTheIndicatorToTheMeetingWindow" xml:space="preserve">
+    <value>Attacher l’indicateur à la fenêtre de la réunion</value>
+    <comment>Attach the indicator to the meeting window</comment>
+  </data>
+  <data name="Audio" xml:space="preserve">
+    <value>Audio</value>
+    <comment>Audio</comment>
+  </data>
+  <data name="AudioAndTranscriptsStayOnThisMac" xml:space="preserve">
+    <value>L’audio et les transcriptions restent sur ce Mac.</value>
+    <comment>Audio and transcripts stay on this Mac.</comment>
+  </data>
+  <data name="AudioHasBeenRemoved" xml:space="preserve">
+    <value>L’audio a été supprimé</value>
+    <comment>Audio has been removed</comment>
+  </data>
+  <data name="AudioLeavesThisMacCloudEnginesUploadTheRecordingToTheProvide" xml:space="preserve">
+    <value>L’audio quitte ce Mac : les moteurs cloud envoient l’enregistrement au fournisseur.</value>
+    <comment>Audio leaves this Mac: cloud engines upload the recording to the provider.</comment>
+  </data>
+  <data name="AudioLeavesThisMacTheCloudDiarizerUploadsTheSystemChannelToT" xml:space="preserve">
+    <value>L’audio quitte ce Mac : la diarisation cloud envoie le canal système au fournisseur.</value>
+    <comment>Audio leaves this Mac: the cloud diarizer uploads the system channel to the provider.</comment>
+  </data>
+  <data name="AudioLeavesThisMacTheRecordingSMicAndSystemChannelsAreUpload" xml:space="preserve">
+    <value>L’audio quitte ce Mac : les canaux micro et système de l’enregistrement sont envoyés vers {0} ({1}) pour la transcription, et facturés par celui-ci. Le fournisseur peut conserver l’audio selon sa propre politique de conservation. La question vous est posée une fois par fournisseur et par destination.</value>
+    <comment>Audio leaves this Mac: the recording's mic and system channels are uploaded to %@ (%@) for transcription and billed by them. The provider may keep the audio under its own retention policy. You are asked once per provider and destination.</comment>
+  </data>
+  <data name="AudioOnlyKeepTranscriptSummaryAndChat" xml:space="preserve">
+    <value>Audio seulement (conserver la transcription, le résumé et la discussion)</value>
+    <comment>Audio only (keep transcript, summary and chat)</comment>
+  </data>
+  <data name="Authentication" xml:space="preserve">
+    <value>Authentification</value>
+    <comment>Authentication</comment>
+  </data>
+  <data name="Auto" xml:space="preserve">
+    <value>Auto</value>
+    <comment>Auto</comment>
+  </data>
+  <data name="AutoDelete" xml:space="preserve">
+    <value>Suppression automatique</value>
+    <comment>Auto-delete</comment>
+  </data>
+  <data name="AutoDeleteOldConversations" xml:space="preserve">
+    <value>Supprimer automatiquement les anciennes conversations</value>
+    <comment>Auto-delete old conversations</comment>
+  </data>
+  <data name="AutoStop" xml:space="preserve">
+    <value>Arrêt automatique</value>
+    <comment>Auto-stop</comment>
+  </data>
+  <data name="Available" xml:space="preserve">
+    <value>Disponible</value>
+    <comment>Available</comment>
+  </data>
+  <data name="Back" xml:space="preserve">
+    <value>Retour</value>
+    <comment>Back</comment>
+  </data>
+  <data name="BackEsc" xml:space="preserve">
+    <value>Retour (Esc)</value>
+    <comment>Back (Esc)</comment>
+  </data>
+  <data name="Balanced" xml:space="preserve">
+    <value>Équilibré</value>
+    <comment>Balanced</comment>
+  </data>
+  <data name="BaseURL" xml:space="preserve">
+    <value>URL de base</value>
+    <comment>Base URL</comment>
+  </data>
+  <data name="BaseURLNotSet" xml:space="preserve">
+    <value>URL de base non définie</value>
+    <comment>Base URL not set</comment>
+  </data>
+  <data name="BearerToken" xml:space="preserve">
+    <value>Jeton Bearer</value>
+    <comment>Bearer token</comment>
+  </data>
+  <data name="BeforeYouRecord" xml:space="preserve">
+    <value>Avant d’enregistrer</value>
+    <comment>Before you record</comment>
+  </data>
+  <data name="BothVoicesInBothEars" xml:space="preserve">
+    <value>Les deux voix dans les deux oreilles</value>
+    <comment>Both voices in both ears</comment>
+  </data>
+  <data name="BrowseModels" xml:space="preserve">
+    <value>Parcourir les modèles</value>
+    <comment>Browse models</comment>
+  </data>
+  <data name="BuiltIn" xml:space="preserve">
+    <value>Intégré</value>
+    <comment>Built in</comment>
+  </data>
+  <data name="CLIs" xml:space="preserve">
+    <value>CLI</value>
+    <comment>CLIs</comment>
+  </data>
+  <data name="Calendar" xml:space="preserve">
+    <value>Calendrier</value>
+    <comment>Calendar</comment>
+  </data>
+  <data name="CalendarAccessIsOffTurnOnEchoDiarInPrivacySecurityCalendars" xml:space="preserve">
+    <value>L’accès aux calendriers est désactivé. Activez EchoDiar dans Confidentialité et sécurité › Calendriers.</value>
+    <comment>Calendar access is off. Turn on EchoDiar in Privacy &amp; Security › Calendars.</comment>
+  </data>
+  <data name="CalendarSettings" xml:space="preserve">
+    <value>Réglages du calendrier…</value>
+    <comment>Calendar settings…</comment>
+  </data>
+  <data name="CallDetectedRecord" xml:space="preserve">
+    <value>Appel {0} détecté — Enregistrer ?</value>
+    <comment>%@ call detected — Record?</comment>
+  </data>
+  <data name="Cancel" xml:space="preserve">
+    <value>Annuler</value>
+    <comment>Cancel</comment>
+  </data>
+  <data name="CancelTheSelectionEsc" xml:space="preserve">
+    <value>Annuler la sélection (Esc)</value>
+    <comment>Cancel the selection (Esc)</comment>
+  </data>
+  <data name="CannotBeRecordedOnItsOwnAllSystemAudioWillBeRecorded" xml:space="preserve">
+    <value>{0} ne peut pas être enregistré seul : tout l’audio du système sera enregistré.</value>
+    <comment>%@ cannot be recorded on its own: all system audio will be recorded.</comment>
+  </data>
+  <data name="Change" xml:space="preserve">
+    <value>Modifier</value>
+    <comment>Change</comment>
+  </data>
+  <data name="Chat" xml:space="preserve">
+    <value>Discussion</value>
+    <comment>Chat</comment>
+  </data>
+  <data name="ChatContext" xml:space="preserve">
+    <value>Contexte de la discussion</value>
+    <comment>Chat context</comment>
+  </data>
+  <data name="ChatTemplatesOfLocalModels" xml:space="preserve">
+    <value>Gabarits de discussion des modèles locaux</value>
+    <comment>Chat templates of local models</comment>
+  </data>
+  <data name="CheckAgain" xml:space="preserve">
+    <value>Vérifier à nouveau</value>
+    <comment>Check Again</comment>
+  </data>
+  <data name="CheckForUpdates" xml:space="preserve">
+    <value>Rechercher les mises à jour…</value>
+    <comment>Check for Updates…</comment>
+  </data>
+  <data name="ChooseModels" xml:space="preserve">
+    <value>Choisir les modèles…</value>
+    <comment>Choose Models…</comment>
+  </data>
+  <data name="ChooseWhatToRecordAndTheLanguage" xml:space="preserve">
+    <value>Choisir quoi enregistrer et la langue</value>
+    <comment>Choose what to record and the language</comment>
+  </data>
+  <data name="ClickToRecordANewShortcut" xml:space="preserve">
+    <value>Cliquez pour saisir un nouveau raccourci</value>
+    <comment>Click to record a new shortcut</comment>
+  </data>
+  <data name="Close" xml:space="preserve">
+    <value>Fermer</value>
+    <comment>Close</comment>
+  </data>
+  <data name="CloseSearchEsc" xml:space="preserve">
+    <value>Fermer la recherche (Esc)</value>
+    <comment>Close search (Esc)</comment>
+  </data>
+  <data name="CloseTheHistory" xml:space="preserve">
+    <value>Fermer l’historique</value>
+    <comment>Close the history</comment>
+  </data>
+  <data name="Cloud" xml:space="preserve">
+    <value>{0} (cloud)</value>
+    <comment>%@ (cloud)</comment>
+  </data>
+  <data name="CloudAPIs" xml:space="preserve">
+    <value>API cloud</value>
+    <comment>Cloud APIs</comment>
+  </data>
+  <data name="CloudDiarization" xml:space="preserve">
+    <value>Diarisation cloud</value>
+    <comment>Cloud diarization</comment>
+  </data>
+  <data name="CloudDiarizationDoesNotTakeThisNumber" xml:space="preserve">
+    <value>La diarisation cloud ne tient pas compte de ce nombre.</value>
+    <comment>Cloud diarization does not take this number.</comment>
+  </data>
+  <data name="CloudDiarizationFailedAndNoDiarizationModelIsInstalledOnThis" xml:space="preserve">
+    <value>La diarisation cloud a échoué et aucun modèle de diarisation n’est installé sur ce Mac.</value>
+    <comment>Cloud diarization failed and no diarization model is installed on this Mac.</comment>
+  </data>
+  <data name="CloudDiarizationFailedSpeakersWereToldApartOnThisMac" xml:space="preserve">
+    <value>La diarisation cloud a échoué ; les intervenants ont été distingués sur ce Mac.</value>
+    <comment>Cloud diarization failed; speakers were told apart on this Mac.</comment>
+  </data>
+  <data name="CloudTranscriptionEngines" xml:space="preserve">
+    <value>Moteurs de transcription cloud</value>
+    <comment>Cloud transcription engines</comment>
+  </data>
+  <data name="Cloud_2" xml:space="preserve">
+    <value>Cloud</value>
+    <comment>Cloud</comment>
+  </data>
+  <data name="Collapse" xml:space="preserve">
+    <value>Réduire</value>
+    <comment>Collapse</comment>
+  </data>
+  <data name="Compressing" xml:space="preserve">
+    <value>Compression…</value>
+    <comment>Compressing…</comment>
+  </data>
+  <data name="CompressingTheAudio" xml:space="preserve">
+    <value>Compression de l’audio…</value>
+    <comment>Compressing the audio…</comment>
+  </data>
+  <data name="CompressionBitrate" xml:space="preserve">
+    <value>Débit de compression</value>
+    <comment>Compression bitrate</comment>
+  </data>
+  <data name="CompressionFailed" xml:space="preserve">
+    <value>Échec de la compression</value>
+    <comment>Compression failed</comment>
+  </data>
+  <data name="Confirm" xml:space="preserve">
+    <value>Confirmer…</value>
+    <comment>Confirm…</comment>
+  </data>
+  <data name="ConfirmTheEmbeddingProviderInSettingsRAG" xml:space="preserve">
+    <value>Confirmez le fournisseur d’embedding dans Réglages › RAG.</value>
+    <comment>Confirm the embedding provider in Settings › RAG.</comment>
+  </data>
+  <data name="Consent" xml:space="preserve">
+    <value>Consentement</value>
+    <comment>Consent</comment>
+  </data>
+  <data name="Continue" xml:space="preserve">
+    <value>Continuer</value>
+    <comment>Continue</comment>
+  </data>
+  <data name="Copied" xml:space="preserve">
+    <value>Copié</value>
+    <comment>Copied</comment>
+  </data>
+  <data name="CopiedPasteIntoAnyChat" xml:space="preserve">
+    <value>Copié — collez-le dans n’importe quelle discussion</value>
+    <comment>Copied — paste into any chat</comment>
+  </data>
+  <data name="Copy" xml:space="preserve">
+    <value>Copier</value>
+    <comment>Copy</comment>
+  </data>
+  <data name="CopyAsPrompt" xml:space="preserve">
+    <value>Copier comme prompt</value>
+    <comment>Copy as prompt</comment>
+  </data>
+  <data name="CopyConsentMessage" xml:space="preserve">
+    <value>Copier le message de consentement</value>
+    <comment>Copy consent message</comment>
+  </data>
+  <data name="CopyTheAnswer" xml:space="preserve">
+    <value>Copier la réponse</value>
+    <comment>Copy the answer</comment>
+  </data>
+  <data name="CopyTheTranscriptAndTheQuestionAsAPromptForAnyChatApp" xml:space="preserve">
+    <value>Copier la transcription et la question comme prompt pour n’importe quelle app de discussion</value>
+    <comment>Copy the transcript and the question as a prompt for any chat app</comment>
+  </data>
+  <data name="CopyTheTranscriptAsASummaryPromptForAnyChatApp" xml:space="preserve">
+    <value>Copier la transcription comme prompt de résumé pour n’importe quelle app de discussion</value>
+    <comment>Copy the transcript as a summary prompt for any chat app</comment>
+  </data>
+  <data name="CopyTranscript" xml:space="preserve">
+    <value>Copier la transcription</value>
+    <comment>Copy transcript</comment>
+  </data>
+  <data name="CouldNotBeRegisteredErrorD" xml:space="preserve">
+    <value>{0} n’a pas pu être activé (erreur {1}).</value>
+    <comment>%@ could not be registered (error %d).</comment>
+  </data>
+  <data name="Current" xml:space="preserve">
+    <value>Actuelle</value>
+    <comment>Current</comment>
+  </data>
+  <data name="CurrentLldMessages" xml:space="preserve">
+    <value>Actuelle · {0} messages</value>
+    <comment>Current · %lld messages</comment>
+  </data>
+  <data name="CurrentLldMessages__One" xml:space="preserve">
+    <value>Actuelle · {0} message</value>
+    <comment>Current · %lld messages</comment>
+  </data>
+  <data name="Custom" xml:space="preserve">
+    <value>Personnalisée</value>
+    <comment>Custom</comment>
+  </data>
+  <data name="CustomOpenAICompatibleEndpoints" xml:space="preserve">
+    <value>Points de terminaison personnalisés compatibles OpenAI</value>
+    <comment>Custom OpenAI-compatible endpoints</comment>
+  </data>
+  <data name="CustomURL" xml:space="preserve">
+    <value>URL personnalisée</value>
+    <comment>Custom URL</comment>
+  </data>
+  <data name="Cut" xml:space="preserve">
+    <value>Couper</value>
+    <comment>Cut</comment>
+  </data>
+  <data name="Daily" xml:space="preserve">
+    <value>Tous les jours</value>
+    <comment>Daily</comment>
+  </data>
+  <data name="DataFolder" xml:space="preserve">
+    <value>Dossier des données</value>
+    <comment>Data folder</comment>
+  </data>
+  <data name="DataSentToCloudProvidersOrCLIsLeavesThisMac" xml:space="preserve">
+    <value>Les données envoyées aux fournisseurs cloud ou aux CLI quittent ce Mac.</value>
+    <comment>Data sent to cloud providers or CLIs leaves this Mac.</comment>
+  </data>
+  <data name="DataSentToLeavesThisMac" xml:space="preserve">
+    <value>Les données envoyées à {0} quittent ce Mac.</value>
+    <comment>Data sent to %@ leaves this Mac.</comment>
+  </data>
+  <data name="Date" xml:space="preserve">
+    <value>Date</value>
+    <comment>Date</comment>
+  </data>
+  <data name="Days" xml:space="preserve">
+    <value>jours</value>
+    <comment>days</comment>
+  </data>
+  <data name="Default" xml:space="preserve">
+    <value>{0} (par défaut)</value>
+    <comment>%@ (default)</comment>
+  </data>
+  <data name="DefaultLanguage" xml:space="preserve">
+    <value>Langue par défaut</value>
+    <comment>Default language</comment>
+  </data>
+  <data name="Default_2" xml:space="preserve">
+    <value>Par défaut</value>
+    <comment>Default</comment>
+  </data>
+  <data name="Delete" xml:space="preserve">
+    <value>Supprimer</value>
+    <comment>Delete</comment>
+  </data>
+  <data name="DeleteARepeatingEvent" xml:space="preserve">
+    <value>Supprimer un événement récurrent ?</value>
+    <comment>Delete a repeating event?</comment>
+  </data>
+  <data name="DeleteAllEarlierChats" xml:space="preserve">
+    <value>Supprimer toutes les discussions précédentes</value>
+    <comment>Delete all earlier chats</comment>
+  </data>
+  <data name="DeleteAllEarlierChats_2" xml:space="preserve">
+    <value>Supprimer toutes les discussions précédentes ?</value>
+    <comment>Delete all earlier chats?</comment>
+  </data>
+  <data name="DeleteAudioAfterTranscription" xml:space="preserve">
+    <value>Supprimer l’audio après la transcription</value>
+    <comment>Delete audio after transcription</comment>
+  </data>
+  <data name="DeleteAudioOfTranscribedConversations" xml:space="preserve">
+    <value>Supprimer l’audio des conversations transcrites…</value>
+    <comment>Delete audio of transcribed conversations…</comment>
+  </data>
+  <data name="DeleteAudioOnly" xml:space="preserve">
+    <value>Supprimer l’audio seulement</value>
+    <comment>Delete audio only</comment>
+  </data>
+  <data name="DeleteAudioOnly_2" xml:space="preserve">
+    <value>Supprimer l’audio seulement…</value>
+    <comment>Delete audio only…</comment>
+  </data>
+  <data name="DeleteConversation" xml:space="preserve">
+    <value>Supprimer la conversation</value>
+    <comment>Delete conversation</comment>
+  </data>
+  <data name="DeleteConversation_2" xml:space="preserve">
+    <value>Supprimer la conversation…</value>
+    <comment>Delete conversation…</comment>
+  </data>
+  <data name="DeleteConversations" xml:space="preserve">
+    <value>Supprimer les conversations</value>
+    <comment>Delete conversations</comment>
+  </data>
+  <data name="DeleteConversationsWithoutConfirmation" xml:space="preserve">
+    <value>Supprimer les conversations sans confirmation</value>
+    <comment>Delete conversations without confirmation</comment>
+  </data>
+  <data name="DeleteConversations_2" xml:space="preserve">
+    <value>Supprimer les conversations…</value>
+    <comment>Delete conversations…</comment>
+  </data>
+  <data name="DeleteEvent" xml:space="preserve">
+    <value>Supprimer l’événement…</value>
+    <comment>Delete Event…</comment>
+  </data>
+  <data name="DeleteEveryDownloadedModel" xml:space="preserve">
+    <value>Supprimer tous les modèles téléchargés</value>
+    <comment>Delete every downloaded model</comment>
+  </data>
+  <data name="DeleteEveryTranscriptSummaryAndChat" xml:space="preserve">
+    <value>Supprimer toutes les transcriptions, tous les résumés et toutes les discussions</value>
+    <comment>Delete every transcript, summary and chat</comment>
+  </data>
+  <data name="DeleteLldConversations" xml:space="preserve">
+    <value>Supprimer {0} conversations ?</value>
+    <comment>Delete %lld conversations?</comment>
+  </data>
+  <data name="DeleteLldConversations__One" xml:space="preserve">
+    <value>Supprimer {0} conversation ?</value>
+    <comment>Delete %lld conversations?</comment>
+  </data>
+  <data name="DeleteLldDownloadedModels" xml:space="preserve">
+    <value>Supprimer {0} modèles téléchargés ?</value>
+    <comment>Delete %lld downloaded models?</comment>
+  </data>
+  <data name="DeleteLldDownloadedModels__One" xml:space="preserve">
+    <value>Supprimer {0} modèle téléchargé ?</value>
+    <comment>Delete %lld downloaded models?</comment>
+  </data>
+  <data name="DeleteMoreAtTheNextRun" xml:space="preserve">
+    <value>Supprimer davantage au prochain passage ?</value>
+    <comment>Delete more at the next run?</comment>
+  </data>
+  <data name="DeleteTheAudioOf" xml:space="preserve">
+    <value>Supprimer l’audio de "{0}" ?</value>
+    <comment>Delete the audio of "%@"?</comment>
+  </data>
+  <data name="DeleteTheAudioOfEveryConversation" xml:space="preserve">
+    <value>Supprimer l’audio de toutes les conversations</value>
+    <comment>Delete the audio of every conversation</comment>
+  </data>
+  <data name="DeleteTheAudioOfLldConversations" xml:space="preserve">
+    <value>Supprimer l’audio de {0} conversations ?</value>
+    <comment>Delete the audio of %lld conversations?</comment>
+  </data>
+  <data name="DeleteTheAudioOfLldConversations__One" xml:space="preserve">
+    <value>Supprimer l’audio de {0} conversation ?</value>
+    <comment>Delete the audio of %lld conversations?</comment>
+  </data>
+  <data name="DeleteTheAudioOfLldTranscribedConversations" xml:space="preserve">
+    <value>Supprimer l’audio de {0} conversations transcrites ?</value>
+    <comment>Delete the audio of %lld transcribed conversations?</comment>
+  </data>
+  <data name="DeleteTheAudioOfLldTranscribedConversations__One" xml:space="preserve">
+    <value>Supprimer l’audio de {0} conversation transcrite ?</value>
+    <comment>Delete the audio of %lld transcribed conversations?</comment>
+  </data>
+  <data name="DeleteTheAudioOrTheSelectedConversations" xml:space="preserve">
+    <value>Supprimer l’audio ou les conversations sélectionnées</value>
+    <comment>Delete the audio or the selected conversations</comment>
+  </data>
+  <data name="DeleteTheAudioOrTheWholeConversation" xml:space="preserve">
+    <value>Supprimer l’audio ou toute la conversation</value>
+    <comment>Delete the audio or the whole conversation</comment>
+  </data>
+  <data name="DeleteTheTranscriptsSummariesAndChatsOfLldConversations" xml:space="preserve">
+    <value>Supprimer les transcriptions, résumés et discussions de {0} conversations ?</value>
+    <comment>Delete the transcripts, summaries and chats of %lld conversations?</comment>
+  </data>
+  <data name="DeleteTheTranscriptsSummariesAndChatsOfLldConversations__One" xml:space="preserve">
+    <value>Supprimer les transcriptions, résumés et discussions de {0} conversation ?</value>
+    <comment>Delete the transcripts, summaries and chats of %lld conversations?</comment>
+  </data>
+  <data name="DeleteThisEvent" xml:space="preserve">
+    <value>Supprimer cet événement ?</value>
+    <comment>Delete this event?</comment>
+  </data>
+  <data name="Delete_2" xml:space="preserve">
+    <value>Supprimer "{0}" ?</value>
+    <comment>Delete "%@"?</comment>
+  </data>
+  <data name="Delete_3" xml:space="preserve">
+    <value>Supprimer {0}</value>
+    <comment>Delete %@</comment>
+  </data>
+  <data name="DeletesTheIndexAndEmbedsEveryConversationAgain" xml:space="preserve">
+    <value>Supprime l’index et recalcule les embeddings de chaque conversation.</value>
+    <comment>Deletes the index and embeds every conversation again.</comment>
+  </data>
+  <data name="DeploymentName" xml:space="preserve">
+    <value>Nom du déploiement</value>
+    <comment>Deployment name</comment>
+  </data>
+  <data name="DetectMeetings" xml:space="preserve">
+    <value>Détecter les réunions</value>
+    <comment>Detect meetings</comment>
+  </data>
+  <data name="DetectMeetingsIsOffSoEchoDiarAsksInstead" xml:space="preserve">
+    <value>Détecter les réunions est désactivé, EchoDiar demande donc à la place.</value>
+    <comment>Detect meetings is off, so EchoDiar asks instead.</comment>
+  </data>
+  <data name="Detected" xml:space="preserve">
+    <value>Détecté : {0}</value>
+    <comment>Detected: %@</comment>
+  </data>
+  <data name="DiarizationFindsWhoSpokeWhenTheDiarizationModelTellsTheVoice" xml:space="preserve">
+    <value>La diarisation identifie qui a parlé et quand. Le modèle de diarisation distingue les voix et attribue chaque partie de la transcription à son intervenant.</value>
+    <comment>Diarization finds who spoke when. The diarization model tells the voices apart and labels each part of the transcript with its speaker.</comment>
+  </data>
+  <data name="DiarizationModel" xml:space="preserve">
+    <value>Modèle de diarisation</value>
+    <comment>Diarization model</comment>
+  </data>
+  <data name="DiarizationModelId" xml:space="preserve">
+    <value>Identifiant du modèle de diarisation</value>
+    <comment>Diarization model id</comment>
+  </data>
+  <data name="DiarizationModels" xml:space="preserve">
+    <value>Modèles de diarisation</value>
+    <comment>Diarization models</comment>
+  </data>
+  <data name="Done" xml:space="preserve">
+    <value>Terminé</value>
+    <comment>Done</comment>
+  </data>
+  <data name="Download" xml:space="preserve">
+    <value>Télécharger</value>
+    <comment>Download</comment>
+  </data>
+  <data name="DownloadAModel" xml:space="preserve">
+    <value>Télécharger un modèle…</value>
+    <comment>Download a model…</comment>
+  </data>
+  <data name="DownloadATranscriptionModelInSettings" xml:space="preserve">
+    <value>Télécharger un modèle de transcription dans Réglages</value>
+    <comment>Download a transcription model in Settings</comment>
+  </data>
+  <data name="DownloadTheEmbeddingModelInSettingsRAG" xml:space="preserve">
+    <value>Téléchargez le modèle d’embedding dans Réglages › RAG</value>
+    <comment>Download the embedding model in Settings › RAG</comment>
+  </data>
+  <data name="Download_2" xml:space="preserve">
+    <value>Télécharger {0} ?</value>
+    <comment>Download %@?</comment>
+  </data>
+  <data name="Download_3" xml:space="preserve">
+    <value>Télécharger…</value>
+    <comment>Download…</comment>
+  </data>
+  <data name="EarlierChatsAcrossConversations" xml:space="preserve">
+    <value>Discussions précédentes sur toutes les conversations</value>
+    <comment>Earlier chats across conversations</comment>
+  </data>
+  <data name="EarlierChatsOfThisConversation" xml:space="preserve">
+    <value>Discussions précédentes de cette conversation</value>
+    <comment>Earlier chats of this conversation</comment>
+  </data>
+  <data name="EarlierMessagesSentWithEachQuestion" xml:space="preserve">
+    <value>Messages précédents envoyés avec chaque question.</value>
+    <comment>Earlier messages sent with each question.</comment>
+  </data>
+  <data name="EarlierSummariesOfThisConversation" xml:space="preserve">
+    <value>Résumés précédents de cette conversation</value>
+    <comment>Earlier summaries of this conversation</comment>
+  </data>
+  <data name="EarlierTranscriptsOfThisConversation" xml:space="preserve">
+    <value>Transcriptions précédentes de cette conversation</value>
+    <comment>Earlier transcripts of this conversation</comment>
+  </data>
+  <data name="EchoDiar" xml:space="preserve">
+    <value>EchoDiar</value>
+    <comment>EchoDiar</comment>
+  </data>
+  <data name="EchoDiarHasNoAccessToYourCalendars" xml:space="preserve">
+    <value>EchoDiar n’a pas accès à vos calendriers.</value>
+    <comment>EchoDiar has no access to your calendars.</comment>
+  </data>
+  <data name="EchoDiarHasNoAccessibilityAccess" xml:space="preserve">
+    <value>EchoDiar n’a pas accès à l’Accessibilité.</value>
+    <comment>EchoDiar has no Accessibility access.</comment>
+  </data>
+  <data name="EchoDiarHasNoCalendarAccessYet" xml:space="preserve">
+    <value>EchoDiar n’a pas encore accès aux calendriers.</value>
+    <comment>EchoDiar has no calendar access yet.</comment>
+  </data>
+  <data name="EchoDiarHeardOnlySilence" xml:space="preserve">
+    <value>EchoDiar n’a entendu que du silence.</value>
+    <comment>EchoDiar heard only silence.</comment>
+  </data>
+  <data name="EchoDiarIncludesThisOpenSourceSoftwareChooseOneToReadItsLice" xml:space="preserve">
+    <value>EchoDiar inclut ces logiciels open source. Choisissez-en un pour lire sa licence.</value>
+    <comment>EchoDiar includes this open-source software. Choose one to read its license.</comment>
+  </data>
+  <data name="EchoDiarMayLackSystemAudioRecordingPermissionAllowItThenRest" xml:space="preserve">
+    <value>Il manque peut-être à EchoDiar l’autorisation Enregistrement de l’audio du système. Autorisez-la, puis relancez l’enregistrement.</value>
+    <comment>EchoDiar may lack System Audio Recording permission. Allow it, then restart the recording.</comment>
+  </data>
+  <data name="EchoDiarProcessing" xml:space="preserve">
+    <value>EchoDiar, traitement en cours</value>
+    <comment>EchoDiar, processing</comment>
+  </data>
+  <data name="EchoDiarReactsToMeetingsOnlyWhileItRunsTurnOnLaunchAtLoginIn" xml:space="preserve">
+    <value>EchoDiar ne réagit aux réunions que lorsqu’il est ouvert. Activez Ouvrir à la connexion dans Général.</value>
+    <comment>EchoDiar reacts to meetings only while it runs. Turn on Launch at login in General.</comment>
+  </data>
+  <data name="EchoDiarRecording" xml:space="preserve">
+    <value>EchoDiar, enregistrement en cours</value>
+    <comment>EchoDiar, recording</comment>
+  </data>
+  <data name="EchoDiarRecordingPaused" xml:space="preserve">
+    <value>EchoDiar, enregistrement en pause</value>
+    <comment>EchoDiar, recording paused</comment>
+  </data>
+  <data name="EchoDiarRecordsTheOtherPeopleOnTheCallFromYourMacSAudioTheTe" xml:space="preserve">
+    <value>EchoDiar enregistre les autres personnes de l’appel à partir de l’audio de votre Mac. Le test joue un son bref et l’écoute. macOS demande l’autorisation Enregistrement de l’audio du système la première fois.</value>
+    <comment>EchoDiar records the other people on the call from your Mac's audio. The test plays a short sound and listens for it. macOS asks for System Audio Recording permission the first time.</comment>
+  </data>
+  <data name="EchoDiarRecordsYourVoiceOnItsOwnChannelSoTheTranscriptKnowsW" xml:space="preserve">
+    <value>EchoDiar enregistre votre voix sur un canal à part, pour que la transcription sache ce que vous avez dit.</value>
+    <comment>EchoDiar records your voice on its own channel, so the transcript knows what you said.</comment>
+  </data>
+  <data name="EchoDiarSUpdates" xml:space="preserve">
+    <value>Mises à jour d’EchoDiar</value>
+    <comment>EchoDiar's updates</comment>
+  </data>
+  <data name="Edit" xml:space="preserve">
+    <value>Édition</value>
+    <comment>Edit</comment>
+  </data>
+  <data name="EditEvent" xml:space="preserve">
+    <value>Modifier l’événement</value>
+    <comment>Edit Event</comment>
+  </data>
+  <data name="Edit_2" xml:space="preserve">
+    <value>Modifier…</value>
+    <comment>Edit…</comment>
+  </data>
+  <data name="EmbeddingModel" xml:space="preserve">
+    <value>Modèle d’embedding</value>
+    <comment>Embedding model</comment>
+  </data>
+  <data name="EmbeddingModelId" xml:space="preserve">
+    <value>Identifiant du modèle d’embedding</value>
+    <comment>Embedding model id</comment>
+  </data>
+  <data name="EmptyTheCLISDefault" xml:space="preserve">
+    <value>Vide = valeur par défaut de la CLI</value>
+    <comment>Empty = the CLI's default</comment>
+  </data>
+  <data name="End" xml:space="preserve">
+    <value>Fin</value>
+    <comment>End</comment>
+  </data>
+  <data name="EndDate" xml:space="preserve">
+    <value>Date de fin</value>
+    <comment>End date</comment>
+  </data>
+  <data name="EndRepeat" xml:space="preserve">
+    <value>Fin de la récurrence</value>
+    <comment>End Repeat</comment>
+  </data>
+  <data name="English" xml:space="preserve">
+    <value>Anglais</value>
+    <comment>English</comment>
+  </data>
+  <data name="EnterANewKeyToReplaceIt" xml:space="preserve">
+    <value>Saisissez une nouvelle clé pour la remplacer</value>
+    <comment>Enter a new key to replace it</comment>
+  </data>
+  <data name="EnterTheEmbeddingModelOfInSettingsRAG" xml:space="preserve">
+    <value>Saisissez le modèle d’embedding de {0} dans Réglages › RAG</value>
+    <comment>Enter the embedding model of %@ in Settings › RAG</comment>
+  </data>
+  <data name="Expand" xml:space="preserve">
+    <value>Développer</value>
+    <comment>Expand</comment>
+  </data>
+  <data name="Failed" xml:space="preserve">
+    <value>Échec</value>
+    <comment>Failed</comment>
+  </data>
+  <data name="Fast" xml:space="preserve">
+    <value>Rapide</value>
+    <comment>Fast</comment>
+  </data>
+  <data name="File" xml:space="preserve">
+    <value>Fichier</value>
+    <comment>File</comment>
+  </data>
+  <data name="Filter" xml:space="preserve">
+    <value>Filtrer</value>
+    <comment>Filter</comment>
+  </data>
+  <data name="FilterModels" xml:space="preserve">
+    <value>Filtrer les modèles</value>
+    <comment>Filter models</comment>
+  </data>
+  <data name="Finishing" xml:space="preserve">
+    <value>Finalisation…</value>
+    <comment>Finishing…</comment>
+  </data>
+  <data name="FloatingIndicator" xml:space="preserve">
+    <value>Indicateur flottant</value>
+    <comment>Floating indicator</comment>
+  </data>
+  <data name="ForExample" xml:space="preserve">
+    <value>Par exemple :</value>
+    <comment>For example:</comment>
+  </data>
+  <data name="FreeSpace" xml:space="preserve">
+    <value>Espace libre</value>
+    <comment>Free space</comment>
+  </data>
+  <data name="FreeUnusedModelsAfter" xml:space="preserve">
+    <value>Libérer les modèles inutilisés après</value>
+    <comment>Free unused models after</comment>
+  </data>
+  <data name="French" xml:space="preserve">
+    <value>Français</value>
+    <comment>French</comment>
+  </data>
+  <data name="GB" xml:space="preserve">
+    <value>{0} Go</value>
+    <comment>%@ GB</comment>
+  </data>
+  <data name="General" xml:space="preserve">
+    <value>Général</value>
+    <comment>General</comment>
+  </data>
+  <data name="GetAnAPIKey" xml:space="preserve">
+    <value>Obtenir une clé API</value>
+    <comment>Get an API key</comment>
+  </data>
+  <data name="GithubComDinhanhthiEchoDiar" xml:space="preserve">
+    <value>github.com/dinhanhthi/EchoDiar</value>
+    <comment>github.com/dinhanhthi/EchoDiar</comment>
+  </data>
+  <data name="GlobalPauseShortcut" xml:space="preserve">
+    <value>Raccourci global de pause</value>
+    <comment>Global pause shortcut</comment>
+  </data>
+  <data name="GlobalRecordShortcut" xml:space="preserve">
+    <value>Raccourci global d’enregistrement</value>
+    <comment>Global record shortcut</comment>
+  </data>
+  <data name="GrantAccess" xml:space="preserve">
+    <value>Autoriser l’accès</value>
+    <comment>Grant Access</comment>
+  </data>
+  <data name="GrantAccessibility" xml:space="preserve">
+    <value>Autoriser l’Accessibilité…</value>
+    <comment>Grant Accessibility…</comment>
+  </data>
+  <data name="HeadsUpIMRecordingThisCallToTakeNotesTheRecordingStaysOnMyMa" xml:space="preserve">
+    <value>Pour info : j’enregistre cet appel pour prendre des notes. L’enregistrement reste sur mon Mac.</value>
+    <comment>Heads up: I'm recording this call to take notes. The recording stays on my Mac.</comment>
+  </data>
+  <data name="HideEchoDiar" xml:space="preserve">
+    <value>Masquer EchoDiar</value>
+    <comment>Hide EchoDiar</comment>
+  </data>
+  <data name="HideItWhileAnEchoDiarWindowIsInFront" xml:space="preserve">
+    <value>Le masquer quand une fenêtre d’EchoDiar est au premier plan</value>
+    <comment>Hide it while an EchoDiar window is in front</comment>
+  </data>
+  <data name="History" xml:space="preserve">
+    <value>Historique</value>
+    <comment>History</comment>
+  </data>
+  <data name="HowTheTranscriptPlaysYourMicrophoneAndTheMeetingSSound" xml:space="preserve">
+    <value>Comment la transcription lit votre microphone et le son de la réunion.</value>
+    <comment>How the transcript plays your microphone and the meeting's sound.</comment>
+  </data>
+  <data name="Http1270018080V1" xml:space="preserve">
+    <value>http://127.0.0.1:8080/v1</value>
+    <comment>http://127.0.0.1:8080/v1</comment>
+  </data>
+  <data name="HttpsResourceOpenaiAzureComOpenaiV1" xml:space="preserve">
+    <value>https://&lt;resource&gt;.openai.azure.com/openai/v1</value>
+    <comment>https://&lt;resource&gt;.openai.azure.com/openai/v1</comment>
+  </data>
+  <data name="HuggingFaceDownloads" xml:space="preserve">
+    <value>Téléchargements Hugging Face</value>
+    <comment>Hugging Face downloads</comment>
+  </data>
+  <data name="IdentifyingSpeakers" xml:space="preserve">
+    <value>Identification des intervenants…</value>
+    <comment>Identifying speakers…</comment>
+  </data>
+  <data name="Ignore" xml:space="preserve">
+    <value>Ignorer</value>
+    <comment>Ignore</comment>
+  </data>
+  <data name="InEchoDiar" xml:space="preserve">
+    <value>Dans EchoDiar</value>
+    <comment>In EchoDiar</comment>
+  </data>
+  <data name="InTheAIPaneSModelMenu" xml:space="preserve">
+    <value>Dans le menu des modèles du panneau IA</value>
+    <comment>In the AI pane's model menu</comment>
+  </data>
+  <data name="Index" xml:space="preserve">
+    <value>Index</value>
+    <comment>Index</comment>
+  </data>
+  <data name="IndexedLldOfLldConversations" xml:space="preserve">
+    <value>Indexées : {0} sur {1} conversations</value>
+    <comment>Indexed %lld of %lld conversations</comment>
+  </data>
+  <data name="IndexedLldOfLldConversations__One" xml:space="preserve">
+    <value>Indexées : {0} sur {1} conversation</value>
+    <comment>Indexed %lld of %lld conversations</comment>
+  </data>
+  <data name="IndexingLldOfLld" xml:space="preserve">
+    <value>Indexation : {0} sur {1}…</value>
+    <comment>Indexing %lld of %lld…</comment>
+  </data>
+  <data name="IndexingPausedAtLldOfLld" xml:space="preserve">
+    <value>Indexation en pause à {0} sur {1}</value>
+    <comment>Indexing paused at %lld of %lld</comment>
+  </data>
+  <data name="IndexingStopped" xml:space="preserve">
+    <value>Indexation arrêtée : {0}</value>
+    <comment>Indexing stopped: %@</comment>
+  </data>
+  <data name="IndexingStoppedAt" xml:space="preserve">
+    <value>Indexation arrêtée à "{0}" : {1}</value>
+    <comment>Indexing stopped at "%@": %@</comment>
+  </data>
+  <data name="IndexingYourConversationsOnThisMacNeedsThisEmbeddingModelYou" xml:space="preserve">
+    <value>L’indexation de vos conversations sur ce Mac nécessite ce modèle d’embedding ({0}). Vous pouvez aussi choisir un autre modèle ci-dessous.</value>
+    <comment>Indexing your conversations on this Mac needs this embedding model (%@). You can also pick another model below.</comment>
+  </data>
+  <data name="IndicatorSize" xml:space="preserve">
+    <value>Taille de l’indicateur</value>
+    <comment>Indicator size</comment>
+  </data>
+  <data name="InstallTheAvailableUpdate" xml:space="preserve">
+    <value>Installer la mise à jour disponible</value>
+    <comment>Install the available update</comment>
+  </data>
+  <data name="InstallTheUpdateFirst" xml:space="preserve">
+    <value>Installez d’abord la mise à jour</value>
+    <comment>Install the update first</comment>
+  </data>
+  <data name="InstallUpdateAndRelaunch" xml:space="preserve">
+    <value>Installer la mise à jour et relancer</value>
+    <comment>Install Update and Relaunch</comment>
+  </data>
+  <data name="Installed" xml:space="preserve">
+    <value>Installé</value>
+    <comment>Installed</comment>
+  </data>
+  <data name="Installed_2" xml:space="preserve">
+    <value>Installé : {0}</value>
+    <comment>Installed: %@</comment>
+  </data>
+  <data name="IsAlreadyUsedByAnotherAppPickAnotherShortcut" xml:space="preserve">
+    <value>{0} est déjà utilisé par une autre app. Choisissez un autre raccourci.</value>
+    <comment>%@ is already used by another app. Pick another shortcut.</comment>
+  </data>
+  <data name="IsNotAvailable" xml:space="preserve">
+    <value>{0} n’est pas disponible.</value>
+    <comment>%@ is not available.</comment>
+  </data>
+  <data name="IsStarting" xml:space="preserve">
+    <value>{0} commence</value>
+    <comment>%@ is starting</comment>
+  </data>
+  <data name="IsTheGlobalPauseShortcut" xml:space="preserve">
+    <value>{0} est le raccourci global de pause.</value>
+    <comment>%@ is the global pause shortcut.</comment>
+  </data>
+  <data name="IsTheGlobalRecordShortcut" xml:space="preserve">
+    <value>{0} est le raccourci global d’enregistrement.</value>
+    <comment>%@ is the global record shortcut.</comment>
+  </data>
+  <data name="IsTheMenuShortcut" xml:space="preserve">
+    <value>{0} est le raccourci du menu "{1}".</value>
+    <comment>%@ is the "%@" menu shortcut.</comment>
+  </data>
+  <data name="ItNeedsAnIndexOfYourTranscriptsBuiltOnThisMacByDefault" xml:space="preserve">
+    <value>Il faut un index de vos transcriptions, créé sur ce Mac par défaut.</value>
+    <comment>It needs an index of your transcripts, built on this Mac by default.</comment>
+  </data>
+  <data name="Join" xml:space="preserve">
+    <value>Rejoindre</value>
+    <comment>Join</comment>
+  </data>
+  <data name="KeepRecording" xml:space="preserve">
+    <value>Continuer l’enregistrement</value>
+    <comment>Keep recording</comment>
+  </data>
+  <data name="KeepUncompressedAudio" xml:space="preserve">
+    <value>Conserver l’audio non compressé</value>
+    <comment>Keep uncompressed audio</comment>
+  </data>
+  <data name="KeepsItAtTheWindowSTopRightCornerNeedsAccessibilityAccess" xml:space="preserve">
+    <value>Le maintient dans le coin supérieur droit de la fenêtre. Nécessite l’accès Accessibilité.</value>
+    <comment>Keeps it at the window's top-right corner. Needs Accessibility access.</comment>
+  </data>
+  <data name="KeepsTheOriginalCAFNextToTheCompressedFileAbout10TimesLarger" xml:space="preserve">
+    <value>Conserve le fichier CAF d’origine à côté du fichier compressé (environ 10 fois plus volumineux).</value>
+    <comment>Keeps the original CAF next to the compressed file (about 10 times larger).</comment>
+  </data>
+  <data name="KeyLld" xml:space="preserve">
+    <value>Touche {0}</value>
+    <comment>Key %lld</comment>
+  </data>
+  <data name="LLMDiarizationTimestampsApproximateSpeakersCanBeMislabeled" xml:space="preserve">
+    <value>Diarisation par LLM — horodatages approximatifs, les intervenants peuvent être mal attribués.</value>
+    <comment>LLM diarization — timestamps approximate, speakers can be mislabeled.</comment>
+  </data>
+  <data name="LLMTranscriptionTimestampsApproximate" xml:space="preserve">
+    <value>Transcription par LLM — horodatages approximatifs.</value>
+    <comment>LLM transcription — timestamps approximate.</comment>
+  </data>
+  <data name="LabelsEachVoiceInTheMeetingAudioSpeaker12OffTheMeetingAudioI" xml:space="preserve">
+    <value>Attribue un libellé à chaque voix de l’audio de la réunion : Intervenant 1, 2, … Désactivé : l’audio de la réunion est un seul intervenant.</value>
+    <comment>Labels each voice in the meeting audio: Speaker 1, 2, … Off: the meeting audio is one speaker.</comment>
+  </data>
+  <data name="Language" xml:space="preserve">
+    <value>Langue</value>
+    <comment>Language</comment>
+  </data>
+  <data name="LanguageFromNowOn" xml:space="preserve">
+    <value>Langue à partir de maintenant</value>
+    <comment>Language from now on</comment>
+  </data>
+  <data name="LanguageOfSummariesAndAnswersAutoTheTranscriptSLanguageForSu" xml:space="preserve">
+    <value>Langue des résumés et des réponses (Auto = la langue de la transcription pour les résumés, celle de la question pour les réponses)</value>
+    <comment>Language of summaries and answers (Auto = the transcript's language for summaries, the question's for answers)</comment>
+  </data>
+  <data name="Large" xml:space="preserve">
+    <value>Grande</value>
+    <comment>Large</comment>
+  </data>
+  <data name="LargestConversations" xml:space="preserve">
+    <value>Conversations les plus volumineuses</value>
+    <comment>Largest conversations</comment>
+  </data>
+  <data name="LaunchAtLogin" xml:space="preserve">
+    <value>Ouvrir à la connexion</value>
+    <comment>Launch at login</comment>
+  </data>
+  <data name="LeavesThisMac" xml:space="preserve">
+    <value>{0} (quitte ce Mac)</value>
+    <comment>%@ (leaves this Mac)</comment>
+  </data>
+  <data name="LeavesThisMac_2" xml:space="preserve">
+    <value>Quitte ce Mac</value>
+    <comment>Leaves this Mac</comment>
+  </data>
+  <data name="Library" xml:space="preserve">
+    <value>Bibliothèque</value>
+    <comment>Library</comment>
+  </data>
+  <data name="LicensedUnderAGPL30" xml:space="preserve">
+    <value>Sous licence AGPL-3.0</value>
+    <comment>Licensed under AGPL-3.0</comment>
+  </data>
+  <data name="Listening" xml:space="preserve">
+    <value>Écoute…</value>
+    <comment>Listening…</comment>
+  </data>
+  <data name="LiveTranscript" xml:space="preserve">
+    <value>Transcription en direct</value>
+    <comment>Live transcript</comment>
+  </data>
+  <data name="LiveTranscriptListening" xml:space="preserve">
+    <value>Transcription en direct : écoute…</value>
+    <comment>Live transcript: listening…</comment>
+  </data>
+  <data name="LiveTranscriptLoadingTheModel" xml:space="preserve">
+    <value>Transcription en direct : chargement du modèle…</value>
+    <comment>Live transcript: loading the model…</comment>
+  </data>
+  <data name="LiveTranscriptPaused" xml:space="preserve">
+    <value>Transcription en direct : en pause</value>
+    <comment>Live transcript: paused</comment>
+  </data>
+  <data name="LiveTranscriptStoppedTheTranscriptIsMadeAfterStop" xml:space="preserve">
+    <value>Transcription en direct arrêtée. La transcription est faite après l’arrêt.</value>
+    <comment>Live transcript stopped. The transcript is made after Stop.</comment>
+  </data>
+  <data name="LldConversationsWithoutAudioWouldBeLeftEmptyTheyAreMovedToTh" xml:space="preserve">
+    <value>{0} conversations sans audio seraient vides : elles sont placées entièrement dans la Corbeille.</value>
+    <comment>%lld conversations without audio would be left empty: they are moved to the Trash entirely.</comment>
+  </data>
+  <data name="LldConversationsWithoutAudioWouldBeLeftEmptyTheyAreMovedToTh__One" xml:space="preserve">
+    <value>{0} conversation sans audio serait vide : elle est placée entièrement dans la Corbeille.</value>
+    <comment>%lld conversations without audio would be left empty: they are moved to the Trash entirely.</comment>
+  </data>
+  <data name="LldKbps" xml:space="preserve">
+    <value>{0} kbit/s</value>
+    <comment>%lld kbps</comment>
+  </data>
+  <data name="LldLanguages" xml:space="preserve">
+    <value>{0} langues</value>
+    <comment>%lld languages</comment>
+  </data>
+  <data name="LldLanguages__One" xml:space="preserve">
+    <value>{0} langue</value>
+    <comment>%lld languages</comment>
+  </data>
+  <data name="LldMB" xml:space="preserve">
+    <value>{0} Mo</value>
+    <comment>%lld MB</comment>
+  </data>
+  <data name="LldMessages" xml:space="preserve">
+    <value>{0} · {1} messages</value>
+    <comment>%@ · %lld messages</comment>
+  </data>
+  <data name="LldMessages_2" xml:space="preserve">
+    <value>{0} messages</value>
+    <comment>%lld messages</comment>
+  </data>
+  <data name="LldMessages_2__One" xml:space="preserve">
+    <value>{0} message</value>
+    <comment>%lld messages</comment>
+  </data>
+  <data name="LldMessages__One" xml:space="preserve">
+    <value>{0} · {1} message</value>
+    <comment>%@ · %lld messages</comment>
+  </data>
+  <data name="LldMiB" xml:space="preserve">
+    <value>{0} Mio</value>
+    <comment>%lld MiB</comment>
+  </data>
+  <data name="LldMin" xml:space="preserve">
+    <value>{0} min</value>
+    <comment>%lld min</comment>
+  </data>
+  <data name="LldModels" xml:space="preserve">
+    <value>{0} - {1} modèles</value>
+    <comment>%@ - %lld models</comment>
+  </data>
+  <data name="LldModels_2" xml:space="preserve">
+    <value>{0} modèles</value>
+    <comment>%lld models</comment>
+  </data>
+  <data name="LldModels_2__One" xml:space="preserve">
+    <value>{0} modèle</value>
+    <comment>%lld models</comment>
+  </data>
+  <data name="LldModels__One" xml:space="preserve">
+    <value>{0} - {1} modèle</value>
+    <comment>%@ - %lld models</comment>
+  </data>
+  <data name="LldOfThemHaveNoTranscriptYetNothingOfItWillBeLeftToRead" xml:space="preserve">
+    <value>{0} d’entre elles n’ont pas encore de transcription : il n’en restera rien à lire.</value>
+    <comment>%lld of them have no transcript yet: nothing of it will be left to read.</comment>
+  </data>
+  <data name="LldOfThemHaveNoTranscriptYetNothingOfItWillBeLeftToRead__One" xml:space="preserve">
+    <value>{0} d’entre elles n’a pas encore de transcription : il n’en restera rien à lire.</value>
+    <comment>%lld of them have no transcript yet: nothing of it will be left to read.</comment>
+  </data>
+  <data name="LldPercent" xml:space="preserve">
+    <value>{0} pour cent</value>
+    <comment>%lld percent</comment>
+  </data>
+  <data name="LldSelected" xml:space="preserve">
+    <value>Sélection : {0}</value>
+    <comment>%lld selected</comment>
+  </data>
+  <data name="LoadModels" xml:space="preserve">
+    <value>Charger les modèles</value>
+    <comment>Load models</comment>
+  </data>
+  <data name="LocalHosts" xml:space="preserve">
+    <value>Hôtes locaux</value>
+    <comment>Local hosts</comment>
+  </data>
+  <data name="LocalLanguageAndEmbeddingModels" xml:space="preserve">
+    <value>Modèles de langage et d’embedding locaux</value>
+    <comment>Local language and embedding models</comment>
+  </data>
+  <data name="LookingFor" xml:space="preserve">
+    <value>Recherche de {0}...</value>
+    <comment>Looking for %@...</comment>
+  </data>
+  <data name="MacOSGivesSilenceNotAnErrorWhenSystemAudioRecordingIsOffIfYo" xml:space="preserve">
+    <value>macOS donne du silence, pas une erreur, quand l’Enregistrement de l’audio du système est désactivé. Si vous venez de l’autoriser, testez à nouveau. Sinon, activez EchoDiar dans Confidentialité et sécurité › Enregistrement de l’écran et de l’audio du système.</value>
+    <comment>macOS gives silence, not an error, when System Audio Recording is off. If you just allowed it, test again. Otherwise turn on EchoDiar in Privacy &amp; Security › Screen &amp; System Audio Recording.</comment>
+  </data>
+  <data name="MacOSLld" xml:space="preserve">
+    <value>macOS {0}+</value>
+    <comment>macOS %lld+</comment>
+  </data>
+  <data name="MacOSRefusedToCaptureSystemAudio" xml:space="preserve">
+    <value>macOS a refusé de capturer l’audio du système.</value>
+    <comment>macOS refused to capture system audio.</comment>
+  </data>
+  <data name="MachineLearningOnAppleSilicon" xml:space="preserve">
+    <value>Apprentissage automatique sur puce Apple</value>
+    <comment>Machine learning on Apple silicon</comment>
+  </data>
+  <data name="MakeANewSummaryTheEarlierOnesStayInTheVersionMenu" xml:space="preserve">
+    <value>Créer un nouveau résumé ; les précédents restent dans le menu des versions</value>
+    <comment>Make a new summary; the earlier ones stay in the version menu</comment>
+  </data>
+  <data name="Me" xml:space="preserve">
+    <value>Moi</value>
+    <comment>Me</comment>
+  </data>
+  <data name="Medium" xml:space="preserve">
+    <value>Moyenne</value>
+    <comment>Medium</comment>
+  </data>
+  <data name="MeetingLink" xml:space="preserve">
+    <value>Lien de la réunion</value>
+    <comment>Meeting link</comment>
+  </data>
+  <data name="MeetingPromptsShowEitherWay" xml:space="preserve">
+    <value>Les propositions d’enregistrement des réunions s’affichent dans tous les cas.</value>
+    <comment>Meeting prompts show either way.</comment>
+  </data>
+  <data name="Meetings" xml:space="preserve">
+    <value>Réunions</value>
+    <comment>Meetings</comment>
+  </data>
+  <data name="Mic" xml:space="preserve">
+    <value>Micro</value>
+    <comment>Mic</comment>
+  </data>
+  <data name="MicLevel" xml:space="preserve">
+    <value>Niveau du micro</value>
+    <comment>Mic level</comment>
+  </data>
+  <data name="Microphone" xml:space="preserve">
+    <value>Microphone</value>
+    <comment>Microphone</comment>
+  </data>
+  <data name="MicrophoneAccessHasNotBeenRequestedYet" xml:space="preserve">
+    <value>L’accès au microphone n’a pas encore été demandé.</value>
+    <comment>Microphone access has not been requested yet.</comment>
+  </data>
+  <data name="MicrophoneAccessIsBlockedOnThisMac" xml:space="preserve">
+    <value>L’accès au microphone est bloqué sur ce Mac.</value>
+    <comment>Microphone access is blocked on this Mac.</comment>
+  </data>
+  <data name="MicrophoneAccessIsOff" xml:space="preserve">
+    <value>L’accès au microphone est désactivé.</value>
+    <comment>Microphone access is off.</comment>
+  </data>
+  <data name="MicrophoneAccessIsOn" xml:space="preserve">
+    <value>L’accès au microphone est activé.</value>
+    <comment>Microphone access is on.</comment>
+  </data>
+  <data name="MicrophoneDisconnectedStopRecording" xml:space="preserve">
+    <value>Microphone déconnecté — arrêter l’enregistrement ?</value>
+    <comment>Microphone disconnected — stop recording?</comment>
+  </data>
+  <data name="MicrophoneMuted" xml:space="preserve">
+    <value>Micro coupé</value>
+    <comment>Microphone muted</comment>
+  </data>
+  <data name="Min" xml:space="preserve">
+    <value>min</value>
+    <comment>min</comment>
+  </data>
+  <data name="Minimize" xml:space="preserve">
+    <value>Placer dans le Dock</value>
+    <comment>Minimize</comment>
+  </data>
+  <data name="MinutesAfterTheEnd" xml:space="preserve">
+    <value>Minutes après la fin</value>
+    <comment>Minutes after the end</comment>
+  </data>
+  <data name="Model" xml:space="preserve">
+    <value>Modèle</value>
+    <comment>Model</comment>
+  </data>
+  <data name="ModelForSummariesAndQuestions" xml:space="preserve">
+    <value>Modèle pour les résumés et les questions</value>
+    <comment>Model for summaries and questions</comment>
+  </data>
+  <data name="ModelId" xml:space="preserve">
+    <value>Identifiant du modèle</value>
+    <comment>Model id</comment>
+  </data>
+  <data name="ModelIdEGWhisper1" xml:space="preserve">
+    <value>Identifiant du modèle, p. ex. whisper-1</value>
+    <comment>Model id, e.g. whisper-1</comment>
+  </data>
+  <data name="Models" xml:space="preserve">
+    <value>Modèles</value>
+    <comment>Models</comment>
+  </data>
+  <data name="ModelsAreDownloadedOnlyWhenYouClickDownload" xml:space="preserve">
+    <value>Les modèles ne sont téléchargés que lorsque vous cliquez sur Télécharger.</value>
+    <comment>Models are downloaded only when you click Download.</comment>
+  </data>
+  <data name="Monthly" xml:space="preserve">
+    <value>Tous les mois</value>
+    <comment>Monthly</comment>
+  </data>
+  <data name="MoveToTrash" xml:space="preserve">
+    <value>Placer dans la Corbeille</value>
+    <comment>Move to Trash</comment>
+  </data>
+  <data name="MovesTheAudioToTheTrashOnceATranscriptionSucceeds" xml:space="preserve">
+    <value>Place l’audio dans la Corbeille dès qu’une transcription réussit.</value>
+    <comment>Moves the audio to the Trash once a transcription succeeds.</comment>
+  </data>
+  <data name="Multilingual" xml:space="preserve">
+    <value>Multilingue</value>
+    <comment>Multilingual</comment>
+  </data>
+  <data name="MuteMicrophone" xml:space="preserve">
+    <value>Couper le micro</value>
+    <comment>Mute Microphone</comment>
+  </data>
+  <data name="MuteMicrophone_2" xml:space="preserve">
+    <value>Couper le micro</value>
+    <comment>Mute microphone</comment>
+  </data>
+  <data name="MyVoiceLeftOthersRight" xml:space="preserve">
+    <value>Ma voix à gauche, les autres à droite</value>
+    <comment>My voice left, others right</comment>
+  </data>
+  <data name="Name" xml:space="preserve">
+    <value>Nom</value>
+    <comment>Name</comment>
+  </data>
+  <data name="NameFor" xml:space="preserve">
+    <value>Nom pour {0}</value>
+    <comment>Name for %@</comment>
+  </data>
+  <data name="NeedsConfirmation" xml:space="preserve">
+    <value>Confirmation requise</value>
+    <comment>Needs confirmation</comment>
+  </data>
+  <data name="NeedsModel" xml:space="preserve">
+    <value>Modèle requis</value>
+    <comment>Needs model</comment>
+  </data>
+  <data name="NeedsMoreThanHalfOfThisMacSMemory" xml:space="preserve">
+    <value>Nécessite plus de la moitié de la mémoire de ce Mac.</value>
+    <comment>Needs more than half of this Mac's memory.</comment>
+  </data>
+  <data name="NeedsTheSpeakerModelDownloadItInTranscriptionDiarizationMode" xml:space="preserve">
+    <value>Nécessite le modèle d’intervenants : téléchargez-le dans Transcription › Modèle de diarisation.</value>
+    <comment>Needs the speaker model: download it in Transcription › Diarization model.</comment>
+  </data>
+  <data name="NemotronTellsUpTo8SpeakersApartAndIgnoresThisNumberAbove8Pya" xml:space="preserve">
+    <value>Nemotron distingue jusqu’à 8 intervenants et ignore ce nombre ; au-delà de 8, pyannote est utilisé s’il est installé.</value>
+    <comment>Nemotron tells up to 8 speakers apart and ignores this number; above 8, pyannote is used when installed.</comment>
+  </data>
+  <data name="Never" xml:space="preserve">
+    <value>Jamais</value>
+    <comment>Never</comment>
+  </data>
+  <data name="NewCalendarsAreWatchedToo" xml:space="preserve">
+    <value>Les nouveaux calendriers sont aussi suivis.</value>
+    <comment>New calendars are watched too.</comment>
+  </data>
+  <data name="NewChat" xml:space="preserve">
+    <value>Nouvelle discussion</value>
+    <comment>New chat</comment>
+  </data>
+  <data name="NewEvent" xml:space="preserve">
+    <value>Nouvel événement</value>
+    <comment>New Event</comment>
+  </data>
+  <data name="NewEvent_2" xml:space="preserve">
+    <value>Nouvel événement…</value>
+    <comment>New Event…</comment>
+  </data>
+  <data name="NextRunLldConversations" xml:space="preserve">
+    <value>Prochain passage : {0} conversations</value>
+    <comment>Next run: %lld conversations</comment>
+  </data>
+  <data name="NextRunLldConversations__One" xml:space="preserve">
+    <value>Prochain passage : {0} conversation</value>
+    <comment>Next run: %lld conversations</comment>
+  </data>
+  <data name="No" xml:space="preserve">
+    <value>Sans {0}</value>
+    <comment>No %@</comment>
+  </data>
+  <data name="NoAIModel" xml:space="preserve">
+    <value>Aucun modèle d’IA</value>
+    <comment>No AI model</comment>
+  </data>
+  <data name="NoAIModelSetUpAProviderOrDownloadAModelInSettingsAI" xml:space="preserve">
+    <value>Aucun modèle d’IA : configurez un fournisseur ou téléchargez un modèle dans Réglages › IA.</value>
+    <comment>No AI model: set up a provider or download a model in Settings › AI.</comment>
+  </data>
+  <data name="NoCalendarAccountCanHoldEchoDiarSCalendar" xml:space="preserve">
+    <value>Aucun compte de calendrier ne peut accueillir le calendrier d’EchoDiar.</value>
+    <comment>No calendar account can hold EchoDiar's calendar.</comment>
+  </data>
+  <data name="NoConversationsMatch" xml:space="preserve">
+    <value>Aucune conversation ne correspond à "{0}"</value>
+    <comment>No conversations match "%@"</comment>
+  </data>
+  <data name="NoConversationsYet" xml:space="preserve">
+    <value>Aucune conversation pour l’instant</value>
+    <comment>No conversations yet</comment>
+  </data>
+  <data name="NoDiarizationModelsListedTypeTheModelId" xml:space="preserve">
+    <value>Aucun modèle de diarisation listé ; saisissez l’identifiant du modèle.</value>
+    <comment>No diarization models listed; type the model id.</comment>
+  </data>
+  <data name="NoEarlierChats" xml:space="preserve">
+    <value>Aucune discussion précédente</value>
+    <comment>No earlier chats</comment>
+  </data>
+  <data name="NoEmbeddingModelsListedTypeTheModelId" xml:space="preserve">
+    <value>Aucun modèle d’embedding listé ; saisissez l’identifiant du modèle.</value>
+    <comment>No embedding models listed; type the model id.</comment>
+  </data>
+  <data name="NoModelChooseOneInSettings" xml:space="preserve">
+    <value>Aucun modèle : choisissez-en un dans Réglages</value>
+    <comment>No model: choose one in Settings</comment>
+  </data>
+  <data name="NoModelsListedTypeTheModelId" xml:space="preserve">
+    <value>Aucun modèle listé ; saisissez l’identifiant du modèle.</value>
+    <comment>No models listed; type the model id.</comment>
+  </data>
+  <data name="NoSettingsMatch" xml:space="preserve">
+    <value>Aucun réglage ne correspond à "{0}"</value>
+    <comment>No settings match "%@"</comment>
+  </data>
+  <data name="NoSoundForLldMinStopRecording" xml:space="preserve">
+    <value>Aucun son depuis {0} min — arrêter l’enregistrement ?</value>
+    <comment>No sound for %lld min — stop recording?</comment>
+  </data>
+  <data name="NoSpeechWasFoundInThisRecording" xml:space="preserve">
+    <value>Aucune parole n’a été trouvée dans cet enregistrement.</value>
+    <comment>No speech was found in this recording.</comment>
+  </data>
+  <data name="NoSummaryYet" xml:space="preserve">
+    <value>Pas encore de résumé.</value>
+    <comment>No summary yet.</comment>
+  </data>
+  <data name="NoSystemAudio" xml:space="preserve">
+    <value>Pas d’audio du système</value>
+    <comment>No system audio</comment>
+  </data>
+  <data name="NoTranscriptYet" xml:space="preserve">
+    <value>Pas encore de transcription.</value>
+    <comment>No transcript yet.</comment>
+  </data>
+  <data name="NoTranscriptionModelsListedTypeTheModelId" xml:space="preserve">
+    <value>Aucun modèle de transcription listé ; saisissez l’identifiant du modèle.</value>
+    <comment>No transcription models listed; type the model id.</comment>
+  </data>
+  <data name="NoUpcomingMeetingsInTheNext7Days" xml:space="preserve">
+    <value>Aucune réunion prévue dans les 7 prochains jours.</value>
+    <comment>No upcoming meetings in the next 7 days.</comment>
+  </data>
+  <data name="None" xml:space="preserve">
+    <value>Aucune</value>
+    <comment>None</comment>
+  </data>
+  <data name="NoneFound" xml:space="preserve">
+    <value>Aucun trouvé</value>
+    <comment>None found</comment>
+  </data>
+  <data name="NotARecognizedMeetingLinkJoinWonTBeOffered" xml:space="preserve">
+    <value>Lien de réunion non reconnu : Rejoindre ne sera pas proposé.</value>
+    <comment>Not a recognized meeting link: Join won't be offered.</comment>
+  </data>
+  <data name="NotAvailableOnThisMac" xml:space="preserve">
+    <value>Non disponible sur ce Mac</value>
+    <comment>Not available on this Mac</comment>
+  </data>
+  <data name="NotInstalled" xml:space="preserve">
+    <value>Non installé</value>
+    <comment>Not installed</comment>
+  </data>
+  <data name="NotNow" xml:space="preserve">
+    <value>Plus tard</value>
+    <comment>Not Now</comment>
+  </data>
+  <data name="NotNow_2" xml:space="preserve">
+    <value>Plus tard</value>
+    <comment>Not now</comment>
+  </data>
+  <data name="NothingIsSentToUntilYouConfirm" xml:space="preserve">
+    <value>Rien n’est envoyé à {0} tant que vous n’avez pas confirmé.</value>
+    <comment>Nothing is sent to %@ until you confirm.</comment>
+  </data>
+  <data name="NothingMatchesNow" xml:space="preserve">
+    <value>Rien ne correspond pour l’instant.</value>
+    <comment>Nothing matches now.</comment>
+  </data>
+  <data name="NothingToDownloadRougherRankingThanTheModelsAbove" xml:space="preserve">
+    <value>Rien à télécharger. Classement plus approximatif que les modèles ci-dessus.</value>
+    <comment>Nothing to download. Rougher ranking than the models above.</comment>
+  </data>
+  <data name="NumberOfOtherSpeakers" xml:space="preserve">
+    <value>Nombre d’autres intervenants</value>
+    <comment>Number of other speakers</comment>
+  </data>
+  <data name="OK" xml:space="preserve">
+    <value>OK</value>
+    <comment>OK</comment>
+  </data>
+  <data name="Off" xml:space="preserve">
+    <value>Désactivé</value>
+    <comment>Off</comment>
+  </data>
+  <data name="OffersToRecordWhenAMeetingAppStartsUsingTheMicrophone" xml:space="preserve">
+    <value>Propose d’enregistrer quand une app de réunion commence à utiliser le microphone.</value>
+    <comment>Offers to record when a meeting app starts using the microphone.</comment>
+  </data>
+  <data name="OlderThan" xml:space="preserve">
+    <value>Plus anciennes que</value>
+    <comment>Older than</comment>
+  </data>
+  <data name="OnDate" xml:space="preserve">
+    <value>À une date</value>
+    <comment>On date</comment>
+  </data>
+  <data name="OnThisMac" xml:space="preserve">
+    <value>Sur ce Mac</value>
+    <comment>On this Mac</comment>
+  </data>
+  <data name="OnceADayMovesTranscribedConversationsOlderThanTheAgeBelowToT" xml:space="preserve">
+    <value>Une fois par jour, place dans la Corbeille les conversations transcrites plus anciennes que la durée ci-dessous.</value>
+    <comment>Once a day, moves transcribed conversations older than the age below to the Trash.</comment>
+  </data>
+  <data name="OnlyEventsInTheEchoDiarCalendarCanBeChanged" xml:space="preserve">
+    <value>Seuls les événements du calendrier EchoDiar peuvent être modifiés.</value>
+    <comment>Only events in the EchoDiar calendar can be changed.</comment>
+  </data>
+  <data name="OnlyEventsWithAMeetingLink" xml:space="preserve">
+    <value>Uniquement les événements avec un lien de réunion</value>
+    <comment>Only events with a meeting link</comment>
+  </data>
+  <data name="OnlyEventsWithAMeetingLinkOrInTheEchoDiarCalendarAreShown" xml:space="preserve">
+    <value>Seuls les événements avec un lien de réunion, ou du calendrier EchoDiar, sont affichés.</value>
+    <comment>Only events with a meeting link, or in the EchoDiar calendar, are shown.</comment>
+  </data>
+  <data name="OnlyTheSystemChannelIsUploadedAsOneExtraTranscriptionBilledB" xml:space="preserve">
+    <value>Seul le canal système est envoyé, comme une transcription supplémentaire facturée par le fournisseur ; seuls les libellés d’intervenants sont conservés. Non utilisé quand le modèle de transcription attribue déjà les intervenants. Les prix sont des prix catalogue approximatifs par heure d’audio.</value>
+    <comment>Only the system channel is uploaded, as one extra transcription billed by the provider; only the speaker labels are kept. Not used when the transcription model already labels speakers. Prices are approximate list prices per audio hour.</comment>
+  </data>
+  <data name="Open" xml:space="preserve">
+    <value>Ouvrir</value>
+    <comment>Open</comment>
+  </data>
+  <data name="OpenAIGroqMistralGoogleGeminiAndCustomEndpointsTranscribeToo" xml:space="preserve">
+    <value>OpenAI, Groq, Mistral, Google Gemini et les points de terminaison personnalisés transcrivent aussi, avec leur modèle de transcription : configurez-les dans Réglages › IA.</value>
+    <comment>OpenAI, Groq, Mistral, Google Gemini and custom endpoints transcribe too, with their transcription model: set them up in Settings › AI.</comment>
+  </data>
+  <data name="OpenEchoDiar" xml:space="preserve">
+    <value>Ouvrir EchoDiar</value>
+    <comment>Open EchoDiar</comment>
+  </data>
+  <data name="OpenGeneral" xml:space="preserve">
+    <value>Ouvrir Général</value>
+    <comment>Open General</comment>
+  </data>
+  <data name="OpenInFinder" xml:space="preserve">
+    <value>Ouvrir dans le Finder</value>
+    <comment>Open in Finder</comment>
+  </data>
+  <data name="OpenMicrophoneSettings" xml:space="preserve">
+    <value>Ouvrir les réglages du microphone</value>
+    <comment>Open Microphone Settings</comment>
+  </data>
+  <data name="OpenPrivacySettings" xml:space="preserve">
+    <value>Ouvrir les réglages de confidentialité</value>
+    <comment>Open Privacy Settings</comment>
+  </data>
+  <data name="OpenSettings" xml:space="preserve">
+    <value>Ouvrir les réglages</value>
+    <comment>Open Settings</comment>
+  </data>
+  <data name="OpenSourceSoftware" xml:space="preserve">
+    <value>Logiciels open source</value>
+    <comment>Open-source software</comment>
+  </data>
+  <data name="OpenTheChatOfTheOpenConversation" xml:space="preserve">
+    <value>Ouvrir la discussion de la conversation ouverte</value>
+    <comment>Open the chat of the open conversation</comment>
+  </data>
+  <data name="OpenTheMeetingLink" xml:space="preserve">
+    <value>Ouvrir le lien de la réunion</value>
+    <comment>Open the meeting link</comment>
+  </data>
+  <data name="OpenThisConversation" xml:space="preserve">
+    <value>Ouvrir cette conversation</value>
+    <comment>Open this conversation</comment>
+  </data>
+  <data name="OpenThisLink" xml:space="preserve">
+    <value>Ouvrir ce lien ?</value>
+    <comment>Open this link?</comment>
+  </data>
+  <data name="Open_2" xml:space="preserve">
+    <value>Ouvrir {0} ?</value>
+    <comment>Open %@?</comment>
+  </data>
+  <data name="Others" xml:space="preserve">
+    <value>Autres</value>
+    <comment>Others</comment>
+  </data>
+  <data name="OutputApprox" xml:space="preserve">
+    <value>{0} + sortie (env.)</value>
+    <comment>%@ + output (approx.)</comment>
+  </data>
+  <data name="ParakeetTranscriptionAndSpeakerDiarization" xml:space="preserve">
+    <value>Transcription Parakeet et diarisation des intervenants</value>
+    <comment>Parakeet transcription and speaker diarization</comment>
+  </data>
+  <data name="Paste" xml:space="preserve">
+    <value>Coller</value>
+    <comment>Paste</comment>
+  </data>
+  <data name="PasteTheKeyThenSave" xml:space="preserve">
+    <value>Collez la clé, puis cliquez sur Enregistrer</value>
+    <comment>Paste the key, then Save</comment>
+  </data>
+  <data name="PathOverride" xml:space="preserve">
+    <value>Chemin personnalisé</value>
+    <comment>Path override</comment>
+  </data>
+  <data name="Pause" xml:space="preserve">
+    <value>Pause</value>
+    <comment>Pause</comment>
+  </data>
+  <data name="PauseRecording" xml:space="preserve">
+    <value>Mettre l’enregistrement en pause</value>
+    <comment>Pause Recording</comment>
+  </data>
+  <data name="PauseRecordingP" xml:space="preserve">
+    <value>Mettre l’enregistrement en pause (⇧⌘P)</value>
+    <comment>Pause recording (⇧⌘P)</comment>
+  </data>
+  <data name="PauseRecording_2" xml:space="preserve">
+    <value>Mettre l’enregistrement en pause</value>
+    <comment>Pause recording</comment>
+  </data>
+  <data name="PauseResume" xml:space="preserve">
+    <value>Pause / Reprendre</value>
+    <comment>Pause / Resume</comment>
+  </data>
+  <data name="PauseSpace" xml:space="preserve">
+    <value>Pause (Espace)</value>
+    <comment>Pause (Space)</comment>
+  </data>
+  <data name="Paused" xml:space="preserve">
+    <value>En pause</value>
+    <comment>Paused</comment>
+  </data>
+  <data name="PausedWhileRecordingOrTranscribing" xml:space="preserve">
+    <value>En pause pendant l’enregistrement ou la transcription</value>
+    <comment>Paused while recording or transcribing</comment>
+  </data>
+  <data name="PausedWhileTheMacIsHotOrInLowPowerModeTheRestIsTranscribedAf" xml:space="preserve">
+    <value>En pause tant que le Mac est chaud ou en mode Économie d’énergie. Le reste est transcrit après l’arrêt.</value>
+    <comment>Paused while the Mac is hot or in Low Power Mode. The rest is transcribed after Stop.</comment>
+  </data>
+  <data name="Paused_2" xml:space="preserve">
+    <value>En pause — {0}</value>
+    <comment>Paused — %@</comment>
+  </data>
+  <data name="PausesOrResumesTheRecordingFromAnyApp" xml:space="preserve">
+    <value>Met en pause ou reprend l’enregistrement depuis n’importe quelle app.</value>
+    <comment>Pauses or resumes the recording from any app.</comment>
+  </data>
+  <data name="PermissionsAndConsent" xml:space="preserve">
+    <value>Autorisations et consentement</value>
+    <comment>Permissions and consent</comment>
+  </data>
+  <data name="PickAConversationInTheSidebar" xml:space="preserve">
+    <value>Choisissez une conversation dans la barre latérale.</value>
+    <comment>Pick a conversation in the sidebar.</comment>
+  </data>
+  <data name="PickAnEmbeddingModelInSettingsRAG" xml:space="preserve">
+    <value>Choisissez un modèle d’embedding dans Réglages › RAG</value>
+    <comment>Pick an embedding model in Settings › RAG</comment>
+  </data>
+  <data name="PickAnEnabledProviderInSettingsRAG" xml:space="preserve">
+    <value>Choisissez un fournisseur activé dans Réglages › RAG</value>
+    <comment>Pick an enabled provider in Settings › RAG</comment>
+  </data>
+  <data name="PickedByAssemblyAIForTheLanguageUniversal" xml:space="preserve">
+    <value>Choisi par AssemblyAI selon la langue (Universal)</value>
+    <comment>Picked by AssemblyAI for the language (Universal)</comment>
+  </data>
+  <data name="PickedByAssemblyAIUniversalSpeakerLabels" xml:space="preserve">
+    <value>Choisi par AssemblyAI (Universal, libellés d’intervenants)</value>
+    <comment>Picked by AssemblyAI (Universal, speaker labels)</comment>
+  </data>
+  <data name="Play" xml:space="preserve">
+    <value>Lire</value>
+    <comment>Play</comment>
+  </data>
+  <data name="PlayFromHere" xml:space="preserve">
+    <value>Lire à partir d’ici</value>
+    <comment>Play from here</comment>
+  </data>
+  <data name="PlayPauseTheTranscriptAudio" xml:space="preserve">
+    <value>Lire / mettre en pause l’audio de la transcription</value>
+    <comment>Play / Pause the transcript audio</comment>
+  </data>
+  <data name="PlaySpace" xml:space="preserve">
+    <value>Lire (Espace)</value>
+    <comment>Play (Space)</comment>
+  </data>
+  <data name="Playback" xml:space="preserve">
+    <value>Lecture</value>
+    <comment>Playback</comment>
+  </data>
+  <data name="PlaybackAndReTranscribingAreNoLongerPossibleTheTranscriptSum" xml:space="preserve">
+    <value>La lecture et la retranscription ne sont plus possibles. La transcription, le résumé et la discussion restent.</value>
+    <comment>Playback and re-transcribing are no longer possible. The transcript, summary and chat stay.</comment>
+  </data>
+  <data name="PlaybackPosition" xml:space="preserve">
+    <value>Position de lecture</value>
+    <comment>Playback position</comment>
+  </data>
+  <data name="PreparingAudio" xml:space="preserve">
+    <value>Préparation de l’audio…</value>
+    <comment>Preparing audio…</comment>
+  </data>
+  <data name="PressAShortcut" xml:space="preserve">
+    <value>Appuyez sur un raccourci…</value>
+    <comment>Press a shortcut…</comment>
+  </data>
+  <data name="PressEscToCancel" xml:space="preserve">
+    <value>Appuyez sur Esc pour annuler</value>
+    <comment>Press Esc to cancel</comment>
+  </data>
+  <data name="PressRToStartRecording" xml:space="preserve">
+    <value>Appuyez sur ⌘R pour lancer l’enregistrement.</value>
+    <comment>Press ⌘R to start recording.</comment>
+  </data>
+  <data name="PressToStartRecordingFromAnywhere" xml:space="preserve">
+    <value>Appuyez sur {0} pour lancer l’enregistrement depuis n’importe où.</value>
+    <comment>Press %@ to start recording from anywhere.</comment>
+  </data>
+  <data name="PricesAreApproximateListPricesPerAudioHourTheMicAndSystemCha" xml:space="preserve">
+    <value>Les prix sont des prix catalogue approximatifs par heure d’audio ; les canaux micro et système sont envoyés et facturés séparément.</value>
+    <comment>Prices are approximate list prices per audio hour; the mic and system channels are sent and billed separately.</comment>
+  </data>
+  <data name="ProviderModel" xml:space="preserve">
+    <value>fournisseur/modèle</value>
+    <comment>provider/model</comment>
+  </data>
+  <data name="Quality" xml:space="preserve">
+    <value>Qualité</value>
+    <comment>Quality</comment>
+  </data>
+  <data name="QualityIn" xml:space="preserve">
+    <value>Qualité en {0}</value>
+    <comment>Quality in %@</comment>
+  </data>
+  <data name="Queued" xml:space="preserve">
+    <value>En file d’attente</value>
+    <comment>Queued</comment>
+  </data>
+  <data name="Quit" xml:space="preserve">
+    <value>Quitter</value>
+    <comment>Quit</comment>
+  </data>
+  <data name="QuitEchoDiar" xml:space="preserve">
+    <value>Quitter EchoDiar</value>
+    <comment>Quit EchoDiar</comment>
+  </data>
+  <data name="QuitStopRecording" xml:space="preserve">
+    <value>{0} s’est fermé — arrêter l’enregistrement ?</value>
+    <comment>%@ quit — stop recording?</comment>
+  </data>
+  <data name="Qwen3Transcription" xml:space="preserve">
+    <value>Transcription Qwen3</value>
+    <comment>Qwen3 transcription</comment>
+  </data>
+  <data name="RAG" xml:space="preserve">
+    <value>RAG</value>
+    <comment>RAG</comment>
+  </data>
+  <data name="RAM" xml:space="preserve">
+    <value>{0} de RAM</value>
+    <comment>%@ RAM</comment>
+  </data>
+  <data name="ReSummarize" xml:space="preserve">
+    <value>Résumer à nouveau</value>
+    <comment>Re-summarize</comment>
+  </data>
+  <data name="ReTranscribe" xml:space="preserve">
+    <value>Retranscrire</value>
+    <comment>Re-transcribe</comment>
+  </data>
+  <data name="ReTranscribeWithAnotherModelOrLanguage" xml:space="preserve">
+    <value>Retranscrire avec un autre modèle ou une autre langue</value>
+    <comment>Re-transcribe with another model or language</comment>
+  </data>
+  <data name="Rebuild" xml:space="preserve">
+    <value>Reconstruire</value>
+    <comment>Rebuild</comment>
+  </data>
+  <data name="RebuildIndex" xml:space="preserve">
+    <value>Reconstruire l’index</value>
+    <comment>Rebuild index</comment>
+  </data>
+  <data name="Record" xml:space="preserve">
+    <value>Enregistrer</value>
+    <comment>Record</comment>
+  </data>
+  <data name="RecordAllSystemAudioFrom15MinBeforeTheStart" xml:space="preserve">
+    <value>Enregistrer tout l’audio du système, dès 15 min avant le début</value>
+    <comment>Record all system audio, from 15 min before the start</comment>
+  </data>
+  <data name="RecordAtStart" xml:space="preserve">
+    <value>Enregistrer au début</value>
+    <comment>Record at start</comment>
+  </data>
+  <data name="RecordR" xml:space="preserve">
+    <value>Enregistrer {0} (⌘R)</value>
+    <comment>Record %@ (⌘R)</comment>
+  </data>
+  <data name="RecordStop" xml:space="preserve">
+    <value>Enregistrer / Arrêter</value>
+    <comment>Record / Stop</comment>
+  </data>
+  <data name="RecordYourFirstConversation" xml:space="preserve">
+    <value>Enregistrez votre première conversation</value>
+    <comment>Record your first conversation</comment>
+  </data>
+  <data name="Recording" xml:space="preserve">
+    <value>Enregistrement</value>
+    <comment>Recording</comment>
+  </data>
+  <data name="RecordingContinuesWithTheDefaultInputUntilThen" xml:space="preserve">
+    <value>L’enregistrement continue avec l’entrée par défaut jusque-là.</value>
+    <comment>Recording continues with the default input until then.</comment>
+  </data>
+  <data name="RecordingInProgress" xml:space="preserve">
+    <value>Enregistrement en cours.</value>
+    <comment>Recording in progress.</comment>
+  </data>
+  <data name="RecordingLawsDifferFromPlaceToPlaceManyRequireEveryoneOnTheC" xml:space="preserve">
+    <value>Les lois sur l’enregistrement varient d’un endroit à l’autre. Beaucoup exigent l’accord de toutes les personnes présentes à l’appel.</value>
+    <comment>Recording laws differ from place to place. Many require everyone on the call to agree.</comment>
+  </data>
+  <data name="RecordingOptions" xml:space="preserve">
+    <value>Options d’enregistrement</value>
+    <comment>Recording options</comment>
+  </data>
+  <data name="RecordingProblem" xml:space="preserve">
+    <value>Problème d’enregistrement</value>
+    <comment>Recording problem</comment>
+  </data>
+  <data name="RecordingStoppedAudioCaptureFailed" xml:space="preserve">
+    <value>Enregistrement arrêté : échec de la capture audio.</value>
+    <comment>Recording stopped: audio capture failed.</comment>
+  </data>
+  <data name="RecordingStoppedCouldNotWriteAudio" xml:space="preserve">
+    <value>Enregistrement arrêté : impossible d’écrire l’audio.</value>
+    <comment>Recording stopped: could not write audio.</comment>
+  </data>
+  <data name="RecordingStoppedDiskIsFull" xml:space="preserve">
+    <value>Enregistrement arrêté : le disque est plein.</value>
+    <comment>Recording stopped: disk is full.</comment>
+  </data>
+  <data name="RecordingStopsAtOnce" xml:space="preserve">
+    <value>L’enregistrement s’arrête immédiatement.</value>
+    <comment>Recording stops at once.</comment>
+  </data>
+  <data name="RecordingSwitchesToTheDefaultInput" xml:space="preserve">
+    <value>L’enregistrement passe à l’entrée par défaut.</value>
+    <comment>Recording switches to the default input.</comment>
+  </data>
+  <data name="Recording_2" xml:space="preserve">
+    <value>Enregistrement de {0}</value>
+    <comment>Recording %@</comment>
+  </data>
+  <data name="Recording_3" xml:space="preserve">
+    <value>Enregistrement — {0}</value>
+    <comment>Recording — %@</comment>
+  </data>
+  <data name="Recording_4" xml:space="preserve">
+    <value>Enregistrement…</value>
+    <comment>Recording…</comment>
+  </data>
+  <data name="Recordings" xml:space="preserve">
+    <value>Enregistrements</value>
+    <comment>Recordings</comment>
+  </data>
+  <data name="RecordsAllSystemAudio" xml:space="preserve">
+    <value>{0} (enregistre tout l’audio du système)</value>
+    <comment>%@ (records all system audio)</comment>
+  </data>
+  <data name="Recovered" xml:space="preserve">
+    <value>Récupéré</value>
+    <comment>Recovered</comment>
+  </data>
+  <data name="RelaunchNow" xml:space="preserve">
+    <value>Relancer maintenant</value>
+    <comment>Relaunch now</comment>
+  </data>
+  <data name="RememberLastRecordLanguage" xml:space="preserve">
+    <value>Mémoriser la dernière langue d’enregistrement</value>
+    <comment>Remember last record language</comment>
+  </data>
+  <data name="Remove" xml:space="preserve">
+    <value>Retirer</value>
+    <comment>Remove</comment>
+  </data>
+  <data name="RemoveLanguageAssets" xml:space="preserve">
+    <value>Supprimer les ressources linguistiques</value>
+    <comment>Remove language assets</comment>
+  </data>
+  <data name="RemoveThisChat" xml:space="preserve">
+    <value>Supprimer cette discussion</value>
+    <comment>Remove this chat</comment>
+  </data>
+  <data name="Rename" xml:space="preserve">
+    <value>Renommer</value>
+    <comment>Rename</comment>
+  </data>
+  <data name="RenameThisSpeaker" xml:space="preserve">
+    <value>Renommer cet intervenant</value>
+    <comment>Rename this speaker</comment>
+  </data>
+  <data name="Repeat" xml:space="preserve">
+    <value>Récurrence</value>
+    <comment>Repeat</comment>
+  </data>
+  <data name="RequiredYourResourceSHttpsResourceOpenaiAzureComOpenaiV1URL" xml:space="preserve">
+    <value>Requis : l’URL https://&lt;resource&gt;.openai.azure.com/openai/v1 de votre ressource.</value>
+    <comment>Required: your resource's https://&lt;resource&gt;.openai.azure.com/openai/v1 URL.</comment>
+  </data>
+  <data name="ReservedByEchoDiar" xml:space="preserve">
+    <value>Réservé par EchoDiar : {0}</value>
+    <comment>Reserved by EchoDiar: %@</comment>
+  </data>
+  <data name="ReservedByEchoDiarNone" xml:space="preserve">
+    <value>Réservé par EchoDiar : aucun</value>
+    <comment>Reserved by EchoDiar: none</comment>
+  </data>
+  <data name="Reset" xml:space="preserve">
+    <value>Réinitialiser</value>
+    <comment>Reset</comment>
+  </data>
+  <data name="RestartEchoDiarToApply" xml:space="preserve">
+    <value>Redémarrez EchoDiar pour appliquer.</value>
+    <comment>Restart EchoDiar to apply.</comment>
+  </data>
+  <data name="Resume" xml:space="preserve">
+    <value>Reprendre</value>
+    <comment>Resume</comment>
+  </data>
+  <data name="ResumeRecording" xml:space="preserve">
+    <value>Reprendre l’enregistrement</value>
+    <comment>Resume Recording</comment>
+  </data>
+  <data name="ResumeRecordingP" xml:space="preserve">
+    <value>Reprendre l’enregistrement (⇧⌘P)</value>
+    <comment>Resume recording (⇧⌘P)</comment>
+  </data>
+  <data name="ResumeRecording_2" xml:space="preserve">
+    <value>Reprendre l’enregistrement</value>
+    <comment>Resume recording</comment>
+  </data>
+  <data name="Retry" xml:space="preserve">
+    <value>Réessayer</value>
+    <comment>Retry</comment>
+  </data>
+  <data name="RetryWithAnotherEngine" xml:space="preserve">
+    <value>Réessayer avec un autre moteur</value>
+    <comment>Retry with another engine</comment>
+  </data>
+  <data name="RevealInFinder" xml:space="preserve">
+    <value>Afficher dans le Finder</value>
+    <comment>Reveal in Finder</comment>
+  </data>
+  <data name="S__3" xml:space="preserve">
+    <value>{0} : {1}</value>
+    <comment>%@: %@</comment>
+  </data>
+  <data name="Save" xml:space="preserve">
+    <value>Enregistrer</value>
+    <comment>Save</comment>
+  </data>
+  <data name="SaveAKeyFirst" xml:space="preserve">
+    <value>Enregistrez d’abord une clé.</value>
+    <comment>Save a key first.</comment>
+  </data>
+  <data name="SaveAKeyForInSettingsAI" xml:space="preserve">
+    <value>Enregistrez une clé pour {0} dans Réglages › IA</value>
+    <comment>Save a key for %@ in Settings › AI</comment>
+  </data>
+  <data name="SaveChangesToARepeatingEvent" xml:space="preserve">
+    <value>Enregistrer les modifications d’un événement récurrent ?</value>
+    <comment>Save changes to a repeating event?</comment>
+  </data>
+  <data name="Saved" xml:space="preserve">
+    <value>Enregistrée</value>
+    <comment>Saved</comment>
+  </data>
+  <data name="Scan" xml:space="preserve">
+    <value>Détecter</value>
+    <comment>Scan</comment>
+  </data>
+  <data name="ScreenLockedStopRecording" xml:space="preserve">
+    <value>Écran verrouillé — arrêter l’enregistrement ?</value>
+    <comment>Screen locked — stop recording?</comment>
+  </data>
+  <data name="ScreenSharingInMeetingAppsShowsItToo" xml:space="preserve">
+    <value>Le partage d’écran des apps de réunion l’affiche aussi.</value>
+    <comment>Screen sharing in meeting apps shows it too.</comment>
+  </data>
+  <data name="Search" xml:space="preserve">
+    <value>Rechercher</value>
+    <comment>Search</comment>
+  </data>
+  <data name="SearchConversations" xml:space="preserve">
+    <value>Rechercher dans les conversations</value>
+    <comment>Search conversations</comment>
+  </data>
+  <data name="SearchConversationsF" xml:space="preserve">
+    <value>Rechercher dans les conversations (⌘F)</value>
+    <comment>Search conversations (⌘F)</comment>
+  </data>
+  <data name="SearchConversationsOrSettings" xml:space="preserve">
+    <value>Rechercher dans les conversations ou les réglages</value>
+    <comment>Search conversations or settings</comment>
+  </data>
+  <data name="SearchPATH" xml:space="preserve">
+    <value>Rechercher dans le PATH</value>
+    <comment>Search PATH</comment>
+  </data>
+  <data name="SearchSettings" xml:space="preserve">
+    <value>Rechercher dans les réglages</value>
+    <comment>Search settings</comment>
+  </data>
+  <data name="SearchSettingsF" xml:space="preserve">
+    <value>Rechercher dans les réglages (⌘F)</value>
+    <comment>Search settings (⌘F)</comment>
+  </data>
+  <data name="SearchingYourConversations" xml:space="preserve">
+    <value>Recherche dans vos conversations…</value>
+    <comment>Searching your conversations…</comment>
+  </data>
+  <data name="SelectAll" xml:space="preserve">
+    <value>Tout sélectionner</value>
+    <comment>Select All</comment>
+  </data>
+  <data name="Send" xml:space="preserve">
+    <value>Envoyer</value>
+    <comment>Send</comment>
+  </data>
+  <data name="SendAudioTo" xml:space="preserve">
+    <value>Envoyer l’audio à {0} ?</value>
+    <comment>Send audio to %@?</comment>
+  </data>
+  <data name="SendTranscriptsTo" xml:space="preserve">
+    <value>Envoyer les transcriptions à {0} ?</value>
+    <comment>Send transcripts to %@?</comment>
+  </data>
+  <data name="SetDefault" xml:space="preserve">
+    <value>Définir par défaut</value>
+    <comment>Set default</comment>
+  </data>
+  <data name="SetUp" xml:space="preserve">
+    <value>Configurer…</value>
+    <comment>Set Up…</comment>
+  </data>
+  <data name="Settings" xml:space="preserve">
+    <value>Réglages</value>
+    <comment>Settings</comment>
+  </data>
+  <data name="Settings_2" xml:space="preserve">
+    <value>Réglages…</value>
+    <comment>Settings…</comment>
+  </data>
+  <data name="Shortcut" xml:space="preserve">
+    <value>Raccourci</value>
+    <comment>Shortcut</comment>
+  </data>
+  <data name="Shortcuts" xml:space="preserve">
+    <value>Raccourcis</value>
+    <comment>Shortcuts</comment>
+  </data>
+  <data name="ShowFloatingIndicatorWhileRecording" xml:space="preserve">
+    <value>Afficher l’indicateur flottant pendant l’enregistrement</value>
+    <comment>Show floating indicator while recording</comment>
+  </data>
+  <data name="ShowItInScreenshotsAndScreenRecordings" xml:space="preserve">
+    <value>L’afficher dans les captures et les enregistrements d’écran</value>
+    <comment>Show it in screenshots and screen recordings</comment>
+  </data>
+  <data name="ShowOnboardingAgain" xml:space="preserve">
+    <value>Afficher à nouveau la prise en main</value>
+    <comment>Show onboarding again</comment>
+  </data>
+  <data name="ShowTheOtherSpeakers" xml:space="preserve">
+    <value>Afficher les autres intervenants</value>
+    <comment>Show the other speakers</comment>
+  </data>
+  <data name="ShowTheRecording" xml:space="preserve">
+    <value>Afficher l’enregistrement</value>
+    <comment>Show the recording</comment>
+  </data>
+  <data name="ShowTheRecordingsList" xml:space="preserve">
+    <value>Afficher la liste des enregistrements</value>
+    <comment>Show the recordings list</comment>
+  </data>
+  <data name="ShowingMeetingsInTheNext7DaysTheListUpdatesAutomatically" xml:space="preserve">
+    <value>Réunions des 7 prochains jours. La liste se met à jour automatiquement.</value>
+    <comment>Showing meetings in the next 7 days. The list updates automatically.</comment>
+  </data>
+  <data name="ShowsTheTranscriptDuringTheRecordingAndKeepsItSoItIsReadyWit" xml:space="preserve">
+    <value>Affiche la transcription pendant l’enregistrement et la conserve, pour qu’elle soit prête quelques secondes après l’arrêt. Utilise plus de processeur et de mémoire pendant l’enregistrement. Modèles WhisperKit et Parakeet uniquement ; les autres moteurs transcrivent après l’arrêt.</value>
+    <comment>Shows the transcript during the recording and keeps it, so it is ready within seconds of Stop. Uses more CPU and memory while recording. WhisperKit and Parakeet models only; other engines transcribe after Stop.</comment>
+  </data>
+  <data name="Skip" xml:space="preserve">
+    <value>Ignorer</value>
+    <comment>Skip</comment>
+  </data>
+  <data name="SkipThisMeetingNoPromptAndNoRecording" xml:space="preserve">
+    <value>Ignorer cette réunion : ni proposition ni enregistrement</value>
+    <comment>Skip this meeting: no prompt and no recording</comment>
+  </data>
+  <data name="Small" xml:space="preserve">
+    <value>Petite</value>
+    <comment>Small</comment>
+  </data>
+  <data name="SonnetOpusOrHaikuEmptyDefault" xml:space="preserve">
+    <value>sonnet, opus ou haiku (vide = par défaut)</value>
+    <comment>sonnet, opus or haiku (empty = default)</comment>
+  </data>
+  <data name="Sources" xml:space="preserve">
+    <value>Sources</value>
+    <comment>Sources</comment>
+  </data>
+  <data name="Space" xml:space="preserve">
+    <value>Espace</value>
+    <comment>Space</comment>
+  </data>
+  <data name="SpeakerLld" xml:space="preserve">
+    <value>Intervenant {0}</value>
+    <comment>Speaker %lld</comment>
+  </data>
+  <data name="Speakers" xml:space="preserve">
+    <value>Intervenants</value>
+    <comment>Speakers</comment>
+  </data>
+  <data name="SpeakersWereNotToldApartTheSpeakerModelIsInstalledNowReTrans" xml:space="preserve">
+    <value>Les intervenants n’ont pas été distingués. Le modèle d’intervenants est maintenant installé : retranscrivez.</value>
+    <comment>Speakers were not told apart. The speaker model is installed now: re-transcribe.</comment>
+  </data>
+  <data name="SpeakersWereNotToldApartTheSpeakerModelIsNotInstalledTranscr" xml:space="preserve">
+    <value>Les intervenants n’ont pas été distingués : le modèle d’intervenants n’est pas installé (Transcription › Modèle de diarisation).</value>
+    <comment>Speakers were not told apart: the speaker model is not installed (Transcription › Diarization model).</comment>
+  </data>
+  <data name="SpeechDetectionForWhisperTranscription" xml:space="preserve">
+    <value>Détection de la parole pour la transcription Whisper</value>
+    <comment>Speech detection for Whisper transcription</comment>
+  </data>
+  <data name="SpeechToTextAPIs" xml:space="preserve">
+    <value>API de reconnaissance vocale</value>
+    <comment>Speech-to-text APIs</comment>
+  </data>
+  <data name="Start" xml:space="preserve">
+    <value>Début</value>
+    <comment>Start</comment>
+  </data>
+  <data name="StartAFreshChat" xml:space="preserve">
+    <value>Commencer une nouvelle discussion</value>
+    <comment>Start a fresh chat</comment>
+  </data>
+  <data name="StartRecording" xml:space="preserve">
+    <value>Démarrer l’enregistrement</value>
+    <comment>Start Recording</comment>
+  </data>
+  <data name="Starting" xml:space="preserve">
+    <value>Démarrage…</value>
+    <comment>Starting…</comment>
+  </data>
+  <data name="StartsOrStopsRecordingFromAnyApp" xml:space="preserve">
+    <value>Démarre ou arrête l’enregistrement depuis n’importe quelle app.</value>
+    <comment>Starts or stops recording from any app.</comment>
+  </data>
+  <data name="StepLldOfLld" xml:space="preserve">
+    <value>Étape {0} sur {1}</value>
+    <comment>Step %lld of %lld</comment>
+  </data>
+  <data name="Stop" xml:space="preserve">
+    <value>Arrêter</value>
+    <comment>Stop</comment>
+  </data>
+  <data name="StopAfterARecordingLengthOf" xml:space="preserve">
+    <value>Arrêter après une durée d’enregistrement de</value>
+    <comment>Stop after a recording length of</comment>
+  </data>
+  <data name="StopAfterSilenceOf" xml:space="preserve">
+    <value>Arrêter après un silence de</value>
+    <comment>Stop after silence of</comment>
+  </data>
+  <data name="StopAskingForThisApp" xml:space="preserve">
+    <value>Ne plus demander pour cette app</value>
+    <comment>Stop asking for this app</comment>
+  </data>
+  <data name="StopNow" xml:space="preserve">
+    <value>Arrêter maintenant</value>
+    <comment>Stop now</comment>
+  </data>
+  <data name="StopRecording" xml:space="preserve">
+    <value>Arrêter l’enregistrement</value>
+    <comment>Stop Recording</comment>
+  </data>
+  <data name="StopRecordingR" xml:space="preserve">
+    <value>Arrêter l’enregistrement (⌘R)</value>
+    <comment>Stop recording (⌘R)</comment>
+  </data>
+  <data name="StopRecording_2" xml:space="preserve">
+    <value>Arrêter l’enregistrement</value>
+    <comment>Stop recording</comment>
+  </data>
+  <data name="StopRecording_3" xml:space="preserve">
+    <value>Arrêter l’enregistrement ?</value>
+    <comment>Stop recording?</comment>
+  </data>
+  <data name="StopTheAnswer" xml:space="preserve">
+    <value>Arrêter la réponse</value>
+    <comment>Stop the answer</comment>
+  </data>
+  <data name="StopTheRecordingFirst" xml:space="preserve">
+    <value>Arrêtez d’abord l’enregistrement</value>
+    <comment>Stop the recording first</comment>
+  </data>
+  <data name="StopTheSummaryAndKeepWhatIsWrittenSoFar" xml:space="preserve">
+    <value>Arrêter le résumé et garder ce qui est déjà écrit</value>
+    <comment>Stop the summary and keep what is written so far</comment>
+  </data>
+  <data name="StopWhenTheAppIsQuietFor" xml:space="preserve">
+    <value>Arrêter quand l’app est silencieuse depuis</value>
+    <comment>Stop when the app is quiet for</comment>
+  </data>
+  <data name="StopWhenTheCallSeemsOverFor" xml:space="preserve">
+    <value>Arrêter quand l’appel semble terminé depuis</value>
+    <comment>Stop when the call seems over for</comment>
+  </data>
+  <data name="StopWhenTheEventEnds" xml:space="preserve">
+    <value>Arrêter à la fin de l’événement</value>
+    <comment>Stop when the event ends</comment>
+  </data>
+  <data name="Stopped" xml:space="preserve">
+    <value>Arrêté</value>
+    <comment>Stopped</comment>
+  </data>
+  <data name="StoppedUsingAudioStopRecording" xml:space="preserve">
+    <value>{0} n’utilise plus l’audio — arrêter l’enregistrement ?</value>
+    <comment>%@ stopped using audio — stop recording?</comment>
+  </data>
+  <data name="StoppingInLldS" xml:space="preserve">
+    <value>Arrêt dans {0} s</value>
+    <comment>Stopping in %lld s</comment>
+  </data>
+  <data name="Storage" xml:space="preserve">
+    <value>Stockage</value>
+    <comment>Storage</comment>
+  </data>
+  <data name="StorageUsed" xml:space="preserve">
+    <value>Stockage utilisé : {0}</value>
+    <comment>Storage used: %@</comment>
+  </data>
+  <data name="Summarize" xml:space="preserve">
+    <value>Résumer</value>
+    <comment>Summarize</comment>
+  </data>
+  <data name="Summarizing" xml:space="preserve">
+    <value>Résumé en cours</value>
+    <comment>Summarizing</comment>
+  </data>
+  <data name="SummarizingAnotherConversation" xml:space="preserve">
+    <value>Résumé d’une autre conversation…</value>
+    <comment>Summarizing another conversation…</comment>
+  </data>
+  <data name="Summarizing_2" xml:space="preserve">
+    <value>Résumé de {0}…</value>
+    <comment>Summarizing %@…</comment>
+  </data>
+  <data name="Summary" xml:space="preserve">
+    <value>Résumé</value>
+    <comment>Summary</comment>
+  </data>
+  <data name="SureToQuit" xml:space="preserve">
+    <value>Vraiment quitter</value>
+    <comment>Sure to quit</comment>
+  </data>
+  <data name="System" xml:space="preserve">
+    <value>Système</value>
+    <comment>System</comment>
+  </data>
+  <data name="SystemAudio" xml:space="preserve">
+    <value>Audio du système</value>
+    <comment>System audio</comment>
+  </data>
+  <data name="SystemAudioIsSilentFix" xml:space="preserve">
+    <value>L’audio du système est muet — Corriger…</value>
+    <comment>System audio is silent — Fix…</comment>
+  </data>
+  <data name="SystemAudioLevel" xml:space="preserve">
+    <value>Niveau de l’audio du système</value>
+    <comment>System audio level</comment>
+  </data>
+  <data name="SystemAudioWorks" xml:space="preserve">
+    <value>L’audio du système fonctionne.</value>
+    <comment>System audio works.</comment>
+  </data>
+  <data name="SystemDefault" xml:space="preserve">
+    <value>Par défaut du système</value>
+    <comment>System default</comment>
+  </data>
+  <data name="SystemModelLanguageAssetsInstalledOnDemandAutoUsesTheDefault" xml:space="preserve">
+    <value>Modèle du système — ressources linguistiques installées à la demande. Auto utilise la langue par défaut (pas de détection de la langue).</value>
+    <comment>System model — language assets installed on demand. Auto uses the default language (no language detection).</comment>
+  </data>
+  <data name="TellSpeakersApart" xml:space="preserve">
+    <value>Distinguer les intervenants</value>
+    <comment>Tell speakers apart</comment>
+  </data>
+  <data name="TellThePeopleYouRecordYouAreResponsibleForTheirConsent" xml:space="preserve">
+    <value>Prévenez les personnes que vous enregistrez. Vous êtes responsable de leur consentement.</value>
+    <comment>Tell the people you record. You are responsible for their consent.</comment>
+  </data>
+  <data name="Test" xml:space="preserve">
+    <value>Tester</value>
+    <comment>Test</comment>
+  </data>
+  <data name="TestAgain" xml:space="preserve">
+    <value>Tester à nouveau</value>
+    <comment>Test Again</comment>
+  </data>
+  <data name="TestSystemAudio" xml:space="preserve">
+    <value>Tester l’audio du système</value>
+    <comment>Test System Audio</comment>
+  </data>
+  <data name="TestUsesYourSubscription" xml:space="preserve">
+    <value>Tester (utilise votre abonnement)</value>
+    <comment>Test (uses your subscription)</comment>
+  </data>
+  <data name="TheAppQuitStopRecording" xml:space="preserve">
+    <value>L’app s’est fermée — arrêter l’enregistrement ?</value>
+    <comment>The app quit — stop recording?</comment>
+  </data>
+  <data name="TheAppStoppedUsingAudioStopRecording" xml:space="preserve">
+    <value>L’app n’utilise plus l’audio — arrêter l’enregistrement ?</value>
+    <comment>The app stopped using audio — stop recording?</comment>
+  </data>
+  <data name="TheAudioDeviceChangedWhileRecordingWasStartingTryAgain" xml:space="preserve">
+    <value>Le périphérique audio a changé pendant le démarrage de l’enregistrement. Réessayez.</value>
+    <comment>The audio device changed while recording was starting. Try again.</comment>
+  </data>
+  <data name="TheAudioFilesAreMovedToTheTrashTranscriptsSummariesAndChatsS" xml:space="preserve">
+    <value>Les fichiers audio sont placés dans la Corbeille. Les transcriptions, résumés et discussions restent.</value>
+    <comment>The audio files are moved to the Trash. Transcripts, summaries and chats stay.</comment>
+  </data>
+  <data name="TheAudioFilesAreMovedToTheTrashTranscriptsSummariesAndChatsS_2" xml:space="preserve">
+    <value>Les fichiers audio sont placés dans la Corbeille. Les transcriptions, résumés et discussions restent ; la lecture et la retranscription ne sont plus possibles.</value>
+    <comment>The audio files are moved to the Trash. Transcripts, summaries and chats stay; playback and re-transcribing are no longer possible.</comment>
+  </data>
+  <data name="TheAudioIsMovedToTheTrashTheTranscriptSummaryAndChatStayPlay" xml:space="preserve">
+    <value>L’audio est placé dans la Corbeille. La transcription, le résumé et la discussion restent ; la lecture et la retranscription ne sont plus possibles.</value>
+    <comment>The audio is moved to the Trash. The transcript, summary and chat stay; playback and re-transcribing are no longer possible.</comment>
+  </data>
+  <data name="TheAudioOfLldConversationsWillBeMovedToTheTrashAtTheNextRunA" xml:space="preserve">
+    <value>L’audio de {0} conversations sera placé dans la Corbeille au prochain passage (au lancement ou dans la journée) :</value>
+    <comment>The audio of %lld conversations will be moved to the Trash at the next run (at launch or within a day):</comment>
+  </data>
+  <data name="TheAudioOfLldConversationsWillBeMovedToTheTrashAtTheNextRunA__One" xml:space="preserve">
+    <value>L’audio de {0} conversation sera placé dans la Corbeille au prochain passage (au lancement ou dans la journée) :</value>
+    <comment>The audio of %lld conversations will be moved to the Trash at the next run (at launch or within a day):</comment>
+  </data>
+  <data name="TheAudioOfLldConversationsWillBeMovedToTheTrashNowThenDailyF" xml:space="preserve">
+    <value>L’audio de {0} conversations sera placé dans la Corbeille maintenant, puis chaque jour pour les plus anciennes :</value>
+    <comment>The audio of %lld conversations will be moved to the Trash now, then daily for older ones:</comment>
+  </data>
+  <data name="TheAudioOfLldConversationsWillBeMovedToTheTrashNowThenDailyF__One" xml:space="preserve">
+    <value>L’audio de {0} conversation sera placé dans la Corbeille maintenant, puis chaque jour pour les plus anciennes :</value>
+    <comment>The audio of %lld conversations will be moved to the Trash now, then daily for older ones:</comment>
+  </data>
+  <data name="TheAudioOfTranscribedConversationsOlderThanLldDaysWillBeMove" xml:space="preserve">
+    <value>L’audio des conversations transcrites de plus de {0} jours sera placé dans la Corbeille une fois par jour. Rien ne correspond pour l’instant.</value>
+    <comment>The audio of transcribed conversations older than %lld days will be moved to the Trash once a day. Nothing matches now.</comment>
+  </data>
+  <data name="TheAudioOfTranscribedConversationsOlderThanLldDaysWillBeMove__One" xml:space="preserve">
+    <value>L’audio des conversations transcrites de plus de {0} jour sera placé dans la Corbeille une fois par jour. Rien ne correspond pour l’instant.</value>
+    <comment>The audio of transcribed conversations older than %lld days will be moved to the Trash once a day. Nothing matches now.</comment>
+  </data>
+  <data name="TheAudioSystemIsNotRunningTryAgainInAMoment" xml:space="preserve">
+    <value>Le système audio n’est pas démarré. Réessayez dans un instant.</value>
+    <comment>The audio system is not running. Try again in a moment.</comment>
+  </data>
+  <data name="TheCallSeemsToBeOverStopRecording" xml:space="preserve">
+    <value>L’appel semble terminé — arrêter l’enregistrement ?</value>
+    <comment>The call seems to be over — stop recording?</comment>
+  </data>
+  <data name="TheEmbeddingModelLetsAQuestionFindPassagesWithTheSameMeaning" xml:space="preserve">
+    <value>Le modèle d’embedding permet à une question de trouver des passages de même sens, dans n’importe quelle langue. Les modèles ne sont téléchargés que lorsque vous cliquez sur Télécharger.</value>
+    <comment>The embedding model lets a question find passages with the same meaning, in any language. Models are downloaded only when you click Download.</comment>
+  </data>
+  <data name="TheEndMustBeAfterTheStart" xml:space="preserve">
+    <value>La fin doit être après le début.</value>
+    <comment>The end must be after the start.</comment>
+  </data>
+  <data name="TheEventNoLongerExists" xml:space="preserve">
+    <value>L’événement n’existe plus.</value>
+    <comment>The event no longer exists.</comment>
+  </data>
+  <data name="TheIndicatorAsksBeforeStoppingWithA15SCountdownLikeTheOtherA" xml:space="preserve">
+    <value>L’indicateur demande avant d’arrêter, avec un compte à rebours de 15 s, comme les autres arrêts automatiques.</value>
+    <comment>The indicator asks before stopping, with a 15 s countdown, like the other auto-stops.</comment>
+  </data>
+  <data name="TheIndicatorAsksBeforeStoppingWithA15SCountdownReachingTheLe" xml:space="preserve">
+    <value>L’indicateur demande avant d’arrêter, avec un compte à rebours de 15 s. Atteindre la durée maximale arrête immédiatement.</value>
+    <comment>The indicator asks before stopping, with a 15 s countdown. Reaching the length limit stops at once.</comment>
+  </data>
+  <data name="TheLicenseTextIsMissingFromThisBuild" xml:space="preserve">
+    <value>Le texte de la licence manque dans cette version.</value>
+    <comment>The license text is missing from this build.</comment>
+  </data>
+  <data name="TheMeetingHasEndedStopRecording" xml:space="preserve">
+    <value>La réunion est terminée — arrêter l’enregistrement ?</value>
+    <comment>The meeting has ended — stop recording?</comment>
+  </data>
+  <data name="TheOpenChatStaysThisCanTBeUndone" xml:space="preserve">
+    <value>La discussion ouverte est conservée. Cette action est irréversible.</value>
+    <comment>The open chat stays. This can't be undone.</comment>
+  </data>
+  <data name="TheProvider" xml:space="preserve">
+    <value>le fournisseur</value>
+    <comment>the provider</comment>
+  </data>
+  <data name="TheRecordingAndItsFilesAreMovedToTheTrash" xml:space="preserve">
+    <value>L’enregistrement et ses fichiers sont placés dans la Corbeille.</value>
+    <comment>The recording and its files are moved to the Trash.</comment>
+  </data>
+  <data name="TheRecordingCouldNotResume" xml:space="preserve">
+    <value>L’enregistrement n’a pas pu reprendre.</value>
+    <comment>The recording could not resume.</comment>
+  </data>
+  <data name="TheRecordingCouldNotStart" xml:space="preserve">
+    <value>L’enregistrement n’a pas pu démarrer.</value>
+    <comment>The recording could not start.</comment>
+  </data>
+  <data name="TheRecordingFailed" xml:space="preserve">
+    <value>L’enregistrement a échoué.</value>
+    <comment>The recording failed.</comment>
+  </data>
+  <data name="TheRecordingsAndTheirFilesAreMovedToTheTrash" xml:space="preserve">
+    <value>Les enregistrements et leurs fichiers sont placés dans la Corbeille.</value>
+    <comment>The recordings and their files are moved to the Trash.</comment>
+  </data>
+  <data name="TheRepeatEndsBeforeThisDate" xml:space="preserve">
+    <value>La récurrence se termine avant cette date.</value>
+    <comment>The repeat ends before this date.</comment>
+  </data>
+  <data name="TheSelectedAppStoppedPlayingAudioBeforeRecordingCouldResume" xml:space="preserve">
+    <value>L’app sélectionnée a cessé de lire de l’audio avant que l’enregistrement puisse reprendre.</value>
+    <comment>The selected app stopped playing audio before recording could resume.</comment>
+  </data>
+  <data name="TheSelectedAppStoppedPlayingAudioBeforeRecordingCouldStart" xml:space="preserve">
+    <value>L’app sélectionnée a cessé de lire de l’audio avant que l’enregistrement puisse démarrer.</value>
+    <comment>The selected app stopped playing audio before recording could start.</comment>
+  </data>
+  <data name="TheShortcutCouldNotBeSetUpErrorD" xml:space="preserve">
+    <value>Le raccourci n’a pas pu être configuré (erreur {0}).</value>
+    <comment>The shortcut could not be set up (error %d).</comment>
+  </data>
+  <data name="TheSystemAudioFormatIsNotSupported" xml:space="preserve">
+    <value>Le format audio du système n’est pas pris en charge.</value>
+    <comment>The system audio format is not supported.</comment>
+  </data>
+  <data name="TheTestCouldNotStart" xml:space="preserve">
+    <value>Le test n’a pas pu démarrer.</value>
+    <comment>The test could not start.</comment>
+  </data>
+  <data name="TheTranscriptCouldNotBeRead" xml:space="preserve">
+    <value>La transcription n’a pas pu être lue.</value>
+    <comment>The transcript could not be read.</comment>
+  </data>
+  <data name="TheTranscriptionSpeakerAndAIModelsAreRemovedFromThisMacNotMo" xml:space="preserve">
+    <value>Les modèles de transcription, d’intervenants et d’IA sont supprimés de ce Mac (pas placés dans la Corbeille). Téléchargez-les à nouveau dans Réglages › Transcription et Réglages › IA.</value>
+    <comment>The transcription, speaker and AI models are removed from this Mac (not moved to the Trash). Download them again in Settings › Transcription and Settings › AI.</comment>
+  </data>
+  <data name="ThereIsNotEnoughFreeDiskSpaceToRecord" xml:space="preserve">
+    <value>Il n’y a pas assez d’espace disque libre pour enregistrer.</value>
+    <comment>There is not enough free disk space to record.</comment>
+  </data>
+  <data name="TheyAreMovedToTheTrashTheAudioStaysSoTheConversationsCanBeTr" xml:space="preserve">
+    <value>Ils sont placés dans la Corbeille. L’audio est conservé, donc les conversations peuvent être transcrites à nouveau.</value>
+    <comment>They are moved to the Trash. The audio stays, so the conversations can be transcribed again.</comment>
+  </data>
+  <data name="TheyStillGoToTheTrash" xml:space="preserve">
+    <value>Elles vont quand même dans la Corbeille.</value>
+    <comment>They still go to the Trash.</comment>
+  </data>
+  <data name="ThisAndFutureEvents" xml:space="preserve">
+    <value>Tous les événements futurs</value>
+    <comment>This and Future Events</comment>
+  </data>
+  <data name="ThisAppSAudioCannotBeIsolatedSoAllSystemAudioIsBeingRecorded" xml:space="preserve">
+    <value>L’audio de cette app ne peut pas être isolé, donc tout l’audio du système est enregistré.</value>
+    <comment>This app's audio cannot be isolated, so all system audio is being recorded.</comment>
+  </data>
+  <data name="ThisConversationHasNoTranscriptYet" xml:space="preserve">
+    <value>Cette conversation n’a pas encore de transcription.</value>
+    <comment>This conversation has no transcript yet.</comment>
+  </data>
+  <data name="ThisConversationWasDeleted" xml:space="preserve">
+    <value>Cette conversation a été supprimée</value>
+    <comment>This conversation was deleted</comment>
+  </data>
+  <data name="ThisEngineTranscribesAfterStopWhisperKitAndParakeetModelsAls" xml:space="preserve">
+    <value>Ce moteur transcrit après l’arrêt. Les modèles WhisperKit et Parakeet transcrivent aussi pendant l’enregistrement.</value>
+    <comment>This engine transcribes after Stop. WhisperKit and Parakeet models also transcribe while recording.</comment>
+  </data>
+  <data name="ThisEventCanTBeEditedHere" xml:space="preserve">
+    <value>Cet événement ne peut pas être modifié ici.</value>
+    <comment>This event can't be edited here.</comment>
+  </data>
+  <data name="ThisEventOnly" xml:space="preserve">
+    <value>Uniquement cet événement</value>
+    <comment>This Event Only</comment>
+  </data>
+  <data name="ThisMac" xml:space="preserve">
+    <value>Ce Mac</value>
+    <comment>This Mac</comment>
+  </data>
+  <data name="ThisModelDoesNotLabelSpeakersAModelOnThisMacIsUsedInstead" xml:space="preserve">
+    <value>Ce modèle n’attribue pas les intervenants ; un modèle sur ce Mac est utilisé à la place.</value>
+    <comment>This model does not label speakers; a model on this Mac is used instead.</comment>
+  </data>
+  <data name="Title" xml:space="preserve">
+    <value>Titre</value>
+    <comment>Title</comment>
+  </data>
+  <data name="Today" xml:space="preserve">
+    <value>Aujourd’hui</value>
+    <comment>Today</comment>
+  </data>
+  <data name="TokenizersAndModelDownloads" xml:space="preserve">
+    <value>Tokeniseurs et téléchargement de modèles</value>
+    <comment>Tokenizers and model downloads</comment>
+  </data>
+  <data name="Tomorrow" xml:space="preserve">
+    <value>Demain</value>
+    <comment>Tomorrow</comment>
+  </data>
+  <data name="Total" xml:space="preserve">
+    <value>Total</value>
+    <comment>Total</comment>
+  </data>
+  <data name="Transcribe" xml:space="preserve">
+    <value>Transcrire</value>
+    <comment>Transcribe</comment>
+  </data>
+  <data name="TranscribeAgainWith" xml:space="preserve">
+    <value>Transcrire à nouveau avec</value>
+    <comment>Transcribe again with</comment>
+  </data>
+  <data name="TranscribeAutomatically" xml:space="preserve">
+    <value>Transcrire automatiquement</value>
+    <comment>Transcribe automatically</comment>
+  </data>
+  <data name="TranscribeThisConversation" xml:space="preserve">
+    <value>Transcrire cette conversation</value>
+    <comment>Transcribe this conversation</comment>
+  </data>
+  <data name="TranscribeWhileRecording" xml:space="preserve">
+    <value>Transcrire pendant l’enregistrement</value>
+    <comment>Transcribe while recording</comment>
+  </data>
+  <data name="TranscribeWhileRecordingIsOffTurnItOnInSettingsTranscription" xml:space="preserve">
+    <value>Transcrire pendant l’enregistrement est désactivé. Activez-le dans Réglages › Transcription.</value>
+    <comment>Transcribe while recording is off. Turn it on in Settings › Transcription.</comment>
+  </data>
+  <data name="Transcribing" xml:space="preserve">
+    <value>Transcription…</value>
+    <comment>Transcribing…</comment>
+  </data>
+  <data name="Transcript" xml:space="preserve">
+    <value>Transcription</value>
+    <comment>Transcript</comment>
+  </data>
+  <data name="Transcription" xml:space="preserve">
+    <value>Transcription</value>
+    <comment>Transcription</comment>
+  </data>
+  <data name="TranscriptionFailed" xml:space="preserve">
+    <value>Échec de la transcription</value>
+    <comment>Transcription failed</comment>
+  </data>
+  <data name="TranscriptionFailedTranscribeThisConversationAgain" xml:space="preserve">
+    <value>Échec de la transcription — transcrire à nouveau cette conversation</value>
+    <comment>Transcription failed — transcribe this conversation again</comment>
+  </data>
+  <data name="TranscriptionIsOffTurnOnTranscribeAutomaticallyInSettingsRec" xml:space="preserve">
+    <value>La transcription est désactivée. Activez Transcrire automatiquement dans Réglages › Enregistrement.</value>
+    <comment>Transcription is off. Turn on Transcribe automatically in Settings › Recording.</comment>
+  </data>
+  <data name="TranscriptionModel" xml:space="preserve">
+    <value>Modèle de transcription</value>
+    <comment>Transcription model</comment>
+  </data>
+  <data name="TranscriptionModelIdEGWhisper1" xml:space="preserve">
+    <value>Identifiant du modèle de transcription, p. ex. whisper-1</value>
+    <comment>Transcription model id, e.g. whisper-1</comment>
+  </data>
+  <data name="TranscriptionModels" xml:space="preserve">
+    <value>Modèles de transcription</value>
+    <comment>Transcription models</comment>
+  </data>
+  <data name="TranscriptionStartsOnceTheMacIsReady" xml:space="preserve">
+    <value>La transcription démarre dès que le Mac est prêt.</value>
+    <comment>Transcription starts once the Mac is ready.</comment>
+  </data>
+  <data name="TranscriptionTurnsSpeechIntoTextTheTranscriptionModelListens" xml:space="preserve">
+    <value>La transcription convertit la parole en texte. Le modèle de transcription écoute l’enregistrement et écrit ce qui a été dit, avec des horodatages.</value>
+    <comment>Transcription turns speech into text. The transcription model listens to the recording and writes what was said, with timestamps.</comment>
+  </data>
+  <data name="TranscriptsAndAI" xml:space="preserve">
+    <value>Transcriptions et IA</value>
+    <comment>Transcripts and AI</comment>
+  </data>
+  <data name="TranscriptsAndSummariesOfLldConversationsAndYourQuestionsWil" xml:space="preserve">
+    <value>Les transcriptions et les résumés de {0} conversations, ainsi que vos questions, seront envoyés à {1} pour créer et interroger l’index, et facturés par {2}. Le fournisseur peut les conserver selon sa propre politique de conservation. La question vous est posée une fois par fournisseur et par destination.</value>
+    <comment>Transcripts and summaries of %lld conversations, and your questions, will be sent to %@ to build and search the index, and billed by %@. The provider may keep them under its own retention policy. You are asked once per provider and destination.</comment>
+  </data>
+  <data name="TranscriptsAndSummariesOfLldConversationsAndYourQuestionsWil__One" xml:space="preserve">
+    <value>Les transcriptions et les résumés de {0} conversation, ainsi que vos questions, seront envoyés à {1} pour créer et interroger l’index, et facturés par {2}. Le fournisseur peut les conserver selon sa propre politique de conservation. La question vous est posée une fois par fournisseur et par destination.</value>
+    <comment>Transcripts and summaries of %lld conversations, and your questions, will be sent to %@ to build and search the index, and billed by %@. The provider may keep them under its own retention policy. You are asked once per provider and destination.</comment>
+  </data>
+  <data name="TranscriptsSummariesAndChatsStayPlaybackAndReTranscribingAre" xml:space="preserve">
+    <value>Les transcriptions, résumés et discussions restent ; la lecture et la retranscription ne sont plus possibles.</value>
+    <comment>Transcripts, summaries and chats stay; playback and re-transcribing are no longer possible.</comment>
+  </data>
+  <data name="TurnOn" xml:space="preserve">
+    <value>Activer</value>
+    <comment>Turn On</comment>
+  </data>
+  <data name="TurnOnAndDelete" xml:space="preserve">
+    <value>Activer et supprimer</value>
+    <comment>Turn On and Delete</comment>
+  </data>
+  <data name="TurnOnAutoDelete" xml:space="preserve">
+    <value>Activer la suppression automatique ?</value>
+    <comment>Turn on auto-delete?</comment>
+  </data>
+  <data name="TurnOnEchoDiarInPrivacySecurityMicrophone" xml:space="preserve">
+    <value>Activez EchoDiar dans Confidentialité et sécurité › Microphone.</value>
+    <comment>Turn on EchoDiar in Privacy &amp; Security › Microphone.</comment>
+  </data>
+  <data name="TurnOnInSettingsAI" xml:space="preserve">
+    <value>Activez {0} dans Réglages › IA</value>
+    <comment>Turn on %@ in Settings › AI</comment>
+  </data>
+  <data name="TurnOnInSettingsRAG" xml:space="preserve">
+    <value>Activer dans Réglages › RAG</value>
+    <comment>Turn on in Settings › RAG</comment>
+  </data>
+  <data name="TypeAModelIdAndPressReturnOrLoadTheModelsToPickFrom" xml:space="preserve">
+    <value>Saisissez un identifiant de modèle et appuyez sur Retour, ou chargez les modèles pour en choisir un.</value>
+    <comment>Type a model id and press Return, or load the models to pick from.</comment>
+  </data>
+  <data name="UnavailableDevice" xml:space="preserve">
+    <value>Périphérique indisponible</value>
+    <comment>Unavailable device</comment>
+  </data>
+  <data name="Understood" xml:space="preserve">
+    <value>Compris</value>
+    <comment>Understood</comment>
+  </data>
+  <data name="UnmuteMicrophone" xml:space="preserve">
+    <value>Réactiver le micro</value>
+    <comment>Unmute Microphone</comment>
+  </data>
+  <data name="UnmuteMicrophone_2" xml:space="preserve">
+    <value>Réactiver le micro</value>
+    <comment>Unmute microphone</comment>
+  </data>
+  <data name="Untitled" xml:space="preserve">
+    <value>Sans titre</value>
+    <comment>Untitled</comment>
+  </data>
+  <data name="Upcoming" xml:space="preserve">
+    <value>À venir</value>
+    <comment>Upcoming</comment>
+  </data>
+  <data name="UpcomingMeetingsShowHereOnceEchoDiarCanReadYourCalendars" xml:space="preserve">
+    <value>Les réunions à venir s’affichent ici une fois qu’EchoDiar peut lire vos calendriers.</value>
+    <comment>Upcoming meetings show here once EchoDiar can read your calendars.</comment>
+  </data>
+  <data name="Update" xml:space="preserve">
+    <value>Mettre à jour</value>
+    <comment>Update</comment>
+  </data>
+  <data name="UpdateAvailable" xml:space="preserve">
+    <value>Mise à jour disponible…</value>
+    <comment>Update Available…</comment>
+  </data>
+  <data name="Usage" xml:space="preserve">
+    <value>Utilisation</value>
+    <comment>Usage</comment>
+  </data>
+  <data name="Use" xml:space="preserve">
+    <value>Utiliser {0}</value>
+    <comment>Use %@</comment>
+  </data>
+  <data name="UseAnHttpsLink" xml:space="preserve">
+    <value>Utilisez un lien https.</value>
+    <comment>Use an https link.</comment>
+  </data>
+  <data name="UseOrWithTheKey" xml:space="preserve">
+    <value>Utilisez ⌘, ⌥ ou ⌃ avec la touche.</value>
+    <comment>Use ⌘, ⌥ or ⌃ with the key.</comment>
+  </data>
+  <data name="UsedByMLXSwift" xml:space="preserve">
+    <value>Utilisé par MLX Swift</value>
+    <comment>Used by MLX Swift</comment>
+  </data>
+  <data name="UsedBySwiftHuggingface" xml:space="preserve">
+    <value>Utilisé par swift-huggingface</value>
+    <comment>Used by swift-huggingface</comment>
+  </data>
+  <data name="UsedBySwiftTransformers" xml:space="preserve">
+    <value>Utilisé par swift-transformers</value>
+    <comment>Used by swift-transformers</comment>
+  </data>
+  <data name="UsesTheLanguagePickedInTheRecordMenuForTheNextRecordingsInst" xml:space="preserve">
+    <value>Utilise la langue choisie dans le menu Enregistrer pour les prochains enregistrements au lieu de la langue par défaut. Les langues changées pendant un enregistrement ne comptent pas.</value>
+    <comment>Uses the language picked in the Record menu for the next recordings instead of the default language. Languages changed during a recording don't count.</comment>
+  </data>
+  <data name="Version" xml:space="preserve">
+    <value>Version</value>
+    <comment>Version</comment>
+  </data>
+  <data name="VersionLld" xml:space="preserve">
+    <value>Version {0}</value>
+    <comment>Version %lld</comment>
+  </data>
+  <data name="Version_2" xml:space="preserve">
+    <value>Version {0}</value>
+    <comment>Version %@</comment>
+  </data>
+  <data name="ViaAPI" xml:space="preserve">
+    <value>Via une API</value>
+    <comment>Via API</comment>
+  </data>
+  <data name="Vietnamese" xml:space="preserve">
+    <value>Vietnamien</value>
+    <comment>Vietnamese</comment>
+  </data>
+  <data name="View" xml:space="preserve">
+    <value>Présentation</value>
+    <comment>View</comment>
+  </data>
+  <data name="WaitForTheCall" xml:space="preserve">
+    <value>Attendre l’appel</value>
+    <comment>Wait for the call</comment>
+  </data>
+  <data name="WaitWhenTheMacIsHotOrInLowPowerMode" xml:space="preserve">
+    <value>Attendre quand le Mac est chaud ou en mode Économie d’énergie</value>
+    <comment>Wait when the Mac is hot or in Low Power Mode</comment>
+  </data>
+  <data name="Waiting" xml:space="preserve">
+    <value>En attente…</value>
+    <comment>Waiting…</comment>
+  </data>
+  <data name="WaitingWhileTheMacIsHotOrInLowPowerMode" xml:space="preserve">
+    <value>En attente tant que le Mac est chaud ou en mode Économie d’énergie</value>
+    <comment>Waiting while the Mac is hot or in Low Power Mode</comment>
+  </data>
+  <data name="WatchedCalendars" xml:space="preserve">
+    <value>Calendriers suivis</value>
+    <comment>Watched calendars</comment>
+  </data>
+  <data name="WeekdaysMonFri" xml:space="preserve">
+    <value>En semaine (lun.–ven.)</value>
+    <comment>Weekdays (Mon–Fri)</comment>
+  </data>
+  <data name="Weekly" xml:space="preserve">
+    <value>Toutes les semaines</value>
+    <comment>Weekly</comment>
+  </data>
+  <data name="WelcomeToEchoDiar" xml:space="preserve">
+    <value>Bienvenue dans EchoDiar</value>
+    <comment>Welcome to EchoDiar</comment>
+  </data>
+  <data name="WhatAreMyOpenActionItems" xml:space="preserve">
+    <value>Quelles sont mes actions en suspens ?</value>
+    <comment>What are my open action items?</comment>
+  </data>
+  <data name="WhatDidWeDecideAboutTheLaunchDate" xml:space="preserve">
+    <value>Qu’avons-nous décidé pour la date de lancement ?</value>
+    <comment>What did we decide about the launch date?</comment>
+  </data>
+  <data name="WhenAMeetingStarts" xml:space="preserve">
+    <value>Quand une réunion commence</value>
+    <comment>When a meeting starts</comment>
+  </data>
+  <data name="WhenTheMicrophoneDisconnects" xml:space="preserve">
+    <value>Quand le microphone se déconnecte</value>
+    <comment>When the microphone disconnects</comment>
+  </data>
+  <data name="WhileARecordingStaysPausedThisLongTheModelThatTranscribesItI" xml:space="preserve">
+    <value>Quand un enregistrement reste en pause aussi longtemps, le modèle qui le transcrit est libéré ; il se recharge quand vous reprenez. Les autres modèles sont libérés dès que leur tâche se termine.</value>
+    <comment>While a recording stays paused this long, the model that transcribes it is freed; it loads again when you resume. Other models are freed as soon as their job ends.</comment>
+  </data>
+  <data name="WhisperTranscription" xml:space="preserve">
+    <value>Transcription Whisper</value>
+    <comment>Whisper transcription</comment>
+  </data>
+  <data name="WhoMentionedTheBudgetAndWhen" xml:space="preserve">
+    <value>Qui a parlé du budget, et quand ?</value>
+    <comment>Who mentioned the budget, and when?</comment>
+  </data>
+  <data name="WholeChat" xml:space="preserve">
+    <value>Toute la discussion</value>
+    <comment>Whole chat</comment>
+  </data>
+  <data name="WholeConversation" xml:space="preserve">
+    <value>Toute la conversation</value>
+    <comment>Whole conversation</comment>
+  </data>
+  <data name="Window" xml:space="preserve">
+    <value>Fenêtre</value>
+    <comment>Window</comment>
+  </data>
+  <data name="WouldDeleteNowLldConversations" xml:space="preserve">
+    <value>Supprimerait maintenant : {0} conversations</value>
+    <comment>Would delete now: %lld conversations</comment>
+  </data>
+  <data name="WouldDeleteNowLldConversations__One" xml:space="preserve">
+    <value>Supprimerait maintenant : {0} conversation</value>
+    <comment>Would delete now: %lld conversations</comment>
+  </data>
+  <data name="WritingTheSummary" xml:space="preserve">
+    <value>Rédaction du résumé…</value>
+    <comment>Writing the summary…</comment>
+  </data>
+  <data name="XApiKeyHeader" xml:space="preserve">
+    <value>En-tête x-api-key</value>
+    <comment>x-api-key header</comment>
+  </data>
+  <data name="Yesterday" xml:space="preserve">
+    <value>Hier</value>
+    <comment>Yesterday</comment>
+  </data>
+  <data name="YourConversationsAreNotIndexedYet" xml:space="preserve">
+    <value>Vos conversations ne sont pas encore indexées.</value>
+    <comment>Your conversations are not indexed yet.</comment>
+  </data>
+  <data name="ZoomGoogleMeetMicrosoftTeamsOrWebexLinkInTheEvent" xml:space="preserve">
+    <value>Lien Zoom, Google Meet, Microsoft Teams ou Webex dans l’événement.</value>
+    <comment>Zoom, Google Meet, Microsoft Teams or Webex link in the event.</comment>
+  </data>
+</root>

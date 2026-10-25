@@ -1,0 +1,2925 @@
+<?xml version="1.0" encoding="utf-8"?>
+<root>
+  <xsd:schema id="root" xmlns="" xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:msdata="urn:schemas-microsoft-com:xml-msdata">
+    <xsd:import namespace="http://www.w3.org/XML/1998/namespace" />
+    <xsd:element name="root" msdata:IsDataSet="true">
+      <xsd:complexType>
+        <xsd:choice maxOccurs="unbounded">
+          <xsd:element name="metadata">
+            <xsd:complexType>
+              <xsd:sequence>
+                <xsd:element name="value" type="xsd:string" minOccurs="0" />
+              </xsd:sequence>
+              <xsd:attribute name="name" use="required" type="xsd:string" />
+              <xsd:attribute name="type" type="xsd:string" />
+              <xsd:attribute name="mimetype" type="xsd:string" />
+              <xsd:attribute ref="xml:space" />
+            </xsd:complexType>
+          </xsd:element>
+          <xsd:element name="assembly">
+            <xsd:complexType>
+              <xsd:attribute name="alias" type="xsd:string" />
+              <xsd:attribute name="name" type="xsd:string" />
+            </xsd:complexType>
+          </xsd:element>
+          <xsd:element name="data">
+            <xsd:complexType>
+              <xsd:sequence>
+                <xsd:element name="value" type="xsd:string" minOccurs="0" msdata:Ordinal="1" />
+                <xsd:element name="comment" type="xsd:string" minOccurs="0" msdata:Ordinal="2" />
+              </xsd:sequence>
+              <xsd:attribute name="name" type="xsd:string" use="required" msdata:Ordinal="1" />
+              <xsd:attribute name="type" type="xsd:string" msdata:Ordinal="3" />
+              <xsd:attribute name="mimetype" type="xsd:string" msdata:Ordinal="4" />
+              <xsd:attribute ref="xml:space" />
+            </xsd:complexType>
+          </xsd:element>
+          <xsd:element name="resheader">
+            <xsd:complexType>
+              <xsd:sequence>
+                <xsd:element name="value" type="xsd:string" minOccurs="0" msdata:Ordinal="1" />
+              </xsd:sequence>
+              <xsd:attribute name="name" type="xsd:string" use="required" />
+            </xsd:complexType>
+          </xsd:element>
+        </xsd:choice>
+      </xsd:complexType>
+    </xsd:element>
+  </xsd:schema>
+  <resheader name="resmimetype">
+    <value>text/microsoft-resx</value>
+  </resheader>
+  <resheader name="version">
+    <value>2.0</value>
+  </resheader>
+  <resheader name="reader">
+    <value>System.Resources.ResXResourceReader, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
+  </resheader>
+  <resheader name="writer">
+    <value>System.Resources.ResXResourceWriter, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
+  </resheader>
+  <data name="ACloudProviderReceivesTheTranscriptsAndSummariesToIndexAndEa" xml:space="preserve">
+    <value>Một nhà cung cấp đám mây nhận các bản chép lời và bản tóm tắt để lập chỉ mục, cùng mỗi câu hỏi.</value>
+    <comment>A cloud provider receives the transcripts and summaries to index, and each question.</comment>
+  </data>
+  <data name="AHintForTellingTheSystemAudioSSpeakersApart" xml:space="preserve">
+    <value>Gợi ý để phân biệt người nói trong âm thanh hệ thống.</value>
+    <comment>A hint for telling the system audio's speakers apart.</comment>
+  </data>
+  <data name="AI" xml:space="preserve">
+    <value>AI</value>
+    <comment>AI</comment>
+  </data>
+  <data name="AIModelsSummariesAndChat" xml:space="preserve">
+    <value>Mô hình AI (tóm tắt và trò chuyện)</value>
+    <comment>AI models (summaries and chat)</comment>
+  </data>
+  <data name="APIKey" xml:space="preserve">
+    <value>Khoá API</value>
+    <comment>API key</comment>
+  </data>
+  <data name="About" xml:space="preserve">
+    <value>Giới thiệu</value>
+    <comment>About</comment>
+  </data>
+  <data name="AboutEchoDiar" xml:space="preserve">
+    <value>Giới thiệu về EchoDiar</value>
+    <comment>About EchoDiar</comment>
+  </data>
+  <data name="AboutWhereDataGoes" xml:space="preserve">
+    <value>Về nơi dữ liệu được gửi đến</value>
+    <comment>About where data goes</comment>
+  </data>
+  <data name="Acknowledgements" xml:space="preserve">
+    <value>Lời cảm ơn</value>
+    <comment>Acknowledgements</comment>
+  </data>
+  <data name="Add" xml:space="preserve">
+    <value>Thêm</value>
+    <comment>Add</comment>
+  </data>
+  <data name="AddAModel" xml:space="preserve">
+    <value>Thêm mô hình</value>
+    <comment>Add a model</comment>
+  </data>
+  <data name="AddAModelId" xml:space="preserve">
+    <value>Thêm ID mô hình</value>
+    <comment>Add a model id</comment>
+  </data>
+  <data name="AddEndpoint" xml:space="preserve">
+    <value>Thêm endpoint</value>
+    <comment>Add Endpoint</comment>
+  </data>
+  <data name="AddTheKeyOfBelow" xml:space="preserve">
+    <value>Thêm khoá của {0} ở bên dưới</value>
+    <comment>Add the key of %@ below</comment>
+  </data>
+  <data name="AddTheKeyOfInTranscriptionModels" xml:space="preserve">
+    <value>Thêm khoá của {0} trong Mô hình chép lời</value>
+    <comment>Add the key of %@ in Transcription models</comment>
+  </data>
+  <data name="Added" xml:space="preserve">
+    <value>Đã thêm</value>
+    <comment>Added</comment>
+  </data>
+  <data name="AfterRecording" xml:space="preserve">
+    <value>Sau khi ghi âm</value>
+    <comment>After recording</comment>
+  </data>
+  <data name="AllFilesOfLldConversationsWillBeMovedToTheTrashAtTheNextRunA" xml:space="preserve">
+    <value>Toàn bộ tệp của {0} cuộc hội thoại sẽ được chuyển vào Thùng rác ở lần chạy tới (khi khởi động hoặc trong vòng một ngày):</value>
+    <comment>All files of %lld conversations will be moved to the Trash at the next run (at launch or within a day):</comment>
+  </data>
+  <data name="AllFilesOfLldConversationsWillBeMovedToTheTrashNowThenDailyF" xml:space="preserve">
+    <value>Toàn bộ tệp của {0} cuộc hội thoại sẽ được chuyển vào Thùng rác ngay bây giờ, sau đó hằng ngày với các cuộc cũ hơn:</value>
+    <comment>All files of %lld conversations will be moved to the Trash now, then daily for older ones:</comment>
+  </data>
+  <data name="AllFilesOfTranscribedConversationsOlderThanLldDaysWillBeMove" xml:space="preserve">
+    <value>Toàn bộ tệp của các cuộc hội thoại đã chép lời cũ hơn {0} ngày sẽ được chuyển vào Thùng rác mỗi ngày một lần. Hiện không có gì khớp.</value>
+    <comment>All files of transcribed conversations older than %lld days will be moved to the Trash once a day. Nothing matches now.</comment>
+  </data>
+  <data name="AllSystemAudio" xml:space="preserve">
+    <value>Toàn bộ âm thanh hệ thống</value>
+    <comment>All system audio</comment>
+  </data>
+  <data name="AllowMicrophone" xml:space="preserve">
+    <value>Cho phép micrô</value>
+    <comment>Allow Microphone</comment>
+  </data>
+  <data name="AlwaysFor" xml:space="preserve">
+    <value>Luôn ghi âm {0}</value>
+    <comment>Always for %@</comment>
+  </data>
+  <data name="AlwaysRecord" xml:space="preserve">
+    <value>Luôn ghi âm</value>
+    <comment>Always record</comment>
+  </data>
+  <data name="AndLldMore" xml:space="preserve">
+    <value>…và {0} mục khác</value>
+    <comment>…and %lld more</comment>
+  </data>
+  <data name="AnotherAppIsUsingTheAudioDeviceExclusively" xml:space="preserve">
+    <value>Một ứng dụng khác đang dùng độc quyền thiết bị âm thanh.</value>
+    <comment>Another app is using the audio device exclusively.</comment>
+  </data>
+  <data name="AnsweringAQuestionAboutYourConversations" xml:space="preserve">
+    <value>Đang trả lời câu hỏi về các cuộc hội thoại của bạn…</value>
+    <comment>Answering a question about your conversations…</comment>
+  </data>
+  <data name="AnsweringAbout" xml:space="preserve">
+    <value>Đang trả lời về {0}…</value>
+    <comment>Answering about %@…</comment>
+  </data>
+  <data name="AnsweringAboutAnotherConversation" xml:space="preserve">
+    <value>Đang trả lời về một cuộc hội thoại khác…</value>
+    <comment>Answering about another conversation…</comment>
+  </data>
+  <data name="AnswersQuestionsAboutAllYourTranscribedConversationsCitingTh" xml:space="preserve">
+    <value>Trả lời câu hỏi về mọi cuộc hội thoại đã chép lời của bạn, kèm trích dẫn cuộc hội thoại và thời điểm. Chỉ mục được giữ trên máy Mac này, trừ khi bạn chọn một trình nhúng qua API.</value>
+    <comment>Answers questions about all your transcribed conversations, citing the conversation and the moment. The index stays on this Mac unless you pick an API embedder.</comment>
+  </data>
+  <data name="ApiKeyHeader" xml:space="preserve">
+    <value>Header api-key</value>
+    <comment>api-key header</comment>
+  </data>
+  <data name="AppLanguage" xml:space="preserve">
+    <value>Ngôn ngữ ứng dụng</value>
+    <comment>App language</comment>
+  </data>
+  <data name="AppleBasicBuiltIn" xml:space="preserve">
+    <value>Apple (Cơ bản, tích hợp sẵn)</value>
+    <comment>Apple (Basic, built-in)</comment>
+  </data>
+  <data name="AppleFoundationModelsNeedMacOS26" xml:space="preserve">
+    <value>Apple Foundation Models cần macOS 26.</value>
+    <comment>Apple Foundation Models need macOS 26.</comment>
+  </data>
+  <data name="AppleFoundationModelsSystem" xml:space="preserve">
+    <value>Apple Foundation Models (hệ thống)</value>
+    <comment>Apple Foundation Models (system)</comment>
+  </data>
+  <data name="ApproveEchoDiarInSystemSettingsGeneralLoginItems" xml:space="preserve">
+    <value>Hãy phê duyệt EchoDiar trong Cài đặt hệ thống &gt; Cài đặt chung &gt; Mục đăng nhập.</value>
+    <comment>Approve EchoDiar in System Settings &gt; General &gt; Login Items.</comment>
+  </data>
+  <data name="Approx" xml:space="preserve">
+    <value>{0} (ước tính)</value>
+    <comment>%@ (approx.)</comment>
+  </data>
+  <data name="AsRecorded" xml:space="preserve">
+    <value>Như lúc ghi âm</value>
+    <comment>As recorded</comment>
+  </data>
+  <data name="Ask" xml:space="preserve">
+    <value>Hỏi</value>
+    <comment>Ask</comment>
+  </data>
+  <data name="AskAQuestionAboutAllYourConversationsBelow" xml:space="preserve">
+    <value>Đặt câu hỏi về mọi cuộc hội thoại của bạn ở bên dưới.</value>
+    <comment>Ask a question about all your conversations below.</comment>
+  </data>
+  <data name="AskAQuestionAboutAllYourConversationsTheAnswerComesFromThePa" xml:space="preserve">
+    <value>Đặt câu hỏi về mọi cuộc hội thoại của bạn: câu trả lời lấy từ các đoạn phù hợp, kèm liên kết đến những thời điểm được trích dẫn.</value>
+    <comment>Ask a question about all your conversations: the answer comes from the passages that match it, with links to the moments it cites.</comment>
+  </data>
+  <data name="AskAQuestionAboutThisConversationBelow" xml:space="preserve">
+    <value>Đặt câu hỏi về cuộc hội thoại này ở bên dưới.</value>
+    <comment>Ask a question about this conversation below.</comment>
+  </data>
+  <data name="AskAboutThisConversation" xml:space="preserve">
+    <value>Hỏi về cuộc hội thoại này</value>
+    <comment>Ask about this conversation</comment>
+  </data>
+  <data name="AskAcrossConversations" xml:space="preserve">
+    <value>Hỏi trên mọi cuộc hội thoại</value>
+    <comment>Ask across conversations</comment>
+  </data>
+  <data name="AskAnything" xml:space="preserve">
+    <value>Hỏi bất cứ điều gì…</value>
+    <comment>Ask anything…</comment>
+  </data>
+  <data name="AskToStop" xml:space="preserve">
+    <value>Hỏi có dừng không</value>
+    <comment>Ask to stop</comment>
+  </data>
+  <data name="AssemblyAIPicksItsModelForTheLanguageUniversal" xml:space="preserve">
+    <value>AssemblyAI tự chọn mô hình theo ngôn ngữ (Universal).</value>
+    <comment>AssemblyAI picks its model for the language (Universal).</comment>
+  </data>
+  <data name="AttachTheIndicatorToTheMeetingWindow" xml:space="preserve">
+    <value>Gắn chỉ báo vào cửa sổ cuộc họp</value>
+    <comment>Attach the indicator to the meeting window</comment>
+  </data>
+  <data name="Audio" xml:space="preserve">
+    <value>Âm thanh</value>
+    <comment>Audio</comment>
+  </data>
+  <data name="AudioAndTranscriptsStayOnThisMac" xml:space="preserve">
+    <value>Âm thanh và bản chép lời được giữ trên máy Mac này.</value>
+    <comment>Audio and transcripts stay on this Mac.</comment>
+  </data>
+  <data name="AudioHasBeenRemoved" xml:space="preserve">
+    <value>Âm thanh đã bị xoá</value>
+    <comment>Audio has been removed</comment>
+  </data>
+  <data name="AudioLeavesThisMacCloudEnginesUploadTheRecordingToTheProvide" xml:space="preserve">
+    <value>Âm thanh rời khỏi máy Mac này: các công cụ đám mây tải bản ghi âm lên nhà cung cấp.</value>
+    <comment>Audio leaves this Mac: cloud engines upload the recording to the provider.</comment>
+  </data>
+  <data name="AudioLeavesThisMacTheCloudDiarizerUploadsTheSystemChannelToT" xml:space="preserve">
+    <value>Âm thanh rời khỏi máy Mac này: công cụ phân biệt người nói trên đám mây tải kênh hệ thống lên nhà cung cấp.</value>
+    <comment>Audio leaves this Mac: the cloud diarizer uploads the system channel to the provider.</comment>
+  </data>
+  <data name="AudioLeavesThisMacTheRecordingSMicAndSystemChannelsAreUpload" xml:space="preserve">
+    <value>Âm thanh rời khỏi máy Mac này: kênh micrô và kênh hệ thống của bản ghi âm được tải lên {0} ({1}) để chép lời và do họ tính phí. Nhà cung cấp có thể lưu giữ âm thanh theo chính sách lưu trữ riêng của họ. Bạn chỉ được hỏi một lần cho mỗi nhà cung cấp và nơi nhận.</value>
+    <comment>Audio leaves this Mac: the recording's mic and system channels are uploaded to %@ (%@) for transcription and billed by them. The provider may keep the audio under its own retention policy. You are asked once per provider and destination.</comment>
+  </data>
+  <data name="AudioOnlyKeepTranscriptSummaryAndChat" xml:space="preserve">
+    <value>Chỉ âm thanh (giữ bản chép lời, bản tóm tắt và cuộc trò chuyện)</value>
+    <comment>Audio only (keep transcript, summary and chat)</comment>
+  </data>
+  <data name="Authentication" xml:space="preserve">
+    <value>Xác thực</value>
+    <comment>Authentication</comment>
+  </data>
+  <data name="Auto" xml:space="preserve">
+    <value>Tự động</value>
+    <comment>Auto</comment>
+  </data>
+  <data name="AutoDelete" xml:space="preserve">
+    <value>Tự động xoá</value>
+    <comment>Auto-delete</comment>
+  </data>
+  <data name="AutoDeleteOldConversations" xml:space="preserve">
+    <value>Tự động xoá cuộc hội thoại cũ</value>
+    <comment>Auto-delete old conversations</comment>
+  </data>
+  <data name="AutoStop" xml:space="preserve">
+    <value>Tự động dừng</value>
+    <comment>Auto-stop</comment>
+  </data>
+  <data name="Available" xml:space="preserve">
+    <value>Khả dụng</value>
+    <comment>Available</comment>
+  </data>
+  <data name="Back" xml:space="preserve">
+    <value>Quay lại</value>
+    <comment>Back</comment>
+  </data>
+  <data name="BackEsc" xml:space="preserve">
+    <value>Quay lại (Esc)</value>
+    <comment>Back (Esc)</comment>
+  </data>
+  <data name="Balanced" xml:space="preserve">
+    <value>Cân bằng</value>
+    <comment>Balanced</comment>
+  </data>
+  <data name="BaseURL" xml:space="preserve">
+    <value>URL gốc</value>
+    <comment>Base URL</comment>
+  </data>
+  <data name="BaseURLNotSet" xml:space="preserve">
+    <value>Chưa đặt URL gốc</value>
+    <comment>Base URL not set</comment>
+  </data>
+  <data name="BearerToken" xml:space="preserve">
+    <value>Token Bearer</value>
+    <comment>Bearer token</comment>
+  </data>
+  <data name="BeforeYouRecord" xml:space="preserve">
+    <value>Trước khi ghi âm</value>
+    <comment>Before you record</comment>
+  </data>
+  <data name="BothVoicesInBothEars" xml:space="preserve">
+    <value>Cả hai giọng ở cả hai tai</value>
+    <comment>Both voices in both ears</comment>
+  </data>
+  <data name="BrowseModels" xml:space="preserve">
+    <value>Duyệt mô hình</value>
+    <comment>Browse models</comment>
+  </data>
+  <data name="BuiltIn" xml:space="preserve">
+    <value>Tích hợp sẵn</value>
+    <comment>Built in</comment>
+  </data>
+  <data name="CLIs" xml:space="preserve">
+    <value>CLI</value>
+    <comment>CLIs</comment>
+  </data>
+  <data name="Calendar" xml:space="preserve">
+    <value>Lịch</value>
+    <comment>Calendar</comment>
+  </data>
+  <data name="CalendarAccessIsOffTurnOnEchoDiarInPrivacySecurityCalendars" xml:space="preserve">
+    <value>Quyền truy cập lịch đang tắt. Hãy bật EchoDiar trong Quyền riêng tư &amp; Bảo mật › Lịch.</value>
+    <comment>Calendar access is off. Turn on EchoDiar in Privacy &amp; Security › Calendars.</comment>
+  </data>
+  <data name="CalendarSettings" xml:space="preserve">
+    <value>Cài đặt lịch…</value>
+    <comment>Calendar settings…</comment>
+  </data>
+  <data name="CallDetectedRecord" xml:space="preserve">
+    <value>Phát hiện cuộc gọi {0} — Ghi âm?</value>
+    <comment>%@ call detected — Record?</comment>
+  </data>
+  <data name="Cancel" xml:space="preserve">
+    <value>Huỷ</value>
+    <comment>Cancel</comment>
+  </data>
+  <data name="CancelTheSelectionEsc" xml:space="preserve">
+    <value>Huỷ lựa chọn (Esc)</value>
+    <comment>Cancel the selection (Esc)</comment>
+  </data>
+  <data name="CannotBeRecordedOnItsOwnAllSystemAudioWillBeRecorded" xml:space="preserve">
+    <value>Không thể ghi riêng {0}: toàn bộ âm thanh hệ thống sẽ được ghi lại.</value>
+    <comment>%@ cannot be recorded on its own: all system audio will be recorded.</comment>
+  </data>
+  <data name="Change" xml:space="preserve">
+    <value>Thay đổi</value>
+    <comment>Change</comment>
+  </data>
+  <data name="Chat" xml:space="preserve">
+    <value>Trò chuyện</value>
+    <comment>Chat</comment>
+  </data>
+  <data name="ChatContext" xml:space="preserve">
+    <value>Ngữ cảnh trò chuyện</value>
+    <comment>Chat context</comment>
+  </data>
+  <data name="ChatTemplatesOfLocalModels" xml:space="preserve">
+    <value>Mẫu trò chuyện của mô hình cục bộ</value>
+    <comment>Chat templates of local models</comment>
+  </data>
+  <data name="CheckAgain" xml:space="preserve">
+    <value>Kiểm tra lại</value>
+    <comment>Check Again</comment>
+  </data>
+  <data name="CheckForUpdates" xml:space="preserve">
+    <value>Kiểm tra bản cập nhật…</value>
+    <comment>Check for Updates…</comment>
+  </data>
+  <data name="ChooseModels" xml:space="preserve">
+    <value>Chọn mô hình…</value>
+    <comment>Choose Models…</comment>
+  </data>
+  <data name="ChooseWhatToRecordAndTheLanguage" xml:space="preserve">
+    <value>Chọn nội dung cần ghi âm và ngôn ngữ</value>
+    <comment>Choose what to record and the language</comment>
+  </data>
+  <data name="ClickToRecordANewShortcut" xml:space="preserve">
+    <value>Bấm để nhập phím tắt mới</value>
+    <comment>Click to record a new shortcut</comment>
+  </data>
+  <data name="Close" xml:space="preserve">
+    <value>Đóng</value>
+    <comment>Close</comment>
+  </data>
+  <data name="CloseSearchEsc" xml:space="preserve">
+    <value>Đóng tìm kiếm (Esc)</value>
+    <comment>Close search (Esc)</comment>
+  </data>
+  <data name="CloseTheHistory" xml:space="preserve">
+    <value>Đóng lịch sử</value>
+    <comment>Close the history</comment>
+  </data>
+  <data name="Cloud" xml:space="preserve">
+    <value>{0} (đám mây)</value>
+    <comment>%@ (cloud)</comment>
+  </data>
+  <data name="CloudAPIs" xml:space="preserve">
+    <value>API đám mây</value>
+    <comment>Cloud APIs</comment>
+  </data>
+  <data name="CloudDiarization" xml:space="preserve">
+    <value>Phân biệt người nói trên đám mây</value>
+    <comment>Cloud diarization</comment>
+  </data>
+  <data name="CloudDiarizationDoesNotTakeThisNumber" xml:space="preserve">
+    <value>Phân biệt người nói trên đám mây không dùng con số này.</value>
+    <comment>Cloud diarization does not take this number.</comment>
+  </data>
+  <data name="CloudDiarizationFailedAndNoDiarizationModelIsInstalledOnThis" xml:space="preserve">
+    <value>Phân biệt người nói trên đám mây không thành công và máy Mac này chưa cài mô hình phân biệt người nói nào.</value>
+    <comment>Cloud diarization failed and no diarization model is installed on this Mac.</comment>
+  </data>
+  <data name="CloudDiarizationFailedSpeakersWereToldApartOnThisMac" xml:space="preserve">
+    <value>Phân biệt người nói trên đám mây không thành công; người nói đã được phân biệt trên máy Mac này.</value>
+    <comment>Cloud diarization failed; speakers were told apart on this Mac.</comment>
+  </data>
+  <data name="CloudTranscriptionEngines" xml:space="preserve">
+    <value>Công cụ chép lời trên đám mây</value>
+    <comment>Cloud transcription engines</comment>
+  </data>
+  <data name="Cloud_2" xml:space="preserve">
+    <value>Đám mây</value>
+    <comment>Cloud</comment>
+  </data>
+  <data name="Collapse" xml:space="preserve">
+    <value>Thu gọn</value>
+    <comment>Collapse</comment>
+  </data>
+  <data name="Compressing" xml:space="preserve">
+    <value>Đang nén…</value>
+    <comment>Compressing…</comment>
+  </data>
+  <data name="CompressingTheAudio" xml:space="preserve">
+    <value>Đang nén âm thanh…</value>
+    <comment>Compressing the audio…</comment>
+  </data>
+  <data name="CompressionBitrate" xml:space="preserve">
+    <value>Tốc độ bit khi nén</value>
+    <comment>Compression bitrate</comment>
+  </data>
+  <data name="CompressionFailed" xml:space="preserve">
+    <value>Nén không thành công</value>
+    <comment>Compression failed</comment>
+  </data>
+  <data name="Confirm" xml:space="preserve">
+    <value>Xác nhận…</value>
+    <comment>Confirm…</comment>
+  </data>
+  <data name="ConfirmTheEmbeddingProviderInSettingsRAG" xml:space="preserve">
+    <value>Hãy xác nhận nhà cung cấp mô hình nhúng trong Cài đặt › RAG.</value>
+    <comment>Confirm the embedding provider in Settings › RAG.</comment>
+  </data>
+  <data name="Consent" xml:space="preserve">
+    <value>Sự đồng ý</value>
+    <comment>Consent</comment>
+  </data>
+  <data name="Continue" xml:space="preserve">
+    <value>Tiếp tục</value>
+    <comment>Continue</comment>
+  </data>
+  <data name="Copied" xml:space="preserve">
+    <value>Đã sao chép</value>
+    <comment>Copied</comment>
+  </data>
+  <data name="CopiedPasteIntoAnyChat" xml:space="preserve">
+    <value>Đã sao chép — hãy dán vào bất kỳ ứng dụng trò chuyện nào</value>
+    <comment>Copied — paste into any chat</comment>
+  </data>
+  <data name="Copy" xml:space="preserve">
+    <value>Sao chép</value>
+    <comment>Copy</comment>
+  </data>
+  <data name="CopyAsPrompt" xml:space="preserve">
+    <value>Sao chép thành lời nhắc</value>
+    <comment>Copy as prompt</comment>
+  </data>
+  <data name="CopyConsentMessage" xml:space="preserve">
+    <value>Sao chép lời xin đồng ý</value>
+    <comment>Copy consent message</comment>
+  </data>
+  <data name="CopyTheAnswer" xml:space="preserve">
+    <value>Sao chép câu trả lời</value>
+    <comment>Copy the answer</comment>
+  </data>
+  <data name="CopyTheTranscriptAndTheQuestionAsAPromptForAnyChatApp" xml:space="preserve">
+    <value>Sao chép bản chép lời và câu hỏi thành lời nhắc cho bất kỳ ứng dụng trò chuyện nào</value>
+    <comment>Copy the transcript and the question as a prompt for any chat app</comment>
+  </data>
+  <data name="CopyTheTranscriptAsASummaryPromptForAnyChatApp" xml:space="preserve">
+    <value>Sao chép bản chép lời thành lời nhắc tóm tắt cho bất kỳ ứng dụng trò chuyện nào</value>
+    <comment>Copy the transcript as a summary prompt for any chat app</comment>
+  </data>
+  <data name="CopyTranscript" xml:space="preserve">
+    <value>Sao chép bản chép lời</value>
+    <comment>Copy transcript</comment>
+  </data>
+  <data name="CouldNotBeRegisteredErrorD" xml:space="preserve">
+    <value>Không thể đăng ký {0} (lỗi {1}).</value>
+    <comment>%@ could not be registered (error %d).</comment>
+  </data>
+  <data name="Current" xml:space="preserve">
+    <value>Hiện tại</value>
+    <comment>Current</comment>
+  </data>
+  <data name="CurrentLldMessages" xml:space="preserve">
+    <value>Hiện tại · {0} tin nhắn</value>
+    <comment>Current · %lld messages</comment>
+  </data>
+  <data name="Custom" xml:space="preserve">
+    <value>Tuỳ chỉnh</value>
+    <comment>Custom</comment>
+  </data>
+  <data name="CustomOpenAICompatibleEndpoints" xml:space="preserve">
+    <value>Endpoint tuỳ chỉnh tương thích OpenAI</value>
+    <comment>Custom OpenAI-compatible endpoints</comment>
+  </data>
+  <data name="CustomURL" xml:space="preserve">
+    <value>URL tuỳ chỉnh</value>
+    <comment>Custom URL</comment>
+  </data>
+  <data name="Cut" xml:space="preserve">
+    <value>Cắt</value>
+    <comment>Cut</comment>
+  </data>
+  <data name="Daily" xml:space="preserve">
+    <value>Hàng ngày</value>
+    <comment>Daily</comment>
+  </data>
+  <data name="DataFolder" xml:space="preserve">
+    <value>Thư mục dữ liệu</value>
+    <comment>Data folder</comment>
+  </data>
+  <data name="DataSentToCloudProvidersOrCLIsLeavesThisMac" xml:space="preserve">
+    <value>Dữ liệu gửi đến nhà cung cấp đám mây hoặc CLI sẽ rời khỏi máy Mac này.</value>
+    <comment>Data sent to cloud providers or CLIs leaves this Mac.</comment>
+  </data>
+  <data name="DataSentToLeavesThisMac" xml:space="preserve">
+    <value>Dữ liệu gửi đến {0} sẽ rời khỏi máy Mac này.</value>
+    <comment>Data sent to %@ leaves this Mac.</comment>
+  </data>
+  <data name="Date" xml:space="preserve">
+    <value>Ngày</value>
+    <comment>Date</comment>
+  </data>
+  <data name="Days" xml:space="preserve">
+    <value>ngày</value>
+    <comment>days</comment>
+  </data>
+  <data name="Default" xml:space="preserve">
+    <value>{0} (mặc định)</value>
+    <comment>%@ (default)</comment>
+  </data>
+  <data name="DefaultLanguage" xml:space="preserve">
+    <value>Ngôn ngữ mặc định</value>
+    <comment>Default language</comment>
+  </data>
+  <data name="Default_2" xml:space="preserve">
+    <value>Mặc định</value>
+    <comment>Default</comment>
+  </data>
+  <data name="Delete" xml:space="preserve">
+    <value>Xoá</value>
+    <comment>Delete</comment>
+  </data>
+  <data name="DeleteARepeatingEvent" xml:space="preserve">
+    <value>Xoá một sự kiện lặp lại?</value>
+    <comment>Delete a repeating event?</comment>
+  </data>
+  <data name="DeleteAllEarlierChats" xml:space="preserve">
+    <value>Xoá mọi cuộc trò chuyện trước đó</value>
+    <comment>Delete all earlier chats</comment>
+  </data>
+  <data name="DeleteAllEarlierChats_2" xml:space="preserve">
+    <value>Xoá mọi cuộc trò chuyện trước đó?</value>
+    <comment>Delete all earlier chats?</comment>
+  </data>
+  <data name="DeleteAudioAfterTranscription" xml:space="preserve">
+    <value>Xoá âm thanh sau khi chép lời</value>
+    <comment>Delete audio after transcription</comment>
+  </data>
+  <data name="DeleteAudioOfTranscribedConversations" xml:space="preserve">
+    <value>Xoá âm thanh của các cuộc hội thoại đã chép lời…</value>
+    <comment>Delete audio of transcribed conversations…</comment>
+  </data>
+  <data name="DeleteAudioOnly" xml:space="preserve">
+    <value>Chỉ xoá âm thanh</value>
+    <comment>Delete audio only</comment>
+  </data>
+  <data name="DeleteAudioOnly_2" xml:space="preserve">
+    <value>Chỉ xoá âm thanh…</value>
+    <comment>Delete audio only…</comment>
+  </data>
+  <data name="DeleteConversation" xml:space="preserve">
+    <value>Xoá cuộc hội thoại</value>
+    <comment>Delete conversation</comment>
+  </data>
+  <data name="DeleteConversation_2" xml:space="preserve">
+    <value>Xoá cuộc hội thoại…</value>
+    <comment>Delete conversation…</comment>
+  </data>
+  <data name="DeleteConversations" xml:space="preserve">
+    <value>Xoá các cuộc hội thoại</value>
+    <comment>Delete conversations</comment>
+  </data>
+  <data name="DeleteConversationsWithoutConfirmation" xml:space="preserve">
+    <value>Xoá cuộc hội thoại mà không cần xác nhận</value>
+    <comment>Delete conversations without confirmation</comment>
+  </data>
+  <data name="DeleteConversations_2" xml:space="preserve">
+    <value>Xoá các cuộc hội thoại…</value>
+    <comment>Delete conversations…</comment>
+  </data>
+  <data name="DeleteEvent" xml:space="preserve">
+    <value>Xoá sự kiện…</value>
+    <comment>Delete Event…</comment>
+  </data>
+  <data name="DeleteEveryDownloadedModel" xml:space="preserve">
+    <value>Xoá mọi mô hình đã tải về</value>
+    <comment>Delete every downloaded model</comment>
+  </data>
+  <data name="DeleteEveryTranscriptSummaryAndChat" xml:space="preserve">
+    <value>Xoá mọi bản chép lời, bản tóm tắt và cuộc trò chuyện</value>
+    <comment>Delete every transcript, summary and chat</comment>
+  </data>
+  <data name="DeleteLldConversations" xml:space="preserve">
+    <value>Xoá {0} cuộc hội thoại?</value>
+    <comment>Delete %lld conversations?</comment>
+  </data>
+  <data name="DeleteLldDownloadedModels" xml:space="preserve">
+    <value>Xoá {0} mô hình đã tải về?</value>
+    <comment>Delete %lld downloaded models?</comment>
+  </data>
+  <data name="DeleteMoreAtTheNextRun" xml:space="preserve">
+    <value>Xoá thêm ở lần chạy tới?</value>
+    <comment>Delete more at the next run?</comment>
+  </data>
+  <data name="DeleteTheAudioOf" xml:space="preserve">
+    <value>Xoá âm thanh của "{0}"?</value>
+    <comment>Delete the audio of "%@"?</comment>
+  </data>
+  <data name="DeleteTheAudioOfEveryConversation" xml:space="preserve">
+    <value>Xoá âm thanh của mọi cuộc hội thoại</value>
+    <comment>Delete the audio of every conversation</comment>
+  </data>
+  <data name="DeleteTheAudioOfLldConversations" xml:space="preserve">
+    <value>Xoá âm thanh của {0} cuộc hội thoại?</value>
+    <comment>Delete the audio of %lld conversations?</comment>
+  </data>
+  <data name="DeleteTheAudioOfLldTranscribedConversations" xml:space="preserve">
+    <value>Xoá âm thanh của {0} cuộc hội thoại đã chép lời?</value>
+    <comment>Delete the audio of %lld transcribed conversations?</comment>
+  </data>
+  <data name="DeleteTheAudioOrTheSelectedConversations" xml:space="preserve">
+    <value>Xoá âm thanh hoặc các cuộc hội thoại đã chọn</value>
+    <comment>Delete the audio or the selected conversations</comment>
+  </data>
+  <data name="DeleteTheAudioOrTheWholeConversation" xml:space="preserve">
+    <value>Xoá âm thanh hoặc toàn bộ cuộc hội thoại</value>
+    <comment>Delete the audio or the whole conversation</comment>
+  </data>
+  <data name="DeleteTheTranscriptsSummariesAndChatsOfLldConversations" xml:space="preserve">
+    <value>Xoá bản chép lời, bản tóm tắt và cuộc trò chuyện của {0} cuộc hội thoại?</value>
+    <comment>Delete the transcripts, summaries and chats of %lld conversations?</comment>
+  </data>
+  <data name="DeleteThisEvent" xml:space="preserve">
+    <value>Xoá sự kiện này?</value>
+    <comment>Delete this event?</comment>
+  </data>
+  <data name="Delete_2" xml:space="preserve">
+    <value>Xoá "{0}"?</value>
+    <comment>Delete "%@"?</comment>
+  </data>
+  <data name="Delete_3" xml:space="preserve">
+    <value>Xoá {0}</value>
+    <comment>Delete %@</comment>
+  </data>
+  <data name="DeletesTheIndexAndEmbedsEveryConversationAgain" xml:space="preserve">
+    <value>Xoá chỉ mục và nhúng lại mọi cuộc hội thoại.</value>
+    <comment>Deletes the index and embeds every conversation again.</comment>
+  </data>
+  <data name="DeploymentName" xml:space="preserve">
+    <value>Tên triển khai</value>
+    <comment>Deployment name</comment>
+  </data>
+  <data name="DetectMeetings" xml:space="preserve">
+    <value>Phát hiện cuộc họp</value>
+    <comment>Detect meetings</comment>
+  </data>
+  <data name="DetectMeetingsIsOffSoEchoDiarAsksInstead" xml:space="preserve">
+    <value>Phát hiện cuộc họp đang tắt nên EchoDiar sẽ hỏi thay.</value>
+    <comment>Detect meetings is off, so EchoDiar asks instead.</comment>
+  </data>
+  <data name="Detected" xml:space="preserve">
+    <value>Đã phát hiện: {0}</value>
+    <comment>Detected: %@</comment>
+  </data>
+  <data name="DiarizationFindsWhoSpokeWhenTheDiarizationModelTellsTheVoice" xml:space="preserve">
+    <value>Phân biệt người nói cho biết ai nói khi nào. Mô hình phân biệt người nói tách các giọng nói và gắn nhãn người nói cho từng phần của bản chép lời.</value>
+    <comment>Diarization finds who spoke when. The diarization model tells the voices apart and labels each part of the transcript with its speaker.</comment>
+  </data>
+  <data name="DiarizationModel" xml:space="preserve">
+    <value>Mô hình phân biệt người nói</value>
+    <comment>Diarization model</comment>
+  </data>
+  <data name="DiarizationModelId" xml:space="preserve">
+    <value>ID mô hình phân biệt người nói</value>
+    <comment>Diarization model id</comment>
+  </data>
+  <data name="DiarizationModels" xml:space="preserve">
+    <value>Mô hình phân biệt người nói</value>
+    <comment>Diarization models</comment>
+  </data>
+  <data name="Done" xml:space="preserve">
+    <value>Xong</value>
+    <comment>Done</comment>
+  </data>
+  <data name="Download" xml:space="preserve">
+    <value>Tải về</value>
+    <comment>Download</comment>
+  </data>
+  <data name="DownloadAModel" xml:space="preserve">
+    <value>Tải về một mô hình…</value>
+    <comment>Download a model…</comment>
+  </data>
+  <data name="DownloadATranscriptionModelInSettings" xml:space="preserve">
+    <value>Tải về mô hình chép lời trong Cài đặt</value>
+    <comment>Download a transcription model in Settings</comment>
+  </data>
+  <data name="DownloadTheEmbeddingModelInSettingsRAG" xml:space="preserve">
+    <value>Tải về mô hình nhúng trong Cài đặt › RAG</value>
+    <comment>Download the embedding model in Settings › RAG</comment>
+  </data>
+  <data name="Download_2" xml:space="preserve">
+    <value>Tải về {0}?</value>
+    <comment>Download %@?</comment>
+  </data>
+  <data name="Download_3" xml:space="preserve">
+    <value>Tải về…</value>
+    <comment>Download…</comment>
+  </data>
+  <data name="EarlierChatsAcrossConversations" xml:space="preserve">
+    <value>Các cuộc trò chuyện trước trên mọi cuộc hội thoại</value>
+    <comment>Earlier chats across conversations</comment>
+  </data>
+  <data name="EarlierChatsOfThisConversation" xml:space="preserve">
+    <value>Các cuộc trò chuyện trước của cuộc hội thoại này</value>
+    <comment>Earlier chats of this conversation</comment>
+  </data>
+  <data name="EarlierMessagesSentWithEachQuestion" xml:space="preserve">
+    <value>Các tin nhắn trước được gửi kèm mỗi câu hỏi.</value>
+    <comment>Earlier messages sent with each question.</comment>
+  </data>
+  <data name="EarlierSummariesOfThisConversation" xml:space="preserve">
+    <value>Các bản tóm tắt trước của cuộc hội thoại này</value>
+    <comment>Earlier summaries of this conversation</comment>
+  </data>
+  <data name="EarlierTranscriptsOfThisConversation" xml:space="preserve">
+    <value>Các bản chép lời trước của cuộc hội thoại này</value>
+    <comment>Earlier transcripts of this conversation</comment>
+  </data>
+  <data name="EchoDiar" xml:space="preserve">
+    <value>EchoDiar</value>
+    <comment>EchoDiar</comment>
+  </data>
+  <data name="EchoDiarHasNoAccessToYourCalendars" xml:space="preserve">
+    <value>EchoDiar không có quyền truy cập lịch của bạn.</value>
+    <comment>EchoDiar has no access to your calendars.</comment>
+  </data>
+  <data name="EchoDiarHasNoAccessibilityAccess" xml:space="preserve">
+    <value>EchoDiar không có quyền Trợ năng.</value>
+    <comment>EchoDiar has no Accessibility access.</comment>
+  </data>
+  <data name="EchoDiarHasNoCalendarAccessYet" xml:space="preserve">
+    <value>EchoDiar chưa có quyền truy cập lịch.</value>
+    <comment>EchoDiar has no calendar access yet.</comment>
+  </data>
+  <data name="EchoDiarHeardOnlySilence" xml:space="preserve">
+    <value>EchoDiar chỉ nghe thấy sự im lặng.</value>
+    <comment>EchoDiar heard only silence.</comment>
+  </data>
+  <data name="EchoDiarIncludesThisOpenSourceSoftwareChooseOneToReadItsLice" xml:space="preserve">
+    <value>EchoDiar bao gồm phần mềm nguồn mở này. Hãy chọn một mục để đọc giấy phép.</value>
+    <comment>EchoDiar includes this open-source software. Choose one to read its license.</comment>
+  </data>
+  <data name="EchoDiarMayLackSystemAudioRecordingPermissionAllowItThenRest" xml:space="preserve">
+    <value>EchoDiar có thể chưa có quyền Ghi âm thanh hệ thống. Hãy cho phép, rồi bắt đầu ghi âm lại.</value>
+    <comment>EchoDiar may lack System Audio Recording permission. Allow it, then restart the recording.</comment>
+  </data>
+  <data name="EchoDiarProcessing" xml:space="preserve">
+    <value>EchoDiar, đang xử lý</value>
+    <comment>EchoDiar, processing</comment>
+  </data>
+  <data name="EchoDiarReactsToMeetingsOnlyWhileItRunsTurnOnLaunchAtLoginIn" xml:space="preserve">
+    <value>EchoDiar chỉ phản hồi các cuộc họp khi đang chạy. Hãy bật Mở khi đăng nhập trong Chung.</value>
+    <comment>EchoDiar reacts to meetings only while it runs. Turn on Launch at login in General.</comment>
+  </data>
+  <data name="EchoDiarRecording" xml:space="preserve">
+    <value>EchoDiar, đang ghi âm</value>
+    <comment>EchoDiar, recording</comment>
+  </data>
+  <data name="EchoDiarRecordingPaused" xml:space="preserve">
+    <value>EchoDiar, đã tạm dừng ghi âm</value>
+    <comment>EchoDiar, recording paused</comment>
+  </data>
+  <data name="EchoDiarRecordsTheOtherPeopleOnTheCallFromYourMacSAudioTheTe" xml:space="preserve">
+    <value>EchoDiar ghi lại những người khác trong cuộc gọi từ âm thanh của máy Mac. Bài kiểm tra phát một âm thanh ngắn và lắng nghe âm thanh đó. macOS sẽ hỏi quyền Ghi âm thanh hệ thống trong lần đầu tiên.</value>
+    <comment>EchoDiar records the other people on the call from your Mac's audio. The test plays a short sound and listens for it. macOS asks for System Audio Recording permission the first time.</comment>
+  </data>
+  <data name="EchoDiarRecordsYourVoiceOnItsOwnChannelSoTheTranscriptKnowsW" xml:space="preserve">
+    <value>EchoDiar ghi giọng của bạn trên một kênh riêng, nhờ đó bản chép lời biết bạn đã nói gì.</value>
+    <comment>EchoDiar records your voice on its own channel, so the transcript knows what you said.</comment>
+  </data>
+  <data name="EchoDiarSUpdates" xml:space="preserve">
+    <value>Bản cập nhật của EchoDiar</value>
+    <comment>EchoDiar's updates</comment>
+  </data>
+  <data name="Edit" xml:space="preserve">
+    <value>Sửa</value>
+    <comment>Edit</comment>
+  </data>
+  <data name="EditEvent" xml:space="preserve">
+    <value>Sửa sự kiện</value>
+    <comment>Edit Event</comment>
+  </data>
+  <data name="Edit_2" xml:space="preserve">
+    <value>Sửa…</value>
+    <comment>Edit…</comment>
+  </data>
+  <data name="EmbeddingModel" xml:space="preserve">
+    <value>Mô hình nhúng</value>
+    <comment>Embedding model</comment>
+  </data>
+  <data name="EmbeddingModelId" xml:space="preserve">
+    <value>ID mô hình nhúng</value>
+    <comment>Embedding model id</comment>
+  </data>
+  <data name="EmptyTheCLISDefault" xml:space="preserve">
+    <value>Để trống = mặc định của CLI</value>
+    <comment>Empty = the CLI's default</comment>
+  </data>
+  <data name="End" xml:space="preserve">
+    <value>Kết thúc</value>
+    <comment>End</comment>
+  </data>
+  <data name="EndDate" xml:space="preserve">
+    <value>Ngày kết thúc</value>
+    <comment>End date</comment>
+  </data>
+  <data name="EndRepeat" xml:space="preserve">
+    <value>Kết thúc lặp lại</value>
+    <comment>End Repeat</comment>
+  </data>
+  <data name="English" xml:space="preserve">
+    <value>Tiếng Anh</value>
+    <comment>English</comment>
+  </data>
+  <data name="EnterANewKeyToReplaceIt" xml:space="preserve">
+    <value>Nhập khoá mới để thay thế</value>
+    <comment>Enter a new key to replace it</comment>
+  </data>
+  <data name="EnterTheEmbeddingModelOfInSettingsRAG" xml:space="preserve">
+    <value>Nhập mô hình nhúng của {0} trong Cài đặt › RAG</value>
+    <comment>Enter the embedding model of %@ in Settings › RAG</comment>
+  </data>
+  <data name="Expand" xml:space="preserve">
+    <value>Mở rộng</value>
+    <comment>Expand</comment>
+  </data>
+  <data name="Failed" xml:space="preserve">
+    <value>Không thành công</value>
+    <comment>Failed</comment>
+  </data>
+  <data name="Fast" xml:space="preserve">
+    <value>Nhanh</value>
+    <comment>Fast</comment>
+  </data>
+  <data name="File" xml:space="preserve">
+    <value>Tệp</value>
+    <comment>File</comment>
+  </data>
+  <data name="Filter" xml:space="preserve">
+    <value>Lọc</value>
+    <comment>Filter</comment>
+  </data>
+  <data name="FilterModels" xml:space="preserve">
+    <value>Lọc mô hình</value>
+    <comment>Filter models</comment>
+  </data>
+  <data name="Finishing" xml:space="preserve">
+    <value>Đang hoàn tất…</value>
+    <comment>Finishing…</comment>
+  </data>
+  <data name="FloatingIndicator" xml:space="preserve">
+    <value>Chỉ báo nổi</value>
+    <comment>Floating indicator</comment>
+  </data>
+  <data name="ForExample" xml:space="preserve">
+    <value>Ví dụ:</value>
+    <comment>For example:</comment>
+  </data>
+  <data name="FreeSpace" xml:space="preserve">
+    <value>Giải phóng dung lượng</value>
+    <comment>Free space</comment>
+  </data>
+  <data name="FreeUnusedModelsAfter" xml:space="preserve">
+    <value>Giải phóng mô hình không dùng sau</value>
+    <comment>Free unused models after</comment>
+  </data>
+  <data name="French" xml:space="preserve">
+    <value>Tiếng Pháp</value>
+    <comment>French</comment>
+  </data>
+  <data name="GB" xml:space="preserve">
+    <value>{0} GB</value>
+    <comment>%@ GB</comment>
+  </data>
+  <data name="General" xml:space="preserve">
+    <value>Chung</value>
+    <comment>General</comment>
+  </data>
+  <data name="GetAnAPIKey" xml:space="preserve">
+    <value>Lấy khoá API</value>
+    <comment>Get an API key</comment>
+  </data>
+  <data name="GithubComDinhanhthiEchoDiar" xml:space="preserve">
+    <value>github.com/dinhanhthi/EchoDiar</value>
+    <comment>github.com/dinhanhthi/EchoDiar</comment>
+  </data>
+  <data name="GlobalPauseShortcut" xml:space="preserve">
+    <value>Phím tắt tạm dừng toàn cục</value>
+    <comment>Global pause shortcut</comment>
+  </data>
+  <data name="GlobalRecordShortcut" xml:space="preserve">
+    <value>Phím tắt ghi âm toàn cục</value>
+    <comment>Global record shortcut</comment>
+  </data>
+  <data name="GrantAccess" xml:space="preserve">
+    <value>Cấp quyền</value>
+    <comment>Grant Access</comment>
+  </data>
+  <data name="GrantAccessibility" xml:space="preserve">
+    <value>Cấp quyền Trợ năng…</value>
+    <comment>Grant Accessibility…</comment>
+  </data>
+  <data name="HeadsUpIMRecordingThisCallToTakeNotesTheRecordingStaysOnMyMa" xml:space="preserve">
+    <value>Xin lưu ý: tôi đang ghi âm cuộc gọi này để ghi chú. Bản ghi âm được lưu giữ trên máy Mac của tôi.</value>
+    <comment>Heads up: I'm recording this call to take notes. The recording stays on my Mac.</comment>
+  </data>
+  <data name="HideEchoDiar" xml:space="preserve">
+    <value>Ẩn EchoDiar</value>
+    <comment>Hide EchoDiar</comment>
+  </data>
+  <data name="HideItWhileAnEchoDiarWindowIsInFront" xml:space="preserve">
+    <value>Ẩn khi một cửa sổ EchoDiar ở phía trước</value>
+    <comment>Hide it while an EchoDiar window is in front</comment>
+  </data>
+  <data name="History" xml:space="preserve">
+    <value>Lịch sử</value>
+    <comment>History</comment>
+  </data>
+  <data name="HowTheTranscriptPlaysYourMicrophoneAndTheMeetingSSound" xml:space="preserve">
+    <value>Cách bản chép lời phát âm thanh micrô của bạn và âm thanh cuộc họp.</value>
+    <comment>How the transcript plays your microphone and the meeting's sound.</comment>
+  </data>
+  <data name="Http1270018080V1" xml:space="preserve">
+    <value>http://127.0.0.1:8080/v1</value>
+    <comment>http://127.0.0.1:8080/v1</comment>
+  </data>
+  <data name="HttpsResourceOpenaiAzureComOpenaiV1" xml:space="preserve">
+    <value>https://&lt;resource&gt;.openai.azure.com/openai/v1</value>
+    <comment>https://&lt;resource&gt;.openai.azure.com/openai/v1</comment>
+  </data>
+  <data name="HuggingFaceDownloads" xml:space="preserve">
+    <value>Tải về từ Hugging Face</value>
+    <comment>Hugging Face downloads</comment>
+  </data>
+  <data name="IdentifyingSpeakers" xml:space="preserve">
+    <value>Đang nhận diện người nói…</value>
+    <comment>Identifying speakers…</comment>
+  </data>
+  <data name="Ignore" xml:space="preserve">
+    <value>Bỏ qua</value>
+    <comment>Ignore</comment>
+  </data>
+  <data name="InEchoDiar" xml:space="preserve">
+    <value>Trong EchoDiar</value>
+    <comment>In EchoDiar</comment>
+  </data>
+  <data name="InTheAIPaneSModelMenu" xml:space="preserve">
+    <value>Trong menu mô hình của ngăn AI</value>
+    <comment>In the AI pane's model menu</comment>
+  </data>
+  <data name="Index" xml:space="preserve">
+    <value>Chỉ mục</value>
+    <comment>Index</comment>
+  </data>
+  <data name="IndexedLldOfLldConversations" xml:space="preserve">
+    <value>Đã lập chỉ mục {0} trên {1} cuộc hội thoại</value>
+    <comment>Indexed %lld of %lld conversations</comment>
+  </data>
+  <data name="IndexingLldOfLld" xml:space="preserve">
+    <value>Đang lập chỉ mục {0} trên {1}…</value>
+    <comment>Indexing %lld of %lld…</comment>
+  </data>
+  <data name="IndexingPausedAtLldOfLld" xml:space="preserve">
+    <value>Đã tạm dừng lập chỉ mục ở {0} trên {1}</value>
+    <comment>Indexing paused at %lld of %lld</comment>
+  </data>
+  <data name="IndexingStopped" xml:space="preserve">
+    <value>Đã dừng lập chỉ mục: {0}</value>
+    <comment>Indexing stopped: %@</comment>
+  </data>
+  <data name="IndexingStoppedAt" xml:space="preserve">
+    <value>Đã dừng lập chỉ mục ở "{0}": {1}</value>
+    <comment>Indexing stopped at "%@": %@</comment>
+  </data>
+  <data name="IndexingYourConversationsOnThisMacNeedsThisEmbeddingModelYou" xml:space="preserve">
+    <value>Việc lập chỉ mục các cuộc hội thoại trên máy Mac này cần mô hình nhúng này ({0}). Bạn cũng có thể chọn một mô hình khác ở bên dưới.</value>
+    <comment>Indexing your conversations on this Mac needs this embedding model (%@). You can also pick another model below.</comment>
+  </data>
+  <data name="IndicatorSize" xml:space="preserve">
+    <value>Kích thước chỉ báo</value>
+    <comment>Indicator size</comment>
+  </data>
+  <data name="InstallTheAvailableUpdate" xml:space="preserve">
+    <value>Cài đặt bản cập nhật hiện có</value>
+    <comment>Install the available update</comment>
+  </data>
+  <data name="InstallTheUpdateFirst" xml:space="preserve">
+    <value>Hãy cài bản cập nhật trước</value>
+    <comment>Install the update first</comment>
+  </data>
+  <data name="InstallUpdateAndRelaunch" xml:space="preserve">
+    <value>Cài đặt bản cập nhật và khởi động lại</value>
+    <comment>Install Update and Relaunch</comment>
+  </data>
+  <data name="Installed" xml:space="preserve">
+    <value>Đã cài đặt</value>
+    <comment>Installed</comment>
+  </data>
+  <data name="Installed_2" xml:space="preserve">
+    <value>Đã cài đặt: {0}</value>
+    <comment>Installed: %@</comment>
+  </data>
+  <data name="IsAlreadyUsedByAnotherAppPickAnotherShortcut" xml:space="preserve">
+    <value>{0} đã được một ứng dụng khác sử dụng. Hãy chọn phím tắt khác.</value>
+    <comment>%@ is already used by another app. Pick another shortcut.</comment>
+  </data>
+  <data name="IsNotAvailable" xml:space="preserve">
+    <value>{0} không khả dụng.</value>
+    <comment>%@ is not available.</comment>
+  </data>
+  <data name="IsStarting" xml:space="preserve">
+    <value>{0} đang bắt đầu</value>
+    <comment>%@ is starting</comment>
+  </data>
+  <data name="IsTheGlobalPauseShortcut" xml:space="preserve">
+    <value>{0} là phím tắt tạm dừng toàn cục.</value>
+    <comment>%@ is the global pause shortcut.</comment>
+  </data>
+  <data name="IsTheGlobalRecordShortcut" xml:space="preserve">
+    <value>{0} là phím tắt ghi âm toàn cục.</value>
+    <comment>%@ is the global record shortcut.</comment>
+  </data>
+  <data name="IsTheMenuShortcut" xml:space="preserve">
+    <value>{0} là phím tắt của mục menu "{1}".</value>
+    <comment>%@ is the "%@" menu shortcut.</comment>
+  </data>
+  <data name="ItNeedsAnIndexOfYourTranscriptsBuiltOnThisMacByDefault" xml:space="preserve">
+    <value>Cần có chỉ mục các bản chép lời của bạn, mặc định được tạo trên máy Mac này.</value>
+    <comment>It needs an index of your transcripts, built on this Mac by default.</comment>
+  </data>
+  <data name="Join" xml:space="preserve">
+    <value>Tham gia</value>
+    <comment>Join</comment>
+  </data>
+  <data name="KeepRecording" xml:space="preserve">
+    <value>Tiếp tục ghi âm</value>
+    <comment>Keep recording</comment>
+  </data>
+  <data name="KeepUncompressedAudio" xml:space="preserve">
+    <value>Giữ âm thanh không nén</value>
+    <comment>Keep uncompressed audio</comment>
+  </data>
+  <data name="KeepsItAtTheWindowSTopRightCornerNeedsAccessibilityAccess" xml:space="preserve">
+    <value>Giữ ở góc trên bên phải của cửa sổ. Cần quyền Trợ năng.</value>
+    <comment>Keeps it at the window's top-right corner. Needs Accessibility access.</comment>
+  </data>
+  <data name="KeepsTheOriginalCAFNextToTheCompressedFileAbout10TimesLarger" xml:space="preserve">
+    <value>Giữ tệp CAF gốc bên cạnh tệp đã nén (lớn hơn khoảng 10 lần).</value>
+    <comment>Keeps the original CAF next to the compressed file (about 10 times larger).</comment>
+  </data>
+  <data name="KeyLld" xml:space="preserve">
+    <value>Phím {0}</value>
+    <comment>Key %lld</comment>
+  </data>
+  <data name="LLMDiarizationTimestampsApproximateSpeakersCanBeMislabeled" xml:space="preserve">
+    <value>Phân biệt người nói bằng LLM — dấu thời gian chỉ gần đúng, người nói có thể bị gắn nhãn sai.</value>
+    <comment>LLM diarization — timestamps approximate, speakers can be mislabeled.</comment>
+  </data>
+  <data name="LLMTranscriptionTimestampsApproximate" xml:space="preserve">
+    <value>Chép lời bằng LLM — dấu thời gian chỉ gần đúng.</value>
+    <comment>LLM transcription — timestamps approximate.</comment>
+  </data>
+  <data name="LabelsEachVoiceInTheMeetingAudioSpeaker12OffTheMeetingAudioI" xml:space="preserve">
+    <value>Gắn nhãn từng giọng trong âm thanh cuộc họp: Người nói 1, 2, … Tắt: âm thanh cuộc họp là một người nói.</value>
+    <comment>Labels each voice in the meeting audio: Speaker 1, 2, … Off: the meeting audio is one speaker.</comment>
+  </data>
+  <data name="Language" xml:space="preserve">
+    <value>Ngôn ngữ</value>
+    <comment>Language</comment>
+  </data>
+  <data name="LanguageFromNowOn" xml:space="preserve">
+    <value>Ngôn ngữ từ giờ trở đi</value>
+    <comment>Language from now on</comment>
+  </data>
+  <data name="LanguageOfSummariesAndAnswersAutoTheTranscriptSLanguageForSu" xml:space="preserve">
+    <value>Ngôn ngữ của bản tóm tắt và câu trả lời (Tự động = ngôn ngữ của bản chép lời đối với bản tóm tắt, của câu hỏi đối với câu trả lời)</value>
+    <comment>Language of summaries and answers (Auto = the transcript's language for summaries, the question's for answers)</comment>
+  </data>
+  <data name="Large" xml:space="preserve">
+    <value>Lớn</value>
+    <comment>Large</comment>
+  </data>
+  <data name="LargestConversations" xml:space="preserve">
+    <value>Cuộc hội thoại lớn nhất</value>
+    <comment>Largest conversations</comment>
+  </data>
+  <data name="LaunchAtLogin" xml:space="preserve">
+    <value>Mở khi đăng nhập</value>
+    <comment>Launch at login</comment>
+  </data>
+  <data name="LeavesThisMac" xml:space="preserve">
+    <value>{0} (rời khỏi máy Mac này)</value>
+    <comment>%@ (leaves this Mac)</comment>
+  </data>
+  <data name="LeavesThisMac_2" xml:space="preserve">
+    <value>Rời khỏi máy Mac này</value>
+    <comment>Leaves this Mac</comment>
+  </data>
+  <data name="Library" xml:space="preserve">
+    <value>Thư viện</value>
+    <comment>Library</comment>
+  </data>
+  <data name="LicensedUnderAGPL30" xml:space="preserve">
+    <value>Cấp phép theo AGPL-3.0</value>
+    <comment>Licensed under AGPL-3.0</comment>
+  </data>
+  <data name="Listening" xml:space="preserve">
+    <value>Đang nghe…</value>
+    <comment>Listening…</comment>
+  </data>
+  <data name="LiveTranscript" xml:space="preserve">
+    <value>Chép lời trực tiếp</value>
+    <comment>Live transcript</comment>
+  </data>
+  <data name="LiveTranscriptListening" xml:space="preserve">
+    <value>Chép lời trực tiếp: đang nghe…</value>
+    <comment>Live transcript: listening…</comment>
+  </data>
+  <data name="LiveTranscriptLoadingTheModel" xml:space="preserve">
+    <value>Chép lời trực tiếp: đang tải mô hình…</value>
+    <comment>Live transcript: loading the model…</comment>
+  </data>
+  <data name="LiveTranscriptPaused" xml:space="preserve">
+    <value>Chép lời trực tiếp: đã tạm dừng</value>
+    <comment>Live transcript: paused</comment>
+  </data>
+  <data name="LiveTranscriptStoppedTheTranscriptIsMadeAfterStop" xml:space="preserve">
+    <value>Đã dừng chép lời trực tiếp. Bản chép lời sẽ được tạo sau khi bấm Dừng.</value>
+    <comment>Live transcript stopped. The transcript is made after Stop.</comment>
+  </data>
+  <data name="LldConversationsWithoutAudioWouldBeLeftEmptyTheyAreMovedToTh" xml:space="preserve">
+    <value>{0} cuộc hội thoại không có âm thanh sẽ trở nên trống: chúng được chuyển toàn bộ vào Thùng rác.</value>
+    <comment>%lld conversations without audio would be left empty: they are moved to the Trash entirely.</comment>
+  </data>
+  <data name="LldKbps" xml:space="preserve">
+    <value>{0} kbps</value>
+    <comment>%lld kbps</comment>
+  </data>
+  <data name="LldLanguages" xml:space="preserve">
+    <value>{0} ngôn ngữ</value>
+    <comment>%lld languages</comment>
+  </data>
+  <data name="LldMB" xml:space="preserve">
+    <value>{0} MB</value>
+    <comment>%lld MB</comment>
+  </data>
+  <data name="LldMessages" xml:space="preserve">
+    <value>{0} · {1} tin nhắn</value>
+    <comment>%@ · %lld messages</comment>
+  </data>
+  <data name="LldMessages_2" xml:space="preserve">
+    <value>{0} tin nhắn</value>
+    <comment>%lld messages</comment>
+  </data>
+  <data name="LldMiB" xml:space="preserve">
+    <value>{0} MiB</value>
+    <comment>%lld MiB</comment>
+  </data>
+  <data name="LldMin" xml:space="preserve">
+    <value>{0} phút</value>
+    <comment>%lld min</comment>
+  </data>
+  <data name="LldModels" xml:space="preserve">
+    <value>{0} - {1} mô hình</value>
+    <comment>%@ - %lld models</comment>
+  </data>
+  <data name="LldModels_2" xml:space="preserve">
+    <value>{0} mô hình</value>
+    <comment>%lld models</comment>
+  </data>
+  <data name="LldOfThemHaveNoTranscriptYetNothingOfItWillBeLeftToRead" xml:space="preserve">
+    <value>{0} cuộc trong số đó chưa có bản chép lời: sẽ không còn gì để đọc.</value>
+    <comment>%lld of them have no transcript yet: nothing of it will be left to read.</comment>
+  </data>
+  <data name="LldPercent" xml:space="preserve">
+    <value>{0} phần trăm</value>
+    <comment>%lld percent</comment>
+  </data>
+  <data name="LldSelected" xml:space="preserve">
+    <value>Đã chọn {0}</value>
+    <comment>%lld selected</comment>
+  </data>
+  <data name="LoadModels" xml:space="preserve">
+    <value>Tải danh sách mô hình</value>
+    <comment>Load models</comment>
+  </data>
+  <data name="LocalHosts" xml:space="preserve">
+    <value>Máy chủ cục bộ</value>
+    <comment>Local hosts</comment>
+  </data>
+  <data name="LocalLanguageAndEmbeddingModels" xml:space="preserve">
+    <value>Mô hình ngôn ngữ và mô hình nhúng cục bộ</value>
+    <comment>Local language and embedding models</comment>
+  </data>
+  <data name="LookingFor" xml:space="preserve">
+    <value>Đang tìm {0}...</value>
+    <comment>Looking for %@...</comment>
+  </data>
+  <data name="MacOSGivesSilenceNotAnErrorWhenSystemAudioRecordingIsOffIfYo" xml:space="preserve">
+    <value>macOS trả về sự im lặng chứ không báo lỗi khi quyền Ghi âm thanh hệ thống bị tắt. Nếu bạn vừa cho phép, hãy kiểm tra lại. Nếu không, hãy bật EchoDiar trong Quyền riêng tư &amp; Bảo mật › Ghi màn hình &amp; âm thanh hệ thống.</value>
+    <comment>macOS gives silence, not an error, when System Audio Recording is off. If you just allowed it, test again. Otherwise turn on EchoDiar in Privacy &amp; Security › Screen &amp; System Audio Recording.</comment>
+  </data>
+  <data name="MacOSLld" xml:space="preserve">
+    <value>macOS {0}+</value>
+    <comment>macOS %lld+</comment>
+  </data>
+  <data name="MacOSRefusedToCaptureSystemAudio" xml:space="preserve">
+    <value>macOS đã từ chối thu âm thanh hệ thống.</value>
+    <comment>macOS refused to capture system audio.</comment>
+  </data>
+  <data name="MachineLearningOnAppleSilicon" xml:space="preserve">
+    <value>Học máy trên Apple silicon</value>
+    <comment>Machine learning on Apple silicon</comment>
+  </data>
+  <data name="MakeANewSummaryTheEarlierOnesStayInTheVersionMenu" xml:space="preserve">
+    <value>Tạo bản tóm tắt mới; các bản trước vẫn còn trong menu phiên bản</value>
+    <comment>Make a new summary; the earlier ones stay in the version menu</comment>
+  </data>
+  <data name="Me" xml:space="preserve">
+    <value>Tôi</value>
+    <comment>Me</comment>
+  </data>
+  <data name="Medium" xml:space="preserve">
+    <value>Vừa</value>
+    <comment>Medium</comment>
+  </data>
+  <data name="MeetingLink" xml:space="preserve">
+    <value>Liên kết cuộc họp</value>
+    <comment>Meeting link</comment>
+  </data>
+  <data name="MeetingPromptsShowEitherWay" xml:space="preserve">
+    <value>Lời nhắc cuộc họp vẫn hiển thị trong mọi trường hợp.</value>
+    <comment>Meeting prompts show either way.</comment>
+  </data>
+  <data name="Meetings" xml:space="preserve">
+    <value>Cuộc họp</value>
+    <comment>Meetings</comment>
+  </data>
+  <data name="Mic" xml:space="preserve">
+    <value>Micrô</value>
+    <comment>Mic</comment>
+  </data>
+  <data name="MicLevel" xml:space="preserve">
+    <value>Mức micrô</value>
+    <comment>Mic level</comment>
+  </data>
+  <data name="Microphone" xml:space="preserve">
+    <value>Micrô</value>
+    <comment>Microphone</comment>
+  </data>
+  <data name="MicrophoneAccessHasNotBeenRequestedYet" xml:space="preserve">
+    <value>Chưa yêu cầu quyền truy cập micrô.</value>
+    <comment>Microphone access has not been requested yet.</comment>
+  </data>
+  <data name="MicrophoneAccessIsBlockedOnThisMac" xml:space="preserve">
+    <value>Quyền truy cập micrô bị chặn trên máy Mac này.</value>
+    <comment>Microphone access is blocked on this Mac.</comment>
+  </data>
+  <data name="MicrophoneAccessIsOff" xml:space="preserve">
+    <value>Quyền truy cập micrô đang tắt.</value>
+    <comment>Microphone access is off.</comment>
+  </data>
+  <data name="MicrophoneAccessIsOn" xml:space="preserve">
+    <value>Quyền truy cập micrô đang bật.</value>
+    <comment>Microphone access is on.</comment>
+  </data>
+  <data name="MicrophoneDisconnectedStopRecording" xml:space="preserve">
+    <value>Micrô đã ngắt kết nối — dừng ghi âm?</value>
+    <comment>Microphone disconnected — stop recording?</comment>
+  </data>
+  <data name="MicrophoneMuted" xml:space="preserve">
+    <value>Đã tắt tiếng micrô</value>
+    <comment>Microphone muted</comment>
+  </data>
+  <data name="Min" xml:space="preserve">
+    <value>phút</value>
+    <comment>min</comment>
+  </data>
+  <data name="Minimize" xml:space="preserve">
+    <value>Thu nhỏ</value>
+    <comment>Minimize</comment>
+  </data>
+  <data name="MinutesAfterTheEnd" xml:space="preserve">
+    <value>Số phút sau khi kết thúc</value>
+    <comment>Minutes after the end</comment>
+  </data>
+  <data name="Model" xml:space="preserve">
+    <value>Mô hình</value>
+    <comment>Model</comment>
+  </data>
+  <data name="ModelForSummariesAndQuestions" xml:space="preserve">
+    <value>Mô hình cho bản tóm tắt và câu hỏi</value>
+    <comment>Model for summaries and questions</comment>
+  </data>
+  <data name="ModelId" xml:space="preserve">
+    <value>ID mô hình</value>
+    <comment>Model id</comment>
+  </data>
+  <data name="ModelIdEGWhisper1" xml:space="preserve">
+    <value>ID mô hình, ví dụ: whisper-1</value>
+    <comment>Model id, e.g. whisper-1</comment>
+  </data>
+  <data name="Models" xml:space="preserve">
+    <value>Mô hình</value>
+    <comment>Models</comment>
+  </data>
+  <data name="ModelsAreDownloadedOnlyWhenYouClickDownload" xml:space="preserve">
+    <value>Mô hình chỉ được tải về khi bạn bấm Tải về.</value>
+    <comment>Models are downloaded only when you click Download.</comment>
+  </data>
+  <data name="Monthly" xml:space="preserve">
+    <value>Hàng tháng</value>
+    <comment>Monthly</comment>
+  </data>
+  <data name="MoveToTrash" xml:space="preserve">
+    <value>Chuyển vào Thùng rác</value>
+    <comment>Move to Trash</comment>
+  </data>
+  <data name="MovesTheAudioToTheTrashOnceATranscriptionSucceeds" xml:space="preserve">
+    <value>Chuyển âm thanh vào Thùng rác khi chép lời thành công.</value>
+    <comment>Moves the audio to the Trash once a transcription succeeds.</comment>
+  </data>
+  <data name="Multilingual" xml:space="preserve">
+    <value>Đa ngôn ngữ</value>
+    <comment>Multilingual</comment>
+  </data>
+  <data name="MuteMicrophone" xml:space="preserve">
+    <value>Tắt tiếng micrô</value>
+    <comment>Mute Microphone</comment>
+  </data>
+  <data name="MuteMicrophone_2" xml:space="preserve">
+    <value>Tắt tiếng micrô</value>
+    <comment>Mute microphone</comment>
+  </data>
+  <data name="MyVoiceLeftOthersRight" xml:space="preserve">
+    <value>Giọng tôi bên trái, người khác bên phải</value>
+    <comment>My voice left, others right</comment>
+  </data>
+  <data name="Name" xml:space="preserve">
+    <value>Tên</value>
+    <comment>Name</comment>
+  </data>
+  <data name="NameFor" xml:space="preserve">
+    <value>Tên cho {0}</value>
+    <comment>Name for %@</comment>
+  </data>
+  <data name="NeedsConfirmation" xml:space="preserve">
+    <value>Cần xác nhận</value>
+    <comment>Needs confirmation</comment>
+  </data>
+  <data name="NeedsModel" xml:space="preserve">
+    <value>Cần mô hình</value>
+    <comment>Needs model</comment>
+  </data>
+  <data name="NeedsMoreThanHalfOfThisMacSMemory" xml:space="preserve">
+    <value>Cần hơn một nửa bộ nhớ của máy Mac này.</value>
+    <comment>Needs more than half of this Mac's memory.</comment>
+  </data>
+  <data name="NeedsTheSpeakerModelDownloadItInTranscriptionDiarizationMode" xml:space="preserve">
+    <value>Cần mô hình người nói: hãy tải về trong Chép lời › Mô hình phân biệt người nói.</value>
+    <comment>Needs the speaker model: download it in Transcription › Diarization model.</comment>
+  </data>
+  <data name="NemotronTellsUpTo8SpeakersApartAndIgnoresThisNumberAbove8Pya" xml:space="preserve">
+    <value>Nemotron phân biệt tối đa 8 người nói và bỏ qua con số này; trên 8 người, pyannote sẽ được dùng nếu đã cài.</value>
+    <comment>Nemotron tells up to 8 speakers apart and ignores this number; above 8, pyannote is used when installed.</comment>
+  </data>
+  <data name="Never" xml:space="preserve">
+    <value>Không bao giờ</value>
+    <comment>Never</comment>
+  </data>
+  <data name="NewCalendarsAreWatchedToo" xml:space="preserve">
+    <value>Các lịch mới cũng được theo dõi.</value>
+    <comment>New calendars are watched too.</comment>
+  </data>
+  <data name="NewChat" xml:space="preserve">
+    <value>Cuộc trò chuyện mới</value>
+    <comment>New chat</comment>
+  </data>
+  <data name="NewEvent" xml:space="preserve">
+    <value>Sự kiện mới</value>
+    <comment>New Event</comment>
+  </data>
+  <data name="NewEvent_2" xml:space="preserve">
+    <value>Sự kiện mới…</value>
+    <comment>New Event…</comment>
+  </data>
+  <data name="NextRunLldConversations" xml:space="preserve">
+    <value>Lần chạy tới: {0} cuộc hội thoại</value>
+    <comment>Next run: %lld conversations</comment>
+  </data>
+  <data name="No" xml:space="preserve">
+    <value>Không hỗ trợ {0}</value>
+    <comment>No %@</comment>
+  </data>
+  <data name="NoAIModel" xml:space="preserve">
+    <value>Không có mô hình AI</value>
+    <comment>No AI model</comment>
+  </data>
+  <data name="NoAIModelSetUpAProviderOrDownloadAModelInSettingsAI" xml:space="preserve">
+    <value>Không có mô hình AI: hãy thiết lập một nhà cung cấp hoặc tải về một mô hình trong Cài đặt › AI.</value>
+    <comment>No AI model: set up a provider or download a model in Settings › AI.</comment>
+  </data>
+  <data name="NoCalendarAccountCanHoldEchoDiarSCalendar" xml:space="preserve">
+    <value>Không có tài khoản lịch nào có thể chứa lịch của EchoDiar.</value>
+    <comment>No calendar account can hold EchoDiar's calendar.</comment>
+  </data>
+  <data name="NoConversationsMatch" xml:space="preserve">
+    <value>Không có cuộc hội thoại nào khớp với "{0}"</value>
+    <comment>No conversations match "%@"</comment>
+  </data>
+  <data name="NoConversationsYet" xml:space="preserve">
+    <value>Chưa có cuộc hội thoại nào</value>
+    <comment>No conversations yet</comment>
+  </data>
+  <data name="NoDiarizationModelsListedTypeTheModelId" xml:space="preserve">
+    <value>Không có mô hình phân biệt người nói nào trong danh sách; hãy nhập ID mô hình.</value>
+    <comment>No diarization models listed; type the model id.</comment>
+  </data>
+  <data name="NoEarlierChats" xml:space="preserve">
+    <value>Không có cuộc trò chuyện nào trước đó</value>
+    <comment>No earlier chats</comment>
+  </data>
+  <data name="NoEmbeddingModelsListedTypeTheModelId" xml:space="preserve">
+    <value>Không có mô hình nhúng nào trong danh sách; hãy nhập ID mô hình.</value>
+    <comment>No embedding models listed; type the model id.</comment>
+  </data>
+  <data name="NoModelChooseOneInSettings" xml:space="preserve">
+    <value>Không có mô hình: hãy chọn một mô hình trong Cài đặt</value>
+    <comment>No model: choose one in Settings</comment>
+  </data>
+  <data name="NoModelsListedTypeTheModelId" xml:space="preserve">
+    <value>Không có mô hình nào trong danh sách; hãy nhập ID mô hình.</value>
+    <comment>No models listed; type the model id.</comment>
+  </data>
+  <data name="NoSettingsMatch" xml:space="preserve">
+    <value>Không có cài đặt nào khớp với "{0}"</value>
+    <comment>No settings match "%@"</comment>
+  </data>
+  <data name="NoSoundForLldMinStopRecording" xml:space="preserve">
+    <value>Không có âm thanh trong {0} phút — dừng ghi âm?</value>
+    <comment>No sound for %lld min — stop recording?</comment>
+  </data>
+  <data name="NoSpeechWasFoundInThisRecording" xml:space="preserve">
+    <value>Không tìm thấy giọng nói trong bản ghi âm này.</value>
+    <comment>No speech was found in this recording.</comment>
+  </data>
+  <data name="NoSummaryYet" xml:space="preserve">
+    <value>Chưa có bản tóm tắt.</value>
+    <comment>No summary yet.</comment>
+  </data>
+  <data name="NoSystemAudio" xml:space="preserve">
+    <value>Không có âm thanh hệ thống</value>
+    <comment>No system audio</comment>
+  </data>
+  <data name="NoTranscriptYet" xml:space="preserve">
+    <value>Chưa có bản chép lời.</value>
+    <comment>No transcript yet.</comment>
+  </data>
+  <data name="NoTranscriptionModelsListedTypeTheModelId" xml:space="preserve">
+    <value>Không có mô hình chép lời nào trong danh sách; hãy nhập ID mô hình.</value>
+    <comment>No transcription models listed; type the model id.</comment>
+  </data>
+  <data name="NoUpcomingMeetingsInTheNext7Days" xml:space="preserve">
+    <value>Không có cuộc họp nào trong 7 ngày tới.</value>
+    <comment>No upcoming meetings in the next 7 days.</comment>
+  </data>
+  <data name="None" xml:space="preserve">
+    <value>Không có</value>
+    <comment>None</comment>
+  </data>
+  <data name="NoneFound" xml:space="preserve">
+    <value>Không tìm thấy</value>
+    <comment>None found</comment>
+  </data>
+  <data name="NotARecognizedMeetingLinkJoinWonTBeOffered" xml:space="preserve">
+    <value>Không phải liên kết cuộc họp được nhận diện: sẽ không có nút Tham gia.</value>
+    <comment>Not a recognized meeting link: Join won't be offered.</comment>
+  </data>
+  <data name="NotAvailableOnThisMac" xml:space="preserve">
+    <value>Không khả dụng trên máy Mac này</value>
+    <comment>Not available on this Mac</comment>
+  </data>
+  <data name="NotInstalled" xml:space="preserve">
+    <value>Chưa cài đặt</value>
+    <comment>Not installed</comment>
+  </data>
+  <data name="NotNow" xml:space="preserve">
+    <value>Để sau</value>
+    <comment>Not Now</comment>
+  </data>
+  <data name="NotNow_2" xml:space="preserve">
+    <value>Để sau</value>
+    <comment>Not now</comment>
+  </data>
+  <data name="NothingIsSentToUntilYouConfirm" xml:space="preserve">
+    <value>Không có gì được gửi đến {0} cho đến khi bạn xác nhận.</value>
+    <comment>Nothing is sent to %@ until you confirm.</comment>
+  </data>
+  <data name="NothingMatchesNow" xml:space="preserve">
+    <value>Hiện không có gì khớp.</value>
+    <comment>Nothing matches now.</comment>
+  </data>
+  <data name="NothingToDownloadRougherRankingThanTheModelsAbove" xml:space="preserve">
+    <value>Không cần tải về. Xếp hạng kém chính xác hơn các mô hình ở trên.</value>
+    <comment>Nothing to download. Rougher ranking than the models above.</comment>
+  </data>
+  <data name="NumberOfOtherSpeakers" xml:space="preserve">
+    <value>Số người nói khác</value>
+    <comment>Number of other speakers</comment>
+  </data>
+  <data name="OK" xml:space="preserve">
+    <value>OK</value>
+    <comment>OK</comment>
+  </data>
+  <data name="Off" xml:space="preserve">
+    <value>Tắt</value>
+    <comment>Off</comment>
+  </data>
+  <data name="OffersToRecordWhenAMeetingAppStartsUsingTheMicrophone" xml:space="preserve">
+    <value>Đề nghị ghi âm khi một ứng dụng họp bắt đầu dùng micrô.</value>
+    <comment>Offers to record when a meeting app starts using the microphone.</comment>
+  </data>
+  <data name="OlderThan" xml:space="preserve">
+    <value>Cũ hơn</value>
+    <comment>Older than</comment>
+  </data>
+  <data name="OnDate" xml:space="preserve">
+    <value>Vào ngày</value>
+    <comment>On date</comment>
+  </data>
+  <data name="OnThisMac" xml:space="preserve">
+    <value>Trên máy Mac này</value>
+    <comment>On this Mac</comment>
+  </data>
+  <data name="OnceADayMovesTranscribedConversationsOlderThanTheAgeBelowToT" xml:space="preserve">
+    <value>Mỗi ngày một lần, chuyển các cuộc hội thoại đã chép lời cũ hơn mốc thời gian bên dưới vào Thùng rác.</value>
+    <comment>Once a day, moves transcribed conversations older than the age below to the Trash.</comment>
+  </data>
+  <data name="OnlyEventsInTheEchoDiarCalendarCanBeChanged" xml:space="preserve">
+    <value>Chỉ có thể thay đổi các sự kiện trong lịch EchoDiar.</value>
+    <comment>Only events in the EchoDiar calendar can be changed.</comment>
+  </data>
+  <data name="OnlyEventsWithAMeetingLink" xml:space="preserve">
+    <value>Chỉ các sự kiện có liên kết cuộc họp</value>
+    <comment>Only events with a meeting link</comment>
+  </data>
+  <data name="OnlyEventsWithAMeetingLinkOrInTheEchoDiarCalendarAreShown" xml:space="preserve">
+    <value>Chỉ hiển thị các sự kiện có liên kết cuộc họp hoặc nằm trong lịch EchoDiar.</value>
+    <comment>Only events with a meeting link, or in the EchoDiar calendar, are shown.</comment>
+  </data>
+  <data name="OnlyTheSystemChannelIsUploadedAsOneExtraTranscriptionBilledB" xml:space="preserve">
+    <value>Chỉ kênh hệ thống được tải lên, tính là một lượt chép lời thêm do nhà cung cấp tính phí; chỉ giữ lại nhãn người nói. Không dùng khi mô hình chép lời đã gắn nhãn người nói. Giá là giá niêm yết ước tính cho mỗi giờ âm thanh.</value>
+    <comment>Only the system channel is uploaded, as one extra transcription billed by the provider; only the speaker labels are kept. Not used when the transcription model already labels speakers. Prices are approximate list prices per audio hour.</comment>
+  </data>
+  <data name="Open" xml:space="preserve">
+    <value>Mở</value>
+    <comment>Open</comment>
+  </data>
+  <data name="OpenAIGroqMistralGoogleGeminiAndCustomEndpointsTranscribeToo" xml:space="preserve">
+    <value>OpenAI, Groq, Mistral, Google Gemini và các endpoint tuỳ chỉnh cũng có thể chép lời bằng mô hình chép lời của chúng: hãy thiết lập trong Cài đặt › AI.</value>
+    <comment>OpenAI, Groq, Mistral, Google Gemini and custom endpoints transcribe too, with their transcription model: set them up in Settings › AI.</comment>
+  </data>
+  <data name="OpenEchoDiar" xml:space="preserve">
+    <value>Mở EchoDiar</value>
+    <comment>Open EchoDiar</comment>
+  </data>
+  <data name="OpenGeneral" xml:space="preserve">
+    <value>Mở mục Chung</value>
+    <comment>Open General</comment>
+  </data>
+  <data name="OpenInFinder" xml:space="preserve">
+    <value>Mở trong Finder</value>
+    <comment>Open in Finder</comment>
+  </data>
+  <data name="OpenMicrophoneSettings" xml:space="preserve">
+    <value>Mở cài đặt Micrô</value>
+    <comment>Open Microphone Settings</comment>
+  </data>
+  <data name="OpenPrivacySettings" xml:space="preserve">
+    <value>Mở cài đặt Quyền riêng tư</value>
+    <comment>Open Privacy Settings</comment>
+  </data>
+  <data name="OpenSettings" xml:space="preserve">
+    <value>Mở Cài đặt</value>
+    <comment>Open Settings</comment>
+  </data>
+  <data name="OpenSourceSoftware" xml:space="preserve">
+    <value>Phần mềm nguồn mở</value>
+    <comment>Open-source software</comment>
+  </data>
+  <data name="OpenTheChatOfTheOpenConversation" xml:space="preserve">
+    <value>Mở cuộc trò chuyện của cuộc hội thoại đang mở</value>
+    <comment>Open the chat of the open conversation</comment>
+  </data>
+  <data name="OpenTheMeetingLink" xml:space="preserve">
+    <value>Mở liên kết cuộc họp</value>
+    <comment>Open the meeting link</comment>
+  </data>
+  <data name="OpenThisConversation" xml:space="preserve">
+    <value>Mở cuộc hội thoại này</value>
+    <comment>Open this conversation</comment>
+  </data>
+  <data name="OpenThisLink" xml:space="preserve">
+    <value>Mở liên kết này?</value>
+    <comment>Open this link?</comment>
+  </data>
+  <data name="Open_2" xml:space="preserve">
+    <value>Mở {0}?</value>
+    <comment>Open %@?</comment>
+  </data>
+  <data name="Others" xml:space="preserve">
+    <value>Người khác</value>
+    <comment>Others</comment>
+  </data>
+  <data name="OutputApprox" xml:space="preserve">
+    <value>{0} + đầu ra (ước tính)</value>
+    <comment>%@ + output (approx.)</comment>
+  </data>
+  <data name="ParakeetTranscriptionAndSpeakerDiarization" xml:space="preserve">
+    <value>Chép lời Parakeet và phân biệt người nói</value>
+    <comment>Parakeet transcription and speaker diarization</comment>
+  </data>
+  <data name="Paste" xml:space="preserve">
+    <value>Dán</value>
+    <comment>Paste</comment>
+  </data>
+  <data name="PasteTheKeyThenSave" xml:space="preserve">
+    <value>Dán khoá, sau đó bấm Lưu</value>
+    <comment>Paste the key, then Save</comment>
+  </data>
+  <data name="PathOverride" xml:space="preserve">
+    <value>Ghi đè đường dẫn</value>
+    <comment>Path override</comment>
+  </data>
+  <data name="Pause" xml:space="preserve">
+    <value>Tạm dừng</value>
+    <comment>Pause</comment>
+  </data>
+  <data name="PauseRecording" xml:space="preserve">
+    <value>Tạm dừng ghi âm</value>
+    <comment>Pause Recording</comment>
+  </data>
+  <data name="PauseRecordingP" xml:space="preserve">
+    <value>Tạm dừng ghi âm (⇧⌘P)</value>
+    <comment>Pause recording (⇧⌘P)</comment>
+  </data>
+  <data name="PauseRecording_2" xml:space="preserve">
+    <value>Tạm dừng ghi âm</value>
+    <comment>Pause recording</comment>
+  </data>
+  <data name="PauseResume" xml:space="preserve">
+    <value>Tạm dừng / Tiếp tục</value>
+    <comment>Pause / Resume</comment>
+  </data>
+  <data name="PauseSpace" xml:space="preserve">
+    <value>Tạm dừng (Phím cách)</value>
+    <comment>Pause (Space)</comment>
+  </data>
+  <data name="Paused" xml:space="preserve">
+    <value>Đã tạm dừng</value>
+    <comment>Paused</comment>
+  </data>
+  <data name="PausedWhileRecordingOrTranscribing" xml:space="preserve">
+    <value>Đã tạm dừng trong khi ghi âm hoặc chép lời</value>
+    <comment>Paused while recording or transcribing</comment>
+  </data>
+  <data name="PausedWhileTheMacIsHotOrInLowPowerModeTheRestIsTranscribedAf" xml:space="preserve">
+    <value>Đã tạm dừng khi máy Mac nóng hoặc ở Chế độ nguồn điện thấp. Phần còn lại sẽ được chép lời sau khi bấm Dừng.</value>
+    <comment>Paused while the Mac is hot or in Low Power Mode. The rest is transcribed after Stop.</comment>
+  </data>
+  <data name="Paused_2" xml:space="preserve">
+    <value>Đã tạm dừng — {0}</value>
+    <comment>Paused — %@</comment>
+  </data>
+  <data name="PausesOrResumesTheRecordingFromAnyApp" xml:space="preserve">
+    <value>Tạm dừng hoặc tiếp tục ghi âm từ bất kỳ ứng dụng nào.</value>
+    <comment>Pauses or resumes the recording from any app.</comment>
+  </data>
+  <data name="PermissionsAndConsent" xml:space="preserve">
+    <value>Quyền và sự đồng ý</value>
+    <comment>Permissions and consent</comment>
+  </data>
+  <data name="PickAConversationInTheSidebar" xml:space="preserve">
+    <value>Hãy chọn một cuộc hội thoại trong thanh bên.</value>
+    <comment>Pick a conversation in the sidebar.</comment>
+  </data>
+  <data name="PickAnEmbeddingModelInSettingsRAG" xml:space="preserve">
+    <value>Hãy chọn một mô hình nhúng trong Cài đặt › RAG</value>
+    <comment>Pick an embedding model in Settings › RAG</comment>
+  </data>
+  <data name="PickAnEnabledProviderInSettingsRAG" xml:space="preserve">
+    <value>Hãy chọn một nhà cung cấp đã bật trong Cài đặt › RAG</value>
+    <comment>Pick an enabled provider in Settings › RAG</comment>
+  </data>
+  <data name="PickedByAssemblyAIForTheLanguageUniversal" xml:space="preserve">
+    <value>Do AssemblyAI chọn theo ngôn ngữ (Universal)</value>
+    <comment>Picked by AssemblyAI for the language (Universal)</comment>
+  </data>
+  <data name="PickedByAssemblyAIUniversalSpeakerLabels" xml:space="preserve">
+    <value>Do AssemblyAI chọn (Universal, nhãn người nói)</value>
+    <comment>Picked by AssemblyAI (Universal, speaker labels)</comment>
+  </data>
+  <data name="Play" xml:space="preserve">
+    <value>Phát</value>
+    <comment>Play</comment>
+  </data>
+  <data name="PlayFromHere" xml:space="preserve">
+    <value>Phát từ đây</value>
+    <comment>Play from here</comment>
+  </data>
+  <data name="PlayPauseTheTranscriptAudio" xml:space="preserve">
+    <value>Phát / Tạm dừng âm thanh của bản chép lời</value>
+    <comment>Play / Pause the transcript audio</comment>
+  </data>
+  <data name="PlaySpace" xml:space="preserve">
+    <value>Phát (Phím cách)</value>
+    <comment>Play (Space)</comment>
+  </data>
+  <data name="Playback" xml:space="preserve">
+    <value>Phát lại</value>
+    <comment>Playback</comment>
+  </data>
+  <data name="PlaybackAndReTranscribingAreNoLongerPossibleTheTranscriptSum" xml:space="preserve">
+    <value>Không thể phát lại và chép lời lại nữa. Bản chép lời, bản tóm tắt và cuộc trò chuyện vẫn được giữ.</value>
+    <comment>Playback and re-transcribing are no longer possible. The transcript, summary and chat stay.</comment>
+  </data>
+  <data name="PlaybackPosition" xml:space="preserve">
+    <value>Vị trí phát</value>
+    <comment>Playback position</comment>
+  </data>
+  <data name="PreparingAudio" xml:space="preserve">
+    <value>Đang chuẩn bị âm thanh…</value>
+    <comment>Preparing audio…</comment>
+  </data>
+  <data name="PressAShortcut" xml:space="preserve">
+    <value>Nhấn một phím tắt…</value>
+    <comment>Press a shortcut…</comment>
+  </data>
+  <data name="PressEscToCancel" xml:space="preserve">
+    <value>Nhấn Esc để huỷ</value>
+    <comment>Press Esc to cancel</comment>
+  </data>
+  <data name="PressRToStartRecording" xml:space="preserve">
+    <value>Nhấn ⌘R để bắt đầu ghi âm.</value>
+    <comment>Press ⌘R to start recording.</comment>
+  </data>
+  <data name="PressToStartRecordingFromAnywhere" xml:space="preserve">
+    <value>Nhấn {0} để bắt đầu ghi âm từ bất kỳ đâu.</value>
+    <comment>Press %@ to start recording from anywhere.</comment>
+  </data>
+  <data name="PricesAreApproximateListPricesPerAudioHourTheMicAndSystemCha" xml:space="preserve">
+    <value>Giá là giá niêm yết ước tính cho mỗi giờ âm thanh; kênh micrô và kênh hệ thống được gửi và tính phí riêng.</value>
+    <comment>Prices are approximate list prices per audio hour; the mic and system channels are sent and billed separately.</comment>
+  </data>
+  <data name="ProviderModel" xml:space="preserve">
+    <value>nhà cung cấp/mô hình</value>
+    <comment>provider/model</comment>
+  </data>
+  <data name="Quality" xml:space="preserve">
+    <value>Chất lượng</value>
+    <comment>Quality</comment>
+  </data>
+  <data name="QualityIn" xml:space="preserve">
+    <value>Chất lượng với {0}</value>
+    <comment>Quality in %@</comment>
+  </data>
+  <data name="Queued" xml:space="preserve">
+    <value>Trong hàng đợi</value>
+    <comment>Queued</comment>
+  </data>
+  <data name="Quit" xml:space="preserve">
+    <value>Thoát</value>
+    <comment>Quit</comment>
+  </data>
+  <data name="QuitEchoDiar" xml:space="preserve">
+    <value>Thoát EchoDiar</value>
+    <comment>Quit EchoDiar</comment>
+  </data>
+  <data name="QuitStopRecording" xml:space="preserve">
+    <value>{0} đã thoát — dừng ghi âm?</value>
+    <comment>%@ quit — stop recording?</comment>
+  </data>
+  <data name="Qwen3Transcription" xml:space="preserve">
+    <value>Chép lời Qwen3</value>
+    <comment>Qwen3 transcription</comment>
+  </data>
+  <data name="RAG" xml:space="preserve">
+    <value>RAG</value>
+    <comment>RAG</comment>
+  </data>
+  <data name="RAM" xml:space="preserve">
+    <value>{0} RAM</value>
+    <comment>%@ RAM</comment>
+  </data>
+  <data name="ReSummarize" xml:space="preserve">
+    <value>Tóm tắt lại</value>
+    <comment>Re-summarize</comment>
+  </data>
+  <data name="ReTranscribe" xml:space="preserve">
+    <value>Chép lời lại</value>
+    <comment>Re-transcribe</comment>
+  </data>
+  <data name="ReTranscribeWithAnotherModelOrLanguage" xml:space="preserve">
+    <value>Chép lời lại bằng mô hình hoặc ngôn ngữ khác</value>
+    <comment>Re-transcribe with another model or language</comment>
+  </data>
+  <data name="Rebuild" xml:space="preserve">
+    <value>Tạo lại</value>
+    <comment>Rebuild</comment>
+  </data>
+  <data name="RebuildIndex" xml:space="preserve">
+    <value>Tạo lại chỉ mục</value>
+    <comment>Rebuild index</comment>
+  </data>
+  <data name="Record" xml:space="preserve">
+    <value>Ghi âm</value>
+    <comment>Record</comment>
+  </data>
+  <data name="RecordAllSystemAudioFrom15MinBeforeTheStart" xml:space="preserve">
+    <value>Ghi âm toàn bộ âm thanh hệ thống, từ 15 phút trước giờ bắt đầu</value>
+    <comment>Record all system audio, from 15 min before the start</comment>
+  </data>
+  <data name="RecordAtStart" xml:space="preserve">
+    <value>Ghi âm khi bắt đầu</value>
+    <comment>Record at start</comment>
+  </data>
+  <data name="RecordR" xml:space="preserve">
+    <value>Ghi âm {0} (⌘R)</value>
+    <comment>Record %@ (⌘R)</comment>
+  </data>
+  <data name="RecordStop" xml:space="preserve">
+    <value>Ghi âm / Dừng</value>
+    <comment>Record / Stop</comment>
+  </data>
+  <data name="RecordYourFirstConversation" xml:space="preserve">
+    <value>Ghi âm cuộc hội thoại đầu tiên của bạn</value>
+    <comment>Record your first conversation</comment>
+  </data>
+  <data name="Recording" xml:space="preserve">
+    <value>Ghi âm</value>
+    <comment>Recording</comment>
+  </data>
+  <data name="RecordingContinuesWithTheDefaultInputUntilThen" xml:space="preserve">
+    <value>Vẫn tiếp tục ghi âm bằng đầu vào mặc định cho đến lúc đó.</value>
+    <comment>Recording continues with the default input until then.</comment>
+  </data>
+  <data name="RecordingInProgress" xml:space="preserve">
+    <value>Đang ghi âm.</value>
+    <comment>Recording in progress.</comment>
+  </data>
+  <data name="RecordingLawsDifferFromPlaceToPlaceManyRequireEveryoneOnTheC" xml:space="preserve">
+    <value>Luật về ghi âm khác nhau ở mỗi nơi. Nhiều nơi yêu cầu mọi người trong cuộc gọi phải đồng ý.</value>
+    <comment>Recording laws differ from place to place. Many require everyone on the call to agree.</comment>
+  </data>
+  <data name="RecordingOptions" xml:space="preserve">
+    <value>Tuỳ chọn ghi âm</value>
+    <comment>Recording options</comment>
+  </data>
+  <data name="RecordingProblem" xml:space="preserve">
+    <value>Sự cố ghi âm</value>
+    <comment>Recording problem</comment>
+  </data>
+  <data name="RecordingStoppedAudioCaptureFailed" xml:space="preserve">
+    <value>Đã dừng ghi âm: thu âm thanh không thành công.</value>
+    <comment>Recording stopped: audio capture failed.</comment>
+  </data>
+  <data name="RecordingStoppedCouldNotWriteAudio" xml:space="preserve">
+    <value>Đã dừng ghi âm: không thể ghi dữ liệu âm thanh.</value>
+    <comment>Recording stopped: could not write audio.</comment>
+  </data>
+  <data name="RecordingStoppedDiskIsFull" xml:space="preserve">
+    <value>Đã dừng ghi âm: ổ đĩa đã đầy.</value>
+    <comment>Recording stopped: disk is full.</comment>
+  </data>
+  <data name="RecordingStopsAtOnce" xml:space="preserve">
+    <value>Dừng ghi âm ngay lập tức.</value>
+    <comment>Recording stops at once.</comment>
+  </data>
+  <data name="RecordingSwitchesToTheDefaultInput" xml:space="preserve">
+    <value>Chuyển sang ghi âm bằng đầu vào mặc định.</value>
+    <comment>Recording switches to the default input.</comment>
+  </data>
+  <data name="Recording_2" xml:space="preserve">
+    <value>Đang ghi âm {0}</value>
+    <comment>Recording %@</comment>
+  </data>
+  <data name="Recording_3" xml:space="preserve">
+    <value>Đang ghi âm — {0}</value>
+    <comment>Recording — %@</comment>
+  </data>
+  <data name="Recording_4" xml:space="preserve">
+    <value>Đang ghi âm…</value>
+    <comment>Recording…</comment>
+  </data>
+  <data name="Recordings" xml:space="preserve">
+    <value>Bản ghi âm</value>
+    <comment>Recordings</comment>
+  </data>
+  <data name="RecordsAllSystemAudio" xml:space="preserve">
+    <value>{0} (ghi toàn bộ âm thanh hệ thống)</value>
+    <comment>%@ (records all system audio)</comment>
+  </data>
+  <data name="Recovered" xml:space="preserve">
+    <value>Đã khôi phục</value>
+    <comment>Recovered</comment>
+  </data>
+  <data name="RelaunchNow" xml:space="preserve">
+    <value>Khởi động lại ngay</value>
+    <comment>Relaunch now</comment>
+  </data>
+  <data name="RememberLastRecordLanguage" xml:space="preserve">
+    <value>Ghi nhớ ngôn ngữ ghi âm gần nhất</value>
+    <comment>Remember last record language</comment>
+  </data>
+  <data name="Remove" xml:space="preserve">
+    <value>Xoá</value>
+    <comment>Remove</comment>
+  </data>
+  <data name="RemoveLanguageAssets" xml:space="preserve">
+    <value>Xoá tài nguyên ngôn ngữ</value>
+    <comment>Remove language assets</comment>
+  </data>
+  <data name="RemoveThisChat" xml:space="preserve">
+    <value>Xoá cuộc trò chuyện này</value>
+    <comment>Remove this chat</comment>
+  </data>
+  <data name="Rename" xml:space="preserve">
+    <value>Đổi tên</value>
+    <comment>Rename</comment>
+  </data>
+  <data name="RenameThisSpeaker" xml:space="preserve">
+    <value>Đổi tên người nói này</value>
+    <comment>Rename this speaker</comment>
+  </data>
+  <data name="Repeat" xml:space="preserve">
+    <value>Lặp lại</value>
+    <comment>Repeat</comment>
+  </data>
+  <data name="RequiredYourResourceSHttpsResourceOpenaiAzureComOpenaiV1URL" xml:space="preserve">
+    <value>Bắt buộc: URL https://&lt;resource&gt;.openai.azure.com/openai/v1 của tài nguyên của bạn.</value>
+    <comment>Required: your resource's https://&lt;resource&gt;.openai.azure.com/openai/v1 URL.</comment>
+  </data>
+  <data name="ReservedByEchoDiar" xml:space="preserve">
+    <value>Được EchoDiar dành riêng: {0}</value>
+    <comment>Reserved by EchoDiar: %@</comment>
+  </data>
+  <data name="ReservedByEchoDiarNone" xml:space="preserve">
+    <value>Được EchoDiar dành riêng: không có</value>
+    <comment>Reserved by EchoDiar: none</comment>
+  </data>
+  <data name="Reset" xml:space="preserve">
+    <value>Đặt lại</value>
+    <comment>Reset</comment>
+  </data>
+  <data name="RestartEchoDiarToApply" xml:space="preserve">
+    <value>Khởi động lại EchoDiar để áp dụng.</value>
+    <comment>Restart EchoDiar to apply.</comment>
+  </data>
+  <data name="Resume" xml:space="preserve">
+    <value>Tiếp tục</value>
+    <comment>Resume</comment>
+  </data>
+  <data name="ResumeRecording" xml:space="preserve">
+    <value>Tiếp tục ghi âm</value>
+    <comment>Resume Recording</comment>
+  </data>
+  <data name="ResumeRecordingP" xml:space="preserve">
+    <value>Tiếp tục ghi âm (⇧⌘P)</value>
+    <comment>Resume recording (⇧⌘P)</comment>
+  </data>
+  <data name="ResumeRecording_2" xml:space="preserve">
+    <value>Tiếp tục ghi âm</value>
+    <comment>Resume recording</comment>
+  </data>
+  <data name="Retry" xml:space="preserve">
+    <value>Thử lại</value>
+    <comment>Retry</comment>
+  </data>
+  <data name="RetryWithAnotherEngine" xml:space="preserve">
+    <value>Thử lại với công cụ khác</value>
+    <comment>Retry with another engine</comment>
+  </data>
+  <data name="RevealInFinder" xml:space="preserve">
+    <value>Hiển thị trong Finder</value>
+    <comment>Reveal in Finder</comment>
+  </data>
+  <data name="S__3" xml:space="preserve">
+    <value>{0}: {1}</value>
+    <comment>%@: %@</comment>
+  </data>
+  <data name="Save" xml:space="preserve">
+    <value>Lưu</value>
+    <comment>Save</comment>
+  </data>
+  <data name="SaveAKeyFirst" xml:space="preserve">
+    <value>Hãy lưu khoá trước.</value>
+    <comment>Save a key first.</comment>
+  </data>
+  <data name="SaveAKeyForInSettingsAI" xml:space="preserve">
+    <value>Lưu khoá cho {0} trong Cài đặt › AI</value>
+    <comment>Save a key for %@ in Settings › AI</comment>
+  </data>
+  <data name="SaveChangesToARepeatingEvent" xml:space="preserve">
+    <value>Lưu thay đổi cho một sự kiện lặp lại?</value>
+    <comment>Save changes to a repeating event?</comment>
+  </data>
+  <data name="Saved" xml:space="preserve">
+    <value>Đã lưu</value>
+    <comment>Saved</comment>
+  </data>
+  <data name="Scan" xml:space="preserve">
+    <value>Quét</value>
+    <comment>Scan</comment>
+  </data>
+  <data name="ScreenLockedStopRecording" xml:space="preserve">
+    <value>Màn hình đã khoá — dừng ghi âm?</value>
+    <comment>Screen locked — stop recording?</comment>
+  </data>
+  <data name="ScreenSharingInMeetingAppsShowsItToo" xml:space="preserve">
+    <value>Chia sẻ màn hình trong ứng dụng họp cũng sẽ hiển thị chỉ báo.</value>
+    <comment>Screen sharing in meeting apps shows it too.</comment>
+  </data>
+  <data name="Search" xml:space="preserve">
+    <value>Tìm kiếm</value>
+    <comment>Search</comment>
+  </data>
+  <data name="SearchConversations" xml:space="preserve">
+    <value>Tìm cuộc hội thoại</value>
+    <comment>Search conversations</comment>
+  </data>
+  <data name="SearchConversationsF" xml:space="preserve">
+    <value>Tìm cuộc hội thoại (⌘F)</value>
+    <comment>Search conversations (⌘F)</comment>
+  </data>
+  <data name="SearchConversationsOrSettings" xml:space="preserve">
+    <value>Tìm cuộc hội thoại hoặc cài đặt</value>
+    <comment>Search conversations or settings</comment>
+  </data>
+  <data name="SearchPATH" xml:space="preserve">
+    <value>Tìm trong PATH</value>
+    <comment>Search PATH</comment>
+  </data>
+  <data name="SearchSettings" xml:space="preserve">
+    <value>Tìm cài đặt</value>
+    <comment>Search settings</comment>
+  </data>
+  <data name="SearchSettingsF" xml:space="preserve">
+    <value>Tìm cài đặt (⌘F)</value>
+    <comment>Search settings (⌘F)</comment>
+  </data>
+  <data name="SearchingYourConversations" xml:space="preserve">
+    <value>Đang tìm trong các cuộc hội thoại của bạn…</value>
+    <comment>Searching your conversations…</comment>
+  </data>
+  <data name="SelectAll" xml:space="preserve">
+    <value>Chọn tất cả</value>
+    <comment>Select All</comment>
+  </data>
+  <data name="Send" xml:space="preserve">
+    <value>Gửi</value>
+    <comment>Send</comment>
+  </data>
+  <data name="SendAudioTo" xml:space="preserve">
+    <value>Gửi âm thanh đến {0}?</value>
+    <comment>Send audio to %@?</comment>
+  </data>
+  <data name="SendTranscriptsTo" xml:space="preserve">
+    <value>Gửi bản chép lời đến {0}?</value>
+    <comment>Send transcripts to %@?</comment>
+  </data>
+  <data name="SetDefault" xml:space="preserve">
+    <value>Đặt làm mặc định</value>
+    <comment>Set default</comment>
+  </data>
+  <data name="SetUp" xml:space="preserve">
+    <value>Thiết lập…</value>
+    <comment>Set Up…</comment>
+  </data>
+  <data name="Settings" xml:space="preserve">
+    <value>Cài đặt</value>
+    <comment>Settings</comment>
+  </data>
+  <data name="Settings_2" xml:space="preserve">
+    <value>Cài đặt…</value>
+    <comment>Settings…</comment>
+  </data>
+  <data name="Shortcut" xml:space="preserve">
+    <value>Phím tắt</value>
+    <comment>Shortcut</comment>
+  </data>
+  <data name="Shortcuts" xml:space="preserve">
+    <value>Phím tắt</value>
+    <comment>Shortcuts</comment>
+  </data>
+  <data name="ShowFloatingIndicatorWhileRecording" xml:space="preserve">
+    <value>Hiện chỉ báo nổi khi ghi âm</value>
+    <comment>Show floating indicator while recording</comment>
+  </data>
+  <data name="ShowItInScreenshotsAndScreenRecordings" xml:space="preserve">
+    <value>Hiện trong ảnh chụp màn hình và bản ghi màn hình</value>
+    <comment>Show it in screenshots and screen recordings</comment>
+  </data>
+  <data name="ShowOnboardingAgain" xml:space="preserve">
+    <value>Xem lại phần giới thiệu ban đầu</value>
+    <comment>Show onboarding again</comment>
+  </data>
+  <data name="ShowTheOtherSpeakers" xml:space="preserve">
+    <value>Hiện những người nói khác</value>
+    <comment>Show the other speakers</comment>
+  </data>
+  <data name="ShowTheRecording" xml:space="preserve">
+    <value>Hiện trang ghi âm</value>
+    <comment>Show the recording</comment>
+  </data>
+  <data name="ShowTheRecordingsList" xml:space="preserve">
+    <value>Hiện danh sách bản ghi âm</value>
+    <comment>Show the recordings list</comment>
+  </data>
+  <data name="ShowingMeetingsInTheNext7DaysTheListUpdatesAutomatically" xml:space="preserve">
+    <value>Đang hiển thị các cuộc họp trong 7 ngày tới. Danh sách tự động cập nhật.</value>
+    <comment>Showing meetings in the next 7 days. The list updates automatically.</comment>
+  </data>
+  <data name="ShowsTheTranscriptDuringTheRecordingAndKeepsItSoItIsReadyWit" xml:space="preserve">
+    <value>Hiển thị bản chép lời trong khi ghi âm và giữ lại, nhờ đó bản chép lời sẵn sàng trong vài giây sau khi bấm Dừng. Dùng nhiều CPU và bộ nhớ hơn khi ghi âm. Chỉ dành cho mô hình WhisperKit và Parakeet; các công cụ khác chép lời sau khi bấm Dừng.</value>
+    <comment>Shows the transcript during the recording and keeps it, so it is ready within seconds of Stop. Uses more CPU and memory while recording. WhisperKit and Parakeet models only; other engines transcribe after Stop.</comment>
+  </data>
+  <data name="Skip" xml:space="preserve">
+    <value>Bỏ qua</value>
+    <comment>Skip</comment>
+  </data>
+  <data name="SkipThisMeetingNoPromptAndNoRecording" xml:space="preserve">
+    <value>Bỏ qua cuộc họp này: không nhắc và không ghi âm</value>
+    <comment>Skip this meeting: no prompt and no recording</comment>
+  </data>
+  <data name="Small" xml:space="preserve">
+    <value>Nhỏ</value>
+    <comment>Small</comment>
+  </data>
+  <data name="SonnetOpusOrHaikuEmptyDefault" xml:space="preserve">
+    <value>sonnet, opus hoặc haiku (để trống = mặc định)</value>
+    <comment>sonnet, opus or haiku (empty = default)</comment>
+  </data>
+  <data name="Sources" xml:space="preserve">
+    <value>Nguồn</value>
+    <comment>Sources</comment>
+  </data>
+  <data name="Space" xml:space="preserve">
+    <value>Phím cách</value>
+    <comment>Space</comment>
+  </data>
+  <data name="SpeakerLld" xml:space="preserve">
+    <value>Người nói {0}</value>
+    <comment>Speaker %lld</comment>
+  </data>
+  <data name="Speakers" xml:space="preserve">
+    <value>Người nói</value>
+    <comment>Speakers</comment>
+  </data>
+  <data name="SpeakersWereNotToldApartTheSpeakerModelIsInstalledNowReTrans" xml:space="preserve">
+    <value>Người nói chưa được phân biệt. Mô hình người nói hiện đã được cài: hãy chép lời lại.</value>
+    <comment>Speakers were not told apart. The speaker model is installed now: re-transcribe.</comment>
+  </data>
+  <data name="SpeakersWereNotToldApartTheSpeakerModelIsNotInstalledTranscr" xml:space="preserve">
+    <value>Người nói chưa được phân biệt: chưa cài mô hình người nói (Chép lời › Mô hình phân biệt người nói).</value>
+    <comment>Speakers were not told apart: the speaker model is not installed (Transcription › Diarization model).</comment>
+  </data>
+  <data name="SpeechDetectionForWhisperTranscription" xml:space="preserve">
+    <value>Phát hiện giọng nói cho chép lời Whisper</value>
+    <comment>Speech detection for Whisper transcription</comment>
+  </data>
+  <data name="SpeechToTextAPIs" xml:space="preserve">
+    <value>API chuyển giọng nói thành văn bản</value>
+    <comment>Speech-to-text APIs</comment>
+  </data>
+  <data name="Start" xml:space="preserve">
+    <value>Bắt đầu</value>
+    <comment>Start</comment>
+  </data>
+  <data name="StartAFreshChat" xml:space="preserve">
+    <value>Bắt đầu cuộc trò chuyện mới</value>
+    <comment>Start a fresh chat</comment>
+  </data>
+  <data name="StartRecording" xml:space="preserve">
+    <value>Bắt đầu ghi âm</value>
+    <comment>Start Recording</comment>
+  </data>
+  <data name="Starting" xml:space="preserve">
+    <value>Đang bắt đầu…</value>
+    <comment>Starting…</comment>
+  </data>
+  <data name="StartsOrStopsRecordingFromAnyApp" xml:space="preserve">
+    <value>Bắt đầu hoặc dừng ghi âm từ bất kỳ ứng dụng nào.</value>
+    <comment>Starts or stops recording from any app.</comment>
+  </data>
+  <data name="StepLldOfLld" xml:space="preserve">
+    <value>Bước {0} trên {1}</value>
+    <comment>Step %lld of %lld</comment>
+  </data>
+  <data name="Stop" xml:space="preserve">
+    <value>Dừng</value>
+    <comment>Stop</comment>
+  </data>
+  <data name="StopAfterARecordingLengthOf" xml:space="preserve">
+    <value>Dừng khi đã ghi được</value>
+    <comment>Stop after a recording length of</comment>
+  </data>
+  <data name="StopAfterSilenceOf" xml:space="preserve">
+    <value>Dừng sau khi im lặng</value>
+    <comment>Stop after silence of</comment>
+  </data>
+  <data name="StopAskingForThisApp" xml:space="preserve">
+    <value>Ngừng hỏi với ứng dụng này</value>
+    <comment>Stop asking for this app</comment>
+  </data>
+  <data name="StopNow" xml:space="preserve">
+    <value>Dừng ngay</value>
+    <comment>Stop now</comment>
+  </data>
+  <data name="StopRecording" xml:space="preserve">
+    <value>Dừng ghi âm</value>
+    <comment>Stop Recording</comment>
+  </data>
+  <data name="StopRecordingR" xml:space="preserve">
+    <value>Dừng ghi âm (⌘R)</value>
+    <comment>Stop recording (⌘R)</comment>
+  </data>
+  <data name="StopRecording_2" xml:space="preserve">
+    <value>Dừng ghi âm</value>
+    <comment>Stop recording</comment>
+  </data>
+  <data name="StopRecording_3" xml:space="preserve">
+    <value>Dừng ghi âm?</value>
+    <comment>Stop recording?</comment>
+  </data>
+  <data name="StopTheAnswer" xml:space="preserve">
+    <value>Dừng câu trả lời</value>
+    <comment>Stop the answer</comment>
+  </data>
+  <data name="StopTheRecordingFirst" xml:space="preserve">
+    <value>Hãy dừng ghi âm trước</value>
+    <comment>Stop the recording first</comment>
+  </data>
+  <data name="StopTheSummaryAndKeepWhatIsWrittenSoFar" xml:space="preserve">
+    <value>Dừng tóm tắt và giữ phần đã viết</value>
+    <comment>Stop the summary and keep what is written so far</comment>
+  </data>
+  <data name="StopWhenTheAppIsQuietFor" xml:space="preserve">
+    <value>Dừng khi ứng dụng im lặng trong</value>
+    <comment>Stop when the app is quiet for</comment>
+  </data>
+  <data name="StopWhenTheCallSeemsOverFor" xml:space="preserve">
+    <value>Dừng khi cuộc gọi có vẻ đã kết thúc trong</value>
+    <comment>Stop when the call seems over for</comment>
+  </data>
+  <data name="StopWhenTheEventEnds" xml:space="preserve">
+    <value>Dừng khi sự kiện kết thúc</value>
+    <comment>Stop when the event ends</comment>
+  </data>
+  <data name="Stopped" xml:space="preserve">
+    <value>Đã dừng</value>
+    <comment>Stopped</comment>
+  </data>
+  <data name="StoppedUsingAudioStopRecording" xml:space="preserve">
+    <value>{0} đã ngừng dùng âm thanh — dừng ghi âm?</value>
+    <comment>%@ stopped using audio — stop recording?</comment>
+  </data>
+  <data name="StoppingInLldS" xml:space="preserve">
+    <value>Dừng sau {0} giây</value>
+    <comment>Stopping in %lld s</comment>
+  </data>
+  <data name="Storage" xml:space="preserve">
+    <value>Dung lượng</value>
+    <comment>Storage</comment>
+  </data>
+  <data name="StorageUsed" xml:space="preserve">
+    <value>Dung lượng đã dùng: {0}</value>
+    <comment>Storage used: %@</comment>
+  </data>
+  <data name="Summarize" xml:space="preserve">
+    <value>Tóm tắt</value>
+    <comment>Summarize</comment>
+  </data>
+  <data name="Summarizing" xml:space="preserve">
+    <value>Đang tóm tắt</value>
+    <comment>Summarizing</comment>
+  </data>
+  <data name="SummarizingAnotherConversation" xml:space="preserve">
+    <value>Đang tóm tắt một cuộc hội thoại khác…</value>
+    <comment>Summarizing another conversation…</comment>
+  </data>
+  <data name="Summarizing_2" xml:space="preserve">
+    <value>Đang tóm tắt {0}…</value>
+    <comment>Summarizing %@…</comment>
+  </data>
+  <data name="Summary" xml:space="preserve">
+    <value>Bản tóm tắt</value>
+    <comment>Summary</comment>
+  </data>
+  <data name="SureToQuit" xml:space="preserve">
+    <value>Chắc chắn thoát</value>
+    <comment>Sure to quit</comment>
+  </data>
+  <data name="System" xml:space="preserve">
+    <value>Hệ thống</value>
+    <comment>System</comment>
+  </data>
+  <data name="SystemAudio" xml:space="preserve">
+    <value>Âm thanh hệ thống</value>
+    <comment>System audio</comment>
+  </data>
+  <data name="SystemAudioIsSilentFix" xml:space="preserve">
+    <value>Âm thanh hệ thống im lặng — Khắc phục…</value>
+    <comment>System audio is silent — Fix…</comment>
+  </data>
+  <data name="SystemAudioLevel" xml:space="preserve">
+    <value>Mức âm thanh hệ thống</value>
+    <comment>System audio level</comment>
+  </data>
+  <data name="SystemAudioWorks" xml:space="preserve">
+    <value>Âm thanh hệ thống hoạt động.</value>
+    <comment>System audio works.</comment>
+  </data>
+  <data name="SystemDefault" xml:space="preserve">
+    <value>Mặc định hệ thống</value>
+    <comment>System default</comment>
+  </data>
+  <data name="SystemModelLanguageAssetsInstalledOnDemandAutoUsesTheDefault" xml:space="preserve">
+    <value>Mô hình hệ thống — tài nguyên ngôn ngữ được cài khi cần. Tự động dùng ngôn ngữ mặc định (không phát hiện ngôn ngữ).</value>
+    <comment>System model — language assets installed on demand. Auto uses the default language (no language detection).</comment>
+  </data>
+  <data name="TellSpeakersApart" xml:space="preserve">
+    <value>Phân biệt người nói</value>
+    <comment>Tell speakers apart</comment>
+  </data>
+  <data name="TellThePeopleYouRecordYouAreResponsibleForTheirConsent" xml:space="preserve">
+    <value>Hãy báo cho những người bạn ghi âm. Bạn chịu trách nhiệm về sự đồng ý của họ.</value>
+    <comment>Tell the people you record. You are responsible for their consent.</comment>
+  </data>
+  <data name="Test" xml:space="preserve">
+    <value>Kiểm tra</value>
+    <comment>Test</comment>
+  </data>
+  <data name="TestAgain" xml:space="preserve">
+    <value>Kiểm tra lại</value>
+    <comment>Test Again</comment>
+  </data>
+  <data name="TestSystemAudio" xml:space="preserve">
+    <value>Kiểm tra âm thanh hệ thống</value>
+    <comment>Test System Audio</comment>
+  </data>
+  <data name="TestUsesYourSubscription" xml:space="preserve">
+    <value>Kiểm tra (dùng gói đăng ký của bạn)</value>
+    <comment>Test (uses your subscription)</comment>
+  </data>
+  <data name="TheAppQuitStopRecording" xml:space="preserve">
+    <value>Ứng dụng đã thoát — dừng ghi âm?</value>
+    <comment>The app quit — stop recording?</comment>
+  </data>
+  <data name="TheAppStoppedUsingAudioStopRecording" xml:space="preserve">
+    <value>Ứng dụng đã ngừng dùng âm thanh — dừng ghi âm?</value>
+    <comment>The app stopped using audio — stop recording?</comment>
+  </data>
+  <data name="TheAudioDeviceChangedWhileRecordingWasStartingTryAgain" xml:space="preserve">
+    <value>Thiết bị âm thanh đã thay đổi khi đang bắt đầu ghi âm. Hãy thử lại.</value>
+    <comment>The audio device changed while recording was starting. Try again.</comment>
+  </data>
+  <data name="TheAudioFilesAreMovedToTheTrashTranscriptsSummariesAndChatsS" xml:space="preserve">
+    <value>Các tệp âm thanh được chuyển vào Thùng rác. Bản chép lời, bản tóm tắt và cuộc trò chuyện vẫn được giữ.</value>
+    <comment>The audio files are moved to the Trash. Transcripts, summaries and chats stay.</comment>
+  </data>
+  <data name="TheAudioFilesAreMovedToTheTrashTranscriptsSummariesAndChatsS_2" xml:space="preserve">
+    <value>Các tệp âm thanh được chuyển vào Thùng rác. Bản chép lời, bản tóm tắt và cuộc trò chuyện vẫn được giữ; không thể phát lại và chép lời lại nữa.</value>
+    <comment>The audio files are moved to the Trash. Transcripts, summaries and chats stay; playback and re-transcribing are no longer possible.</comment>
+  </data>
+  <data name="TheAudioIsMovedToTheTrashTheTranscriptSummaryAndChatStayPlay" xml:space="preserve">
+    <value>Âm thanh được chuyển vào Thùng rác. Bản chép lời, bản tóm tắt và cuộc trò chuyện vẫn được giữ; không thể phát lại và chép lời lại nữa.</value>
+    <comment>The audio is moved to the Trash. The transcript, summary and chat stay; playback and re-transcribing are no longer possible.</comment>
+  </data>
+  <data name="TheAudioOfLldConversationsWillBeMovedToTheTrashAtTheNextRunA" xml:space="preserve">
+    <value>Âm thanh của {0} cuộc hội thoại sẽ được chuyển vào Thùng rác ở lần chạy tới (khi khởi động hoặc trong vòng một ngày):</value>
+    <comment>The audio of %lld conversations will be moved to the Trash at the next run (at launch or within a day):</comment>
+  </data>
+  <data name="TheAudioOfLldConversationsWillBeMovedToTheTrashNowThenDailyF" xml:space="preserve">
+    <value>Âm thanh của {0} cuộc hội thoại sẽ được chuyển vào Thùng rác ngay bây giờ, sau đó hằng ngày với các cuộc cũ hơn:</value>
+    <comment>The audio of %lld conversations will be moved to the Trash now, then daily for older ones:</comment>
+  </data>
+  <data name="TheAudioOfTranscribedConversationsOlderThanLldDaysWillBeMove" xml:space="preserve">
+    <value>Âm thanh của các cuộc hội thoại đã chép lời cũ hơn {0} ngày sẽ được chuyển vào Thùng rác mỗi ngày một lần. Hiện không có gì khớp.</value>
+    <comment>The audio of transcribed conversations older than %lld days will be moved to the Trash once a day. Nothing matches now.</comment>
+  </data>
+  <data name="TheAudioSystemIsNotRunningTryAgainInAMoment" xml:space="preserve">
+    <value>Hệ thống âm thanh không chạy. Hãy thử lại sau giây lát.</value>
+    <comment>The audio system is not running. Try again in a moment.</comment>
+  </data>
+  <data name="TheCallSeemsToBeOverStopRecording" xml:space="preserve">
+    <value>Cuộc gọi có vẻ đã kết thúc — dừng ghi âm?</value>
+    <comment>The call seems to be over — stop recording?</comment>
+  </data>
+  <data name="TheEmbeddingModelLetsAQuestionFindPassagesWithTheSameMeaning" xml:space="preserve">
+    <value>Mô hình nhúng giúp câu hỏi tìm được các đoạn có cùng ý nghĩa, bằng bất kỳ ngôn ngữ nào. Mô hình chỉ được tải về khi bạn bấm Tải về.</value>
+    <comment>The embedding model lets a question find passages with the same meaning, in any language. Models are downloaded only when you click Download.</comment>
+  </data>
+  <data name="TheEndMustBeAfterTheStart" xml:space="preserve">
+    <value>Thời điểm kết thúc phải sau thời điểm bắt đầu.</value>
+    <comment>The end must be after the start.</comment>
+  </data>
+  <data name="TheEventNoLongerExists" xml:space="preserve">
+    <value>Sự kiện không còn tồn tại.</value>
+    <comment>The event no longer exists.</comment>
+  </data>
+  <data name="TheIndicatorAsksBeforeStoppingWithA15SCountdownLikeTheOtherA" xml:space="preserve">
+    <value>Chỉ báo sẽ hỏi trước khi dừng, với bộ đếm ngược 15 giây, giống các lần tự động dừng khác.</value>
+    <comment>The indicator asks before stopping, with a 15 s countdown, like the other auto-stops.</comment>
+  </data>
+  <data name="TheIndicatorAsksBeforeStoppingWithA15SCountdownReachingTheLe" xml:space="preserve">
+    <value>Chỉ báo sẽ hỏi trước khi dừng, với bộ đếm ngược 15 giây. Khi đạt giới hạn thời lượng, việc ghi âm dừng ngay.</value>
+    <comment>The indicator asks before stopping, with a 15 s countdown. Reaching the length limit stops at once.</comment>
+  </data>
+  <data name="TheLicenseTextIsMissingFromThisBuild" xml:space="preserve">
+    <value>Bản dựng này thiếu văn bản giấy phép.</value>
+    <comment>The license text is missing from this build.</comment>
+  </data>
+  <data name="TheMeetingHasEndedStopRecording" xml:space="preserve">
+    <value>Cuộc họp đã kết thúc — dừng ghi âm?</value>
+    <comment>The meeting has ended — stop recording?</comment>
+  </data>
+  <data name="TheOpenChatStaysThisCanTBeUndone" xml:space="preserve">
+    <value>Cuộc trò chuyện đang mở vẫn được giữ. Không thể hoàn tác thao tác này.</value>
+    <comment>The open chat stays. This can't be undone.</comment>
+  </data>
+  <data name="TheProvider" xml:space="preserve">
+    <value>nhà cung cấp</value>
+    <comment>the provider</comment>
+  </data>
+  <data name="TheRecordingAndItsFilesAreMovedToTheTrash" xml:space="preserve">
+    <value>Bản ghi âm và các tệp của nó được chuyển vào Thùng rác.</value>
+    <comment>The recording and its files are moved to the Trash.</comment>
+  </data>
+  <data name="TheRecordingCouldNotResume" xml:space="preserve">
+    <value>Không thể tiếp tục ghi âm.</value>
+    <comment>The recording could not resume.</comment>
+  </data>
+  <data name="TheRecordingCouldNotStart" xml:space="preserve">
+    <value>Không thể bắt đầu ghi âm.</value>
+    <comment>The recording could not start.</comment>
+  </data>
+  <data name="TheRecordingFailed" xml:space="preserve">
+    <value>Ghi âm không thành công.</value>
+    <comment>The recording failed.</comment>
+  </data>
+  <data name="TheRecordingsAndTheirFilesAreMovedToTheTrash" xml:space="preserve">
+    <value>Các bản ghi âm và tệp của chúng được chuyển vào Thùng rác.</value>
+    <comment>The recordings and their files are moved to the Trash.</comment>
+  </data>
+  <data name="TheRepeatEndsBeforeThisDate" xml:space="preserve">
+    <value>Lặp lại kết thúc trước ngày này.</value>
+    <comment>The repeat ends before this date.</comment>
+  </data>
+  <data name="TheSelectedAppStoppedPlayingAudioBeforeRecordingCouldResume" xml:space="preserve">
+    <value>Ứng dụng đã chọn ngừng phát âm thanh trước khi có thể tiếp tục ghi âm.</value>
+    <comment>The selected app stopped playing audio before recording could resume.</comment>
+  </data>
+  <data name="TheSelectedAppStoppedPlayingAudioBeforeRecordingCouldStart" xml:space="preserve">
+    <value>Ứng dụng đã chọn ngừng phát âm thanh trước khi có thể bắt đầu ghi âm.</value>
+    <comment>The selected app stopped playing audio before recording could start.</comment>
+  </data>
+  <data name="TheShortcutCouldNotBeSetUpErrorD" xml:space="preserve">
+    <value>Không thể thiết lập phím tắt (lỗi {0}).</value>
+    <comment>The shortcut could not be set up (error %d).</comment>
+  </data>
+  <data name="TheSystemAudioFormatIsNotSupported" xml:space="preserve">
+    <value>Định dạng âm thanh hệ thống không được hỗ trợ.</value>
+    <comment>The system audio format is not supported.</comment>
+  </data>
+  <data name="TheTestCouldNotStart" xml:space="preserve">
+    <value>Không thể bắt đầu bài kiểm tra.</value>
+    <comment>The test could not start.</comment>
+  </data>
+  <data name="TheTranscriptCouldNotBeRead" xml:space="preserve">
+    <value>Không thể đọc bản chép lời.</value>
+    <comment>The transcript could not be read.</comment>
+  </data>
+  <data name="TheTranscriptionSpeakerAndAIModelsAreRemovedFromThisMacNotMo" xml:space="preserve">
+    <value>Các mô hình chép lời, người nói và AI bị xoá khỏi máy Mac này (không chuyển vào Thùng rác). Hãy tải về lại trong Cài đặt › Chép lời và Cài đặt › AI.</value>
+    <comment>The transcription, speaker and AI models are removed from this Mac (not moved to the Trash). Download them again in Settings › Transcription and Settings › AI.</comment>
+  </data>
+  <data name="ThereIsNotEnoughFreeDiskSpaceToRecord" xml:space="preserve">
+    <value>Không đủ dung lượng ổ đĩa trống để ghi âm.</value>
+    <comment>There is not enough free disk space to record.</comment>
+  </data>
+  <data name="TheyAreMovedToTheTrashTheAudioStaysSoTheConversationsCanBeTr" xml:space="preserve">
+    <value>Chúng được chuyển vào Thùng rác. Âm thanh vẫn được giữ, nên có thể chép lời lại các cuộc hội thoại.</value>
+    <comment>They are moved to the Trash. The audio stays, so the conversations can be transcribed again.</comment>
+  </data>
+  <data name="TheyStillGoToTheTrash" xml:space="preserve">
+    <value>Chúng vẫn được chuyển vào Thùng rác.</value>
+    <comment>They still go to the Trash.</comment>
+  </data>
+  <data name="ThisAndFutureEvents" xml:space="preserve">
+    <value>Tất cả sự kiện trong tương lai</value>
+    <comment>This and Future Events</comment>
+  </data>
+  <data name="ThisAppSAudioCannotBeIsolatedSoAllSystemAudioIsBeingRecorded" xml:space="preserve">
+    <value>Không thể tách riêng âm thanh của ứng dụng này, nên toàn bộ âm thanh hệ thống đang được ghi lại.</value>
+    <comment>This app's audio cannot be isolated, so all system audio is being recorded.</comment>
+  </data>
+  <data name="ThisConversationHasNoTranscriptYet" xml:space="preserve">
+    <value>Cuộc hội thoại này chưa có bản chép lời.</value>
+    <comment>This conversation has no transcript yet.</comment>
+  </data>
+  <data name="ThisConversationWasDeleted" xml:space="preserve">
+    <value>Cuộc hội thoại này đã bị xoá</value>
+    <comment>This conversation was deleted</comment>
+  </data>
+  <data name="ThisEngineTranscribesAfterStopWhisperKitAndParakeetModelsAls" xml:space="preserve">
+    <value>Công cụ này chép lời sau khi bấm Dừng. Mô hình WhisperKit và Parakeet cũng chép lời trong khi ghi âm.</value>
+    <comment>This engine transcribes after Stop. WhisperKit and Parakeet models also transcribe while recording.</comment>
+  </data>
+  <data name="ThisEventCanTBeEditedHere" xml:space="preserve">
+    <value>Không thể sửa sự kiện này ở đây.</value>
+    <comment>This event can't be edited here.</comment>
+  </data>
+  <data name="ThisEventOnly" xml:space="preserve">
+    <value>Chỉ sự kiện này</value>
+    <comment>This Event Only</comment>
+  </data>
+  <data name="ThisMac" xml:space="preserve">
+    <value>Máy Mac này</value>
+    <comment>This Mac</comment>
+  </data>
+  <data name="ThisModelDoesNotLabelSpeakersAModelOnThisMacIsUsedInstead" xml:space="preserve">
+    <value>Mô hình này không gắn nhãn người nói; một mô hình trên máy Mac này sẽ được dùng thay thế.</value>
+    <comment>This model does not label speakers; a model on this Mac is used instead.</comment>
+  </data>
+  <data name="Title" xml:space="preserve">
+    <value>Tiêu đề</value>
+    <comment>Title</comment>
+  </data>
+  <data name="Today" xml:space="preserve">
+    <value>Hôm nay</value>
+    <comment>Today</comment>
+  </data>
+  <data name="TokenizersAndModelDownloads" xml:space="preserve">
+    <value>Tokenizer và tải về mô hình</value>
+    <comment>Tokenizers and model downloads</comment>
+  </data>
+  <data name="Tomorrow" xml:space="preserve">
+    <value>Ngày mai</value>
+    <comment>Tomorrow</comment>
+  </data>
+  <data name="Total" xml:space="preserve">
+    <value>Tổng</value>
+    <comment>Total</comment>
+  </data>
+  <data name="Transcribe" xml:space="preserve">
+    <value>Chép lời</value>
+    <comment>Transcribe</comment>
+  </data>
+  <data name="TranscribeAgainWith" xml:space="preserve">
+    <value>Chép lời lại bằng</value>
+    <comment>Transcribe again with</comment>
+  </data>
+  <data name="TranscribeAutomatically" xml:space="preserve">
+    <value>Tự động chép lời</value>
+    <comment>Transcribe automatically</comment>
+  </data>
+  <data name="TranscribeThisConversation" xml:space="preserve">
+    <value>Chép lời cuộc hội thoại này</value>
+    <comment>Transcribe this conversation</comment>
+  </data>
+  <data name="TranscribeWhileRecording" xml:space="preserve">
+    <value>Chép lời trong khi ghi âm</value>
+    <comment>Transcribe while recording</comment>
+  </data>
+  <data name="TranscribeWhileRecordingIsOffTurnItOnInSettingsTranscription" xml:space="preserve">
+    <value>Chép lời trong khi ghi âm đang tắt. Hãy bật trong Cài đặt › Chép lời.</value>
+    <comment>Transcribe while recording is off. Turn it on in Settings › Transcription.</comment>
+  </data>
+  <data name="Transcribing" xml:space="preserve">
+    <value>Đang chép lời…</value>
+    <comment>Transcribing…</comment>
+  </data>
+  <data name="Transcript" xml:space="preserve">
+    <value>Bản chép lời</value>
+    <comment>Transcript</comment>
+  </data>
+  <data name="Transcription" xml:space="preserve">
+    <value>Chép lời</value>
+    <comment>Transcription</comment>
+  </data>
+  <data name="TranscriptionFailed" xml:space="preserve">
+    <value>Chép lời không thành công</value>
+    <comment>Transcription failed</comment>
+  </data>
+  <data name="TranscriptionFailedTranscribeThisConversationAgain" xml:space="preserve">
+    <value>Chép lời không thành công — hãy chép lời lại cuộc hội thoại này</value>
+    <comment>Transcription failed — transcribe this conversation again</comment>
+  </data>
+  <data name="TranscriptionIsOffTurnOnTranscribeAutomaticallyInSettingsRec" xml:space="preserve">
+    <value>Chép lời đang tắt. Hãy bật Tự động chép lời trong Cài đặt › Ghi âm.</value>
+    <comment>Transcription is off. Turn on Transcribe automatically in Settings › Recording.</comment>
+  </data>
+  <data name="TranscriptionModel" xml:space="preserve">
+    <value>Mô hình chép lời</value>
+    <comment>Transcription model</comment>
+  </data>
+  <data name="TranscriptionModelIdEGWhisper1" xml:space="preserve">
+    <value>ID mô hình chép lời, ví dụ: whisper-1</value>
+    <comment>Transcription model id, e.g. whisper-1</comment>
+  </data>
+  <data name="TranscriptionModels" xml:space="preserve">
+    <value>Mô hình chép lời</value>
+    <comment>Transcription models</comment>
+  </data>
+  <data name="TranscriptionStartsOnceTheMacIsReady" xml:space="preserve">
+    <value>Việc chép lời sẽ bắt đầu khi máy Mac sẵn sàng.</value>
+    <comment>Transcription starts once the Mac is ready.</comment>
+  </data>
+  <data name="TranscriptionTurnsSpeechIntoTextTheTranscriptionModelListens" xml:space="preserve">
+    <value>Chép lời chuyển giọng nói thành văn bản. Mô hình chép lời nghe bản ghi âm và viết lại những gì đã nói, kèm dấu thời gian.</value>
+    <comment>Transcription turns speech into text. The transcription model listens to the recording and writes what was said, with timestamps.</comment>
+  </data>
+  <data name="TranscriptsAndAI" xml:space="preserve">
+    <value>Bản chép lời và AI</value>
+    <comment>Transcripts and AI</comment>
+  </data>
+  <data name="TranscriptsAndSummariesOfLldConversationsAndYourQuestionsWil" xml:space="preserve">
+    <value>Bản chép lời và bản tóm tắt của {0} cuộc hội thoại, cùng các câu hỏi của bạn, sẽ được gửi đến {1} để tạo và tìm kiếm chỉ mục, và do {2} tính phí. Nhà cung cấp có thể lưu giữ chúng theo chính sách lưu trữ riêng của họ. Bạn chỉ được hỏi một lần cho mỗi nhà cung cấp và nơi nhận.</value>
+    <comment>Transcripts and summaries of %lld conversations, and your questions, will be sent to %@ to build and search the index, and billed by %@. The provider may keep them under its own retention policy. You are asked once per provider and destination.</comment>
+  </data>
+  <data name="TranscriptsSummariesAndChatsStayPlaybackAndReTranscribingAre" xml:space="preserve">
+    <value>Bản chép lời, bản tóm tắt và cuộc trò chuyện vẫn được giữ; không thể phát lại và chép lời lại nữa.</value>
+    <comment>Transcripts, summaries and chats stay; playback and re-transcribing are no longer possible.</comment>
+  </data>
+  <data name="TurnOn" xml:space="preserve">
+    <value>Bật</value>
+    <comment>Turn On</comment>
+  </data>
+  <data name="TurnOnAndDelete" xml:space="preserve">
+    <value>Bật và xoá</value>
+    <comment>Turn On and Delete</comment>
+  </data>
+  <data name="TurnOnAutoDelete" xml:space="preserve">
+    <value>Bật tự động xoá?</value>
+    <comment>Turn on auto-delete?</comment>
+  </data>
+  <data name="TurnOnEchoDiarInPrivacySecurityMicrophone" xml:space="preserve">
+    <value>Hãy bật EchoDiar trong Quyền riêng tư &amp; Bảo mật › Micrô.</value>
+    <comment>Turn on EchoDiar in Privacy &amp; Security › Microphone.</comment>
+  </data>
+  <data name="TurnOnInSettingsAI" xml:space="preserve">
+    <value>Bật {0} trong Cài đặt › AI</value>
+    <comment>Turn on %@ in Settings › AI</comment>
+  </data>
+  <data name="TurnOnInSettingsRAG" xml:space="preserve">
+    <value>Bật trong Cài đặt › RAG</value>
+    <comment>Turn on in Settings › RAG</comment>
+  </data>
+  <data name="TypeAModelIdAndPressReturnOrLoadTheModelsToPickFrom" xml:space="preserve">
+    <value>Nhập ID mô hình rồi nhấn Return, hoặc tải danh sách mô hình để chọn.</value>
+    <comment>Type a model id and press Return, or load the models to pick from.</comment>
+  </data>
+  <data name="UnavailableDevice" xml:space="preserve">
+    <value>Thiết bị không khả dụng</value>
+    <comment>Unavailable device</comment>
+  </data>
+  <data name="Understood" xml:space="preserve">
+    <value>Đã hiểu</value>
+    <comment>Understood</comment>
+  </data>
+  <data name="UnmuteMicrophone" xml:space="preserve">
+    <value>Bật tiếng micrô</value>
+    <comment>Unmute Microphone</comment>
+  </data>
+  <data name="UnmuteMicrophone_2" xml:space="preserve">
+    <value>Bật tiếng micrô</value>
+    <comment>Unmute microphone</comment>
+  </data>
+  <data name="Untitled" xml:space="preserve">
+    <value>Không có tiêu đề</value>
+    <comment>Untitled</comment>
+  </data>
+  <data name="Upcoming" xml:space="preserve">
+    <value>Sắp tới</value>
+    <comment>Upcoming</comment>
+  </data>
+  <data name="UpcomingMeetingsShowHereOnceEchoDiarCanReadYourCalendars" xml:space="preserve">
+    <value>Các cuộc họp sắp tới sẽ hiển thị ở đây khi EchoDiar có thể đọc lịch của bạn.</value>
+    <comment>Upcoming meetings show here once EchoDiar can read your calendars.</comment>
+  </data>
+  <data name="Update" xml:space="preserve">
+    <value>Cập nhật</value>
+    <comment>Update</comment>
+  </data>
+  <data name="UpdateAvailable" xml:space="preserve">
+    <value>Có bản cập nhật…</value>
+    <comment>Update Available…</comment>
+  </data>
+  <data name="Usage" xml:space="preserve">
+    <value>Mức sử dụng</value>
+    <comment>Usage</comment>
+  </data>
+  <data name="Use" xml:space="preserve">
+    <value>Dùng {0}</value>
+    <comment>Use %@</comment>
+  </data>
+  <data name="UseAnHttpsLink" xml:space="preserve">
+    <value>Hãy dùng liên kết https.</value>
+    <comment>Use an https link.</comment>
+  </data>
+  <data name="UseOrWithTheKey" xml:space="preserve">
+    <value>Dùng ⌘, ⌥ hoặc ⌃ cùng với phím.</value>
+    <comment>Use ⌘, ⌥ or ⌃ with the key.</comment>
+  </data>
+  <data name="UsedByMLXSwift" xml:space="preserve">
+    <value>Được MLX Swift sử dụng</value>
+    <comment>Used by MLX Swift</comment>
+  </data>
+  <data name="UsedBySwiftHuggingface" xml:space="preserve">
+    <value>Được swift-huggingface sử dụng</value>
+    <comment>Used by swift-huggingface</comment>
+  </data>
+  <data name="UsedBySwiftTransformers" xml:space="preserve">
+    <value>Được swift-transformers sử dụng</value>
+    <comment>Used by swift-transformers</comment>
+  </data>
+  <data name="UsesTheLanguagePickedInTheRecordMenuForTheNextRecordingsInst" xml:space="preserve">
+    <value>Dùng ngôn ngữ đã chọn trong menu Ghi âm cho các lần ghi âm tiếp theo thay vì ngôn ngữ mặc định. Ngôn ngữ đổi trong lúc ghi âm không được tính.</value>
+    <comment>Uses the language picked in the Record menu for the next recordings instead of the default language. Languages changed during a recording don't count.</comment>
+  </data>
+  <data name="Version" xml:space="preserve">
+    <value>Phiên bản</value>
+    <comment>Version</comment>
+  </data>
+  <data name="VersionLld" xml:space="preserve">
+    <value>Phiên bản {0}</value>
+    <comment>Version %lld</comment>
+  </data>
+  <data name="Version_2" xml:space="preserve">
+    <value>Phiên bản {0}</value>
+    <comment>Version %@</comment>
+  </data>
+  <data name="ViaAPI" xml:space="preserve">
+    <value>Qua API</value>
+    <comment>Via API</comment>
+  </data>
+  <data name="Vietnamese" xml:space="preserve">
+    <value>Tiếng Việt</value>
+    <comment>Vietnamese</comment>
+  </data>
+  <data name="View" xml:space="preserve">
+    <value>Hiển thị</value>
+    <comment>View</comment>
+  </data>
+  <data name="WaitForTheCall" xml:space="preserve">
+    <value>Chờ cuộc gọi</value>
+    <comment>Wait for the call</comment>
+  </data>
+  <data name="WaitWhenTheMacIsHotOrInLowPowerMode" xml:space="preserve">
+    <value>Chờ khi máy Mac nóng hoặc ở Chế độ nguồn điện thấp</value>
+    <comment>Wait when the Mac is hot or in Low Power Mode</comment>
+  </data>
+  <data name="Waiting" xml:space="preserve">
+    <value>Đang chờ…</value>
+    <comment>Waiting…</comment>
+  </data>
+  <data name="WaitingWhileTheMacIsHotOrInLowPowerMode" xml:space="preserve">
+    <value>Đang chờ vì máy Mac nóng hoặc ở Chế độ nguồn điện thấp</value>
+    <comment>Waiting while the Mac is hot or in Low Power Mode</comment>
+  </data>
+  <data name="WatchedCalendars" xml:space="preserve">
+    <value>Lịch được theo dõi</value>
+    <comment>Watched calendars</comment>
+  </data>
+  <data name="WeekdaysMonFri" xml:space="preserve">
+    <value>Ngày trong tuần (T2–T6)</value>
+    <comment>Weekdays (Mon–Fri)</comment>
+  </data>
+  <data name="Weekly" xml:space="preserve">
+    <value>Hàng tuần</value>
+    <comment>Weekly</comment>
+  </data>
+  <data name="WelcomeToEchoDiar" xml:space="preserve">
+    <value>Chào mừng bạn đến với EchoDiar</value>
+    <comment>Welcome to EchoDiar</comment>
+  </data>
+  <data name="WhatAreMyOpenActionItems" xml:space="preserve">
+    <value>Tôi còn những đầu việc nào chưa xong?</value>
+    <comment>What are my open action items?</comment>
+  </data>
+  <data name="WhatDidWeDecideAboutTheLaunchDate" xml:space="preserve">
+    <value>Chúng ta đã quyết định gì về ngày ra mắt?</value>
+    <comment>What did we decide about the launch date?</comment>
+  </data>
+  <data name="WhenAMeetingStarts" xml:space="preserve">
+    <value>Khi cuộc họp bắt đầu</value>
+    <comment>When a meeting starts</comment>
+  </data>
+  <data name="WhenTheMicrophoneDisconnects" xml:space="preserve">
+    <value>Khi micrô ngắt kết nối</value>
+    <comment>When the microphone disconnects</comment>
+  </data>
+  <data name="WhileARecordingStaysPausedThisLongTheModelThatTranscribesItI" xml:space="preserve">
+    <value>Khi bản ghi âm tạm dừng lâu như vậy, mô hình đang chép lời bản ghi âm đó sẽ được giải phóng; mô hình sẽ tải lại khi bạn tiếp tục. Các mô hình khác được giải phóng ngay khi xong việc.</value>
+    <comment>While a recording stays paused this long, the model that transcribes it is freed; it loads again when you resume. Other models are freed as soon as their job ends.</comment>
+  </data>
+  <data name="WhisperTranscription" xml:space="preserve">
+    <value>Chép lời Whisper</value>
+    <comment>Whisper transcription</comment>
+  </data>
+  <data name="WhoMentionedTheBudgetAndWhen" xml:space="preserve">
+    <value>Ai đã nhắc đến ngân sách, và khi nào?</value>
+    <comment>Who mentioned the budget, and when?</comment>
+  </data>
+  <data name="WholeChat" xml:space="preserve">
+    <value>Toàn bộ cuộc trò chuyện</value>
+    <comment>Whole chat</comment>
+  </data>
+  <data name="WholeConversation" xml:space="preserve">
+    <value>Toàn bộ cuộc hội thoại</value>
+    <comment>Whole conversation</comment>
+  </data>
+  <data name="Window" xml:space="preserve">
+    <value>Cửa sổ</value>
+    <comment>Window</comment>
+  </data>
+  <data name="WouldDeleteNowLldConversations" xml:space="preserve">
+    <value>Sẽ xoá ngay: {0} cuộc hội thoại</value>
+    <comment>Would delete now: %lld conversations</comment>
+  </data>
+  <data name="WritingTheSummary" xml:space="preserve">
+    <value>Đang viết bản tóm tắt…</value>
+    <comment>Writing the summary…</comment>
+  </data>
+  <data name="XApiKeyHeader" xml:space="preserve">
+    <value>Header x-api-key</value>
+    <comment>x-api-key header</comment>
+  </data>
+  <data name="Yesterday" xml:space="preserve">
+    <value>Hôm qua</value>
+    <comment>Yesterday</comment>
+  </data>
+  <data name="YourConversationsAreNotIndexedYet" xml:space="preserve">
+    <value>Các cuộc hội thoại của bạn chưa được lập chỉ mục.</value>
+    <comment>Your conversations are not indexed yet.</comment>
+  </data>
+  <data name="ZoomGoogleMeetMicrosoftTeamsOrWebexLinkInTheEvent" xml:space="preserve">
+    <value>Có liên kết Zoom, Google Meet, Microsoft Teams hoặc Webex trong sự kiện.</value>
+    <comment>Zoom, Google Meet, Microsoft Teams or Webex link in the event.</comment>
+  </data>
+</root>

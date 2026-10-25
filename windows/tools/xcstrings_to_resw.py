@@ -1,34 +1,47 @@
 #!/usr/bin/env python3
-"""Generates the Windows app's English string table from the macOS catalog.
+"""Generates the Windows app's string tables from the macOS catalog and the Windows-only catalog.
 
-Reads EchoDiar/Localizable.xcstrings and writes
-windows/src/EchoDiar.App/Strings/en-US/Resources.resw and
-windows/src/EchoDiar.App/Strings/LocKeys.g.cs.
+Reads EchoDiar/Localizable.xcstrings (the macOS catalog, never edited for Windows) and
+windows/src/EchoDiar.App/Strings/Windows.xcstrings (Windows-only texts, same xcstrings format; a key in both
+catalogs is an error), and writes windows/src/EchoDiar.App/Strings/<folder>/Resources.resw for en-US, vi, fr, es
+and zh-Hans, and windows/src/EchoDiar.App/Strings/LocKeys.g.cs.
 
 - Key: a slug of the source text (the xcstrings key): the ASCII alphanumeric runs, each
   with its first letter upper-cased, joined and cut to 60 characters. A slug that is empty
   or starts with a digit gets the prefix "S_". Colliding slugs get "_2", "_3"... in the
-  order of the sorted source keys. Loc.Slug in windows/src/EchoDiar.App/Loc.cs is the
-  same algorithm. LocKeys.g.cs lists every source text (Loc.KnownTexts): Loc.T and
-  Loc.Format resolve only those, and return any other text as is, so a Windows-only text
-  whose slug happens to match a catalog key never gets that key's string. It also maps the
-  exact source text of every member of a collision group to its key (Loc.CollisionKeys),
-  which Loc.T and Loc.Format look up before the slug.
-- Value: the English text (the en localization when present, the "other" plural form for
-  plural variations, else the key), with each substitution (%2$#@name@) replaced by the
-  "other" plural form of that substitution, its %arg as the substitution's argument
-  (%2$lld), and printf placeholders as .NET format items: %@, %lld, %d, %f... become
-  {0}, {1}... in order, %2$@ becomes {1}, %% becomes %, and literal braces are doubled so
-  string.Format works.
-- Self-checks (fail generation and --check, nothing written): an English text that still
-  holds a substitution (#@) or a % that is neither a printf placeholder to_net_format
-  converts nor %%, or a value whose {n} count differs from its source text's placeholder count.
+  order of the sorted source keys of both catalogs. Loc.Slug in windows/src/EchoDiar.App/Loc.cs
+  is the same algorithm. LocKeys.g.cs lists every source text (Loc.KnownTexts): Loc.T and
+  Loc.Format resolve only those, and return any other text as is, so a text whose slug
+  happens to match a catalog key never gets that key's string. It also maps the exact
+  source text of every member of a collision group to its key (Loc.CollisionKeys), which
+  Loc.T and Loc.Format look up before the slug.
+- Plurals: a text with plural variations, or with a substitution (%2$#@name@) that has plural
+  variations, gets its "other" form under the key and its "one" form under "<key>__One" (slugs
+  never contain "__"). Other plural categories ("many"...) are not written.
+- Value: en-US has every key: the English text (the en localization when present, else the
+  key). vi, fr, es and zh-Hans have only the forms translated in that language (state
+  "translated" or "needs_review"); MRT falls back to en-US for the others. Each substitution
+  is replaced by the same plural form of that substitution ("other" when it has no "one"),
+  its %arg as the substitution's argument (%2$lld), and printf placeholders become .NET
+  format items: %@, %lld, %d, %f... become {0}, {1}... in order, %2$@ becomes {1}, %% becomes
+  %, and literal braces are doubled so string.Format works.
+- Self-checks: a text that still holds a substitution (#@) or a % that is neither a printf
+  placeholder to_net_format converts nor %%, or a value whose {n} indices are not exactly
+  0..n-1 for the n placeholders of its source text. A failing translation of the macOS
+  catalog is left out of that language (warning; MRT falls back to en-US); any other failure
+  (English, or the Windows catalog) fails generation and --check, nothing written.
+- Literal check: every literal first argument of Loc.T / Loc.Format / Loc.Plural("...") in a
+  .cs file, and every {local:T Text='...'} in a .xaml file, under windows/src/EchoDiar.App
+  must be a key of one of the catalogs: a warning when generating, an error with --check.
+  Other arguments (variables, ternaries, concatenations) are not checked.
 
 Usage: python3 -I windows/tools/xcstrings_to_resw.py [--check]
-  --check  regenerates in memory and diffs against the committed files; exit 1 on a mismatch or a self-check error.
+  --check  regenerates in memory and diffs against the committed files; exit 1 on a mismatch,
+           a self-check error or a literal in neither catalog.
 """
 
 import difflib
+import html
 import json
 import re
 import sys
@@ -36,9 +49,14 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
 SOURCE = ROOT / "EchoDiar" / "Localizable.xcstrings"
-STRINGS = ROOT / "windows" / "src" / "EchoDiar.App" / "Strings"
-TARGET = STRINGS / "en-US" / "Resources.resw"
+APP = ROOT / "windows" / "src" / "EchoDiar.App"
+STRINGS = APP / "Strings"
+WINDOWS_SOURCE = STRINGS / "Windows.xcstrings"
 KEYS_TARGET = STRINGS / "LocKeys.g.cs"
+# xcstrings language -> resw folder (an MRT language qualifier). en is the source language: every key.
+LANGUAGES = [("en", "en-US"), ("vi", "vi"), ("fr", "fr"), ("es", "es"), ("zh-Hans", "zh-Hans")]
+USABLE = {"translated", "needs_review"}
+ONE = "__One"
 
 MAX_SLUG = 60
 PREFIX = "S_"
@@ -49,6 +67,11 @@ FORMAT_ITEM = re.compile(r"\{\{|\}\}|\{(\d+)\}")
 PLACEHOLDER = re.compile(
     r"%(?:(\d+)\$)?[-+ #0]*\d*(?:\.\d+)?(?:hh|h|ll|l|q|z|t|j|L)?([@dDiuUxXoOfFeEgGcCsSpaA%])"
 )
+# A string literal as the whole first argument of Loc.T / Loc.Format / Loc.Plural, and {local:T Text='...'}.
+LOC_CALL = re.compile(r'\bLoc\.(?:T|Format|Plural)\(\s*"((?:[^"\\\n]|\\.)*)"\s*[,)]')
+XAML_T = re.compile(r"\{local:T\s+Text='((?:[^'\\]|\\.)*)'\s*\}")
+CS_ESCAPE = re.compile(r"\\(u[0-9A-Fa-f]{4}|U[0-9A-Fa-f]{8}|x[0-9A-Fa-f]{1,4}|.)")
+CS_SIMPLE = {"0": "\0", "a": "\a", "b": "\b", "e": "\x1b", "f": "\f", "n": "\n", "r": "\r", "t": "\t", "v": "\v"}
 
 HEADER = """<?xml version="1.0" encoding="utf-8"?>
 <root>
@@ -140,42 +163,78 @@ def to_net_format(text):
     return "".join(out)
 
 
-def english(key, entry):
-    en = entry.get("localizations", {}).get("en", {})
-    unit = en.get("stringUnit")
-    if unit is None:
-        plural = en.get("variations", {}).get("plural", {})
-        unit = plural.get("other", {}).get("stringUnit")
-    value = unit["value"] if unit and "value" in unit else key
-    return SUBSTITUTION.sub(lambda m: substitution(key, en, m.group(1)), value)
+def usable(unit, lang):
+    """A unit with a value; outside en, only a translated or needs_review one."""
+    return unit is not None and "value" in unit and (lang == "en" or unit.get("state") in USABLE)
 
 
-def substitution(key, en, name):
-    """The "other" plural form of substitution name, its %arg as %<argNum>$<formatSpecifier>."""
-    try:
-        sub = en["substitutions"][name]
-        other = sub["variations"]["plural"]["other"]["stringUnit"]["value"]
-        # Positional, so to_net_format gives it its own argument whatever comes before it.
-        arg = "%%%d$%s" % (sub["argNum"], sub["formatSpecifier"])
-    except (KeyError, TypeError) as e:
-        raise SystemExit("%r: substitution %r has no %s" % (key, name, e))
-    return other.replace("%arg", arg)
+def plural_unit(variations, form, lang):
+    """The usable unit of plural form, else of "other", else None."""
+    plural = (variations or {}).get("plural", {})
+    for f in (form, "other"):
+        unit = plural.get(f, {}).get("stringUnit")
+        if usable(unit, lang):
+            return unit
+    return None
 
 
-def check(key, english_text, value):
-    """The problems of value, to_net_format(english_text): a substitution left, a printf placeholder not
-    converted, a {n} count off the key's. Checked in english_text: PLACEHOLDER reads %2$#@ as a %@ (# is a
-    flag), so the value loses the #@, and %% is still distinct from a stray %."""
+def expand(loc, text, form, lang):
+    """text with each substitution (%2$#@name@) replaced by its plural form, its %arg as
+    %<argNum>$<formatSpecifier> (positional, so to_net_format gives it its own argument whatever comes before
+    it), and the problems found. A substitution without a usable form is left in place (check reports it)."""
     problems = []
-    if "#@" in english_text:
+
+    def replace(m):
+        sub = loc.get("substitutions", {}).get(m.group(1), {})
+        unit = plural_unit(sub.get("variations"), form, lang)
+        if unit is None or "argNum" not in sub or "formatSpecifier" not in sub:
+            problems.append("substitution %r has no usable %s form" % (m.group(1), form))
+            return m.group(0)
+        return unit["value"].replace("%arg", "%%%d$%s" % (sub["argNum"], sub["formatSpecifier"]))
+
+    return SUBSTITUTION.sub(replace, text), problems
+
+
+def forms(key, entry, lang):
+    """({"other": text, "one": text}, problems): the plural forms of lang with substitutions expanded. A form
+    that lang has no usable unit for is left out, except en's "other", which falls back to the key. "one" comes
+    from the plural variations, or from the substitutions of a plain string unit."""
+    loc = entry.get("localizations", {}).get(lang, {})
+    if "variations" in loc:
+        plural = loc["variations"].get("plural", {})
+        units = {f: plural[f].get("stringUnit") for f in ("other", "one") if f in plural}
+    else:
+        unit = loc.get("stringUnit")
+        units = {"other": unit}
+        names = SUBSTITUTION.findall(unit["value"]) if usable(unit, lang) else []
+        subs = loc.get("substitutions", {})
+        if any("one" in subs.get(n, {}).get("variations", {}).get("plural", {}) for n in names):
+            units["one"] = unit
+    texts, problems = {}, []
+    for form, unit in units.items():
+        if usable(unit, lang):
+            text, found = expand(loc, unit["value"], form, lang)
+            texts[form] = text
+            problems += ["%s form: %s" % (form, p) for p in found]
+    if lang == "en" and "other" not in texts:
+        texts["other"] = key
+    return texts, problems
+
+
+def check(key, text, value):
+    """The problems of value, to_net_format(text): a substitution left, a printf placeholder not converted, {n}
+    indices other than 0..n-1 for the key's n placeholders. Checked in text: PLACEHOLDER reads %2$#@ as a %@
+    (# is a flag), so the value loses the #@, and %% is still distinct from a stray %."""
+    problems = []
+    if "#@" in text:
         problems.append("substitution left")
-    left = PLACEHOLDER.sub("", english_text)
+    left = PLACEHOLDER.sub("", text)
     if "%" in left:
         problems.append("printf placeholder not converted near %r" % left[left.index("%"):][:12])
     expected = sum(1 for m in PLACEHOLDER.finditer(key) if m.group(2) != "%")
-    found = sum(1 for m in FORMAT_ITEM.finditer(value) if m.group(1))  # {{ and }} are literal braces
-    if found != expected:
-        problems.append("%d format items, the source text has %d placeholders" % (found, expected))
+    found = {int(m.group(1)) for m in FORMAT_ITEM.finditer(value) if m.group(1)}  # {{ and }} are literal braces
+    if found != set(range(expected)):
+        problems.append("format items %s, the source text has %d placeholders" % (sorted(found), expected))
     return problems
 
 
@@ -200,7 +259,8 @@ def keys_cs(collisions, names):
     """LocKeys.g.cs: every source text, and the exact source text of every member of a collision group -> its key."""
     lines = [
         "// <auto-generated>\n",
-        "// Generated by windows/tools/xcstrings_to_resw.py from EchoDiar/Localizable.xcstrings. Do not edit.\n",
+        "// Generated by windows/tools/xcstrings_to_resw.py from EchoDiar/Localizable.xcstrings and\n",
+        "// windows/src/EchoDiar.App/Strings/Windows.xcstrings. Do not edit.\n",
         "// </auto-generated>\n",
         "using System;\n",
         "using System.Collections.Generic;\n",
@@ -209,7 +269,7 @@ def keys_cs(collisions, names):
         "\n",
         "public static partial class Loc\n",
         "{\n",
-        "    // Every source text of the catalog: the only texts Loc.T and Loc.Format look up.\n",
+        "    // Every source text of both catalogs: the only texts Loc.T and Loc.Format look up.\n",
         "    private static readonly HashSet<string> KnownTexts = new(StringComparer.Ordinal)\n",
         "    {\n",
     ]
@@ -228,17 +288,41 @@ def keys_cs(collisions, names):
     return "".join(lines)
 
 
+def load(path):
+    """The "strings" of an xcstrings catalog."""
+    try:
+        with open(path, encoding="utf-8") as f:
+            return json.load(f)["strings"]
+    except FileNotFoundError:
+        raise SystemExit("%s not found" % path.relative_to(ROOT))
+
+
+def resw(rows):
+    """A Resources.resw of rows (name, value, source text as the comment), sorted by name."""
+    parts = [HEADER]
+    for name, value, key in sorted(rows):
+        parts.append('  <data name="%s" xml:space="preserve">\n' % name)
+        parts.append("    <value>%s</value>\n" % xml_escape(value))
+        parts.append("    <comment>%s</comment>\n" % xml_escape(key))
+        parts.append("  </data>\n")
+    parts.append("</root>\n")
+    return "".join(parts)
+
+
 def build():
-    """Returns (resw text, LocKeys.g.cs text, number of strings, collision groups as {slug: [source keys]},
-    self-check problems as [(source key, problem)])."""
-    with open(SOURCE, encoding="utf-8") as f:
-        catalog = json.load(f)
-    strings = catalog["strings"]
-    rows = []
+    """Returns (outputs as {path: text}, source keys of both catalogs, entries per resw folder as {folder: (keys,
+    "one" forms)}, collision groups as {slug: [source keys]}, dropped translations as [(language, source key,
+    problems)], self-check errors as [(language, source key, problem)])."""
+    mac = load(SOURCE)
+    windows = load(WINDOWS_SOURCE)
+    both = sorted(set(mac) & set(windows))
+    if both:
+        raise SystemExit("in both EchoDiar/Localizable.xcstrings and Strings/Windows.xcstrings: %s"
+                         % ", ".join(repr(k) for k in both))
+    strings = {**mac, **windows}
     used = set()
     groups = {}
     names = {}
-    problems = []
     for key in sorted(strings):
         base = slug(key)
         name = base
@@ -249,20 +333,54 @@ def build():
         used.add(name)
         names[key] = name
         groups.setdefault(base, []).append(key)
-        english_text = english(key, strings[key])
-        value = to_net_format(english_text)
-        problems += [(key, problem) for problem in check(key, english_text, value)]
-        rows.append((name, value, key))
-    rows.sort(key=lambda r: r[0])
-    parts = [HEADER]
-    for name, value, key in rows:
-        parts.append('  <data name="%s" xml:space="preserve">\n' % name)
-        parts.append("    <value>%s</value>\n" % xml_escape(value))
-        parts.append("    <comment>%s</comment>\n" % xml_escape(key))
-        parts.append("  </data>\n")
-    parts.append("</root>\n")
     collisions = {b: keys for b, keys in groups.items() if len(keys) > 1}
-    return "".join(parts), keys_cs(collisions, names), len(rows), collisions, problems
+    outputs, counts, dropped, errors = {}, {}, [], []
+    for lang, folder in LANGUAGES:
+        rows = []
+        for key in sorted(strings):
+            texts, problems = forms(key, strings[key], lang)
+            values = {form: to_net_format(text) for form, text in texts.items()}
+            for form, text in texts.items():
+                problems += ["%s form: %s" % (form, p) for p in check(key, text, values[form])]
+            if problems and lang != "en" and key in mac:
+                dropped.append((lang, key, problems))  # A broken macOS translation: MRT falls back to en-US.
+                continue
+            errors += [(lang, key, p) for p in problems]
+            rows += [(names[key] + (ONE if form == "one" else ""), value, key) for form, value in values.items()]
+        outputs[STRINGS / folder / "Resources.resw"] = resw(rows)
+        ones = sum(1 for r in rows if r[0].endswith(ONE))
+        counts[folder] = (len(rows) - ones, ones)
+    outputs[KEYS_TARGET] = keys_cs(collisions, names)
+    return outputs, set(strings), counts, collisions, dropped, errors
+
+
+def unescape_cs(text):
+    """The value of a C# regular string literal's content."""
+    def one(m):
+        e = m.group(1)
+        if len(e) > 1:
+            return chr(int(e[1:], 16))  # \uXXXX, \UXXXXXXXX, \xH..
+        return CS_SIMPLE.get(e, e)
+    return CS_ESCAPE.sub(one, text)
+
+
+def literals():
+    """(text, "file:line") of every literal first argument of Loc.T / Loc.Format / Loc.Plural in a .cs file and
+    every {local:T Text='...'} in a .xaml file under windows/src/EchoDiar.App, bin and obj left out."""
+    found = []
+    for path in sorted(APP.rglob("*")):
+        rel = path.relative_to(APP)
+        if rel.parts[0] in ("bin", "obj") or path.suffix not in (".cs", ".xaml") or not path.is_file():
+            continue
+        with open(path, encoding="utf-8-sig") as f:
+            source = f.read()
+        for m in (LOC_CALL if path.suffix == ".cs" else XAML_T).finditer(source):
+            if path.suffix == ".cs":
+                text = unescape_cs(m.group(1))
+            else:  # XML entities first (the XML parser), then the markup extension's \x escapes.
+                text = re.sub(r"\\(.)", r"\1", html.unescape(m.group(1)))
+            found.append((text, "%s:%d" % (rel.as_posix(), source.count("\n", 0, m.start()) + 1)))
+    return found
 
 
 def read_committed(path):
@@ -277,34 +395,42 @@ def main(argv):
     if hasattr(sys.stdout, "reconfigure"):
         sys.stdout.reconfigure(encoding="utf-8", errors="replace")
     check = "--check" in argv[1:]
-    text, keys_text, count, collisions, problems = build()
-    print("%d strings, %d collision groups" % (count, len(collisions)))
+    outputs, known, counts, collisions, dropped, errors = build()
+    print("%d strings, %d collision groups" % (len(known), len(collisions)))
+    for folder, (keys, ones) in counts.items():
+        print("  %s: %d strings, %d one forms" % (folder, keys, ones))
     for base, keys in sorted(collisions.items()):
         print("  %s: %s" % (base, " | ".join(repr(k) for k in keys)))
-    if problems:
-        for key, problem in problems:
-            print("error: %r: %s" % (key, problem))
-        print("%d self-check errors: nothing written" % len(problems))
+    for lang, key, problems in dropped:
+        print("warning: %s translation of %r left out: %s" % (lang, key, "; ".join(problems)))
+    if errors:
+        for lang, key, problem in errors:
+            print("error: %s %r: %s" % (lang, key, problem))
+        print("%d self-check errors: nothing written" % len(errors))
         return 1
-    outputs = [(TARGET, text), (KEYS_TARGET, keys_text)]
+    missing = [(text, where) for text, where in literals() if text not in known]
+    for text, where in missing:
+        print("%s: %s %r is in neither catalog: add it to Strings/Windows.xcstrings"
+              % ("error" if check else "warning", where, text))
     if check:
         stale = 0
-        for path, generated in outputs:
+        for path, generated in outputs.items():
             committed = read_committed(path)
+            name = path.relative_to(STRINGS).as_posix()
             if committed != generated:
                 diff = difflib.unified_diff(
                     committed.splitlines(keepends=True),
                     generated.splitlines(keepends=True),
-                    "committed/" + path.name,
-                    "generated/" + path.name,
+                    "committed/" + name,
+                    "generated/" + name,
                 )
                 sys.stdout.writelines(diff)
-                print("%s is out of date: run python3 -I windows/tools/xcstrings_to_resw.py" % path.name)
+                print("%s is out of date: run python3 -I windows/tools/xcstrings_to_resw.py" % name)
                 stale += 1
             else:
-                print("%s is up to date" % path.name)
-        return 1 if stale else 0
-    for path, generated in outputs:
+                print("%s is up to date" % name)
+        return 1 if stale or missing else 0
+    for path, generated in outputs.items():
         path.parent.mkdir(parents=True, exist_ok=True)
         with open(path, "w", encoding="utf-8", newline="\n") as f:
             f.write(generated)
