@@ -44,7 +44,9 @@ jobs:
 
       - uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6.0.0
         with:
-          global-json-file: windows/global.json
+          # An exact SDK version downloads from builds.dotnet.microsoft.com; a channel goes through aka.ms,
+          # which pointed at a private storage account (HTTP 409) on 2026-10-25. Keep it within windows/global.json.
+          dotnet-version: 10.0.402
 
       # A job-level hashFiles() guard never runs (checkout has not happened yet), so probe here.
       - id: probe
@@ -69,7 +71,9 @@ jobs:
 
       - uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6.0.0
         with:
-          global-json-file: windows/global.json
+          # An exact SDK version downloads from builds.dotnet.microsoft.com; a channel goes through aka.ms,
+          # which pointed at a private storage account (HTTP 409) on 2026-10-25. Keep it within windows/global.json.
+          dotnet-version: 10.0.402
 
       - id: probe
         name: Probe for tests
@@ -120,7 +124,9 @@ jobs:
 
       - uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6.0.0
         with:
-          global-json-file: windows/global.json
+          # An exact SDK version downloads from builds.dotnet.microsoft.com; a channel goes through aka.ms,
+          # which pointed at a private storage account (HTTP 409) on 2026-10-25. Keep it within windows/global.json.
+          dotnet-version: 10.0.402
 
       - name: Platform tests
         working-directory: windows
@@ -142,7 +148,9 @@ jobs:
 
       - uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6.0.0
         with:
-          global-json-file: windows/global.json
+          # An exact SDK version downloads from builds.dotnet.microsoft.com; a channel goes through aka.ms,
+          # which pointed at a private storage account (HTTP 409) on 2026-10-25. Keep it within windows/global.json.
+          dotnet-version: 10.0.402
 
       # Keyed by the SHA-256 of ggml-tiny.bin, the pyannote segmentation model, the campplus embedding, Qwen3-0.6B
       # Q8_0 and Qwen3-Embedding-0.6B Q8_0.
@@ -183,7 +191,9 @@ jobs:
 
       - uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6.0.0
         with:
-          global-json-file: windows/global.json
+          # An exact SDK version downloads from builds.dotnet.microsoft.com; a channel goes through aka.ms,
+          # which pointed at a private storage account (HTTP 409) on 2026-10-25. Keep it within windows/global.json.
+          dotnet-version: 10.0.402
 
       - uses: microsoft/setup-msbuild@30375c66a4eea26614e0d39710365f22f8b0af57 # v3.0.0
 
