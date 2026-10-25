@@ -1,0 +1,87 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    The detail when no entry is shown (macOS WelcomeView.swift): the logo, "Welcome to EchoDiar" and a hint to pick a
+    conversation in the sidebar; with an empty library and nothing recording, the invite to the first recording (the
+    shortcut that starts one and Record). In a card filling the detail, like the transcript's.
+-->
+<UserControl
+    x:Class="EchoDiar.App.Views.WelcomeView"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:local="using:EchoDiar.App">
+
+    <Border
+        Margin="0,8,12,12"
+        Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
+        BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
+        BorderThickness="1"
+        CornerRadius="{StaticResource OverlayCornerRadius}">
+        <StackPanel
+            MaxWidth="360"
+            Margin="20"
+            HorizontalAlignment="Center"
+            VerticalAlignment="Center"
+            Spacing="10">
+            <Image
+                Width="128"
+                Height="128"
+                AutomationProperties.AccessibilityView="Raw"
+                Source="ms-appx:///Assets/Square150x150Logo.png" />
+            <TextBlock
+                HorizontalAlignment="Center"
+                FontWeight="SemiBold"
+                Style="{StaticResource SubtitleTextBlockStyle}"
+                Text="{local:T Text='Welcome to EchoDiar'}"
+                TextAlignment="Center"
+                TextWrapping="Wrap" />
+
+            <TextBlock
+                x:Name="PickHint"
+                HorizontalAlignment="Center"
+                Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                Style="{StaticResource BodyTextBlockStyle}"
+                Text="{local:T Text='Pick a conversation in the sidebar.'}"
+                TextAlignment="Center" />
+
+            <!-- The library is empty and nothing records: the first recording's invite. -->
+            <StackPanel x:Name="FirstRecording" Spacing="10" Visibility="Collapsed">
+                <TextBlock
+                    HorizontalAlignment="Center"
+                    Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                    Style="{StaticResource BodyTextBlockStyle}"
+                    Text="{local:T Text='Record your first conversation'}"
+                    TextAlignment="Center" />
+                <TextBlock
+                    x:Name="ShortcutHint"
+                    HorizontalAlignment="Center"
+                    Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                    Style="{StaticResource CaptionTextBlockStyle}"
+                    TextAlignment="Center" />
+                <!-- The toolbar's Record and Ctrl+R, then the recording page; "Starting…" and off while it starts. -->
+                <Button
+                    x:Name="RecordButton"
+                    Margin="0,6,0,0"
+                    HorizontalAlignment="Center"
+                    Style="{StaticResource AccentButtonStyle}">
+                    <Grid>
+                        <TextBlock x:Name="RecordText" Text="{local:T Text='Record'}" />
+                        <StackPanel
+                            x:Name="StartingContent"
+                            Orientation="Horizontal"
+                            Spacing="6"
+                            Visibility="Collapsed">
+                            <ProgressRing
+                                x:Name="StartingRing"
+                                Width="16"
+                                Height="16"
+                                VerticalAlignment="Center"
+                                Foreground="{ThemeResource TextOnAccentFillColorDisabledBrush}"
+                                IsActive="False" />
+                            <TextBlock Text="{local:T Text='Starting…'}" />
+                        </StackPanel>
+                    </Grid>
+                </Button>
+            </StackPanel>
+        </StackPanel>
+    </Border>
+</UserControl>

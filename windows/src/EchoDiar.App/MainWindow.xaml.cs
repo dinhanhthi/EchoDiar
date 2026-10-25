@@ -27,6 +27,9 @@ public sealed partial class MainWindow : Window
 
     /// <summary>The library chat, made when first opened and kept (its typed question too) while the window lives.</summary>
     private GlobalChatView? _globalChat;
+
+    /// <summary>The welcome pane, made when first shown and kept while the window lives.</summary>
+    private WelcomeView? _welcome;
     private IReadOnlyList<RectInt32> _passthrough = [];
 
     /// <summary>
@@ -316,8 +319,12 @@ public sealed partial class MainWindow : Window
                 ShowLibraryOrChat();
                 break;
             case nameof(AppViewModel.SelectedTarget):
+                UpdateGlobalTapNote();
+                break;
             case nameof(AppViewModel.RecordingSnapshot):
                 UpdateGlobalTapNote();
+                // The recording page shows the recording once it runs, the welcome pane while it starts or once it ended.
+                if (_model.Route.Kind == RouteKind.Recording && (RouteHost.Content is RecordingView) != _model.IsRecording) ShowRoute();
                 break;
         }
     }
@@ -338,17 +345,18 @@ public sealed partial class MainWindow : Window
 
     /// <summary>
     /// Shows the route's page: the library as a 360 px sidebar, then the detail; the window keeps its size. Settings
-    /// takes the whole window, with its own sidebar instead of the library (macOS MainView.swift).
+    /// takes the whole window, with its own sidebar instead of the library (macOS MainView.swift). The recording page
+    /// shows the welcome pane until the recording runs and once it has ended (macOS <c>detail</c>).
     /// </summary>
     private void ShowRoute()
     {
         var route = _model.Route;
         RouteHost.Content = route switch
         {
-            { Kind: RouteKind.Recording } => new RecordingView(_model),
+            { Kind: RouteKind.Recording } when _model.IsRecording => new RecordingView(_model),
             { Kind: RouteKind.Conversation, ConversationId: { } id } => new ConversationView(_model, id),
             { Kind: RouteKind.Settings } => new SettingsPage(_model),
-            _ => WelcomePane(),
+            _ => _welcome ??= new WelcomeView(_model),
         };
         var settings = route.Kind == RouteKind.Settings;
         SidebarColumn.Width = new GridLength(settings ? 0 : 360);
@@ -356,12 +364,6 @@ public sealed partial class MainWindow : Window
         _library.ShowAsSidebar(true, route.ConversationId);
         ShowLibraryOrChat();
     }
-
-    /// <summary>
-    /// The detail when nothing is open (the list route): the welcome pane (macOS WelcomeView.swift) goes here; empty
-    /// until it is ported.
-    /// </summary>
-    private static UIElement? WelcomePane() => null;
 
     /// <summary>
     /// The library chat in place of the cards while it is open (macOS MainView.swift <c>chatOr</c>): the sidebar beside
