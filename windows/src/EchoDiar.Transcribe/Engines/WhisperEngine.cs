@@ -121,11 +121,14 @@ public sealed partial class WhisperEngine(ModelEntry entry, string folder) : ISe
 
     /// <summary>
     /// One loaded model for many chunks, decoded like WhisperKit's batch windows (Swift <c>WhisperKitEngine.Session</c>):
-    /// a chunk longer than the window is split at silences, and each window is filtered by <see cref="SpeechText"/>,
-    /// <see cref="IsSubtitleCredit"/> and <see cref="IsSilent"/>. Not thread-safe.
+    /// a chunk longer than the window is split at silences, a window where the <see cref="SpeechGate"/> hears no speech
+    /// is not decoded, and each window is filtered by <see cref="SpeechText"/>, <see cref="IsSubtitleCredit"/>,
+    /// <see cref="IsSilent"/> and the gate. Not thread-safe.
     /// </summary>
     public sealed class Session(WhisperFactory factory, int windowSamples) : ITranscriptionSession
     {
+        /// <summary>Null when Silero cannot load: windows are then decoded without it.</summary>
+        private readonly SpeechGate? _gate = SpeechGate.TryLoad(windowSamples);
         private WhisperProcessor? _processor;
         private string? _processorLanguage;
 
@@ -144,10 +147,14 @@ public sealed partial class WhisperEngine(ModelEntry entry, string folder) : ISe
                 cancellationToken.ThrowIfCancellationRequested();
                 var offset = (double)start / SampleRate;
                 var window = samples.AsMemory(start, length);
+                // Null without the gate; no interval: Whisper would only make text up here.
+                var speech = _gate?.Intervals(window.Span);
+                if (speech is { Count: 0 }) continue;
                 await foreach (var segment in processor.ProcessAsync(window, cancellationToken).ConfigureAwait(false))
                 {
                     var text = SpeechText(segment.Text);
                     if (text.Length == 0 || IsSubtitleCredit(text) || IsSilent(window.Span, (float)segment.Start.TotalSeconds, (float)segment.End.TotalSeconds)) continue;
+                    if (speech is not null && !SpeechGate.HasSpeech(speech, segment.Start.TotalSeconds, segment.End.TotalSeconds)) continue;
                     segments.Add(new RawSegment(
                         offset + segment.Start.TotalSeconds, offset + segment.End.TotalSeconds, text,
                         code is null ? segment.Language : null));
@@ -174,6 +181,7 @@ public sealed partial class WhisperEngine(ModelEntry entry, string folder) : ISe
         {
             if (_processor is not null) await _processor.DisposeAsync().ConfigureAwait(false);
             _processor = null;
+            _gate?.Dispose();
             factory.Dispose();
         }
     }
