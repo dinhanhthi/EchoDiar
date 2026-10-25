@@ -183,12 +183,16 @@ internal sealed class TrayIcon : IDisposable
         }, enabled);
     }
 
-    /// <summary>Elapsed time, Pause/Resume, Stop, Language and the silent-tap item (macOS addRecordingItems).</summary>
+    /// <summary>
+    /// Elapsed time, Pause/Resume, Mute/Unmute Microphone, Stop, Language and the silent-tap item (macOS
+    /// addRecordingItems).
+    /// </summary>
     private void AddRecordingItems(List<NotifyIconMenuItem> items, RecordingEngine.Snapshot snapshot)
     {
         var paused = snapshot.State == RecordingEngine.State.Paused;
         items.Add(new NotifyIconMenuItem($"{Loc.T(paused ? "Paused" : "Recording")} {ConversationText.Clock(snapshot.Elapsed)}", Enabled: false));
         items.Add(Item(Loc.T(paused ? "Resume" : "Pause"), () => _ = _model.TogglePauseAsync()));
+        items.Add(Item(Loc.T(snapshot.MicMuted ? "Unmute Microphone" : "Mute Microphone"), _model.ToggleMicMute));
         items.Add(Item(Loc.T("Stop recording"), () => _ = _model.StopRecordingAsync()));
         items.Add(LanguageItem());
         if (snapshot.SilentTapSuspected)

@@ -21,10 +21,11 @@ namespace EchoDiar.App.Views;
 
 /// <summary>
 /// The floating pill's window and content (macOS FloatingPillView.swift and PillHostingView): the recording
-/// indicator, its controls on hover, and the meeting prompts in its place. <see cref="Services.FloatingPillController"/>
-/// owns it: it styles, shows, hides, places and closes it. The window reports its content's size in physical pixels and
-/// the user's drags (pointer capture on the capsule: the window has no title bar). A press may make the pill the
-/// foreground window: once the press is over it gives the foreground back to the window that had it.
+/// indicator (a muted mic's glyph included), its controls on hover (Pause or Resume, Mute or Unmute, Stop, Language),
+/// and the meeting prompts in its place. <see cref="Services.FloatingPillController"/> owns it: it styles, shows,
+/// hides, places and closes it. The window reports its content's size in physical pixels and the user's drags
+/// (pointer capture on the capsule: the window has no title bar). A press may make the pill the foreground window: once
+/// the press is over it gives the foreground back to the window that had it.
 /// </summary>
 public sealed partial class FloatingPillWindow : Window
 {
@@ -64,6 +65,7 @@ public sealed partial class FloatingPillWindow : Window
     private readonly PointerEventHandler _anyReleased;
     private double _scale;
     private bool? _shownPaused;
+    private bool? _shownMuted;
     private SizeInt32 _reportedSize;
 
     public FloatingPillWindow(AppViewModel model)
@@ -82,6 +84,7 @@ public sealed partial class FloatingPillWindow : Window
         _countdownTimer.Tick += (_, _) => UpdateCountdown();
 
         PauseButton.Click += (_, _) => _ = _model.TogglePauseAsync();
+        MuteButton.Click += (_, _) => _model.ToggleMicMute();
         StopButton.Click += (_, _) => _ = _model.StopRecordingAsync();
         RecordPromptButton.Click += (_, _) => _model.RecordDetectedMeeting();
         NotNowButton.Click += (_, _) => _model.DismissMeetingPrompt();
@@ -126,6 +129,7 @@ public sealed partial class FloatingPillWindow : Window
         _attached = true;
         _model.PropertyChanged += OnModelChanged;
         _shownPaused = null;
+        _shownMuted = null;
         Update();
     }
 
@@ -143,7 +147,7 @@ public sealed partial class FloatingPillWindow : Window
         if (!_closing)
         {
             RecordingDot.Opacity = 1;
-            Controls.Visibility = Visibility.Collapsed;
+            ShowControls(false);
         }
     }
 
@@ -202,8 +206,10 @@ public sealed partial class FloatingPillWindow : Window
         MeterTrack.Visibility = paused ? Visibility.Collapsed : Visibility.Visible;
         UpdateBlink(recording && !paused);
         UpdateMeter();
+        UpdateMutedIcon();
 
         // The snapshot changes at 15 Hz: a tooltip set again each time would close under the pointer.
+        UpdateMuteButton(snapshot.MicMuted);
         if (paused == _shownPaused) return;
         _shownPaused = paused;
         AutomationProperties.SetName(DotGrid, Loc.T(paused ? "Paused" : "Recording"));
@@ -211,6 +217,28 @@ public sealed partial class FloatingPillWindow : Window
         AutomationProperties.SetName(PauseButton, Loc.T(paused ? "Resume" : "Pause"));
         ToolTipService.SetToolTip(PauseButton, Loc.T(paused ? "Resume recording" : "Pause recording"));
     }
+
+    /// <summary>The Mute button's glyph, name and tooltip, when the state changed.</summary>
+    private void UpdateMuteButton(bool muted)
+    {
+        if (muted == _shownMuted) return;
+        _shownMuted = muted;
+        MuteIcon.Glyph = muted ? RecordingCard.MicOffGlyph : RecordingCard.MicGlyph;
+        var title = Loc.T(muted ? "Unmute microphone" : "Mute microphone");
+        AutomationProperties.SetName(MuteButton, title);
+        ToolTipService.SetToolTip(MuteButton, title);
+    }
+
+    /// <summary>The hover controls show or hide; the muted mic's glyph shows only while they are hidden.</summary>
+    private void ShowControls(bool shown)
+    {
+        Controls.Visibility = shown ? Visibility.Visible : Visibility.Collapsed;
+        UpdateMutedIcon();
+    }
+
+    /// <summary>The muted mic's glyph, while muted and collapsed (expanded, the Mute button shows it).</summary>
+    private void UpdateMutedIcon() =>
+        MutedIcon.Visibility = _model.MicMuted && Controls.Visibility == Visibility.Collapsed ? Visibility.Visible : Visibility.Collapsed;
 
     /// <summary>The prompt's question, countdown and buttons (macOS detectedPrompt and endPrompt).</summary>
     private void ShowPrompt(PillPrompt? prompt)
@@ -306,8 +334,9 @@ public sealed partial class FloatingPillWindow : Window
         MeterTrack.CornerRadius = MeterFill.CornerRadius = new CornerRadius(2 * scale);
         // Icon-only buttons: their padding stands in for macOS's 12 pt spacing.
         Controls.Spacing = 4 * scale;
-        foreach (var button in new[] { PauseButton, StopButton, LanguageButton }) button.Padding = new Thickness(4 * scale);
-        PauseIcon.FontSize = StopIcon.FontSize = GlobeIcon.FontSize = 13 * scale;
+        foreach (var button in new[] { PauseButton, MuteButton, StopButton, LanguageButton }) button.Padding = new Thickness(4 * scale);
+        PauseIcon.FontSize = MuteIcon.FontSize = StopIcon.FontSize = GlobeIcon.FontSize = 13 * scale;
+        MutedIcon.FontSize = 11 * scale;
         UpdateMeter();
     }
 
@@ -319,7 +348,7 @@ public sealed partial class FloatingPillWindow : Window
         _hovering = true;
         RememberForeground();
         _collapseTimer.Stop();
-        Controls.Visibility = Visibility.Visible;
+        ShowControls(true);
     }
 
     private void OnPointerExited(object sender, PointerRoutedEventArgs e)
@@ -342,7 +371,7 @@ public sealed partial class FloatingPillWindow : Window
     private void Collapse()
     {
         if (_closing || _hovering || _menuOpen) return;
-        Controls.Visibility = Visibility.Collapsed;
+        ShowControls(false);
     }
 
     /// <summary>The recording dot blinks while recording, unless paused or Windows animations are off.</summary>

@@ -55,6 +55,29 @@ public sealed partial class AppViewModel
         private set => SetProperty(ref _recordingSourceName, value);
     }
 
+    /// <summary>The mic is muted in the current recording (its channel written as silence); false when idle.</summary>
+    public bool MicMuted => RecordingSnapshot.MicMuted;
+
+    /// <summary>
+    /// Mutes or unmutes the mic, off the UI thread: reopening the device can take a while. The engine flips its state
+    /// under its lock and publishes it, which <see cref="RecordingSnapshot"/> picks up (macOS <c>toggleMicMute</c>).
+    /// </summary>
+    public void ToggleMicMute()
+    {
+        if (!IsRecording) return;
+        _ = Task.Run(() =>
+        {
+            try
+            {
+                _services.Engine.ToggleMicMuted();
+            }
+            catch (Exception e)
+            {
+                Debug.WriteLine($"EchoDiar: could not mute or unmute the mic: {e}");
+            }
+        });
+    }
+
     /// <summary>The window closed: views stop their frame callbacks, since its controls fail every call.</summary>
     internal bool IsClosing => _closing;
 

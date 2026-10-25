@@ -1,7 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!--
     The floating pill (macOS FloatingPillView.swift): the logo, the recording dot, "Recording <App>" after an automatic
-    start, the elapsed time and a level meter; Pause or Resume, Stop and the language menu while the pointer is over it.
+    start, the elapsed time, a level meter and a muted mic's glyph; Pause or Resume, Mute or Unmute, Stop and the
+    language menu while the pointer is over it.
     A meeting prompt takes the indicator's place. The capsule sizes to its content inside a Canvas, so its size is
     the window's, which the controller sets; the window's region clips it to the capsule. Its buttons never take the
     focus: focus would activate the window, which would then take the foreground (and Alt+F4) from the meeting app.
@@ -58,6 +59,15 @@
                         HorizontalAlignment="Left"
                         Background="{ThemeResource AccentFillColorDefaultBrush}" />
                 </Border>
+                <!-- The mic is muted; expanded, the Mute button shows it. -->
+                <FontIcon
+                    x:Name="MutedIcon"
+                    VerticalAlignment="Center"
+                    AutomationProperties.Name="{local:T Text='Microphone muted'}"
+                    FontFamily="{ThemeResource SymbolThemeFontFamily}"
+                    Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                    Glyph="&#xF781;"
+                    Visibility="Collapsed" />
                 <!-- Shown while the pointer is over the pill. -->
                 <StackPanel x:Name="Controls" Orientation="Horizontal" Visibility="Collapsed">
                     <Button
@@ -69,6 +79,16 @@
                         VerticalAlignment="Center"
                         Style="{StaticResource SubtleButtonStyle}">
                         <FontIcon x:Name="PauseIcon" FontFamily="{ThemeResource SymbolThemeFontFamily}" Glyph="&#xE769;" />
+                    </Button>
+                    <Button
+                        x:Name="MuteButton"
+                        AllowFocusOnInteraction="False"
+                        IsTabStop="False"
+                        MinWidth="0"
+                        MinHeight="0"
+                        VerticalAlignment="Center"
+                        Style="{StaticResource SubtleButtonStyle}">
+                        <FontIcon x:Name="MuteIcon" FontFamily="{ThemeResource SymbolThemeFontFamily}" Glyph="&#xE720;" />
                     </Button>
                     <Button
                         x:Name="StopButton"

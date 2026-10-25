@@ -1,8 +1,9 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!--
     The recording in the library, above the conversations (macOS RecordingViews.swift RecordingCard): the source,
-    "Recording…" or "Paused", the elapsed time and mini meters, then a row with Stop and Pause or Resume (also in the
-    context menu). A click opens the recording page; selected (that page is shown) adds the accent fill and edge.
+    "Recording…" or "Paused", the elapsed time and mini meters, then a row with Stop, Pause or Resume and Mute or
+    Unmute (also in the context menu). A click opens the recording page; selected (that page is shown) adds the accent
+    fill and edge.
 -->
 <UserControl
     x:Class="EchoDiar.App.Views.RecordingCard"
@@ -15,6 +16,7 @@
             <MenuFlyout x:Name="CardMenu">
                 <MenuFlyoutItem x:Name="StopItem" Text="{local:T Text='Stop'}" />
                 <MenuFlyoutItem x:Name="PauseItem" />
+                <MenuFlyoutItem x:Name="MuteItem" />
             </MenuFlyout>
         </Grid.ContextFlyout>
 
@@ -113,7 +115,7 @@
                         TextTrimming="CharacterEllipsis" />
                 </Grid>
 
-                <!-- Stop, Pause or Resume, then the language menu (added in code). -->
+                <!-- Stop, Pause or Resume, Mute or Unmute, then the language menu (added in code). -->
                 <StackPanel
                     x:Name="ButtonRow"
                     Margin="0,4,0,0"
@@ -136,6 +138,13 @@
                             FontFamily="{ThemeResource SymbolThemeFontFamily}"
                             FontSize="15"
                             Glyph="&#xE769;" />
+                    </Button>
+                    <Button x:Name="MuteButton" Style="{StaticResource SubtleButtonStyle}">
+                        <FontIcon
+                            x:Name="MuteIcon"
+                            FontFamily="{ThemeResource SymbolThemeFontFamily}"
+                            FontSize="15"
+                            Glyph="&#xE720;" />
                     </Button>
                 </StackPanel>
             </StackPanel>

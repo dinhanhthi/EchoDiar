@@ -13,18 +13,22 @@ namespace EchoDiar.App.Views;
 
 /// <summary>
 /// The recording's card at the top of the library (macOS RecordingViews.swift RecordingCard), while recording: Stop,
-/// Pause or Resume and the language in its row. The mini meters move at 15 Hz while the window is shown.
+/// Pause or Resume, Mute or Unmute and the language in its row. The mini meters move at 15 Hz while the window is
+/// shown.
 /// </summary>
 public sealed partial class RecordingCard : UserControl
 {
     private const string PauseGlyph = "\uE769";
     private const string ResumeGlyph = "\uE768";
+    internal const string MicGlyph = "\uE720";
+    internal const string MicOffGlyph = "\uF781";
     private const double MiniMeterWidth = 44;
 
     private readonly AppViewModel _model;
     private readonly FrameTicker _ticker;
     private bool _selected;
     private bool? _shownPaused;
+    private bool? _shownMuted;
 
     public RecordingCard(AppViewModel model)
     {
@@ -35,6 +39,8 @@ public sealed partial class RecordingCard : UserControl
         StopItem.Click += (_, _) => _ = _model.StopRecordingAsync();
         PauseButton.Click += (_, _) => _ = _model.TogglePauseAsync();
         PauseItem.Click += (_, _) => _ = _model.TogglePauseAsync();
+        MuteButton.Click += (_, _) => _model.ToggleMicMute();
+        MuteItem.Click += (_, _) => _model.ToggleMicMute();
         ButtonRow.Children.Add(new LanguagePicker(model, shortLabel: true));
         Tapped += OnTapped;
         Loaded += (_, _) =>
@@ -91,6 +97,7 @@ public sealed partial class RecordingCard : UserControl
         if (!recording || paused) UpdateMeters();
 
         // The snapshot changes at 15 Hz: a tooltip set again each time would close under the pointer.
+        UpdateMute(snapshot.MicMuted);
         if (paused == _shownPaused) return;
         _shownPaused = paused;
         PauseIcon.Glyph = paused ? ResumeGlyph : PauseGlyph;
@@ -98,6 +105,18 @@ public sealed partial class RecordingCard : UserControl
         AutomationProperties.SetName(PauseButton, pauseTitle);
         ToolTipService.SetToolTip(PauseButton, Loc.T(paused ? "Resume recording" : "Pause recording"));
         PauseItem.Text = pauseTitle;
+    }
+
+    /// <summary>The Mute button's glyph, name and tooltip and the menu item's text, when the state changed.</summary>
+    private void UpdateMute(bool muted)
+    {
+        if (muted == _shownMuted) return;
+        _shownMuted = muted;
+        MuteIcon.Glyph = muted ? MicOffGlyph : MicGlyph;
+        var title = Loc.T(muted ? "Unmute microphone" : "Mute microphone");
+        AutomationProperties.SetName(MuteButton, title);
+        ToolTipService.SetToolTip(MuteButton, title);
+        MuteItem.Text = Loc.T(muted ? "Unmute Microphone" : "Mute Microphone");
     }
 
     /// <summary>The mic and system peaks the model reads at 15 Hz; empty while paused or idle.</summary>
