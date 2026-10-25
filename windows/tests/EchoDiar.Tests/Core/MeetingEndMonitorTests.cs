@@ -128,6 +128,22 @@ public sealed class MeetingEndMonitorTests
     }
 
     [Fact]
+    public void ScheduledEndPromptsEventEndedAndKeepRecordingSnoozesIt()
+    {
+        var monitor = Monitor();
+        monitor.Record(new Input.ScheduledEnd(At(1_800)), Start);
+        Assert.Equal(Decision.None, monitor.Evaluate(At(1_799)));
+        Assert.Equal(Prompt(Reason.EventEnded), monitor.Evaluate(At(1_800)));
+
+        monitor.KeepRecording(Reason.EventEnded, At(1_810));
+        Assert.Equal(Decision.None, monitor.Evaluate(At(1_810 + 599)));
+        Assert.Equal(Prompt(Reason.EventEnded), monitor.Evaluate(At(1_810 + 600)));
+
+        monitor.Record(new Input.ScheduledEnd(null), At(1_810 + 600));
+        Assert.Equal(Decision.None, monitor.Evaluate(At(1_810 + 600)));
+    }
+
+    [Fact]
     public void SleepStopsNow()
     {
         var monitor = Monitor();

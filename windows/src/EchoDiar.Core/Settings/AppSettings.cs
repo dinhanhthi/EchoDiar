@@ -1,5 +1,6 @@
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using EchoDiar.Core.Calendar;
 using EchoDiar.Core.Json;
 
 namespace EchoDiar.Core.Settings;
@@ -34,6 +35,13 @@ public sealed record AppSettings : IJsonOnDeserialized
     /// <summary>Total AAC bitrate of the compressed 2-channel <c>audio.m4a</c>.</summary>
     [JsonPropertyName("compressionBitrateKbps")] public int CompressionBitrateKbps { get; set; } = 64;
     [JsonPropertyName("keepUncompressedAudio")] public bool KeepUncompressedAudio { get; set; }
+    /// <summary>Start recordings in <see cref="LastRecordingLanguage"/> instead of <see cref="DefaultLanguage"/>.</summary>
+    [JsonPropertyName("rememberRecordingLanguage")] public bool RememberRecordingLanguage { get; set; }
+    /// <summary>
+    /// The language last picked from the record button's menu while <see cref="RememberRecordingLanguage"/> is on (a
+    /// code or "auto"); kept, but ignored, once it is turned off.
+    /// </summary>
+    [JsonPropertyName("lastRecordingLanguage")] public string? LastRecordingLanguage { get; set; }
     [JsonPropertyName("playbackChannels")] public PlaybackChannels PlaybackChannels { get; set; } = PlaybackChannels.Mixed;
     [JsonPropertyName("onboardingCompleted")] public bool OnboardingCompleted { get; set; }
     /// <summary>Minutes a loaded on-device model may go unused before it is freed.</summary>
@@ -73,6 +81,8 @@ public sealed record AppSettings : IJsonOnDeserialized
     [JsonPropertyName("pillSize")] public PillSize PillSize { get; set; } = PillSize.Medium;
     [JsonPropertyName("endMonitor")] public MeetingEndMonitorConfiguration EndMonitor { get; set; } = new();
     [JsonPropertyName("routeChangeBehavior")] public RouteChangeBehavior RouteChangeBehavior { get; set; } = RouteChangeBehavior.Ask;
+    /// <summary>Calendar auto-record: trigger mode, watched calendars, event-end stop and skipped occurrences.</summary>
+    [JsonPropertyName("calendar")] public CalendarScheduler.Configuration Calendar { get; set; } = new();
     [JsonPropertyName("autoTranscribe")] public bool AutoTranscribe { get; set; } = true;
     [JsonPropertyName("transcribeWhileRecording")] public bool TranscribeWhileRecording { get; set; } = true;
     /// <summary>Expected speakers on the system channel, 1...20; null = detect.</summary>

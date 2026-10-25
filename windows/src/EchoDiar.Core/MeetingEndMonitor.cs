@@ -12,9 +12,9 @@ namespace EchoDiar.Core;
 /// <item>Max duration (wall clock from <see cref="StartedAt"/>) always stops, before any snooze is consulted, so a
 /// recording cannot run forever unattended.</item>
 /// <item>System sleep and disk full stop at once.</item>
-/// <item>Source app quit, source input and output inactive, both channels silent, screen locked and input route lost
-/// prompt with a countdown (default action Stop). "Keep recording" snoozes that trigger for
-/// <see cref="SnoozeDuration"/>; a condition that still holds afterwards prompts again.</item>
+/// <item>Source app quit, source input and output inactive, both channels silent, screen locked, input route lost and
+/// the calendar event's scheduled end reached prompt with a countdown (default action Stop). "Keep recording" snoozes
+/// that trigger for <see cref="SnoozeDuration"/>; a condition that still holds afterwards prompts again.</item>
 /// <item>Source inactivity is ignored once the source app quit (its own prompt covers it).</item>
 /// <item>Call ended: the system channel went silent after it had been audible while the meeting app's mic is off,
 /// both for <c>callEndedSeconds</c>. Either alone is normal mid-call (others quiet, a muted web client); also ignored
@@ -51,11 +51,14 @@ public sealed class MeetingEndMonitor
         public sealed record InputRouteLost : Input;
         public sealed record SystemSleep : Input;
         public sealed record DiskFull : Input;
+        /// <summary>The calendar event being recorded ends at <paramref name="At"/>; null clears it.</summary>
+        public sealed record ScheduledEnd(DateTimeOffset? At) : Input;
     }
 
     public enum Reason
     {
         SourceExited, SourceInactive, CallEnded, Silence, ScreenLocked, InputRouteLost, SystemSleep, DiskFull, MaxDuration,
+        EventEnded,
     }
 
     /// <summary>What <see cref="Evaluate"/> says to do (Swift <c>Action</c>).</summary>
@@ -80,6 +83,7 @@ public sealed class MeetingEndMonitor
     private bool _paused;
     private bool _screenLocked;
     private bool _inputRouteLost;
+    private DateTimeOffset? _scheduledEnd;
     private Reason? _stopReason;
     private readonly Dictionary<Reason, DateTimeOffset> _snoozedUntil = [];
 
@@ -118,6 +122,7 @@ public sealed class MeetingEndMonitor
             case Input.InputRouteLost: if (!IsSnoozed(Reason.InputRouteLost, at)) _inputRouteLost = true; break;
             case Input.SystemSleep: _stopReason ??= Reason.SystemSleep; break;
             case Input.DiskFull: _stopReason ??= Reason.DiskFull; break;
+            case Input.ScheduledEnd(var end): _scheduledEnd = end; break;
         }
     }
 
@@ -147,6 +152,7 @@ public sealed class MeetingEndMonitor
             (Reason.SourceInactive, !_sourceExited && Held(_sourceInactiveSince, inactiveThreshold, now)),
             (Reason.CallEnded, !_sourceExited && !_paused && Held(CallEndedSince, callEndedThreshold, now)),
             (Reason.Silence, Held(_silentSince, silenceThreshold, now)),
+            (Reason.EventEnded, Held(_scheduledEnd, TimeSpan.Zero, now)),
         ];
         foreach (var (reason, fired) in triggers)
         {

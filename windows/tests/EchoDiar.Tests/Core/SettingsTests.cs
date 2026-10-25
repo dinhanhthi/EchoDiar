@@ -2,6 +2,7 @@ using System.Text;
 using System.Text.Json;
 using System.Text.Json.Nodes;
 using EchoDiar.Core;
+using EchoDiar.Core.Calendar;
 using EchoDiar.Core.Json;
 using EchoDiar.Core.Settings;
 
@@ -49,6 +50,35 @@ public sealed class SettingsTests : IDisposable
         Assert.False(written["showPill"]!.GetValue<bool>());
         Assert.Equal(65u, loaded.GlobalHotKeyWindows.VirtualKey);
         Assert.Equal(Json(loaded), Json(_store.Load()));
+    }
+
+    [Fact]
+    public void CalendarAndRememberedLanguageRoundTripAsMacOSWritesThem()
+    {
+        File.WriteAllText(_store.FilePath, """
+            {"rememberRecordingLanguage":true,"lastRecordingLanguage":"fr",
+             "calendar":{"mode":"someFutureMode","ignoredCalendarIDs":["work"],"allTimedEvents":true,
+              "stopAtEventEnd":false,"stopAfterEndMinutes":999,"skippedEvents":{"evt|1":783000000.5},
+              "ownCalendarID":"own"}}
+            """);
+
+        var loaded = _store.Load();
+        Assert.True(loaded.RememberRecordingLanguage);
+        Assert.Equal("fr", loaded.LastRecordingLanguage);
+        Assert.Equal(CalendarScheduler.Mode.Ask, loaded.Calendar.Mode);
+        Assert.Equal(120, loaded.Calendar.StopAfterEndMinutes);
+        Assert.Equal(DateTimeOffset.FromUnixTimeSeconds(978_307_200).AddSeconds(783_000_000.5),
+            loaded.Calendar.SkippedEvents["evt|1"]);
+        Assert.Empty(loaded.Extra);
+
+        _store.Save(loaded);
+        var written = JsonNode.Parse(File.ReadAllBytes(_store.FilePath))!.AsObject();
+        Assert.True(written["rememberRecordingLanguage"]!.GetValue<bool>());
+        Assert.Equal("fr", written["lastRecordingLanguage"]!.GetValue<string>());
+        Assert.True(JsonNode.DeepEquals(JsonNode.Parse("""
+            {"mode":"ask","ignoredCalendarIDs":["work"],"allTimedEvents":true,"stopAtEventEnd":false,
+             "stopAfterEndMinutes":120,"skippedEvents":{"evt|1":783000000.5},"ownCalendarID":"own"}
+            """), written["calendar"]), written["calendar"]?.ToJsonString());
     }
 
     [Theory]
@@ -181,7 +211,8 @@ public sealed class SettingsTests : IDisposable
     private const string DefaultsJson = """
         {
           "version": 1, "launchAtLogin": false, "defaultLanguage": "auto", "recentLanguages": [],
-          "compressionBitrateKbps": 64, "keepUncompressedAudio": false, "playbackChannels": "mixed",
+          "compressionBitrateKbps": 64, "keepUncompressedAudio": false, "rememberRecordingLanguage": false,
+          "playbackChannels": "mixed",
           "onboardingCompleted": false, "modelIdleMinutes": 2, "providers": [], "cloudSTTConfirmed": [],
           "summaryLanguage": "auto", "chatContextMessages": 10, "ragEnabled": false,
           "embeddingModelID": "gguf-qwen3-embedding-0.6b", "embeddingAPIModel": "", "cloudEmbeddingConfirmed": [],
@@ -189,7 +220,10 @@ public sealed class SettingsTests : IDisposable
           "hidePillWhenAppActive": false, "showPillInScreenCaptures": false, "attachPillToWindow": false,
           "pillSize": "medium",
           "endMonitor": {"sourceInactiveSeconds": 25, "callEndedSeconds": 60, "silenceMinutes": 10, "maxDurationMinutes": 240},
-          "routeChangeBehavior": "ask", "autoTranscribe": true, "transcribeWhileRecording": true, "diarization": false,
+          "routeChangeBehavior": "ask",
+          "calendar": {"mode": "ask", "ignoredCalendarIDs": [], "allTimedEvents": false, "stopAtEventEnd": true,
+                       "stopAfterEndMinutes": 10, "skippedEvents": {}},
+          "autoTranscribe": true, "transcribeWhileRecording": true, "diarization": false,
           "deferTranscriptionWhenConstrained": true, "autoDeleteEnabled": false, "autoDeleteAfterDays": 90,
           "autoDeleteMode": "audioOnly", "deleteAudioAfterTranscription": false, "deleteWithoutConfirmation": false,
           "globalHotKeyWindows": {"virtualKey": 82, "modifiers": 3}, "globalHotKeyEnabled": true,
