@@ -3,6 +3,7 @@ using EchoDiar.Core.Models;
 using EchoDiar.Transcribe;
 using EchoDiar.Transcribe.Engines;
 using NAudio.Wave;
+using SherpaOnnx;
 
 namespace EchoDiar.Tests.Transcribe;
 
@@ -63,6 +64,61 @@ public sealed class NativeSmokeTests : IDisposable
         Log($"whisper ({Environment.OSVersion}, {System.Runtime.InteropServices.RuntimeInformation.ProcessArchitecture}): {text}");
         Log("whisper segments: " + Times(segments));
         Assert.Contains(KnownWord, text, StringComparison.OrdinalIgnoreCase);
+    }
+
+    // Guards the speech gate: Silero hears the fixture's speech and none in a window of noise (above IsSilent's
+    // level), which then gives no segment. Hearing the fixture keeps a dead gate, which skips every window, from passing.
+    [Fact]
+    public async Task WhisperGivesNoSegmentForNoise()
+    {
+        var folder = await Installed(WhisperTiny);
+        var windowSamples = WhisperEngine.DefaultWindowSeconds * (int)MonoAudio.SampleRate;
+        var random = new Random(1);
+        var noise = Enumerable.Range(0, 5 * (int)MonoAudio.SampleRate).Select(_ => (float)(random.NextDouble() - 0.5) * 0.06f).ToArray();
+        using (var gate = SpeechGate.TryLoad(windowSamples))
+        {
+            Assert.NotNull(gate);
+            Assert.NotEmpty(gate.Intervals(FixtureSamples()));
+            Assert.Empty(gate.Intervals(noise));
+        }
+
+        var segments = await Native(async () =>
+        {
+            await using var session = await ((ISessionTranscriptionEngine)WhisperEngine.Create(WhisperTiny, folder)).OpenSessionAsync(Token);
+            return await session.TranscribeAsync(noise, "en", Token);
+        });
+
+        Log("whisper on noise: " + string.Join(" ", segments.Select(s => s.Text)));
+        Assert.Empty(segments);
+    }
+
+    // Guards the gate's fail-open rule: when sherpa cannot open the model (a non-ASCII path on Windows, which its
+    // ANSI marshalling breaks; an unreadable file, which aborts onnxruntime; any config it rejects), there is no gate,
+    // so Whisper decodes every window. sherpa gives a null detector rather than throwing for a config it rejects.
+    [Fact]
+    public void TheSpeechGateIsOffWhenSherpaCannotOpenTheModel()
+    {
+        var model = Path.Combine(AppContext.BaseDirectory, "Models", "silero_vad.onnx");
+        var nonAscii = Path.Combine(Directory.CreateDirectory(Path.Combine(_dir, "Réunion")).FullName, "silero_vad.onnx");
+        File.Copy(model, nonAscii);
+
+        Assert.Null(SpeechGate.TryLoad(16_000, nonAscii));
+        Assert.Null(SpeechGate.TryLoad(16_000, Path.Combine(_dir, "missing.onnx")));
+        if (!OperatingSystem.IsWindows())
+        {
+            var unreadable = Path.Combine(_dir, "silero_vad.onnx");
+            File.Copy(model, unreadable);
+            File.SetUnixFileMode(unreadable, UnixFileMode.None);
+            Assert.Null(SpeechGate.TryLoad(16_000, unreadable));
+        }
+        foreach (var (threshold, open) in new[] { (SpeechGate.SpeechThreshold, true), (2f, false) })
+        {
+            var config = new VadModelConfig();
+            config.SileroVad.Model = model;
+            config.SileroVad.Threshold = threshold;
+            using var detector = new VoiceActivityDetector(config, 2);
+            Assert.Equal(open, SpeechGate.IsOpen(detector));
+        }
     }
 
     [Fact]
@@ -147,6 +203,8 @@ public sealed class NativeSmokeTests : IDisposable
             throw;
         }
     }
+
+    private static float[] FixtureSamples() => ReadWav(Path.Combine(AppContext.BaseDirectory, "Fixtures", "two-voice-16k.wav"), 0);
 
     /// <summary>The fixture's PCM16 samples as floats (the decoder hook of <see cref="MonoAudio.Extract"/>).</summary>
     private static float[] ReadWav(string path, int channel)
