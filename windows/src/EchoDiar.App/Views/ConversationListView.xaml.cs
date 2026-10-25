@@ -51,11 +51,11 @@ public sealed partial class ConversationListView : UserControl
     /// <summary>The recording state the rows were last listed for.</summary>
     private bool _listedWhileRecording;
 
-    /// <summary>Shown as the wide layout's sidebar: only the rows.</summary>
-    private bool _sidebar;
-
     /// <summary>The sidebar's selected card: the shown conversation.</summary>
     private Guid? _selectedId;
+
+    /// <summary>The ids of the banner's models, in the order of their names in <see cref="ModelPicker"/>.</summary>
+    private List<string> _pickerIds = [];
 
     public ConversationListView(AppViewModel model)
     {
@@ -239,19 +239,14 @@ public sealed partial class ConversationListView : UserControl
     }
 
     /// <summary>
-    /// The whole page on the compact layout; on wide, the sidebar beside the page (macOS compact cards) with
-    /// <paramref name="selectedId"/> (the shown conversation) selected and scrolled into view. Another shown
-    /// conversation ends the selection.
+    /// The sidebar beside the detail, with <paramref name="selectedId"/> (the shown conversation) selected and
+    /// scrolled into view. Another shown conversation ends the selection.
     /// </summary>
-    public void ShowAsSidebar(bool sidebar, Guid? selectedId)
+    public void ShowAsSidebar(Guid? selectedId)
     {
         if (selectedId != _selectedId) _selection.Clear();
-        _sidebar = sidebar;
         _selectedId = selectedId;
-        HeaderGrid.Visibility = sidebar ? Visibility.Collapsed : Visibility.Visible;
-        _card.Compact = sidebar;
         _card.Selected = _model.Route.Kind == RouteKind.Recording;
-        UpdateBanner();
         UpdateCards();
         if (selectedId is { } id && _cards.TryGetValue(id, out var row) && _items.Contains(row.Item)) ConversationList.ScrollIntoView(row.Item);
     }
@@ -259,7 +254,7 @@ public sealed partial class ConversationListView : UserControl
     // Selection
 
     /// <summary>
-    /// Each card's state: compact in the sidebar; selected as the open entry, or as part of the selection. A card WinUI
+    /// Each card's state: selected as the open entry, or as part of the selection. A card WinUI
     /// took out of its item is put back first (see <see cref="_items"/>).
     /// </summary>
     private void UpdateCards()
@@ -269,7 +264,7 @@ public sealed partial class ConversationListView : UserControl
             if (!_cards.TryGetValue(conversation.Id, out var row)) continue;
             if (!ReferenceEquals(row.Item.Content, row.Card)) row.Item.Content = row.Card;
             var selected = _selection.IsEmpty ? conversation.Id == _selectedId : _selection.Ids.Contains(conversation.Id);
-            row.Card.Update(conversation, _sidebar, selected);
+            row.Card.Update(conversation, selected);
         }
         UpdateSelectionBar();
     }
@@ -380,22 +375,25 @@ public sealed partial class ConversationListView : UserControl
     private void UpdateBanner()
     {
         var needsSpeech = !_model.HasTranscriptionModel;
-        var visible = !_sidebar && (needsSpeech || _model.NeedsDiarizer);
+        var visible = needsSpeech || _model.NeedsDiarizer;
         ModelBanner.IsOpen = visible;
         if (!visible) return;
 
-        ModelBanner.Title = needsSpeech ? "Download a transcription model" : "Download a speaker model";
-        ModelBanner.Message = needsSpeech
+        // Windows-only texts (no macOS catalog entry): Loc.T returns them as is.
+        ModelBanner.Title = Loc.T(needsSpeech ? "Download a transcription model" : "Download a speaker model");
+        ModelBanner.Message = Loc.T(needsSpeech
             ? "Recordings are transcribed on this PC. Pick a speech recognition model to download."
-            : "\"Tell speakers apart\" is on. Download a model to tell the other speakers apart.";
+            : "\"Tell speakers apart\" is on. Download a model to tell the other speakers apart.");
         var entries = (needsSpeech ? ModelCatalog.Asr : ModelCatalog.Diarization)
             .Where(e => !_model.InstalledModelIds.Contains(e.Id))
             .ToList();
-        var selected = (ModelPicker.SelectedItem as ComboBoxItem)?.Tag as string;
-        if (!entries.Select(e => e.Id).SequenceEqual(ModelPicker.Items.OfType<ComboBoxItem>().Select(i => i.Tag as string)))
+        var selected = PickedModelId();
+        if (!entries.Select(e => e.Id).SequenceEqual(_pickerIds))
         {
+            // Plain names, so the ItemTemplate (with its ellipsis) also draws the closed combo.
+            _pickerIds = entries.Select(e => e.Id).ToList();
             ModelPicker.Items.Clear();
-            foreach (var entry in entries) ModelPicker.Items.Add(new ComboBoxItem { Content = entry.DisplayName, Tag = entry.Id });
+            foreach (var entry in entries) ModelPicker.Items.Add(entry.DisplayName);
             var keep = entries.FindIndex(e => e.Id == selected);
             var fallback = entries.FindIndex(e => e.IsDefault);
             ModelPicker.SelectedIndex = keep >= 0 ? keep : Math.Max(0, fallback);
@@ -410,14 +408,18 @@ public sealed partial class ConversationListView : UserControl
         DownloadBar.Value = running.Value;
 
         var error = entries.Select(e => _model.DownloadErrors.GetValueOrDefault(e.Id)).FirstOrDefault(m => m is not null);
-        DownloadErrorText.Text = error is null ? "" : $"The download failed: {error}";
+        DownloadErrorText.Text = error is null ? "" : Loc.Format("The download failed: %@", error);
         DownloadErrorText.Visibility = error is null ? Visibility.Collapsed : Visibility.Visible;
     }
 
     private void OnDownloadClick(object sender, RoutedEventArgs e)
     {
-        if ((ModelPicker.SelectedItem as ComboBoxItem)?.Tag is string id) _model.DownloadModel(id);
+        if (PickedModelId() is { } id) _model.DownloadModel(id);
     }
+
+    /// <summary>The picked model's id: the banner's combo lists the names of <see cref="_pickerIds"/>, in order.</summary>
+    private string? PickedModelId() =>
+        ModelPicker.SelectedIndex is var i && i >= 0 && i < _pickerIds.Count ? _pickerIds[i] : null;
 
     private void OnCancelClick(object sender, RoutedEventArgs e)
     {

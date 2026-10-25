@@ -18,28 +18,40 @@
     <Grid Padding="24,8,24,24" RowSpacing="12">
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto" />
-            <RowDefinition Height="Auto" />
             <RowDefinition Height="*" />
         </Grid.RowDefinitions>
 
-        <!-- The header and the banner are left out of the wide layout's sidebar, which shows only the rows. -->
-        <Grid x:Name="HeaderGrid">
-            <TextBlock VerticalAlignment="Center" Style="{StaticResource TitleTextBlockStyle}" Text="Library" />
-        </Grid>
-
-        <!-- Shown until a speech model is installed (and a speaker model, with "Tell speakers apart" on). -->
+        <!--
+            Shown until a speech model is installed (and a speaker model, with "Tell speakers apart" on), at the top of
+            the 360 px sidebar: the model on its own row (long names end in an ellipsis), then Download or Cancel.
+        -->
         <InfoBar
             x:Name="ModelBanner"
-            Grid.Row="1"
             IsClosable="False"
             IsOpen="False"
-            Severity="Informational"
-            Title="Download a transcription model">
+            Severity="Informational">
             <StackPanel Margin="0,0,16,16" Spacing="8">
-                <StackPanel Orientation="Horizontal" Spacing="8">
-                    <ComboBox x:Name="ModelPicker" MinWidth="320" AutomationProperties.Name="Model" />
-                    <Button x:Name="DownloadButton" Click="OnDownloadClick" Content="Download" />
-                    <Button x:Name="CancelButton" Click="OnCancelClick" Content="Cancel" Visibility="Collapsed" />
+                <ComboBox
+                    x:Name="ModelPicker"
+                    HorizontalAlignment="Stretch"
+                    AutomationProperties.Name="{local:T Text='Model'}">
+                    <ComboBox.ItemTemplate>
+                        <DataTemplate x:DataType="x:String">
+                            <TextBlock
+                                MaxLines="1"
+                                Text="{x:Bind}"
+                                TextTrimming="CharacterEllipsis"
+                                TextWrapping="NoWrap" />
+                        </DataTemplate>
+                    </ComboBox.ItemTemplate>
+                </ComboBox>
+                <StackPanel HorizontalAlignment="Right" Orientation="Horizontal" Spacing="8">
+                    <Button x:Name="DownloadButton" Click="OnDownloadClick" Content="{local:T Text='Download'}" />
+                    <Button
+                        x:Name="CancelButton"
+                        Click="OnCancelClick"
+                        Content="{local:T Text='Cancel'}"
+                        Visibility="Collapsed" />
                 </StackPanel>
                 <ProgressBar x:Name="DownloadBar" Maximum="1" Visibility="Collapsed" />
                 <TextBlock
@@ -50,7 +62,7 @@
             </StackPanel>
         </InfoBar>
 
-        <Grid Grid.Row="2">
+        <Grid Grid.Row="1">
             <Grid.RowDefinitions>
                 <RowDefinition Height="Auto" />
                 <RowDefinition Height="*" />

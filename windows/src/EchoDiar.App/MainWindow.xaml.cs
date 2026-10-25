@@ -361,7 +361,7 @@ public sealed partial class MainWindow : Window
         var settings = route.Kind == RouteKind.Settings;
         SidebarColumn.Width = new GridLength(settings ? 0 : 360);
         ListHost.Visibility = settings ? Visibility.Collapsed : Visibility.Visible;
-        _library.ShowAsSidebar(true, route.ConversationId);
+        _library.ShowAsSidebar(route.ConversationId);
         ShowLibraryOrChat();
     }
 

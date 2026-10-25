@@ -1,9 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!--
     The recording in the library, above the conversations (macOS RecordingViews.swift RecordingCard): the source,
-    "Recording…" or "Paused", the elapsed time and mini meters, then a row with Stop and Pause or Resume. The compact
-    card (the wide layout's sidebar) drops the row; the context menu keeps Stop and Pause. A click opens the recording
-    page; selected (that page is shown) adds the accent fill and edge.
+    "Recording…" or "Paused", the elapsed time and mini meters, then a row with Stop and Pause or Resume (also in the
+    context menu). A click opens the recording page; selected (that page is shown) adds the accent fill and edge.
 -->
 <UserControl
     x:Class="EchoDiar.App.Views.RecordingCard"
@@ -31,7 +30,7 @@
             Opacity="0.18"
             Visibility="Collapsed" />
 
-        <Grid x:Name="ContentGrid" Padding="16,12" ColumnSpacing="12">
+        <Grid x:Name="ContentGrid" Padding="12,8" ColumnSpacing="12">
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="Auto" />
                 <ColumnDefinition Width="*" />

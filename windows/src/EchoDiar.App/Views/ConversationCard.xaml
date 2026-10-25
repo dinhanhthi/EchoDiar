@@ -2,10 +2,9 @@
 <!--
     One conversation of the library (macOS ConversationCard.swift): the source icon, the title (double-click to rename),
     the source app's name, the date, duration, size, status pill and "Audio has been removed" marker, the reason of a
-    failed transcription, then a row with AI (the Chat tab), Summary (with a summary), Reveal in Explorer, the Delete
-    menu and the transcription progress or its action. A Fluent card (card fill and stroke, overlay corners, 16 px
-    padding) in theme resources (Light and Dark). Compact (the wide layout's sidebar) drops the buttons, which stay in
-    the context menu and the detail. Selected adds the accent fill and edge.
+    failed transcription, then a row with the transcription progress or its action. The actions are in the context
+    menu and the detail. A Fluent card (card fill and stroke, overlay corners) in theme resources (Light and Dark), in
+    the sidebar. Selected adds the accent fill and edge.
 -->
 <UserControl
     x:Class="EchoDiar.App.Views.ConversationCard"
@@ -36,7 +35,7 @@
             Opacity="0.12"
             Visibility="Collapsed" />
 
-        <Grid x:Name="ContentGrid" Padding="16,12" ColumnSpacing="12">
+        <Grid x:Name="ContentGrid" Padding="12,8" ColumnSpacing="12">
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="Auto" />
                 <ColumnDefinition Width="*" />
@@ -158,43 +157,11 @@
                     TextWrapping="Wrap"
                     Visibility="Collapsed" />
 
-                <!-- AI, Summary, Reveal and Delete (not compact), then the transcription progress or its action. -->
+                <!-- The transcription progress or its action; collapsed when there is none. -->
                 <StackPanel
                     x:Name="ActionRow"
-                    Margin="0,6,0,0"
                     Orientation="Horizontal"
                     Spacing="12">
-                    <StackPanel x:Name="ButtonsPanel" Orientation="Horizontal" Spacing="4">
-                        <Button
-                            x:Name="AIButton"
-                            AutomationProperties.Name="{local:T Text='Ask AI about this conversation'}"
-                            ToolTipService.ToolTip="{local:T Text='Ask AI about this conversation'}">
-                            <FontIcon FontFamily="{ThemeResource SymbolThemeFontFamily}" FontSize="14" Glyph="&#xE99A;" />
-                        </Button>
-                        <Button
-                            x:Name="SummaryButton"
-                            AutomationProperties.Name="{local:T Text='Show the summary'}"
-                            ToolTipService.ToolTip="{local:T Text='Show the summary'}"
-                            Visibility="Collapsed">
-                            <FontIcon FontFamily="{ThemeResource SymbolThemeFontFamily}" FontSize="14" Glyph="&#xE8E4;" />
-                        </Button>
-                        <Button x:Name="RevealButton">
-                            <FontIcon FontFamily="{ThemeResource SymbolThemeFontFamily}" FontSize="14" Glyph="&#xE8B7;" />
-                        </Button>
-                        <DropDownButton
-                            x:Name="DeleteButton"
-                            AutomationProperties.Name="{local:T Text='Delete'}"
-                            ToolTipService.ToolTip="{local:T Text='Delete the audio or the whole conversation'}">
-                            <FontIcon FontFamily="{ThemeResource SymbolThemeFontFamily}" FontSize="14" Glyph="&#xE74D;" />
-                            <DropDownButton.Flyout>
-                                <MenuFlyout x:Name="DeleteMenu" Placement="BottomEdgeAlignedLeft">
-                                    <MenuFlyoutItem x:Name="DeleteAudioItem" />
-                                    <MenuFlyoutItem x:Name="DeleteConversationItem" />
-                                </MenuFlyout>
-                            </DropDownButton.Flyout>
-                        </DropDownButton>
-                    </StackPanel>
-
                     <!-- A job's ring (or a spinner while queued or waiting), its step; the percent on hover. -->
                     <StackPanel
                         x:Name="ProgressPanel"

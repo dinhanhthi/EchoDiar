@@ -57,25 +57,16 @@ public sealed partial class ConversationCard : UserControl
             Open();
         };
 
-        var reveal = Loc.T("Reveal in Explorer");
-        RevealItem.Text = reveal;
-        AutomationProperties.SetName(RevealButton, reveal);
-        ToolTipService.SetToolTip(RevealButton, reveal);
-        AIButton.Click += (_, _) => _list.Open(this, DetailTab.Chat);
-        SummaryButton.Click += (_, _) => _list.Open(this, DetailTab.Summary);
+        RevealItem.Text = Loc.T("Reveal in Explorer");
         RevealItem.Click += (_, _) => AppViewModel.RevealInExplorer(Conversation);
-        RevealButton.Click += (_, _) => AppViewModel.RevealInExplorer(Conversation);
         RenameItem.Click += (_, _) => _renameAfterMenu = true;
-        CardMenu.Opening += (_, _) => UpdateDeleteItems(MenuDeleteAudioItem, MenuDeleteConversationItem, menu: true);
+        CardMenu.Opening += (_, _) => UpdateDeleteItems();
         CardMenu.Closed += (_, _) =>
         {
             if (!_renameAfterMenu) return;
             _renameAfterMenu = false;
             BeginEditing();
         };
-        DeleteMenu.Opening += (_, _) => UpdateDeleteItems(DeleteAudioItem, DeleteConversationItem, menu: false);
-        DeleteAudioItem.Click += (_, _) => _ = _list.DeleteAsync([Conversation], audioOnly: true);
-        DeleteConversationItem.Click += (_, _) => _ = _list.DeleteAsync([Conversation], audioOnly: false);
         MenuDeleteAudioItem.Click += (_, _) => _ = _list.DeleteAsync([Conversation], audioOnly: true);
         MenuDeleteConversationItem.Click += (_, _) => _ = _list.DeleteAsync([Conversation], audioOnly: false);
         RetryButton.Click += (_, _) => _ = _model.TranscribeAsync(Conversation.Id);
@@ -97,24 +88,19 @@ public sealed partial class ConversationCard : UserControl
     /// <summary>The conversation as last listed. Internal: the XAML type info would try to create a public property's type.</summary>
     internal Conversation Conversation { get; private set; }
 
-    /// <summary>Shows <paramref name="conversation"/>; compact for the wide layout's sidebar; selected adds the accent fill and edge.</summary>
-    internal void Update(Conversation conversation, bool compact, bool selected)
+    /// <summary>Shows <paramref name="conversation"/>; selected adds the accent fill and edge.</summary>
+    internal void Update(Conversation conversation, bool selected)
     {
         Conversation = conversation;
-        ContentGrid.Padding = compact ? new Thickness(12, 8, 12, 8) : new Thickness(16, 12, 16, 12);
-        ButtonsPanel.Visibility = Shown(!compact);
-        ActionRow.Margin = new Thickness(0, compact ? 0 : 6, 0, 0);
         SelectionFill.Visibility = Shown(selected);
         SelectionStroke.Visibility = Shown(selected);
 
         RecordingCard.SetText(TitleText, conversation.Title);
         SetTip(TitleText, conversation.Title, ref _titleTip);
         UpdateDetails(conversation);
-        DeleteButton.IsEnabled = _model.CanDelete(conversation);
-        SummaryButton.Visibility = Shown(conversation.HasSummary);
         UpdateStatus(conversation);
-        // Compact cards have no buttons: an empty row would only add space.
-        ActionRow.Visibility = Shown(!compact || ProgressPanel.Visibility == Visibility.Visible
+        // An empty row would only add space.
+        ActionRow.Visibility = Shown(ProgressPanel.Visibility == Visibility.Visible
             || TranscribeNowButton.Visibility == Visibility.Visible
             || NeedsModelBadge.Visibility == Visibility.Visible || RetryButton.Visibility == Visibility.Visible
             || TranscribeButton.Visibility == Visibility.Visible);
@@ -244,17 +230,17 @@ public sealed partial class ConversationCard : UserControl
 
     /// <summary>
     /// macOS DeleteMenuItems: the audio only (or "Audio has been removed", disabled) and the whole conversation, each
-    /// with "…" when it is asked first; the context menu's are disabled while it cannot be deleted.
+    /// with "…" when it is asked first; disabled while it cannot be deleted.
     /// </summary>
-    private void UpdateDeleteItems(MenuFlyoutItem audio, MenuFlyoutItem conversation, bool menu)
+    private void UpdateDeleteItems()
     {
         var asks = !_model.Settings.DeleteWithoutConfirmation;
         var hasAudio = Conversation.HasAudio;
-        var deletable = !menu || _model.CanDelete(Conversation);
-        audio.Text = hasAudio ? Loc.T(asks ? "Delete audio only…" : "Delete audio only") : Loc.T("Audio has been removed");
-        audio.IsEnabled = hasAudio && deletable;
-        conversation.Text = Loc.T(asks ? "Delete conversation…" : "Delete conversation");
-        conversation.IsEnabled = deletable;
+        var deletable = _model.CanDelete(Conversation);
+        MenuDeleteAudioItem.Text = hasAudio ? Loc.T(asks ? "Delete audio only…" : "Delete audio only") : Loc.T("Audio has been removed");
+        MenuDeleteAudioItem.IsEnabled = hasAudio && deletable;
+        MenuDeleteConversationItem.Text = Loc.T(asks ? "Delete conversation…" : "Delete conversation");
+        MenuDeleteConversationItem.IsEnabled = deletable;
     }
 
     // Clicks and rename

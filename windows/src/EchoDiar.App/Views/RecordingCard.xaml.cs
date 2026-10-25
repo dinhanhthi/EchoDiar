@@ -23,7 +23,6 @@ public sealed partial class RecordingCard : UserControl
 
     private readonly AppViewModel _model;
     private readonly FrameTicker _ticker;
-    private bool _compact;
     private bool _selected;
     private bool? _shownPaused;
 
@@ -48,18 +47,6 @@ public sealed partial class RecordingCard : UserControl
             _model.PropertyChanged -= OnModelChanged;
             _ticker.Run(false);
         };
-    }
-
-    /// <summary>The wide layout's sidebar: smaller padding and no button row.</summary>
-    public bool Compact
-    {
-        get => _compact;
-        set
-        {
-            _compact = value;
-            ContentGrid.Padding = value ? new Thickness(12, 8, 12, 8) : new Thickness(16, 12, 16, 12);
-            ButtonRow.Visibility = value ? Visibility.Collapsed : Visibility.Visible;
-        }
     }
 
     /// <summary>The recording page is shown: the accent fill and edge.</summary>
