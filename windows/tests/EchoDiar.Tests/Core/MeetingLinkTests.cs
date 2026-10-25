@@ -27,6 +27,9 @@ public sealed class MeetingLinkTests
     // Credentials in the link and a non-default port are refused.
     [InlineData("https://user@zoom.us/j/1", null, null, null, null)]
     [InlineData(null, null, null, "https://zoom.us:8443/j/1", null)]
+    // Non-ASCII hosts are refused: a Cyrillic look-alike, and a full-width host IDNA would map onto zoom.us.
+    [InlineData("https://zооm.us/j/1", null, null, null, null)]
+    [InlineData("https://ｚｏｏｍ.us/j/1", null, null, null, null)]
     public void Find(string? uri, string? onlineMeetingLink, string? location, string? notes, string? expected)
     {
         var link = MeetingLink.Find(uri is null ? null : new Uri(uri), onlineMeetingLink, location, notes);

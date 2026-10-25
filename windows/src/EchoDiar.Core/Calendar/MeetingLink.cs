@@ -33,7 +33,10 @@ public sealed partial record MeetingLink(string ServiceName, Uri Url)
     {
         if (!url.IsAbsoluteUri || url.Scheme != Uri.UriSchemeHttps) return null;
         if (url.UserInfo.Length > 0 || !url.IsDefaultPort) return null;
-        var host = url.Host.ToLowerInvariant();
+        // Only plain ASCII hosts, compared in their DNS (IdnHost) form, so no Unicode look-alike or IDNA mapping can
+        // reach the suffix check.
+        if (url.Host.Any(c => c > 127)) return null;
+        var host = url.IdnHost.ToLowerInvariant();
         foreach (var (serviceHost, name) in Services)
             if (host == serviceHost || host.EndsWith("." + serviceHost, StringComparison.Ordinal))
                 return new MeetingLink(name, url);
