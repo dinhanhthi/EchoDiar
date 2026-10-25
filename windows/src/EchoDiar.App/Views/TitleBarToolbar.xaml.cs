@@ -588,8 +588,8 @@ public sealed partial class TitleBarToolbar : UserControl
             ({ } c, true) => Loc.Format("Delete the audio of \"%@\"?", c.Title),
             // Not through Loc: the text is not in the catalog, and its slug finds the catalog's "Delete".
             ({ } c, false) => $"Delete \"{c.Title}\"?",
-            (null, true) => Loc.Format("Delete the audio of %lld conversations?", conversations.Count),
-            (null, false) => Loc.Format("Delete %lld conversations?", conversations.Count),
+            (null, true) => Loc.Plural("Delete the audio of %lld conversations?", conversations.Count),
+            (null, false) => Loc.Plural("Delete %lld conversations?", conversations.Count),
         };
         var body = audioOnly
             ? Loc.T("The audio is moved to the Recycle Bin. The transcript, summary and chat stay; playback and re-transcribing are no longer possible.")

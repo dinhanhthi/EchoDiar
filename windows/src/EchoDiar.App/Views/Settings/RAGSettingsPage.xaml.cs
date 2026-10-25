@@ -174,7 +174,7 @@ public sealed partial class RAGSettingsPage : UserControl
         var on = Settings.RagEnabled;
         var status = _model.RAGStatus;
         StatusCard.Visibility = Show(on);
-        StatusCard.Header = Loc.Format("Indexed %lld of %lld conversations", status.Indexed, status.Total);
+        StatusCard.Header = Loc.Plural("Indexed %lld of %lld conversations", status.Total, status.Indexed, status.Total);
         var spinning = on && status.Running && !status.Paused;
         StatusRing.IsActive = spinning;
         StatusRing.Visibility = Show(spinning);
@@ -309,7 +309,7 @@ public sealed partial class RAGSettingsPage : UserControl
                 ModelsMenu.Items.Add(item);
             }
         }
-        ModelsButton.Content = Loc.Format("%lld model%@", count, count == 1 ? "" : "s");
+        ModelsButton.Content = Loc.Plural("%lld models", count);
         ModelsButton.Visibility = Show(count > 0);
         LoadErrorText.Text = _loadError ?? "";
         LoadErrorText.Visibility = Show(_loadError is not null);

@@ -244,7 +244,7 @@ public sealed partial class ModelsViewModel : ObservableObject
     {
         null => Loc.T("Multilingual"),
         [var only] => LanguageOptions.Name(only),
-        _ => Loc.Format("%lld languages", languages.Count),
+        _ => Loc.Plural("%lld languages", languages.Count),
     };
 
     /// <summary>"English", "English and French", "English, French and Vietnamese".</summary>

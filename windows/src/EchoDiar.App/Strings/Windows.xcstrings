@@ -9,10 +9,6 @@
       "comment" : "Windows only: Views/AIMenus.cs, Views/Settings/ProvidersSettingsPage.xaml.cs.",
       "extractionState" : "manual"
     },
-    "%@ - %lld model%@" : {
-      "comment" : "Windows only: Views/Settings/ProvidersSettingsPage.xaml.cs.",
-      "extractionState" : "manual"
-    },
     "%@ could not be registered (error %lld)." : {
       "comment" : "Windows only: ViewModels/AppViewModel.HotKeys.cs.",
       "extractionState" : "manual"
@@ -29,20 +25,8 @@
       "comment" : "Windows only: Views/HotKeyRecorder.cs.",
       "extractionState" : "manual"
     },
-    "%@ level" : {
-      "comment" : "Windows only: Views/RecordingView.xaml.cs.",
-      "extractionState" : "manual"
-    },
     "%@ not saved: put the key in the API key field, which keeps it in Credential Manager." : {
       "comment" : "Windows only: Views/Settings/ProvidersSettingsPage.xaml.cs.",
-      "extractionState" : "manual"
-    },
-    "%lld model%@" : {
-      "comment" : "Windows only: Views/Settings/ProvidersSettingsPage.xaml.cs, Views/Settings/RAGSettingsPage.xaml.cs.",
-      "extractionState" : "manual"
-    },
-    "1 model" : {
-      "comment" : "Windows only: Views/Settings/TranscriptionSettingsPage.xaml.cs.",
       "extractionState" : "manual"
     },
     "An update is available: Update in the toolbar installs it." : {
@@ -91,10 +75,6 @@
     },
     "Data sent to cloud providers or CLIs leaves this PC." : {
       "comment" : "Windows only: Views/Settings/ProvidersSettingsPage.xaml.",
-      "extractionState" : "manual"
-    },
-    "Delete the audio of %lld transcribed conversation%@?" : {
-      "comment" : "Windows only: Views/Settings/StorageSettingsPage.xaml.cs.",
       "extractionState" : "manual"
     },
     "Download a speaker model" : {
@@ -183,10 +163,6 @@
     },
     "Needs more than half of this PC's memory." : {
       "comment" : "Windows only: Views/Settings/ProvidersSettingsPage.xaml.cs, Views/Settings/RAGSettingsPage.xaml.cs.",
-      "extractionState" : "manual"
-    },
-    "Next run: %@" : {
-      "comment" : "Windows only: Views/Settings/StorageSettingsPage.xaml.cs.",
       "extractionState" : "manual"
     },
     "No conversations yet — press ⌘R to record" : {
@@ -359,10 +335,6 @@
     },
     "Windows AI (system)" : {
       "comment" : "Windows only: Views/Settings/ProvidersSettingsPage.xaml.",
-      "extractionState" : "manual"
-    },
-    "Would delete now: %@" : {
-      "comment" : "Windows only: Views/Settings/StorageSettingsPage.xaml.cs.",
       "extractionState" : "manual"
     },
     "You're up to date!" : {

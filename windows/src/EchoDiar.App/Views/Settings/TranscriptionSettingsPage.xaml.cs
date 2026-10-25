@@ -766,7 +766,7 @@ public sealed partial class TranscriptionSettingsPage : UserControl
                     _modelsMenu.Items.Add(item);
                 }
             }
-            _modelsButton.Content = choices.Count == 1 ? Loc.T("1 model") : Loc.Format("%lld models", choices.Count);
+            _modelsButton.Content = Loc.Plural("%lld models", choices.Count);
             _modelsButton.Visibility = Show(choices.Count > 0);
             _loadButton.Visibility = Show(config.Kind == ProviderKind.OpenAICompatible);
             _error.Text = _loadError ?? "";

@@ -44,8 +44,8 @@ public sealed partial class RecordingView : UserControl
         LanguageHost.Content = new LanguagePicker(model, shortLabel: false);
         LiveHost.Child = new LiveTranscriptView(model);
         GlobalTapWarning.Message = Loc.T("This app's audio cannot be isolated, so all system audio is being recorded.");
-        AutomationProperties.SetName(MicMeter, Loc.Format("%@ level", "Mic"));
-        AutomationProperties.SetName(SystemMeter, Loc.Format("%@ level", "System"));
+        AutomationProperties.SetName(MicMeter, Loc.T("Mic level"));
+        AutomationProperties.SetName(SystemMeter, Loc.T("System audio level"));
         OpenSettingsLink.Click += (_, _) => OpenReasonSettings();
         Loaded += (_, _) =>
         {

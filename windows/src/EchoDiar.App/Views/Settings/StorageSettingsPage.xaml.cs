@@ -503,7 +503,7 @@ public sealed partial class StorageSettingsPage : UserControl
         var count = TranscribedWithAudio().Count;
         if (count == 0 || _model.Confirm is not { } confirm) return;
         var confirmed = await confirm(
-            Loc.Format("Delete the audio of %lld transcribed conversation%@?", count, count == 1 ? "" : "s"),
+            Loc.Plural("Delete the audio of %lld transcribed conversations?", count),
             Loc.T("The audio files are moved to the Recycle Bin. Transcripts, summaries and chats stay."),
             Loc.T("Move to Recycle Bin"));
         if (!confirmed || _model.IsClosing) return;
@@ -571,8 +571,8 @@ public sealed partial class StorageSettingsPage : UserControl
         PreviewList.Children.Clear();
         if (preview.Count == 0) return;
         PreviewExpander.Header = _model.Settings.AutoDeleteEnabled
-            ? Loc.Format("Next run: %@", CountText(preview.Count))
-            : Loc.Format("Would delete now: %@", CountText(preview.Count));
+            ? Loc.Plural("Next run: %lld conversations", preview.Count)
+            : Loc.Plural("Would delete now: %lld conversations", preview.Count);
         foreach (var deletion in preview)
         {
             PreviewList.Children.Add(new TextBlock { Text = Title(deletion), Style = StyleOf("PreviewTitleStyle") });

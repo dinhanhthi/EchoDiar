@@ -448,7 +448,7 @@ public sealed partial class ProvidersSettingsPage : UserControl
             ChatContextCombo.Items.Clear();
             foreach (var value in values)
             {
-                ChatContextCombo.Items.Add(value == 0 ? Loc.T("Whole chat") : Loc.Format("%lld messages", value));
+                ChatContextCombo.Items.Add(value == 0 ? Loc.T("Whole chat") : Loc.Plural("%lld messages", value));
             }
         }
         ChatContextCombo.SelectedIndex = _chatContextValues.IndexOf(current);
@@ -494,7 +494,7 @@ public sealed partial class ProvidersSettingsPage : UserControl
             FoundHostsList.Children.Add(new SettingsCard
             {
                 Header = name,
-                Description = Loc.Format("%@ - %lld model%@", host.BaseURL, count, count == 1 ? "" : "s"),
+                Description = Loc.Plural("%@ - %lld models", count, host.BaseURL, count),
                 Content = action,
             });
         }
@@ -1098,7 +1098,7 @@ public sealed partial class ProvidersSettingsPage : UserControl
                 _modelsMenu.Items.Add(item);
             }
             var count = _models?.Count ?? 0;
-            _modelsButton.Content = Loc.Format("%lld model%@", count, count == 1 ? "" : "s");
+            _modelsButton.Content = Loc.Plural("%lld models", count);
             _modelsButton.Visibility = Show(count > 0);
             UpdateChecklist();
         }

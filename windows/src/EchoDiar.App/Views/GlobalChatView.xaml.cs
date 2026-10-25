@@ -361,7 +361,7 @@ public sealed partial class GlobalChatView : UserControl
         var count = _chat.Chat.Count;
         current.Children.Add(new TextBlock
         {
-            Text = count == 0 ? Loc.T("Current") : $"{Loc.T("Current")} · {Loc.Format("%lld messages", count)}",
+            Text = count == 0 ? Loc.T("Current") : Loc.Plural("Current · %lld messages", count),
             Style = (Style)Resources["CaptionStyle"],
         });
         HistoryList.Children.Add(new Border { Style = (Style)Resources["CurrentChatStyle"], Child = current });
@@ -385,7 +385,7 @@ public sealed partial class GlobalChatView : UserControl
         text.Children.Add(new TextBlock { Text = entry.Title, MaxLines = 2, TextWrapping = TextWrapping.Wrap, TextTrimming = TextTrimming.CharacterEllipsis });
         text.Children.Add(new TextBlock
         {
-            Text = Loc.Format("%@ · %lld messages",
+            Text = Loc.Plural("%@ · %lld messages", entry.MessageCount,
                 entry.ArchivedAt.ToLocalTime().ToString("g", CultureInfo.CurrentCulture), entry.MessageCount),
             Style = (Style)Resources["CaptionStyle"],
         });

@@ -58,12 +58,9 @@ internal static class CloudConsent
         Content = new TextBlock
         {
             TextWrapping = TextWrapping.Wrap,
-            Text = string.Format(
-                CultureInfo.CurrentCulture,
-                "Transcripts and summaries of {0} conversation{1}, and your questions, will be sent to {2} to build and "
-                + "search the index, and billed by {3}. The provider may keep them under its own retention policy. You are "
-                + "asked once per provider and destination.",
-                consent.Conversations, consent.Conversations == 1 ? "" : "s", consent.Host, consent.ProviderName),
+            Text = Loc.Plural(
+                "Transcripts and summaries of %lld conversations, and your questions, will be sent to %@ to build and search the index, and billed by %@. The provider may keep them under its own retention policy. You are asked once per provider and destination.",
+                consent.Conversations, consent.Conversations, consent.Host, consent.ProviderName),
         },
         PrimaryButtonText = Loc.T("Understood"),
         CloseButtonText = Loc.T("Cancel"),

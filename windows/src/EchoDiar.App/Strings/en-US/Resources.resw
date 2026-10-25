@@ -762,10 +762,6 @@
     <value>Delete the audio of {0} conversation?</value>
     <comment>Delete the audio of %lld conversations?</comment>
   </data>
-  <data name="DeleteTheAudioOfLldTranscribedConversation" xml:space="preserve">
-    <value>Delete the audio of {0} transcribed conversation{1}?</value>
-    <comment>Delete the audio of %lld transcribed conversation%@?</comment>
-  </data>
   <data name="DeleteTheAudioOfLldTranscribedConversations" xml:space="preserve">
     <value>Delete the audio of {0} transcribed conversations?</value>
     <comment>Delete the audio of %lld transcribed conversations?</comment>
@@ -1354,10 +1350,6 @@
     <value>Leaves this PC</value>
     <comment>Leaves this PC</comment>
   </data>
-  <data name="Level" xml:space="preserve">
-    <value>{0} level</value>
-    <comment>%@ level</comment>
-  </data>
   <data name="Library" xml:space="preserve">
     <value>Library</value>
     <comment>Library</comment>
@@ -1445,14 +1437,6 @@
   <data name="LldMin" xml:space="preserve">
     <value>{0} min</value>
     <comment>%lld min</comment>
-  </data>
-  <data name="LldModel" xml:space="preserve">
-    <value>{0} - {1} model{2}</value>
-    <comment>%@ - %lld model%@</comment>
-  </data>
-  <data name="LldModel_2" xml:space="preserve">
-    <value>{0} model{1}</value>
-    <comment>%lld model%@</comment>
   </data>
   <data name="LldModels" xml:space="preserve">
     <value>{0} - {1} models</value>
@@ -1709,10 +1693,6 @@
   <data name="NewEvent_2" xml:space="preserve">
     <value>New Event…</value>
     <comment>New Event…</comment>
-  </data>
-  <data name="NextRun" xml:space="preserve">
-    <value>Next run: {0}</value>
-    <comment>Next run: %@</comment>
   </data>
   <data name="NextRunLldConversations" xml:space="preserve">
     <value>Next run: {0} conversations</value>
@@ -2369,10 +2349,6 @@
   <data name="S_" xml:space="preserve">
     <value></value>
     <comment></comment>
-  </data>
-  <data name="S_1Model" xml:space="preserve">
-    <value>1 model</value>
-    <comment>1 model</comment>
   </data>
   <data name="S__2" xml:space="preserve">
     <value>{0} / {1}</value>
@@ -3373,10 +3349,6 @@
   <data name="WindowsAISystem" xml:space="preserve">
     <value>Windows AI (system)</value>
     <comment>Windows AI (system)</comment>
-  </data>
-  <data name="WouldDeleteNow" xml:space="preserve">
-    <value>Would delete now: {0}</value>
-    <comment>Would delete now: %@</comment>
   </data>
   <data name="WouldDeleteNowLldConversations" xml:space="preserve">
     <value>Would delete now: {0} conversations</value>
