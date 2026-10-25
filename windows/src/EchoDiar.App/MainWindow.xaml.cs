@@ -87,15 +87,15 @@ public sealed partial class MainWindow : Window
         TitleBarGrid.LayoutUpdated += OnTitleBarLayoutUpdated;
 
         Toolbar.Attach(_model);
-        // One library for both layouts: the whole page on compact, the sidebar on wide. Its deletes ask through the
-        // toolbar, which shows the window's dialogs one at a time.
+        // One library, always the sidebar beside the detail. Its deletes ask through the toolbar, which shows the
+        // window's dialogs one at a time.
         _library = new ConversationListView(_model) { Delete = Toolbar.DeleteAsync };
         ListHost.Content = _library;
         AddAccelerators();
 
         _frames = new WindowFrames(AppWindow);
         StartupTrace.Write("begin Place");
-        _frames.Place(WindowFrames.For(_model.Route));
+        _frames.Place();
         StartupTrace.Write("end Place");
         // A move to a display of another DPI changes the presenter's bounds in physical pixels.
         RootGrid.Loaded += OnRootLoaded;
@@ -184,7 +184,7 @@ public sealed partial class MainWindow : Window
         return null;
     }
 
-    /// <summary>Saves the frame of the shown layout (the window is hidden to the tray: the process may end before it closes).</summary>
+    /// <summary>Saves the window's frame (the window is hidden to the tray: the process may end before it closes).</summary>
     internal void SaveFrame()
     {
         if (!_closing) _frames.Save();
@@ -206,7 +206,6 @@ public sealed partial class MainWindow : Window
         _model.PropertyChanged -= OnModelChanged;
         Toolbar.Detach();
         _frames.Save();
-        _frames.Detach();
     }
 
     /// <summary>
@@ -338,8 +337,8 @@ public sealed partial class MainWindow : Window
     }
 
     /// <summary>
-    /// Shows the route's page in its layout, then resizes the window to that layout. Settings takes the whole wide
-    /// window, with its own sidebar instead of the library (macOS MainView.swift).
+    /// Shows the route's page: the library as a 360 px sidebar, then the detail; the window keeps its size. Settings
+    /// takes the whole window, with its own sidebar instead of the library (macOS MainView.swift).
     /// </summary>
     private void ShowRoute()
     {
@@ -349,23 +348,24 @@ public sealed partial class MainWindow : Window
             { Kind: RouteKind.Recording } => new RecordingView(_model),
             { Kind: RouteKind.Conversation, ConversationId: { } id } => new ConversationView(_model, id),
             { Kind: RouteKind.Settings } => new SettingsPage(_model),
-            _ => null,
+            _ => WelcomePane(),
         };
-        var layout = WindowFrames.For(route);
-        var wide = layout == MainWindowLayout.Wide;
         var settings = route.Kind == RouteKind.Settings;
-        SidebarColumn.Width = settings ? new GridLength(0) : wide ? new GridLength(360) : new GridLength(1, GridUnitType.Star);
-        DetailColumn.Width = wide ? new GridLength(1, GridUnitType.Star) : new GridLength(0);
+        SidebarColumn.Width = new GridLength(settings ? 0 : 360);
         ListHost.Visibility = settings ? Visibility.Collapsed : Visibility.Visible;
-        RouteHost.Visibility = wide ? Visibility.Visible : Visibility.Collapsed;
-        _library.ShowAsSidebar(wide, route.ConversationId);
+        _library.ShowAsSidebar(true, route.ConversationId);
         ShowLibraryOrChat();
-        _frames.SwitchTo(layout);
     }
 
     /// <summary>
-    /// The library chat in place of the cards while it is open (macOS MainView.swift <c>chatOr</c>): the whole list page,
-    /// or the sidebar beside a conversation or the recording.
+    /// The detail when nothing is open (the list route): the welcome pane (macOS WelcomeView.swift) goes here; empty
+    /// until it is ported.
+    /// </summary>
+    private static UIElement? WelcomePane() => null;
+
+    /// <summary>
+    /// The library chat in place of the cards while it is open (macOS MainView.swift <c>chatOr</c>): the sidebar beside
+    /// the detail.
     /// </summary>
     private void ShowLibraryOrChat()
     {

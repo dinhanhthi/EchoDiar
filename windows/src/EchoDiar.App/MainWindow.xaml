@@ -36,13 +36,13 @@
             Visibility="Collapsed" />
 
         <!--
-            Compact (the list route): the library fills the window. Wide (a conversation, the recording): the same
-            library as a 360 px sidebar, then the route's page. Settings: its page alone, with its own sidebar.
+            The library as a 360 px sidebar, then the detail: a conversation, the recording, or the welcome pane when
+            nothing is open. Settings: its page alone, with its own sidebar.
         -->
         <Grid Grid.Row="2">
             <Grid.ColumnDefinitions>
-                <ColumnDefinition x:Name="SidebarColumn" Width="*" />
-                <ColumnDefinition x:Name="DetailColumn" Width="0" />
+                <ColumnDefinition x:Name="SidebarColumn" Width="360" />
+                <ColumnDefinition x:Name="DetailColumn" Width="*" />
             </Grid.ColumnDefinitions>
 
             <ContentControl
@@ -51,14 +51,13 @@
                 VerticalContentAlignment="Stretch"
                 IsTabStop="False" />
 
-            <!-- The recording page, one conversation or Settings. -->
+            <!-- The recording page, one conversation, the welcome pane or Settings. -->
             <ContentControl
                 x:Name="RouteHost"
                 Grid.Column="1"
                 HorizontalContentAlignment="Stretch"
                 VerticalContentAlignment="Stretch"
-                IsTabStop="False"
-                Visibility="Collapsed" />
+                IsTabStop="False" />
         </Grid>
     </Grid>
 </Window>
