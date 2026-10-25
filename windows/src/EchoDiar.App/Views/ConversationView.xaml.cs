@@ -1,5 +1,6 @@
 using System.ComponentModel;
 using EchoDiar.AI;
+using EchoDiar.App.Services;
 using EchoDiar.App.ViewModels;
 using EchoDiar.Core.Model;
 using Microsoft.UI.Dispatching;
@@ -7,6 +8,7 @@ using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Input;
 using VirtualKey = Windows.System.VirtualKey;
+using Windows.UI.ViewManagement;
 
 namespace EchoDiar.App.Views;
 
@@ -17,6 +19,11 @@ namespace EchoDiar.App.Views;
 /// </summary>
 public sealed partial class ConversationView : UserControl
 {
+    /// <summary>How long the loading pane shows without its ring: a ring shown for a frame or two reads as a flicker.</summary>
+    private static readonly TimeSpan SpinnerDelay = TimeSpan.FromMilliseconds(150);
+
+    private static readonly UISettings UISettings = new();
+
     private readonly AppViewModel _model;
     private readonly Guid _id;
     private readonly PlaybackController _playback;
@@ -40,6 +47,12 @@ public sealed partial class ConversationView : UserControl
     /// <summary>The citation's play head, set once the player has opened the audio.</summary>
     private double? _pendingSeek;
 
+    /// <summary>Fades the loading pane's ring in after <see cref="SpinnerDelay"/>.</summary>
+    private readonly DispatcherQueueTimer _spinnerTimer;
+
+    /// <summary>The loading pane shows; null before the first <see cref="UpdateTab"/>.</summary>
+    private bool? _loadingShown;
+
     public ConversationView(AppViewModel model, Guid id)
     {
         _model = model;
@@ -47,6 +60,17 @@ public sealed partial class ConversationView : UserControl
         InitializeComponent();
         _playback = new PlaybackController(DispatcherQueue);
         _transcript = new TranscriptViewModel(model, id);
+        _spinnerTimer = DispatcherQueue.CreateTimer();
+        _spinnerTimer.Interval = SpinnerDelay;
+        _spinnerTimer.IsRepeating = false;
+        _spinnerTimer.Tick += (t, _) =>
+        {
+            t.Stop();
+            LoadingRing.OpacityTransition = UISettings.AnimationsEnabled ? new ScalarTransition() : null;
+            LoadingRing.IsActive = true;
+            LoadingRing.Opacity = 1;
+        };
+        AIPanel.HasLoadedChanged += UpdateTab;
         TitleText.DoubleTapped += (_, e) =>
         {
             e.Handled = true;
@@ -74,6 +98,8 @@ public sealed partial class ConversationView : UserControl
             TranscriptPane.Detach();
             AIPanel.Detach();
             _transcript.Detach();
+            _spinnerTimer.Stop();
+            _loadingShown = null; // shown again from the start if the page comes back
             _loadGeneration++; // a lookup still running must not open a player after this
             _audioFor = null;
             _audioPath = null;
@@ -117,10 +143,14 @@ public sealed partial class ConversationView : UserControl
         if (_model.TakePendingTranscriptTime(_id) is { } seconds) OpenCitation(seconds);
     }
 
-    /// <summary>Another version shows: the same audio highlights its segments. A citation waits for the transcript.</summary>
+    /// <summary>
+    /// Another version shows: the same audio highlights its segments. The first read shows the tab. A citation waits for
+    /// the transcript.
+    /// </summary>
     private void OnTranscriptChanged(object? sender, PropertyChangedEventArgs e)
     {
         if (e.PropertyName == nameof(TranscriptViewModel.Lines)) LoadPlayback();
+        if (e.PropertyName == nameof(TranscriptViewModel.HasLoaded)) UpdateTab();
         ShowPendingTime();
     }
 
@@ -153,12 +183,30 @@ public sealed partial class ConversationView : UserControl
         }
     }
 
-    /// <summary>Transcript shows the transcript and playback; Summary and Chat the AI panel (playback goes on).</summary>
+    /// <summary>
+    /// Transcript shows the transcript and playback; Summary and Chat the AI panel (playback goes on). Each once its
+    /// files are read, the loading pane until then (macOS c45b593).
+    /// </summary>
     private void UpdateTab()
     {
         var transcript = _model.DetailTab == DetailTab.Transcript;
-        TranscriptPane.Visibility = transcript ? Visibility.Visible : Visibility.Collapsed;
-        AIPanel.Visibility = transcript ? Visibility.Collapsed : Visibility.Visible;
+        var loaded = transcript ? _transcript.HasLoaded : AIPanel.HasLoaded;
+        TranscriptPane.Visibility = transcript && loaded ? Visibility.Visible : Visibility.Collapsed;
+        AIPanel.Visibility = !transcript && loaded ? Visibility.Visible : Visibility.Collapsed;
+        ShowLoadingPane(!loaded);
+    }
+
+    /// <summary>The loading pane at once, its ring only after <see cref="SpinnerDelay"/> (macOS DetailLoadingPane).</summary>
+    private void ShowLoadingPane(bool loading)
+    {
+        if (loading == _loadingShown) return;
+        _loadingShown = loading;
+        _spinnerTimer.Stop();
+        LoadingRing.IsActive = false;
+        LoadingRing.Opacity = 0;
+        LoadingPane.Visibility = loading ? Visibility.Visible : Visibility.Collapsed;
+        if (loading) _spinnerTimer.Start();
+        StartupTrace.Write($"conversation {_id} {_model.DetailTab}: {(loading ? "loading pane" : "content")} shown");
     }
 
     /// <summary>
@@ -206,7 +254,9 @@ public sealed partial class ConversationView : UserControl
         var audio = playable ? await Task.Run(() => AudioPath(folder)) : null;
         if (generation != _loadGeneration || _model.IsClosing) return;
         _audioPath = audio;
+        StartupTrace.Write($"conversation {_id}: begin audio open");
         LoadPlayback();
+        StartupTrace.Write($"conversation {_id}: end audio open");
     }
 
     /// <summary>The player for the audio, with the shown version's segments and the channels setting; then a citation's seek.</summary>

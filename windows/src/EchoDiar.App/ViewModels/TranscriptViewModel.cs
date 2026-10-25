@@ -77,6 +77,7 @@ public sealed partial class TranscriptViewModel : ObservableObject
     private int? _shownVersion;
 
     private bool _loadFailed;
+    private bool _hasLoaded;
     private IReadOnlyList<TranscriptLineItem> _lines = [];
     private IReadOnlyList<SpeakerChip> _speakers = [];
     private string _retranscribeLanguage = "";
@@ -143,6 +144,16 @@ public sealed partial class TranscriptViewModel : ObservableObject
 
     /// <summary><c>transcript.json</c> exists but could not be read.</summary>
     public bool LoadFailed => _loadFailed;
+
+    /// <summary>
+    /// The first load has returned (or there is nothing to read); until then the page shows its loading pane (macOS
+    /// TranscriptView <c>loaded</c>). Stays true across later loads.
+    /// </summary>
+    public bool HasLoaded
+    {
+        get => _hasLoaded;
+        private set => SetProperty(ref _hasLoaded, value);
+    }
 
     /// <summary>What the card shows while there are no lines.</summary>
     public string EmptyText
@@ -311,6 +322,8 @@ public sealed partial class TranscriptViewModel : ObservableObject
         OnPropertyChanged(nameof(EmptyText));
         OnPropertyChanged(nameof(IsLoading));
         OnPropertyChanged(nameof(CanRetranscribe));
+        // Not listed (deleted, or not yet listed at launch): nothing to read, the panes show why.
+        if (conversation is null) HasLoaded = true;
         if (conversation is null || conversation == _loadedFor) return;
         _loadedFor = conversation;
         _ = LoadAsync(conversation);
@@ -338,6 +351,7 @@ public sealed partial class TranscriptViewModel : ObservableObject
         _shownVersion = null;
         _loadFailed = wantsTranscript && versions.Count == 0;
         ApplyShownVersion();
+        HasLoaded = true;
     }
 
     /// <summary>The lines and speakers of <see cref="ShownTranscript"/>, and every state that depends on it.</summary>

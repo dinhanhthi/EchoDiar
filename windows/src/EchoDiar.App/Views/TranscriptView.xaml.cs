@@ -65,6 +65,8 @@ public sealed partial class TranscriptView : UserControl
         LineList.ItemClick += OnLineClick;
         LineList.ContainerContentChanging += OnContainerContentChanging;
         LineList.Loaded += (_, _) => FollowUserScrolling();
+        // Loaded while collapsed (the page's loading pane) comes before the template: its first layout finds the scroller.
+        LineList.SizeChanged += (_, _) => FollowUserScrolling();
         VersionMenu.Opening += (_, _) => BuildVersionMenu();
         RetranscribeMenu.Opening += (_, _) => BuildRetranscribeMenu();
         RetryMenu.Opening += (_, _) => BuildRetryMenu();

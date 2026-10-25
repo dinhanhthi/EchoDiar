@@ -272,6 +272,7 @@ public sealed partial class ConversationListView : UserControl
     /// <summary>A plain click (or Enter), or its AI or Summary button with their <paramref name="tab"/>: opens the card and ends the selection.</summary>
     internal void Open(ConversationCard card, DetailTab? tab = null)
     {
+        StartupTrace.Write($"card open {card.Conversation.Id} (click, Enter or its AI/Summary button)");
         ClearSelection();
         if (tab is { } shown) _model.Open(card.Conversation.Id, shown);
         else _model.Open(card.Conversation.Id);

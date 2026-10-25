@@ -10,7 +10,6 @@ using Microsoft.UI.Xaml.Controls.Primitives;
 using Microsoft.UI.Xaml.Input;
 using Microsoft.UI.Xaml.Media;
 using VirtualKey = Windows.System.VirtualKey;
-using Windows.UI.ViewManagement;
 
 namespace EchoDiar.App.Views;
 
@@ -22,13 +21,8 @@ namespace EchoDiar.App.Views;
 /// </summary>
 public sealed partial class ConversationCard : UserControl
 {
-    private static readonly UISettings UISettings = new();
-
     private readonly AppViewModel _model;
     private readonly ConversationListView _list;
-
-    /// <summary>A click on the title waits out the double click, which renames instead of opening.</summary>
-    private readonly DispatcherQueueTimer _openTimer;
 
     private bool _editing;
 
@@ -48,15 +42,6 @@ public sealed partial class ConversationCard : UserControl
         _list = list;
         Conversation = conversation;
         InitializeComponent();
-        _openTimer = DispatcherQueue.CreateTimer();
-        _openTimer.Interval = TimeSpan.FromMilliseconds(UISettings.DoubleClickTime);
-        _openTimer.IsRepeating = false;
-        _openTimer.Tick += (t, _) =>
-        {
-            t.Stop();
-            Open();
-        };
-
         RevealItem.Text = Loc.T("Reveal in Explorer");
         RevealItem.Click += (_, _) => AppViewModel.RevealInExplorer(Conversation);
         RenameItem.Click += (_, _) => _renameAfterMenu = true;
@@ -82,7 +67,8 @@ public sealed partial class ConversationCard : UserControl
         TitleBox.KeyDown += OnTitleBoxKeyDown;
         // Clicking elsewhere cancels, like Esc; only Enter saves.
         TitleBox.LostFocus += (_, _) => EndEditing();
-        Unloaded += (_, _) => _openTimer.Stop();
+        // Leaving the page or closing the window mid-rename never ends the edit.
+        Unloaded += (_, _) => EndRenamingFlag();
     }
 
     /// <summary>The conversation as last listed. Internal: the XAML type info would try to create a public property's type.</summary>
@@ -246,8 +232,9 @@ public sealed partial class ConversationCard : UserControl
     // Clicks and rename
 
     /// <summary>
-    /// Ctrl-click toggles the card, Shift-click adds the span from the anchor; a click opens it, on the title once the
-    /// double click is ruled out. Buttons and the title field take their own clicks.
+    /// Ctrl-click toggles the card, Shift-click adds the span from the anchor; a click opens it at once, also on the
+    /// title, whose double click then renames the opened conversation (macOS c45b593). Buttons and the title field take
+    /// their own clicks.
     /// </summary>
     private void OnTapped(object sender, TappedRoutedEventArgs e)
     {
@@ -257,18 +244,15 @@ public sealed partial class ConversationCard : UserControl
         }
         if (ConversationListView.IsKeyDown(VirtualKey.Control) || ConversationListView.IsKeyDown(VirtualKey.Shift))
         {
-            _openTimer.Stop();
             _list.Select(this, extend: ConversationListView.IsKeyDown(VirtualKey.Shift));
             return;
         }
-        if (ReferenceEquals(e.OriginalSource, TitleText)) _openTimer.Start();
-        else Open();
+        Open();
     }
 
     private void OnTitleDoubleTapped(object sender, DoubleTappedRoutedEventArgs e)
     {
         if (ConversationListView.IsKeyDown(VirtualKey.Control) || ConversationListView.IsKeyDown(VirtualKey.Shift)) return;
-        _openTimer.Stop();
         e.Handled = true;
         BeginEditing();
     }
@@ -283,6 +267,7 @@ public sealed partial class ConversationCard : UserControl
     {
         if (_editing) return;
         _editing = true;
+        _model.RenamingConversation = Conversation.Id;
         TitleBox.Text = Conversation.Title;
         TitleText.Visibility = Visibility.Collapsed;
         TitleBox.Visibility = Visibility.Visible;
@@ -299,8 +284,15 @@ public sealed partial class ConversationCard : UserControl
     {
         if (!_editing) return;
         _editing = false;
+        EndRenamingFlag();
         TitleBox.Visibility = Visibility.Collapsed;
         TitleText.Visibility = Visibility.Visible;
+    }
+
+    /// <summary>Only if it is still this card's: another card's rename may have started since.</summary>
+    private void EndRenamingFlag()
+    {
+        if (_model.RenamingConversation == Conversation.Id) _model.RenamingConversation = null;
     }
 
     /// <summary>Enter saves a changed title, Esc cancels; neither reaches the list (Enter would open the card).</summary>

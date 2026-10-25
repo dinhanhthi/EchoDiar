@@ -42,6 +42,12 @@ public sealed partial class AIPanelView : UserControl
     /// <summary>The streamed answer at the end of the messages: its status row, or its text once the first arrives.</summary>
     private StackPanel? _streamSlot;
 
+    /// <summary><see cref="HasLoaded"/> as last announced by <see cref="HasLoadedChanged"/>.</summary>
+    private bool _loadedSeen;
+
+    /// <summary>Chat opened before the files were read: the question takes the cursor once they are.</summary>
+    private bool _focusPending;
+
     public AIPanelView()
     {
         InitializeComponent();
@@ -54,7 +60,11 @@ public sealed partial class AIPanelView : UserControl
         _focusTimer.IsRepeating = false;
         _focusTimer.Tick += (_, _) =>
         {
-            if (_model is not null && _tab == DetailTab.Chat && QuestionBox.IsEnabled) QuestionBox.Focus(FocusState.Programmatic);
+            // Not while a sidebar card is being renamed: its field keeps the cursor (macOS c45b593).
+            if (_model is { RenamingConversation: null } && _tab == DetailTab.Chat && QuestionBox.IsEnabled)
+            {
+                QuestionBox.Focus(FocusState.Programmatic);
+            }
         };
 
         ToolTipService.SetToolTip(LanguageButton,
@@ -77,6 +87,12 @@ public sealed partial class AIPanelView : UserControl
         QuestionBox.PreviewKeyDown += OnQuestionKeyDown;
         QuestionBox.TextChanged += (_, _) => UpdateActions();
     }
+
+    /// <summary>The first read of the conversation's files has returned; until then its page shows the loading pane.</summary>
+    public bool HasLoaded => _panel?.HasLoaded == true;
+
+    /// <summary>Raised on the UI thread once <see cref="HasLoaded"/> turns true.</summary>
+    public event Action? HasLoadedChanged;
 
     /// <summary>Shows conversation <paramref name="id"/>; <paramref name="seek"/> opens the transcript at a citation's time.</summary>
     public void Attach(AppViewModel model, Guid id, Action<double> seek)
@@ -111,6 +127,8 @@ public sealed partial class AIPanelView : UserControl
         _streamRendered = null;
         _historyKey = null;
         _streamSlot = null;
+        _loadedSeen = false;
+        _focusPending = false;
     }
 
     private void OnModelChanged(object? sender, PropertyChangedEventArgs e)
@@ -124,7 +142,8 @@ public sealed partial class AIPanelView : UserControl
 
     /// <summary>
     /// The tab's pane and bottom bar: Summary's menus are model, "i", language; Chat's are model, language, "i", a fresh
-    /// chat and History, with the question row under them. Opening Chat puts the cursor in the question.
+    /// chat and History, with the question row under them. Opening Chat puts the cursor in the question, once the files
+    /// are read.
     /// </summary>
     private void UpdateTab()
     {
@@ -143,14 +162,27 @@ public sealed partial class AIPanelView : UserControl
             MenusPanel.Children.Clear();
             foreach (var element in order) MenusPanel.Children.Add(element);
         }
-        if (chat) _focusTimer.Start();
+        if (chat) FocusQuestionOnceLoaded();
         else ShowHistory(false);
+    }
+
+    /// <summary>The question takes the cursor now if the files are read, else once they are (macOS: once loaded).</summary>
+    private void FocusQuestionOnceLoaded()
+    {
+        _focusPending = !HasLoaded;
+        if (!_focusPending) _focusTimer.Start();
     }
 
     /// <summary>Everything from the state: the panes, the error, the bottom bar.</summary>
     private void Update()
     {
         if (_model is not { IsClosing: false } || _panel is null) return;
+        if (_panel.HasLoaded && !_loadedSeen)
+        {
+            _loadedSeen = true;
+            HasLoadedChanged?.Invoke();
+            if (_focusPending && _tab == DetailTab.Chat) FocusQuestionOnceLoaded();
+        }
         UpdateSummary();
         UpdateChat();
         UpdateHistory();

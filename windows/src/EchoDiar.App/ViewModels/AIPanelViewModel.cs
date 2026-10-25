@@ -53,6 +53,12 @@ public sealed class AIPanelViewModel
     /// <summary>The earlier chats, newest first.</summary>
     public IReadOnlyList<ChatArchive.Entry> Archives { get; private set; } = [];
 
+    /// <summary>
+    /// The first <see cref="LoadAsync"/> has returned (or there is nothing to read); until then the page shows its
+    /// loading pane (macOS AIPanelView <c>loaded</c>). Stays true across later loads.
+    /// </summary>
+    public bool HasLoaded { get; private set; }
+
     public ProvidersViewModel Providers => _model.ProvidersModel;
 
     public Conversation? Conversation => _model.Conversations.FirstOrDefault(c => c.Id == ConversationId);
@@ -203,7 +209,12 @@ public sealed class AIPanelViewModel
     private async Task LoadAsync()
     {
         var generation = ++_loadGeneration;
-        if (Conversation is not { } conversation) return;
+        if (Conversation is not { } conversation)
+        {
+            // Not listed (deleted, or not yet listed at launch): nothing to read, the tab shows why.
+            HasLoaded = true;
+            return;
+        }
         var folder = conversation.Folder;
         var (transcript, versions, chat) = await Task.Run(() =>
         {
@@ -224,6 +235,7 @@ public sealed class AIPanelViewModel
         Chat = chat.Messages;
         ShownVersion = null;
         _endedJob = null;
+        HasLoaded = true;
         Changed?.Invoke();
     }
 

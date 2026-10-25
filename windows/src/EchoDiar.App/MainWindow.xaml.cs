@@ -351,6 +351,7 @@ public sealed partial class MainWindow : Window
     private void ShowRoute()
     {
         var route = _model.Route;
+        StartupTrace.Write($"begin route {route.Kind} {route.ConversationId}");
         RouteHost.Content = route switch
         {
             { Kind: RouteKind.Recording } when _model.IsRecording => new RecordingView(_model),
@@ -363,6 +364,11 @@ public sealed partial class MainWindow : Window
         ListHost.Visibility = settings ? Visibility.Collapsed : Visibility.Visible;
         _library.ShowAsSidebar(route.ConversationId);
         ShowLibraryOrChat();
+        StartupTrace.Write($"end route {route.Kind} {route.ConversationId}");
+#if DEBUG
+        // Click -> selection and detail on screen, for the timings of the VM QA.
+        AfterNextFrame(() => StartupTrace.Write($"route {route.Kind} {route.ConversationId} drawn"));
+#endif
     }
 
     /// <summary>

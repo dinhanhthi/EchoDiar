@@ -1,7 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!--
     One conversation beside the wide layout's sidebar: its title (double-click to rename) and details, then the
-    toolbar's tab. Transcript is TranscriptView with playback; Summary and Chat are AIPanelView.
+    toolbar's tab. Transcript is TranscriptView with playback; Summary and Chat are AIPanelView. Until the shown tab's
+    files are read, the loading pane in their place.
 -->
 <UserControl
     x:Class="EchoDiar.App.Views.ConversationView"
@@ -40,12 +41,34 @@
                 TextWrapping="NoWrap" />
         </StackPanel>
 
-        <views:TranscriptView x:Name="TranscriptPane" Grid.Row="1" />
+        <views:TranscriptView
+            x:Name="TranscriptPane"
+            Grid.Row="1"
+            Visibility="Collapsed" />
 
         <!-- Summary and Chat: the AI panel; the transcript and its player stay while it shows, so playback goes on. -->
         <views:AIPanelView
             x:Name="AIPanel"
             Grid.Row="1"
             Visibility="Collapsed" />
+
+        <!--
+            The shown tab until its files are read (macOS DetailLoadingPane): the card its content shows in, from the
+            click's frame; the ring fades in only once the reading takes 150 ms, so a fast load does not flash it.
+        -->
+        <Border
+            x:Name="LoadingPane"
+            Grid.Row="1"
+            Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
+            BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
+            BorderThickness="1"
+            CornerRadius="{StaticResource OverlayCornerRadius}">
+            <ProgressRing
+                x:Name="LoadingRing"
+                HorizontalAlignment="Center"
+                VerticalAlignment="Center"
+                IsActive="False"
+                Opacity="0" />
+        </Border>
     </Grid>
 </UserControl>

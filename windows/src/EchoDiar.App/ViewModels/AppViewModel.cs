@@ -117,6 +117,9 @@ public sealed partial class AppViewModel : ObservableObject
         set => SetProperty(ref _detailTab, value);
     }
 
+    /// <summary>The conversation whose sidebar title is being renamed: opening Chat then leaves the cursor in its field.</summary>
+    internal Guid? RenamingConversation { get; set; }
+
     public AppSettings Settings
     {
         get => _settings;
