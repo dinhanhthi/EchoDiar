@@ -276,10 +276,11 @@ public partial class App : Application
 
     /// <summary>
     /// The app language at launch (<see cref="LanguageAtLaunch"/>); a chosen one also sets the culture of every thread
-    /// (macOS <c>AppleLocale</c>): the chosen language in the region of Windows' "Regional format"
-    /// (<see cref="RegionInfo.CurrentRegion"/>, read before the culture changes), so a French user who picks English
-    /// gets en-FR dates and numbers. That setting, not "Country or region" (the GeoID), is what macOS'
-    /// <c>Locale.current.region</c> is: the region the formats come from. A culture Windows doesn't know falls back to
+    /// (macOS <c>AppleLocale</c>): the chosen language in the region of Windows' "Regional format" (the region of
+    /// <see cref="CultureInfo.CurrentCulture"/>, read before the culture changes), so a French user who picks English
+    /// gets en-FR dates and numbers. That setting, not "Country or region" (the GeoID, which
+    /// <see cref="RegionInfo.CurrentRegion"/> reads on Windows), is what macOS' <c>Locale.current.region</c> is: the
+    /// region the formats come from. A culture Windows doesn't know falls back to
     /// the override tag (the language alone, en-US for English). System leaves the culture to Windows.
     /// </summary>
     private static void ApplyLanguageOverride()
@@ -299,7 +300,7 @@ public partial class App : Application
         string? region = null;
         try
         {
-            region = RegionInfo.CurrentRegion.TwoLetterISORegionName;
+            region = new RegionInfo(CultureInfo.CurrentCulture.Name).TwoLetterISORegionName;
         }
         catch (Exception e)
         {
