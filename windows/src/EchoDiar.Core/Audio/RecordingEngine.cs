@@ -122,6 +122,10 @@ public sealed class RecordingEngine : IDisposable
         /// <summary>Times the mic device in use disappeared during this recording (the mic moved to the default input).</summary>
         public int MicRoutesLost { get; init; }
 
+        /// <summary>The mic device is closed (privacy indicator off) and its channel is written as silence; see
+        /// <see cref="ToggleMicMuted"/>.</summary>
+        public bool MicMuted { get; init; }
+
         /// <summary>Set on the snapshot published when a recording ends.</summary>
         public EndReason? EndReason { get; init; }
 
@@ -169,6 +173,7 @@ public sealed class RecordingEngine : IDisposable
     private bool _lowDisk;
     private bool _silentTapSuspected;
     private int _micRoutesLost;
+    private bool _micMuted;
 
     // Behind _routeLock: the session the route source runs for (0: none) and the handlers subscribed for it.
     private long _routesGeneration;
@@ -256,6 +261,7 @@ public sealed class RecordingEngine : IDisposable
             _lowDisk = available < LowDiskBytes;
             _silentTapSuspected = false;
             _micRoutesLost = 0;
+            _micMuted = false;
             _target = target;
             _micEndpointId = micEndpointId;
 
@@ -342,7 +348,7 @@ public sealed class RecordingEngine : IDisposable
         }
     }
 
-    /// <summary>Reopens the system source and the mic. Throws, staying paused, if the system source cannot start.</summary>
+    /// <summary>Reopens the system source and the mic (unless muted). Throws, staying paused, if the system source cannot start.</summary>
     public void Resume()
     {
         lock (_gate)
@@ -374,6 +380,40 @@ public sealed class RecordingEngine : IDisposable
             {
                 _micRing = mic.Ring;
                 _systemRing = system.Ring;
+            }
+            Publish();
+        }
+    }
+
+    /// <summary>
+    /// Flips the mute. Muted, the mic device is closed (privacy indicator off) and the mic channel is written as
+    /// silence, so the file stays time-aligned; unmuted, the picked input (else the default) is reopened, and while
+    /// recording, if no input opens, the mute stays on. While paused only the flag changes and <see cref="Resume"/>
+    /// honours it; it is kept across pauses and cleared when the recording starts and stops. No-op when idle.
+    /// </summary>
+    public void ToggleMicMuted()
+    {
+        lock (_gate)
+        {
+            if (_state == State.Idle || _session is null) return;
+            _micMuted = !_micMuted;
+            if (_state == State.Recording && _writer is not null)
+            {
+                try
+                {
+                    ReopenMic(_micEndpointId); // a silent stand-in while muted
+                }
+                catch (Exception e)
+                {
+                    Debug.WriteLine($"EchoDiar: could not swap the mic: {e}");
+                    Log?.Invoke($"engine: could not swap the mic, {e.GetType().Name} 0x{e.HResult:X8} {e.Message}");
+                }
+                if (!_micMuted && _mic?.Source is null)
+                {
+                    // A failed unmute stays muted, so the controls offer Unmute again; the mic channel stays silent.
+                    Log?.Invoke("engine: could not reopen the mic, staying muted");
+                    _micMuted = true;
+                }
             }
             Publish();
         }
@@ -450,6 +490,7 @@ public sealed class RecordingEngine : IDisposable
         var stats = _writer?.Stats;
         _sessionGeneration++;
         _state = State.Idle;
+        _micMuted = false;
         _session = null;
         _folder = null;
         _writer = null;
@@ -470,11 +511,13 @@ public sealed class RecordingEngine : IDisposable
 
     /// <summary>
     /// The input <paramref name="endpointId"/> (null: the default), else the default input when that one is gone (as
-    /// on macOS), else a stand-in ring nothing writes to, which the writer fills with silence; never throws.
+    /// on macOS), else a stand-in ring nothing writes to, which the writer fills with silence; never throws. Muted,
+    /// no device is opened: the stand-in.
     /// </summary>
     private Capture OpenMic(string? endpointId)
     {
         var generation = ++_micGeneration;
+        if (_micMuted) return StandInMic();
         Action<Exception> onFailed = _ => ThreadPool.QueueUserWorkItem(_ => MicFailed(generation));
         try
         {
@@ -579,7 +622,8 @@ public sealed class RecordingEngine : IDisposable
     /// A route change for session <paramref name="generation"/> (ignored once that session has ended), as on macOS: an
     /// output change rebuilds the global system source; a lost input is counted, moves the mic to the default input and
     /// raises <see cref="MicRouteLost"/>; a changed input reopens the picked mic (else the default). While paused only
-    /// the count changes: resume opens the sources anew. Runs on the route source's thread-pool thread: never throws.
+    /// the count changes: resume opens the sources anew. Input events are ignored while muted. Runs on the route
+    /// source's thread-pool thread: never throws.
     /// </summary>
     private void RouteChanged(RouteEvent route, long generation)
     {
@@ -589,6 +633,8 @@ public sealed class RecordingEngine : IDisposable
             {
                 Log?.Invoke($"engine: {route} for session {generation} (current {_sessionGeneration}, {_state})");
                 if (generation != _sessionGeneration || _state == State.Idle) return;
+                // Muted, no input is open: unmuting opens the current one.
+                if (_micMuted && route != RouteEvent.OutputChanged) return;
                 switch (route)
                 {
                     case RouteEvent.OutputChanged:
@@ -732,6 +778,7 @@ public sealed class RecordingEngine : IDisposable
             GlobalTapFallback = _target.GlobalTapFallback,
             LowDisk = _lowDisk,
             MicRoutesLost = _micRoutesLost,
+            MicMuted = _micMuted,
             EndReason = endReason,
         };
         if ((stats ?? _writer?.Stats) is { } current) snapshot = snapshot.Applying(current);

@@ -87,6 +87,36 @@ public sealed class RecordingEngineTests : IDisposable
     }
 
     [Fact]
+    public void MutedMicIsClosedAndItsChannelStaysTimeAlignedSilence()
+    {
+        var engine = Engine();
+        var folder = engine.Start(CaptureTarget.Global, "auto", micEndpointId: "mic-1", _root);
+        EmitBlock();
+
+        _now += TicksPerSecond / 10;
+        engine.ToggleMicMuted();
+        Assert.True(_mics[0].Disposed); // the device is released
+        Assert.True(engine.CurrentSnapshot().MicMuted);
+        _systems[^1].Emit(Enumerable.Repeat(0.25f, 1_600).ToArray(), _now);
+
+        _now += TicksPerSecond / 10;
+        engine.ToggleMicMuted();
+        Assert.False(engine.CurrentSnapshot().MicMuted);
+        Assert.Equal(["mic-1", "mic-1"], _mics.Select(mic => mic.EndpointId));
+        EmitBlock();
+        var stored = engine.Stop()!;
+
+        using var reader = new CafFile.Reader(Path.Combine(folder, stored.AudioFileName));
+        Assert.Equal(0.3, reader.Frames / 16_000.0, 0.005);
+        // Interleaved ch0 mic, ch1 system; the middle of each 100 ms block, away from the ring swaps.
+        float Sample(int frame, int channel) => reader.Read(frame, 1)[channel];
+        Assert.Equal(0.25f, Sample(800, 0), 0.01f);
+        Assert.Equal(0f, Sample(2_400, 0), 0.001f);
+        Assert.Equal(0.25f, Sample(2_400, 1), 0.01f);
+        Assert.Equal(0.25f, Sample(4_000, 0), 0.01f);
+    }
+
+    [Fact]
     public void FailingSystemSourceRemovesTheFolder()
     {
         var engine = Engine(() => new FakeSource { StartError = new InvalidOperationException("no loopback") });
