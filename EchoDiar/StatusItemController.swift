@@ -1,4 +1,5 @@
 import AppKit
+import EchoCore
 
 /// What the menu bar icon shows.
 enum IndicatorState: CaseIterable {
@@ -16,9 +17,9 @@ enum IndicatorState: CaseIterable {
     var accessibilityLabel: String {
         switch self {
         case .idle: return "EchoDiar"
-        case .recording: return "EchoDiar, recording"
-        case .paused: return "EchoDiar, recording paused"
-        case .processing: return "EchoDiar, processing"
+        case .recording: return String(localized: "EchoDiar, recording")
+        case .paused: return String(localized: "EchoDiar, recording paused")
+        case .processing: return String(localized: "EchoDiar, processing")
         }
     }
 }
@@ -29,6 +30,8 @@ struct RecordingMenuControls {
     var silentTapSuspected: @MainActor () -> Bool
     var toggleRecording: @MainActor () -> Void
     var togglePause: @MainActor () -> Void
+    var micMuted: @MainActor () -> Bool
+    var toggleMicMute: @MainActor () -> Void
     var stop: @MainActor () -> Void
     var language: @MainActor () -> String
     /// `LanguageOptions.groups` for the current language.
@@ -37,6 +40,9 @@ struct RecordingMenuControls {
     /// The detected meeting app's name ("Detected: Zoom"); nil when none.
     var detectedApp: @MainActor () -> String?
     var stopAskingForDetectedApp: @MainActor () -> Void
+    /// Eligible calendar events not yet ended, by start; empty without calendar access.
+    var upcoming: @MainActor () -> [CalendarEvent]
+    var openMeetingLink: @MainActor (CalendarEvent) -> Void
 }
 
 /// Menu bar item with a plain AppKit menu (no SwiftUI, for footprint). The menu is rebuilt each time it opens.
@@ -85,10 +91,10 @@ final class StatusItemController: NSObject, NSMenuDelegate {
             button.image = Self.logo
         case .recording:
             stopEffect()
-            button.image = symbol("record.circle.fill", tint: .systemRed)
+            button.image = Self.recordingLogo
         case .paused:
             stopEffect()
-            button.image = symbol("pause.circle.fill", tint: .systemOrange)
+            button.image = Self.pausedLogo
         case .processing:
             button.image = nil
             startEffect(in: button)
@@ -97,14 +103,43 @@ final class StatusItemController: NSObject, NSMenuDelegate {
 
     /// The idle icon: `logo_white` on a dark menu bar, `logo_black` on a light one. Drawn per appearance, so it
     /// follows the menu bar (which tracks the wallpaper, not only the system appearance).
-    private static let logo: NSImage? = {
+    private static let logo = logoImage()
+
+    /// The logo with a red dot at the bottom-right.
+    private static let recordingLogo = logoImage(knockout: NSRect(x: 10, y: -1, width: 9, height: 9)) {
+        NSColor.systemRed.setFill()
+        NSBezierPath(ovalIn: NSRect(x: 11, y: 0, width: 7, height: 7)).fill()
+    }
+
+    /// The logo with an orange pause badge ("||") at the bottom-right.
+    private static let pausedLogo = logoImage(knockout: NSRect(x: 9, y: -1, width: 10, height: 10)) {
+        NSColor.systemOrange.setFill()
+        NSBezierPath(ovalIn: NSRect(x: 10, y: 0, width: 8, height: 8)).fill()
+        NSColor.white.setFill()
+        NSRect(x: 12, y: 2, width: 1, height: 4).fill()
+        NSRect(x: 15, y: 2, width: 1, height: 4).fill()
+    }
+
+    /// An 18 pt image: the logo, cut out by `knockout` (so a badge reads against it), then `badge` on top. Whole-point
+    /// rects keep the badge crisp at 1x and 2x.
+    private static func logoImage(knockout: NSRect? = nil, badge: @escaping () -> Void = {}) -> NSImage? {
         guard let white = NSImage(named: "logo_white"), let black = NSImage(named: "logo_black") else { return nil }
         return NSImage(size: NSSize(width: 18, height: 18), flipped: false) { rect in
             let dark = NSAppearance.currentDrawing().bestMatch(from: [.aqua, .darkAqua]) == .darkAqua
+            NSGraphicsContext.saveGraphicsState()
+            if let knockout {
+                // Even-odd clip instead of a `.clear` fill, so nothing is erased if AppKit draws straight into the menu bar.
+                let clip = NSBezierPath(rect: rect)
+                clip.appendOval(in: knockout)
+                clip.windingRule = .evenOdd
+                clip.addClip()
+            }
             (dark ? white : black).draw(in: rect)
+            NSGraphicsContext.restoreGraphicsState()
+            badge()
             return true
         }
-    }()
+    }
 
     /// A template image when `tint` is nil, so it follows the menu bar's tint.
     private func symbol(_ name: String, tint: NSColor?) -> NSImage? {
@@ -137,23 +172,24 @@ final class StatusItemController: NSObject, NSMenuDelegate {
 
     func menuNeedsUpdate(_ menu: NSMenu) {
         menu.removeAllItems()
-        menu.addItem(item("Open EchoDiar", #selector(openMain)))
+        menu.addItem(item(String(localized: "Open EchoDiar"), #selector(openMain)))
         let active = state == .recording || state == .paused
         if active, let controls = Self.controls {
             addRecordingItems(controls)
         } else {
-            let record = item("Start Recording", #selector(toggleRecording))
+            let record = item(String(localized: "Start Recording"), #selector(toggleRecording))
             record.isEnabled = recordingEnabled
             menu.addItem(record)
         }
         if let controls = Self.controls, let app = controls.detectedApp() {
-            let detected = NSMenuItem(title: "Detected: \(app)", action: nil, keyEquivalent: "")
+            let detected = NSMenuItem(title: String(localized: "Detected: \(app)"), action: nil, keyEquivalent: "")
             detected.isEnabled = false
             menu.addItem(detected)
-            menu.addItem(item("Stop asking for this app", #selector(stopAskingForDetectedApp)))
+            menu.addItem(item(String(localized: "Stop asking for this app"), #selector(stopAskingForDetectedApp)))
             menu.addItem(.separator())
         }
-        menu.addItem(item("Settings…", #selector(openSettings)))
+        if let controls = Self.controls { addUpcomingItems(controls) }
+        menu.addItem(item(String(localized: "Settings…"), #selector(openSettings)))
         #if DEBUG
         let simulate = NSMenuItem(title: "Simulate state", action: nil, keyEquivalent: "")
         simulate.submenu = NSMenu()
@@ -170,29 +206,59 @@ final class StatusItemController: NSObject, NSMenuDelegate {
         let update = item(updater.menuTitle, #selector(checkForUpdates))
         update.isEnabled = updater.canCheck && !active
         menu.addItem(update)
-        menu.addItem(item("About EchoDiar", #selector(about)))
+        menu.addItem(item(String(localized: "About EchoDiar"), #selector(about)))
         menu.addItem(.separator())
-        let quit = NSMenuItem(title: "Quit", action: nil, keyEquivalent: "")
+        let quit = NSMenuItem(title: String(localized: "Quit"), action: nil, keyEquivalent: "")
         quit.submenu = NSMenu()
-        quit.submenu?.addItem(item("Sure to quit", #selector(terminate)))
+        quit.submenu?.addItem(item(String(localized: "Sure to quit"), #selector(terminate)))
         menu.addItem(quit)
     }
 
-    /// Elapsed time, Pause/Resume, Stop, Language and the silent-tap fix. The values are read when the menu opens.
+    /// Elapsed time, Pause/Resume, Mute/Unmute Microphone, Stop, Language and the silent-tap fix. The values are read
+    /// when the menu opens.
     private func addRecordingItems(_ controls: RecordingMenuControls) {
         let elapsed = controls.elapsed()
         let pattern: Duration.TimeFormatStyle.Pattern = elapsed >= 3_600 ? .hourMinuteSecond : .minuteSecond
         let time = Duration.seconds(elapsed).formatted(.time(pattern: pattern))
-        let status = NSMenuItem(title: "\(state == .paused ? "Paused" : "Recording") \(time)", action: nil, keyEquivalent: "")
+        let title = state == .paused
+            ? String(localized: "Paused — \(time)", comment: "Status menu: elapsed recording time")
+            : String(localized: "Recording — \(time)", comment: "Status menu: elapsed recording time")
+        let status = NSMenuItem(title: title, action: nil, keyEquivalent: "")
         status.isEnabled = false
         menu.addItem(status)
-        menu.addItem(item(state == .paused ? "Resume" : "Pause", #selector(togglePause)))
-        let stop = item("Stop Recording", #selector(stopRecording))
+        let pause = state == .paused ? String(localized: "Resume") : String(localized: "Pause")
+        menu.addItem(item(pause, #selector(togglePause)))
+        let mute = controls.micMuted()
+            ? String(localized: "Unmute Microphone") : String(localized: "Mute Microphone")
+        menu.addItem(item(mute, #selector(toggleMicMute)))
+        let stop = item(String(localized: "Stop Recording"), #selector(stopRecording))
         stop.isEnabled = recordingEnabled
         menu.addItem(stop)
         menu.addItem(languageItem(controls))
         if controls.silentTapSuspected() {
-            menu.addItem(item("System audio is silent — Fix…", #selector(fixSilentTap)))
+            menu.addItem(item(String(localized: "System audio is silent — Fix…"), #selector(fixSilentTap)))
+        }
+        menu.addItem(.separator())
+    }
+
+    /// Up to 3 events in progress or starting within 12 h, as "14:00 Weekly sync"; one with a link opens it.
+    private func addUpcomingItems(_ controls: RecordingMenuControls) {
+        let now = Date()
+        let events = controls.upcoming()
+            .filter { $0.end > now && $0.start <= now.addingTimeInterval(12 * 3_600) }
+            .prefix(3)
+        guard !events.isEmpty else { return }
+        let header = NSMenuItem(title: String(localized: "Upcoming"), action: nil, keyEquivalent: "")
+        header.isEnabled = false
+        menu.addItem(header)
+        for event in events {
+            let time = event.start.formatted(date: .omitted, time: .shortened)
+            // The title comes from the invite: cut so a long one cannot widen the menu.
+            let title = event.title.count > 60 ? String(event.title.prefix(59)) + "…" : event.title
+            let entry = item("\(time) \(title)", #selector(openMeetingLink(_:)))
+            entry.representedObject = event
+            entry.isEnabled = event.link != nil
+            menu.addItem(entry)
         }
         menu.addItem(.separator())
     }
@@ -210,7 +276,7 @@ final class StatusItemController: NSObject, NSMenuDelegate {
                 submenu.addItem(option)
             }
         }
-        let language = NSMenuItem(title: "Language", action: nil, keyEquivalent: "")
+        let language = NSMenuItem(title: String(localized: "Language"), action: nil, keyEquivalent: "")
         language.submenu = submenu
         return language
     }
@@ -226,11 +292,15 @@ final class StatusItemController: NSObject, NSMenuDelegate {
         if let controls = Self.controls { controls.toggleRecording() } else { onToggleRecording() }
     }
     @objc private func togglePause() { Self.controls?.togglePause() }
+    @objc private func toggleMicMute() { Self.controls?.toggleMicMute() }
     @objc private func stopRecording() { Self.controls?.stop() }
     @objc private func setLanguage(_ sender: NSMenuItem) {
         if let code = sender.representedObject as? String { Self.controls?.setLanguage(code) }
     }
     @objc private func stopAskingForDetectedApp() { Self.controls?.stopAskingForDetectedApp() }
+    @objc private func openMeetingLink(_ sender: NSMenuItem) {
+        if let event = sender.representedObject as? CalendarEvent { Self.controls?.openMeetingLink(event) }
+    }
     @objc private func fixSilentTap() { PrivacySettings.openSystemAudioRecording() }
     @objc private func openSettings() { onOpenSettings() }
     @objc private func checkForUpdates() { updater.checkForUpdates() }

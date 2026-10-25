@@ -22,6 +22,8 @@ struct Acknowledgement: Identifiable {
         .init(name: "WhisperKit", version: "1.1.1", purpose: "Whisper transcription", license: "MIT", file: "WhisperKit"),
         .init(name: "FluidAudio", version: "0.17.7", purpose: "Parakeet transcription and speaker diarization",
               license: "Apache 2.0", file: "FluidAudio"),
+        .init(name: "Silero VAD", version: "6.2.1", purpose: "Speech detection for Whisper transcription",
+              license: "MIT", file: "silero-vad"),
         .init(name: "speech-swift", version: "0.0.28", purpose: "Qwen3 transcription", license: "Apache 2.0",
               file: "speech-swift"),
         .init(name: "MLX Swift", version: "0.31.6", purpose: "Machine learning on Apple silicon", license: "MIT",

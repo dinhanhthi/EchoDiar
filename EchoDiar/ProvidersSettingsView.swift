@@ -145,7 +145,7 @@ struct ProvidersSettingsView: View {
                 HStack {
                     VStack(alignment: .leading) {
                         Text(ProviderConfig.presets.first { $0.id == host.preset }?.displayName ?? host.preset)
-                        Text("\(host.baseURL) - \(host.models.count) model\(host.models.count == 1 ? "" : "s")")
+                        Text("\(host.baseURL) - \(host.models.count) models")
                             .font(.caption)
                             .foregroundStyle(.secondary)
                     }
@@ -308,7 +308,7 @@ private struct APIProviderRow: View {
             .padding(.leading, disclosureIndent)
         } label: {
             Toggle(isOn: binding(\.enabled)) {
-                Text(config.displayName.isEmpty ? "Untitled" : config.displayName)
+                Text(config.displayName.isEmpty ? String(localized: "Untitled") : config.displayName)
                 if config.kind == .local || (isCustom && !config.baseURL.isEmpty) { Text(config.baseURL) }
             }
         }
@@ -360,7 +360,7 @@ struct SpeechProviderRow: View {
                 // A free GET that needs a valid key; no audio is uploaded.
                 TestButton(title: "Test", config: config, model: model, pendingKey: $pendingKey) {
                     guard let key = try KeychainStore.apiKey(forProvider: config.id) else {
-                        throw LLMError.provider("Save a key first.")
+                        throw LLMError.provider(String(localized: "Save a key first."))
                     }
                     do {
                         try await CloudTranscription.checkKey(config: config, apiKey: key)
@@ -443,7 +443,7 @@ private struct CLIProviderRow: View {
         }
     }
 
-    private var modelPrompt: String {
+    private var modelPrompt: LocalizedStringKey {
         switch preset {
         case .opencode: "provider/model"
         case .claude: "sonnet, opus or haiku (empty = default)"
@@ -610,7 +610,7 @@ private struct TranscriptionModelField: View {
             TextField("Transcription model", text: Binding(
                 get: { config.transcriptionModel },
                 set: { value in model.updateProvider(id: config.id) { $0.transcriptionModel = value } }
-            ), prompt: Text(defaultModel.isEmpty ? "Model id, e.g. whisper-1" : defaultModel))
+            ), prompt: defaultModel.isEmpty ? Text("Model id, e.g. whisper-1") : Text(verbatim: defaultModel))
             .labelsHidden()
             if known.count > 1 {
                 Menu("Models") {
@@ -629,7 +629,7 @@ private struct TranscriptionModelField: View {
 private struct ModelField: View {
     let config: ProviderConfig
     let model: AppModel
-    let prompt: String
+    let prompt: LocalizedStringKey
     let load: () async throws -> [String]
 
     @State private var models: [String]?
@@ -646,7 +646,7 @@ private struct ModelField: View {
             FieldRow("Model") {
                 TextField("Model", text: modelBinding, prompt: Text(prompt)).labelsHidden()
                 if let models, !models.isEmpty {
-                    Menu("\(models.count) model\(models.count == 1 ? "" : "s")") {
+                    Menu("\(models.count) models") {
                         ForEach(models, id: \.self) { id in
                             Button(id) { modelBinding.wrappedValue = id }
                         }
@@ -730,7 +730,7 @@ private struct ModelField: View {
         VStack(alignment: .leading, spacing: 6) {
             ForEach(ids, id: \.self) { id in
                 Toggle(isOn: shownBinding(id, defaultID: defaultID)) {
-                    Text(id == defaultID ? "\(id) (default)" : id)
+                    id == defaultID ? Text("\(id) (default)") : Text(verbatim: id)
                 }
                 .toggleStyle(.checkbox)
                 .disabled(id == defaultID)
@@ -771,7 +771,7 @@ private struct ModelField: View {
 /// below.
 /// With `pendingKey`, a Save button writes the typed key to the Keychain, and Test saves it first. Not run while idle.
 private struct TestButton: View {
-    let title: String
+    let title: LocalizedStringKey
     let config: ProviderConfig
     let model: AppModel
     var pendingKey: Binding<String>?
@@ -840,7 +840,7 @@ private struct TestButton: View {
                     for try await _ in stream { break }
                 }
                 try Task.checkCancellation()
-                result = (true, "OK")
+                result = (true, String(localized: "OK"))
             } catch {
                 // Cancel surfaces as CancellationError or URLError.cancelled: no result then.
                 result = Task.isCancelled ? nil : (false, shortMessage(error))

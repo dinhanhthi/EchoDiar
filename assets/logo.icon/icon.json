@@ -12,7 +12,7 @@
           "image-name" : "logo_white.png",
           "name" : "logo_white",
           "position" : {
-            "scale" : 0.95,
+            "scale" : 0.8,
             "translation-in-points" : [
               7,
               -23

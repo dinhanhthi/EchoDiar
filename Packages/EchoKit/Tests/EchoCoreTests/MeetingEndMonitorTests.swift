@@ -67,6 +67,17 @@ struct MeetingEndMonitorTests {
         #expect(micStillOn.evaluate(now: at(300)) == MeetingEndMonitor.Action.none)
     }
 
+    @Test func scheduledEndPromptsEventEndedAndKeepRecordingSnoozesIt() {
+        var monitor = monitor()
+        monitor.record(.scheduledEnd(at(1_800)), at: start)
+        #expect(monitor.evaluate(now: at(1_799)) == MeetingEndMonitor.Action.none)
+        #expect(monitor.evaluate(now: at(1_800)) == .promptStop(reason: .eventEnded, countdown: 15))
+
+        monitor.keepRecording(.eventEnded, now: at(1_810))
+        #expect(monitor.evaluate(now: at(1_810 + 599)) == MeetingEndMonitor.Action.none)
+        #expect(monitor.evaluate(now: at(1_810 + 600)) == .promptStop(reason: .eventEnded, countdown: 15))
+    }
+
     @Test func sleepStopsNow() {
         var monitor = monitor()
         monitor.record(.systemSleep, at: at(30))

@@ -14,6 +14,7 @@ import Foundation
 /// - Call ended: the system channel went silent after it had been audible while the meeting app's mic is off, both
 ///   for `callEndedSeconds`. Either alone is normal mid-call (others quiet, a muted web client); also ignored once
 ///   the source app quit. Paused time does not count: a pause measures nothing.
+/// - Event ended: the calendar event's scheduled end has passed; prompts like the others.
 /// - The recording starts as silent: the silence prompt fires unless `audible(true)` arrives within the threshold.
 /// - `evaluate` returns the same prompt on every call while its condition holds; the caller dedupes, and dismisses
 ///   the prompt when the result drops back to `.none`.
@@ -88,10 +89,12 @@ public struct MeetingEndMonitor: Sendable {
         case inputRouteLost
         case systemSleep
         case diskFull
+        /// The calendar event being recorded ends at this time.
+        case scheduledEnd(Date)
     }
 
     public enum Reason: String, Codable, Sendable {
-        case sourceExited, sourceInactive, callEnded, silence, screenLocked, inputRouteLost, systemSleep, diskFull, maxDuration
+        case sourceExited, sourceInactive, callEnded, silence, screenLocked, inputRouteLost, systemSleep, diskFull, maxDuration, eventEnded
     }
 
     public enum Action: Equatable, Sendable {
@@ -116,6 +119,7 @@ public struct MeetingEndMonitor: Sendable {
     private var paused = false
     private var screenLocked = false
     private var inputRouteLost = false
+    private var scheduledEnd: Date?
     private var stopReason: Reason?
     private var snoozedUntil: [Reason: Date] = [:]
 
@@ -142,6 +146,7 @@ public struct MeetingEndMonitor: Sendable {
         case .inputRouteLost: if !isSnoozed(.inputRouteLost, at: time) { inputRouteLost = true }
         case .systemSleep: stopReason = stopReason ?? .systemSleep
         case .diskFull: stopReason = stopReason ?? .diskFull
+        case .scheduledEnd(let end): scheduledEnd = end
         }
     }
 
@@ -166,6 +171,7 @@ public struct MeetingEndMonitor: Sendable {
             (.sourceInactive, !sourceExited && Self.held(since: sourceInactiveSince, for: inactiveThreshold, at: now)),
             (.callEnded, !sourceExited && !paused && Self.held(since: callEndedSince, for: callEndedThreshold, at: now)),
             (.silence, Self.held(since: silentSince, for: silenceThreshold, at: now)),
+            (.eventEnded, Self.held(since: scheduledEnd, for: 0, at: now)),
         ]
         for (reason, fired) in triggers where fired && !isSnoozed(reason, at: now) {
             return .promptStop(reason: reason, countdown: Self.promptCountdown)

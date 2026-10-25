@@ -27,28 +27,28 @@ extension AppModel {
         if id == "apple-nl" { return AppleTextEmbedder() }
         if id.hasPrefix(Self.apiEmbedderPrefix) {
             guard let config = embeddingProviderConfig else {
-                problem("Pick an enabled provider in Settings › RAG")
+                problem(String(localized: "Pick an enabled provider in Settings › RAG"))
                 return nil
             }
             let model = settings.embeddingAPIModel.trimmingCharacters(in: .whitespacesAndNewlines)
             guard !model.isEmpty else {
-                problem("Enter the embedding model of \(config.displayName) in Settings › RAG")
+                problem(String(localized: "Enter the embedding model of \(config.displayName) in Settings › RAG"))
                 return nil
             }
             let apiKey = config.authStyle == .none ? nil : try? KeychainStore.apiKey(forProvider: config.id)
             // As `makeProvider(for:)`: sent without a key, a preset only answers HTTP 401.
             if config.preset != nil, config.authStyle != .none, apiKey?.isEmpty ?? true {
-                problem("Save a key for \(config.displayName) in Settings › AI")
+                problem(String(localized: "Save a key for \(config.displayName) in Settings › AI"))
                 return nil
             }
             return APITextEmbedder(config: config, apiKey: apiKey, model: model)
         }
         guard let entry = ModelCatalog.entry(id: id), entry.kind == .embedding, entry.runtime == .mlx else {
-            problem("Pick an embedding model in Settings › RAG")
+            problem(String(localized: "Pick an embedding model in Settings › RAG"))
             return nil
         }
         guard modelStore.isInstalled(id), let folder = modelStore.folder(for: id) else {
-            problem("Download the embedding model in Settings › RAG")
+            problem(String(localized: "Download the embedding model in Settings › RAG"))
             return nil
         }
         return MLXEmbedder(entryID: id, folder: folder)
@@ -190,7 +190,7 @@ extension AppModel {
             } catch {
                 guard !Task.isCancelled else { return }
                 NSLog("EchoDiar: indexing failed to load the embedder: \(error)")
-                ragStatus.message = "Indexing stopped: \(error.localizedDescription)"
+                ragStatus.message = String(localized: "Indexing stopped: \(error.localizedDescription)")
                 return
             }
             guard !result.stopped, !Task.isCancelled else { return }
@@ -220,7 +220,8 @@ extension AppModel {
                 } catch {
                     guard !Task.isCancelled else { return (handled, true) }
                     NSLog("EchoDiar: indexing failed for \(folder.lastPathComponent): \(error)")
-                    ragStatus.message = "Indexing stopped at \"\(conversation.title)\": \(error.localizedDescription)"
+                    ragStatus.message = String(
+                        localized: "Indexing stopped at \"\(conversation.title)\": \(error.localizedDescription)")
                     return (handled, true)
                 }
                 ragStatus.indexed = await libraryIndex.indexedIDs.intersection(transcribed).count
@@ -250,7 +251,7 @@ extension AppModel {
             return
         }
         guard let client else {
-            aiError = (nil, "\(provider.name) is not available.")
+            aiError = (nil, String(localized: "\(provider.name) is not available."))
             return
         }
         let task = Task { [weak self] in
@@ -268,7 +269,9 @@ extension AppModel {
             aiJobsEnded += 1
             syncLibraryIndex()
         }
-        aiJob = AIJob(conversationID: nil, kind: .question(question), status: "Searching your conversations…", task: task)
+        aiJob = AIJob(
+            conversationID: nil, kind: .question(question),
+            status: String(localized: "Searching your conversations…"), task: task)
     }
 
     /// The search and the answer stream of `askLibrary`; nil when the job was stopped during the search.

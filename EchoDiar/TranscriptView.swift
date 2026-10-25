@@ -28,6 +28,8 @@ struct TranscriptView: View {
     @State private var speakers: [String] = []
     /// `transcript.json` exists but could not be read.
     @State private var loadFailed = false
+    /// The first `load` has returned; until then the tab shows `DetailLoadingPane`.
+    @State private var loaded = false
     @State private var playback = PlaybackController()
     /// The speaker whose rename popover is open.
     @State private var renaming: String?
@@ -54,12 +56,17 @@ struct TranscriptView: View {
     var body: some View {
         ZStack(alignment: .top) {
             if shownTab == .transcript {
-                // The bar slides with the transcript: it has nothing for Summary and Chat.
-                VStack(spacing: 10) {
-                    content
-                    bottomBar
+                // The bar slides with the transcript: it has nothing for Summary and Chat. Until the files are read,
+                // a light pane, so the click that opened the conversation shows at once.
+                if loaded {
+                    VStack(spacing: 10) {
+                        content
+                        bottomBar
+                    }
+                    .transition(tabTransition)
+                } else {
+                    DetailLoadingPane().transition(tabTransition)
                 }
-                .transition(tabTransition)
             } else {
                 AIPanelView(conversation: conversation, model: model, tab: shownTab, transition: tabTransition)
                     .transition(tabTransition)
@@ -320,7 +327,7 @@ struct TranscriptView: View {
     private func speakerLabel(_ speaker: String) -> some View {
         HStack(spacing: 5) {
             Circle().fill(Self.color(for: speaker)).frame(width: 7, height: 7)
-            Text(shownTranscript?.displayName(for: speaker) ?? speaker)
+            Text(shownTranscript.map { Self.displayName(for: speaker, in: $0) } ?? speaker)
         }
     }
 
@@ -375,10 +382,10 @@ struct TranscriptView: View {
     /// The name field of a speaker: Return saves, Esc or a click elsewhere cancels.
     private func renameForm(_ speaker: String) -> some View {
         VStack(alignment: .leading, spacing: 8) {
-            Text("Name for \(Transcript.defaultName(for: speaker))")
+            Text("Name for \(Self.defaultName(for: speaker))")
                 .font(.caption)
                 .foregroundStyle(.secondary)
-            TextField(Transcript.defaultName(for: speaker), text: $nameDraft)
+            TextField(Self.defaultName(for: speaker), text: $nameDraft)
                 .onSubmit {
                     rename(speaker, to: nameDraft)
                     renaming = nil
@@ -407,6 +414,22 @@ struct TranscriptView: View {
                 NSLog("EchoDiar: could not save the speaker name in \(folder.lastPathComponent): \(error)")
             }
         }
+    }
+
+    /// `Transcript.displayName(for:)` with the default names localized: the user's name for `speaker`, else "Me",
+    /// "Speaker N" or the raw id. Display only: search and the AI prompts keep EchoCore's English names.
+    static func displayName(for speaker: String, in transcript: Transcript) -> String {
+        let name = transcript.displayName(for: speaker)
+        return name == Transcript.defaultName(for: speaker) ? defaultName(for: speaker) : name
+    }
+
+    /// `Transcript.defaultName(for:)`, localized.
+    static func defaultName(for speaker: String) -> String {
+        if speaker == Transcript.Speaker.me { return String(localized: "Me") }
+        if speaker.hasPrefix("s"), let number = Int(speaker.dropFirst()) {
+            return String(localized: "Speaker \(number)")
+        }
+        return speaker
     }
 
     /// Me in the accent color; other speakers by number from a fixed list, so a speaker keeps its color.
@@ -502,7 +525,7 @@ struct TranscriptView: View {
 
     private var loading: Bool { conversation.hasTranscript && transcript == nil && !loadFailed }
 
-    private var emptyText: String {
+    private var emptyText: LocalizedStringKey {
         if loadFailed { return "The transcript could not be read." }
         if shownTranscript != nil { return "No speech was found in this recording." }
         switch conversation.status {
@@ -539,6 +562,7 @@ struct TranscriptView: View {
         audioURL = audio
         loadFailed = wantsTranscript && loaded.isEmpty
         applyShownVersion()
+        self.loaded = true
         showPendingTime()
     }
 
@@ -577,7 +601,7 @@ struct TranscriptView: View {
     private func copyTranscript() {
         guard let transcript = shownTranscript else { return }
         let text = transcript.segments
-            .map { "\(transcript.displayName(for: $0.speaker)) [\(Self.timestamp($0.start))]: \($0.text)" }
+            .map { "\(Self.displayName(for: $0.speaker, in: transcript)) [\(Self.timestamp($0.start))]: \($0.text)" }
             .joined(separator: "\n")
         NSPasteboard.general.clearContents()
         NSPasteboard.general.setString(text, forType: .string)
@@ -586,6 +610,25 @@ struct TranscriptView: View {
     /// mm:ss; minutes go past 59 in recordings longer than an hour.
     static func timestamp(_ seconds: Double) -> String {
         Duration.seconds(seconds).formatted(.time(pattern: .minuteSecond(padMinuteToLength: 2)))
+    }
+}
+
+/// The open conversation's tab until its files are read: the card its content shows in, at once, and a spinner once
+/// the reading takes long enough to notice; a spinner shown for a frame or two reads as a flicker.
+struct DetailLoadingPane: View {
+    @State private var showsSpinner = false
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
+    var body: some View {
+        ProgressView()
+            .opacity(showsSpinner ? 1 : 0)
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .modifier(GlassCard(cornerRadius: 20))
+            .task {
+                try? await Task.sleep(for: .milliseconds(150))
+                guard !Task.isCancelled else { return }
+                withAnimation(reduceMotion ? nil : Motion.standard) { showsSpinner = true }
+            }
     }
 }
 
@@ -693,7 +736,7 @@ private struct SegmentList: View {
                 LazyVStack(alignment: .leading, spacing: 2) {
                     ForEach(transcript.segments) { segment in
                         SegmentRow(
-                            segment: segment, name: transcript.displayName(for: segment.speaker),
+                            segment: segment, name: TranscriptView.displayName(for: segment.speaker, in: transcript),
                             active: segment.id == active, speaking: segment.id == active && playback.isPlaying
                         ) {
                             following = true

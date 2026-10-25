@@ -1,14 +1,13 @@
 import EchoCore
 import SwiftUI
 
-/// The library as cards under pinned day headers, the recording's card above them while recording. Shows the groups
-/// it is given, so callers can filter them. Compact cards for the wide layout's sidebar, where the open entry is
-/// selected and scrolled into view. ⌘-click and ⇧-click select cards (not the recording's), from the open entry in the
-/// sidebar as in Mail, and the selection bar shows at the top while any is selected.
+/// The library as compact cards under pinned day headers, in the library page's sidebar, the recording's card above
+/// them while recording. Shows the groups it is given, so callers can filter them. The open entry is selected and
+/// scrolled into view. ⌘-click and ⇧-click select cards (not the recording's), from the open entry as in Mail, and the
+/// selection bar shows at the top while any is selected.
 struct ConversationListView: View {
     let model: AppModel
     let groups: [DayGroup]
-    var compact = false
     var selectedID: UUID?
     @State private var selection = ListSelection()
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
@@ -18,14 +17,14 @@ struct ConversationListView: View {
             ScrollView {
                 LazyVStack(alignment: .leading, spacing: 10, pinnedViews: .sectionHeaders) {
                     if model.isRecording {
-                        RecordingCard(model: model, compact: compact, selected: model.route == .recording)
+                        RecordingCard(model: model, selected: model.route == .recording)
                             .transition(cardTransition)
                     }
                     ForEach(groups) { group in
                         Section {
                             ForEach(group.conversations) { conversation in
                                 ConversationCard(
-                                    conversation: conversation, model: model, compact: compact,
+                                    conversation: conversation, model: model,
                                     selected: selection.isEmpty
                                         ? conversation.id == selectedID : selection.ids.contains(conversation.id),
                                     select: { extend in
@@ -163,8 +162,8 @@ private struct DayHeader: View {
 
     private var title: String {
         let calendar = Calendar.current
-        if calendar.isDateInToday(day) { return "Today" }
-        if calendar.isDateInYesterday(day) { return "Yesterday" }
+        if calendar.isDateInToday(day) { return String(localized: "Today") }
+        if calendar.isDateInYesterday(day) { return String(localized: "Yesterday") }
         return day.formatted(date: .long, time: .omitted)
     }
 }

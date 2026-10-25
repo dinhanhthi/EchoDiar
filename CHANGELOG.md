@@ -7,6 +7,31 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.1.0] - 2026-10-24
+
+### Added
+
+- Calendar triggers (Settings > Recording > Calendar), with any account added to macOS Calendar (iCloud, Google, Outlook/Exchange, CalDAV) and the optional Calendars permission. "When a meeting starts": Off, Ask (default: the floating indicator offers Record, Join or Not now), Wait for the call (records the meeting app as soon as the call starts) or Record at start (records all system audio and the microphone at the start time). Automatic modes start without asking only for events you organize, accepted or answered Maybe to, and events without invitees in the EchoDiar calendar or a calendar On My Mac; other events ask. Choose the calendars to watch, keep only events with a meeting link (Zoom, Google Meet, Microsoft Teams, Webex), and stop when the event ends plus a few minutes (10 by default, asked with a countdown). Works while EchoDiar runs, so Launch at login is recommended.
+- A recording started from a calendar event is named after the event.
+- A Calendar page (toolbar button next to Settings) lists the meetings of the next 7 days, updated automatically, with Join, Record and Skip, and the menu bar menu lists upcoming meetings.
+- Create your own meetings from the Calendar page with "New Event…": title, date, start and end, an optional meeting link and Repeat (None, Daily, Weekdays, Weekly or Monthly, ending never or on a date). They go to an "EchoDiar" calendar (On My Mac when available, otherwise your default account, e.g. iCloud, which syncs those events like any other). "Edit…" changes or deletes them; for a repeating event, choose "This Event Only" or "This and Future Events" (only the latter when Repeat or End Repeat changed). Events in the EchoDiar calendar count even without a meeting link, and follow the same "When a meeting starts" mode.
+- Settings > Transcription > General > "Remember last record language" (off by default): the language picked in the Record button's menu before recording is kept for the next recordings instead of the default language.
+- Mute the microphone while recording: a mute button in the recording controls (also in the recording's context menu, the floating indicator and the menu bar menu) releases the microphone and writes silence on its channel, so the two channels stay in sync.
+- The menu bar icon shows the state on the logo: a red dot while recording and an orange pause badge while paused.
+- App language: Settings > General > "App language" switches the interface between English, Vietnamese, French, Spanish and Simplified Chinese (relaunch to apply).
+- A welcome pane with the new logo whenever no conversation is selected, with an invitation to make your first recording when the library is empty.
+
+### Changed
+
+- The window has a single layout: the conversation list with the conversation beside it, replacing the compact layout.
+- New app icon.
+- Buttons in Settings and on the Calendar page are capsule-shaped.
+
+### Fixed
+
+- Whisper no longer invents text such as "Thank you" or "Merci" when the microphone is silent: speech is detected before a window is transcribed.
+- Live transcription shows lines sooner: a chunk closes at a short pause once it is a few seconds long, and is cut after 12 seconds at most.
+
 ## [1.0.2] - 2026-10-21
 
 ### Added

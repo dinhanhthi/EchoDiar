@@ -3,10 +3,11 @@ import CoreAudio
 import EchoAI
 import EchoCore
 import EchoTranscribe
+import EventKit
 import SwiftUI
 
 /// The Recording tab, one inner tab per section: the microphone, meeting detection and per-app behavior with the
-/// floating pill's anchor, auto-stop, and what happens after a recording stops.
+/// floating pill's anchor, calendar events, auto-stop, and what happens after a recording stops.
 struct RecordingSettingsView: View {
     let model: AppModel
     @State private var microphones: [InputDevice] = []
@@ -20,7 +21,7 @@ struct RecordingSettingsView: View {
 
     /// Ids in `SettingsTab.recording.subTabs`; picked in the toolbar.
     private enum Tab: String {
-        case microphone, meetings, autoStop, afterRecording
+        case microphone, meetings, calendar, autoStop, afterRecording
     }
 
     private var tab: Tab { model.settingsSubTab(.recording).flatMap(Tab.init) ?? .microphone }
@@ -30,6 +31,7 @@ struct RecordingSettingsView: View {
             switch tab {
             case .microphone: microphoneSection
             case .meetings: meetingsSection
+            case .calendar: calendarSection
             case .autoStop: autoStopSection
             case .afterRecording: afterRecordingSection
             }
@@ -44,6 +46,7 @@ struct RecordingSettingsView: View {
         .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in
             // Back from System Settings.
             accessibilityTrusted = WindowAnchor.isTrusted
+            model.refreshCalendarAccess()
         }
     }
 
@@ -100,6 +103,113 @@ struct RecordingSettingsView: View {
         }
     }
 
+    @ViewBuilder private var calendarSection: some View {
+        Section {
+            calendarAccessRow
+            Picker(selection: model.setting(\.calendar.mode)) {
+                Text("Off").tag(CalendarScheduler.Mode.off)
+                Text("Ask").tag(CalendarScheduler.Mode.ask)
+                Text("Wait for the call").tag(CalendarScheduler.Mode.waitForCall)
+                Text("Record at start").tag(CalendarScheduler.Mode.recordAtStart)
+            } label: {
+                Text("When a meeting starts")
+                if model.settings.calendar.mode == .waitForCall && !model.settings.meetingDetection {
+                    Text("Detect meetings is off, so EchoDiar asks instead.")
+                }
+            }
+            if !model.settings.launchAtLogin {
+                LabeledContent("EchoDiar reacts to meetings only while it runs. Turn on Launch at login in General.") {
+                    Button("Open General") { model.openSettings(tab: .general) }
+                }
+                .foregroundStyle(.secondary)
+            }
+        }
+        if model.calendarAuthorized {
+            Section {
+                ForEach(calendarSources, id: \.self) { source in
+                    if !source.isEmpty {
+                        Text(source)
+                            .font(.subheadline)
+                            .foregroundStyle(.secondary)
+                    }
+                    ForEach(model.calendars.filter { $0.sourceTitle == source }) { calendar in
+                        Toggle(isOn: watched(calendar)) {
+                            HStack(spacing: 6) {
+                                Circle()
+                                    .fill(Color(nsColor: calendar.color))
+                                    .frame(width: 10, height: 10)
+                                Text(calendar.title)
+                            }
+                        }
+                        .toggleStyle(.checkbox)
+                    }
+                }
+            } header: {
+                SectionHeader(title: "Watched calendars", description: "New calendars are watched too.")
+            }
+        }
+        Section {
+            Toggle(isOn: meetingLinkOnly) {
+                Text("Only events with a meeting link")
+                Text("Zoom, Google Meet, Microsoft Teams or Webex link in the event.")
+            }
+        }
+        Section {
+            Toggle(isOn: model.setting(\.calendar.stopAtEventEnd)) {
+                Text("Stop when the event ends")
+                Text("The indicator asks before stopping, with a 15 s countdown, like the other auto-stops.")
+            }
+            NumberRow(
+                title: "Minutes after the end", unit: String(localized: "min"),
+                value: model.setting(\.calendar.stopAfterEndMinutes),
+                range: CalendarScheduler.Configuration.stopAfterEndRange)
+                .disabled(!model.settings.calendar.stopAtEventEnd)
+        }
+    }
+
+    /// Nothing once full access is granted; else what is missing and how to grant it.
+    @ViewBuilder private var calendarAccessRow: some View {
+        switch model.calendarStatus {
+        case .fullAccess:
+            EmptyView()
+        case .notDetermined:
+            LabeledContent("EchoDiar has no calendar access yet.") {
+                Button("Grant Access") { model.requestCalendarAccess() }
+            }
+            .foregroundStyle(.secondary)
+        default:
+            LabeledContent("Calendar access is off. Turn on EchoDiar in Privacy & Security › Calendars.") {
+                Button("Open Privacy Settings") { PrivacySettings.openCalendars() }
+            }
+            .foregroundStyle(.secondary)
+        }
+    }
+
+    /// Calendar sources ("iCloud", an account) in the list's order.
+    private var calendarSources: [String] {
+        var seen = Set<String>()
+        return model.calendars.map(\.sourceTitle).filter { seen.insert($0).inserted }
+    }
+
+    /// Checked = watched, stored as not in `ignoredCalendarIDs`.
+    private func watched(_ calendar: CalendarStore.CalendarInfo) -> Binding<Bool> {
+        Binding(
+            get: { !model.settings.calendar.ignoredCalendarIDs.contains(calendar.id) },
+            set: { watched in
+                model.updateSettings { settings in
+                    settings.calendar.ignoredCalendarIDs.removeAll { $0 == calendar.id }
+                    if !watched { settings.calendar.ignoredCalendarIDs.append(calendar.id) }
+                }
+            })
+    }
+
+    /// The inverse of `allTimedEvents`.
+    private var meetingLinkOnly: Binding<Bool> {
+        Binding(
+            get: { !model.settings.calendar.allTimedEvents },
+            set: { value in model.updateSettings { $0.calendar.allTimedEvents = !value } })
+    }
+
     private var autoStopSection: some View {
         Section {
             NumberRow(
@@ -111,11 +221,11 @@ struct RecordingSettingsView: View {
                 value: model.setting(\.endMonitor.callEndedSeconds),
                 range: MeetingEndMonitor.Configuration.callEndedRange)
             NumberRow(
-                title: "Stop after silence of", unit: "min",
+                title: "Stop after silence of", unit: String(localized: "min"),
                 value: model.setting(\.endMonitor.silenceMinutes),
                 range: MeetingEndMonitor.Configuration.silenceRange)
             NumberRow(
-                title: "Stop after a recording length of", unit: "min",
+                title: "Stop after a recording length of", unit: String(localized: "min"),
                 value: model.setting(\.endMonitor.maxDurationMinutes),
                 range: MeetingEndMonitor.Configuration.maxDurationRange)
         } header: {
@@ -185,7 +295,7 @@ struct SpeakerCountPicker: View {
 
 /// A whole number typed or stepped within `range`.
 struct NumberRow: View {
-    let title: String
+    let title: LocalizedStringKey
     let unit: String
     @Binding var value: Int
     let range: ClosedRange<Int>

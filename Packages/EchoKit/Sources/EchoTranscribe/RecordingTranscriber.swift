@@ -5,7 +5,8 @@ import Synchronization
 
 /// Transcribes a recording while it is made: takes the writer's 16 kHz blocks, cuts each channel into speech chunks
 /// (`SpeechChunker`) and decodes them with one WhisperKit or Parakeet session (mic lines "Me", system lines
-/// "Others"). `finish()` at Stop hands the segments, in file time, and the spans not transcribed (gaps) to the
+/// "Others"). Live chunks are at most 12 s and close at a short pause from 4 s, so a line follows continuous speech
+/// within seconds. `finish()` at Stop hands the segments, in file time, and the spans not transcribed (gaps) to the
 /// pipeline as a `PriorTranscription`.
 ///
 /// Clock: the running sample count of each channel is file time. Every frame written to the CAF passes the sink,
@@ -67,6 +68,12 @@ public actor RecordingTranscriber {
     /// How often the decode task wakes without a chunk: to free the model after `idleRelease`, and to see whether a
     /// constrained Mac recovered.
     static let tickInterval = Duration.seconds(15)
+    /// The longest live chunk (at most the model window): the hard cut searches its last third, 8–12 s. With
+    /// `liveShortPauseMinSeconds` it bounds the time to a live line under continuous speech (the batch tuning waits up
+    /// to 30 s), while keeping chunks long enough that Whisper does not fall back on memorised boilerplate.
+    static let liveMaxChunkSeconds = 12
+    /// The length a live chunk needs before a 0.6 s pause closes it: `min(4·50, 600/2) = 200` frames, so from 4 s.
+    static let liveShortPauseMinSeconds = 4
 
     /// Every change, for a single consumer; finished by `finish()` or `cancel()`.
     public nonisolated let updates: AsyncStream<Snapshot>
@@ -104,7 +111,8 @@ public actor RecordingTranscriber {
         self.idleRelease = idleRelease
         self.deferWhenConstrained = deferWhenConstrained
         self.language = language
-        buffer = Mutex(Buffer(maxChunkSeconds: entry.windowSeconds ?? 30))
+        buffer = Mutex(Buffer(maxChunkSeconds: min(entry.windowSeconds ?? 30, Self.liveMaxChunkSeconds),
+                              shortPauseMinSeconds: Self.liveShortPauseMinSeconds))
         (updates, updatesContinuation) = AsyncStream.makeStream(bufferingPolicy: .bufferingNewest(1))
         (wake, wakeContinuation) = AsyncStream.makeStream(bufferingPolicy: .bufferingNewest(1))
     }
@@ -342,11 +350,12 @@ public actor RecordingTranscriber {
         var closed = false
 
         init(
-            maxChunkSeconds: Int,
+            maxChunkSeconds: Int, shortPauseMinSeconds: Int = SpeechChunker.shortPauseMinSeconds,
             maxQueuedSamples: Int = RecordingTranscriber.maxQueuedSeconds * RecordingTranscriber.sampleRate
         ) {
             self.maxQueuedSamples = maxQueuedSamples
-            let mic = Channel(chunker: SpeechChunker(maxChunkSeconds: maxChunkSeconds))
+            let mic = Channel(chunker: SpeechChunker(maxChunkSeconds: maxChunkSeconds,
+                                                     shortPauseMinSeconds: shortPauseMinSeconds))
             channels = [mic, mic]
         }
 

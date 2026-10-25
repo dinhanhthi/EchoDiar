@@ -8,7 +8,7 @@ struct ShortcutsSettingsView: View {
     let model: AppModel
 
     /// The table of shortcuts used inside EchoDiar.
-    static let inAppShortcuts: [(action: String, keys: String)] = [
+    static let inAppShortcuts: [(action: LocalizedStringResource, keys: String)] = [
         ("Record / Stop", "⌘R"),
         ("Pause / Resume", "⇧⌘P"),
         ("Show the recording", "⌘1"),
@@ -17,7 +17,7 @@ struct ShortcutsSettingsView: View {
         ("Search conversations or settings", "⌘F"),
         ("Settings", "⌘,"),
         ("Back", "⌘[ / Esc"),
-        ("Play / Pause the transcript audio", "Space"),
+        ("Play / Pause the transcript audio", String(localized: "Space", comment: "The Space bar, in a shortcut such as ⌥⌘Space")),
     ]
 
     var body: some View {
@@ -30,7 +30,7 @@ struct ShortcutsSettingsView: View {
                 LabeledContent("Shortcut") {
                     HotKeyRecorder(
                         model: model, key: \.globalHotKey, defaultKey: .defaultRecord,
-                        other: \.globalPauseHotKey, otherName: "global pause shortcut")
+                        other: \.globalPauseHotKey, otherIsPause: true)
                 }
                 .disabled(!model.settings.globalHotKeyEnabled)
                 if let error = model.hotKeyError {
@@ -45,7 +45,7 @@ struct ShortcutsSettingsView: View {
                 LabeledContent("Shortcut") {
                     HotKeyRecorder(
                         model: model, key: \.globalPauseHotKey, defaultKey: .defaultPause,
-                        other: \.globalHotKey, otherName: "global record shortcut")
+                        other: \.globalHotKey, otherIsPause: false)
                 }
                 .disabled(!model.settings.globalPauseHotKeyEnabled)
                 if let error = model.pauseHotKeyError {
@@ -53,9 +53,11 @@ struct ShortcutsSettingsView: View {
                 }
             }
             Section("In EchoDiar") {
-                ForEach(Self.inAppShortcuts, id: \.action) { shortcut in
-                    LabeledContent(shortcut.action) {
+                ForEach(Self.inAppShortcuts, id: \.keys) { shortcut in
+                    LabeledContent {
                         keysText(shortcut.keys).monospaced()
+                    } label: {
+                        Text(shortcut.action)
                     }
                 }
             }
@@ -87,9 +89,10 @@ private struct HotKeyRecorder: View {
     let defaultKey: HotKey
     /// The other global shortcut, which this one may not equal.
     let other: KeyPath<AppSettings, HotKey>
-    let otherName: String
+    /// The other one is the global pause shortcut (else the global record shortcut).
+    let otherIsPause: Bool
     @State private var monitor: Any?
-    @State private var note: String?
+    @State private var note: LocalizedStringKey?
 
     var body: some View {
         VStack(alignment: .trailing, spacing: 4) {
@@ -150,7 +153,7 @@ private struct HotKeyRecorder: View {
             return
         }
         if pressed == model.settings[keyPath: other] {
-            note = "\(pressed.displayString) is the \(otherName)."
+            note = takenByOther(pressed)
             return
         }
         stop()
@@ -160,11 +163,17 @@ private struct HotKeyRecorder: View {
     /// Back to `defaultKey`, unless the other shortcut has taken it.
     private func reset() {
         guard defaultKey != model.settings[keyPath: other] else {
-            note = "\(defaultKey.displayString) is the \(otherName)."
+            note = takenByOther(defaultKey)
             return
         }
         note = nil
         model.updateSettings { $0[keyPath: key] = defaultKey }
+    }
+
+    /// "⇧⌘P is the global pause shortcut.", a whole sentence per shortcut.
+    private func takenByOther(_ key: HotKey) -> LocalizedStringKey {
+        otherIsPause ? "\(key.displayString) is the global pause shortcut."
+            : "\(key.displayString) is the global record shortcut."
     }
 
     /// The main menu item (submenus included) with the same shortcut.

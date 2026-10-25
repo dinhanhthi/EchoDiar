@@ -27,7 +27,7 @@ struct AIPanelView: View {
     @State private var chatTitle: String?
     @State private var question = ""
     @FocusState private var questionFocused: Bool
-    @State private var toast: String?
+    @State private var toast: LocalizedStringKey?
     /// Hides the toast 2 s after it shows; replaced by each new toast.
     @State private var toastTask: Task<Void, Never>?
     /// A web link from model output, opened only once its destination is confirmed.
@@ -42,6 +42,8 @@ struct AIPanelView: View {
     @State private var confirmingClear = false
     /// The earlier chat under the pointer, which shows its Remove button.
     @State private var hoveredEntry: UUID?
+    /// The first `load` has returned; until then the tab shows `DetailLoadingPane`.
+    @State private var loaded = false
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     private static let chatEnd = "chatEnd"
@@ -53,20 +55,27 @@ struct AIPanelView: View {
     private static let answerFooterHeight: CGFloat = 22
 
     var body: some View {
-        VStack(spacing: 10) {
-            ZStack {
-                if tab == .chat {
-                    chatPane
-                        .transition(transition)
-                } else {
-                    summaryPane
-                        .transition(transition)
+        // Until the files are read, a light pane, so the click that opened the conversation shows at once.
+        Group {
+            if loaded {
+                VStack(spacing: 10) {
+                    ZStack {
+                        if tab == .chat {
+                            chatPane
+                                .transition(transition)
+                        } else {
+                            summaryPane
+                                .transition(transition)
+                        }
+                    }
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    .clipped()
+                    errorText
+                    bottomBar
                 }
+            } else {
+                DetailLoadingPane()
             }
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
-            .clipped()
-            errorText
-            bottomBar
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
         .overlay(alignment: .bottom) { toastView }
@@ -74,11 +83,12 @@ struct AIPanelView: View {
         .modifier(WebLinkConfirmation(link: $pendingLink))
         .task { model.refreshInstalledModels() }
         // Opening Chat (a card's Ask AI, a tab switch) puts the cursor in the question, once the tab's slide has put
-        // the field in the window.
-        .task(id: model.detailTab) {
-            guard model.detailTab == .chat else { return }
+        // the field in the window, and once it is loaded, unless a sidebar card is being renamed.
+        .task(id: model.detailTab == .chat && loaded) {
+            guard model.detailTab == .chat, loaded else { return }
             try? await Task.sleep(for: .milliseconds(50))
-            if !Task.isCancelled { questionFocused = true }
+            guard !Task.isCancelled, model.renamingConversation == nil else { return }
+            questionFocused = true
         }
         .task(id: LoadKey(id: conversation.id, hasTranscript: conversation.hasTranscript,
                           jobsEnded: model.aiJobsEnded)) { await load() }
@@ -247,7 +257,7 @@ struct AIPanelView: View {
         VStack(alignment: .leading, spacing: 2) {
             // The title may come from a model: plain text, never Markdown.
             Text(chatTitle ?? chat.first { $0.role == .user }?.text ?? String(localized: "New chat")).lineLimit(2)
-            (chat.isEmpty ? Text("Current") : Text("Current") + Text(verbatim: " · ") + Text("\(chat.count) messages"))
+            (chat.isEmpty ? Text("Current") : Text("Current · \(chat.count) messages"))
                 .font(.caption)
                 .foregroundStyle(.secondary)
         }
@@ -390,7 +400,7 @@ struct AIPanelView: View {
     }
 
     /// Why nothing can run for this conversation.
-    private var emptyNote: String? {
+    private var emptyNote: LocalizedStringKey? {
         conversation.hasTranscript ? nil : "This conversation has no transcript yet."
     }
 
@@ -510,11 +520,9 @@ struct AIPanelView: View {
     /// runs and can be stopped from here.
     @ViewBuilder private var busyElsewhere: some View {
         if let job = model.aiJob, (model.detailTab == .chat ? questionJob : summaryJob) == nil {
-            let title = model.conversations.first { $0.id == job.conversationID }?.title ?? "another conversation"
             HStack(spacing: 6) {
                 ProgressView().controlSize(.small)
-                (job.conversationID == nil ? Text("Answering a question about your conversations…")
-                    : Text(job.kind == .summary ? "Summarizing \(title)…" : "Answering about \(title)…"))
+                busyText(job)
                     .lineLimit(1)
                     .truncationMode(.middle)
                 Spacer(minLength: 0)
@@ -524,6 +532,16 @@ struct AIPanelView: View {
             .font(.caption)
             .foregroundStyle(.secondary)
         }
+    }
+
+    /// What `job` does, in a whole sentence; a conversation no longer in the library is "another conversation".
+    private func busyText(_ job: AppModel.AIJob) -> Text {
+        guard let id = job.conversationID else { return Text("Answering a question about your conversations…") }
+        if let title = model.conversations.first(where: { $0.id == id })?.title {
+            return job.kind == .summary ? Text("Summarizing \(title)…") : Text("Answering about \(title)…")
+        }
+        return job.kind == .summary ? Text("Summarizing another conversation…")
+            : Text("Answering about another conversation…")
     }
 
     /// The "i": where the data goes with the current provider, in a popover; only when there is something to say.
@@ -615,6 +633,7 @@ struct AIPanelView: View {
         guard !Task.isCancelled else { return }
         (transcript, summaries, summary, chat) = (loaded, versions, versions.last?.text, messages)
         shownVersion = nil
+        self.loaded = true
     }
 
     private func loadChat() async {
@@ -656,7 +675,7 @@ struct AIPanelView: View {
     }
 
     /// Shows `text` for 2 s; a newer toast replaces it and gets its own 2 s.
-    private func showToast(_ text: String) {
+    private func showToast(_ text: LocalizedStringKey) {
         toastTask?.cancel()
         withAnimation(.snappy(duration: 0.2)) { toast = text }
         toastTask = Task {
@@ -706,12 +725,12 @@ struct AIModelMenu: View {
                 }
             }
             ForEach(hosts) { provider in
-                Section(provider.leavesMac ? "\(provider.name) (leaves this Mac)" : provider.name) {
+                Section(provider.leavesMac ? String(localized: "\(provider.name) (leaves this Mac)") : provider.name) {
                     if provider.models.isEmpty {
                         Text("No model: choose one in Settings")
                     }
                     ForEach(provider.models, id: \.self) { id in
-                        modelItem(provider, id, title: id.isEmpty ? "Default" : id)
+                        modelItem(provider, id, title: id.isEmpty ? String(localized: "Default") : id)
                     }
                 }
             }
@@ -737,7 +756,7 @@ struct AIModelMenu: View {
     }
 
     private var modelTitle: String {
-        guard let provider = model.currentAIProvider else { return "No AI model" }
+        guard let provider = model.currentAIProvider else { return String(localized: "No AI model") }
         guard provider.kind != .inApp else { return provider.name }
         let id = currentModel ?? ""
         return id.isEmpty ? provider.name : id
@@ -817,7 +836,7 @@ struct WebLinkConfirmation: ViewModifier {
 
     func body(content: Content) -> some View {
         content.alert(
-            "Open \(link?.host() ?? "this link")?",
+            link?.host().map { Text("Open \($0)?") } ?? Text("Open this link?"),
             isPresented: Binding(get: { link != nil }, set: { if !$0 { link = nil } }),
             presenting: link
         ) { url in

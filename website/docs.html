@@ -79,6 +79,7 @@
               <li><a href="#permissions">Permissions</a></li>
               <li><a href="#recording">Recording</a></li>
               <li><a href="#meetings">Meeting detection</a></li>
+              <li><a href="#calendar">Calendar</a></li>
               <li><a href="#transcription">Transcription</a></li>
               <li><a href="#how-it-works">How it works</a></li>
               <li><a href="#cloud-transcription">Cloud transcription</a></li>
@@ -110,6 +111,7 @@
             <li><strong>Microphone:</strong> records your voice.</li>
             <li><strong>System Audio Recording:</strong> records the meeting's audio. The first-run onboarding tests it and opens the right Privacy &amp; Security pane.</li>
             <li><strong>Accessibility</strong> (optional): only to keep the floating indicator on the meeting window.</li>
+            <li><strong>Calendars</strong> (optional): reads your meetings from macOS Calendar to offer recording when they start and to name the recording, and adds the events you create to an "EchoDiar" calendar (On My Mac when available, otherwise your default account, e.g. iCloud, which syncs them). EchoDiar writes to no other calendar.</li>
             <li>Tell the people you record. Onboarding and Settings &gt; General have a <strong>Copy consent message</strong> button.</li>
 </ul>
           </section>
@@ -133,6 +135,24 @@
             <li>Per app: <strong>Ask</strong>, <strong>Always record</strong> or <strong>Ignore</strong> (browsers: Ask or Ignore).</li>
             <li>A floating indicator shows while recording. Drag it, hide it while EchoDiar is in front, or attach it to the meeting window.</li>
             <li>Auto-stop: when the meeting app quits, the call goes quiet or the screen locks, the indicator asks before stopping, with a 15 s countdown.</li>
+</ul>
+          </section>
+
+          <section id="calendar" class="doc">
+            <h2>Calendar</h2>
+<ul class="list">
+            <li>Works with any account added to macOS Calendar: iCloud, Google, Outlook/Exchange, CalDAV. Set it up in <strong>Settings &gt; Recording &gt; Calendar</strong>, with the optional Calendars permission.</li>
+            <li><strong>When a meeting starts:</strong> <strong>Off</strong>, <strong>Ask</strong> (the default: the floating indicator offers <strong>Record</strong>, <strong>Join</strong> or <strong>Not now</strong>), <strong>Wait for the call</strong> (records the meeting app as soon as the call starts) or <strong>Record at start</strong> (records all system audio and the mic at the start time).</li>
+            <li>The automatic modes start without asking only for events you organize, accepted or answered Maybe to, and events without invitees in the EchoDiar calendar or a calendar On My Mac. Other events ask.</li>
+            <li>Choose the calendars to watch, and keep only events with a meeting link (Zoom, Google Meet, Microsoft Teams, Webex).</li>
+            <li><strong>Stop when the event ends</strong>, plus a few minutes (10 by default). The indicator asks before stopping, with a 15 s countdown.</li>
+            <li>A recording started from an event is named after it.</li>
+            <li>The <strong>Calendar</strong> page (toolbar button next to Settings) lists the meetings of the next 7 days (updated automatically) with <strong>Join</strong>, <strong>Record</strong> and <strong>Skip</strong>. The menu bar menu lists upcoming meetings.</li>
+            <li><strong>New Event…</strong> on the Calendar page creates a meeting: title, date, start and end, and an optional meeting link (https). It goes to an "EchoDiar" calendar (On My Mac when available, otherwise your default account, e.g. iCloud, which syncs those events like any other).</li>
+            <li><strong>Repeat:</strong> <strong>None</strong>, <strong>Daily</strong>, <strong>Weekdays</strong>, <strong>Weekly</strong> or <strong>Monthly</strong>, with <strong>End Repeat</strong> never or on a date.</li>
+            <li><strong>Edit…</strong> on events in the EchoDiar calendar changes them, and <strong>Delete Event…</strong> is in the editor. For a repeating event, choose <strong>This Event Only</strong> or <strong>This and Future Events</strong>; when <strong>Repeat</strong> or <strong>End Repeat</strong> changed, Save offers only <strong>This and Future Events</strong>.</li>
+            <li>Events in the EchoDiar calendar count even without a meeting link, and follow the same <strong>When a meeting starts</strong> mode. Don't share the EchoDiar calendar: anyone who can add events to it could start a recording.</li>
+            <li>Works while EchoDiar runs, so turn on <strong>Launch at login</strong> in <strong>Settings &gt; General</strong>.</li>
 </ul>
           </section>
 
@@ -325,7 +345,7 @@
             <li>Open with <kbd>Cmd+,</kbd>. Sections: General, Recording, Transcription, AI, Storage, Shortcuts, About.</li>
             <li>Change the global record shortcut, and view the app's shortcuts, in <strong>Settings &gt; Shortcuts</strong>.</li>
             <li>Launch at login and the floating indicator are in <strong>Settings &gt; General</strong>.</li>
-            <li>Default language, <strong>Transcribe while recording</strong> and <strong>Free unused models after</strong> are in <strong>Settings &gt; Transcription &gt; General</strong>. <strong>Tell speakers apart</strong> is in both <strong>Settings &gt; Recording</strong> and <strong>Settings &gt; Transcription &gt; Diarization model</strong>.</li>
+            <li>Default language, <strong>Remember last record language</strong> (off by default: keeps the language picked in the Record button's menu for the next recordings), <strong>Transcribe while recording</strong> and <strong>Free unused models after</strong> are in <strong>Settings &gt; Transcription &gt; General</strong>. <strong>Tell speakers apart</strong> is in both <strong>Settings &gt; Recording</strong> and <strong>Settings &gt; Transcription &gt; Diarization model</strong>.</li>
 </ul>
           </section>
           </div>
