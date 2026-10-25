@@ -66,6 +66,44 @@ public sealed class SpeechChunkerTests
         Assert.Equal(signal.Length, chunks[^1].End);
     }
 
+    // The live tuning bounds the time to a live line: a 0.6 s pause closes a chunk from 4 s (the batch tuning waits
+    // for 8 s), and continuous speech is cut into contiguous chunks of at most 12 s, in the last third (8–12 s).
+    [Fact]
+    public void LiveChunksCloseAtAShortPauseFrom4SecondsAndNeverExceed12()
+    {
+        float[] paused = [.. NoiseFloor(1), .. Speech(5), .. NoiseFloor(0.7)];
+        var live = new SpeechChunker(maxChunkSeconds: 12, shortPauseMinSeconds: 4);
+        var batch = new SpeechChunker(maxChunkSeconds: 30);
+
+        var closed = Feed(paused, live);
+
+        var chunk = Assert.Single(closed);
+        Assert.Empty(Feed(paused, batch));
+        Assert.InRange(chunk.End, At(6), At(6.2) + 2 * Frame);
+        Assert.Equal(paused[chunk.Start..chunk.End], chunk.Samples);
+
+        float[] continuous = [.. NoiseFloor(1), .. Speech(20)];
+        live = new SpeechChunker(maxChunkSeconds: 12, shortPauseMinSeconds: 4);
+        var cut = Feed(continuous, live);
+        var chunks = cut.Concat(Flush(live)).ToList();
+
+        Assert.NotEmpty(cut);
+        foreach (var piece in chunks)
+        {
+            Assert.True(piece.Samples.Length <= At(12));
+            Assert.Equal(continuous[piece.Start..piece.End], piece.Samples);
+        }
+        foreach (var piece in cut)
+        {
+            Assert.True(piece.Samples.Length >= At(8) - Frame);
+        }
+        for (var i = 1; i < chunks.Count; i++)
+        {
+            Assert.Equal(chunks[i - 1].End, chunks[i].Start);
+        }
+        Assert.Equal(continuous.Length, chunks[^1].End);
+    }
+
     [Fact]
     public void FlushEmitsTheOpenChunk()
     {

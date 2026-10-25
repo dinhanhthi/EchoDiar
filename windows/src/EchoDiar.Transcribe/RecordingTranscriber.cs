@@ -9,8 +9,9 @@ namespace EchoDiar.Transcribe;
 /// <summary>
 /// Transcribes a recording while it is made (Swift <c>RecordingTranscriber</c>): takes the writer's 16 kHz blocks,
 /// cuts each channel into speech chunks (<see cref="SpeechChunker"/>) and decodes them with one Whisper or Parakeet
-/// session (mic lines "Me", system lines "Others"). <see cref="FinishAsync"/> at Stop hands the segments, in file time,
-/// and the spans not transcribed (gaps) to the pipeline as a <see cref="PriorTranscription"/>.
+/// session (mic lines "Me", system lines "Others"). Live chunks are at most 12 s and close at a short pause from 4 s,
+/// so a line follows continuous speech within seconds. <see cref="FinishAsync"/> at Stop hands the segments, in file
+/// time, and the spans not transcribed (gaps) to the pipeline as a <see cref="PriorTranscription"/>.
 /// </summary>
 /// <remarks>
 /// <para>
@@ -54,6 +55,14 @@ public sealed class RecordingTranscriber : IAsyncDisposable
     public const int MaxQueuedSeconds = 600;
     /// <summary>How often the decode task wakes without a chunk, to free the model after the idle release.</summary>
     public static readonly TimeSpan TickInterval = TimeSpan.FromSeconds(15);
+    /// <summary>
+    /// The longest live chunk (at most the model window): the hard cut searches its last third, 8–12 s. With
+    /// <see cref="LiveShortPauseMinSeconds"/> it bounds the time to a live line under continuous speech (the batch
+    /// tuning waits up to 30 s), while keeping chunks long enough that Whisper does not fall back on memorised boilerplate.
+    /// </summary>
+    public const int LiveMaxChunkSeconds = 12;
+    /// <summary>The length a live chunk needs before a 0.6 s pause closes it: <c>min(4·50, 600/2) = 200</c> frames, so from 4 s.</summary>
+    public const int LiveShortPauseMinSeconds = 4;
 
     private readonly ModelEntry _entry;
     private readonly ISessionTranscriptionEngine _engine;
@@ -94,7 +103,9 @@ public sealed class RecordingTranscriber : IAsyncDisposable
         _gate = gate;
         _idleRelease = idleRelease;
         _language = language;
-        _buffer = new Buffer(entry.WindowSeconds ?? TranscriptionPipeline.DefaultWindowSeconds);
+        _buffer = new Buffer(
+            Math.Min(entry.WindowSeconds ?? TranscriptionPipeline.DefaultWindowSeconds, LiveMaxChunkSeconds),
+            shortPauseMinSeconds: LiveShortPauseMinSeconds);
     }
 
     /// <summary>
@@ -389,9 +400,9 @@ public sealed class RecordingTranscriber : IAsyncDisposable
     public sealed record Item(int Channel, int Index, SpeechChunker.Chunk Chunk);
 
     /// <summary>One channel's chunker, chunk outcomes (file order) and decoded segments (file time).</summary>
-    public sealed class ChannelState(int maxChunkSeconds)
+    public sealed class ChannelState(int maxChunkSeconds, int shortPauseMinSeconds)
     {
-        public SpeechChunker Chunker { get; } = new(maxChunkSeconds);
+        public SpeechChunker Chunker { get; } = new(maxChunkSeconds, shortPauseMinSeconds);
         public List<(Span Span, PriorTranscription.ChunkOutcome Outcome)> Chunks { get; } = [];
         public List<RawSegment> Segments { get; } = [];
     }
@@ -400,7 +411,9 @@ public sealed class RecordingTranscriber : IAsyncDisposable
     /// The transcriber's bookkeeping, public for its tests. Not thread-safe (the transcriber locks it). Both channels
     /// grow in step (the writer writes equal frames per channel); index = <see cref="RecordingSession.Channel"/>.
     /// </summary>
-    public sealed class Buffer(int maxChunkSeconds, int maxQueuedSamples = MaxQueuedSeconds * SampleRate)
+    public sealed class Buffer(
+        int maxChunkSeconds, int shortPauseMinSeconds = SpeechChunker.ShortPauseMinSeconds,
+        int maxQueuedSamples = MaxQueuedSeconds * SampleRate)
     {
         private readonly Queue<Item> _queue = new();
         private int _queuedSamples;
@@ -408,7 +421,8 @@ public sealed class RecordingTranscriber : IAsyncDisposable
         /// <summary>One channel at a time, reused across blocks (the chunker copies what it keeps).</summary>
         private float[] _scratch = [];
 
-        public List<ChannelState> Channels { get; private set; } = [new(maxChunkSeconds), new(maxChunkSeconds)];
+        public List<ChannelState> Channels { get; private set; } =
+            [new(maxChunkSeconds, shortPauseMinSeconds), new(maxChunkSeconds, shortPauseMinSeconds)];
         public long SamplesSeen { get; private set; }
         /// <summary>The session loaded once; until then <see cref="FinishAsync"/> has nothing to wait for.</summary>
         public bool Loaded { get; set; }

@@ -3,9 +3,10 @@ namespace EchoDiar.Transcribe;
 /// <summary>
 /// Splits a 16 kHz mono stream into speech chunks for transcribe-while-recording, with an energy VAD over 20 ms
 /// frames (Swift <c>SpeechChunker</c>). A chunk opens on speech (with pre-roll), closes at a pause (with post-roll)
-/// and is cut at its quietest frame when it reaches <c>maxChunkSeconds</c>, so every chunk fits the model window.
-/// Silence between chunks is never emitted: it counts as covered. The clock is the sample index of the stream, so
-/// chunk starts are file time.
+/// and is cut at its quietest frame when it reaches <c>maxChunkSeconds</c>, so every chunk fits the model window. The
+/// length a chunk needs before a short pause closes it is per instance (<c>shortPauseMinSeconds</c>): the batch gap
+/// fill keeps the default, the live path passes a shorter one. Silence between chunks is never emitted: it counts as
+/// covered. The clock is the sample index of the stream, so chunk starts are file time.
 /// </summary>
 /// <remarks>Pure and bounded: only the open chunk and the pre-roll are retained. Not thread-safe.</remarks>
 public sealed class SpeechChunker
@@ -37,7 +38,7 @@ public sealed class SpeechChunker
     public const int ShortPauseFrames = 30; // 0.6 s
     /// <summary>A pause this long closes a chunk of any length.</summary>
     public const int LongPauseFrames = 75; // 1.5 s
-    /// <summary>The length a chunk needs before a short pause closes it, capped at half the window.</summary>
+    /// <summary>The default length a chunk needs before a short pause closes it, capped at half the window.</summary>
     public const int ShortPauseMinSeconds = 8;
     /// <summary>A chunk reaching the window is cut at its quietest frame in the last third.</summary>
     private const int CutSearchNumerator = 2, CutSearchDenominator = 3;
@@ -62,10 +63,10 @@ public sealed class SpeechChunker
     private int _partialCount;
     private string? _partialLanguage;
 
-    public SpeechChunker(int maxChunkSeconds)
+    public SpeechChunker(int maxChunkSeconds, int shortPauseMinSeconds = ShortPauseMinSeconds)
     {
         _maxFrames = Math.Max(1, maxChunkSeconds) * FramesPerSecond;
-        _shortPauseMinFrames = Math.Min(ShortPauseMinSeconds * FramesPerSecond, _maxFrames / 2);
+        _shortPauseMinFrames = Math.Min(shortPauseMinSeconds * FramesPerSecond, _maxFrames / 2);
     }
 
     /// <summary>Feeds the next samples of the stream; returns the chunks they closed.</summary>
