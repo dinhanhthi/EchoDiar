@@ -84,6 +84,8 @@
   </Applications>
 
   <Capabilities>
+    <!-- Calendar (Windows.ApplicationModel.Appointments): read the user's calendars, write the app's own. -->
+    <uap:Capability Name="appointments" />
     <rescap:Capability Name="runFullTrust" />
     <rescap:Capability Name="unvirtualizedResources" />
     <!-- Settings › About and the Update button install the update from the .appinstaller (PackageManager). -->
