@@ -42,6 +42,15 @@ public static class AppLanguages
     };
 
     /// <summary>
+    /// The .NET culture of a chosen language (Swift <c>AppLanguage.locale(for:region:)</c>): its code with the user's
+    /// <paramref name="region"/>, so only the language changes ("en-FR", "zh-Hans-FR"); "US" when there is none. ""
+    /// for System.
+    /// </summary>
+    public static string CultureTag(this AppLanguage language, string? region) =>
+        language == AppLanguage.System ? ""
+        : Code(language) + "-" + (string.IsNullOrWhiteSpace(region) ? "US" : region);
+
+    /// <summary>
     /// The endonym, the same in every language; only System is translated, so the caller passes
     /// <paramref name="systemName"/> (Core has no localization).
     /// </summary>

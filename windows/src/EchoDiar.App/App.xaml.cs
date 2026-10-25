@@ -275,8 +275,12 @@ public partial class App : Application
     }
 
     /// <summary>
-    /// The app language at launch (<see cref="LanguageAtLaunch"/>); a chosen one also sets the culture of every thread,
-    /// so dates and numbers follow it (macOS <c>AppleLocale</c>). System leaves the culture to Windows.
+    /// The app language at launch (<see cref="LanguageAtLaunch"/>); a chosen one also sets the culture of every thread
+    /// (macOS <c>AppleLocale</c>): the chosen language in the region of Windows' "Regional format"
+    /// (<see cref="RegionInfo.CurrentRegion"/>, read before the culture changes), so a French user who picks English
+    /// gets en-FR dates and numbers. That setting, not "Country or region" (the GeoID), is what macOS'
+    /// <c>Locale.current.region</c> is: the region the formats come from. A culture Windows doesn't know falls back to
+    /// the override tag (the language alone, en-US for English). System leaves the culture to Windows.
     /// </summary>
     private static void ApplyLanguageOverride()
     {
@@ -292,9 +296,26 @@ public partial class App : Application
         }
         LanguageAtLaunch = AppLanguages.Matching(tag);
         if (LanguageAtLaunch == AppLanguage.System) return;
+        string? region = null;
         try
         {
-            var culture = new CultureInfo(LanguageAtLaunch.OverrideTag());
+            region = RegionInfo.CurrentRegion.TwoLetterISORegionName;
+        }
+        catch (Exception e)
+        {
+            Debug.WriteLine($"EchoDiar: could not read the region: {e}");
+        }
+        try
+        {
+            CultureInfo culture;
+            try
+            {
+                culture = new CultureInfo(LanguageAtLaunch.CultureTag(region));
+            }
+            catch (CultureNotFoundException)
+            {
+                culture = new CultureInfo(LanguageAtLaunch.OverrideTag());
+            }
             CultureInfo.DefaultThreadCurrentCulture = culture;
             CultureInfo.DefaultThreadCurrentUICulture = culture;
             CultureInfo.CurrentCulture = culture;

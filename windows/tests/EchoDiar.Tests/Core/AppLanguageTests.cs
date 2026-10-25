@@ -36,6 +36,15 @@ public sealed class AppLanguageTests
         Assert.Equal(["", "en-US", "vi", "fr", "es", "zh-Hans"], AppLanguages.All.Select(l => l.OverrideTag()));
     }
 
+    // Swift AppLanguage.locale(for:region:): the chosen language keeps the user's region, "US" when there is none.
+    [Theory]
+    [InlineData(AppLanguage.En, "FR", "en-FR")]
+    [InlineData(AppLanguage.ZhHans, "FR", "zh-Hans-FR")]
+    [InlineData(AppLanguage.Vi, null, "vi-US")]
+    [InlineData(AppLanguage.Fr, "", "fr-US")]
+    public void CultureTagKeepsTheRegion(AppLanguage language, string? region, string expected) =>
+        Assert.Equal(expected, language.CultureTag(region));
+
     // Loc.Plural's "one" form: CLDR integer rules of the five resw languages.
     [Theory]
     [InlineData("en-US", 1, true)]

@@ -1,4 +1,5 @@
 using System.ComponentModel;
+using System.Diagnostics;
 using EchoDiar.App.Services;
 using EchoDiar.App.ViewModels;
 using EchoDiar.Core;
@@ -53,7 +54,7 @@ public sealed partial class GeneralSettingsPage : UserControl
         var system = Loc.T("System");
         LanguageCombo.ItemsSource = AppLanguages.All.Select(language => language.DisplayName(system)).ToList();
         _syncing = true;
-        LanguageCombo.SelectedIndex = IndexOf(AppLanguages.Matching(ApplicationLanguages.PrimaryLanguageOverride));
+        LanguageCombo.SelectedIndex = IndexOf(AppLanguages.Matching(ReadLanguageOverride()));
         _syncing = false;
 
         LaunchToggle.Toggled += (_, _) => _ = OnLaunchToggledAsync();
@@ -141,8 +142,30 @@ public sealed partial class GeneralSettingsPage : UserControl
     private void OnLanguageChosen()
     {
         if (_syncing || ChosenLanguage is not { } language) return;
-        ApplicationLanguages.PrimaryLanguageOverride = language.OverrideTag();
+        try
+        {
+            ApplicationLanguages.PrimaryLanguageOverride = language.OverrideTag();
+        }
+        catch (Exception e)
+        {
+            Debug.WriteLine($"EchoDiar: could not set the app language: {e}");
+            return;
+        }
         RefreshRelaunch();
+    }
+
+    /// <summary>The override the next launch reads; none (System) without package identity, as in App.</summary>
+    private static string? ReadLanguageOverride()
+    {
+        try
+        {
+            return ApplicationLanguages.PrimaryLanguageOverride;
+        }
+        catch (Exception e)
+        {
+            Debug.WriteLine($"EchoDiar: could not read the app language: {e}");
+            return null;
+        }
     }
 
     /// <summary>
