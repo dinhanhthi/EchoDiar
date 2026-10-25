@@ -49,6 +49,28 @@ public sealed class NotifyIconTests
         Assert.Equal(976, NotifyIcon.DataSize);
     }
 
+    [Theory]
+    [InlineData(NotifyIconGlyph.Record, 16)]
+    [InlineData(NotifyIconGlyph.Pause, 24)]
+    public void BadgeIsDrawnBottomRightAndTheLogoKeptElsewhere(NotifyIconGlyph glyph, int size)
+    {
+        const uint Logo = 0xFF2E7D32; // an opaque green square
+        var logo = Enumerable.Repeat(Logo, size * size).ToArray();
+        var fill = Windows.UI.Color.FromArgb(255, 196, 43, 28);
+
+        var pixels = NotifyIcon.GlyphPixels(logo, glyph, fill, size);
+
+        uint At(int x, int y) => pixels[y * size + x];
+        Assert.Equal(Logo, At(0, 0));
+        Assert.Equal(Logo, At(size - 1, 0));
+        Assert.Equal(Logo, At(0, size - 1));
+        // The badge's lower edge: its fill (the pause bars sit higher), opaque.
+        var badge = (int)Math.Round(size * 0.45);
+        Assert.Equal(0xFFC42B1Cu, At(size - 1 - badge / 2, size - 1));
+        // Left of the badge, on its middle row: the ring cleared from the logo.
+        Assert.Equal(0u, At(size - badge - 1, size - 1 - badge / 2) >> 24);
+    }
+
     [Fact]
     public void DisposeDestroysTheWindow()
     {

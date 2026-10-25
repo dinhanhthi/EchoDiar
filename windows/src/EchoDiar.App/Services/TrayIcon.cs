@@ -16,9 +16,9 @@ internal enum IndicatorState { Idle, Recording, Paused, Processing }
 /// <summary>
 /// The notification area icon and its menu (macOS StatusItemController.swift), on the Platform <see cref="NotifyIcon"/>.
 /// The menu is rebuilt each time it opens; a left click opens the main window (the Windows convention; macOS opens the
-/// menu). The icon follows the recording: the logo while idle or processing, a disc while recording or paused, and the
-/// tooltip names the state. The window's session end (sign-out, shutdown) goes to <c>sessionEnding</c>, synchronously.
-/// UI thread only; menu picks run after the menu closed, posted to the dispatcher.
+/// menu). The icon follows the recording: the logo, with a red dot while recording or an orange pause badge while paused
+/// at its bottom-right (macOS), and the tooltip names the state. The window's session end (sign-out, shutdown) goes to
+/// <c>sessionEnding</c>, synchronously. UI thread only; menu picks run after the menu closed, posted to the dispatcher.
 /// </summary>
 internal sealed class TrayIcon : IDisposable
 {
@@ -100,7 +100,7 @@ internal sealed class TrayIcon : IDisposable
         switch (state)
         {
             case IndicatorState.Recording:
-                // The Light theme's status colours: saturated enough under a white glyph on a light or dark taskbar.
+                // The Light theme's status colours: saturated enough on a light or dark taskbar and under white pause bars.
                 _icon.SetGlyph(NotifyIconGlyph.Record, MainWindow.ThemeColor("SystemFillColorCritical", ElementTheme.Light));
                 break;
             case IndicatorState.Paused:

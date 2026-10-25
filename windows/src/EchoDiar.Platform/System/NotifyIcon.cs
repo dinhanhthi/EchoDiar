@@ -25,10 +25,10 @@ public enum NotifyIconGlyph
     /// <summary>The icon file given to the constructor.</summary>
     Logo,
 
-    /// <summary>A filled disc with a white dot (macOS record.circle.fill).</summary>
+    /// <summary>The logo with a dot at the bottom-right (macOS recordingLogo).</summary>
     Record,
 
-    /// <summary>A filled disc with two white bars (macOS pause.circle.fill).</summary>
+    /// <summary>The logo with a dot holding two white bars at the bottom-right (macOS pausedLogo).</summary>
     Pause,
 }
 
@@ -62,6 +62,11 @@ public sealed class NotifyIcon : IDisposable
     private readonly uint _taskbarCreated;
     private HICON _logo;
 
+    /// <summary>The logo's pixels (see <see cref="GlyphPixels"/>), read on the first badge; empty if they cannot be read.</summary>
+    private uint[]? _logoPixels;
+
+    private readonly int _size;
+
     /// <summary>The drawn glyph shown now, destroyed when replaced; null while the logo shows.</summary>
     private HICON _drawn;
 
@@ -75,6 +80,7 @@ public sealed class NotifyIcon : IDisposable
         _log = log;
         _tooltip = tooltip;
         _window = new MessageWindow(log, topLevel: true);
+        _size = IconSize();
         _logo = LoadIcon(iconPath);
         _window.AddHandler(CallbackMessage, OnCallback);
         _window.AddHandler(PInvoke.WM_QUERYENDSESSION, (_, _) => (LRESULT)1); // TRUE: never blocks the session's end
@@ -115,13 +121,13 @@ public sealed class NotifyIcon : IDisposable
         if (IsAdded && !Notify(NOTIFY_ICON_MESSAGE.NIM_MODIFY)) Log("Shell_NotifyIcon(NIM_MODIFY)");
     }
 
-    /// <summary>Shows <paramref name="glyph"/>; <paramref name="fill"/> is the disc's colour (unused for the logo).</summary>
+    /// <summary>Shows <paramref name="glyph"/>; <paramref name="fill"/> is the badge's colour (unused for the logo).</summary>
     public void SetGlyph(NotifyIconGlyph glyph, Color fill = default)
     {
         _window.CheckThread();
         if (_disposed) return;
         var previous = _drawn;
-        _drawn = glyph == NotifyIconGlyph.Logo ? default : CreateGlyphIcon(glyph, fill, IconSize());
+        _drawn = glyph == NotifyIconGlyph.Logo ? default : CreateGlyphIcon(glyph, fill);
         if (IsAdded && !Notify(NOTIFY_ICON_MESSAGE.NIM_MODIFY)) Log("Shell_NotifyIcon(NIM_MODIFY)");
         if (!previous.IsNull) PInvoke.DestroyIcon(previous);
     }
@@ -142,46 +148,65 @@ public sealed class NotifyIcon : IDisposable
     }
 
     /// <summary>
-    /// The pixels of a drawn glyph, <paramref name="size"/> square, row by row from the top, as 0xAARRGGBB with straight
-    /// alpha (a 32 bpp DIB's B, G, R, A bytes): a disc filling the square less 1/16 on each side, its edge antialiased.
+    /// <paramref name="logo"/> with the badge of <paramref name="glyph"/> at the bottom-right (macOS logoImage): a disc
+    /// of <paramref name="fill"/> about 45% of the icon, flush with the corner, white pause bars for
+    /// <see cref="NotifyIconGlyph.Pause"/>, and a ring around it cleared from the logo so it reads on any taskbar.
+    /// Pixels are <paramref name="size"/> square, row by row from the top, as 0xAARRGGBB with straight alpha (a 32 bpp
+    /// DIB's B, G, R, A bytes); an empty <paramref name="logo"/> is transparent. Logo pixels away from the badge are kept.
     /// </summary>
-    internal static uint[] GlyphPixels(NotifyIconGlyph glyph, Color fill, int size)
+    internal static uint[] GlyphPixels(ReadOnlySpan<uint> logo, NotifyIconGlyph glyph, Color fill, int size)
     {
         var pixels = new uint[size * size];
-        var center = size / 2.0;
-        var radius = center - size / 16.0;
-        for (var y = 0; y < size; y++)
+        if (logo.Length == pixels.Length) logo.CopyTo(pixels);
+        if (glyph == NotifyIconGlyph.Logo) return pixels;
+        // Whole pixels keep the badge's box and bars crisp at 16 px (macOS rounds to whole points too).
+        var diameter = (int)Math.Round(size * 0.45);
+        var origin = size - diameter;
+        var radius = diameter / 2.0;
+        var center = origin + radius;
+        var knockout = radius + Math.Max(1, size / 16.0);
+        // macOS: 1 x 4 bars 2 apart in an 8 wide badge; gap and height snapped so the pair centres in the badge.
+        var barWidth = Math.Max(1, (int)Math.Round(diameter / 8.0));
+        var gap = Snap(diameter / 4.0, diameter);
+        var barHeight = Snap(diameter / 2.0, diameter);
+        var barLeft = origin + (diameter - 2 * barWidth - gap) / 2;
+        var barTop = origin + (diameter - barHeight) / 2;
+        for (var y = Math.Max(0, (int)(center - knockout - 1)); y < size; y++)
         {
-            for (var x = 0; x < size; x++)
+            for (var x = Math.Max(0, (int)(center - knockout - 1)); x < size; x++)
             {
-                double px = x + 0.5, py = y + 0.5;
-                var distance = Math.Sqrt((px - center) * (px - center) + (py - center) * (py - center));
-                var disc = Math.Clamp(radius - distance + 0.5, 0, 1);
-                if (disc <= 0) continue;
-                var white = glyph switch
+                double px = x + 0.5 - center, py = y + 0.5 - center;
+                var distance = Math.Sqrt(px * px + py * py);
+                var cleared = Math.Clamp(knockout - distance + 0.5, 0, 1);
+                if (cleared <= 0) continue;
+                var under = pixels[y * size + x];
+                var underAlpha = (under >> 24) / 255.0 * (1 - cleared);
+                var badgeAlpha = Math.Clamp(radius - distance + 0.5, 0, 1) * fill.A / 255.0;
+                var bar = glyph == NotifyIconGlyph.Pause && y >= barTop && y < barTop + barHeight
+                    && (x >= barLeft && x < barLeft + barWidth || x >= barLeft + barWidth + gap && x < barLeft + 2 * barWidth + gap);
+                double r = bar ? 255 : fill.R, g = bar ? 255 : fill.G, b = bar ? 255 : fill.B;
+                // The badge over what is left of the logo, in straight alpha.
+                var alpha = badgeAlpha + underAlpha * (1 - badgeAlpha);
+                if (alpha <= 0)
                 {
-                    NotifyIconGlyph.Record => Math.Clamp(radius * 0.45 - distance + 0.5, 0, 1),
-                    NotifyIconGlyph.Pause => Math.Max(Bar(x, y, center - radius * 0.3, center, radius),
-                                                      Bar(x, y, center + radius * 0.3, center, radius)),
-                    _ => 0,
-                };
-                var alpha = (uint)Math.Round(disc * fill.A);
-                var r = (uint)Math.Round(fill.R + (255 - fill.R) * white);
-                var g = (uint)Math.Round(fill.G + (255 - fill.G) * white);
-                var b = (uint)Math.Round(fill.B + (255 - fill.B) * white);
-                pixels[y * size + x] = alpha << 24 | r << 16 | g << 8 | b;
+                    pixels[y * size + x] = 0;
+                    continue;
+                }
+                var keep = underAlpha * (1 - badgeAlpha);
+                uint Channel(double badge, int shift) =>
+                    (uint)Math.Round((badge * badgeAlpha + (under >> shift & 0xFF) * keep) / alpha);
+                pixels[y * size + x] = (uint)Math.Round(alpha * 255) << 24 | Channel(r, 16) << 16 | Channel(g, 8) << 8 | Channel(b, 0);
             }
         }
         return pixels;
     }
 
-    /// <summary>How much of pixel (x, y) a pause bar centred on (<paramref name="cx"/>, <paramref name="cy"/>) covers.</summary>
-    private static double Bar(int x, int y, double cx, double cy, double radius)
+    /// <summary>The whole number nearest <paramref name="target"/> (at least 1) that centres in <paramref name="span"/> pixels: same parity.</summary>
+    private static int Snap(double target, int span)
     {
-        double halfWidth = radius * 0.13, halfHeight = radius * 0.45;
-        var across = Math.Clamp(Math.Min(x + 1, cx + halfWidth) - Math.Max(x, cx - halfWidth), 0, 1);
-        var down = Math.Clamp(Math.Min(y + 1, cy + halfHeight) - Math.Max(y, cy - halfHeight), 0, 1);
-        return across * down;
+        var n = (int)Math.Round(target);
+        if ((span - n) % 2 != 0) n += target > n ? 1 : -1;
+        return n >= 1 ? n : n + 2;
     }
 
     /// <summary>The small icon size, which the notification area shows.</summary>
@@ -189,29 +214,84 @@ public sealed class NotifyIcon : IDisposable
 
     private unsafe HICON LoadIcon(string path)
     {
-        var size = IconSize();
         HANDLE handle;
         fixed (char* name = path)
         {
-            handle = PInvoke.LoadImage(HINSTANCE.Null, name, GDI_IMAGE_TYPE.IMAGE_ICON, size, size, IMAGE_FLAGS.LR_LOADFROMFILE);
+            handle = PInvoke.LoadImage(HINSTANCE.Null, name, GDI_IMAGE_TYPE.IMAGE_ICON, _size, _size, IMAGE_FLAGS.LR_LOADFROMFILE);
         }
         if (handle.IsNull) Log($"LoadImage({Path.GetFileName(path)})");
         return new HICON(handle.Value);
     }
 
-    /// <summary>A 32 bpp icon from <see cref="GlyphPixels"/>; null (the logo shows) if GDI refuses.</summary>
-    private unsafe HICON CreateGlyphIcon(NotifyIconGlyph glyph, Color fill, int size)
+    /// <summary>A 32 bpp, top-down, <see cref="_size"/> square DIB header.</summary>
+    private unsafe BITMAPINFO DibInfo() => new()
     {
-        var header = new BITMAPINFOHEADER
+        bmiHeader = new BITMAPINFOHEADER
         {
             biSize = (uint)sizeof(BITMAPINFOHEADER),
-            biWidth = size,
-            biHeight = -size, // top-down rows
+            biWidth = _size,
+            biHeight = -_size, // top-down rows
             biPlanes = 1,
             biBitCount = 32,
             biCompression = 0, // BI_RGB
-        };
-        var info = new BITMAPINFO { bmiHeader = header };
+        },
+    };
+
+    /// <summary>
+    /// The logo's pixels as <see cref="GlyphPixels"/> takes them; empty (a transparent logo) if there is no logo or GDI
+    /// refuses. A .ico frame's 32 bpp colour bitmap holds straight alpha; one without alpha (all zero) takes it from the mask.
+    /// </summary>
+    private unsafe uint[] ReadLogoPixels()
+    {
+        if (_logo.IsNull) return [];
+        ICONINFO iconInfo;
+        if (!PInvoke.GetIconInfo(_logo, &iconInfo))
+        {
+            Log("GetIconInfo");
+            return [];
+        }
+        var screen = PInvoke.GetDC(HWND.Null);
+        try
+        {
+            var color = ReadBitmap(screen, iconInfo.hbmColor);
+            if (color.Length == 0 || color.Any(pixel => pixel >> 24 != 0)) return color;
+            // GetDIBits turns the monochrome mask into black (opaque) and white (transparent) pixels.
+            var mask = ReadBitmap(screen, iconInfo.hbmMask);
+            if (mask.Length != color.Length) return [];
+            for (var i = 0; i < color.Length; i++) color[i] = (mask[i] & 0xFFFFFF) == 0 ? color[i] | 0xFF000000 : 0;
+            return color;
+        }
+        finally
+        {
+            // GetIconInfo made copies of both bitmaps.
+            if (!screen.IsNull) PInvoke.ReleaseDC(HWND.Null, screen);
+            if (!iconInfo.hbmColor.IsNull) PInvoke.DeleteObject(iconInfo.hbmColor);
+            if (!iconInfo.hbmMask.IsNull) PInvoke.DeleteObject(iconInfo.hbmMask);
+        }
+    }
+
+    /// <summary>The first <see cref="_size"/> rows of <paramref name="bitmap"/> as 32 bpp pixels; empty if GDI refuses.</summary>
+    private unsafe uint[] ReadBitmap(HDC screen, HBITMAP bitmap)
+    {
+        if (screen.IsNull || bitmap.IsNull) return [];
+        var info = DibInfo();
+        var pixels = new uint[_size * _size];
+        fixed (uint* bits = pixels)
+        {
+            if (PInvoke.GetDIBits(screen, bitmap, 0, (uint)_size, bits, &info, DIB_USAGE.DIB_RGB_COLORS) != _size)
+            {
+                Log("GetDIBits");
+                return [];
+            }
+        }
+        return pixels;
+    }
+
+    /// <summary>A 32 bpp icon from <see cref="GlyphPixels"/>; null (the logo shows) if GDI refuses.</summary>
+    private unsafe HICON CreateGlyphIcon(NotifyIconGlyph glyph, Color fill)
+    {
+        var size = _size;
+        var info = DibInfo();
         void* bits;
         var color = PInvoke.CreateDIBSection(default, &info, DIB_USAGE.DIB_RGB_COLORS, &bits, default, 0);
         if (color.IsNull)
@@ -229,7 +309,8 @@ public sealed class NotifyIcon : IDisposable
                 Log("CreateBitmap");
                 return default;
             }
-            GlyphPixels(glyph, fill, size).AsSpan().CopyTo(new Span<uint>(bits, size * size));
+            _logoPixels ??= ReadLogoPixels();
+            GlyphPixels(_logoPixels, glyph, fill, size).AsSpan().CopyTo(new Span<uint>(bits, size * size));
             var iconInfo = new ICONINFO { fIcon = true, hbmMask = mask, hbmColor = color };
             var icon = PInvoke.CreateIconIndirect(&iconInfo);
             if (icon.IsNull) Log("CreateIconIndirect");
