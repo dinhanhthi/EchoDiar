@@ -45,7 +45,7 @@ struct ConversationCard: View {
         // Buttons take their own clicks; the title's double click is handled before this.
         .contentShape(Rectangle())
         .onTapGesture(perform: open)
-        // Before the title's taps, which wait out the double click: the modifiers are read when the click happens.
+        // Before the title's taps: the modifiers are read when the click happens.
         .highPriorityGesture(TapGesture().modifiers(.command).onEnded { select?(false) },
                              including: select == nil ? .subviews : .all)
         .highPriorityGesture(TapGesture().modifiers(.shift).onEnded { select?(true) },
@@ -57,6 +57,11 @@ struct ConversationCard: View {
             DeleteMenuItems(conversation: conversation, model: model)
                 .disabled(!DeleteMenuItems.canDelete(conversation, model))
         }
+        .onChange(of: editing) {
+            if editing { model.renamingConversation = conversation.id } else { endRenamingFlag() }
+        }
+        // Leaving the page or closing the window mid-rename never turns `editing` off.
+        .onDisappear(perform: endRenamingFlag)
     }
 
     /// The `GlassCard` shape, for the selection.
@@ -81,9 +86,10 @@ struct ConversationCard: View {
                 .font(.headline)
                 .lineLimit(1)
                 .truncationMode(.tail)
-                .onTapGesture(count: 2, perform: beginEditing)
-                // After the double click, so a double click renames instead of opening.
+                // Side by side, so the first click opens at once instead of waiting out the double click, which then
+                // renames the opened conversation.
                 .onTapGesture(perform: open)
+                .simultaneousGesture(TapGesture(count: 2).onEnded(beginEditing))
                 .help(conversation.title)
         }
     }
@@ -119,6 +125,11 @@ struct ConversationCard: View {
     private func beginEditing() {
         draft = conversation.title
         editing = true
+    }
+
+    /// Only if it is still this card's: another card's rename may have started since.
+    private func endRenamingFlag() {
+        if model.renamingConversation == conversation.id { model.renamingConversation = nil }
     }
 
     /// Not while the title is being edited: clicks in its field must not open the conversation.

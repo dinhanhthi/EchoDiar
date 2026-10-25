@@ -28,6 +28,8 @@ struct TranscriptView: View {
     @State private var speakers: [String] = []
     /// `transcript.json` exists but could not be read.
     @State private var loadFailed = false
+    /// The first `load` has returned; until then the tab shows `DetailLoadingPane`.
+    @State private var loaded = false
     @State private var playback = PlaybackController()
     /// The speaker whose rename popover is open.
     @State private var renaming: String?
@@ -54,12 +56,17 @@ struct TranscriptView: View {
     var body: some View {
         ZStack(alignment: .top) {
             if shownTab == .transcript {
-                // The bar slides with the transcript: it has nothing for Summary and Chat.
-                VStack(spacing: 10) {
-                    content
-                    bottomBar
+                // The bar slides with the transcript: it has nothing for Summary and Chat. Until the files are read,
+                // a light pane, so the click that opened the conversation shows at once.
+                if loaded {
+                    VStack(spacing: 10) {
+                        content
+                        bottomBar
+                    }
+                    .transition(tabTransition)
+                } else {
+                    DetailLoadingPane().transition(tabTransition)
                 }
-                .transition(tabTransition)
             } else {
                 AIPanelView(conversation: conversation, model: model, tab: shownTab, transition: tabTransition)
                     .transition(tabTransition)
@@ -555,6 +562,7 @@ struct TranscriptView: View {
         audioURL = audio
         loadFailed = wantsTranscript && loaded.isEmpty
         applyShownVersion()
+        self.loaded = true
         showPendingTime()
     }
 
@@ -602,6 +610,25 @@ struct TranscriptView: View {
     /// mm:ss; minutes go past 59 in recordings longer than an hour.
     static func timestamp(_ seconds: Double) -> String {
         Duration.seconds(seconds).formatted(.time(pattern: .minuteSecond(padMinuteToLength: 2)))
+    }
+}
+
+/// The open conversation's tab until its files are read: the card its content shows in, at once, and a spinner once
+/// the reading takes long enough to notice; a spinner shown for a frame or two reads as a flicker.
+struct DetailLoadingPane: View {
+    @State private var showsSpinner = false
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
+    var body: some View {
+        ProgressView()
+            .opacity(showsSpinner ? 1 : 0)
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .modifier(GlassCard(cornerRadius: 20))
+            .task {
+                try? await Task.sleep(for: .milliseconds(150))
+                guard !Task.isCancelled else { return }
+                withAnimation(reduceMotion ? nil : Motion.standard) { showsSpinner = true }
+            }
     }
 }
 

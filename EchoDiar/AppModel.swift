@@ -124,6 +124,8 @@ final class AppModel {
     var searchPresented = false
     /// Cards are selected in the list: Esc cancels the selection instead of going back.
     var listSelectionActive = false
+    /// The conversation whose sidebar title is being renamed: opening Chat then leaves the cursor in its field.
+    var renamingConversation: UUID?
     /// The library chat is shown: in place of the cards on the list, or of the sidebar beside a conversation.
     var globalChatOpen = false
     /// What the library index (RAG) is doing, for Settings › RAG.

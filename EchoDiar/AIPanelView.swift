@@ -42,6 +42,8 @@ struct AIPanelView: View {
     @State private var confirmingClear = false
     /// The earlier chat under the pointer, which shows its Remove button.
     @State private var hoveredEntry: UUID?
+    /// The first `load` has returned; until then the tab shows `DetailLoadingPane`.
+    @State private var loaded = false
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     private static let chatEnd = "chatEnd"
@@ -53,20 +55,27 @@ struct AIPanelView: View {
     private static let answerFooterHeight: CGFloat = 22
 
     var body: some View {
-        VStack(spacing: 10) {
-            ZStack {
-                if tab == .chat {
-                    chatPane
-                        .transition(transition)
-                } else {
-                    summaryPane
-                        .transition(transition)
+        // Until the files are read, a light pane, so the click that opened the conversation shows at once.
+        Group {
+            if loaded {
+                VStack(spacing: 10) {
+                    ZStack {
+                        if tab == .chat {
+                            chatPane
+                                .transition(transition)
+                        } else {
+                            summaryPane
+                                .transition(transition)
+                        }
+                    }
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    .clipped()
+                    errorText
+                    bottomBar
                 }
+            } else {
+                DetailLoadingPane()
             }
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
-            .clipped()
-            errorText
-            bottomBar
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
         .overlay(alignment: .bottom) { toastView }
@@ -74,11 +83,12 @@ struct AIPanelView: View {
         .modifier(WebLinkConfirmation(link: $pendingLink))
         .task { model.refreshInstalledModels() }
         // Opening Chat (a card's Ask AI, a tab switch) puts the cursor in the question, once the tab's slide has put
-        // the field in the window.
-        .task(id: model.detailTab) {
-            guard model.detailTab == .chat else { return }
+        // the field in the window, and once it is loaded, unless a sidebar card is being renamed.
+        .task(id: model.detailTab == .chat && loaded) {
+            guard model.detailTab == .chat, loaded else { return }
             try? await Task.sleep(for: .milliseconds(50))
-            if !Task.isCancelled { questionFocused = true }
+            guard !Task.isCancelled, model.renamingConversation == nil else { return }
+            questionFocused = true
         }
         .task(id: LoadKey(id: conversation.id, hasTranscript: conversation.hasTranscript,
                           jobsEnded: model.aiJobsEnded)) { await load() }
@@ -623,6 +633,7 @@ struct AIPanelView: View {
         guard !Task.isCancelled else { return }
         (transcript, summaries, summary, chat) = (loaded, versions, versions.last?.text, messages)
         shownVersion = nil
+        self.loaded = true
     }
 
     private func loadChat() async {
