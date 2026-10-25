@@ -54,7 +54,7 @@ security find-identity -v -p codesigning | grep -q "Developer ID Application"
 G=$(find ~/Library/Developer/Xcode/DerivedData/EchoDiar-*/SourcePackages/artifacts -name generate_keys -type f 2>/dev/null | head -1); "$G" --account EchoDiar -p
 
 # 4. Notary profile
-xcrun notarytool history --keychain-profile "${ECHODIAR_NOTARY_PROFILE:-echodiar-notary}"
+xcrun notarytool history --keychain-profile apple-notary
 
 # 5. GitHub CLI and Pages source
 gh auth status
@@ -92,7 +92,8 @@ gh repo view dinhanhthi/EchoDiar --json visibility --jq .visibility
 - Check 3: both commands must print the same non-empty value. If `generate_keys` is not found,
   build once first (`xcodegen generate && xcodebuild -project EchoDiar.xcodeproj -scheme EchoDiar -configuration Debug build`),
   then rerun the check.
-- Check 4: an existing profile of the same Apple team works. Shell state does not persist between
+- Check 4: the maintainer uses the shared profile `apple-notary` (decided 2026-10-25; the
+  scripts' default `echodiar-notary` no longer exists). Shell state does not persist between
   agent commands, so an override must be on the same command line as every script call that
   uses it, e.g. `ECHODIAR_NOTARY_PROFILE=<name> scripts/ship.sh` (a separate `export` is
   lost). Check such a profile with `xcrun notarytool history --keychain-profile <name>`.
@@ -275,11 +276,10 @@ Already checked in Step B0 (Preflight); do not re-check here.
 ### Step A1: Ship (one command)
 
 ```bash
-scripts/ship.sh
+ECHODIAR_NOTARY_PROFILE=apple-notary scripts/ship.sh
 ```
 
-With a notary profile override, put it on the same command line:
-`ECHODIAR_NOTARY_PROFILE=<name> scripts/ship.sh`.
+The profile override must stay on the same command line as the script.
 
 Before building it refuses: a branch other than `main`, `HEAD` != `origin/main`, `gh` not
 authenticated, a dirty tree of tracked files, no `## [X.Y.Z]` section in `CHANGELOG.md`, or an
