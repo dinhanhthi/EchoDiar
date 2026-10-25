@@ -9,7 +9,7 @@ name: Windows
 
 on:
   push:
-    branches: [plan/2026-10-21-windows-port, main]
+    branches: [plan/2026-10-21-windows-port, plan/2026-10-25-windows-macos-parity, main]
     paths:
       - 'windows/**'
       - '.github/workflows/windows.yml'
