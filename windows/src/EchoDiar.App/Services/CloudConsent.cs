@@ -1,4 +1,3 @@
-using System.Globalization;
 using EchoDiar.AI.Cloud;
 using EchoDiar.App.ViewModels;
 using EchoDiar.Core.Settings;
@@ -33,11 +32,8 @@ internal static class CloudConsent
         Content = new TextBlock
         {
             TextWrapping = TextWrapping.Wrap,
-            Text = string.Format(
-                CultureInfo.CurrentCulture,
-                "Audio leaves this PC: the recording's mic and system channels are uploaded to {0} ({1}) for transcription "
-                + "and billed by them. The provider may keep the audio under its own retention policy. You are asked once "
-                + "per provider and destination.",
+            Text = Loc.Format(
+                "Audio leaves this PC: the recording's mic and system channels are uploaded to %@ (%@) for transcription and billed by them. The provider may keep the audio under its own retention policy. You are asked once per provider and destination.",
                 run.ProviderName, run.Host),
         },
         PrimaryButtonText = Loc.T("Send"),

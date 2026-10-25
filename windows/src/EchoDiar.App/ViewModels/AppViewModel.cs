@@ -593,8 +593,8 @@ public sealed partial class AppViewModel : ObservableObject
             RecordingSourceRootPid = null;
             AutoStartedAppName = null;
             RecordingError = e is RecordingDiskFullException
-                ? "There is not enough free disk space to record."
-                : $"The recording could not start ({e.Message}).";
+                ? Loc.T("There is not enough free disk space to record.")
+                : $"{Loc.T("The recording could not start.")} ({e.Message})";
         }
         finally
         {
@@ -634,7 +634,7 @@ public sealed partial class AppViewModel : ObservableObject
         catch (Exception e)
         {
             Debug.WriteLine($"EchoDiar: could not resume recording: {e}");
-            RecordingError = $"The recording could not resume ({e.Message}).";
+            RecordingError = $"{Loc.T("The recording could not resume.")} ({e.Message})";
         }
     }
 
@@ -741,9 +741,9 @@ public sealed partial class AppViewModel : ObservableObject
 
     private static string? StopMessage(RecordingEngine.EndReason reason) => reason switch
     {
-        RecordingEngine.EndReason.DiskFull => "Recording stopped: disk is full.",
-        RecordingEngine.EndReason.WriteFailed => "Recording stopped: could not write audio.",
-        RecordingEngine.EndReason.CaptureFailed => "Recording stopped: audio capture failed.",
+        RecordingEngine.EndReason.DiskFull => Loc.T("Recording stopped: disk is full."),
+        RecordingEngine.EndReason.WriteFailed => Loc.T("Recording stopped: could not write audio."),
+        RecordingEngine.EndReason.CaptureFailed => Loc.T("Recording stopped: audio capture failed."),
         _ => null,
     };
 
@@ -886,7 +886,7 @@ public sealed partial class AppViewModel : ObservableObject
                 break;
             case JobStep.Failed:
                 TranscriptionProgress = Without(TranscriptionProgress, id);
-                TranscriptionErrors = With(TranscriptionErrors, id, progress.Detail ?? "Transcription failed.");
+                TranscriptionErrors = With(TranscriptionErrors, id, progress.Detail ?? Loc.T("Transcription failed"));
                 break;
             default:
                 // Whole percents only: the screens redraw at most 100 times per job step.

@@ -131,7 +131,7 @@ public sealed partial class PlaybackController : ObservableObject, IDisposable
         catch (Exception e)
         {
             Debug.WriteLine($"EchoDiar: could not start playback: {e}");
-            Error = $"Could not play the audio ({e.Message}).";
+            Error = Loc.Format("Could not play the audio (%@).", e.Message);
             return;
         }
         Error = null;
@@ -196,7 +196,7 @@ public sealed partial class PlaybackController : ObservableObject, IDisposable
         catch (Exception e)
         {
             Debug.WriteLine($"EchoDiar: could not open {path} for playback: {e}");
-            Error = $"Could not open the audio ({e.Message}).";
+            Error = Loc.Format("Could not open the audio (%@).", e.Message);
         }
     }
 
@@ -211,7 +211,7 @@ public sealed partial class PlaybackController : ObservableObject, IDisposable
         {
             // The play head stays where the device failed.
             Debug.WriteLine($"EchoDiar: playback stopped: {error}");
-            Error = $"Playback stopped ({error.Message}).";
+            Error = Loc.Format("Playback stopped (%@).", error.Message);
             return;
         }
         CurrentTime = 0;

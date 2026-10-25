@@ -141,8 +141,7 @@ internal sealed class TrayIcon : IDisposable
             items.Add(Item(Loc.T("Stop asking for this app"), _model.StopAskingForDetectedApp));
             items.Add(NotifyIconMenuItem.Separator);
         }
-        // "Settings…" would resolve to the catalog's "Settings" (same resource name): the ellipsis is added.
-        items.Add(Item($"{Loc.T("Settings")}…", () =>
+        items.Add(Item(Loc.T("Settings…"), () =>
         {
             _model.OpenSettings();
             _openMain();

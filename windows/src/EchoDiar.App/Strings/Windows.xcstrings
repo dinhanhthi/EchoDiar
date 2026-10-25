@@ -9,6 +9,10 @@
       "comment" : "Windows only: Views/AIMenus.cs, Views/Settings/ProvidersSettingsPage.xaml.cs.",
       "extractionState" : "manual"
     },
+    "%@ and %@" : {
+      "comment" : "Windows only: ViewModels/ModelsViewModel.cs (the last two items of a list, \"English, French and Vietnamese\").",
+      "extractionState" : "manual"
+    },
     "%@ could not be registered (error %lld)." : {
       "comment" : "Windows only: ViewModels/AppViewModel.HotKeys.cs.",
       "extractionState" : "manual"
@@ -173,6 +177,10 @@
       "comment" : "Windows only: Views/Settings/TranscriptionSettingsPage.xaml.cs.",
       "extractionState" : "manual"
     },
+    "Audio leaves this PC: the recording's mic and system channels are uploaded to %@ (%@) for transcription and billed by them. The provider may keep the audio under its own retention policy. You are asked once per provider and destination." : {
+      "comment" : "Windows only: Services/CloudConsent.cs.",
+      "extractionState" : "manual"
+    },
     "Auto = the transcript's language for summaries, the question's for answers." : {
       "comment" : "Windows only: Views/Settings/ProvidersSettingsPage.xaml.cs.",
       "extractionState" : "manual"
@@ -205,12 +213,24 @@
       "comment" : "Windows only: Views/TranscriptView.xaml.cs.",
       "extractionState" : "manual"
     },
+    "Codex runs without your ~/.codex/config.toml (its model, MCP servers and hooks) in a read-only, offline sandbox, but its remaining built-in tools can still read files on this PC." : {
+      "comment" : "Windows only: EchoDiar.AI/CLIRunner.cs ContainmentNote, shown by Views/AIPanelView.xaml.cs, Views/Settings/ProvidersSettingsPage.xaml.cs.",
+      "extractionState" : "manual"
+    },
     "Could not check for updates" : {
       "comment" : "Windows only: Views/TitleBarToolbar.xaml.cs.",
       "extractionState" : "manual"
     },
     "Could not install the update" : {
       "comment" : "Windows only: Views/TitleBarToolbar.xaml.cs.",
+      "extractionState" : "manual"
+    },
+    "Could not open the audio (%@)." : {
+      "comment" : "Windows only: ViewModels/PlaybackController.cs.",
+      "extractionState" : "manual"
+    },
+    "Could not play the audio (%@)." : {
+      "comment" : "Windows only: ViewModels/PlaybackController.cs.",
       "extractionState" : "manual"
     },
     "Data sent to %@ leaves this PC." : {
@@ -255,6 +275,10 @@
     },
     "Extra headers" : {
       "comment" : "Windows only: Views/Settings/ProvidersSettingsPage.xaml.cs.",
+      "extractionState" : "manual"
+    },
+    "Gemini CLI denies every tool and loads no MCP server or extension, unless a system-wide admin policy allows them." : {
+      "comment" : "Windows only: EchoDiar.AI/CLIRunner.cs ContainmentNote, shown by Views/AIPanelView.xaml.cs, Views/Settings/ProvidersSettingsPage.xaml.cs.",
       "extractionState" : "manual"
     },
     "Heads up: I'm recording this call to take notes. The recording stays on my PC." : {
@@ -303,6 +327,10 @@
     },
     "Leaves this PC" : {
       "comment" : "Windows only: Views/Settings/RAGSettingsPage.xaml.cs.",
+      "extractionState" : "manual"
+    },
+    "Loading the model…" : {
+      "comment" : "Windows only: EchoDiar.AI/AIService.cs (AI job status), shown by ViewModels/AppViewModel.AI.cs.",
       "extractionState" : "manual"
     },
     "Microphone access is blocked on this PC." : {
@@ -369,8 +397,16 @@
       "comment" : "Windows only: Views/Settings/StorageSettingsPage.xaml.",
       "extractionState" : "manual"
     },
+    "OpenCode denies every tool, but MCP servers in your OpenCode config still start (their tools are denied)." : {
+      "comment" : "Windows only: EchoDiar.AI/CLIRunner.cs ContainmentNote, shown by Views/AIPanelView.xaml.cs, Views/Settings/ProvidersSettingsPage.xaml.cs.",
+      "extractionState" : "manual"
+    },
     "Parakeet transcription" : {
       "comment" : "Windows only: Views/Settings/AcknowledgementsSettingsPage.xaml.cs.",
+      "extractionState" : "manual"
+    },
+    "Playback stopped (%@)." : {
+      "comment" : "Windows only: ViewModels/PlaybackController.cs.",
       "extractionState" : "manual"
     },
     "Press Ctrl+R to start recording." : {
@@ -549,6 +585,14 @@
       "comment" : "Windows only: Views/Settings/RAGSettingsPage.xaml.cs.",
       "extractionState" : "manual"
     },
+    "This PC's hardware does not support Windows AI (it needs a Copilot+ PC)." : {
+      "comment" : "Windows only: EchoDiar.AI/WindowsAIAvailability.cs, shown by ViewModels/ProvidersViewModel.cs, Views/AIMenus.cs, Views/Settings/ProvidersSettingsPage.xaml.cs.",
+      "extractionState" : "manual"
+    },
+    "This build of EchoDiar cannot use Windows AI (the systemAIModels capability is missing)." : {
+      "comment" : "Windows only: EchoDiar.AI/WindowsAIAvailability.cs, shown by ViewModels/ProvidersViewModel.cs, Views/AIMenus.cs, Views/Settings/ProvidersSettingsPage.xaml.cs.",
+      "extractionState" : "manual"
+    },
     "This conversation is not in the library." : {
       "comment" : "Windows only: Views/ConversationView.xaml.cs.",
       "extractionState" : "manual"
@@ -661,6 +705,10 @@
       "comment" : "Windows only: Views/Settings/RecordingSettingsPage.xaml.cs.",
       "extractionState" : "manual"
     },
+    "Waiting for live captions or transcription to finish…" : {
+      "comment" : "Windows only: EchoDiar.AI/AIService.cs (AI job status), shown by ViewModels/AppViewModel.AI.cs.",
+      "extractionState" : "manual"
+    },
     "Waiting: energy saver is on" : {
       "comment" : "Windows only: Views/ConversationCard.xaml.cs.",
       "extractionState" : "manual"
@@ -671,6 +719,26 @@
     },
     "Windows AI (system)" : {
       "comment" : "Windows only: Views/Settings/ProvidersSettingsPage.xaml.",
+      "extractionState" : "manual"
+    },
+    "Windows AI is not available on this PC." : {
+      "comment" : "Windows only: EchoDiar.AI/WindowsAIAvailability.cs, shown by ViewModels/ProvidersViewModel.cs, Views/AIMenus.cs, Views/Settings/ProvidersSettingsPage.xaml.cs.",
+      "extractionState" : "manual"
+    },
+    "Windows AI is not supported on this PC (it needs a Copilot+ PC)." : {
+      "comment" : "Windows only: EchoDiar.AI/WindowsAIAvailability.cs, shown by ViewModels/ProvidersViewModel.cs, Views/AIMenus.cs, Views/Settings/ProvidersSettingsPage.xaml.cs.",
+      "extractionState" : "manual"
+    },
+    "Windows AI is not unlocked for EchoDiar." : {
+      "comment" : "Windows only: EchoDiar.AI/WindowsAIAvailability.cs, shown by ViewModels/ProvidersViewModel.cs, Views/AIMenus.cs, Views/Settings/ProvidersSettingsPage.xaml.cs.",
+      "extractionState" : "manual"
+    },
+    "Windows AI is turned off (Settings › Privacy & security › Text and image generation)." : {
+      "comment" : "Windows only: EchoDiar.AI/WindowsAIAvailability.cs, shown by ViewModels/ProvidersViewModel.cs, Views/AIMenus.cs, Views/Settings/ProvidersSettingsPage.xaml.cs.",
+      "extractionState" : "manual"
+    },
+    "Windows AI needs a Windows update (Settings › Windows Update)." : {
+      "comment" : "Windows only: EchoDiar.AI/WindowsAIAvailability.cs, shown by ViewModels/ProvidersViewModel.cs, Views/AIMenus.cs, Views/Settings/ProvidersSettingsPage.xaml.cs.",
       "extractionState" : "manual"
     },
     "You're up to date!" : {

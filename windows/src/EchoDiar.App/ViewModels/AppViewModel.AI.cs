@@ -253,7 +253,8 @@ public sealed partial class AppViewModel
         if (_closing || AIJob is not { } job) return;
         if (update.Kind == AIUpdateKind.Status)
         {
-            AIJob = job with { Status = update.Value };
+            // The AI project's fixed statuses have catalog keys; "Reading part 2 of 5…" stays English, as on macOS.
+            AIJob = job with { Status = Loc.T(update.Value) };
             return;
         }
         _aiPendingText.Append(update.Value);

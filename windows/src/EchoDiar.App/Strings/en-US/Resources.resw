@@ -194,6 +194,10 @@
     <value>An update is available: Update in the toolbar installs it.</value>
     <comment>An update is available: Update in the toolbar installs it.</comment>
   </data>
+  <data name="And" xml:space="preserve">
+    <value>{0} and {1}</value>
+    <comment>%@ and %@</comment>
+  </data>
   <data name="AndLldMore" xml:space="preserve">
     <value>…and {0} more</value>
     <comment>…and %lld more</comment>
@@ -341,6 +345,10 @@
   <data name="AudioLeavesThisPCTheCloudDiarizerUploadsTheSystemChannelToTh" xml:space="preserve">
     <value>Audio leaves this PC: the cloud diarizer uploads the system channel to the provider.</value>
     <comment>Audio leaves this PC: the cloud diarizer uploads the system channel to the provider.</comment>
+  </data>
+  <data name="AudioLeavesThisPCTheRecordingSMicAndSystemChannelsAreUploade" xml:space="preserve">
+    <value>Audio leaves this PC: the recording's mic and system channels are uploaded to {0} ({1}) for transcription and billed by them. The provider may keep the audio under its own retention policy. You are asked once per provider and destination.</value>
+    <comment>Audio leaves this PC: the recording's mic and system channels are uploaded to %@ (%@) for transcription and billed by them. The provider may keep the audio under its own retention policy. You are asked once per provider and destination.</comment>
   </data>
   <data name="AudioOnlyKeepTranscriptSummaryAndChat" xml:space="preserve">
     <value>Audio only (keep transcript, summary and chat)</value>
@@ -554,6 +562,10 @@
     <value>Cloud</value>
     <comment>Cloud</comment>
   </data>
+  <data name="CodexRunsWithoutYourCodexConfigTomlItsModelMCPServersAndHook" xml:space="preserve">
+    <value>Codex runs without your ~/.codex/config.toml (its model, MCP servers and hooks) in a read-only, offline sandbox, but its remaining built-in tools can still read files on this PC.</value>
+    <comment>Codex runs without your ~/.codex/config.toml (its model, MCP servers and hooks) in a read-only, offline sandbox, but its remaining built-in tools can still read files on this PC.</comment>
+  </data>
   <data name="Collapse" xml:space="preserve">
     <value>Collapse</value>
     <comment>Collapse</comment>
@@ -641,6 +653,14 @@
   <data name="CouldNotInstallTheUpdate" xml:space="preserve">
     <value>Could not install the update</value>
     <comment>Could not install the update</comment>
+  </data>
+  <data name="CouldNotOpenTheAudio" xml:space="preserve">
+    <value>Could not open the audio ({0}).</value>
+    <comment>Could not open the audio (%@).</comment>
+  </data>
+  <data name="CouldNotPlayTheAudio" xml:space="preserve">
+    <value>Could not play the audio ({0}).</value>
+    <comment>Could not play the audio (%@).</comment>
   </data>
   <data name="Current" xml:space="preserve">
     <value>Current</value>
@@ -1130,6 +1150,10 @@
     <value>{0} GB</value>
     <comment>%@ GB</comment>
   </data>
+  <data name="GeminiCLIDeniesEveryToolAndLoadsNoMCPServerOrExtensionUnless" xml:space="preserve">
+    <value>Gemini CLI denies every tool and loads no MCP server or extension, unless a system-wide admin policy allows them.</value>
+    <comment>Gemini CLI denies every tool and loads no MCP server or extension, unless a system-wide admin policy allows them.</comment>
+  </data>
   <data name="General" xml:space="preserve">
     <value>General</value>
     <comment>General</comment>
@@ -1553,6 +1577,10 @@
   <data name="LoadModels" xml:space="preserve">
     <value>Load models</value>
     <comment>Load models</comment>
+  </data>
+  <data name="LoadingTheModel" xml:space="preserve">
+    <value>Loading the model…</value>
+    <comment>Loading the model…</comment>
   </data>
   <data name="LocalHosts" xml:space="preserve">
     <value>Local hosts</value>
@@ -1990,6 +2018,10 @@
     <value>OpenAI, Groq, Mistral, Google Gemini and custom endpoints transcribe too, with their transcription model: set them up in Settings › AI.</value>
     <comment>OpenAI, Groq, Mistral, Google Gemini and custom endpoints transcribe too, with their transcription model: set them up in Settings › AI.</comment>
   </data>
+  <data name="OpenCodeDeniesEveryToolButMCPServersInYourOpenCodeConfigStil" xml:space="preserve">
+    <value>OpenCode denies every tool, but MCP servers in your OpenCode config still start (their tools are denied).</value>
+    <comment>OpenCode denies every tool, but MCP servers in your OpenCode config still start (their tools are denied).</comment>
+  </data>
   <data name="OpenEchoDiar" xml:space="preserve">
     <value>Open EchoDiar</value>
     <comment>Open EchoDiar</comment>
@@ -2173,6 +2205,10 @@
   <data name="PlaybackPosition" xml:space="preserve">
     <value>Playback position</value>
     <comment>Playback position</comment>
+  </data>
+  <data name="PlaybackStopped" xml:space="preserve">
+    <value>Playback stopped ({0}).</value>
+    <comment>Playback stopped (%@).</comment>
   </data>
   <data name="PreparingAudio" xml:space="preserve">
     <value>Preparing audio…</value>
@@ -3106,6 +3142,10 @@
     <value>This app's audio cannot be isolated, so all system audio is being recorded.</value>
     <comment>This app's audio cannot be isolated, so all system audio is being recorded.</comment>
   </data>
+  <data name="ThisBuildOfEchoDiarCannotUseWindowsAITheSystemAIModelsCapabi" xml:space="preserve">
+    <value>This build of EchoDiar cannot use Windows AI (the systemAIModels capability is missing).</value>
+    <comment>This build of EchoDiar cannot use Windows AI (the systemAIModels capability is missing).</comment>
+  </data>
   <data name="ThisConversationHasNoTranscriptYet" xml:space="preserve">
     <value>This conversation has no transcript yet.</value>
     <comment>This conversation has no transcript yet.</comment>
@@ -3161,6 +3201,10 @@
   <data name="ThisPC" xml:space="preserve">
     <value>This PC</value>
     <comment>This PC</comment>
+  </data>
+  <data name="ThisPCSHardwareDoesNotSupportWindowsAIItNeedsACopilotPC" xml:space="preserve">
+    <value>This PC's hardware does not support Windows AI (it needs a Copilot+ PC).</value>
+    <comment>This PC's hardware does not support Windows AI (it needs a Copilot+ PC).</comment>
   </data>
   <data name="Title" xml:space="preserve">
     <value>Title</value>
@@ -3494,6 +3538,10 @@
     <value>Waiting: energy saver is on</value>
     <comment>Waiting: energy saver is on</comment>
   </data>
+  <data name="WaitingForLiveCaptionsOrTranscriptionToFinish" xml:space="preserve">
+    <value>Waiting for live captions or transcription to finish…</value>
+    <comment>Waiting for live captions or transcription to finish…</comment>
+  </data>
   <data name="WaitingWhileTheMacIsHotOrInLowPowerMode" xml:space="preserve">
     <value>Waiting while the Mac is hot or in Low Power Mode</value>
     <comment>Waiting while the Mac is hot or in Low Power Mode</comment>
@@ -3557,6 +3605,26 @@
   <data name="Window" xml:space="preserve">
     <value>Window</value>
     <comment>Window</comment>
+  </data>
+  <data name="WindowsAIIsNotAvailableOnThisPC" xml:space="preserve">
+    <value>Windows AI is not available on this PC.</value>
+    <comment>Windows AI is not available on this PC.</comment>
+  </data>
+  <data name="WindowsAIIsNotSupportedOnThisPCItNeedsACopilotPC" xml:space="preserve">
+    <value>Windows AI is not supported on this PC (it needs a Copilot+ PC).</value>
+    <comment>Windows AI is not supported on this PC (it needs a Copilot+ PC).</comment>
+  </data>
+  <data name="WindowsAIIsNotUnlockedForEchoDiar" xml:space="preserve">
+    <value>Windows AI is not unlocked for EchoDiar.</value>
+    <comment>Windows AI is not unlocked for EchoDiar.</comment>
+  </data>
+  <data name="WindowsAIIsTurnedOffSettingsPrivacySecurityTextAndImageGener" xml:space="preserve">
+    <value>Windows AI is turned off (Settings › Privacy &amp; security › Text and image generation).</value>
+    <comment>Windows AI is turned off (Settings › Privacy &amp; security › Text and image generation).</comment>
+  </data>
+  <data name="WindowsAINeedsAWindowsUpdateSettingsWindowsUpdate" xml:space="preserve">
+    <value>Windows AI needs a Windows update (Settings › Windows Update).</value>
+    <comment>Windows AI needs a Windows update (Settings › Windows Update).</comment>
   </data>
   <data name="WindowsAISystem" xml:space="preserve">
     <value>Windows AI (system)</value>

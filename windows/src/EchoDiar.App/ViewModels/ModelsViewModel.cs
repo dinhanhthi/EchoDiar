@@ -232,13 +232,13 @@ public sealed partial class ModelsViewModel : ObservableObject
     /// <summary>A model's download size as its row shows it ("547 MiB", "2.6 GB"; macOS <c>ModelRow.sizeText</c>).</summary>
     internal static string SizeText(int mib) =>
         mib < 1024
-            ? string.Format(CultureInfo.CurrentCulture, "{0} MiB", mib)
-            : string.Format(CultureInfo.CurrentCulture, "{0:0.0} GB", mib / 1024.0);
+            ? Loc.Format("%lld MiB", mib)
+            : Loc.Format("%@ GB", (mib / 1024.0).ToString("0.0", CultureInfo.CurrentCulture));
 
     private static string RamText(int mb) =>
         mb < 1024
-            ? string.Format(CultureInfo.CurrentCulture, "{0} MB", mb)
-            : string.Format(CultureInfo.CurrentCulture, "{0:0.0} GB", mb / 1024.0);
+            ? Loc.Format("%lld MB", mb)
+            : Loc.Format("%@ GB", (mb / 1024.0).ToString("0.0", CultureInfo.CurrentCulture));
 
     private static string LanguagesText(IReadOnlyList<string>? languages) => languages switch
     {
@@ -249,7 +249,7 @@ public sealed partial class ModelsViewModel : ObservableObject
 
     /// <summary>"English", "English and French", "English, French and Vietnamese".</summary>
     private static string JoinList(List<string> items) =>
-        items.Count == 1 ? items[0] : $"{string.Join(", ", items[..^1])} and {items[^1]}";
+        items.Count == 1 ? items[0] : Loc.Format("%@ and %@", string.Join(", ", items[..^1]), items[^1]);
 
     // Following the app
 

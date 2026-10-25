@@ -160,15 +160,15 @@ public sealed partial class TranscriptViewModel : ObservableObject
     {
         get
         {
-            if (_loadFailed) return "The transcript could not be read.";
-            if (ShownTranscript is not null) return "No speech was found in this recording.";
-            return _conversation?.Status switch
+            if (_loadFailed) return Loc.T("The transcript could not be read.");
+            if (ShownTranscript is not null) return Loc.T("No speech was found in this recording.");
+            return Loc.T(_conversation?.Status switch
             {
                 ConversationStatus.Recording => "Recording in progress.",
                 ConversationStatus.Compressing => "Compressing the audio…",
                 ConversationStatus.Failed => "The recording failed.",
                 _ => "No transcript yet.",
-            };
+            });
         }
     }
 
