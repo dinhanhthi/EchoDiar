@@ -434,6 +434,10 @@
     <value>Calendar access is off. Turn on EchoDiar in Privacy &amp; Security › Calendars.</value>
     <comment>Calendar access is off. Turn on EchoDiar in Privacy &amp; Security › Calendars.</comment>
   </data>
+  <data name="CalendarAccessIsOffTurnOnEchoDiarInWindowsSettingsPrivacySec" xml:space="preserve">
+    <value>Calendar access is off. Turn on EchoDiar in Windows Settings › Privacy &amp; security › Calendar.</value>
+    <comment>Calendar access is off. Turn on EchoDiar in Windows Settings › Privacy &amp; security › Calendar.</comment>
+  </data>
   <data name="CalendarSettings" xml:space="preserve">
     <value>Calendar settings…</value>
     <comment>Calendar settings…</comment>
@@ -2077,6 +2081,10 @@
   <data name="OpenWindowsMicrophoneSettings" xml:space="preserve">
     <value>Open Windows microphone settings</value>
     <comment>Open Windows microphone settings</comment>
+  </data>
+  <data name="OpenWindowsPrivacySettings" xml:space="preserve">
+    <value>Open Windows privacy settings</value>
+    <comment>Open Windows privacy settings</comment>
   </data>
   <data name="Open_2" xml:space="preserve">
     <value>Open {0}?</value>

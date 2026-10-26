@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!--
     The title bar's toolbar (macOS MainView.swift toolbar) in Windows 11 title bar controls. Leading: Back, the record
-    group, a Settings section's inner tabs, the conversation's title. Trailing: Update, Reveal and Delete, Settings and Ask across conversations, Search,
+    group, a Settings section's inner tabs, the conversation's title. Trailing: Update, Reveal and Delete, Settings, Calendar and Ask across conversations, Search,
     the conversation's tabs. The title and the empty space drag the window (MainWindow makes only the groups, the lone
     buttons, the search box and the tabs passthrough). Icon buttons are 32 x 32 subtle buttons with 16 px Segoe Fluent
     Icons; 4 px between the buttons of a group, 8 px between groups.
@@ -194,7 +194,10 @@
                 </Button>
             </StackPanel>
 
-            <!-- Settings opens the Settings page, or goes back from it; Ask across conversations opens or closes the library chat. -->
+            <!--
+                Settings opens the Settings page, or goes back from it, and Calendar the Calendar page; Ask across
+                conversations opens or closes the library chat.
+            -->
             <StackPanel x:Name="AppGroup" Orientation="Horizontal" Spacing="4" VerticalAlignment="Center">
                 <Button
                     x:Name="SettingsButton"
@@ -205,6 +208,16 @@
                     AutomationProperties.Name="{local:T Text='Settings'}"
                     ToolTipService.ToolTip="{local:T Text='Settings'}">
                     <FontIcon FontFamily="{ThemeResource SymbolThemeFontFamily}" FontSize="16" Glyph="&#xE9E9;" />
+                </Button>
+                <Button
+                    x:Name="CalendarButton"
+                    Width="32"
+                    Height="32"
+                    Padding="0"
+                    Style="{StaticResource SubtleButtonStyle}"
+                    AutomationProperties.Name="{local:T Text='Calendar'}"
+                    ToolTipService.ToolTip="{local:T Text='Calendar'}">
+                    <FontIcon FontFamily="{ThemeResource SymbolThemeFontFamily}" FontSize="16" Glyph="&#xE787;" />
                 </Button>
                 <Button
                     x:Name="AskButton"

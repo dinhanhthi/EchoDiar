@@ -22,13 +22,14 @@ namespace EchoDiar.App.Views;
 /// The title bar's button groups (macOS MainView.swift toolbar), shown by route: Back off the list (and on it while the
 /// library chat shows); Record with its menu of targets and the language (Stop, blinking, and Pause or Resume while
 /// recording); on a conversation its title, Reveal, Delete and the tabs (a SelectorBar); on Settings the section's inner
-/// tabs after Record; Settings (opens the Settings page, or goes back from it), Ask across conversations (opens or
-/// closes the library chat) and Search everywhere, an icon button that opens the box where the box does not fit. Update
-/// shows while an App Installer update is available and nothing runs that installing would cut off (macOS hides it while
-/// recording). It also hosts the window's dialogs (it lives as long as the window): the delete confirmations (of this
-/// conversation, and of the library's cards and selection), "Recording problem", the cloud confirmations (audio for
-/// transcription, transcripts for the library index), the update's confirmation and answers, and the Settings pages'
-/// confirmations (<see cref="AppViewModel.Confirm"/>), one at a time. The lost-mic question is the pill's end prompt.
+/// tabs after Record; Settings (opens the Settings page, or goes back from it), Calendar (the same for the Calendar
+/// page), Ask across conversations (opens or closes the library chat) and Search everywhere, an icon button that opens
+/// the box where the box does not fit. Update shows while an App Installer update is available and nothing runs that
+/// installing would cut off (macOS hides it while recording). It also hosts the window's dialogs (it lives as long as
+/// the window): the delete confirmations (of this conversation, and of the library's cards and selection), "Recording
+/// problem", the cloud confirmations (audio for transcription, transcripts for the library index), the update's
+/// confirmation and answers, and the Settings pages' confirmations (<see cref="AppViewModel.Confirm"/>), one at a time.
+/// The lost-mic question is the pill's end prompt.
 /// </summary>
 public sealed partial class TitleBarToolbar : UserControl
 {
@@ -96,6 +97,7 @@ public sealed partial class TitleBarToolbar : UserControl
         InitializeComponent();
         BackButton.Click += (_, _) => _model?.GoBack();
         SettingsButton.Click += (_, _) => ToggleSettings();
+        CalendarButton.Click += (_, _) => ToggleCalendar();
         AskButton.Click += (_, _) => ToggleGlobalChat();
         RecordSplitButton.Click += (_, _) => _ = _model?.StartRecordingAsync(_model.SelectedTarget);
         TargetMenu.Items.Add(_languageSeparator);
@@ -116,6 +118,7 @@ public sealed partial class TitleBarToolbar : UserControl
         // Settings returns to (macOS searchPresented).
         SearchBox.GotFocus += (_, _) =>
         {
+            LeaveCalendar();
             if (_model is { Route.Kind: not RouteKind.Settings }) _model.GlobalChatOpen = false;
         };
         SearchButton.Click += (_, _) => OpenSearch();
@@ -452,17 +455,37 @@ public sealed partial class TitleBarToolbar : UserControl
         _model.SetSettingsSubTab(_model.SettingsSection, id);
     }
 
+    // Calendar
+
+    /// <summary>macOS's Calendar toggle: opens the Calendar page, or on it goes back to the page it was opened from.</summary>
+    private void ToggleCalendar()
+    {
+        if (_model is null) return;
+        if (_model.Route.Kind == RouteKind.Calendar) _model.GoBack();
+        else _model.OpenCalendar();
+    }
+
+    /// <summary>
+    /// Search on the Calendar page goes back to the library first, to search there (macOS <c>showSearch</c>); before the
+    /// box opens, since the page change closes an opened box.
+    /// </summary>
+    private void LeaveCalendar()
+    {
+        if (_model is { Route.Kind: RouteKind.Calendar }) _model.GoBack();
+    }
+
     // Library chat
 
     /// <summary>
-    /// macOS's Ask across conversations toggle: on Settings it goes back first; opening the chat clears the search, which
-    /// would filter the cards it replaces.
+    /// macOS's Ask across conversations toggle: on Settings or the Calendar page it goes back first (twice from Settings
+    /// opened from the Calendar page); opening the chat clears the search, which would filter the cards it replaces.
     /// </summary>
     private void ToggleGlobalChat()
     {
         if (_model is null) return;
-        var open = _model.Route.Kind == RouteKind.Settings || !_model.GlobalChatOpen;
+        var open = _model.Route.Kind is RouteKind.Settings or RouteKind.Calendar || !_model.GlobalChatOpen;
         if (_model.Route.Kind == RouteKind.Settings) _model.GoBack();
+        if (_model.Route.Kind == RouteKind.Calendar) _model.GoBack();
         _model.GlobalChatOpen = open;
         if (!open) return;
         _searchTimer?.Stop();
@@ -714,12 +737,14 @@ public sealed partial class TitleBarToolbar : UserControl
     /// <summary>Ctrl+F (macOS <c>showSearch</c>): the focus goes to the page's search box, opened first where Search is an icon.</summary>
     public void FocusSearch()
     {
+        LeaveCalendar();
         if (SearchBox.Visibility == Visibility.Visible) SearchBox.Focus(FocusState.Programmatic);
         else OpenSearch();
     }
 
     private void OpenSearch()
     {
+        LeaveCalendar();
         _searchOpened = true;
         ApplySearchMode();
         DispatcherQueue.TryEnqueue(() =>

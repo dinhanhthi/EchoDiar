@@ -185,6 +185,10 @@
       "comment" : "Windows only: Views/Settings/ProvidersSettingsPage.xaml.cs.",
       "extractionState" : "manual"
     },
+    "Calendar access is off. Turn on EchoDiar in Windows Settings › Privacy & security › Calendar." : {
+      "comment" : "Windows only: Views/CalendarPage.xaml.",
+      "extractionState" : "manual"
+    },
     "Check for updates…" : {
       "comment" : "Windows only: Services/Updater.cs.",
       "extractionState" : "manual"
@@ -387,6 +391,10 @@
     },
     "Open Windows microphone settings" : {
       "comment" : "Windows only: Views/OnboardingWindow.xaml.",
+      "extractionState" : "manual"
+    },
+    "Open Windows privacy settings" : {
+      "comment" : "Windows only: Views/CalendarPage.xaml.",
       "extractionState" : "manual"
     },
     "Open full notices" : {

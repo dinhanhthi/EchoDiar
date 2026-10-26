@@ -2,6 +2,7 @@ using System.ComponentModel;
 using EchoDiar.App.Services;
 using EchoDiar.App.ViewModels;
 using EchoDiar.App.Views;
+using EchoDiar.Core.Calendar;
 using EchoDiar.Core.Settings;
 using Microsoft.UI.Composition.SystemBackdrops;
 using Microsoft.UI.Dispatching;
@@ -104,6 +105,7 @@ public sealed partial class MainWindow : Window
         RootGrid.Loaded += OnRootLoaded;
         Closed += OnClosed;
         Activated += OnFirstActivated;
+        Activated += OnActivated;
         CompositionTarget.SurfaceContentsLost += OnSurfaceContentsLost;
 
         _model.PropertyChanged += OnModelChanged;
@@ -199,6 +201,7 @@ public sealed partial class MainWindow : Window
         _closing = true;
         StartupTrace.Write("Closed");
         CompositionTarget.SurfaceContentsLost -= OnSurfaceContentsLost;
+        Activated -= OnActivated;
 #if DEBUG
         UntraceWindowEvents();
 #endif
@@ -209,6 +212,16 @@ public sealed partial class MainWindow : Window
         _model.PropertyChanged -= OnModelChanged;
         Toolbar.Detach();
         _frames.Save();
+    }
+
+    /// <summary>
+    /// The window comes back to the front on the Calendar page (from Windows' privacy settings): calendar access is
+    /// asked again while it is not granted (macOS CalendarView didBecomeActive).
+    /// </summary>
+    private void OnActivated(object sender, WindowActivatedEventArgs args)
+    {
+        if (_closing || args.WindowActivationState == WindowActivationState.Deactivated) return;
+        if (_model.Route.Kind == RouteKind.Calendar && _model.CalendarAccess != CalendarAccess.Granted) _model.RefreshCalendar();
     }
 
     /// <summary>
@@ -345,8 +358,9 @@ public sealed partial class MainWindow : Window
 
     /// <summary>
     /// Shows the route's page: the library as a 360 px sidebar, then the detail; the window keeps its size. Settings
-    /// takes the whole window, with its own sidebar instead of the library (macOS MainView.swift). The recording page
-    /// shows the welcome pane until the recording runs and once it has ended (macOS <c>detail</c>).
+    /// takes the whole window, with its own sidebar instead of the library, and so does the Calendar page (macOS
+    /// MainView.swift). The recording page shows the welcome pane until the recording runs and once it has ended (macOS
+    /// <c>detail</c>).
     /// </summary>
     private void ShowRoute()
     {
@@ -357,11 +371,12 @@ public sealed partial class MainWindow : Window
             { Kind: RouteKind.Recording } when _model.IsRecording => new RecordingView(_model),
             { Kind: RouteKind.Conversation, ConversationId: { } id } => new ConversationView(_model, id),
             { Kind: RouteKind.Settings } => new SettingsPage(_model),
+            { Kind: RouteKind.Calendar } => new CalendarPage(_model),
             _ => _welcome ??= new WelcomeView(_model),
         };
-        var settings = route.Kind == RouteKind.Settings;
-        SidebarColumn.Width = new GridLength(settings ? 0 : 360);
-        ListHost.Visibility = settings ? Visibility.Collapsed : Visibility.Visible;
+        var fullWidth = route.Kind is RouteKind.Settings or RouteKind.Calendar;
+        SidebarColumn.Width = new GridLength(fullWidth ? 0 : 360);
+        ListHost.Visibility = fullWidth ? Visibility.Collapsed : Visibility.Visible;
         _library.ShowAsSidebar(route.ConversationId);
         ShowLibraryOrChat();
         StartupTrace.Write($"end route {route.Kind} {route.ConversationId}");
@@ -495,7 +510,7 @@ public sealed partial class MainWindow : Window
                 && conversation.CloseHistory():
                 return true;
             // The library chat's History panel too.
-            case InAppAction.Back when plain && route != RouteKind.Settings && ListHost.Content is GlobalChatView chat
+            case InAppAction.Back when plain && route is not (RouteKind.Settings or RouteKind.Calendar) && ListHost.Content is GlobalChatView chat
                 && chat.CloseHistory():
                 return true;
             // Back from the list closes the library chat.

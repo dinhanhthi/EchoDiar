@@ -214,7 +214,12 @@ public sealed partial class ConversationListView : UserControl
         var today = DateTime.Today;
         if (day == today) return Loc.T("Today");
         if (day == today.AddDays(-1)) return Loc.T("Yesterday");
-        // macOS .long without a time: "October 22, 2026"; Windows' long date also names the weekday.
+        return LongDate(day);
+    }
+
+    /// <summary>macOS .long without a time: "October 22, 2026"; Windows' long date also names the weekday.</summary>
+    internal static string LongDate(DateTime day)
+    {
         var pattern = CultureInfo.CurrentCulture.DateTimeFormat.LongDatePattern;
         foreach (var weekday in new[] { "dddd, ", "dddd ", ", dddd", " dddd", "dddd" }) pattern = pattern.Replace(weekday, "");
         return day.ToString(pattern.Trim(), CultureInfo.CurrentCulture);

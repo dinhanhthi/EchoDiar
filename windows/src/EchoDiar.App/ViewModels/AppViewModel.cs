@@ -16,12 +16,12 @@ using Microsoft.UI.Dispatching;
 
 namespace EchoDiar.App.ViewModels;
 
-public enum RouteKind { List, Conversation, Recording, Settings }
+public enum RouteKind { List, Conversation, Recording, Settings, Calendar }
 
 /// <summary>The conversation page's tab (macOS <c>AppModel.DetailTab</c>).</summary>
 public enum DetailTab { Transcript, Summary, Chat }
 
-/// <summary>What the main window shows: the library list, one conversation, the recording page or Settings.</summary>
+/// <summary>What the main window shows: the library list, one conversation, the recording page, Settings or the Calendar page.</summary>
 public sealed record Route(RouteKind Kind, Guid? ConversationId = null)
 {
     public static Route List { get; } = new(RouteKind.List);
@@ -29,6 +29,8 @@ public sealed record Route(RouteKind Kind, Guid? ConversationId = null)
     public static Route Recording { get; } = new(RouteKind.Recording);
 
     public static Route Settings { get; } = new(RouteKind.Settings);
+
+    public static Route Calendar { get; } = new(RouteKind.Calendar);
 
     public static Route ForConversation(Guid id) => new(RouteKind.Conversation, id);
 }
@@ -70,6 +72,10 @@ public sealed partial class AppViewModel : ObservableObject
     private string? _activeFolder;
 
     private Route _route = Route.List;
+
+    /// <summary>The library page the Calendar page was opened from.</summary>
+    private Route _calendarReturnRoute = Route.List;
+
     private DetailTab _detailTab = DetailTab.Transcript;
     private AppSettings _settings = new();
     private IReadOnlyList<Conversation> _conversations = [];
@@ -484,14 +490,39 @@ public sealed partial class AppViewModel : ObservableObject
     public void CompleteOnboarding() => ApplySettings(Settings with { OnboardingCompleted = true });
 
     /// <summary>
+    /// The Calendar page; Back returns to the library page it was opened from (from Settings, to the page Settings was
+    /// opened from) (macOS AppModel <c>openCalendar</c>).
+    /// </summary>
+    public void OpenCalendar()
+    {
+        switch (Route.Kind)
+        {
+            case RouteKind.Calendar:
+                break;
+            case RouteKind.Settings:
+                if (_settingsReturnRoute.Kind != RouteKind.Calendar) _calendarReturnRoute = _settingsReturnRoute;
+                break;
+            default:
+                _calendarReturnRoute = Route;
+                break;
+        }
+        Route = Route.Calendar;
+    }
+
+    /// <summary>
     /// Back: a conversation or the recording goes to the list (the library chat stays open), the list closes the library
-    /// chat; Settings goes to the page it was opened from, or the list when that conversation is gone or that recording has
-    /// ended (macOS AppModel <c>goBack</c>).
+    /// chat; Settings and the Calendar page go to the page they were opened from, or the list when that conversation is
+    /// gone or that recording has ended (macOS AppModel <c>goBack</c>).
     /// </summary>
     public void GoBack()
     {
         if (Route.Kind == RouteKind.List) GlobalChatOpen = false;
-        else Route = Route.Kind == RouteKind.Settings ? SettingsReturnRoute() : Route.List;
+        else Route = Route.Kind switch
+        {
+            RouteKind.Settings => ReturnRoute(_settingsReturnRoute),
+            RouteKind.Calendar => ReturnRoute(_calendarReturnRoute),
+            _ => Route.List,
+        };
     }
 
     /// <summary>The pages that slide on macOS (MainView.swift <c>Page</c>): a conversation and the recording share one.</summary>
@@ -499,6 +530,7 @@ public sealed partial class AppViewModel : ObservableObject
     {
         RouteKind.List => 0,
         RouteKind.Settings => 2,
+        RouteKind.Calendar => 3,
         _ => 1,
     };
 

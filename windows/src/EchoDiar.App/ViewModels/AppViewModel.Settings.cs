@@ -77,8 +77,9 @@ public sealed partial class AppViewModel
         Route = Route.Settings;
     }
 
-    /// <summary>The page Settings was opened from, or the list when that conversation is gone or that recording ended.</summary>
-    private Route SettingsReturnRoute() => _settingsReturnRoute switch
+    /// <summary>The page <paramref name="saved"/> (Settings' or the Calendar page's), or the list when that conversation is
+    /// gone or that recording ended.</summary>
+    private Route ReturnRoute(Route saved) => saved switch
     {
         { Kind: RouteKind.Conversation, ConversationId: { } id } when Conversations.All(c => c.Id != id) => Route.List,
         { Kind: RouteKind.Recording } when !IsRecording => Route.List,
