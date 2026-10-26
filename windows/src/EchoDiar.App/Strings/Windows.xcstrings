@@ -3,31 +3,87 @@
   "strings" : {
     "\"Tell speakers apart\" is on. Download a model to tell the other speakers apart." : {
       "comment" : "Windows only: Views/ConversationListView.xaml.cs.",
-      "extractionState" : "manual"
+      "extractionState" : "manual",
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "\"Phân biệt người nói\" đang bật. Hãy tải về một mô hình để phân biệt những người nói khác."
+          }
+        }
+      }
     },
     "%@ (leaves this PC)" : {
       "comment" : "Windows only: Views/AIMenus.cs, Views/Settings/ProvidersSettingsPage.xaml.cs.",
-      "extractionState" : "manual"
+      "extractionState" : "manual",
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "%@ (rời khỏi máy tính này)"
+          }
+        }
+      }
     },
     "%@ and %@" : {
       "comment" : "Windows only: ViewModels/ModelsViewModel.cs (the last two items of a list, \"English, French and Vietnamese\").",
-      "extractionState" : "manual"
+      "extractionState" : "manual",
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "%@ và %@"
+          }
+        }
+      }
     },
     "%@ could not be registered (error %lld)." : {
       "comment" : "Windows only: ViewModels/AppViewModel.HotKeys.cs.",
-      "extractionState" : "manual"
+      "extractionState" : "manual",
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Không thể đăng ký %@ (lỗi %lld)."
+          }
+        }
+      }
     },
     "%@ failed its integrity check. Download it again." : {
       "comment" : "Windows only: Services/AppServices.cs, ViewModels/AppViewModel.AI.cs.",
-      "extractionState" : "manual"
+      "extractionState" : "manual",
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "%@ không vượt qua bước kiểm tra tính toàn vẹn. Hãy tải về lại."
+          }
+        }
+      }
     },
     "%@ is the \"%@\" shortcut." : {
       "comment" : "Windows only: Views/HotKeyRecorder.cs.",
-      "extractionState" : "manual"
+      "extractionState" : "manual",
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "%@ là phím tắt \"%@\"."
+          }
+        }
+      }
     },
     "%@ not saved: put the key in the API key field, which keeps it in Credential Manager." : {
       "comment" : "Windows only: Views/Settings/ProvidersSettingsPage.xaml.cs.",
-      "extractionState" : "manual"
+      "extractionState" : "manual",
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "%@ chưa được lưu: hãy nhập khoá vào ô Khoá API, nơi khoá được giữ trong Trình quản lý thông tin xác thực."
+          }
+        }
+      }
     },
     "%lld bytes" : {
       "comment" : "Windows only: Views/ConversationCard.xaml.cs.",
@@ -49,6 +105,12 @@
                 }
               }
             }
+          }
+        },
+        "vi" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "%lld byte"
           }
         }
       }
@@ -74,6 +136,12 @@
               }
             }
           }
+        },
+        "vi" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "%lld cuộc hội thoại không có âm thanh sẽ trở nên trống: chúng được chuyển toàn bộ vào Thùng rác."
+          }
         }
       }
     },
@@ -97,6 +165,12 @@
                 }
               }
             }
+          }
+        },
+        "vi" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Toàn bộ tệp của %lld cuộc hội thoại sẽ được chuyển vào Thùng rác ở lần chạy tới (khi khởi động hoặc trong vòng một ngày):"
           }
         }
       }
@@ -122,6 +196,12 @@
               }
             }
           }
+        },
+        "vi" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Toàn bộ tệp của %lld cuộc hội thoại sẽ được chuyển vào Thùng rác ngay bây giờ, sau đó hằng ngày với các cuộc cũ hơn:"
+          }
         }
       }
     },
@@ -146,344 +226,1022 @@
               }
             }
           }
+        },
+        "vi" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Toàn bộ tệp của các cuộc hội thoại đã chép lời cũ hơn %lld ngày sẽ được chuyển vào Thùng rác mỗi ngày một lần. Hiện không có gì khớp."
+          }
         }
       }
     },
     "An update is available: Update in the toolbar installs it." : {
       "comment" : "Windows only: Views/Settings/AboutSettingsPage.xaml.cs.",
-      "extractionState" : "manual"
+      "extractionState" : "manual",
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Có bản cập nhật: bấm Cập nhật trên thanh công cụ để cài đặt."
+          }
+        }
+      }
     },
     "Answers questions about all your transcribed conversations, citing the conversation and the moment. The index stays on this PC unless you pick an API embedder." : {
       "comment" : "Windows only: Views/Settings/RAGSettingsPage.xaml.cs.",
-      "extractionState" : "manual"
+      "extractionState" : "manual",
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Trả lời câu hỏi về mọi cuộc hội thoại đã chép lời của bạn, kèm trích dẫn cuộc hội thoại và thời điểm. Chỉ mục được giữ trên máy tính này, trừ khi bạn chọn một trình nhúng qua API."
+          }
+        }
+      }
     },
     "App structure (MVVM)" : {
       "comment" : "Windows only: Views/Settings/AcknowledgementsSettingsPage.xaml.cs.",
-      "extractionState" : "manual"
+      "extractionState" : "manual",
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Cấu trúc ứng dụng (MVVM)"
+          }
+        }
+      }
     },
     "Audio and transcripts stay on this PC." : {
       "comment" : "Windows only: Views/OnboardingWindow.xaml.",
-      "extractionState" : "manual"
+      "extractionState" : "manual",
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Âm thanh và bản chép lời được giữ trên máy tính này."
+          }
+        }
+      }
     },
     "Audio capture and playback" : {
       "comment" : "Windows only: Views/Settings/AcknowledgementsSettingsPage.xaml.cs.",
-      "extractionState" : "manual"
+      "extractionState" : "manual",
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Thu và phát âm thanh"
+          }
+        }
+      }
     },
     "Audio leaves this PC: cloud engines upload the recording to the provider." : {
       "comment" : "Windows only: Views/Settings/TranscriptionSettingsPage.xaml.cs.",
-      "extractionState" : "manual"
+      "extractionState" : "manual",
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Âm thanh rời khỏi máy tính này: các công cụ đám mây tải bản ghi âm lên nhà cung cấp."
+          }
+        }
+      }
     },
     "Audio leaves this PC: the cloud diarizer uploads the system channel to the provider." : {
       "comment" : "Windows only: Views/Settings/TranscriptionSettingsPage.xaml.cs.",
-      "extractionState" : "manual"
+      "extractionState" : "manual",
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Âm thanh rời khỏi máy tính này: công cụ phân biệt người nói trên đám mây tải kênh hệ thống lên nhà cung cấp."
+          }
+        }
+      }
     },
     "Audio leaves this PC: the recording's mic and system channels are uploaded to %@ (%@) for transcription and billed by them. The provider may keep the audio under its own retention policy. You are asked once per provider and destination." : {
       "comment" : "Windows only: Services/CloudConsent.cs.",
-      "extractionState" : "manual"
+      "extractionState" : "manual",
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Âm thanh rời khỏi máy tính này: kênh micrô và kênh hệ thống của bản ghi âm được tải lên %@ (%@) để chép lời và do họ tính phí. Nhà cung cấp có thể lưu giữ âm thanh theo chính sách lưu trữ riêng của họ. Bạn chỉ được hỏi một lần cho mỗi nhà cung cấp và nơi nhận."
+          }
+        }
+      }
     },
     "Auto = the transcript's language for summaries, the question's for answers." : {
       "comment" : "Windows only: Views/Settings/ProvidersSettingsPage.xaml.cs.",
-      "extractionState" : "manual"
+      "extractionState" : "manual",
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Tự động = ngôn ngữ của bản chép lời đối với bản tóm tắt, của câu hỏi đối với câu trả lời."
+          }
+        }
+      }
     },
     "Calendar access is off. Turn on EchoDiar in Windows Settings › Privacy & security › Calendar." : {
       "comment" : "Windows only: Views/CalendarPage.xaml.",
-      "extractionState" : "manual"
+      "extractionState" : "manual",
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Quyền truy cập lịch đang tắt. Hãy bật EchoDiar trong Cài đặt Windows › Quyền riêng tư & bảo mật › Lịch."
+          }
+        }
+      }
     },
     "Check for updates…" : {
       "comment" : "Windows only: Services/Updater.cs.",
-      "extractionState" : "manual"
+      "extractionState" : "manual",
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Kiểm tra bản cập nhật…"
+          }
+        }
+      }
     },
     "Check now" : {
       "comment" : "Windows only: Views/Settings/AboutSettingsPage.xaml.",
-      "extractionState" : "manual"
+      "extractionState" : "manual",
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Kiểm tra ngay"
+          }
+        }
+      }
     },
     "Check that the base URL ends with /v1." : {
       "comment" : "Windows only: Views/Settings/ProvidersSettingsPage.xaml.cs.",
-      "extractionState" : "manual"
+      "extractionState" : "manual",
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Hãy kiểm tra xem URL gốc có kết thúc bằng /v1 không."
+          }
+        }
+      }
     },
     "Check that your speakers or headphones are on and not muted, then test again." : {
       "comment" : "Windows only: Views/OnboardingWindow.xaml.cs.",
-      "extractionState" : "manual"
+      "extractionState" : "manual",
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Hãy kiểm tra loa hoặc tai nghe đã bật và không bị tắt tiếng, rồi kiểm tra lại."
+          }
+        }
+      }
     },
     "Checking for updates…" : {
       "comment" : "Windows only: Views/Settings/AboutSettingsPage.xaml.cs.",
-      "extractionState" : "manual"
+      "extractionState" : "manual",
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Đang kiểm tra bản cập nhật…"
+          }
+        }
+      }
     },
     "Cloud diarization failed and no diarization model is installed on this PC." : {
       "comment" : "Windows only: Views/TranscriptView.xaml.cs.",
-      "extractionState" : "manual"
+      "extractionState" : "manual",
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Phân biệt người nói trên đám mây không thành công và máy tính này chưa cài mô hình phân biệt người nói nào."
+          }
+        }
+      }
     },
     "Cloud diarization failed; speakers were told apart on this PC." : {
       "comment" : "Windows only: Views/TranscriptView.xaml.cs.",
-      "extractionState" : "manual"
+      "extractionState" : "manual",
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Phân biệt người nói trên đám mây không thành công; người nói đã được phân biệt trên máy tính này."
+          }
+        }
+      }
     },
     "Codex runs without your ~/.codex/config.toml (its model, MCP servers and hooks) in a read-only, offline sandbox, but its remaining built-in tools can still read files on this PC." : {
       "comment" : "Windows only: EchoDiar.AI/CLIRunner.cs ContainmentNote, shown by Views/AIPanelView.xaml.cs, Views/Settings/ProvidersSettingsPage.xaml.cs.",
-      "extractionState" : "manual"
+      "extractionState" : "manual",
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Codex chạy mà không dùng ~/.codex/config.toml của bạn (mô hình, máy chủ MCP và hook trong đó), trong một sandbox chỉ đọc và ngoại tuyến, nhưng các công cụ tích hợp sẵn còn lại của Codex vẫn có thể đọc tệp trên máy tính này."
+          }
+        }
+      }
     },
     "Could not check for updates" : {
       "comment" : "Windows only: Views/TitleBarToolbar.xaml.cs.",
-      "extractionState" : "manual"
+      "extractionState" : "manual",
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Không thể kiểm tra bản cập nhật"
+          }
+        }
+      }
     },
     "Could not install the update" : {
       "comment" : "Windows only: Views/TitleBarToolbar.xaml.cs.",
-      "extractionState" : "manual"
+      "extractionState" : "manual",
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Không thể cài đặt bản cập nhật"
+          }
+        }
+      }
     },
     "Could not open the audio (%@)." : {
       "comment" : "Windows only: ViewModels/PlaybackController.cs.",
-      "extractionState" : "manual"
+      "extractionState" : "manual",
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Không thể mở âm thanh (%@)."
+          }
+        }
+      }
     },
     "Could not play the audio (%@)." : {
       "comment" : "Windows only: ViewModels/PlaybackController.cs.",
-      "extractionState" : "manual"
+      "extractionState" : "manual",
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Không thể phát âm thanh (%@)."
+          }
+        }
+      }
     },
     "Data sent to %@ leaves this PC." : {
       "comment" : "Windows only: Views/AIPanelView.xaml.cs.",
-      "extractionState" : "manual"
+      "extractionState" : "manual",
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Dữ liệu gửi đến %@ sẽ rời khỏi máy tính này."
+          }
+        }
+      }
     },
     "Data sent to cloud providers or CLIs leaves this PC." : {
       "comment" : "Windows only: Views/Settings/ProvidersSettingsPage.xaml.",
-      "extractionState" : "manual"
+      "extractionState" : "manual",
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Dữ liệu gửi đến nhà cung cấp đám mây hoặc CLI sẽ rời khỏi máy tính này."
+          }
+        }
+      }
     },
     "Download a speaker model" : {
       "comment" : "Windows only: Views/ConversationListView.xaml.cs.",
-      "extractionState" : "manual"
+      "extractionState" : "manual",
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Tải về mô hình người nói"
+          }
+        }
+      }
     },
     "Download a transcription model" : {
       "comment" : "Windows only: Views/ConversationListView.xaml.cs.",
-      "extractionState" : "manual"
+      "extractionState" : "manual",
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Tải về mô hình chép lời"
+          }
+        }
+      }
     },
     "EchoDiar %@ is currently the newest version available." : {
       "comment" : "Windows only: Views/TitleBarToolbar.xaml.cs.",
-      "extractionState" : "manual"
+      "extractionState" : "manual",
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "EchoDiar %@ hiện là phiên bản mới nhất."
+          }
+        }
+      }
     },
     "EchoDiar closes, installs the new version and opens again." : {
       "comment" : "Windows only: Views/TitleBarToolbar.xaml.cs.",
-      "extractionState" : "manual"
+      "extractionState" : "manual",
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "EchoDiar sẽ đóng, cài đặt phiên bản mới rồi mở lại."
+          }
+        }
+      }
     },
     "EchoDiar hears nothing from %@. Pick another source or check that the app is playing." : {
       "comment" : "Windows only: Views/RecordingView.xaml.cs.",
-      "extractionState" : "manual"
+      "extractionState" : "manual",
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "EchoDiar không nghe thấy gì từ %@. Hãy chọn nguồn khác hoặc kiểm tra xem ứng dụng có đang phát âm thanh không."
+          }
+        }
+      }
     },
     "EchoDiar installs the update once the recording, transcriptions and AI answers have finished." : {
       "comment" : "Windows only: Views/TitleBarToolbar.xaml.cs.",
-      "extractionState" : "manual"
+      "extractionState" : "manual",
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "EchoDiar sẽ cài đặt bản cập nhật khi việc ghi âm, chép lời và câu trả lời AI đã hoàn tất."
+          }
+        }
+      }
     },
     "EchoDiar records the other people on the call from your PC's audio. The test plays a short sound and listens for it." : {
       "comment" : "Windows only: Views/OnboardingWindow.xaml.cs.",
-      "extractionState" : "manual"
+      "extractionState" : "manual",
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "EchoDiar ghi lại những người khác trong cuộc gọi từ âm thanh của máy tính. Bài kiểm tra phát một âm thanh ngắn và lắng nghe âm thanh đó."
+          }
+        }
+      }
     },
     "Every license above in one text file." : {
       "comment" : "Windows only: Views/Settings/AcknowledgementsSettingsPage.xaml.",
-      "extractionState" : "manual"
+      "extractionState" : "manual",
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Mọi giấy phép ở trên trong một tệp văn bản."
+          }
+        }
+      }
     },
     "Extra headers" : {
       "comment" : "Windows only: Views/Settings/ProvidersSettingsPage.xaml.cs.",
-      "extractionState" : "manual"
+      "extractionState" : "manual",
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Header bổ sung"
+          }
+        }
+      }
     },
     "Gemini CLI denies every tool and loads no MCP server or extension, unless a system-wide admin policy allows them." : {
       "comment" : "Windows only: EchoDiar.AI/CLIRunner.cs ContainmentNote, shown by Views/AIPanelView.xaml.cs, Views/Settings/ProvidersSettingsPage.xaml.cs.",
-      "extractionState" : "manual"
+      "extractionState" : "manual",
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Gemini CLI từ chối mọi công cụ và không tải máy chủ MCP hay tiện ích mở rộng nào, trừ khi chính sách quản trị toàn hệ thống cho phép."
+          }
+        }
+      }
     },
     "Heads up: I'm recording this call to take notes. The recording stays on my PC." : {
       "comment" : "Windows only: Views/Settings/GeneralSettingsPage.xaml.cs, Views/OnboardingWindow.xaml.cs.",
-      "extractionState" : "manual"
+      "extractionState" : "manual",
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Xin lưu ý: tôi đang ghi âm cuộc gọi này để ghi chú. Bản ghi âm được lưu giữ trên máy tính của tôi."
+          }
+        }
+      }
     },
     "Indexing your conversations on this PC needs this embedding model (%@). You can also pick another model below." : {
       "comment" : "Windows only: Views/Settings/RAGSettingsPage.xaml.cs.",
-      "extractionState" : "manual"
+      "extractionState" : "manual",
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Việc lập chỉ mục các cuộc hội thoại trên máy tính này cần mô hình nhúng này (%@). Bạn cũng có thể chọn một mô hình khác ở bên dưới."
+          }
+        }
+      }
     },
     "Install and Relaunch" : {
       "comment" : "Windows only: Views/TitleBarToolbar.xaml.cs.",
-      "extractionState" : "manual"
+      "extractionState" : "manual",
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Cài đặt và khởi động lại"
+          }
+        }
+      }
     },
     "Install the update?" : {
       "comment" : "Windows only: Views/TitleBarToolbar.xaml.cs.",
-      "extractionState" : "manual"
+      "extractionState" : "manual",
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Cài đặt bản cập nhật?"
+          }
+        }
+      }
     },
     "Installing the update…" : {
       "comment" : "Windows only: Services/Updater.cs, ViewModels/AppViewModel.Updates.cs, Views/TitleBarToolbar.xaml.cs.",
-      "extractionState" : "manual"
+      "extractionState" : "manual",
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Đang cài đặt bản cập nhật…"
+          }
+        }
+      }
     },
     "Installing the update… %lld%%" : {
       "comment" : "Windows only: Views/Settings/AboutSettingsPage.xaml.cs, Views/TitleBarToolbar.xaml.cs.",
-      "extractionState" : "manual"
+      "extractionState" : "manual",
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Đang cài đặt bản cập nhật… %lld%%"
+          }
+        }
+      }
     },
     "It needs an index of your transcripts, built on this PC by default." : {
       "comment" : "Windows only: Views/GlobalChatView.xaml.",
-      "extractionState" : "manual"
+      "extractionState" : "manual",
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Cần có chỉ mục các bản chép lời của bạn, mặc định được tạo trên máy tính này."
+          }
+        }
+      }
     },
     "Its runtime files come under the Microsoft Software License Terms." : {
       "comment" : "Windows only: Views/Settings/AcknowledgementsSettingsPage.xaml.cs.",
-      "extractionState" : "manual"
+      "extractionState" : "manual",
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Các tệp runtime của thư viện này tuân theo Điều khoản cấp phép phần mềm của Microsoft."
+          }
+        }
+      }
     },
     "Keeps it at the window's top-right corner." : {
       "comment" : "Windows only: Views/Settings/RecordingSettingsPage.xaml.cs.",
-      "extractionState" : "manual"
+      "extractionState" : "manual",
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Giữ ở góc trên bên phải của cửa sổ."
+          }
+        }
+      }
     },
     "Language of summaries and answers" : {
       "comment" : "Windows only: Views/Settings/ProvidersSettingsPage.xaml.",
-      "extractionState" : "manual"
+      "extractionState" : "manual",
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Ngôn ngữ của bản tóm tắt và câu trả lời"
+          }
+        }
+      }
     },
     "Last checked %@" : {
       "comment" : "Windows only: Views/Settings/AboutSettingsPage.xaml.cs.",
-      "extractionState" : "manual"
+      "extractionState" : "manual",
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Kiểm tra lần cuối: %@"
+          }
+        }
+      }
     },
     "Leaves this PC" : {
       "comment" : "Windows only: Views/Settings/RAGSettingsPage.xaml.cs.",
-      "extractionState" : "manual"
+      "extractionState" : "manual",
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Rời khỏi máy tính này"
+          }
+        }
+      }
     },
     "Loading the model…" : {
       "comment" : "Windows only: EchoDiar.AI/AIService.cs (AI job status), shown by ViewModels/AppViewModel.AI.cs.",
-      "extractionState" : "manual"
+      "extractionState" : "manual",
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Đang tải mô hình…"
+          }
+        }
+      }
     },
     "Microphone access is blocked on this PC." : {
       "comment" : "Windows only: Views/OnboardingWindow.xaml.cs.",
-      "extractionState" : "manual"
+      "extractionState" : "manual",
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Quyền truy cập micrô bị chặn trên máy tính này."
+          }
+        }
+      }
     },
     "Microphone level" : {
       "comment" : "Windows only: Views/OnboardingWindow.xaml.",
-      "extractionState" : "manual"
+      "extractionState" : "manual",
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Mức âm lượng micrô"
+          }
+        }
+      }
     },
     "Models EchoDiar downloads when you choose them. Choose one to read its license." : {
       "comment" : "Windows only: Views/Settings/AcknowledgementsSettingsPage.xaml.",
-      "extractionState" : "manual"
+      "extractionState" : "manual",
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Các mô hình EchoDiar tải về khi bạn chọn. Hãy chọn một mục để đọc giấy phép."
+          }
+        }
+      }
     },
     "Move to Recycle Bin" : {
       "comment" : "Windows only: Views/Settings/StorageSettingsPage.xaml.cs.",
-      "extractionState" : "manual"
+      "extractionState" : "manual",
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Chuyển vào Thùng rác"
+          }
+        }
+      }
     },
     "Moves the audio to the Recycle Bin once a transcription succeeds." : {
       "comment" : "Windows only: Views/Settings/StorageSettingsPage.xaml, Views/Settings/TranscriptionSettingsPage.xaml.",
-      "extractionState" : "manual"
+      "extractionState" : "manual",
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Chuyển âm thanh vào Thùng rác khi chép lời thành công."
+          }
+        }
+      }
     },
     "Needs more than half of this PC's memory." : {
       "comment" : "Windows only: Views/Settings/ProvidersSettingsPage.xaml.cs, Views/Settings/RAGSettingsPage.xaml.cs.",
-      "extractionState" : "manual"
+      "extractionState" : "manual",
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Cần hơn một nửa bộ nhớ của máy tính này."
+          }
+        }
+      }
     },
     "No conversations yet — press Ctrl+R to record" : {
       "comment" : "Windows only: Views/ConversationListView.xaml.cs.",
-      "extractionState" : "manual"
+      "extractionState" : "manual",
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Chưa có cuộc hội thoại nào — nhấn Ctrl+R để ghi âm"
+          }
+        }
+      }
     },
     "Not checked yet" : {
       "comment" : "Windows only: Views/Settings/AboutSettingsPage.xaml.cs.",
-      "extractionState" : "manual"
+      "extractionState" : "manual",
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Chưa kiểm tra"
+          }
+        }
+      }
     },
     "Not found: give the full path to a .exe, or to an npm .cmd shim." : {
       "comment" : "Windows only: Views/Settings/ProvidersSettingsPage.xaml.cs.",
-      "extractionState" : "manual"
+      "extractionState" : "manual",
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Không tìm thấy: hãy nhập đường dẫn đầy đủ đến tệp .exe, hoặc đến shim .cmd của npm."
+          }
+        }
+      }
     },
     "Not transcribed" : {
       "comment" : "Windows only: Views/ConversationListView.xaml.cs.",
-      "extractionState" : "manual"
+      "extractionState" : "manual",
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Chưa chép lời"
+          }
+        }
+      }
     },
     "On this PC" : {
       "comment" : "Windows only: Views/AIMenus.cs, Views/Settings/RAGSettingsPage.xaml.",
-      "extractionState" : "manual"
+      "extractionState" : "manual",
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Trên máy tính này"
+          }
+        }
+      }
     },
     "Once a day, moves transcribed conversations older than the age below to the Recycle Bin." : {
       "comment" : "Windows only: Views/Settings/StorageSettingsPage.xaml.cs.",
-      "extractionState" : "manual"
+      "extractionState" : "manual",
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Mỗi ngày một lần, chuyển các cuộc hội thoại đã chép lời cũ hơn mốc thời gian bên dưới vào Thùng rác."
+          }
+        }
+      }
     },
     "One per line, Name: value. Saved in the settings file: put API keys in the API key field." : {
       "comment" : "Windows only: Views/Settings/ProvidersSettingsPage.xaml.cs.",
-      "extractionState" : "manual"
+      "extractionState" : "manual",
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Mỗi dòng một header, dạng Tên: giá trị. Được lưu trong tệp cài đặt: hãy nhập khoá API vào ô Khoá API."
+          }
+        }
+      }
     },
     "Open Windows microphone settings" : {
       "comment" : "Windows only: Views/OnboardingWindow.xaml.",
-      "extractionState" : "manual"
+      "extractionState" : "manual",
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Mở cài đặt micrô của Windows"
+          }
+        }
+      }
     },
     "Open Windows privacy settings" : {
       "comment" : "Windows only: Views/CalendarPage.xaml.",
-      "extractionState" : "manual"
+      "extractionState" : "manual",
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Mở cài đặt quyền riêng tư của Windows"
+          }
+        }
+      }
     },
     "Open full notices" : {
       "comment" : "Windows only: Views/Settings/AcknowledgementsSettingsPage.xaml.",
-      "extractionState" : "manual"
+      "extractionState" : "manual",
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Mở thông báo đầy đủ"
+          }
+        }
+      }
     },
     "Open in File Explorer" : {
       "comment" : "Windows only: Views/Settings/StorageSettingsPage.xaml.",
-      "extractionState" : "manual"
+      "extractionState" : "manual",
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Mở trong File Explorer"
+          }
+        }
+      }
     },
     "OpenCode denies every tool, but MCP servers in your OpenCode config still start (their tools are denied)." : {
       "comment" : "Windows only: EchoDiar.AI/CLIRunner.cs ContainmentNote, shown by Views/AIPanelView.xaml.cs, Views/Settings/ProvidersSettingsPage.xaml.cs.",
-      "extractionState" : "manual"
+      "extractionState" : "manual",
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "OpenCode từ chối mọi công cụ, nhưng các máy chủ MCP trong cấu hình OpenCode của bạn vẫn khởi động (các công cụ của chúng bị từ chối)."
+          }
+        }
+      }
     },
     "Parakeet transcription" : {
       "comment" : "Windows only: Views/Settings/AcknowledgementsSettingsPage.xaml.cs.",
-      "extractionState" : "manual"
+      "extractionState" : "manual",
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Chép lời Parakeet"
+          }
+        }
+      }
     },
     "Playback stopped (%@)." : {
       "comment" : "Windows only: ViewModels/PlaybackController.cs.",
-      "extractionState" : "manual"
+      "extractionState" : "manual",
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Đã dừng phát (%@)."
+          }
+        }
+      }
     },
     "Press Ctrl+R to start recording." : {
       "comment" : "Windows only: Views/WelcomeView.xaml.cs.",
-      "extractionState" : "manual"
+      "extractionState" : "manual",
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Nhấn Ctrl+R để bắt đầu ghi âm."
+          }
+        }
+      }
     },
     "Ready" : {
       "comment" : "Windows only: Views/ConversationListView.xaml.cs.",
-      "extractionState" : "manual"
+      "extractionState" : "manual",
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Sẵn sàng"
+          }
+        }
+      }
     },
     "Record %@" : {
       "comment" : "Windows only: Views/TitleBarToolbar.xaml.cs.",
-      "extractionState" : "manual"
+      "extractionState" : "manual",
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Ghi âm %@"
+          }
+        }
+      }
     },
     "Recordings are transcribed on this PC. Pick a speech recognition model to download." : {
       "comment" : "Windows only: Views/ConversationListView.xaml.cs.",
-      "extractionState" : "manual"
+      "extractionState" : "manual",
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Bản ghi âm được chép lời trên máy tính này. Hãy chọn một mô hình nhận dạng giọng nói để tải về."
+          }
+        }
+      }
     },
     "Redo" : {
       "comment" : "Windows only: Views/HotKeyRecorder.cs.",
-      "extractionState" : "manual"
+      "extractionState" : "manual",
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Làm lại"
+          }
+        }
+      }
     },
     "Reveal in Explorer" : {
       "comment" : "Windows only: Views/ConversationCard.xaml.cs.",
-      "extractionState" : "manual"
+      "extractionState" : "manual",
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Hiển thị trong Explorer"
+          }
+        }
+      }
     },
     "Settings cards" : {
       "comment" : "Windows only: Views/Settings/AcknowledgementsSettingsPage.xaml.cs.",
-      "extractionState" : "manual"
+      "extractionState" : "manual",
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Thẻ cài đặt"
+          }
+        }
+      }
     },
     "Shows the transcript during the recording and keeps it, so it is ready within seconds of Stop. Uses more CPU and memory while recording. Whisper and Parakeet models only; other engines transcribe after Stop." : {
       "comment" : "Windows only: Views/Settings/TranscriptionSettingsPage.xaml.cs.",
-      "extractionState" : "manual"
+      "extractionState" : "manual",
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Hiển thị bản chép lời trong khi ghi âm và giữ lại, nhờ đó bản chép lời sẵn sàng trong vài giây sau khi bấm Dừng. Dùng nhiều CPU và bộ nhớ hơn khi ghi âm. Chỉ dành cho mô hình Whisper và Parakeet; các công cụ khác chép lời sau khi bấm Dừng."
+          }
+        }
+      }
     },
     "Simulate state" : {
       "comment" : "Windows only: Services/TrayIcon.cs.",
-      "extractionState" : "manual"
+      "extractionState" : "manual",
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Mô phỏng trạng thái"
+          }
+        }
+      }
     },
     "Speaker diarization" : {
       "comment" : "Windows only: Views/Settings/AcknowledgementsSettingsPage.xaml.cs.",
-      "extractionState" : "manual"
+      "extractionState" : "manual",
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Phân biệt người nói"
+          }
+        }
+      }
     },
     "Start recording" : {
       "comment" : "Windows only: Services/TrayIcon.cs.",
-      "extractionState" : "manual"
+      "extractionState" : "manual",
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Bắt đầu ghi âm"
+          }
+        }
+      }
     },
     "The API key is longer than %lld bytes, the most Credential Manager keeps." : {
       "comment" : "Windows only: ViewModels/ProvidersViewModel.cs.",
-      "extractionState" : "manual"
+      "extractionState" : "manual",
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Khoá API dài hơn %lld byte, mức tối đa mà Trình quản lý thông tin xác thực lưu được."
+          }
+        }
+      }
     },
     "The API key is sent unencrypted over http to %@. Use https, or a host on this PC." : {
       "comment" : "Windows only: Views/Settings/ProvidersSettingsPage.xaml.cs.",
-      "extractionState" : "manual"
+      "extractionState" : "manual",
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Khoá API được gửi qua http không mã hoá đến %@. Hãy dùng https, hoặc một máy chủ trên máy tính này."
+          }
+        }
+      }
     },
     "The app" : {
       "comment" : "Windows only: Views/FloatingPillWindow.xaml.cs.",
-      "extractionState" : "manual"
+      "extractionState" : "manual",
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Ứng dụng"
+          }
+        }
+      }
     },
     "The audio files are moved to the Recycle Bin. Transcripts, summaries and chats stay." : {
       "comment" : "Windows only: Views/Settings/StorageSettingsPage.xaml.cs.",
-      "extractionState" : "manual"
+      "extractionState" : "manual",
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Các tệp âm thanh được chuyển vào Thùng rác. Bản chép lời, bản tóm tắt và cuộc trò chuyện vẫn được giữ."
+          }
+        }
+      }
     },
     "The audio files are moved to the Recycle Bin. Transcripts, summaries and chats stay; playback and re-transcribing are no longer possible." : {
       "comment" : "Windows only: Views/Settings/StorageSettingsPage.xaml.cs.",
-      "extractionState" : "manual"
+      "extractionState" : "manual",
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Các tệp âm thanh được chuyển vào Thùng rác. Bản chép lời, bản tóm tắt và cuộc trò chuyện vẫn được giữ; không thể phát lại và chép lời lại nữa."
+          }
+        }
+      }
     },
     "The audio is moved to the Recycle Bin. The transcript, summary and chat stay; playback and re-transcribing are no longer possible." : {
       "comment" : "Windows only: Views/TitleBarToolbar.xaml.cs.",
-      "extractionState" : "manual"
+      "extractionState" : "manual",
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Âm thanh được chuyển vào Thùng rác. Bản chép lời, bản tóm tắt và cuộc trò chuyện vẫn được giữ; không thể phát lại và chép lời lại nữa."
+          }
+        }
+      }
     },
     "The audio of %lld conversations will be moved to the Recycle Bin at the next run (at launch or within a day):" : {
       "comment" : "Windows only: Views/Settings/StorageSettingsPage.xaml.cs.",
@@ -505,6 +1263,12 @@
                 }
               }
             }
+          }
+        },
+        "vi" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Âm thanh của %lld cuộc hội thoại sẽ được chuyển vào Thùng rác ở lần chạy tới (khi khởi động hoặc trong vòng một ngày):"
           }
         }
       }
@@ -530,6 +1294,12 @@
               }
             }
           }
+        },
+        "vi" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Âm thanh của %lld cuộc hội thoại sẽ được chuyển vào Thùng rác ngay bây giờ, sau đó hằng ngày với các cuộc cũ hơn:"
+          }
         }
       }
     },
@@ -554,220 +1324,650 @@
               }
             }
           }
+        },
+        "vi" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Âm thanh của các cuộc hội thoại đã chép lời cũ hơn %lld ngày sẽ được chuyển vào Thùng rác mỗi ngày một lần. Hiện không có gì khớp."
+          }
         }
       }
     },
     "The calendar could not be changed. Try again later." : {
       "comment" : "Windows only: ViewModels/AppViewModel.Calendar.cs (the event editor's error when the Appointments API fails).",
-      "extractionState" : "manual"
+      "extractionState" : "manual",
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Không thể thay đổi lịch. Hãy thử lại sau."
+          }
+        }
+      }
     },
     "The download failed: %@" : {
       "comment" : "Windows only: Views/ConversationListView.xaml.cs.",
-      "extractionState" : "manual"
+      "extractionState" : "manual",
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Tải về không thành công: %@"
+          }
+        }
+      }
     },
     "The ggml conversion's model card says Apache-2.0; the original weights by VinAI are BSD-3-Clause." : {
       "comment" : "Windows only: Views/Settings/AcknowledgementsSettingsPage.xaml.cs.",
-      "extractionState" : "manual"
+      "extractionState" : "manual",
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Thẻ mô hình của bản chuyển đổi ggml ghi Apache-2.0; trọng số gốc của VinAI theo giấy phép BSD-3-Clause."
+          }
+        }
+      }
     },
     "The recording and its files are moved to the Recycle Bin." : {
       "comment" : "Windows only: Views/TitleBarToolbar.xaml.cs.",
-      "extractionState" : "manual"
+      "extractionState" : "manual",
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Bản ghi âm và các tệp của nó được chuyển vào Thùng rác."
+          }
+        }
+      }
     },
     "The recordings and their files are moved to the Recycle Bin." : {
       "comment" : "Windows only: Views/TitleBarToolbar.xaml.cs.",
-      "extractionState" : "manual"
+      "extractionState" : "manual",
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Các bản ghi âm và tệp của chúng được chuyển vào Thùng rác."
+          }
+        }
+      }
     },
     "The transcription, speaker and AI models are removed from this PC (not moved to the Recycle Bin). Download them again in Settings › Transcription and Settings › AI." : {
       "comment" : "Windows only: Views/Settings/StorageSettingsPage.xaml.cs.",
-      "extractionState" : "manual"
+      "extractionState" : "manual",
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Các mô hình chép lời, người nói và AI bị xoá khỏi máy tính này (không chuyển vào Thùng rác). Hãy tải về lại trong Cài đặt › Chép lời và Cài đặt › AI."
+          }
+        }
+      }
     },
     "They are moved to the Recycle Bin. The audio stays, so the conversations can be transcribed again." : {
       "comment" : "Windows only: Views/Settings/StorageSettingsPage.xaml.cs.",
-      "extractionState" : "manual"
+      "extractionState" : "manual",
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Chúng được chuyển vào Thùng rác. Âm thanh vẫn được giữ, nên có thể chép lời lại các cuộc hội thoại."
+          }
+        }
+      }
     },
     "They still go to the Recycle Bin." : {
       "comment" : "Windows only: Views/Settings/GeneralSettingsPage.xaml.",
-      "extractionState" : "manual"
+      "extractionState" : "manual",
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Chúng vẫn được chuyển vào Thùng rác."
+          }
+        }
+      }
     },
     "Third-party notices" : {
       "comment" : "Windows only: Views/Settings/AcknowledgementsSettingsPage.xaml.",
-      "extractionState" : "manual"
+      "extractionState" : "manual",
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Thông báo của bên thứ ba"
+          }
+        }
+      }
     },
     "This PC" : {
       "comment" : "Windows only: Views/Settings/RAGSettingsPage.xaml.cs.",
-      "extractionState" : "manual"
+      "extractionState" : "manual",
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Máy tính này"
+          }
+        }
+      }
     },
     "This PC's hardware does not support Windows AI (it needs a Copilot+ PC)." : {
       "comment" : "Windows only: EchoDiar.AI/WindowsAIAvailability.cs, shown by ViewModels/ProvidersViewModel.cs, Views/AIMenus.cs, Views/Settings/ProvidersSettingsPage.xaml.cs.",
-      "extractionState" : "manual"
+      "extractionState" : "manual",
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Phần cứng của máy tính này không hỗ trợ Windows AI (cần Copilot+ PC)."
+          }
+        }
+      }
     },
     "This build of EchoDiar cannot use Windows AI (the systemAIModels capability is missing)." : {
       "comment" : "Windows only: EchoDiar.AI/WindowsAIAvailability.cs, shown by ViewModels/ProvidersViewModel.cs, Views/AIMenus.cs, Views/Settings/ProvidersSettingsPage.xaml.cs.",
-      "extractionState" : "manual"
+      "extractionState" : "manual",
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Bản dựng EchoDiar này không thể dùng Windows AI (thiếu capability systemAIModels)."
+          }
+        }
+      }
     },
     "This conversation is not in the library." : {
       "comment" : "Windows only: Views/ConversationView.xaml.cs.",
-      "extractionState" : "manual"
+      "extractionState" : "manual",
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Cuộc hội thoại này không có trong thư viện."
+          }
+        }
+      }
     },
     "This copy was not installed from an .appinstaller file, so it does not update itself." : {
       "comment" : "Windows only: Views/Settings/AboutSettingsPage.xaml.cs.",
-      "extractionState" : "manual"
+      "extractionState" : "manual",
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Bản sao này không được cài đặt từ tệp .appinstaller, nên không tự cập nhật."
+          }
+        }
+      }
     },
     "This copy was not installed from an .appinstaller file." : {
       "comment" : "Windows only: Services/Updater.cs.",
-      "extractionState" : "manual"
+      "extractionState" : "manual",
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Bản sao này không được cài đặt từ tệp .appinstaller."
+          }
+        }
+      }
     },
     "This engine transcribes after Stop. Whisper and Parakeet models also transcribe while recording." : {
       "comment" : "Windows only: Views/RecordingView.xaml.cs.",
-      "extractionState" : "manual"
+      "extractionState" : "manual",
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Công cụ này chép lời sau khi bấm Dừng. Mô hình Whisper và Parakeet cũng chép lời trong khi ghi âm."
+          }
+        }
+      }
     },
     "This model does not label speakers; a model on this PC is used instead." : {
       "comment" : "Windows only: Views/Settings/TranscriptionSettingsPage.xaml.cs.",
-      "extractionState" : "manual"
+      "extractionState" : "manual",
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Mô hình này không gắn nhãn người nói; một mô hình trên máy tính này sẽ được dùng thay thế."
+          }
+        }
+      }
     },
     "Transcribe now" : {
       "comment" : "Windows only: Views/ConversationCard.xaml.",
-      "extractionState" : "manual"
+      "extractionState" : "manual",
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Chép lời ngay"
+          }
+        }
+      }
     },
     "Transcribe now, even with energy saver on" : {
       "comment" : "Windows only: Views/ConversationCard.xaml.",
-      "extractionState" : "manual"
+      "extractionState" : "manual",
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Chép lời ngay, kể cả khi Trình tiết kiệm năng lượng đang bật"
+          }
+        }
+      }
     },
     "Transcribed" : {
       "comment" : "Windows only: Views/ConversationListView.xaml.cs.",
-      "extractionState" : "manual"
+      "extractionState" : "manual",
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Đã chép lời"
+          }
+        }
+      }
     },
     "Transcribing %lld%%" : {
       "comment" : "Windows only: Views/ConversationListView.xaml.cs.",
-      "extractionState" : "manual"
+      "extractionState" : "manual",
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Đang chép lời %lld%%"
+          }
+        }
+      }
     },
     "Transcription starts once energy saver is off." : {
       "comment" : "Windows only: Views/Settings/RecordingSettingsPage.xaml.cs.",
-      "extractionState" : "manual"
+      "extractionState" : "manual",
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Việc chép lời sẽ bắt đầu khi Trình tiết kiệm năng lượng tắt."
+          }
+        }
+      }
     },
     "Try again later." : {
       "comment" : "Windows only: Views/TitleBarToolbar.xaml.cs.",
-      "extractionState" : "manual"
+      "extractionState" : "manual",
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Hãy thử lại sau."
+          }
+        }
+      }
     },
     "Turn on EchoDiar in Windows Settings › Privacy & security › Microphone." : {
       "comment" : "Windows only: Views/OnboardingWindow.xaml.cs.",
-      "extractionState" : "manual"
+      "extractionState" : "manual",
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Hãy bật EchoDiar trong Cài đặt Windows › Quyền riêng tư & bảo mật › Micrô."
+          }
+        }
+      }
     },
     "Turned off by your organization." : {
       "comment" : "Windows only: ViewModels/SettingsViewModel.cs.",
-      "extractionState" : "manual"
+      "extractionState" : "manual",
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Đã bị tổ chức của bạn tắt."
+          }
+        }
+      }
     },
     "Turned off in Windows Settings > Apps > Startup. Turn EchoDiar on there." : {
       "comment" : "Windows only: ViewModels/SettingsViewModel.cs.",
-      "extractionState" : "manual"
+      "extractionState" : "manual",
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Đã bị tắt trong Cài đặt Windows > Ứng dụng > Khởi động. Hãy bật EchoDiar ở đó."
+          }
+        }
+      }
     },
     "Turned on by your organization." : {
       "comment" : "Windows only: ViewModels/SettingsViewModel.cs.",
-      "extractionState" : "manual"
+      "extractionState" : "manual",
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Đã được tổ chức của bạn bật."
+          }
+        }
+      }
     },
     "Undo" : {
       "comment" : "Windows only: Views/HotKeyRecorder.cs.",
-      "extractionState" : "manual"
+      "extractionState" : "manual",
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Hoàn tác"
+          }
+        }
+      }
     },
     "Update after the current work" : {
       "comment" : "Windows only: Views/TitleBarToolbar.xaml.cs.",
-      "extractionState" : "manual"
+      "extractionState" : "manual",
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Cập nhật sau khi xong việc hiện tại"
+          }
+        }
+      }
     },
     "Update available…" : {
       "comment" : "Windows only: Services/Updater.cs.",
-      "extractionState" : "manual"
+      "extractionState" : "manual",
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Có bản cập nhật…"
+          }
+        }
+      }
     },
     "Updates" : {
       "comment" : "Windows only: Views/Settings/AboutSettingsPage.xaml.",
-      "extractionState" : "manual"
+      "extractionState" : "manual",
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Cập nhật"
+          }
+        }
+      }
     },
     "Updates need an .appinstaller install" : {
       "comment" : "Windows only: Services/Updater.cs.",
-      "extractionState" : "manual"
+      "extractionState" : "manual",
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Cần cài đặt từ tệp .appinstaller để nhận bản cập nhật"
+          }
+        }
+      }
     },
     "Use Ctrl or Alt with the key." : {
       "comment" : "Windows only: Views/HotKeyRecorder.cs.",
-      "extractionState" : "manual"
+      "extractionState" : "manual",
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Dùng Ctrl hoặc Alt cùng với phím."
+          }
+        }
+      }
     },
     "Used by LLamaSharp" : {
       "comment" : "Windows only: Views/Settings/AcknowledgementsSettingsPage.xaml.cs.",
-      "extractionState" : "manual"
+      "extractionState" : "manual",
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Được LLamaSharp sử dụng"
+          }
+        }
+      }
     },
     "Used by Whisper.net" : {
       "comment" : "Windows only: Views/Settings/AcknowledgementsSettingsPage.xaml.cs.",
-      "extractionState" : "manual"
+      "extractionState" : "manual",
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Được Whisper.net sử dụng"
+          }
+        }
+      }
     },
     "Used by sherpa-onnx" : {
       "comment" : "Windows only: Views/Settings/AcknowledgementsSettingsPage.xaml.cs.",
-      "extractionState" : "manual"
+      "extractionState" : "manual",
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Được sherpa-onnx sử dụng"
+          }
+        }
+      }
     },
     "Used for summaries and questions. The model of each enabled provider below, as checked in its row." : {
       "comment" : "Windows only: Views/Settings/ProvidersSettingsPage.xaml.",
-      "extractionState" : "manual"
+      "extractionState" : "manual",
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Dùng cho bản tóm tắt và câu hỏi. Là mô hình của từng nhà cung cấp đã bật bên dưới, theo lựa chọn ở hàng của nhà cung cấp đó."
+          }
+        }
+      }
     },
     "Vietnamese transcription" : {
       "comment" : "Windows only: Views/Settings/AcknowledgementsSettingsPage.xaml.cs.",
-      "extractionState" : "manual"
+      "extractionState" : "manual",
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Chép lời tiếng Việt"
+          }
+        }
+      }
     },
     "Wait for the transcriptions and AI answers to finish" : {
       "comment" : "Windows only: Views/Settings/GeneralSettingsPage.xaml.cs.",
-      "extractionState" : "manual"
+      "extractionState" : "manual",
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Chờ việc chép lời và câu trả lời AI hoàn tất"
+          }
+        }
+      }
     },
     "Wait while energy saver is on" : {
       "comment" : "Windows only: Views/Settings/RecordingSettingsPage.xaml.cs.",
-      "extractionState" : "manual"
+      "extractionState" : "manual",
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Chờ khi Trình tiết kiệm năng lượng đang bật"
+          }
+        }
+      }
     },
     "Waiting for live captions or transcription to finish…" : {
       "comment" : "Windows only: EchoDiar.AI/AIService.cs (AI job status), shown by ViewModels/AppViewModel.AI.cs.",
-      "extractionState" : "manual"
+      "extractionState" : "manual",
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Đang chờ phụ đề trực tiếp hoặc việc chép lời hoàn tất…"
+          }
+        }
+      }
     },
     "Waiting: energy saver is on" : {
       "comment" : "Windows only: Views/ConversationCard.xaml.cs.",
-      "extractionState" : "manual"
+      "extractionState" : "manual",
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Đang chờ: Trình tiết kiệm năng lượng đang bật"
+          }
+        }
+      }
     },
     "WinUI 3 and the app platform" : {
       "comment" : "Windows only: Views/Settings/AcknowledgementsSettingsPage.xaml.cs.",
-      "extractionState" : "manual"
+      "extractionState" : "manual",
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "WinUI 3 và nền tảng ứng dụng"
+          }
+        }
+      }
     },
     "Windows AI (system)" : {
       "comment" : "Windows only: Views/Settings/ProvidersSettingsPage.xaml.",
-      "extractionState" : "manual"
+      "extractionState" : "manual",
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Windows AI (hệ thống)"
+          }
+        }
+      }
     },
     "Windows AI is not available on this PC." : {
       "comment" : "Windows only: EchoDiar.AI/WindowsAIAvailability.cs, shown by ViewModels/ProvidersViewModel.cs, Views/AIMenus.cs, Views/Settings/ProvidersSettingsPage.xaml.cs.",
-      "extractionState" : "manual"
+      "extractionState" : "manual",
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Windows AI không khả dụng trên máy tính này."
+          }
+        }
+      }
     },
     "Windows AI is not supported on this PC (it needs a Copilot+ PC)." : {
       "comment" : "Windows only: EchoDiar.AI/WindowsAIAvailability.cs, shown by ViewModels/ProvidersViewModel.cs, Views/AIMenus.cs, Views/Settings/ProvidersSettingsPage.xaml.cs.",
-      "extractionState" : "manual"
+      "extractionState" : "manual",
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Windows AI không được hỗ trợ trên máy tính này (cần Copilot+ PC)."
+          }
+        }
+      }
     },
     "Windows AI is not unlocked for EchoDiar." : {
       "comment" : "Windows only: EchoDiar.AI/WindowsAIAvailability.cs, shown by ViewModels/ProvidersViewModel.cs, Views/AIMenus.cs, Views/Settings/ProvidersSettingsPage.xaml.cs.",
-      "extractionState" : "manual"
+      "extractionState" : "manual",
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Windows AI chưa được mở khoá cho EchoDiar."
+          }
+        }
+      }
     },
     "Windows AI is turned off (Settings › Privacy & security › Text and image generation)." : {
       "comment" : "Windows only: EchoDiar.AI/WindowsAIAvailability.cs, shown by ViewModels/ProvidersViewModel.cs, Views/AIMenus.cs, Views/Settings/ProvidersSettingsPage.xaml.cs.",
-      "extractionState" : "manual"
+      "extractionState" : "manual",
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Windows AI đang tắt (Cài đặt › Quyền riêng tư & bảo mật › Tạo văn bản và hình ảnh)."
+          }
+        }
+      }
     },
     "Windows AI needs a Windows update (Settings › Windows Update)." : {
       "comment" : "Windows only: EchoDiar.AI/WindowsAIAvailability.cs, shown by ViewModels/ProvidersViewModel.cs, Views/AIMenus.cs, Views/Settings/ProvidersSettingsPage.xaml.cs.",
-      "extractionState" : "manual"
+      "extractionState" : "manual",
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Windows AI cần một bản cập nhật Windows (Cài đặt › Windows Update)."
+          }
+        }
+      }
     },
     "You're up to date!" : {
       "comment" : "Windows only: Views/TitleBarToolbar.xaml.cs.",
-      "extractionState" : "manual"
+      "extractionState" : "manual",
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Bạn đang dùng phiên bản mới nhất!"
+          }
+        }
+      }
     },
     "another conversation" : {
       "comment" : "Windows only: Views/AIPanelView.xaml.cs, Views/GlobalChatView.xaml.cs.",
-      "extractionState" : "manual"
+      "extractionState" : "manual",
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "một cuộc hội thoại khác"
+          }
+        }
+      }
     },
     "the app" : {
       "comment" : "Windows only: Views/RecordingView.xaml.cs.",
-      "extractionState" : "manual"
+      "extractionState" : "manual",
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "ứng dụng"
+          }
+        }
+      }
     },
     "this link" : {
       "comment" : "Windows only: Views/AIPanelView.xaml.cs, Views/GlobalChatView.xaml.cs.",
-      "extractionState" : "manual"
+      "extractionState" : "manual",
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "liên kết này"
+          }
+        }
+      }
     }
   },
   "version" : "1.1"
