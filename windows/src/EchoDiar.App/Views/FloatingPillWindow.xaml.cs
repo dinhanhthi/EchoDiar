@@ -268,6 +268,7 @@ public sealed partial class FloatingPillWindow : Window
         if (prompt is not PillPrompt.CalendarEvent)
         {
             PromptText.MaxWidth = double.PositiveInfinity;
+            PromptText.MaxLines = 0;
             PromptText.TextTrimming = TextTrimming.None;
         }
         switch (prompt)
@@ -287,6 +288,7 @@ public sealed partial class FloatingPillWindow : Window
             case PillPrompt.CalendarEvent calendar:
                 // One line, cut at 320: a long title cannot widen the pill.
                 PromptText.MaxWidth = 320;
+                PromptText.MaxLines = 1;
                 PromptText.TextTrimming = TextTrimming.CharacterEllipsis;
                 RecordingCard.SetText(PromptText, Loc.Format("%@ is starting", calendar.Prompt.Event.Title));
                 CountdownText.Visibility = Visibility.Collapsed;

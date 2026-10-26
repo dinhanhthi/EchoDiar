@@ -450,7 +450,8 @@ internal static class CalendarProbe
 /// <c>--seed-event &lt;minutesFromNow&gt; &lt;durationMinutes&gt; [--link &lt;https url&gt;] [--invitee] [--title &lt;text&gt;] [--weekly]</c>
 /// saves one (negative minutes start it in the past), then tags it (<c>Details</c>) and, with <c>--invitee</c>, adds
 /// an invitee and marks it as not organized by the user, so the trust rule reads it as unconfirmed. The calendar id is
-/// written to <c>calendar.ownCalendarID</c> when the setting differs. <c>--seed-event --clear</c> deletes every tagged
+/// written to <c>calendar.ownCalendarID</c> when the setting differs, so quit EchoDiar before the first seed (a running
+/// app never reloads its settings). <c>--seed-event --clear</c> deletes every tagged
 /// event of the own calendar. Each line goes to <c>Probes\seed-event-&lt;stamp&gt;.log</c>, stdout and the debugger.
 /// Exit code 0, 1 when a step failed, 2 for invalid arguments (with the usage line).
 /// </summary>
@@ -603,6 +604,9 @@ internal static class CalendarSeed
         {
             settingsStore.Save(settings with { Calendar = settings.Calendar with { OwnCalendarID = calendarId } });
             Log($"settings: calendar.ownCalendarID {storedId ?? "null"} -> {calendarId}");
+            // A running app keeps its settings in memory and writes them back on its next save.
+            if (System.Diagnostics.Process.GetProcessesByName("EchoDiar").Any(p => p.Id != Environment.ProcessId))
+                Log("WARN EchoDiar is running and does not see the new ownCalendarID: quit it and seed again");
         }
 
         // Tag it (and add the invitee) on the series itself, never on one instance.
