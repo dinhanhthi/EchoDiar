@@ -1,4 +1,5 @@
 using System.ComponentModel;
+using System.Globalization;
 using EchoDiar.App.ViewModels;
 using EchoDiar.App.Views;
 using EchoDiar.Core.Audio;
@@ -141,6 +142,7 @@ internal sealed class TrayIcon : IDisposable
             items.Add(Item(Loc.T("Stop asking for this app"), _model.StopAskingForDetectedApp));
             items.Add(NotifyIconMenuItem.Separator);
         }
+        AddUpcomingItems(items);
         items.Add(Item(Loc.T("Settings…"), () =>
         {
             _model.OpenSettings();
@@ -203,6 +205,29 @@ internal sealed class TrayIcon : IDisposable
                 _model.ShowRecording();
                 _openMain();
             }));
+        }
+        items.Add(NotifyIconMenuItem.Separator);
+    }
+
+    /// <summary>
+    /// Up to 3 events in progress or starting within 12 h, as "14:00 Weekly sync"; one with a link opens it (macOS
+    /// addUpcomingItems). Skipped events are listed too, as on macOS. Nothing when there is none.
+    /// </summary>
+    private void AddUpcomingItems(List<NotifyIconMenuItem> items)
+    {
+        var now = DateTimeOffset.Now;
+        var events = _model.UpcomingCalendarEvents.Where(e => e.End > now && e.Start <= now.AddHours(12)).Take(3).ToList();
+        if (events.Count == 0) return;
+        items.Add(new NotifyIconMenuItem(Loc.T("Upcoming"), Enabled: false));
+        foreach (var @event in events)
+        {
+            var time = @event.Start.ToLocalTime().ToString("t", CultureInfo.CurrentCulture);
+            // The title comes from the invite (cleaned by the store; NotifyIcon escapes "&"): cut so a long one cannot
+            // widen the menu, never in the middle of a character.
+            var title = new StringInfo(@event.Title) is { LengthInTextElements: > 60 } info
+                ? info.SubstringByTextElements(0, 59) + "…"
+                : @event.Title;
+            items.Add(Item($"{time} {title}", () => _model.OpenCalendarEventLink(@event), enabled: @event.Link is not null));
         }
         items.Add(NotifyIconMenuItem.Separator);
     }
