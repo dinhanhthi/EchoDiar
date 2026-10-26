@@ -5,6 +5,7 @@ using CommunityToolkit.WinUI.Controls;
 using EchoDiar.App.Services;
 using EchoDiar.App.ViewModels;
 using EchoDiar.Core;
+using EchoDiar.Core.Calendar;
 using EchoDiar.Core.Settings;
 using EchoDiar.Platform.Audio;
 using Microsoft.UI.Xaml;
@@ -14,8 +15,8 @@ using Microsoft.UI.Xaml.Controls;
 namespace EchoDiar.App.Views;
 
 /// <summary>
-/// Settings › Recording (macOS RecordingSettingsView.swift), the Microphone, Meetings, Auto-stop and After recording
-/// inner tabs; the title bar picks the tab (<see cref="AppViewModel.SubTabOf"/>). Every setting shows
+/// Settings › Recording (macOS RecordingSettingsView.swift), the Microphone, Meetings, Calendar, Auto-stop and After
+/// recording inner tabs; the title bar picks the tab (<see cref="AppViewModel.SubTabOf"/>). Every setting shows
 /// <see cref="SettingsViewModel"/> and changes it; the change is saved after its delay. The microphones are listed
 /// again each time the page or its Microphone tab shows (macOS follows device changes live).
 /// </summary>
@@ -23,6 +24,7 @@ public sealed partial class RecordingSettingsPage : UserControl
 {
     public const string MicrophoneTab = "microphone";
     public const string MeetingsTab = "meetings";
+    public const string CalendarTab = "calendar";
     public const string AutoStopTab = "autoStop";
     public const string AfterRecordingTab = "afterRecording";
 
@@ -31,6 +33,7 @@ public sealed partial class RecordingSettingsPage : UserControl
     [
         new(MicrophoneTab, "Microphone"),
         new(MeetingsTab, "Meetings"),
+        new(CalendarTab, "Calendar"),
         new(AutoStopTab, "Auto-stop"),
         new(AfterRecordingTab, "After recording"),
     ];
@@ -42,6 +45,11 @@ public sealed partial class RecordingSettingsPage : UserControl
         new("When the microphone disconnects", ["unplug", "headphones", "route change"], MicrophoneTab),
         new("Detect meetings", ["auto record", "meeting apps", .. MeetingApps.Known.Select(a => a.Name)], MeetingsTab),
         new("Attach the indicator to the meeting window", ["floating indicator", "pill", "anchor"], MeetingsTab),
+        new("Calendar", ["calendar access", "iCloud", "Google", "Outlook", "Exchange", "events", "schedule", "privacy"], CalendarTab),
+        new("When a meeting starts", ["calendar", "auto record", "event", "schedule", "wait for the call", "record at start"], CalendarTab),
+        new("Watched calendars", ["calendar", "iCloud", "Google", "Outlook", "Exchange", "account"], CalendarTab),
+        new("Only events with a meeting link", ["calendar", "event", "Zoom", "Google Meet", "Microsoft Teams", "Webex", "link"], CalendarTab),
+        new("Stop when the event ends", ["calendar", "auto-stop", "event end", "meeting end"], CalendarTab),
         new("Stop when the app is quiet for", ["auto-stop", "inactive", "idle"], AutoStopTab),
         new("Stop when the call seems over for", ["auto-stop", "call ended", "hang up"], AutoStopTab),
         new("Stop after silence of", ["auto-stop", "quiet", "silent"], AutoStopTab),
@@ -66,6 +74,10 @@ public sealed partial class RecordingSettingsPage : UserControl
     /// <summary>The route combo's items, in order (macOS: Ask to stop, Keep recording, Stop recording).</summary>
     private static readonly RouteChangeBehavior[] RouteBehaviors = [RouteChangeBehavior.Ask, RouteChangeBehavior.Continue, RouteChangeBehavior.Stop];
 
+    /// <summary>The calendar mode combo's items, in order (macOS: Off, Ask, Wait for the call, Record at start).</summary>
+    private static readonly CalendarScheduler.Mode[] CalendarModes =
+        [CalendarScheduler.Mode.Off, CalendarScheduler.Mode.Ask, CalendarScheduler.Mode.WaitForCall, CalendarScheduler.Mode.RecordAtStart];
+
     private readonly AppViewModel _model;
     private readonly SettingsViewModel _settings;
     private readonly ModelsViewModel _models;
@@ -85,6 +97,9 @@ public sealed partial class RecordingSettingsPage : UserControl
     /// <summary>One row per meeting app: its app, its combo and the behaviors of the combo's items.</summary>
     private readonly List<(MeetingApp App, ComboBox Combo, MeetingBehavior[] Behaviors)> _appRows = [];
 
+    /// <summary>One row per calendar of <see cref="AppViewModel.Calendars"/>: its calendar and its switch (on = watched).</summary>
+    private readonly List<(CalendarInfo Calendar, ToggleSwitch Toggle)> _calendarRows = [];
+
     public RecordingSettingsPage(AppViewModel model)
     {
         _model = model;
@@ -100,14 +115,17 @@ public sealed partial class RecordingSettingsPage : UserControl
         var (min, max) = AppSettings.SpeakerCountHintRange;
         for (var count = min; count <= max; count++) SpeakerCountCombo.Items.Add(count.ToString(CultureInfo.CurrentCulture));
         AddAppRows();
+        AddCalendarRows();
         SetUpNumber(SourceInactiveBox, SourceInactiveCard, MeetingEndMonitorConfiguration.SourceInactiveRange, "s",
-            (c, v) => c with { SourceInactiveSeconds = v });
+            (s, v) => s with { EndMonitor = s.EndMonitor with { SourceInactiveSeconds = v } });
         SetUpNumber(CallEndedBox, CallEndedCard, MeetingEndMonitorConfiguration.CallEndedRange, "s",
-            (c, v) => c with { CallEndedSeconds = v });
+            (s, v) => s with { EndMonitor = s.EndMonitor with { CallEndedSeconds = v } });
         SetUpNumber(SilenceBox, SilenceCard, MeetingEndMonitorConfiguration.SilenceRange, "min",
-            (c, v) => c with { SilenceMinutes = v });
+            (s, v) => s with { EndMonitor = s.EndMonitor with { SilenceMinutes = v } });
         SetUpNumber(MaxDurationBox, MaxDurationCard, MeetingEndMonitorConfiguration.MaxDurationRange, "min",
-            (c, v) => c with { MaxDurationMinutes = v });
+            (s, v) => s with { EndMonitor = s.EndMonitor with { MaxDurationMinutes = v } });
+        SetUpNumber(StopAfterEndBox, StopAfterEndCard, CalendarScheduler.Configuration.StopAfterEndRange, "min",
+            (s, v) => s with { Calendar = s.Calendar with { StopAfterEndMinutes = v } });
 
         MicCombo.SelectionChanged += (_, _) =>
         {
@@ -123,6 +141,18 @@ public sealed partial class RecordingSettingsPage : UserControl
         };
         AttachToggle.Toggled += (_, _) => Set(() => _settings.Update(s => s with { AttachPillToWindow = AttachToggle.IsOn }));
         DetectToggle.Toggled += (_, _) => Set(() => _settings.Update(s => s with { MeetingDetection = DetectToggle.IsOn }));
+        CalendarGrantAccessButton.Click += (_, _) => _model.RefreshCalendar();
+        CalendarPrivacyButton.Click += (_, _) =>
+            _ = Windows.System.Launcher.LaunchUriAsync(new Uri("ms-settings:privacy-calendar"));
+        CalendarModeCombo.SelectionChanged += (_, _) =>
+        {
+            var index = CalendarModeCombo.SelectedIndex;
+            if (!_syncing && index >= 0) UpdateCalendar(c => c with { Mode = CalendarModes[index] });
+        };
+        CalendarOpenGeneralButton.Click += (_, _) => _model.OpenSettings(SettingsSearch.General);
+        // The inverse of allTimedEvents (macOS meetingLinkOnly).
+        LinkOnlyToggle.Toggled += (_, _) => Set(() => UpdateCalendar(c => c with { AllTimedEvents = !LinkOnlyToggle.IsOn }));
+        StopAtEventEndToggle.Toggled += (_, _) => Set(() => UpdateCalendar(c => c with { StopAtEventEnd = StopAtEventEndToggle.IsOn }));
         AutoTranscribeToggle.Toggled += (_, _) => Set(() => _settings.AutoTranscribe = AutoTranscribeToggle.IsOn);
         DiarizationToggle.Toggled += (_, _) => Set(() => _settings.Diarization = DiarizationToggle.IsOn);
         SpeakerCountCombo.SelectionChanged += (_, _) =>
@@ -138,6 +168,8 @@ public sealed partial class RecordingSettingsPage : UserControl
             _model.PropertyChanged += OnModelChanged;
             _settings.PropertyChanged += OnSettingsChanged;
             _models.PropertyChanged += OnModelsChanged;
+            // The calendars may have changed while the page was not shown.
+            if (!_calendarRows.Select(r => r.Calendar).SequenceEqual(_model.Calendars)) AddCalendarRows();
             Refresh();
             ShowTab();
             _ = ListMicrophonesAsync();
@@ -156,9 +188,21 @@ public sealed partial class RecordingSettingsPage : UserControl
 
     private void OnModelChanged(object? sender, PropertyChangedEventArgs e)
     {
-        if (e.PropertyName != nameof(AppViewModel.SettingsSubTab) || _model.IsClosing) return;
-        ShowTab();
-        if (Tab == MicrophoneTab) _ = ListMicrophonesAsync();
+        if (_model.IsClosing) return;
+        switch (e.PropertyName)
+        {
+            case nameof(AppViewModel.SettingsSubTab):
+                ShowTab();
+                if (Tab == MicrophoneTab) _ = ListMicrophonesAsync();
+                break;
+            case nameof(AppViewModel.CalendarAccess):
+                Refresh();
+                break;
+            case nameof(AppViewModel.Calendars):
+                AddCalendarRows();
+                Refresh();
+                break;
+        }
     }
 
     private void OnSettingsChanged(object? sender, PropertyChangedEventArgs e)
@@ -182,6 +226,7 @@ public sealed partial class RecordingSettingsPage : UserControl
         var tab = Tab;
         MicrophonePanel.Visibility = tab == MicrophoneTab ? Visibility.Visible : Visibility.Collapsed;
         MeetingsPanel.Visibility = tab == MeetingsTab ? Visibility.Visible : Visibility.Collapsed;
+        CalendarPanel.Visibility = tab == CalendarTab ? Visibility.Visible : Visibility.Collapsed;
         AutoStopPanel.Visibility = tab == AutoStopTab ? Visibility.Visible : Visibility.Collapsed;
         AfterRecordingPanel.Visibility = tab == AfterRecordingTab ? Visibility.Visible : Visibility.Collapsed;
     }
@@ -213,6 +258,8 @@ public sealed partial class RecordingSettingsPage : UserControl
                 combo.SelectedIndex = index >= 0 ? index : 0;
                 combo.IsEnabled = settings.MeetingDetection;
             }
+
+            RefreshCalendar(settings);
 
             var endMonitor = settings.EndMonitor;
             SourceInactiveBox.Value = Clamped(endMonitor.SourceInactiveSeconds, MeetingEndMonitorConfiguration.SourceInactiveRange);
@@ -330,6 +377,73 @@ public sealed partial class RecordingSettingsPage : UserControl
         return s with { PerAppBehavior = behaviors };
     });
 
+    // Calendar
+
+    /// <summary>
+    /// Access (nothing once granted, else what is missing and how to grant it), the mode and its Detect meetings hint,
+    /// the launch at login hint, the watched calendars (with access only), and the event-end stop.
+    /// </summary>
+    private void RefreshCalendar(AppSettings settings)
+    {
+        var access = _model.CalendarAccess;
+        var granted = access == CalendarAccess.Granted;
+        var notDetermined = access == CalendarAccess.NotDetermined;
+        CalendarAccessCard.Visibility = granted ? Visibility.Collapsed : Visibility.Visible;
+        CalendarAccessCard.Description = Loc.T(notDetermined
+            ? "EchoDiar has no calendar access yet."
+            : "Calendar access is off. Turn on EchoDiar in Windows Settings › Privacy & security › Calendar.");
+        CalendarGrantAccessButton.Visibility = notDetermined ? Visibility.Visible : Visibility.Collapsed;
+        CalendarPrivacyButton.Visibility = notDetermined ? Visibility.Collapsed : Visibility.Visible;
+
+        var calendar = settings.Calendar;
+        CalendarModeCombo.SelectedIndex = Array.IndexOf(CalendarModes, calendar.Mode);
+        CalendarModeCard.Description = calendar.Mode == CalendarScheduler.Mode.WaitForCall && !settings.MeetingDetection
+            ? Loc.T("Detect meetings is off, so EchoDiar asks instead.")
+            : null!; // null hides it
+        CalendarLaunchAtLoginCard.Visibility = settings.LaunchAtLogin ? Visibility.Collapsed : Visibility.Visible;
+
+        WatchedCalendarsPanel.Visibility = granted ? Visibility.Visible : Visibility.Collapsed;
+        foreach (var (info, toggle) in _calendarRows) toggle.IsOn = !calendar.IgnoredCalendarIDs.Contains(info.Id);
+
+        LinkOnlyToggle.IsOn = !calendar.AllTimedEvents;
+        StopAtEventEndToggle.IsOn = calendar.StopAtEventEnd;
+        StopAfterEndCard.IsEnabled = calendar.StopAtEventEnd;
+        StopAfterEndBox.Value = calendar.EffectiveStopAfterEndMinutes;
+    }
+
+    /// <summary>A switch per calendar, under its account's name (when it has one), in the model's order.</summary>
+    private void AddCalendarRows()
+    {
+        _calendarRows.Clear();
+        CalendarsList.Children.Clear();
+        foreach (var group in _model.Calendars.GroupBy(c => c.SourceTitle))
+        {
+            if (group.Key.Length > 0)
+            {
+                CalendarsList.Children.Add(new TextBlock { Text = group.Key, Style = (Style)Resources["SourceTitleStyle"] });
+            }
+            foreach (var info in group)
+            {
+                var toggle = new ToggleSwitch();
+                AutomationProperties.SetName(toggle, info.Title);
+                toggle.Toggled += (_, _) => Set(() => SetWatched(info, toggle.IsOn));
+                CalendarsList.Children.Add(new SettingsCard { Header = info.Title, Content = toggle });
+                _calendarRows.Add((info, toggle));
+            }
+        }
+    }
+
+    /// <summary>Watched = not in <c>ignoredCalendarIDs</c>; a new list, so the change is seen and syncs the calendar.</summary>
+    private void SetWatched(CalendarInfo calendar, bool watched) => UpdateCalendar(c =>
+    {
+        List<string> ignored = [.. c.IgnoredCalendarIDs.Where(id => id != calendar.Id)];
+        if (!watched) ignored.Add(calendar.Id);
+        return c with { IgnoredCalendarIDs = ignored };
+    });
+
+    private void UpdateCalendar(Func<CalendarScheduler.Configuration, CalendarScheduler.Configuration> change) =>
+        _settings.Update(s => s with { Calendar = change(s.Calendar) });
+
     // Auto-stop
 
     /// <summary>
@@ -337,8 +451,7 @@ public sealed partial class RecordingSettingsPage : UserControl
     /// clamped, a cleared box shows the saved value again.
     /// </summary>
     private void SetUpNumber(
-        NumberBox box, SettingsCard card, (int Min, int Max) range, string unit,
-        Func<MeetingEndMonitorConfiguration, int, MeetingEndMonitorConfiguration> change)
+        NumberBox box, SettingsCard card, (int Min, int Max) range, string unit, Func<AppSettings, int, AppSettings> change)
     {
         box.Minimum = range.Min;
         box.Maximum = range.Max;
@@ -352,7 +465,7 @@ public sealed partial class RecordingSettingsPage : UserControl
                 return;
             }
             var value = Math.Clamp((int)Math.Round(args.NewValue), range.Min, range.Max);
-            _settings.Update(s => s with { EndMonitor = change(s.EndMonitor, value) });
+            _settings.Update(s => change(s, value));
             // A typed value outside the range shows clamped.
             if (value != args.NewValue) Refresh();
         };

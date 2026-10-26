@@ -4,6 +4,8 @@
     - Microphone: the recording microphone, and what losing it does.
     - Meetings: attaching the floating indicator to the meeting window, meeting detection and each app's behavior
       (rows made in code).
+    - Calendar: calendar access while it is not granted, what a meeting starting does, the launch at login hint, the
+      watched calendars (rows made in code), meeting-link-only events, and stopping at the event's end.
     - Auto-stop: the end monitor's thresholds, each clamped to its range.
     - After recording: transcribe automatically, tell speakers apart and the number of other speakers (also in
       Transcription › Diarization model, as on macOS), and waiting while energy saver is on.
@@ -26,6 +28,14 @@
             <Setter Property="Margin" Value="1,4,0,4" />
             <Setter Property="Foreground" Value="{ThemeResource TextFillColorSecondaryBrush}" />
             <Setter Property="TextWrapping" Value="Wrap" />
+        </Style>
+        <!-- A watched calendar's account, built in code: theme resources, so it follows a theme switch. -->
+        <Style
+            x:Key="SourceTitleStyle"
+            BasedOn="{StaticResource CaptionTextBlockStyle}"
+            TargetType="TextBlock">
+            <Setter Property="Margin" Value="1,8,0,0" />
+            <Setter Property="Foreground" Value="{ThemeResource TextFillColorSecondaryBrush}" />
         </Style>
         <Style x:Key="UnitStyle" TargetType="TextBlock">
             <Setter Property="MinWidth" Value="26" />
@@ -85,6 +95,88 @@
 
                 <!-- One row per app: Ask, Always record (not for browsers), Ignore. -->
                 <StackPanel x:Name="AppsList" Spacing="4" />
+            </StackPanel>
+
+            <!-- Calendar -->
+            <StackPanel
+                x:Name="CalendarPanel"
+                Spacing="4"
+                Visibility="Collapsed">
+                <!-- Shown until access is granted: what is missing (set in code) and how to grant it. -->
+                <controls:SettingsCard
+                    x:Name="CalendarAccessCard"
+                    Tag="Calendar"
+                    Visibility="Collapsed">
+                    <StackPanel Orientation="Horizontal">
+                        <Button x:Name="CalendarGrantAccessButton" Content="{local:T Text='Grant Access'}" />
+                        <Button x:Name="CalendarPrivacyButton" Content="{local:T Text='Open Windows privacy settings'}" />
+                    </StackPanel>
+                </controls:SettingsCard>
+
+                <!-- The description is the Detect meetings hint, when it applies (set in code). -->
+                <controls:SettingsCard
+                    x:Name="CalendarModeCard"
+                    Header="{local:T Text='When a meeting starts'}"
+                    Tag="When a meeting starts">
+                    <ComboBox
+                        x:Name="CalendarModeCombo"
+                        MinWidth="200"
+                        AutomationProperties.Name="{local:T Text='When a meeting starts'}">
+                        <ComboBoxItem Content="{local:T Text='Off'}" />
+                        <ComboBoxItem Content="{local:T Text='Ask'}" />
+                        <ComboBoxItem Content="{local:T Text='Wait for the call'}" />
+                        <ComboBoxItem Content="{local:T Text='Record at start'}" />
+                    </ComboBox>
+                </controls:SettingsCard>
+
+                <!-- Shown while Launch at login is off. -->
+                <controls:SettingsCard
+                    x:Name="CalendarLaunchAtLoginCard"
+                    Description="{local:T Text='EchoDiar reacts to meetings only while it runs. Turn on Launch at login in General.'}"
+                    Visibility="Collapsed">
+                    <Button x:Name="CalendarOpenGeneralButton" Content="{local:T Text='Open General'}" />
+                </controls:SettingsCard>
+
+                <!-- Shown with access: one switch per calendar, under its account (rows made in code). -->
+                <StackPanel x:Name="WatchedCalendarsPanel" Spacing="4">
+                    <StackPanel Style="{StaticResource SectionHeaderStyle}" Tag="Watched calendars">
+                        <TextBlock Style="{StaticResource BodyStrongTextBlockStyle}" Text="{local:T Text='Watched calendars'}" />
+                        <TextBlock
+                            Style="{StaticResource CaptionTextBlockStyle}"
+                            Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                            Text="{local:T Text='New calendars are watched too.'}"
+                            TextWrapping="Wrap" />
+                    </StackPanel>
+                    <StackPanel x:Name="CalendarsList" Spacing="4" />
+                </StackPanel>
+
+                <controls:SettingsCard
+                    Margin="0,24,0,0"
+                    Description="{local:T Text='Zoom, Google Meet, Microsoft Teams or Webex link in the event.'}"
+                    Header="{local:T Text='Only events with a meeting link'}"
+                    Tag="Only events with a meeting link">
+                    <ToggleSwitch x:Name="LinkOnlyToggle" AutomationProperties.Name="{local:T Text='Only events with a meeting link'}" />
+                </controls:SettingsCard>
+
+                <controls:SettingsCard
+                    Margin="0,24,0,0"
+                    Description="{local:T Text='The indicator asks before stopping, with a 15 s countdown, like the other auto-stops.'}"
+                    Header="{local:T Text='Stop when the event ends'}"
+                    Tag="Stop when the event ends">
+                    <ToggleSwitch x:Name="StopAtEventEndToggle" AutomationProperties.Name="{local:T Text='Stop when the event ends'}" />
+                </controls:SettingsCard>
+
+                <controls:SettingsCard x:Name="StopAfterEndCard" Header="{local:T Text='Minutes after the end'}">
+                    <StackPanel Orientation="Horizontal" Spacing="6">
+                        <NumberBox
+                            x:Name="StopAfterEndBox"
+                            MinWidth="120"
+                            AutomationProperties.Name="{local:T Text='Minutes after the end'}"
+                            SmallChange="1"
+                            SpinButtonPlacementMode="Inline" />
+                        <TextBlock Style="{StaticResource UnitStyle}" Text="{local:T Text='min'}" />
+                    </StackPanel>
+                </controls:SettingsCard>
             </StackPanel>
 
             <!-- Auto-stop -->
