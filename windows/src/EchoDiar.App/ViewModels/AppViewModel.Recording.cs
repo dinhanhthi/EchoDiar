@@ -87,13 +87,26 @@ public sealed partial class AppViewModel
         if (RecordingError == shown) RecordingError = null;
     }
 
-    /// <summary>The language the next recording starts with, or the current one while recording.</summary>
-    public string RecordingLanguage => _languageOverride ?? Settings.DefaultLanguage;
+    /// <summary>
+    /// The language the next recording starts with, or the current one while recording: the pick, else the remembered
+    /// pick when that setting is on, else the default language.
+    /// </summary>
+    public string RecordingLanguage =>
+        _languageOverride ?? (Settings.RememberRecordingLanguage ? Settings.LastRecordingLanguage : null) ?? Settings.DefaultLanguage;
 
-    /// <summary>Before recording: the next session's language. While recording: a language marker at the current time.</summary>
+    /// <summary>
+    /// Before recording: the next session's language, remembered when that setting is on. While recording (or
+    /// starting): a language marker at the current time, never remembered.
+    /// </summary>
     public void SetRecordingLanguage(string language)
     {
-        if (language == RecordingLanguage) return;
+        // Picking the current language is remembered too, so a later default change doesn't override it.
+        var remembers = !IsRecording && !IsStarting && Settings.RememberRecordingLanguage;
+        if (language == RecordingLanguage)
+        {
+            if (remembers && Settings.LastRecordingLanguage != language) SaveSettings(Settings with { LastRecordingLanguage = language });
+            return;
+        }
         _languageOverride = language;
         OnPropertyChanged(nameof(RecordingLanguage));
         if (IsRecording)
@@ -113,7 +126,9 @@ public sealed partial class AppViewModel
                 }
             }, TaskScheduler.Default);
         }
-        RememberLanguage(language);
+        var settings = WithRecentLanguage(Settings, language);
+        if (remembers) settings = settings with { LastRecordingLanguage = language };
+        if (settings != Settings) SaveSettings(settings);
     }
 
     /// <summary>Codes the catalog's default engine accepts, sorted by name.</summary>
@@ -124,13 +139,18 @@ public sealed partial class AppViewModel
     /// <summary>Most recent first; Auto and the pinned languages are always listed, so they are not kept.</summary>
     private void RememberLanguage(string language)
     {
-        if (language == LanguageOptions.Auto || LanguageOptions.Pinned.Contains(language)) return;
-        var settings = Settings with
-        {
-            RecentLanguages = [.. Settings.RecentLanguages.Where(l => l != language).Prepend(language).Take(LanguageOptions.MaxRecent)],
-        };
-        SaveSettings(settings);
+        var settings = WithRecentLanguage(Settings, language);
+        if (settings != Settings) SaveSettings(settings);
     }
+
+    /// <summary><paramref name="settings"/> with <paramref name="language"/> first in the recent languages, unless always listed.</summary>
+    private static AppSettings WithRecentLanguage(AppSettings settings, string language) =>
+        language == LanguageOptions.Auto || LanguageOptions.Pinned.Contains(language)
+            ? settings
+            : settings with
+            {
+                RecentLanguages = [.. settings.RecentLanguages.Where(l => l != language).Prepend(language).Take(LanguageOptions.MaxRecent)],
+            };
 
     /// <summary>How transcripts play (macOS Settings › Storage "Playback"): both voices in both ears, or as recorded.</summary>
     public void SetPlaybackChannels(PlaybackChannels channels)

@@ -164,12 +164,12 @@ public sealed partial class ModelsViewModel : ObservableObject
     }
 
     /// <summary>
-    /// "No Vietnamese" for a speech model that cannot transcribe the default language; null for Auto, which never
-    /// disables a row, and for speaker models.
+    /// "No Vietnamese" for a speech model that cannot transcribe the next recording's language; null for Auto, which
+    /// never disables a row, and for speaker models.
     /// </summary>
     private string? UnsupportedNote(ModelEntry entry)
     {
-        var language = _app.Settings.DefaultLanguage;
+        var language = _app.RecordingLanguage;
         if (entry.Kind != ModelKind.Asr || language == LanguageOptions.Auto || language.Length == 0) return null;
         if (TranscriptionPipeline.Supports(entry, language)) return null;
         return Loc.Format("No %@", LanguageOptions.Name(WhisperLanguages.Primary(language)));
@@ -268,6 +268,8 @@ public sealed partial class ModelsViewModel : ObservableObject
                 StatesChanged?.Invoke();
                 OnPropertyChanged(nameof(DiarizerAvailable));
                 break;
+            // The unsupported note follows the next recording's language (a pick in the Record menu).
+            case nameof(AppViewModel.RecordingLanguage):
             case nameof(AppViewModel.Downloads):
             case nameof(AppViewModel.DownloadErrors):
             case nameof(AppViewModel.TranscriptionProgress):

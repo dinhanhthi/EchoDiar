@@ -699,7 +699,7 @@ public sealed partial class AppViewModel : ObservableObject
         RecordingSourceRootPid = null;
         if (snapshot.EndReason is not { } reason) return;
         EndEndWatch();
-        // The next recording starts with the default language again.
+        // The next recording starts with the remembered or default language again.
         if (_languageOverride is not null)
         {
             _languageOverride = null;

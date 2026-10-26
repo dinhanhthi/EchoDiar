@@ -1,9 +1,9 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!--
     Settings › Transcription (macOS ModelsSettingsView.swift), one panel per inner tab picked in the title bar:
-    - General: default language, transcribe while recording, free unused models after, delete audio after transcription
-      (the same setting as Storage › Audio). Transcribe automatically and waiting while energy saver is on are in
-      Recording › After recording, as on macOS.
+    - General: default language, remember last record language, transcribe while recording, free unused models after,
+      delete audio after transcription (the same setting as Storage › Audio). Transcribe automatically and waiting while
+      energy saver is on are in Recording › After recording, as on macOS.
     - Transcription model: what transcription is, then the speech models by tier, each with its details, Download,
       progress and Cancel, Installed and Delete, Set default; then Cloud (the default cloud engine's model, then every
       provider that transcribes, with Set default or Set Up) and the speech-to-text APIs (key, model, Test).
@@ -98,6 +98,14 @@
                             x:Name="LanguageCombo"
                             MinWidth="200"
                             AutomationProperties.Name="{local:T Text='Default language'}" />
+                    </controls:SettingsCard>
+
+                    <!-- The description is set in code (its apostrophe can't go in a {local:T} text). -->
+                    <controls:SettingsCard
+                        x:Name="RememberLanguageCard"
+                        Header="{local:T Text='Remember last record language'}"
+                        Tag="Remember last record language">
+                        <ToggleSwitch x:Name="RememberLanguageToggle" AutomationProperties.Name="{local:T Text='Remember last record language'}" />
                     </controls:SettingsCard>
 
                     <!-- The description is set in code (Windows text). -->

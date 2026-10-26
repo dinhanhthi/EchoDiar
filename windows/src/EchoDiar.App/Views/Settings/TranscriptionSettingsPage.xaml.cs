@@ -41,6 +41,7 @@ public sealed partial class TranscriptionSettingsPage : UserControl
     public static IReadOnlyList<SettingsEntry> SearchEntries { get; } =
     [
         new("Default language", ["language", "English", "French", "Vietnamese"], GeneralTab),
+        new("Remember last record language", ["language", "remember", "last", "record", "chevron", "menu"], GeneralTab),
         new("Transcribe while recording", ["live transcript", "captions", "real-time", "subtitles", "Whisper", "Parakeet"], GeneralTab),
         new("Free unused models after", ["memory", "RAM", "idle", "unload", "pause"], GeneralTab),
         new("Delete audio after transcription", ["remove audio", "Recycle Bin", "trash", "save space"], GeneralTab),
@@ -93,6 +94,8 @@ public sealed partial class TranscriptionSettingsPage : UserControl
             "Speech-to-text APIs",
             "OpenAI, Groq, Mistral, Google Gemini and custom endpoints transcribe too, with their transcription model: set them up in Settings › AI.",
             "Speech-to-text APIs"));
+        RememberLanguageCard.Description = Loc.T(
+            "Uses the language picked in the Record menu for the next recordings instead of the default language. Languages changed during a recording don't count.");
         LiveCard.Description = Loc.T(LiveDescription);
         SpeakerCountCombo.Items.Add(Loc.T("Auto"));
         var (min, max) = AppSettings.SpeakerCountHintRange;
@@ -105,6 +108,8 @@ public sealed partial class TranscriptionSettingsPage : UserControl
             var index = LanguageCombo.SelectedIndex;
             if (!_syncing && index >= 0 && index < _languageCodes.Count) _settings.DefaultLanguage = _languageCodes[index];
         };
+        RememberLanguageToggle.Toggled += (_, _) =>
+            Set(() => _settings.Update(s => s with { RememberRecordingLanguage = RememberLanguageToggle.IsOn }));
         LiveToggle.Toggled += (_, _) => Set(() => _settings.TranscribeWhileRecording = LiveToggle.IsOn);
         IdleCombo.SelectionChanged += (_, _) =>
         {
@@ -201,6 +206,7 @@ public sealed partial class TranscriptionSettingsPage : UserControl
         try
         {
             RefreshLanguages();
+            RememberLanguageToggle.IsOn = _settings.Settings.RememberRecordingLanguage;
             LiveToggle.IsOn = _settings.TranscribeWhileRecording;
             RefreshIdleMinutes();
             DeleteAfterToggle.IsOn = _settings.DeleteAudioAfterTranscription;
