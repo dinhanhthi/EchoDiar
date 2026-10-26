@@ -5,6 +5,12 @@
       "comment" : "Windows only: Views/ConversationListView.xaml.cs.",
       "extractionState" : "manual",
       "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "\"Distinguer les intervenants\" est activé. Téléchargez un modèle pour distinguer les autres intervenants."
+          }
+        },
         "vi" : {
           "stringUnit" : {
             "state" : "needs_review",
@@ -17,6 +23,12 @@
       "comment" : "Windows only: Views/AIMenus.cs, Views/Settings/ProvidersSettingsPage.xaml.cs.",
       "extractionState" : "manual",
       "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "%@ (quitte ce PC)"
+          }
+        },
         "vi" : {
           "stringUnit" : {
             "state" : "needs_review",
@@ -29,6 +41,12 @@
       "comment" : "Windows only: ViewModels/ModelsViewModel.cs (the last two items of a list, \"English, French and Vietnamese\").",
       "extractionState" : "manual",
       "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "%@ et %@"
+          }
+        },
         "vi" : {
           "stringUnit" : {
             "state" : "needs_review",
@@ -41,6 +59,12 @@
       "comment" : "Windows only: ViewModels/AppViewModel.HotKeys.cs.",
       "extractionState" : "manual",
       "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "%@ n’a pas pu être activé (erreur %lld)."
+          }
+        },
         "vi" : {
           "stringUnit" : {
             "state" : "needs_review",
@@ -53,6 +77,12 @@
       "comment" : "Windows only: Services/AppServices.cs, ViewModels/AppViewModel.AI.cs.",
       "extractionState" : "manual",
       "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "%@ n’a pas passé le contrôle d’intégrité. Téléchargez-le à nouveau."
+          }
+        },
         "vi" : {
           "stringUnit" : {
             "state" : "needs_review",
@@ -65,6 +95,12 @@
       "comment" : "Windows only: Views/HotKeyRecorder.cs.",
       "extractionState" : "manual",
       "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "%@ est le raccourci \"%@\"."
+          }
+        },
         "vi" : {
           "stringUnit" : {
             "state" : "needs_review",
@@ -77,6 +113,12 @@
       "comment" : "Windows only: Views/Settings/ProvidersSettingsPage.xaml.cs.",
       "extractionState" : "manual",
       "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "%@ non enregistré : saisissez la clé dans le champ Clé API, qui la conserve dans le Gestionnaire d’identification."
+          }
+        },
         "vi" : {
           "stringUnit" : {
             "state" : "needs_review",
@@ -102,6 +144,30 @@
                 "stringUnit" : {
                   "state" : "translated",
                   "value" : "%lld bytes"
+                }
+              }
+            }
+          }
+        },
+        "fr" : {
+          "variations" : {
+            "plural" : {
+              "many" : {
+                "stringUnit" : {
+                  "state" : "needs_review",
+                  "value" : "%lld octets"
+                }
+              },
+              "one" : {
+                "stringUnit" : {
+                  "state" : "needs_review",
+                  "value" : "%lld octet"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "needs_review",
+                  "value" : "%lld octets"
                 }
               }
             }
@@ -137,6 +203,30 @@
             }
           }
         },
+        "fr" : {
+          "variations" : {
+            "plural" : {
+              "many" : {
+                "stringUnit" : {
+                  "state" : "needs_review",
+                  "value" : "%lld conversations sans audio seraient vides : elles sont placées entièrement dans la Corbeille."
+                }
+              },
+              "one" : {
+                "stringUnit" : {
+                  "state" : "needs_review",
+                  "value" : "%lld conversation sans audio serait vide : elle est placée entièrement dans la Corbeille."
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "needs_review",
+                  "value" : "%lld conversations sans audio seraient vides : elles sont placées entièrement dans la Corbeille."
+                }
+              }
+            }
+          }
+        },
         "vi" : {
           "stringUnit" : {
             "state" : "needs_review",
@@ -162,6 +252,30 @@
                 "stringUnit" : {
                   "state" : "translated",
                   "value" : "All files of %lld conversations will be moved to the Recycle Bin at the next run (at launch or within a day):"
+                }
+              }
+            }
+          }
+        },
+        "fr" : {
+          "variations" : {
+            "plural" : {
+              "many" : {
+                "stringUnit" : {
+                  "state" : "needs_review",
+                  "value" : "Tous les fichiers de %lld conversations seront placés dans la Corbeille au prochain passage (au lancement ou dans la journée) :"
+                }
+              },
+              "one" : {
+                "stringUnit" : {
+                  "state" : "needs_review",
+                  "value" : "Tous les fichiers de %lld conversation seront placés dans la Corbeille au prochain passage (au lancement ou dans la journée) :"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "needs_review",
+                  "value" : "Tous les fichiers de %lld conversations seront placés dans la Corbeille au prochain passage (au lancement ou dans la journée) :"
                 }
               }
             }
@@ -197,6 +311,30 @@
             }
           }
         },
+        "fr" : {
+          "variations" : {
+            "plural" : {
+              "many" : {
+                "stringUnit" : {
+                  "state" : "needs_review",
+                  "value" : "Tous les fichiers de %lld conversations seront placés dans la Corbeille maintenant, puis chaque jour pour les plus anciennes :"
+                }
+              },
+              "one" : {
+                "stringUnit" : {
+                  "state" : "needs_review",
+                  "value" : "Tous les fichiers de %lld conversation seront placés dans la Corbeille maintenant, puis chaque jour pour les plus anciennes :"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "needs_review",
+                  "value" : "Tous les fichiers de %lld conversations seront placés dans la Corbeille maintenant, puis chaque jour pour les plus anciennes :"
+                }
+              }
+            }
+          }
+        },
         "vi" : {
           "stringUnit" : {
             "state" : "needs_review",
@@ -227,6 +365,30 @@
             }
           }
         },
+        "fr" : {
+          "variations" : {
+            "plural" : {
+              "many" : {
+                "stringUnit" : {
+                  "state" : "needs_review",
+                  "value" : "Tous les fichiers des conversations transcrites de plus de %lld jours seront placés dans la Corbeille une fois par jour. Rien ne correspond pour l’instant."
+                }
+              },
+              "one" : {
+                "stringUnit" : {
+                  "state" : "needs_review",
+                  "value" : "Tous les fichiers des conversations transcrites de plus de %lld jour seront placés dans la Corbeille une fois par jour. Rien ne correspond pour l’instant."
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "needs_review",
+                  "value" : "Tous les fichiers des conversations transcrites de plus de %lld jours seront placés dans la Corbeille une fois par jour. Rien ne correspond pour l’instant."
+                }
+              }
+            }
+          }
+        },
         "vi" : {
           "stringUnit" : {
             "state" : "needs_review",
@@ -239,6 +401,12 @@
       "comment" : "Windows only: Views/Settings/AboutSettingsPage.xaml.cs.",
       "extractionState" : "manual",
       "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Une mise à jour est disponible : le bouton Mettre à jour de la barre d’outils l’installe."
+          }
+        },
         "vi" : {
           "stringUnit" : {
             "state" : "needs_review",
@@ -251,6 +419,12 @@
       "comment" : "Windows only: Views/Settings/RAGSettingsPage.xaml.cs.",
       "extractionState" : "manual",
       "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Répond aux questions sur toutes vos conversations transcrites, en citant la conversation et le moment. L’index reste sur ce PC, sauf si vous choisissez un modèle d’embedding via API."
+          }
+        },
         "vi" : {
           "stringUnit" : {
             "state" : "needs_review",
@@ -263,6 +437,12 @@
       "comment" : "Windows only: Views/Settings/AcknowledgementsSettingsPage.xaml.cs.",
       "extractionState" : "manual",
       "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Structure de l’app (MVVM)"
+          }
+        },
         "vi" : {
           "stringUnit" : {
             "state" : "needs_review",
@@ -275,6 +455,12 @@
       "comment" : "Windows only: Views/OnboardingWindow.xaml.",
       "extractionState" : "manual",
       "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "L’audio et les transcriptions restent sur ce PC."
+          }
+        },
         "vi" : {
           "stringUnit" : {
             "state" : "needs_review",
@@ -287,6 +473,12 @@
       "comment" : "Windows only: Views/Settings/AcknowledgementsSettingsPage.xaml.cs.",
       "extractionState" : "manual",
       "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Capture et lecture audio"
+          }
+        },
         "vi" : {
           "stringUnit" : {
             "state" : "needs_review",
@@ -299,6 +491,12 @@
       "comment" : "Windows only: Views/Settings/TranscriptionSettingsPage.xaml.cs.",
       "extractionState" : "manual",
       "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "L’audio quitte ce PC : les moteurs cloud envoient l’enregistrement au fournisseur."
+          }
+        },
         "vi" : {
           "stringUnit" : {
             "state" : "needs_review",
@@ -311,6 +509,12 @@
       "comment" : "Windows only: Views/Settings/TranscriptionSettingsPage.xaml.cs.",
       "extractionState" : "manual",
       "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "L’audio quitte ce PC : la diarisation cloud envoie le canal système au fournisseur."
+          }
+        },
         "vi" : {
           "stringUnit" : {
             "state" : "needs_review",
@@ -323,6 +527,12 @@
       "comment" : "Windows only: Services/CloudConsent.cs.",
       "extractionState" : "manual",
       "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "L’audio quitte ce PC : les canaux micro et système de l’enregistrement sont envoyés vers %@ (%@) pour la transcription, et facturés par celui-ci. Le fournisseur peut conserver l’audio selon sa propre politique de conservation. La question vous est posée une fois par fournisseur et par destination."
+          }
+        },
         "vi" : {
           "stringUnit" : {
             "state" : "needs_review",
@@ -335,6 +545,12 @@
       "comment" : "Windows only: Views/Settings/ProvidersSettingsPage.xaml.cs.",
       "extractionState" : "manual",
       "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Auto = la langue de la transcription pour les résumés, celle de la question pour les réponses."
+          }
+        },
         "vi" : {
           "stringUnit" : {
             "state" : "needs_review",
@@ -347,6 +563,12 @@
       "comment" : "Windows only: Views/CalendarPage.xaml.",
       "extractionState" : "manual",
       "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "L’accès au calendrier est désactivé. Activez EchoDiar dans Paramètres Windows › Confidentialité et sécurité › Calendrier."
+          }
+        },
         "vi" : {
           "stringUnit" : {
             "state" : "needs_review",
@@ -359,6 +581,12 @@
       "comment" : "Windows only: Services/Updater.cs.",
       "extractionState" : "manual",
       "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Rechercher les mises à jour…"
+          }
+        },
         "vi" : {
           "stringUnit" : {
             "state" : "needs_review",
@@ -371,6 +599,12 @@
       "comment" : "Windows only: Views/Settings/AboutSettingsPage.xaml.",
       "extractionState" : "manual",
       "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Vérifier maintenant"
+          }
+        },
         "vi" : {
           "stringUnit" : {
             "state" : "needs_review",
@@ -383,6 +617,12 @@
       "comment" : "Windows only: Views/Settings/ProvidersSettingsPage.xaml.cs.",
       "extractionState" : "manual",
       "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Vérifiez que l’URL de base se termine par /v1."
+          }
+        },
         "vi" : {
           "stringUnit" : {
             "state" : "needs_review",
@@ -395,6 +635,12 @@
       "comment" : "Windows only: Views/OnboardingWindow.xaml.cs.",
       "extractionState" : "manual",
       "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Vérifiez que vos haut-parleurs ou votre casque sont allumés et que le son n’est pas coupé, puis testez à nouveau."
+          }
+        },
         "vi" : {
           "stringUnit" : {
             "state" : "needs_review",
@@ -407,6 +653,12 @@
       "comment" : "Windows only: Views/Settings/AboutSettingsPage.xaml.cs.",
       "extractionState" : "manual",
       "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Recherche de mises à jour…"
+          }
+        },
         "vi" : {
           "stringUnit" : {
             "state" : "needs_review",
@@ -419,6 +671,12 @@
       "comment" : "Windows only: Views/TranscriptView.xaml.cs.",
       "extractionState" : "manual",
       "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "La diarisation cloud a échoué et aucun modèle de diarisation n’est installé sur ce PC."
+          }
+        },
         "vi" : {
           "stringUnit" : {
             "state" : "needs_review",
@@ -431,6 +689,12 @@
       "comment" : "Windows only: Views/TranscriptView.xaml.cs.",
       "extractionState" : "manual",
       "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "La diarisation cloud a échoué ; les intervenants ont été distingués sur ce PC."
+          }
+        },
         "vi" : {
           "stringUnit" : {
             "state" : "needs_review",
@@ -443,6 +707,12 @@
       "comment" : "Windows only: EchoDiar.AI/CLIRunner.cs ContainmentNote, shown by Views/AIPanelView.xaml.cs, Views/Settings/ProvidersSettingsPage.xaml.cs.",
       "extractionState" : "manual",
       "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Codex s’exécute sans votre ~/.codex/config.toml (son modèle, ses serveurs MCP et ses hooks) dans un bac à sable hors ligne en lecture seule, mais ses autres outils intégrés peuvent toujours lire des fichiers sur ce PC."
+          }
+        },
         "vi" : {
           "stringUnit" : {
             "state" : "needs_review",
@@ -455,6 +725,12 @@
       "comment" : "Windows only: Views/TitleBarToolbar.xaml.cs.",
       "extractionState" : "manual",
       "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Impossible de rechercher les mises à jour"
+          }
+        },
         "vi" : {
           "stringUnit" : {
             "state" : "needs_review",
@@ -467,6 +743,12 @@
       "comment" : "Windows only: Views/TitleBarToolbar.xaml.cs.",
       "extractionState" : "manual",
       "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Impossible d’installer la mise à jour"
+          }
+        },
         "vi" : {
           "stringUnit" : {
             "state" : "needs_review",
@@ -479,6 +761,12 @@
       "comment" : "Windows only: ViewModels/PlaybackController.cs.",
       "extractionState" : "manual",
       "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Impossible d’ouvrir l’audio (%@)."
+          }
+        },
         "vi" : {
           "stringUnit" : {
             "state" : "needs_review",
@@ -491,6 +779,12 @@
       "comment" : "Windows only: ViewModels/PlaybackController.cs.",
       "extractionState" : "manual",
       "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Impossible de lire l’audio (%@)."
+          }
+        },
         "vi" : {
           "stringUnit" : {
             "state" : "needs_review",
@@ -503,6 +797,12 @@
       "comment" : "Windows only: Views/AIPanelView.xaml.cs.",
       "extractionState" : "manual",
       "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Les données envoyées à %@ quittent ce PC."
+          }
+        },
         "vi" : {
           "stringUnit" : {
             "state" : "needs_review",
@@ -515,6 +815,12 @@
       "comment" : "Windows only: Views/Settings/ProvidersSettingsPage.xaml.",
       "extractionState" : "manual",
       "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Les données envoyées aux fournisseurs cloud ou aux CLI quittent ce PC."
+          }
+        },
         "vi" : {
           "stringUnit" : {
             "state" : "needs_review",
@@ -527,6 +833,12 @@
       "comment" : "Windows only: Views/ConversationListView.xaml.cs.",
       "extractionState" : "manual",
       "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Télécharger un modèle d’intervenants"
+          }
+        },
         "vi" : {
           "stringUnit" : {
             "state" : "needs_review",
@@ -539,6 +851,12 @@
       "comment" : "Windows only: Views/ConversationListView.xaml.cs.",
       "extractionState" : "manual",
       "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Télécharger un modèle de transcription"
+          }
+        },
         "vi" : {
           "stringUnit" : {
             "state" : "needs_review",
@@ -551,6 +869,12 @@
       "comment" : "Windows only: Views/TitleBarToolbar.xaml.cs.",
       "extractionState" : "manual",
       "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "EchoDiar %@ est actuellement la version la plus récente."
+          }
+        },
         "vi" : {
           "stringUnit" : {
             "state" : "needs_review",
@@ -563,6 +887,12 @@
       "comment" : "Windows only: Views/TitleBarToolbar.xaml.cs.",
       "extractionState" : "manual",
       "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "EchoDiar se ferme, installe la nouvelle version et se rouvre."
+          }
+        },
         "vi" : {
           "stringUnit" : {
             "state" : "needs_review",
@@ -575,6 +905,12 @@
       "comment" : "Windows only: Views/RecordingView.xaml.cs.",
       "extractionState" : "manual",
       "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "EchoDiar n’entend rien de %@. Choisissez une autre source ou vérifiez que l’app joue du son."
+          }
+        },
         "vi" : {
           "stringUnit" : {
             "state" : "needs_review",
@@ -587,6 +923,12 @@
       "comment" : "Windows only: Views/TitleBarToolbar.xaml.cs.",
       "extractionState" : "manual",
       "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "EchoDiar installe la mise à jour une fois que l’enregistrement, les transcriptions et les réponses de l’IA sont terminés."
+          }
+        },
         "vi" : {
           "stringUnit" : {
             "state" : "needs_review",
@@ -599,6 +941,12 @@
       "comment" : "Windows only: Views/OnboardingWindow.xaml.cs.",
       "extractionState" : "manual",
       "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "EchoDiar enregistre les autres personnes de l’appel à partir de l’audio de votre PC. Le test joue un son bref et l’écoute."
+          }
+        },
         "vi" : {
           "stringUnit" : {
             "state" : "needs_review",
@@ -611,6 +959,12 @@
       "comment" : "Windows only: Views/Settings/AcknowledgementsSettingsPage.xaml.",
       "extractionState" : "manual",
       "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Toutes les licences ci-dessus dans un seul fichier texte."
+          }
+        },
         "vi" : {
           "stringUnit" : {
             "state" : "needs_review",
@@ -623,6 +977,12 @@
       "comment" : "Windows only: Views/Settings/ProvidersSettingsPage.xaml.cs.",
       "extractionState" : "manual",
       "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "En-têtes supplémentaires"
+          }
+        },
         "vi" : {
           "stringUnit" : {
             "state" : "needs_review",
@@ -635,6 +995,12 @@
       "comment" : "Windows only: EchoDiar.AI/CLIRunner.cs ContainmentNote, shown by Views/AIPanelView.xaml.cs, Views/Settings/ProvidersSettingsPage.xaml.cs.",
       "extractionState" : "manual",
       "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Gemini CLI refuse tous les outils et ne charge aucun serveur MCP ni aucune extension, sauf si une stratégie d’administration à l’échelle du système les autorise."
+          }
+        },
         "vi" : {
           "stringUnit" : {
             "state" : "needs_review",
@@ -647,6 +1013,12 @@
       "comment" : "Windows only: Views/Settings/GeneralSettingsPage.xaml.cs, Views/OnboardingWindow.xaml.cs.",
       "extractionState" : "manual",
       "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Pour info : j’enregistre cet appel pour prendre des notes. L’enregistrement reste sur mon PC."
+          }
+        },
         "vi" : {
           "stringUnit" : {
             "state" : "needs_review",
@@ -659,6 +1031,12 @@
       "comment" : "Windows only: Views/Settings/RAGSettingsPage.xaml.cs.",
       "extractionState" : "manual",
       "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "L’indexation de vos conversations sur ce PC nécessite ce modèle d’embedding (%@). Vous pouvez aussi choisir un autre modèle ci-dessous."
+          }
+        },
         "vi" : {
           "stringUnit" : {
             "state" : "needs_review",
@@ -671,6 +1049,12 @@
       "comment" : "Windows only: Views/TitleBarToolbar.xaml.cs.",
       "extractionState" : "manual",
       "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Installer et relancer"
+          }
+        },
         "vi" : {
           "stringUnit" : {
             "state" : "needs_review",
@@ -683,6 +1067,12 @@
       "comment" : "Windows only: Views/TitleBarToolbar.xaml.cs.",
       "extractionState" : "manual",
       "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Installer la mise à jour ?"
+          }
+        },
         "vi" : {
           "stringUnit" : {
             "state" : "needs_review",
@@ -695,6 +1085,12 @@
       "comment" : "Windows only: Services/Updater.cs, ViewModels/AppViewModel.Updates.cs, Views/TitleBarToolbar.xaml.cs.",
       "extractionState" : "manual",
       "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Installation de la mise à jour…"
+          }
+        },
         "vi" : {
           "stringUnit" : {
             "state" : "needs_review",
@@ -707,6 +1103,12 @@
       "comment" : "Windows only: Views/Settings/AboutSettingsPage.xaml.cs, Views/TitleBarToolbar.xaml.cs.",
       "extractionState" : "manual",
       "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Installation de la mise à jour… %lld %%"
+          }
+        },
         "vi" : {
           "stringUnit" : {
             "state" : "needs_review",
@@ -719,6 +1121,12 @@
       "comment" : "Windows only: Views/GlobalChatView.xaml.",
       "extractionState" : "manual",
       "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Il faut un index de vos transcriptions, créé sur ce PC par défaut."
+          }
+        },
         "vi" : {
           "stringUnit" : {
             "state" : "needs_review",
@@ -731,6 +1139,12 @@
       "comment" : "Windows only: Views/Settings/AcknowledgementsSettingsPage.xaml.cs.",
       "extractionState" : "manual",
       "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Ses fichiers d’exécution relèvent des Termes du contrat de licence logiciel Microsoft."
+          }
+        },
         "vi" : {
           "stringUnit" : {
             "state" : "needs_review",
@@ -743,6 +1157,12 @@
       "comment" : "Windows only: Views/Settings/RecordingSettingsPage.xaml.cs.",
       "extractionState" : "manual",
       "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Le maintient dans le coin supérieur droit de la fenêtre."
+          }
+        },
         "vi" : {
           "stringUnit" : {
             "state" : "needs_review",
@@ -755,6 +1175,12 @@
       "comment" : "Windows only: Views/Settings/ProvidersSettingsPage.xaml.",
       "extractionState" : "manual",
       "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Langue des résumés et des réponses"
+          }
+        },
         "vi" : {
           "stringUnit" : {
             "state" : "needs_review",
@@ -767,6 +1193,12 @@
       "comment" : "Windows only: Views/Settings/AboutSettingsPage.xaml.cs.",
       "extractionState" : "manual",
       "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Dernière vérification : %@"
+          }
+        },
         "vi" : {
           "stringUnit" : {
             "state" : "needs_review",
@@ -779,6 +1211,12 @@
       "comment" : "Windows only: Views/Settings/RAGSettingsPage.xaml.cs.",
       "extractionState" : "manual",
       "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Quitte ce PC"
+          }
+        },
         "vi" : {
           "stringUnit" : {
             "state" : "needs_review",
@@ -791,6 +1229,12 @@
       "comment" : "Windows only: EchoDiar.AI/AIService.cs (AI job status), shown by ViewModels/AppViewModel.AI.cs.",
       "extractionState" : "manual",
       "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Chargement du modèle…"
+          }
+        },
         "vi" : {
           "stringUnit" : {
             "state" : "needs_review",
@@ -803,6 +1247,12 @@
       "comment" : "Windows only: Views/OnboardingWindow.xaml.cs.",
       "extractionState" : "manual",
       "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "L’accès au microphone est bloqué sur ce PC."
+          }
+        },
         "vi" : {
           "stringUnit" : {
             "state" : "needs_review",
@@ -815,6 +1265,12 @@
       "comment" : "Windows only: Views/OnboardingWindow.xaml.",
       "extractionState" : "manual",
       "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Niveau du microphone"
+          }
+        },
         "vi" : {
           "stringUnit" : {
             "state" : "needs_review",
@@ -827,6 +1283,12 @@
       "comment" : "Windows only: Views/Settings/AcknowledgementsSettingsPage.xaml.",
       "extractionState" : "manual",
       "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Modèles qu’EchoDiar télécharge quand vous les choisissez. Choisissez-en un pour lire sa licence."
+          }
+        },
         "vi" : {
           "stringUnit" : {
             "state" : "needs_review",
@@ -839,6 +1301,12 @@
       "comment" : "Windows only: Views/Settings/StorageSettingsPage.xaml.cs.",
       "extractionState" : "manual",
       "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Placer dans la Corbeille"
+          }
+        },
         "vi" : {
           "stringUnit" : {
             "state" : "needs_review",
@@ -851,6 +1319,12 @@
       "comment" : "Windows only: Views/Settings/StorageSettingsPage.xaml, Views/Settings/TranscriptionSettingsPage.xaml.",
       "extractionState" : "manual",
       "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Place l’audio dans la Corbeille dès qu’une transcription réussit."
+          }
+        },
         "vi" : {
           "stringUnit" : {
             "state" : "needs_review",
@@ -863,6 +1337,12 @@
       "comment" : "Windows only: Views/Settings/ProvidersSettingsPage.xaml.cs, Views/Settings/RAGSettingsPage.xaml.cs.",
       "extractionState" : "manual",
       "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Nécessite plus de la moitié de la mémoire de ce PC."
+          }
+        },
         "vi" : {
           "stringUnit" : {
             "state" : "needs_review",
@@ -875,6 +1355,12 @@
       "comment" : "Windows only: Views/ConversationListView.xaml.cs.",
       "extractionState" : "manual",
       "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Aucune conversation pour l’instant — appuyez sur Ctrl+R pour enregistrer"
+          }
+        },
         "vi" : {
           "stringUnit" : {
             "state" : "needs_review",
@@ -887,6 +1373,12 @@
       "comment" : "Windows only: Views/Settings/AboutSettingsPage.xaml.cs.",
       "extractionState" : "manual",
       "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Pas encore vérifié"
+          }
+        },
         "vi" : {
           "stringUnit" : {
             "state" : "needs_review",
@@ -899,6 +1391,12 @@
       "comment" : "Windows only: Views/Settings/ProvidersSettingsPage.xaml.cs.",
       "extractionState" : "manual",
       "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Introuvable : indiquez le chemin complet d’un .exe ou d’un shim npm .cmd."
+          }
+        },
         "vi" : {
           "stringUnit" : {
             "state" : "needs_review",
@@ -911,6 +1409,12 @@
       "comment" : "Windows only: Views/ConversationListView.xaml.cs.",
       "extractionState" : "manual",
       "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Non transcrite"
+          }
+        },
         "vi" : {
           "stringUnit" : {
             "state" : "needs_review",
@@ -923,6 +1427,12 @@
       "comment" : "Windows only: Views/AIMenus.cs, Views/Settings/RAGSettingsPage.xaml.",
       "extractionState" : "manual",
       "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Sur ce PC"
+          }
+        },
         "vi" : {
           "stringUnit" : {
             "state" : "needs_review",
@@ -935,6 +1445,12 @@
       "comment" : "Windows only: Views/Settings/StorageSettingsPage.xaml.cs.",
       "extractionState" : "manual",
       "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Une fois par jour, place dans la Corbeille les conversations transcrites plus anciennes que la durée ci-dessous."
+          }
+        },
         "vi" : {
           "stringUnit" : {
             "state" : "needs_review",
@@ -947,6 +1463,12 @@
       "comment" : "Windows only: Views/Settings/ProvidersSettingsPage.xaml.cs.",
       "extractionState" : "manual",
       "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Un par ligne, Nom: valeur. Enregistrés dans le fichier de réglages : mettez les clés API dans le champ Clé API."
+          }
+        },
         "vi" : {
           "stringUnit" : {
             "state" : "needs_review",
@@ -959,6 +1481,12 @@
       "comment" : "Windows only: Views/OnboardingWindow.xaml.",
       "extractionState" : "manual",
       "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Ouvrir les paramètres du microphone de Windows"
+          }
+        },
         "vi" : {
           "stringUnit" : {
             "state" : "needs_review",
@@ -971,6 +1499,12 @@
       "comment" : "Windows only: Views/CalendarPage.xaml.",
       "extractionState" : "manual",
       "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Ouvrir les paramètres de confidentialité de Windows"
+          }
+        },
         "vi" : {
           "stringUnit" : {
             "state" : "needs_review",
@@ -983,6 +1517,12 @@
       "comment" : "Windows only: Views/Settings/AcknowledgementsSettingsPage.xaml.",
       "extractionState" : "manual",
       "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Ouvrir les mentions complètes"
+          }
+        },
         "vi" : {
           "stringUnit" : {
             "state" : "needs_review",
@@ -995,6 +1535,12 @@
       "comment" : "Windows only: Views/Settings/StorageSettingsPage.xaml.",
       "extractionState" : "manual",
       "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Ouvrir dans l’Explorateur de fichiers"
+          }
+        },
         "vi" : {
           "stringUnit" : {
             "state" : "needs_review",
@@ -1007,6 +1553,12 @@
       "comment" : "Windows only: EchoDiar.AI/CLIRunner.cs ContainmentNote, shown by Views/AIPanelView.xaml.cs, Views/Settings/ProvidersSettingsPage.xaml.cs.",
       "extractionState" : "manual",
       "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "OpenCode refuse tous les outils, mais les serveurs MCP de votre configuration OpenCode démarrent quand même (leurs outils sont refusés)."
+          }
+        },
         "vi" : {
           "stringUnit" : {
             "state" : "needs_review",
@@ -1019,6 +1571,12 @@
       "comment" : "Windows only: Views/Settings/AcknowledgementsSettingsPage.xaml.cs.",
       "extractionState" : "manual",
       "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Transcription Parakeet"
+          }
+        },
         "vi" : {
           "stringUnit" : {
             "state" : "needs_review",
@@ -1031,6 +1589,12 @@
       "comment" : "Windows only: ViewModels/PlaybackController.cs.",
       "extractionState" : "manual",
       "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Lecture arrêtée (%@)."
+          }
+        },
         "vi" : {
           "stringUnit" : {
             "state" : "needs_review",
@@ -1043,6 +1607,12 @@
       "comment" : "Windows only: Views/WelcomeView.xaml.cs.",
       "extractionState" : "manual",
       "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Appuyez sur Ctrl+R pour lancer l’enregistrement."
+          }
+        },
         "vi" : {
           "stringUnit" : {
             "state" : "needs_review",
@@ -1055,6 +1625,12 @@
       "comment" : "Windows only: Views/ConversationListView.xaml.cs.",
       "extractionState" : "manual",
       "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Prête"
+          }
+        },
         "vi" : {
           "stringUnit" : {
             "state" : "needs_review",
@@ -1067,6 +1643,12 @@
       "comment" : "Windows only: Views/TitleBarToolbar.xaml.cs.",
       "extractionState" : "manual",
       "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Enregistrer %@"
+          }
+        },
         "vi" : {
           "stringUnit" : {
             "state" : "needs_review",
@@ -1079,6 +1661,12 @@
       "comment" : "Windows only: Views/ConversationListView.xaml.cs.",
       "extractionState" : "manual",
       "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Les enregistrements sont transcrits sur ce PC. Choisissez un modèle de reconnaissance vocale à télécharger."
+          }
+        },
         "vi" : {
           "stringUnit" : {
             "state" : "needs_review",
@@ -1091,6 +1679,12 @@
       "comment" : "Windows only: Views/HotKeyRecorder.cs.",
       "extractionState" : "manual",
       "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Rétablir"
+          }
+        },
         "vi" : {
           "stringUnit" : {
             "state" : "needs_review",
@@ -1103,6 +1697,12 @@
       "comment" : "Windows only: Views/ConversationCard.xaml.cs.",
       "extractionState" : "manual",
       "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Afficher dans l’Explorateur"
+          }
+        },
         "vi" : {
           "stringUnit" : {
             "state" : "needs_review",
@@ -1115,6 +1715,12 @@
       "comment" : "Windows only: Views/Settings/AcknowledgementsSettingsPage.xaml.cs.",
       "extractionState" : "manual",
       "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Cartes de réglages"
+          }
+        },
         "vi" : {
           "stringUnit" : {
             "state" : "needs_review",
@@ -1127,6 +1733,12 @@
       "comment" : "Windows only: Views/Settings/TranscriptionSettingsPage.xaml.cs.",
       "extractionState" : "manual",
       "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Affiche la transcription pendant l’enregistrement et la conserve, pour qu’elle soit prête quelques secondes après l’arrêt. Utilise plus de processeur et de mémoire pendant l’enregistrement. Modèles Whisper et Parakeet uniquement ; les autres moteurs transcrivent après l’arrêt."
+          }
+        },
         "vi" : {
           "stringUnit" : {
             "state" : "needs_review",
@@ -1139,6 +1751,12 @@
       "comment" : "Windows only: Services/TrayIcon.cs.",
       "extractionState" : "manual",
       "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Simuler un état"
+          }
+        },
         "vi" : {
           "stringUnit" : {
             "state" : "needs_review",
@@ -1151,6 +1769,12 @@
       "comment" : "Windows only: Views/Settings/AcknowledgementsSettingsPage.xaml.cs.",
       "extractionState" : "manual",
       "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Diarisation des intervenants"
+          }
+        },
         "vi" : {
           "stringUnit" : {
             "state" : "needs_review",
@@ -1163,6 +1787,12 @@
       "comment" : "Windows only: Services/TrayIcon.cs.",
       "extractionState" : "manual",
       "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Démarrer l’enregistrement"
+          }
+        },
         "vi" : {
           "stringUnit" : {
             "state" : "needs_review",
@@ -1175,6 +1805,12 @@
       "comment" : "Windows only: ViewModels/ProvidersViewModel.cs.",
       "extractionState" : "manual",
       "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "La clé API dépasse %lld octets, le maximum que conserve le Gestionnaire d’identification."
+          }
+        },
         "vi" : {
           "stringUnit" : {
             "state" : "needs_review",
@@ -1187,6 +1823,12 @@
       "comment" : "Windows only: Views/Settings/ProvidersSettingsPage.xaml.cs.",
       "extractionState" : "manual",
       "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "La clé API est envoyée sans chiffrement via http à %@. Utilisez https, ou un hôte sur ce PC."
+          }
+        },
         "vi" : {
           "stringUnit" : {
             "state" : "needs_review",
@@ -1199,6 +1841,12 @@
       "comment" : "Windows only: Views/FloatingPillWindow.xaml.cs.",
       "extractionState" : "manual",
       "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "L’app"
+          }
+        },
         "vi" : {
           "stringUnit" : {
             "state" : "needs_review",
@@ -1211,6 +1859,12 @@
       "comment" : "Windows only: Views/Settings/StorageSettingsPage.xaml.cs.",
       "extractionState" : "manual",
       "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Les fichiers audio sont placés dans la Corbeille. Les transcriptions, résumés et discussions restent."
+          }
+        },
         "vi" : {
           "stringUnit" : {
             "state" : "needs_review",
@@ -1223,6 +1877,12 @@
       "comment" : "Windows only: Views/Settings/StorageSettingsPage.xaml.cs.",
       "extractionState" : "manual",
       "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Les fichiers audio sont placés dans la Corbeille. Les transcriptions, résumés et discussions restent ; la lecture et la retranscription ne sont plus possibles."
+          }
+        },
         "vi" : {
           "stringUnit" : {
             "state" : "needs_review",
@@ -1235,6 +1895,12 @@
       "comment" : "Windows only: Views/TitleBarToolbar.xaml.cs.",
       "extractionState" : "manual",
       "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "L’audio est placé dans la Corbeille. La transcription, le résumé et la discussion restent ; la lecture et la retranscription ne sont plus possibles."
+          }
+        },
         "vi" : {
           "stringUnit" : {
             "state" : "needs_review",
@@ -1260,6 +1926,30 @@
                 "stringUnit" : {
                   "state" : "translated",
                   "value" : "The audio of %lld conversations will be moved to the Recycle Bin at the next run (at launch or within a day):"
+                }
+              }
+            }
+          }
+        },
+        "fr" : {
+          "variations" : {
+            "plural" : {
+              "many" : {
+                "stringUnit" : {
+                  "state" : "needs_review",
+                  "value" : "L’audio de %lld conversations sera placé dans la Corbeille au prochain passage (au lancement ou dans la journée) :"
+                }
+              },
+              "one" : {
+                "stringUnit" : {
+                  "state" : "needs_review",
+                  "value" : "L’audio de %lld conversation sera placé dans la Corbeille au prochain passage (au lancement ou dans la journée) :"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "needs_review",
+                  "value" : "L’audio de %lld conversations sera placé dans la Corbeille au prochain passage (au lancement ou dans la journée) :"
                 }
               }
             }
@@ -1295,6 +1985,30 @@
             }
           }
         },
+        "fr" : {
+          "variations" : {
+            "plural" : {
+              "many" : {
+                "stringUnit" : {
+                  "state" : "needs_review",
+                  "value" : "L’audio de %lld conversations sera placé dans la Corbeille maintenant, puis chaque jour pour les plus anciennes :"
+                }
+              },
+              "one" : {
+                "stringUnit" : {
+                  "state" : "needs_review",
+                  "value" : "L’audio de %lld conversation sera placé dans la Corbeille maintenant, puis chaque jour pour les plus anciennes :"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "needs_review",
+                  "value" : "L’audio de %lld conversations sera placé dans la Corbeille maintenant, puis chaque jour pour les plus anciennes :"
+                }
+              }
+            }
+          }
+        },
         "vi" : {
           "stringUnit" : {
             "state" : "needs_review",
@@ -1325,6 +2039,30 @@
             }
           }
         },
+        "fr" : {
+          "variations" : {
+            "plural" : {
+              "many" : {
+                "stringUnit" : {
+                  "state" : "needs_review",
+                  "value" : "L’audio des conversations transcrites de plus de %lld jours sera placé dans la Corbeille une fois par jour. Rien ne correspond pour l’instant."
+                }
+              },
+              "one" : {
+                "stringUnit" : {
+                  "state" : "needs_review",
+                  "value" : "L’audio des conversations transcrites de plus de %lld jour sera placé dans la Corbeille une fois par jour. Rien ne correspond pour l’instant."
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "needs_review",
+                  "value" : "L’audio des conversations transcrites de plus de %lld jours sera placé dans la Corbeille une fois par jour. Rien ne correspond pour l’instant."
+                }
+              }
+            }
+          }
+        },
         "vi" : {
           "stringUnit" : {
             "state" : "needs_review",
@@ -1337,6 +2075,12 @@
       "comment" : "Windows only: ViewModels/AppViewModel.Calendar.cs (the event editor's error when the Appointments API fails).",
       "extractionState" : "manual",
       "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Le calendrier n’a pas pu être modifié. Réessayez plus tard."
+          }
+        },
         "vi" : {
           "stringUnit" : {
             "state" : "needs_review",
@@ -1349,6 +2093,12 @@
       "comment" : "Windows only: Views/ConversationListView.xaml.cs.",
       "extractionState" : "manual",
       "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Le téléchargement a échoué : %@"
+          }
+        },
         "vi" : {
           "stringUnit" : {
             "state" : "needs_review",
@@ -1361,6 +2111,12 @@
       "comment" : "Windows only: Views/Settings/AcknowledgementsSettingsPage.xaml.cs.",
       "extractionState" : "manual",
       "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "La fiche de modèle de la conversion ggml indique Apache-2.0 ; les poids d’origine de VinAI sont sous BSD-3-Clause."
+          }
+        },
         "vi" : {
           "stringUnit" : {
             "state" : "needs_review",
@@ -1373,6 +2129,12 @@
       "comment" : "Windows only: Views/TitleBarToolbar.xaml.cs.",
       "extractionState" : "manual",
       "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "L’enregistrement et ses fichiers sont placés dans la Corbeille."
+          }
+        },
         "vi" : {
           "stringUnit" : {
             "state" : "needs_review",
@@ -1385,6 +2147,12 @@
       "comment" : "Windows only: Views/TitleBarToolbar.xaml.cs.",
       "extractionState" : "manual",
       "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Les enregistrements et leurs fichiers sont placés dans la Corbeille."
+          }
+        },
         "vi" : {
           "stringUnit" : {
             "state" : "needs_review",
@@ -1397,6 +2165,12 @@
       "comment" : "Windows only: Views/Settings/StorageSettingsPage.xaml.cs.",
       "extractionState" : "manual",
       "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Les modèles de transcription, d’intervenants et d’IA sont supprimés de ce PC (pas placés dans la Corbeille). Téléchargez-les à nouveau dans Réglages › Transcription et Réglages › IA."
+          }
+        },
         "vi" : {
           "stringUnit" : {
             "state" : "needs_review",
@@ -1409,6 +2183,12 @@
       "comment" : "Windows only: Views/Settings/StorageSettingsPage.xaml.cs.",
       "extractionState" : "manual",
       "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Ils sont placés dans la Corbeille. L’audio est conservé, donc les conversations peuvent être transcrites à nouveau."
+          }
+        },
         "vi" : {
           "stringUnit" : {
             "state" : "needs_review",
@@ -1421,6 +2201,12 @@
       "comment" : "Windows only: Views/Settings/GeneralSettingsPage.xaml.",
       "extractionState" : "manual",
       "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Elles vont quand même dans la Corbeille."
+          }
+        },
         "vi" : {
           "stringUnit" : {
             "state" : "needs_review",
@@ -1433,6 +2219,12 @@
       "comment" : "Windows only: Views/Settings/AcknowledgementsSettingsPage.xaml.",
       "extractionState" : "manual",
       "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Mentions de tiers"
+          }
+        },
         "vi" : {
           "stringUnit" : {
             "state" : "needs_review",
@@ -1445,6 +2237,12 @@
       "comment" : "Windows only: Views/Settings/RAGSettingsPage.xaml.cs.",
       "extractionState" : "manual",
       "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Ce PC"
+          }
+        },
         "vi" : {
           "stringUnit" : {
             "state" : "needs_review",
@@ -1457,6 +2255,12 @@
       "comment" : "Windows only: EchoDiar.AI/WindowsAIAvailability.cs, shown by ViewModels/ProvidersViewModel.cs, Views/AIMenus.cs, Views/Settings/ProvidersSettingsPage.xaml.cs.",
       "extractionState" : "manual",
       "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Le matériel de ce PC ne prend pas en charge Windows AI (il faut un PC Copilot+)."
+          }
+        },
         "vi" : {
           "stringUnit" : {
             "state" : "needs_review",
@@ -1469,6 +2273,12 @@
       "comment" : "Windows only: EchoDiar.AI/WindowsAIAvailability.cs, shown by ViewModels/ProvidersViewModel.cs, Views/AIMenus.cs, Views/Settings/ProvidersSettingsPage.xaml.cs.",
       "extractionState" : "manual",
       "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Cette version d’EchoDiar ne peut pas utiliser Windows AI (la capacité systemAIModels est absente)."
+          }
+        },
         "vi" : {
           "stringUnit" : {
             "state" : "needs_review",
@@ -1481,6 +2291,12 @@
       "comment" : "Windows only: Views/ConversationView.xaml.cs.",
       "extractionState" : "manual",
       "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Cette conversation n’est pas dans la bibliothèque."
+          }
+        },
         "vi" : {
           "stringUnit" : {
             "state" : "needs_review",
@@ -1493,6 +2309,12 @@
       "comment" : "Windows only: Views/Settings/AboutSettingsPage.xaml.cs.",
       "extractionState" : "manual",
       "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Cette copie n’a pas été installée à partir d’un fichier .appinstaller, elle ne se met donc pas à jour d’elle-même."
+          }
+        },
         "vi" : {
           "stringUnit" : {
             "state" : "needs_review",
@@ -1505,6 +2327,12 @@
       "comment" : "Windows only: Services/Updater.cs.",
       "extractionState" : "manual",
       "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Cette copie n’a pas été installée à partir d’un fichier .appinstaller."
+          }
+        },
         "vi" : {
           "stringUnit" : {
             "state" : "needs_review",
@@ -1517,6 +2345,12 @@
       "comment" : "Windows only: Views/RecordingView.xaml.cs.",
       "extractionState" : "manual",
       "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Ce moteur transcrit après l’arrêt. Les modèles Whisper et Parakeet transcrivent aussi pendant l’enregistrement."
+          }
+        },
         "vi" : {
           "stringUnit" : {
             "state" : "needs_review",
@@ -1529,6 +2363,12 @@
       "comment" : "Windows only: Views/Settings/TranscriptionSettingsPage.xaml.cs.",
       "extractionState" : "manual",
       "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Ce modèle n’attribue pas les intervenants ; un modèle sur ce PC est utilisé à la place."
+          }
+        },
         "vi" : {
           "stringUnit" : {
             "state" : "needs_review",
@@ -1541,6 +2381,12 @@
       "comment" : "Windows only: Views/ConversationCard.xaml.",
       "extractionState" : "manual",
       "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Transcrire maintenant"
+          }
+        },
         "vi" : {
           "stringUnit" : {
             "state" : "needs_review",
@@ -1553,6 +2399,12 @@
       "comment" : "Windows only: Views/ConversationCard.xaml.",
       "extractionState" : "manual",
       "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Transcrire maintenant, même avec l’économiseur d’énergie activé"
+          }
+        },
         "vi" : {
           "stringUnit" : {
             "state" : "needs_review",
@@ -1565,6 +2417,12 @@
       "comment" : "Windows only: Views/ConversationListView.xaml.cs.",
       "extractionState" : "manual",
       "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Transcrite"
+          }
+        },
         "vi" : {
           "stringUnit" : {
             "state" : "needs_review",
@@ -1577,6 +2435,12 @@
       "comment" : "Windows only: Views/ConversationListView.xaml.cs.",
       "extractionState" : "manual",
       "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Transcription %lld %%"
+          }
+        },
         "vi" : {
           "stringUnit" : {
             "state" : "needs_review",
@@ -1589,6 +2453,12 @@
       "comment" : "Windows only: Views/Settings/RecordingSettingsPage.xaml.cs.",
       "extractionState" : "manual",
       "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "La transcription démarre dès que l’économiseur d’énergie est désactivé."
+          }
+        },
         "vi" : {
           "stringUnit" : {
             "state" : "needs_review",
@@ -1601,6 +2471,12 @@
       "comment" : "Windows only: Views/TitleBarToolbar.xaml.cs.",
       "extractionState" : "manual",
       "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Réessayez plus tard."
+          }
+        },
         "vi" : {
           "stringUnit" : {
             "state" : "needs_review",
@@ -1613,6 +2489,12 @@
       "comment" : "Windows only: Views/OnboardingWindow.xaml.cs.",
       "extractionState" : "manual",
       "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Activez EchoDiar dans Paramètres Windows › Confidentialité et sécurité › Microphone."
+          }
+        },
         "vi" : {
           "stringUnit" : {
             "state" : "needs_review",
@@ -1625,6 +2507,12 @@
       "comment" : "Windows only: ViewModels/SettingsViewModel.cs.",
       "extractionState" : "manual",
       "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Désactivé par votre organisation."
+          }
+        },
         "vi" : {
           "stringUnit" : {
             "state" : "needs_review",
@@ -1637,6 +2525,12 @@
       "comment" : "Windows only: ViewModels/SettingsViewModel.cs.",
       "extractionState" : "manual",
       "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Désactivé dans Paramètres Windows > Applications > Démarrage. Activez-y EchoDiar."
+          }
+        },
         "vi" : {
           "stringUnit" : {
             "state" : "needs_review",
@@ -1649,6 +2543,12 @@
       "comment" : "Windows only: ViewModels/SettingsViewModel.cs.",
       "extractionState" : "manual",
       "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Activé par votre organisation."
+          }
+        },
         "vi" : {
           "stringUnit" : {
             "state" : "needs_review",
@@ -1661,6 +2561,12 @@
       "comment" : "Windows only: Views/HotKeyRecorder.cs.",
       "extractionState" : "manual",
       "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Annuler"
+          }
+        },
         "vi" : {
           "stringUnit" : {
             "state" : "needs_review",
@@ -1673,6 +2579,12 @@
       "comment" : "Windows only: Views/TitleBarToolbar.xaml.cs.",
       "extractionState" : "manual",
       "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Mettre à jour après les tâches en cours"
+          }
+        },
         "vi" : {
           "stringUnit" : {
             "state" : "needs_review",
@@ -1685,6 +2597,12 @@
       "comment" : "Windows only: Services/Updater.cs.",
       "extractionState" : "manual",
       "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Mise à jour disponible…"
+          }
+        },
         "vi" : {
           "stringUnit" : {
             "state" : "needs_review",
@@ -1697,6 +2615,12 @@
       "comment" : "Windows only: Views/Settings/AboutSettingsPage.xaml.",
       "extractionState" : "manual",
       "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Mises à jour"
+          }
+        },
         "vi" : {
           "stringUnit" : {
             "state" : "needs_review",
@@ -1709,6 +2633,12 @@
       "comment" : "Windows only: Services/Updater.cs.",
       "extractionState" : "manual",
       "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Les mises à jour nécessitent une installation via .appinstaller"
+          }
+        },
         "vi" : {
           "stringUnit" : {
             "state" : "needs_review",
@@ -1721,6 +2651,12 @@
       "comment" : "Windows only: Views/HotKeyRecorder.cs.",
       "extractionState" : "manual",
       "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Utilisez Ctrl ou Alt avec la touche."
+          }
+        },
         "vi" : {
           "stringUnit" : {
             "state" : "needs_review",
@@ -1733,6 +2669,12 @@
       "comment" : "Windows only: Views/Settings/AcknowledgementsSettingsPage.xaml.cs.",
       "extractionState" : "manual",
       "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Utilisé par LLamaSharp"
+          }
+        },
         "vi" : {
           "stringUnit" : {
             "state" : "needs_review",
@@ -1745,6 +2687,12 @@
       "comment" : "Windows only: Views/Settings/AcknowledgementsSettingsPage.xaml.cs.",
       "extractionState" : "manual",
       "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Utilisé par Whisper.net"
+          }
+        },
         "vi" : {
           "stringUnit" : {
             "state" : "needs_review",
@@ -1757,6 +2705,12 @@
       "comment" : "Windows only: Views/Settings/AcknowledgementsSettingsPage.xaml.cs.",
       "extractionState" : "manual",
       "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Utilisé par sherpa-onnx"
+          }
+        },
         "vi" : {
           "stringUnit" : {
             "state" : "needs_review",
@@ -1769,6 +2723,12 @@
       "comment" : "Windows only: Views/Settings/ProvidersSettingsPage.xaml.",
       "extractionState" : "manual",
       "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Utilisé pour les résumés et les questions. Le modèle de chaque fournisseur activé ci-dessous, tel que coché dans sa ligne."
+          }
+        },
         "vi" : {
           "stringUnit" : {
             "state" : "needs_review",
@@ -1781,6 +2741,12 @@
       "comment" : "Windows only: Views/Settings/AcknowledgementsSettingsPage.xaml.cs.",
       "extractionState" : "manual",
       "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Transcription du vietnamien"
+          }
+        },
         "vi" : {
           "stringUnit" : {
             "state" : "needs_review",
@@ -1793,6 +2759,12 @@
       "comment" : "Windows only: Views/Settings/GeneralSettingsPage.xaml.cs.",
       "extractionState" : "manual",
       "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Attendre la fin des transcriptions et des réponses de l’IA"
+          }
+        },
         "vi" : {
           "stringUnit" : {
             "state" : "needs_review",
@@ -1805,6 +2777,12 @@
       "comment" : "Windows only: Views/Settings/RecordingSettingsPage.xaml.cs.",
       "extractionState" : "manual",
       "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Attendre tant que l’économiseur d’énergie est activé"
+          }
+        },
         "vi" : {
           "stringUnit" : {
             "state" : "needs_review",
@@ -1817,6 +2795,12 @@
       "comment" : "Windows only: EchoDiar.AI/AIService.cs (AI job status), shown by ViewModels/AppViewModel.AI.cs.",
       "extractionState" : "manual",
       "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "En attente de la fin des sous-titres en direct ou de la transcription…"
+          }
+        },
         "vi" : {
           "stringUnit" : {
             "state" : "needs_review",
@@ -1829,6 +2813,12 @@
       "comment" : "Windows only: Views/ConversationCard.xaml.cs.",
       "extractionState" : "manual",
       "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "En attente : l’économiseur d’énergie est activé"
+          }
+        },
         "vi" : {
           "stringUnit" : {
             "state" : "needs_review",
@@ -1841,6 +2831,12 @@
       "comment" : "Windows only: Views/Settings/AcknowledgementsSettingsPage.xaml.cs.",
       "extractionState" : "manual",
       "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "WinUI 3 et la plateforme d’app"
+          }
+        },
         "vi" : {
           "stringUnit" : {
             "state" : "needs_review",
@@ -1853,6 +2849,12 @@
       "comment" : "Windows only: Views/Settings/ProvidersSettingsPage.xaml.",
       "extractionState" : "manual",
       "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Windows AI (système)"
+          }
+        },
         "vi" : {
           "stringUnit" : {
             "state" : "needs_review",
@@ -1865,6 +2867,12 @@
       "comment" : "Windows only: EchoDiar.AI/WindowsAIAvailability.cs, shown by ViewModels/ProvidersViewModel.cs, Views/AIMenus.cs, Views/Settings/ProvidersSettingsPage.xaml.cs.",
       "extractionState" : "manual",
       "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Windows AI n’est pas disponible sur ce PC."
+          }
+        },
         "vi" : {
           "stringUnit" : {
             "state" : "needs_review",
@@ -1877,6 +2885,12 @@
       "comment" : "Windows only: EchoDiar.AI/WindowsAIAvailability.cs, shown by ViewModels/ProvidersViewModel.cs, Views/AIMenus.cs, Views/Settings/ProvidersSettingsPage.xaml.cs.",
       "extractionState" : "manual",
       "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Windows AI n’est pas pris en charge sur ce PC (il faut un PC Copilot+)."
+          }
+        },
         "vi" : {
           "stringUnit" : {
             "state" : "needs_review",
@@ -1889,6 +2903,12 @@
       "comment" : "Windows only: EchoDiar.AI/WindowsAIAvailability.cs, shown by ViewModels/ProvidersViewModel.cs, Views/AIMenus.cs, Views/Settings/ProvidersSettingsPage.xaml.cs.",
       "extractionState" : "manual",
       "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Windows AI n’est pas déverrouillé pour EchoDiar."
+          }
+        },
         "vi" : {
           "stringUnit" : {
             "state" : "needs_review",
@@ -1901,6 +2921,12 @@
       "comment" : "Windows only: EchoDiar.AI/WindowsAIAvailability.cs, shown by ViewModels/ProvidersViewModel.cs, Views/AIMenus.cs, Views/Settings/ProvidersSettingsPage.xaml.cs.",
       "extractionState" : "manual",
       "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Windows AI est désactivé (Paramètres › Confidentialité et sécurité › Génération de texte et d’images)."
+          }
+        },
         "vi" : {
           "stringUnit" : {
             "state" : "needs_review",
@@ -1913,6 +2939,12 @@
       "comment" : "Windows only: EchoDiar.AI/WindowsAIAvailability.cs, shown by ViewModels/ProvidersViewModel.cs, Views/AIMenus.cs, Views/Settings/ProvidersSettingsPage.xaml.cs.",
       "extractionState" : "manual",
       "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Windows AI nécessite une mise à jour de Windows (Paramètres › Windows Update)."
+          }
+        },
         "vi" : {
           "stringUnit" : {
             "state" : "needs_review",
@@ -1925,6 +2957,12 @@
       "comment" : "Windows only: Views/TitleBarToolbar.xaml.cs.",
       "extractionState" : "manual",
       "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Vous êtes à jour !"
+          }
+        },
         "vi" : {
           "stringUnit" : {
             "state" : "needs_review",
@@ -1937,6 +2975,12 @@
       "comment" : "Windows only: Views/AIPanelView.xaml.cs, Views/GlobalChatView.xaml.cs.",
       "extractionState" : "manual",
       "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "une autre conversation"
+          }
+        },
         "vi" : {
           "stringUnit" : {
             "state" : "needs_review",
@@ -1949,6 +2993,12 @@
       "comment" : "Windows only: Views/RecordingView.xaml.cs.",
       "extractionState" : "manual",
       "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "l’app"
+          }
+        },
         "vi" : {
           "stringUnit" : {
             "state" : "needs_review",
@@ -1961,6 +3011,12 @@
       "comment" : "Windows only: Views/AIPanelView.xaml.cs, Views/GlobalChatView.xaml.cs.",
       "extractionState" : "manual",
       "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "ce lien"
+          }
+        },
         "vi" : {
           "stringUnit" : {
             "state" : "needs_review",
