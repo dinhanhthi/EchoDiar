@@ -67,12 +67,13 @@ public partial class App : Application
 #if DEBUG
         // Off the UI thread: no file work runs there while the window is first shown.
         _ = Task.Run(WriteLaunchProbe);
-        // Headless harnesses (--capture-probe, --native-probe, --seed-library, --calendar-probe): no window, exit when
-        // done. They run before the single-instance key, so they also work while the app is open. The alias echodiar.exe
-        // passes its arguments on the process command line.
+        // Headless harnesses (--capture-probe, --native-probe, --seed-library, --calendar-probe, --seed-event): no window,
+        // exit when done. They run before the single-instance key, so they also work while the app is open. The alias
+        // echodiar.exe passes its arguments on the process command line.
         if (CaptureProbe.TryRun(Environment.GetCommandLineArgs(), Exit)) return;
         if (DebugLibrarySeed.TryRun(Environment.GetCommandLineArgs(), Exit)) return;
         if (CalendarProbe.TryRun(Environment.GetCommandLineArgs(), Exit)) return;
+        if (CalendarSeed.TryRun(Environment.GetCommandLineArgs(), Exit)) return;
 #endif
         // Single instance: a second launch activates the running app's window, then exits.
         StartupTrace.Write("begin FindOrRegisterForKey");

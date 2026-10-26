@@ -1,5 +1,8 @@
 #if DEBUG
 using System.Globalization;
+using EchoDiar.Core.Calendar;
+using EchoDiar.Core.Settings;
+using EchoDiar.Platform.Calendar;
 using Microsoft.UI.Dispatching;
 using Windows.ApplicationModel.Appointments;
 using Windows.Foundation;
@@ -437,6 +440,357 @@ internal static class CalendarProbe
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
         {
             System.Diagnostics.Debug.WriteLine($"EchoDiar calendar-probe: log write failed: {ex.Message}");
+        }
+    }
+}
+
+/// <summary>
+/// DEBUG headless harness <c>--seed-event</c> (task 8.5): saves an event in EchoDiar's own calendar through the app's
+/// <see cref="AppointmentCalendarStore"/>, so calendar triggers can be tested without accounts.
+/// <c>--seed-event &lt;minutesFromNow&gt; &lt;durationMinutes&gt; [--link &lt;https url&gt;] [--invitee] [--title &lt;text&gt;] [--weekly]</c>
+/// saves one (negative minutes start it in the past), then tags it (<c>Details</c>) and, with <c>--invitee</c>, adds
+/// an invitee and marks it as not organized by the user, so the trust rule reads it as unconfirmed. The calendar id is
+/// written to <c>calendar.ownCalendarID</c> when the setting differs. <c>--seed-event --clear</c> deletes every tagged
+/// event of the own calendar. Each line goes to <c>Probes\seed-event-&lt;stamp&gt;.log</c>, stdout and the debugger.
+/// Exit code 0, 1 when a step failed, 2 for invalid arguments (with the usage line).
+/// </summary>
+internal static class CalendarSeed
+{
+    private const string Flag = "--seed-event";
+    private const string ClearFlag = "--clear";
+    private const string OwnCalendarName = "EchoDiar";
+    /// <summary>The tag in <c>Details</c> that <c>--clear</c> looks for; no link in it, so the trigger reads none.</summary>
+    private const string SeedTag = "EchoDiar QA seed";
+    private const string DefaultTitle = "QA seed";
+    private const int MaxMinutes = 7 * 24 * 60;
+    private const string Usage =
+        "usage: echodiar.exe --seed-event <minutesFromNow> <durationMinutes> [--link <https url>] [--invitee] "
+        + "[--title <text>] [--weekly] | echodiar.exe --seed-event --clear";
+
+    private static readonly TimeSpan CallTimeout = TimeSpan.FromSeconds(30);
+    private static readonly TimeSpan ClearRange = TimeSpan.FromDays(365);
+
+    private static readonly object LogLock = new();
+    private static string? _logPath;
+
+    private sealed record Request(
+        bool Clear, int MinutesFromNow = 0, int DurationMinutes = 0, string? Link = null, bool Invitee = false,
+        string? Title = null, bool Weekly = false);
+
+    /// <summary>Starts the seed when <paramref name="commandLine"/> has <c>--seed-event</c>, and calls <paramref name="exit"/> on this thread when it ends.</summary>
+    public static bool TryRun(string[] commandLine, Action exit)
+    {
+        var index = Array.IndexOf(commandLine, Flag);
+        if (index < 0) return false;
+
+        var dispatcher = DispatcherQueue.GetForCurrentThread();
+        _ = Task.Run(async () =>
+        {
+            var code = 1;
+            try
+            {
+                OpenLog();
+                if (Parse(commandLine[(index + 1)..]) is not { } request)
+                {
+                    Log($"invalid arguments: {string.Join(' ', commandLine[(index + 1)..])}");
+                    Log(Usage);
+                    code = 2;
+                }
+                else code = request.Clear ? await ClearAsync() : await SeedAsync(request);
+            }
+            catch (Exception ex)
+            {
+                Log($"seed failed: {ex}");
+            }
+            finally
+            {
+                dispatcher.TryEnqueue(() =>
+                {
+                    Environment.ExitCode = code;
+                    exit();
+                });
+            }
+        });
+        return true;
+    }
+
+    /// <summary>The request, or null when the arguments are invalid (each flag at most once).</summary>
+    private static Request? Parse(string[] args)
+    {
+        if (args.Length == 1 && args[0] == ClearFlag) return new Request(Clear: true);
+        if (args.Length < 2
+            || !int.TryParse(args[0], NumberStyles.AllowLeadingSign, CultureInfo.InvariantCulture, out var minutes)
+            || !int.TryParse(args[1], NumberStyles.None, CultureInfo.InvariantCulture, out var duration)
+            || Math.Abs(minutes) > MaxMinutes || duration is < 1 or > MaxMinutes)
+        {
+            return null;
+        }
+
+        var request = new Request(Clear: false, minutes, duration);
+        for (var i = 2; i < args.Length; i++)
+        {
+            var hasValue = i + 1 < args.Length && !string.IsNullOrWhiteSpace(args[i + 1])
+                && !args[i + 1].StartsWith("--", StringComparison.Ordinal);
+            switch (args[i])
+            {
+                case "--invitee" when !request.Invitee:
+                    request = request with { Invitee = true };
+                    break;
+                case "--weekly" when !request.Weekly:
+                    request = request with { Weekly = true };
+                    break;
+                case "--link" when request.Link is null && hasValue:
+                    request = request with { Link = args[++i] };
+                    break;
+                case "--title" when request.Title is null && hasValue:
+                    request = request with { Title = args[++i] };
+                    break;
+                default:
+                    return null;
+            }
+        }
+        return request;
+    }
+
+    private static async Task<int> SeedAsync(Request request)
+    {
+        var now = DateTimeOffset.Now;
+        var start = now.AddMinutes(request.MinutesFromNow);
+        start = start.AddTicks(-(start.Ticks % TimeSpan.TicksPerSecond));
+        var end = start.AddMinutes(request.DurationMinutes);
+        var draft = new CalendarEventDraft(request.Title ?? DefaultTitle, start, end, request.Link ?? "",
+            request.Weekly ? CalendarEventDraft.Repeat.Weekly : CalendarEventDraft.Repeat.None);
+        if (!draft.IsValid || (request.Link is not null && draft.Url is null))
+        {
+            Log("invalid event: a title is needed and the link must be https with a host");
+            Log(Usage);
+            return 2;
+        }
+        Log($"start {now:O}: seeding start={start:O} end={end:O} link={draft.Url?.ToString() ?? "none"} "
+            + $"invitee={request.Invitee} weekly={request.Weekly}");
+
+        var settingsStore = new SettingsStore(App.Paths);
+        var settings = settingsStore.Load();
+        var storedId = settings.Calendar.OwnCalendarID;
+
+        // The app's own calendar before the save: the new appointment is the one not there yet.
+        var writeStore = await Step("RequestStoreAsync(AppCalendarsReadWrite)",
+            () => AppointmentManager.RequestStoreAsync(AppointmentStoreAccessType.AppCalendarsReadWrite));
+        if (writeStore is null) return Fail("no read-write calendar store");
+        var window = (Start: start.AddMinutes(-1), Length: TimeSpan.FromMinutes(2));
+        var before = new HashSet<string>(StringComparer.Ordinal);
+        foreach (var calendar in await OwnCalendars(writeStore, storedId) ?? [])
+        {
+            var found = await Find(calendar, window.Start, window.Length);
+            if (found is null) return Fail("own calendar unreadable before the save");
+            before.UnionWith(found.Select(a => a.LocalId));
+        }
+
+        // The save the app's event form makes.
+        var store = new AppointmentCalendarStore(message => Log($"store: {message}"));
+        if (!await store.RequestAccessAsync()) return Fail("no calendar access (Windows Settings › Privacy › Calendar)");
+        string calendarId;
+        try
+        {
+            calendarId = await store.SaveEventAsync(draft, null, CalendarSpan.ThisEvent, storedId);
+        }
+        catch (CalendarStoreException ex)
+        {
+            return Fail($"SaveEventAsync: {ex.Kind} {ex.Message}");
+        }
+        Log($"OK SaveEventAsync: calendar {calendarId}");
+        if (storedId != calendarId)
+        {
+            settingsStore.Save(settings with { Calendar = settings.Calendar with { OwnCalendarID = calendarId } });
+            Log($"settings: calendar.ownCalendarID {storedId ?? "null"} -> {calendarId}");
+        }
+
+        // Tag it (and add the invitee) on the series itself, never on one instance.
+        var own = await Step($"GetAppointmentCalendarAsync({calendarId})", () => writeStore.GetAppointmentCalendarAsync(calendarId));
+        if (own is null) return Fail($"calendar {calendarId} not in the read-write store");
+        var after = await Find(own, window.Start, window.Length);
+        if (after is null) return Fail("own calendar unreadable after the save");
+        var added = after.Select(a => a.LocalId).Where(id => !before.Contains(id)).Distinct().ToList();
+        if (added.Count != 1) return Fail($"expected 1 new appointment, found {added.Count}: {string.Join(", ", added)}");
+        var localId = added[0];
+        var appointment = await Step($"GetAppointmentAsync({localId})", () => own.GetAppointmentAsync(localId));
+        if (appointment is null) return Fail($"appointment {localId} not found");
+        try
+        {
+            appointment.Details = SeedTag;
+            if (request.Invitee)
+            {
+                appointment.IsOrganizedByUser = false;
+                appointment.UserResponse = AppointmentParticipantResponse.None;
+                appointment.Invitees.Add(new AppointmentInvitee
+                {
+                    DisplayName = "QA Invitee",
+                    Address = "qa-invitee@example.com",
+                    Role = AppointmentParticipantRole.RequiredAttendee,
+                    Response = AppointmentParticipantResponse.None,
+                });
+            }
+        }
+        catch (Exception ex)
+        {
+            return Fail($"tag/invitee: 0x{ex.HResult:X8} {ex.GetType().Name}: {ex.Message}");
+        }
+        if (!await Step("SaveAppointmentAsync(tag)", () => own.SaveAppointmentAsync(appointment))) return Fail("tag save");
+
+        // What the trigger will read, through the app's store code.
+        var saved = await Step($"GetAppointmentAsync({localId}) read-back", () => own.GetAppointmentAsync(localId));
+        if (saved is not null)
+        {
+            Log($"read-back IsOrganizedByUser={Read(() => saved.IsOrganizedByUser)} UserResponse={Read(() => saved.UserResponse)} "
+                + $"Invitees={Read(() => saved.Invitees.Count)} "
+                + $"Details={Read(() => saved.Details)} Recurrence={Read(() => saved.Recurrence is not null)}");
+        }
+        var events = await store.EventsAsync(start.AddMinutes(-1), end, calendarId);
+        var seen = events.FirstOrDefault(e => e.Id.StartsWith(localId + "|", StringComparison.Ordinal));
+        Log(seen is null
+            ? "WARN EventsAsync does not list it yet"
+            : $"EventsAsync: Id={seen.Id} Confirmed={seen.Confirmed} Link={seen.Link?.ToString() ?? "none"}");
+
+        Log($"SEED-EVENT OK LocalId={localId} start={start:O} end={end:O} calendar={calendarId}");
+        return 0;
+    }
+
+    /// <summary>Deletes every tagged appointment (a series with its master) of the own calendar; untagged ones and the calendar stay.</summary>
+    private static async Task<int> ClearAsync()
+    {
+        var storedId = new SettingsStore(App.Paths).Load().Calendar.OwnCalendarID;
+        var writeStore = await Step("RequestStoreAsync(AppCalendarsReadWrite)",
+            () => AppointmentManager.RequestStoreAsync(AppointmentStoreAccessType.AppCalendarsReadWrite));
+        if (writeStore is null) return Fail("no read-write calendar store");
+        var calendars = await OwnCalendars(writeStore, storedId);
+        if (calendars is null) return Fail("own calendars unreadable");
+        if (calendars.Count == 0)
+        {
+            Log("SEED-EVENT clear: no EchoDiar calendar, nothing to delete");
+            return 0;
+        }
+
+        var deleted = 0;
+        var failed = false;
+        var now = DateTimeOffset.Now;
+        foreach (var calendar in calendars)
+        {
+            var found = await Find(calendar, now - ClearRange, ClearRange * 2);
+            if (found is null)
+            {
+                failed = true;
+                continue;
+            }
+            var tagged = found
+                .Where(a => Read(() => a.Details) == SeedTag)
+                .Select(a => a.LocalId)
+                .Distinct(StringComparer.Ordinal);
+            foreach (var localId in tagged)
+            {
+                if (await Step($"DeleteAppointmentAsync({localId})", () => calendar.DeleteAppointmentAsync(localId)))
+                {
+                    deleted++;
+                    Log($"deleted {localId} from calendar {calendar.LocalId}");
+                }
+                else failed = true;
+            }
+        }
+        Log($"SEED-EVENT clear {(failed ? "FAIL" : "OK")} deleted={deleted}");
+        return failed ? 1 : 0;
+    }
+
+    /// <summary>EchoDiar's calendar as the store resolves it: the stored id, else one named "EchoDiar"; null when unreadable.</summary>
+    private static async Task<List<AppointmentCalendar>?> OwnCalendars(AppointmentStore store, string? storedId)
+    {
+        var calendars = await Step("FindAppointmentCalendarsAsync(read-write)",
+            () => store.FindAppointmentCalendarsAsync(FindAppointmentCalendarsOptions.IncludeHidden));
+        if (calendars is null) return null;
+        var own = calendars.FirstOrDefault(c => storedId is not null && c.LocalId == storedId)
+            ?? calendars.FirstOrDefault(c => c.DisplayName == OwnCalendarName);
+        return own is null ? [] : [own];
+    }
+
+    private static async Task<IReadOnlyList<Appointment>?> Find(AppointmentCalendar calendar, DateTimeOffset start, TimeSpan length)
+    {
+        var options = new FindAppointmentsOptions { IncludeHidden = true };
+        options.FetchProperties.Add(AppointmentProperties.Subject);
+        options.FetchProperties.Add(AppointmentProperties.StartTime);
+        options.FetchProperties.Add(AppointmentProperties.Details);
+        return await Step($"FindAppointmentsAsync({calendar.LocalId}, {length.TotalMinutes:0} min)",
+            () => calendar.FindAppointmentsAsync(start, length, options));
+    }
+
+    private static int Fail(string message)
+    {
+        Log($"SEED-EVENT FAIL {message}");
+        return 1;
+    }
+
+    private static string Read(Func<object?> get)
+    {
+        try
+        {
+            return Convert.ToString(get(), CultureInfo.InvariantCulture) ?? "null";
+        }
+        catch (Exception ex)
+        {
+            return $"<0x{ex.HResult:X8}>";
+        }
+    }
+
+    private static async Task<T?> Step<T>(string name, Func<IAsyncOperation<T>> start)
+    {
+        try
+        {
+            return await start().AsTask().WaitAsync(CallTimeout);
+        }
+        catch (Exception ex)
+        {
+            Log($"FAIL {name}: 0x{ex.HResult:X8} {ex.GetType().Name}: {ex.Message}");
+            return default;
+        }
+    }
+
+    private static async Task<bool> Step(string name, Func<IAsyncAction> start)
+    {
+        try
+        {
+            await start().AsTask().WaitAsync(CallTimeout);
+            return true;
+        }
+        catch (Exception ex)
+        {
+            Log($"FAIL {name}: 0x{ex.HResult:X8} {ex.GetType().Name}: {ex.Message}");
+            return false;
+        }
+    }
+
+    private static void OpenLog()
+    {
+        try
+        {
+            Directory.CreateDirectory(App.Paths.Probes);
+            _logPath = Path.Combine(App.Paths.Probes, $"seed-event-{DateTime.Now.ToString("yyyyMMdd-HHmmss", CultureInfo.InvariantCulture)}.log");
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            Log($"no log file: {ex.Message}");
+        }
+    }
+
+    private static void Log(string message)
+    {
+        var line = $"EchoDiar seed-event: {message}";
+        Console.WriteLine(line);
+        System.Diagnostics.Debug.WriteLine(line);
+        if (_logPath is null) return;
+        try
+        {
+            lock (LogLock) File.AppendAllText(_logPath, $"{DateTime.Now:HH:mm:ss.fff} {message}{Environment.NewLine}");
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            System.Diagnostics.Debug.WriteLine($"EchoDiar seed-event: log write failed: {ex.Message}");
         }
     }
 }
