@@ -126,6 +126,14 @@
     <value>录音结束后</value>
     <comment>After recording</comment>
   </data>
+  <data name="AllFilesOfLldConversationsWillBeMovedToTheRecycleBinAtTheNex" xml:space="preserve">
+    <value>{0} 个对话的所有文件将在下次运行时（启动时或一天内）移到回收站：</value>
+    <comment>All files of %lld conversations will be moved to the Recycle Bin at the next run (at launch or within a day):</comment>
+  </data>
+  <data name="AllFilesOfLldConversationsWillBeMovedToTheRecycleBinNowThenD" xml:space="preserve">
+    <value>{0} 个对话的所有文件将立即移到回收站，之后每天处理更旧的对话：</value>
+    <comment>All files of %lld conversations will be moved to the Recycle Bin now, then daily for older ones:</comment>
+  </data>
   <data name="AllFilesOfLldConversationsWillBeMovedToTheTrashAtTheNextRunA" xml:space="preserve">
     <value>{0} 个对话的所有文件将在下次运行时（启动时或一天内）移到废纸篓：</value>
     <comment>All files of %lld conversations will be moved to the Trash at the next run (at launch or within a day):</comment>
@@ -133,6 +141,10 @@
   <data name="AllFilesOfLldConversationsWillBeMovedToTheTrashNowThenDailyF" xml:space="preserve">
     <value>{0} 个对话的所有文件将立即移到废纸篓，之后每天处理更旧的对话：</value>
     <comment>All files of %lld conversations will be moved to the Trash now, then daily for older ones:</comment>
+  </data>
+  <data name="AllFilesOfTranscribedConversationsOlderThanLldDaysWillBeMove" xml:space="preserve">
+    <value>超过 {0} 天的已转写对话的所有文件将每天移到回收站一次。目前没有匹配项。</value>
+    <comment>All files of transcribed conversations older than %lld days will be moved to the Recycle Bin once a day. Nothing matches now.</comment>
   </data>
   <data name="AllFilesOfTranscribedConversationsOlderThanLldDaysWillBeMove_2" xml:space="preserve">
     <value>超过 {0} 天的已转写对话的所有文件将每天移到废纸篓一次。目前没有匹配项。</value>
@@ -154,6 +166,14 @@
     <value>始终录制</value>
     <comment>Always record</comment>
   </data>
+  <data name="AnUpdateIsAvailableUpdateInTheToolbarInstallsIt" xml:space="preserve">
+    <value>有可用更新：点击工具栏中的“更新”即可安装。</value>
+    <comment>An update is available: Update in the toolbar installs it.</comment>
+  </data>
+  <data name="And" xml:space="preserve">
+    <value>{0}和{1}</value>
+    <comment>%@ and %@</comment>
+  </data>
   <data name="AndLldMore" xml:space="preserve">
     <value>…以及另外 {0} 个</value>
     <comment>…and %lld more</comment>
@@ -161,6 +181,10 @@
   <data name="AnotherAppIsUsingTheAudioDeviceExclusively" xml:space="preserve">
     <value>另一个应用正在独占使用该音频设备。</value>
     <comment>Another app is using the audio device exclusively.</comment>
+  </data>
+  <data name="AnotherConversation" xml:space="preserve">
+    <value>另一个对话</value>
+    <comment>another conversation</comment>
   </data>
   <data name="AnsweringAQuestionAboutYourConversations" xml:space="preserve">
     <value>正在回答关于你的对话的问题…</value>
@@ -178,6 +202,10 @@
     <value>回答关于你所有已转写对话的问题，并注明出处对话和时间点。除非你选择 API 嵌入服务，否则索引会保留在这台 Mac 上。</value>
     <comment>Answers questions about all your transcribed conversations, citing the conversation and the moment. The index stays on this Mac unless you pick an API embedder.</comment>
   </data>
+  <data name="AnswersQuestionsAboutAllYourTranscribedConversationsCitingTh_2" xml:space="preserve">
+    <value>回答关于你所有已转写对话的问题，并注明出处对话和时间点。除非你选择 API 嵌入服务，否则索引会保留在这台电脑上。</value>
+    <comment>Answers questions about all your transcribed conversations, citing the conversation and the moment. The index stays on this PC unless you pick an API embedder.</comment>
+  </data>
   <data name="ApiKeyHeader" xml:space="preserve">
     <value>api-key 标头</value>
     <comment>api-key header</comment>
@@ -185,6 +213,10 @@
   <data name="AppLanguage" xml:space="preserve">
     <value>应用语言</value>
     <comment>App language</comment>
+  </data>
+  <data name="AppStructureMVVM" xml:space="preserve">
+    <value>应用结构（MVVM）</value>
+    <comment>App structure (MVVM)</comment>
   </data>
   <data name="AppleBasicBuiltIn" xml:space="preserve">
     <value>Apple（基础，内置）</value>
@@ -258,6 +290,14 @@
     <value>音频和转写文本会保留在这台 Mac 上。</value>
     <comment>Audio and transcripts stay on this Mac.</comment>
   </data>
+  <data name="AudioAndTranscriptsStayOnThisPC" xml:space="preserve">
+    <value>音频和转写文本会保留在这台电脑上。</value>
+    <comment>Audio and transcripts stay on this PC.</comment>
+  </data>
+  <data name="AudioCaptureAndPlayback" xml:space="preserve">
+    <value>音频捕获和播放</value>
+    <comment>Audio capture and playback</comment>
+  </data>
   <data name="AudioHasBeenRemoved" xml:space="preserve">
     <value>音频已移除</value>
     <comment>Audio has been removed</comment>
@@ -273,6 +313,18 @@
   <data name="AudioLeavesThisMacTheRecordingSMicAndSystemChannelsAreUpload" xml:space="preserve">
     <value>音频会离开这台 Mac：录音的麦克风声道和系统声道会上传到 {0}（{1}）进行转写，并由其计费。提供商可能会按照其自身的保留政策保存音频。每个提供商和目标位置只会询问你一次。</value>
     <comment>Audio leaves this Mac: the recording's mic and system channels are uploaded to %@ (%@) for transcription and billed by them. The provider may keep the audio under its own retention policy. You are asked once per provider and destination.</comment>
+  </data>
+  <data name="AudioLeavesThisPCCloudEnginesUploadTheRecordingToTheProvider" xml:space="preserve">
+    <value>音频会离开这台电脑：云端引擎会将录音上传到提供商。</value>
+    <comment>Audio leaves this PC: cloud engines upload the recording to the provider.</comment>
+  </data>
+  <data name="AudioLeavesThisPCTheCloudDiarizerUploadsTheSystemChannelToTh" xml:space="preserve">
+    <value>音频会离开这台电脑：云端说话人分离服务会将系统声道上传到提供商。</value>
+    <comment>Audio leaves this PC: the cloud diarizer uploads the system channel to the provider.</comment>
+  </data>
+  <data name="AudioLeavesThisPCTheRecordingSMicAndSystemChannelsAreUploade" xml:space="preserve">
+    <value>音频会离开这台电脑：录音的麦克风声道和系统声道会上传到 {0}（{1}）进行转写，并由其计费。提供商可能会按照其自身的保留政策保存音频。每个提供商和目标位置只会询问你一次。</value>
+    <comment>Audio leaves this PC: the recording's mic and system channels are uploaded to %@ (%@) for transcription and billed by them. The provider may keep the audio under its own retention policy. You are asked once per provider and destination.</comment>
   </data>
   <data name="AudioOnlyKeepTranscriptSummaryAndChat" xml:space="preserve">
     <value>仅音频（保留转写文本、摘要和聊天）</value>
@@ -297,6 +349,10 @@
   <data name="AutoStop" xml:space="preserve">
     <value>自动停止</value>
     <comment>Auto-stop</comment>
+  </data>
+  <data name="AutoTheTranscriptSLanguageForSummariesTheQuestionSForAnswers" xml:space="preserve">
+    <value>自动 = 摘要使用转写文本的语言，回答使用问题的语言。</value>
+    <comment>Auto = the transcript's language for summaries, the question's for answers.</comment>
   </data>
   <data name="Available" xml:space="preserve">
     <value>可用</value>
@@ -354,6 +410,10 @@
     <value>日历访问已关闭。请在“隐私与安全 › 日历”中打开 EchoDiar。</value>
     <comment>Calendar access is off. Turn on EchoDiar in Privacy &amp; Security › Calendars.</comment>
   </data>
+  <data name="CalendarAccessIsOffTurnOnEchoDiarInWindowsSettingsPrivacySec" xml:space="preserve">
+    <value>日历访问已关闭。请在“Windows 设置 › 隐私和安全性 › 日历”中打开 EchoDiar。</value>
+    <comment>Calendar access is off. Turn on EchoDiar in Windows Settings › Privacy &amp; security › Calendar.</comment>
+  </data>
   <data name="CalendarSettings" xml:space="preserve">
     <value>日历设置…</value>
     <comment>Calendar settings…</comment>
@@ -397,6 +457,26 @@
   <data name="CheckForUpdates" xml:space="preserve">
     <value>检查更新…</value>
     <comment>Check for Updates…</comment>
+  </data>
+  <data name="CheckForUpdates_2" xml:space="preserve">
+    <value>检查更新…</value>
+    <comment>Check for updates…</comment>
+  </data>
+  <data name="CheckNow" xml:space="preserve">
+    <value>立即检查</value>
+    <comment>Check now</comment>
+  </data>
+  <data name="CheckThatTheBaseURLEndsWithV1" xml:space="preserve">
+    <value>请检查基础 URL 是否以 /v1 结尾。</value>
+    <comment>Check that the base URL ends with /v1.</comment>
+  </data>
+  <data name="CheckThatYourSpeakersOrHeadphonesAreOnAndNotMutedThenTestAga" xml:space="preserve">
+    <value>请检查扬声器或耳机是否已打开且未静音，然后再次测试。</value>
+    <comment>Check that your speakers or headphones are on and not muted, then test again.</comment>
+  </data>
+  <data name="CheckingForUpdates" xml:space="preserve">
+    <value>正在检查更新…</value>
+    <comment>Checking for updates…</comment>
   </data>
   <data name="ChooseModels" xml:space="preserve">
     <value>选择模型…</value>
@@ -442,9 +522,17 @@
     <value>云端说话人分离失败，且这台 Mac 上未安装说话人分离模型。</value>
     <comment>Cloud diarization failed and no diarization model is installed on this Mac.</comment>
   </data>
+  <data name="CloudDiarizationFailedAndNoDiarizationModelIsInstalledOnThis_2" xml:space="preserve">
+    <value>云端说话人分离失败，且这台电脑上未安装说话人分离模型。</value>
+    <comment>Cloud diarization failed and no diarization model is installed on this PC.</comment>
+  </data>
   <data name="CloudDiarizationFailedSpeakersWereToldApartOnThisMac" xml:space="preserve">
     <value>云端说话人分离失败；已在这台 Mac 上区分说话人。</value>
     <comment>Cloud diarization failed; speakers were told apart on this Mac.</comment>
+  </data>
+  <data name="CloudDiarizationFailedSpeakersWereToldApartOnThisPC" xml:space="preserve">
+    <value>云端说话人分离失败；已在这台电脑上区分说话人。</value>
+    <comment>Cloud diarization failed; speakers were told apart on this PC.</comment>
   </data>
   <data name="CloudTranscriptionEngines" xml:space="preserve">
     <value>云端转写引擎</value>
@@ -453,6 +541,10 @@
   <data name="Cloud_2" xml:space="preserve">
     <value>云端</value>
     <comment>Cloud</comment>
+  </data>
+  <data name="CodexRunsWithoutYourCodexConfigTomlItsModelMCPServersAndHook" xml:space="preserve">
+    <value>Codex 会在只读、离线的沙盒中运行，不加载你的 ~/.codex/config.toml（其中的模型、MCP 服务器和钩子），但其余内置工具仍可读取这台电脑上的文件。</value>
+    <comment>Codex runs without your ~/.codex/config.toml (its model, MCP servers and hooks) in a read-only, offline sandbox, but its remaining built-in tools can still read files on this PC.</comment>
   </data>
   <data name="Collapse" xml:space="preserve">
     <value>折叠</value>
@@ -530,6 +622,26 @@
     <value>无法注册 {0}（错误 {1}）。</value>
     <comment>%@ could not be registered (error %d).</comment>
   </data>
+  <data name="CouldNotBeRegisteredErrorLld" xml:space="preserve">
+    <value>无法注册 {0}（错误 {1}）。</value>
+    <comment>%@ could not be registered (error %lld).</comment>
+  </data>
+  <data name="CouldNotCheckForUpdates" xml:space="preserve">
+    <value>无法检查更新</value>
+    <comment>Could not check for updates</comment>
+  </data>
+  <data name="CouldNotInstallTheUpdate" xml:space="preserve">
+    <value>无法安装更新</value>
+    <comment>Could not install the update</comment>
+  </data>
+  <data name="CouldNotOpenTheAudio" xml:space="preserve">
+    <value>无法打开音频（{0}）。</value>
+    <comment>Could not open the audio (%@).</comment>
+  </data>
+  <data name="CouldNotPlayTheAudio" xml:space="preserve">
+    <value>无法播放音频（{0}）。</value>
+    <comment>Could not play the audio (%@).</comment>
+  </data>
   <data name="Current" xml:space="preserve">
     <value>当前</value>
     <comment>Current</comment>
@@ -566,9 +678,17 @@
     <value>发送到云端提供商或 CLI 的数据会离开这台 Mac。</value>
     <comment>Data sent to cloud providers or CLIs leaves this Mac.</comment>
   </data>
+  <data name="DataSentToCloudProvidersOrCLIsLeavesThisPC" xml:space="preserve">
+    <value>发送到云端提供商或 CLI 的数据会离开这台电脑。</value>
+    <comment>Data sent to cloud providers or CLIs leaves this PC.</comment>
+  </data>
   <data name="DataSentToLeavesThisMac" xml:space="preserve">
     <value>发送到 {0} 的数据会离开这台 Mac。</value>
     <comment>Data sent to %@ leaves this Mac.</comment>
+  </data>
+  <data name="DataSentToLeavesThisPC" xml:space="preserve">
+    <value>发送到 {0} 的数据会离开这台电脑。</value>
+    <comment>Data sent to %@ leaves this PC.</comment>
   </data>
   <data name="Date" xml:space="preserve">
     <value>日期</value>
@@ -754,6 +874,14 @@
     <value>下载模型…</value>
     <comment>Download a model…</comment>
   </data>
+  <data name="DownloadASpeakerModel" xml:space="preserve">
+    <value>下载说话人模型</value>
+    <comment>Download a speaker model</comment>
+  </data>
+  <data name="DownloadATranscriptionModel" xml:space="preserve">
+    <value>下载转写模型</value>
+    <comment>Download a transcription model</comment>
+  </data>
   <data name="DownloadATranscriptionModelInSettings" xml:space="preserve">
     <value>在设置中下载转写模型</value>
     <comment>Download a transcription model in Settings</comment>
@@ -794,6 +922,10 @@
     <value>EchoDiar</value>
     <comment>EchoDiar</comment>
   </data>
+  <data name="EchoDiarClosesInstallsTheNewVersionAndOpensAgain" xml:space="preserve">
+    <value>EchoDiar 将关闭、安装新版本，然后重新打开。</value>
+    <comment>EchoDiar closes, installs the new version and opens again.</comment>
+  </data>
   <data name="EchoDiarHasNoAccessToYourCalendars" xml:space="preserve">
     <value>EchoDiar 无权访问你的日历。</value>
     <comment>EchoDiar has no access to your calendars.</comment>
@@ -810,9 +942,21 @@
     <value>EchoDiar 只听到了静音。</value>
     <comment>EchoDiar heard only silence.</comment>
   </data>
+  <data name="EchoDiarHearsNothingFromPickAnotherSourceOrCheckThatTheAppIs" xml:space="preserve">
+    <value>EchoDiar 没有听到来自 {0} 的任何声音。请选择其他来源，或检查该应用是否正在播放。</value>
+    <comment>EchoDiar hears nothing from %@. Pick another source or check that the app is playing.</comment>
+  </data>
   <data name="EchoDiarIncludesThisOpenSourceSoftwareChooseOneToReadItsLice" xml:space="preserve">
     <value>EchoDiar 包含以下开源软件。选择一项以阅读其许可证。</value>
     <comment>EchoDiar includes this open-source software. Choose one to read its license.</comment>
+  </data>
+  <data name="EchoDiarInstallsTheUpdateOnceTheRecordingTranscriptionsAndAI" xml:space="preserve">
+    <value>EchoDiar 会在录音、转写和 AI 回答完成后安装更新。</value>
+    <comment>EchoDiar installs the update once the recording, transcriptions and AI answers have finished.</comment>
+  </data>
+  <data name="EchoDiarIsCurrentlyTheNewestVersionAvailable" xml:space="preserve">
+    <value>EchoDiar {0} 已是目前可用的最新版本。</value>
+    <comment>EchoDiar %@ is currently the newest version available.</comment>
   </data>
   <data name="EchoDiarMayLackSystemAudioRecordingPermissionAllowItThenRest" xml:space="preserve">
     <value>EchoDiar 可能缺少“系统录音”权限。请允许该权限，然后重新开始录音。</value>
@@ -837,6 +981,10 @@
   <data name="EchoDiarRecordsTheOtherPeopleOnTheCallFromYourMacSAudioTheTe" xml:space="preserve">
     <value>EchoDiar 会从你的 Mac 的音频中录制通话中的其他人。测试会播放一段简短的声音并监听它。首次使用时，macOS 会请求“系统录音”权限。</value>
     <comment>EchoDiar records the other people on the call from your Mac's audio. The test plays a short sound and listens for it. macOS asks for System Audio Recording permission the first time.</comment>
+  </data>
+  <data name="EchoDiarRecordsTheOtherPeopleOnTheCallFromYourPCSAudioTheTes" xml:space="preserve">
+    <value>EchoDiar 会从你电脑的音频中录制通话中的其他人。测试会播放一段简短的声音并监听它。</value>
+    <comment>EchoDiar records the other people on the call from your PC's audio. The test plays a short sound and listens for it.</comment>
   </data>
   <data name="EchoDiarRecordsYourVoiceOnItsOwnChannelSoTheTranscriptKnowsW" xml:space="preserve">
     <value>EchoDiar 会在单独的声道上录制你的声音，这样转写文本就能知道你说了什么。</value>
@@ -894,13 +1042,25 @@
     <value>在“设置 › RAG”中输入 {0} 的嵌入模型</value>
     <comment>Enter the embedding model of %@ in Settings › RAG</comment>
   </data>
+  <data name="EveryLicenseAboveInOneTextFile" xml:space="preserve">
+    <value>上述所有许可证，汇总在一个文本文件中。</value>
+    <comment>Every license above in one text file.</comment>
+  </data>
   <data name="Expand" xml:space="preserve">
     <value>展开</value>
     <comment>Expand</comment>
   </data>
+  <data name="ExtraHeaders" xml:space="preserve">
+    <value>额外标头</value>
+    <comment>Extra headers</comment>
+  </data>
   <data name="Failed" xml:space="preserve">
     <value>失败</value>
     <comment>Failed</comment>
+  </data>
+  <data name="FailedItsIntegrityCheckDownloadItAgain" xml:space="preserve">
+    <value>{0} 未通过完整性检查。请重新下载。</value>
+    <comment>%@ failed its integrity check. Download it again.</comment>
   </data>
   <data name="Fast" xml:space="preserve">
     <value>快速</value>
@@ -946,6 +1106,10 @@
     <value>{0} GB</value>
     <comment>%@ GB</comment>
   </data>
+  <data name="GeminiCLIDeniesEveryToolAndLoadsNoMCPServerOrExtensionUnless" xml:space="preserve">
+    <value>Gemini CLI 会拒绝所有工具，且不加载任何 MCP 服务器或扩展，除非系统级管理员策略允许它们。</value>
+    <comment>Gemini CLI denies every tool and loads no MCP server or extension, unless a system-wide admin policy allows them.</comment>
+  </data>
   <data name="General" xml:space="preserve">
     <value>通用</value>
     <comment>General</comment>
@@ -977,6 +1141,10 @@
   <data name="HeadsUpIMRecordingThisCallToTakeNotesTheRecordingStaysOnMyMa" xml:space="preserve">
     <value>提醒一下：我正在录制这次通话以便记笔记。录音会保留在我的 Mac 上。</value>
     <comment>Heads up: I'm recording this call to take notes. The recording stays on my Mac.</comment>
+  </data>
+  <data name="HeadsUpIMRecordingThisCallToTakeNotesTheRecordingStaysOnMyPC" xml:space="preserve">
+    <value>提醒一下：我正在录制这次通话以便记笔记。录音会保留在我的电脑上。</value>
+    <comment>Heads up: I'm recording this call to take notes. The recording stays on my PC.</comment>
   </data>
   <data name="HideEchoDiar" xml:space="preserve">
     <value>隐藏 EchoDiar</value>
@@ -1050,13 +1218,25 @@
     <value>在这台 Mac 上为你的对话编入索引需要此嵌入模型（{0}）。你也可以在下方选择其他模型。</value>
     <comment>Indexing your conversations on this Mac needs this embedding model (%@). You can also pick another model below.</comment>
   </data>
+  <data name="IndexingYourConversationsOnThisPCNeedsThisEmbeddingModelYouC" xml:space="preserve">
+    <value>在这台电脑上为你的对话编入索引需要此嵌入模型（{0}）。你也可以在下方选择其他模型。</value>
+    <comment>Indexing your conversations on this PC needs this embedding model (%@). You can also pick another model below.</comment>
+  </data>
   <data name="IndicatorSize" xml:space="preserve">
     <value>指示器大小</value>
     <comment>Indicator size</comment>
   </data>
+  <data name="InstallAndRelaunch" xml:space="preserve">
+    <value>安装并重新启动</value>
+    <comment>Install and Relaunch</comment>
+  </data>
   <data name="InstallTheAvailableUpdate" xml:space="preserve">
     <value>安装可用的更新</value>
     <comment>Install the available update</comment>
+  </data>
+  <data name="InstallTheUpdate" xml:space="preserve">
+    <value>要安装更新吗？</value>
+    <comment>Install the update?</comment>
   </data>
   <data name="InstallTheUpdateFirst" xml:space="preserve">
     <value>请先安装更新</value>
@@ -1073,6 +1253,14 @@
   <data name="Installed_2" xml:space="preserve">
     <value>已安装：{0}</value>
     <comment>Installed: %@</comment>
+  </data>
+  <data name="InstallingTheUpdate" xml:space="preserve">
+    <value>正在安装更新…</value>
+    <comment>Installing the update…</comment>
+  </data>
+  <data name="InstallingTheUpdateLld" xml:space="preserve">
+    <value>正在安装更新… {0}%</value>
+    <comment>Installing the update… %lld%%</comment>
   </data>
   <data name="IsAlreadyUsedByAnotherAppPickAnotherShortcut" xml:space="preserve">
     <value>{0} 已被其他应用使用。请选择其他快捷键。</value>
@@ -1098,9 +1286,21 @@
     <value>{0} 是“{1}”菜单的快捷键。</value>
     <comment>%@ is the "%@" menu shortcut.</comment>
   </data>
+  <data name="IsTheShortcut" xml:space="preserve">
+    <value>{0} 是“{1}”的快捷键。</value>
+    <comment>%@ is the "%@" shortcut.</comment>
+  </data>
   <data name="ItNeedsAnIndexOfYourTranscriptsBuiltOnThisMacByDefault" xml:space="preserve">
     <value>这需要为你的转写文本建立索引，默认在这台 Mac 上建立。</value>
     <comment>It needs an index of your transcripts, built on this Mac by default.</comment>
+  </data>
+  <data name="ItNeedsAnIndexOfYourTranscriptsBuiltOnThisPCByDefault" xml:space="preserve">
+    <value>这需要为你的转写文本建立索引，默认在这台电脑上建立。</value>
+    <comment>It needs an index of your transcripts, built on this PC by default.</comment>
+  </data>
+  <data name="ItsRuntimeFilesComeUnderTheMicrosoftSoftwareLicenseTerms" xml:space="preserve">
+    <value>其运行时文件受 Microsoft 软件许可条款约束。</value>
+    <comment>Its runtime files come under the Microsoft Software License Terms.</comment>
   </data>
   <data name="Join" xml:space="preserve">
     <value>加入</value>
@@ -1113,6 +1313,10 @@
   <data name="KeepUncompressedAudio" xml:space="preserve">
     <value>保留未压缩的音频</value>
     <comment>Keep uncompressed audio</comment>
+  </data>
+  <data name="KeepsItAtTheWindowSTopRightCorner" xml:space="preserve">
+    <value>将它保持在窗口的右上角。</value>
+    <comment>Keeps it at the window's top-right corner.</comment>
   </data>
   <data name="KeepsItAtTheWindowSTopRightCornerNeedsAccessibilityAccess" xml:space="preserve">
     <value>将它保持在窗口的右上角。需要“无障碍”访问权限。</value>
@@ -1146,6 +1350,10 @@
     <value>从现在起的语言</value>
     <comment>Language from now on</comment>
   </data>
+  <data name="LanguageOfSummariesAndAnswers" xml:space="preserve">
+    <value>摘要和回答的语言</value>
+    <comment>Language of summaries and answers</comment>
+  </data>
   <data name="LanguageOfSummariesAndAnswersAutoTheTranscriptSLanguageForSu" xml:space="preserve">
     <value>摘要和回答的语言（自动 = 摘要使用转写文本的语言，回答使用问题的语言）</value>
     <comment>Language of summaries and answers (Auto = the transcript's language for summaries, the question's for answers)</comment>
@@ -1158,6 +1366,10 @@
     <value>最大的对话</value>
     <comment>Largest conversations</comment>
   </data>
+  <data name="LastChecked" xml:space="preserve">
+    <value>上次检查：{0}</value>
+    <comment>Last checked %@</comment>
+  </data>
   <data name="LaunchAtLogin" xml:space="preserve">
     <value>登录时启动</value>
     <comment>Launch at login</comment>
@@ -1169,6 +1381,14 @@
   <data name="LeavesThisMac_2" xml:space="preserve">
     <value>离开这台 Mac</value>
     <comment>Leaves this Mac</comment>
+  </data>
+  <data name="LeavesThisPC" xml:space="preserve">
+    <value>{0}（离开这台电脑）</value>
+    <comment>%@ (leaves this PC)</comment>
+  </data>
+  <data name="LeavesThisPC_2" xml:space="preserve">
+    <value>离开这台电脑</value>
+    <comment>Leaves this PC</comment>
   </data>
   <data name="Library" xml:space="preserve">
     <value>资料库</value>
@@ -1201,6 +1421,14 @@
   <data name="LiveTranscriptStoppedTheTranscriptIsMadeAfterStop" xml:space="preserve">
     <value>实时转写已停止。转写文本会在停止后生成。</value>
     <comment>Live transcript stopped. The transcript is made after Stop.</comment>
+  </data>
+  <data name="LldBytes" xml:space="preserve">
+    <value>{0} 字节</value>
+    <comment>%lld bytes</comment>
+  </data>
+  <data name="LldConversationsWithoutAudioWouldBeLeftEmptyTheyAreMovedToTh" xml:space="preserve">
+    <value>{0} 个没有音频的对话将变为空：它们会被整个移到回收站。</value>
+    <comment>%lld conversations without audio would be left empty: they are moved to the Recycle Bin entirely.</comment>
   </data>
   <data name="LldConversationsWithoutAudioWouldBeLeftEmptyTheyAreMovedToTh_2" xml:space="preserve">
     <value>{0} 个没有音频的对话将变为空：它们会被整个移到废纸篓。</value>
@@ -1257,6 +1485,10 @@
   <data name="LoadModels" xml:space="preserve">
     <value>载入模型</value>
     <comment>Load models</comment>
+  </data>
+  <data name="LoadingTheModel" xml:space="preserve">
+    <value>正在载入模型…</value>
+    <comment>Loading the model…</comment>
   </data>
   <data name="LocalHosts" xml:space="preserve">
     <value>本地主机</value>
@@ -1330,6 +1562,10 @@
     <value>这台 Mac 上的麦克风访问已被阻止。</value>
     <comment>Microphone access is blocked on this Mac.</comment>
   </data>
+  <data name="MicrophoneAccessIsBlockedOnThisPC" xml:space="preserve">
+    <value>这台电脑上的麦克风访问已被阻止。</value>
+    <comment>Microphone access is blocked on this PC.</comment>
+  </data>
   <data name="MicrophoneAccessIsOff" xml:space="preserve">
     <value>麦克风访问已关闭。</value>
     <comment>Microphone access is off.</comment>
@@ -1341,6 +1577,10 @@
   <data name="MicrophoneDisconnectedStopRecording" xml:space="preserve">
     <value>麦克风已断开 — 要停止录音吗？</value>
     <comment>Microphone disconnected — stop recording?</comment>
+  </data>
+  <data name="MicrophoneLevel" xml:space="preserve">
+    <value>麦克风音量</value>
+    <comment>Microphone level</comment>
   </data>
   <data name="MicrophoneMuted" xml:space="preserve">
     <value>麦克风已静音</value>
@@ -1382,13 +1622,25 @@
     <value>只有在你点按“下载”时才会下载模型。</value>
     <comment>Models are downloaded only when you click Download.</comment>
   </data>
+  <data name="ModelsEchoDiarDownloadsWhenYouChooseThemChooseOneToReadItsLi" xml:space="preserve">
+    <value>你选择后由 EchoDiar 下载的模型。选择一项以阅读其许可证。</value>
+    <comment>Models EchoDiar downloads when you choose them. Choose one to read its license.</comment>
+  </data>
   <data name="Monthly" xml:space="preserve">
     <value>每月</value>
     <comment>Monthly</comment>
   </data>
+  <data name="MoveToRecycleBin" xml:space="preserve">
+    <value>移到回收站</value>
+    <comment>Move to Recycle Bin</comment>
+  </data>
   <data name="MoveToTrash" xml:space="preserve">
     <value>移到废纸篓</value>
     <comment>Move to Trash</comment>
+  </data>
+  <data name="MovesTheAudioToTheRecycleBinOnceATranscriptionSucceeds" xml:space="preserve">
+    <value>转写成功后将音频移到回收站。</value>
+    <comment>Moves the audio to the Recycle Bin once a transcription succeeds.</comment>
   </data>
   <data name="MovesTheAudioToTheTrashOnceATranscriptionSucceeds" xml:space="preserve">
     <value>转写成功后将音频移到废纸篓。</value>
@@ -1429,6 +1681,10 @@
   <data name="NeedsMoreThanHalfOfThisMacSMemory" xml:space="preserve">
     <value>需要这台 Mac 一半以上的内存。</value>
     <comment>Needs more than half of this Mac's memory.</comment>
+  </data>
+  <data name="NeedsMoreThanHalfOfThisPCSMemory" xml:space="preserve">
+    <value>需要这台电脑一半以上的内存。</value>
+    <comment>Needs more than half of this PC's memory.</comment>
   </data>
   <data name="NeedsTheSpeakerModelDownloadItInTranscriptionDiarizationMode" xml:space="preserve">
     <value>需要说话人模型：请在“转写 › 说话人分离模型”中下载。</value>
@@ -1485,6 +1741,10 @@
   <data name="NoConversationsYet" xml:space="preserve">
     <value>还没有对话</value>
     <comment>No conversations yet</comment>
+  </data>
+  <data name="NoConversationsYetPressCtrlRToRecord" xml:space="preserve">
+    <value>还没有对话 — 按下 Ctrl+R 开始录音</value>
+    <comment>No conversations yet — press Ctrl+R to record</comment>
   </data>
   <data name="NoDiarizationModelsListedTypeTheModelId" xml:space="preserve">
     <value>未列出说话人分离模型；请输入模型 ID。</value>
@@ -1554,6 +1814,14 @@
     <value>在这台 Mac 上不可用</value>
     <comment>Not available on this Mac</comment>
   </data>
+  <data name="NotCheckedYet" xml:space="preserve">
+    <value>尚未检查</value>
+    <comment>Not checked yet</comment>
+  </data>
+  <data name="NotFoundGiveTheFullPathToAExeOrToAnNpmCmdShim" xml:space="preserve">
+    <value>未找到：请提供 .exe 或 npm .cmd 垫片的完整路径。</value>
+    <comment>Not found: give the full path to a .exe, or to an npm .cmd shim.</comment>
+  </data>
   <data name="NotInstalled" xml:space="preserve">
     <value>未安装</value>
     <comment>Not installed</comment>
@@ -1565,6 +1833,14 @@
   <data name="NotNow_2" xml:space="preserve">
     <value>以后再说</value>
     <comment>Not now</comment>
+  </data>
+  <data name="NotSavedPutTheKeyInTheAPIKeyFieldWhichKeepsItInCredentialMan" xml:space="preserve">
+    <value>未保存 {0}：请将密钥填入“API 密钥”栏，它会保存在凭据管理器中。</value>
+    <comment>%@ not saved: put the key in the API key field, which keeps it in Credential Manager.</comment>
+  </data>
+  <data name="NotTranscribed" xml:space="preserve">
+    <value>未转写</value>
+    <comment>Not transcribed</comment>
   </data>
   <data name="NothingIsSentToUntilYouConfirm" xml:space="preserve">
     <value>在你确认之前，不会向 {0} 发送任何内容。</value>
@@ -1606,9 +1882,21 @@
     <value>在这台 Mac 上</value>
     <comment>On this Mac</comment>
   </data>
+  <data name="OnThisPC" xml:space="preserve">
+    <value>在这台电脑上</value>
+    <comment>On this PC</comment>
+  </data>
+  <data name="OnceADayMovesTranscribedConversationsOlderThanTheAgeBelowToT" xml:space="preserve">
+    <value>每天一次，将超过以下时长的已转写对话移到回收站。</value>
+    <comment>Once a day, moves transcribed conversations older than the age below to the Recycle Bin.</comment>
+  </data>
   <data name="OnceADayMovesTranscribedConversationsOlderThanTheAgeBelowToT_2" xml:space="preserve">
     <value>每天一次，将超过以下时长的已转写对话移到废纸篓。</value>
     <comment>Once a day, moves transcribed conversations older than the age below to the Trash.</comment>
+  </data>
+  <data name="OnePerLineNameValueSavedInTheSettingsFilePutAPIKeysInTheAPIK" xml:space="preserve">
+    <value>每行一个，格式为“名称: 值”。保存在设置文件中：请将 API 密钥填入“API 密钥”栏。</value>
+    <comment>One per line, Name: value. Saved in the settings file: put API keys in the API key field.</comment>
   </data>
   <data name="OnlyEventsInTheEchoDiarCalendarCanBeChanged" xml:space="preserve">
     <value>只能更改 EchoDiar 日历中的日程。</value>
@@ -1634,13 +1922,25 @@
     <value>OpenAI、Groq、Mistral、Google Gemini 和自定义端点也可以使用各自的转写模型进行转写：请在“设置 › AI”中进行设置。</value>
     <comment>OpenAI, Groq, Mistral, Google Gemini and custom endpoints transcribe too, with their transcription model: set them up in Settings › AI.</comment>
   </data>
+  <data name="OpenCodeDeniesEveryToolButMCPServersInYourOpenCodeConfigStil" xml:space="preserve">
+    <value>OpenCode 会拒绝所有工具，但你的 OpenCode 配置中的 MCP 服务器仍会启动（其工具会被拒绝）。</value>
+    <comment>OpenCode denies every tool, but MCP servers in your OpenCode config still start (their tools are denied).</comment>
+  </data>
   <data name="OpenEchoDiar" xml:space="preserve">
     <value>打开 EchoDiar</value>
     <comment>Open EchoDiar</comment>
   </data>
+  <data name="OpenFullNotices" xml:space="preserve">
+    <value>打开完整声明</value>
+    <comment>Open full notices</comment>
+  </data>
   <data name="OpenGeneral" xml:space="preserve">
     <value>打开“通用”</value>
     <comment>Open General</comment>
+  </data>
+  <data name="OpenInFileExplorer" xml:space="preserve">
+    <value>在文件资源管理器中打开</value>
+    <comment>Open in File Explorer</comment>
   </data>
   <data name="OpenInFinder" xml:space="preserve">
     <value>在访达中打开</value>
@@ -1678,6 +1978,14 @@
     <value>要打开此链接吗？</value>
     <comment>Open this link?</comment>
   </data>
+  <data name="OpenWindowsMicrophoneSettings" xml:space="preserve">
+    <value>打开 Windows 麦克风设置</value>
+    <comment>Open Windows microphone settings</comment>
+  </data>
+  <data name="OpenWindowsPrivacySettings" xml:space="preserve">
+    <value>打开 Windows 隐私设置</value>
+    <comment>Open Windows privacy settings</comment>
+  </data>
   <data name="Open_2" xml:space="preserve">
     <value>要打开 {0} 吗？</value>
     <comment>Open %@?</comment>
@@ -1689,6 +1997,10 @@
   <data name="OutputApprox" xml:space="preserve">
     <value>{0} + 输出（约）</value>
     <comment>%@ + output (approx.)</comment>
+  </data>
+  <data name="ParakeetTranscription" xml:space="preserve">
+    <value>Parakeet 转写</value>
+    <comment>Parakeet transcription</comment>
   </data>
   <data name="ParakeetTranscriptionAndSpeakerDiarization" xml:space="preserve">
     <value>Parakeet 转写和说话人分离</value>
@@ -1802,6 +2114,10 @@
     <value>播放位置</value>
     <comment>Playback position</comment>
   </data>
+  <data name="PlaybackStopped" xml:space="preserve">
+    <value>播放已停止（{0}）。</value>
+    <comment>Playback stopped (%@).</comment>
+  </data>
   <data name="PreparingAudio" xml:space="preserve">
     <value>正在准备音频…</value>
     <comment>Preparing audio…</comment>
@@ -1809,6 +2125,10 @@
   <data name="PressAShortcut" xml:space="preserve">
     <value>按下快捷键…</value>
     <comment>Press a shortcut…</comment>
+  </data>
+  <data name="PressCtrlRToStartRecording" xml:space="preserve">
+    <value>按下 Ctrl+R 开始录音。</value>
+    <comment>Press Ctrl+R to start recording.</comment>
   </data>
   <data name="PressEscToCancel" xml:space="preserve">
     <value>按 Esc 取消</value>
@@ -1878,6 +2198,10 @@
     <value>使用其他模型或语言重新转写</value>
     <comment>Re-transcribe with another model or language</comment>
   </data>
+  <data name="Ready" xml:space="preserve">
+    <value>就绪</value>
+    <comment>Ready</comment>
+  </data>
   <data name="Rebuild" xml:space="preserve">
     <value>重建</value>
     <comment>Rebuild</comment>
@@ -1909,6 +2233,10 @@
   <data name="RecordYourFirstConversation" xml:space="preserve">
     <value>录制你的第一个对话</value>
     <comment>Record your first conversation</comment>
+  </data>
+  <data name="Record_2" xml:space="preserve">
+    <value>录制“{0}”</value>
+    <comment>Record %@</comment>
   </data>
   <data name="Recording" xml:space="preserve">
     <value>录音</value>
@@ -1970,6 +2298,10 @@
     <value>录音列表</value>
     <comment>Recordings</comment>
   </data>
+  <data name="RecordingsAreTranscribedOnThisPCPickASpeechRecognitionModelT" xml:space="preserve">
+    <value>录音会在这台电脑上转写。请选择要下载的语音识别模型。</value>
+    <comment>Recordings are transcribed on this PC. Pick a speech recognition model to download.</comment>
+  </data>
   <data name="RecordsAllSystemAudio" xml:space="preserve">
     <value>{0}（录制全部系统音频）</value>
     <comment>%@ (records all system audio)</comment>
@@ -1977,6 +2309,10 @@
   <data name="Recovered" xml:space="preserve">
     <value>已恢复</value>
     <comment>Recovered</comment>
+  </data>
+  <data name="Redo" xml:space="preserve">
+    <value>重做</value>
+    <comment>Redo</comment>
   </data>
   <data name="RelaunchNow" xml:space="preserve">
     <value>立即重新启动</value>
@@ -2053,6 +2389,10 @@
   <data name="RetryWithAnotherEngine" xml:space="preserve">
     <value>使用其他引擎重试</value>
     <comment>Retry with another engine</comment>
+  </data>
+  <data name="RevealInExplorer" xml:space="preserve">
+    <value>在资源管理器中显示</value>
+    <comment>Reveal in Explorer</comment>
   </data>
   <data name="RevealInFinder" xml:space="preserve">
     <value>在访达中显示</value>
@@ -2154,6 +2494,10 @@
     <value>设置</value>
     <comment>Settings</comment>
   </data>
+  <data name="SettingsCards" xml:space="preserve">
+    <value>设置卡片</value>
+    <comment>Settings cards</comment>
+  </data>
   <data name="Settings_2" xml:space="preserve">
     <value>设置…</value>
     <comment>Settings…</comment>
@@ -2194,9 +2538,17 @@
     <value>显示未来 7 天内的会议。列表会自动更新。</value>
     <comment>Showing meetings in the next 7 days. The list updates automatically.</comment>
   </data>
+  <data name="ShowsTheTranscriptDuringTheRecordingAndKeepsItSoItIsReadyWit" xml:space="preserve">
+    <value>在录音期间显示转写文本并保留下来，因此停止后几秒内即可就绪。录音时会占用更多 CPU 和内存。仅限 Whisper 和 Parakeet 模型；其他引擎会在停止后转写。</value>
+    <comment>Shows the transcript during the recording and keeps it, so it is ready within seconds of Stop. Uses more CPU and memory while recording. Whisper and Parakeet models only; other engines transcribe after Stop.</comment>
+  </data>
   <data name="ShowsTheTranscriptDuringTheRecordingAndKeepsItSoItIsReadyWit_2" xml:space="preserve">
     <value>在录音期间显示转写文本并保留下来，因此停止后几秒内即可就绪。录音时会占用更多 CPU 和内存。仅限 WhisperKit 和 Parakeet 模型；其他引擎会在停止后转写。</value>
     <comment>Shows the transcript during the recording and keeps it, so it is ready within seconds of Stop. Uses more CPU and memory while recording. WhisperKit and Parakeet models only; other engines transcribe after Stop.</comment>
+  </data>
+  <data name="SimulateState" xml:space="preserve">
+    <value>模拟状态</value>
+    <comment>Simulate state</comment>
   </data>
   <data name="Skip" xml:space="preserve">
     <value>跳过</value>
@@ -2221,6 +2573,10 @@
   <data name="Space" xml:space="preserve">
     <value>空格键</value>
     <comment>Space</comment>
+  </data>
+  <data name="SpeakerDiarization" xml:space="preserve">
+    <value>说话人分离</value>
+    <comment>Speaker diarization</comment>
   </data>
   <data name="SpeakerLld" xml:space="preserve">
     <value>说话人 {0}</value>
@@ -2257,6 +2613,10 @@
   <data name="StartRecording" xml:space="preserve">
     <value>开始录音</value>
     <comment>Start Recording</comment>
+  </data>
+  <data name="StartRecording_2" xml:space="preserve">
+    <value>开始录音</value>
+    <comment>Start recording</comment>
   </data>
   <data name="Starting" xml:space="preserve">
     <value>正在开始…</value>
@@ -2406,6 +2766,10 @@
     <value>区分说话人</value>
     <comment>Tell speakers apart</comment>
   </data>
+  <data name="TellSpeakersApartIsOnDownloadAModelToTellTheOtherSpeakersApa" xml:space="preserve">
+    <value>“区分说话人”已打开。请下载模型以区分其他说话人。</value>
+    <comment>"Tell speakers apart" is on. Download a model to tell the other speakers apart.</comment>
+  </data>
   <data name="TellThePeopleYouRecordYouAreResponsibleForTheirConsent" xml:space="preserve">
     <value>请告知你录制的对象。你需要负责取得他们的同意。</value>
     <comment>Tell the people you record. You are responsible for their consent.</comment>
@@ -2426,6 +2790,18 @@
     <value>测试（使用你的订阅）</value>
     <comment>Test (uses your subscription)</comment>
   </data>
+  <data name="TheAPIKeyIsLongerThanLldBytesTheMostCredentialManagerKeeps" xml:space="preserve">
+    <value>API 密钥超过 {0} 字节，这是凭据管理器可保存的上限。</value>
+    <comment>The API key is longer than %lld bytes, the most Credential Manager keeps.</comment>
+  </data>
+  <data name="TheAPIKeyIsSentUnencryptedOverHttpToUseHttpsOrAHostOnThisPC" xml:space="preserve">
+    <value>API 密钥会通过 http 以未加密方式发送到 {0}。请使用 https，或这台电脑上的主机。</value>
+    <comment>The API key is sent unencrypted over http to %@. Use https, or a host on this PC.</comment>
+  </data>
+  <data name="TheApp" xml:space="preserve">
+    <value>该应用</value>
+    <comment>The app</comment>
+  </data>
   <data name="TheAppQuitStopRecording" xml:space="preserve">
     <value>该应用已退出 — 要停止录音吗？</value>
     <comment>The app quit — stop recording?</comment>
@@ -2434,9 +2810,21 @@
     <value>该应用已停止使用音频 — 要停止录音吗？</value>
     <comment>The app stopped using audio — stop recording?</comment>
   </data>
+  <data name="TheApp_2" xml:space="preserve">
+    <value>该应用</value>
+    <comment>the app</comment>
+  </data>
   <data name="TheAudioDeviceChangedWhileRecordingWasStartingTryAgain" xml:space="preserve">
     <value>开始录音时音频设备发生了变化。请再试一次。</value>
     <comment>The audio device changed while recording was starting. Try again.</comment>
+  </data>
+  <data name="TheAudioFilesAreMovedToTheRecycleBinTranscriptsSummariesAndC" xml:space="preserve">
+    <value>音频文件会移到回收站。转写文本、摘要和聊天会保留。</value>
+    <comment>The audio files are moved to the Recycle Bin. Transcripts, summaries and chats stay.</comment>
+  </data>
+  <data name="TheAudioFilesAreMovedToTheRecycleBinTranscriptsSummariesAndC_2" xml:space="preserve">
+    <value>音频文件会移到回收站。转写文本、摘要和聊天会保留；将无法再播放和重新转写。</value>
+    <comment>The audio files are moved to the Recycle Bin. Transcripts, summaries and chats stay; playback and re-transcribing are no longer possible.</comment>
   </data>
   <data name="TheAudioFilesAreMovedToTheTrashTranscriptsSummariesAndChatsS" xml:space="preserve">
     <value>音频文件会移到废纸篓。转写文本、摘要和聊天会保留。</value>
@@ -2446,9 +2834,21 @@
     <value>音频文件会移到废纸篓。转写文本、摘要和聊天会保留；将无法再播放和重新转写。</value>
     <comment>The audio files are moved to the Trash. Transcripts, summaries and chats stay; playback and re-transcribing are no longer possible.</comment>
   </data>
+  <data name="TheAudioIsMovedToTheRecycleBinTheTranscriptSummaryAndChatSta" xml:space="preserve">
+    <value>音频会移到回收站。转写文本、摘要和聊天会保留；将无法再播放和重新转写。</value>
+    <comment>The audio is moved to the Recycle Bin. The transcript, summary and chat stay; playback and re-transcribing are no longer possible.</comment>
+  </data>
   <data name="TheAudioIsMovedToTheTrashTheTranscriptSummaryAndChatStayPlay" xml:space="preserve">
     <value>音频会移到废纸篓。转写文本、摘要和聊天会保留；将无法再播放和重新转写。</value>
     <comment>The audio is moved to the Trash. The transcript, summary and chat stay; playback and re-transcribing are no longer possible.</comment>
+  </data>
+  <data name="TheAudioOfLldConversationsWillBeMovedToTheRecycleBinAtTheNex" xml:space="preserve">
+    <value>{0} 个对话的音频将在下次运行时（启动时或一天内）移到回收站：</value>
+    <comment>The audio of %lld conversations will be moved to the Recycle Bin at the next run (at launch or within a day):</comment>
+  </data>
+  <data name="TheAudioOfLldConversationsWillBeMovedToTheRecycleBinNowThenD" xml:space="preserve">
+    <value>{0} 个对话的音频将立即移到回收站，之后每天处理更旧的对话：</value>
+    <comment>The audio of %lld conversations will be moved to the Recycle Bin now, then daily for older ones:</comment>
   </data>
   <data name="TheAudioOfLldConversationsWillBeMovedToTheTrashAtTheNextRunA" xml:space="preserve">
     <value>{0} 个对话的音频将在下次运行时（启动时或一天内）移到废纸篓：</value>
@@ -2458,6 +2858,10 @@
     <value>{0} 个对话的音频将立即移到废纸篓，之后每天处理更旧的对话：</value>
     <comment>The audio of %lld conversations will be moved to the Trash now, then daily for older ones:</comment>
   </data>
+  <data name="TheAudioOfTranscribedConversationsOlderThanLldDaysWillBeMove" xml:space="preserve">
+    <value>超过 {0} 天的已转写对话的音频将每天移到回收站一次。目前没有匹配项。</value>
+    <comment>The audio of transcribed conversations older than %lld days will be moved to the Recycle Bin once a day. Nothing matches now.</comment>
+  </data>
   <data name="TheAudioOfTranscribedConversationsOlderThanLldDaysWillBeMove_2" xml:space="preserve">
     <value>超过 {0} 天的已转写对话的音频将每天移到废纸篓一次。目前没有匹配项。</value>
     <comment>The audio of transcribed conversations older than %lld days will be moved to the Trash once a day. Nothing matches now.</comment>
@@ -2466,9 +2870,17 @@
     <value>音频系统未运行。请稍后再试。</value>
     <comment>The audio system is not running. Try again in a moment.</comment>
   </data>
+  <data name="TheCalendarCouldNotBeChangedTryAgainLater" xml:space="preserve">
+    <value>无法更改日历。请稍后再试。</value>
+    <comment>The calendar could not be changed. Try again later.</comment>
+  </data>
   <data name="TheCallSeemsToBeOverStopRecording" xml:space="preserve">
     <value>通话似乎已结束 — 要停止录音吗？</value>
     <comment>The call seems to be over — stop recording?</comment>
+  </data>
+  <data name="TheDownloadFailed" xml:space="preserve">
+    <value>下载失败：{0}</value>
+    <comment>The download failed: %@</comment>
   </data>
   <data name="TheEmbeddingModelLetsAQuestionFindPassagesWithTheSameMeaning" xml:space="preserve">
     <value>嵌入模型让问题能够找到含义相同的段落，无论使用哪种语言。只有在你点按“下载”时才会下载模型。</value>
@@ -2481,6 +2893,10 @@
   <data name="TheEventNoLongerExists" xml:space="preserve">
     <value>该日程已不存在。</value>
     <comment>The event no longer exists.</comment>
+  </data>
+  <data name="TheGgmlConversionSModelCardSaysApache20TheOriginalWeightsByV" xml:space="preserve">
+    <value>ggml 转换版本的模型卡片标注为 Apache-2.0；VinAI 的原始权重采用 BSD-3-Clause 许可。</value>
+    <comment>The ggml conversion's model card says Apache-2.0; the original weights by VinAI are BSD-3-Clause.</comment>
   </data>
   <data name="TheIndicatorAsksBeforeStoppingWithA15SCountdownLikeTheOtherA" xml:space="preserve">
     <value>指示器会在停止前询问，并倒计时 15 秒，与其他自动停止一样。</value>
@@ -2506,6 +2922,10 @@
     <value>提供商</value>
     <comment>the provider</comment>
   </data>
+  <data name="TheRecordingAndItsFilesAreMovedToTheRecycleBin" xml:space="preserve">
+    <value>该录音及其文件会移到回收站。</value>
+    <comment>The recording and its files are moved to the Recycle Bin.</comment>
+  </data>
   <data name="TheRecordingAndItsFilesAreMovedToTheTrash" xml:space="preserve">
     <value>该录音及其文件会移到废纸篓。</value>
     <comment>The recording and its files are moved to the Trash.</comment>
@@ -2521,6 +2941,10 @@
   <data name="TheRecordingFailed" xml:space="preserve">
     <value>录音失败。</value>
     <comment>The recording failed.</comment>
+  </data>
+  <data name="TheRecordingsAndTheirFilesAreMovedToTheRecycleBin" xml:space="preserve">
+    <value>这些录音及其文件会移到回收站。</value>
+    <comment>The recordings and their files are moved to the Recycle Bin.</comment>
   </data>
   <data name="TheRecordingsAndTheirFilesAreMovedToTheTrash" xml:space="preserve">
     <value>这些录音及其文件会移到废纸篓。</value>
@@ -2558,17 +2982,33 @@
     <value>转写模型、说话人模型和 AI 模型会从这台 Mac 上移除（不会移到废纸篓）。可在“设置 › 转写”和“设置 › AI”中重新下载。</value>
     <comment>The transcription, speaker and AI models are removed from this Mac (not moved to the Trash). Download them again in Settings › Transcription and Settings › AI.</comment>
   </data>
+  <data name="TheTranscriptionSpeakerAndAIModelsAreRemovedFromThisPCNotMov" xml:space="preserve">
+    <value>转写模型、说话人模型和 AI 模型会从这台电脑上移除（不会移到回收站）。可在“设置 › 转写”和“设置 › AI”中重新下载。</value>
+    <comment>The transcription, speaker and AI models are removed from this PC (not moved to the Recycle Bin). Download them again in Settings › Transcription and Settings › AI.</comment>
+  </data>
   <data name="ThereIsNotEnoughFreeDiskSpaceToRecord" xml:space="preserve">
     <value>没有足够的可用磁盘空间来录音。</value>
     <comment>There is not enough free disk space to record.</comment>
+  </data>
+  <data name="TheyAreMovedToTheRecycleBinTheAudioStaysSoTheConversationsCa" xml:space="preserve">
+    <value>它们会移到回收站。音频会保留，因此可以重新转写这些对话。</value>
+    <comment>They are moved to the Recycle Bin. The audio stays, so the conversations can be transcribed again.</comment>
   </data>
   <data name="TheyAreMovedToTheTrashTheAudioStaysSoTheConversationsCanBeTr" xml:space="preserve">
     <value>它们会移到废纸篓。音频会保留，因此可以重新转写这些对话。</value>
     <comment>They are moved to the Trash. The audio stays, so the conversations can be transcribed again.</comment>
   </data>
+  <data name="TheyStillGoToTheRecycleBin" xml:space="preserve">
+    <value>它们仍会移到回收站。</value>
+    <comment>They still go to the Recycle Bin.</comment>
+  </data>
   <data name="TheyStillGoToTheTrash" xml:space="preserve">
     <value>它们仍会移到废纸篓。</value>
     <comment>They still go to the Trash.</comment>
+  </data>
+  <data name="ThirdPartyNotices" xml:space="preserve">
+    <value>第三方声明</value>
+    <comment>Third-party notices</comment>
   </data>
   <data name="ThisAndFutureEvents" xml:space="preserve">
     <value>所有将来日程</value>
@@ -2578,13 +3018,33 @@
     <value>无法单独分离此应用的音频，因此正在录制全部系统音频。</value>
     <comment>This app's audio cannot be isolated, so all system audio is being recorded.</comment>
   </data>
+  <data name="ThisBuildOfEchoDiarCannotUseWindowsAITheSystemAIModelsCapabi" xml:space="preserve">
+    <value>此版本的 EchoDiar 无法使用 Windows AI（缺少 systemAIModels 功能）。</value>
+    <comment>This build of EchoDiar cannot use Windows AI (the systemAIModels capability is missing).</comment>
+  </data>
   <data name="ThisConversationHasNoTranscriptYet" xml:space="preserve">
     <value>此对话还没有转写文本。</value>
     <comment>This conversation has no transcript yet.</comment>
   </data>
+  <data name="ThisConversationIsNotInTheLibrary" xml:space="preserve">
+    <value>此对话不在资料库中。</value>
+    <comment>This conversation is not in the library.</comment>
+  </data>
   <data name="ThisConversationWasDeleted" xml:space="preserve">
     <value>此对话已删除</value>
     <comment>This conversation was deleted</comment>
+  </data>
+  <data name="ThisCopyWasNotInstalledFromAnAppinstallerFile" xml:space="preserve">
+    <value>此副本不是通过 .appinstaller 文件安装的。</value>
+    <comment>This copy was not installed from an .appinstaller file.</comment>
+  </data>
+  <data name="ThisCopyWasNotInstalledFromAnAppinstallerFileSoItDoesNotUpda" xml:space="preserve">
+    <value>此副本不是通过 .appinstaller 文件安装的，因此不会自动更新。</value>
+    <comment>This copy was not installed from an .appinstaller file, so it does not update itself.</comment>
+  </data>
+  <data name="ThisEngineTranscribesAfterStopWhisperAndParakeetModelsAlsoTr" xml:space="preserve">
+    <value>此引擎会在停止后转写。Whisper 和 Parakeet 模型还可以在录音时转写。</value>
+    <comment>This engine transcribes after Stop. Whisper and Parakeet models also transcribe while recording.</comment>
   </data>
   <data name="ThisEngineTranscribesAfterStopWhisperKitAndParakeetModelsAls" xml:space="preserve">
     <value>此引擎会在停止后转写。WhisperKit 和 Parakeet 模型还可以在录音时转写。</value>
@@ -2598,6 +3058,10 @@
     <value>仅此日程</value>
     <comment>This Event Only</comment>
   </data>
+  <data name="ThisLink" xml:space="preserve">
+    <value>此链接</value>
+    <comment>this link</comment>
+  </data>
   <data name="ThisMac" xml:space="preserve">
     <value>这台 Mac</value>
     <comment>This Mac</comment>
@@ -2605,6 +3069,18 @@
   <data name="ThisModelDoesNotLabelSpeakersAModelOnThisMacIsUsedInstead" xml:space="preserve">
     <value>此模型不会标注说话人；将改用这台 Mac 上的模型。</value>
     <comment>This model does not label speakers; a model on this Mac is used instead.</comment>
+  </data>
+  <data name="ThisModelDoesNotLabelSpeakersAModelOnThisPCIsUsedInstead" xml:space="preserve">
+    <value>此模型不会标注说话人；将改用这台电脑上的模型。</value>
+    <comment>This model does not label speakers; a model on this PC is used instead.</comment>
+  </data>
+  <data name="ThisPC" xml:space="preserve">
+    <value>这台电脑</value>
+    <comment>This PC</comment>
+  </data>
+  <data name="ThisPCSHardwareDoesNotSupportWindowsAIItNeedsACopilotPC" xml:space="preserve">
+    <value>这台电脑的硬件不支持 Windows AI（需要 Copilot+ PC）。</value>
+    <comment>This PC's hardware does not support Windows AI (it needs a Copilot+ PC).</comment>
   </data>
   <data name="Title" xml:space="preserve">
     <value>标题</value>
@@ -2638,6 +3114,14 @@
     <value>自动转写</value>
     <comment>Transcribe automatically</comment>
   </data>
+  <data name="TranscribeNow" xml:space="preserve">
+    <value>立即转写</value>
+    <comment>Transcribe now</comment>
+  </data>
+  <data name="TranscribeNowEvenWithEnergySaverOn" xml:space="preserve">
+    <value>立即转写，即使节能模式已开启</value>
+    <comment>Transcribe now, even with energy saver on</comment>
+  </data>
   <data name="TranscribeThisConversation" xml:space="preserve">
     <value>转写此对话</value>
     <comment>Transcribe this conversation</comment>
@@ -2650,9 +3134,17 @@
     <value>“录音时转写”已关闭。请在“设置 › 转写”中打开。</value>
     <comment>Transcribe while recording is off. Turn it on in Settings › Transcription.</comment>
   </data>
+  <data name="Transcribed" xml:space="preserve">
+    <value>已转写</value>
+    <comment>Transcribed</comment>
+  </data>
   <data name="Transcribing" xml:space="preserve">
     <value>正在转写…</value>
     <comment>Transcribing…</comment>
+  </data>
+  <data name="TranscribingLld" xml:space="preserve">
+    <value>正在转写 {0}%</value>
+    <comment>Transcribing %lld%%</comment>
   </data>
   <data name="Transcript" xml:space="preserve">
     <value>转写文本</value>
@@ -2686,6 +3178,10 @@
     <value>转写模型</value>
     <comment>Transcription models</comment>
   </data>
+  <data name="TranscriptionStartsOnceEnergySaverIsOff" xml:space="preserve">
+    <value>节能模式关闭后即开始转写。</value>
+    <comment>Transcription starts once energy saver is off.</comment>
+  </data>
   <data name="TranscriptionStartsOnceTheMacIsReady" xml:space="preserve">
     <value>Mac 准备就绪后即开始转写。</value>
     <comment>Transcription starts once the Mac is ready.</comment>
@@ -2706,6 +3202,10 @@
     <value>转写文本、摘要和聊天会保留；将无法再播放和重新转写。</value>
     <comment>Transcripts, summaries and chats stay; playback and re-transcribing are no longer possible.</comment>
   </data>
+  <data name="TryAgainLater" xml:space="preserve">
+    <value>请稍后再试。</value>
+    <comment>Try again later.</comment>
+  </data>
   <data name="TurnOn" xml:space="preserve">
     <value>打开</value>
     <comment>Turn On</comment>
@@ -2722,6 +3222,10 @@
     <value>请在“隐私与安全 › 麦克风”中打开 EchoDiar。</value>
     <comment>Turn on EchoDiar in Privacy &amp; Security › Microphone.</comment>
   </data>
+  <data name="TurnOnEchoDiarInWindowsSettingsPrivacySecurityMicrophone" xml:space="preserve">
+    <value>请在“Windows 设置 › 隐私和安全性 › 麦克风”中打开 EchoDiar。</value>
+    <comment>Turn on EchoDiar in Windows Settings › Privacy &amp; security › Microphone.</comment>
+  </data>
   <data name="TurnOnInSettingsAI" xml:space="preserve">
     <value>在“设置 › AI”中打开 {0}</value>
     <comment>Turn on %@ in Settings › AI</comment>
@@ -2729,6 +3233,18 @@
   <data name="TurnOnInSettingsRAG" xml:space="preserve">
     <value>在“设置 › RAG”中打开</value>
     <comment>Turn on in Settings › RAG</comment>
+  </data>
+  <data name="TurnedOffByYourOrganization" xml:space="preserve">
+    <value>已由你的组织关闭。</value>
+    <comment>Turned off by your organization.</comment>
+  </data>
+  <data name="TurnedOffInWindowsSettingsAppsStartupTurnEchoDiarOnThere" xml:space="preserve">
+    <value>已在“Windows 设置 &gt; 应用 &gt; 启动”中关闭。请在那里打开 EchoDiar。</value>
+    <comment>Turned off in Windows Settings &gt; Apps &gt; Startup. Turn EchoDiar on there.</comment>
+  </data>
+  <data name="TurnedOnByYourOrganization" xml:space="preserve">
+    <value>已由你的组织打开。</value>
+    <comment>Turned on by your organization.</comment>
   </data>
   <data name="TypeAModelIdAndPressReturnOrLoadTheModelsToPickFrom" xml:space="preserve">
     <value>输入模型 ID 并按下回车键，或载入模型以从中选择。</value>
@@ -2741,6 +3257,10 @@
   <data name="Understood" xml:space="preserve">
     <value>我知道了</value>
     <comment>Understood</comment>
+  </data>
+  <data name="Undo" xml:space="preserve">
+    <value>撤销</value>
+    <comment>Undo</comment>
   </data>
   <data name="UnmuteMicrophone" xml:space="preserve">
     <value>取消麦克风静音</value>
@@ -2766,9 +3286,25 @@
     <value>更新</value>
     <comment>Update</comment>
   </data>
+  <data name="UpdateAfterTheCurrentWork" xml:space="preserve">
+    <value>当前工作完成后更新</value>
+    <comment>Update after the current work</comment>
+  </data>
   <data name="UpdateAvailable" xml:space="preserve">
     <value>有可用更新…</value>
     <comment>Update Available…</comment>
+  </data>
+  <data name="UpdateAvailable_2" xml:space="preserve">
+    <value>有可用更新…</value>
+    <comment>Update available…</comment>
+  </data>
+  <data name="Updates" xml:space="preserve">
+    <value>更新</value>
+    <comment>Updates</comment>
+  </data>
+  <data name="UpdatesNeedAnAppinstallerInstall" xml:space="preserve">
+    <value>更新需要通过 .appinstaller 安装</value>
+    <comment>Updates need an .appinstaller install</comment>
   </data>
   <data name="Usage" xml:space="preserve">
     <value>使用情况</value>
@@ -2782,13 +3318,25 @@
     <value>请使用 https 链接。</value>
     <comment>Use an https link.</comment>
   </data>
+  <data name="UseCtrlOrAltWithTheKey" xml:space="preserve">
+    <value>请配合 Ctrl 或 Alt 使用该键。</value>
+    <comment>Use Ctrl or Alt with the key.</comment>
+  </data>
   <data name="UseOrWithTheKey" xml:space="preserve">
     <value>请将 ⌘、⌥ 或 ⌃ 与该键配合使用。</value>
     <comment>Use ⌘, ⌥ or ⌃ with the key.</comment>
   </data>
+  <data name="UsedByLLamaSharp" xml:space="preserve">
+    <value>由 LLamaSharp 使用</value>
+    <comment>Used by LLamaSharp</comment>
+  </data>
   <data name="UsedByMLXSwift" xml:space="preserve">
     <value>由 MLX Swift 使用</value>
     <comment>Used by MLX Swift</comment>
+  </data>
+  <data name="UsedBySherpaOnnx" xml:space="preserve">
+    <value>由 sherpa-onnx 使用</value>
+    <comment>Used by sherpa-onnx</comment>
   </data>
   <data name="UsedBySwiftHuggingface" xml:space="preserve">
     <value>由 swift-huggingface 使用</value>
@@ -2797,6 +3345,14 @@
   <data name="UsedBySwiftTransformers" xml:space="preserve">
     <value>由 swift-transformers 使用</value>
     <comment>Used by swift-transformers</comment>
+  </data>
+  <data name="UsedByWhisperNet" xml:space="preserve">
+    <value>由 Whisper.net 使用</value>
+    <comment>Used by Whisper.net</comment>
+  </data>
+  <data name="UsedForSummariesAndQuestionsTheModelOfEachEnabledProviderBel" xml:space="preserve">
+    <value>用于摘要和提问。即下方每个已启用提供商的模型，以其所在行中勾选的为准。</value>
+    <comment>Used for summaries and questions. The model of each enabled provider below, as checked in its row.</comment>
   </data>
   <data name="UsesTheLanguagePickedInTheRecordMenuForTheNextRecordingsInst" xml:space="preserve">
     <value>后续录制使用在“录制”菜单中选择的语言，而不是默认语言。录制过程中更改的语言不计入。</value>
@@ -2822,6 +3378,10 @@
     <value>越南语</value>
     <comment>Vietnamese</comment>
   </data>
+  <data name="VietnameseTranscription" xml:space="preserve">
+    <value>越南语转写</value>
+    <comment>Vietnamese transcription</comment>
+  </data>
   <data name="View" xml:space="preserve">
     <value>显示</value>
     <comment>View</comment>
@@ -2830,13 +3390,29 @@
     <value>等待通话</value>
     <comment>Wait for the call</comment>
   </data>
+  <data name="WaitForTheTranscriptionsAndAIAnswersToFinish" xml:space="preserve">
+    <value>等待转写和 AI 回答完成</value>
+    <comment>Wait for the transcriptions and AI answers to finish</comment>
+  </data>
   <data name="WaitWhenTheMacIsHotOrInLowPowerMode" xml:space="preserve">
     <value>Mac 过热或处于低电量模式时等待</value>
     <comment>Wait when the Mac is hot or in Low Power Mode</comment>
   </data>
+  <data name="WaitWhileEnergySaverIsOn" xml:space="preserve">
+    <value>节能模式开启时等待</value>
+    <comment>Wait while energy saver is on</comment>
+  </data>
   <data name="Waiting" xml:space="preserve">
     <value>正在等待…</value>
     <comment>Waiting…</comment>
+  </data>
+  <data name="WaitingEnergySaverIsOn" xml:space="preserve">
+    <value>正在等待：节能模式已开启</value>
+    <comment>Waiting: energy saver is on</comment>
+  </data>
+  <data name="WaitingForLiveCaptionsOrTranscriptionToFinish" xml:space="preserve">
+    <value>正在等待实时字幕或转写完成…</value>
+    <comment>Waiting for live captions or transcription to finish…</comment>
   </data>
   <data name="WaitingWhileTheMacIsHotOrInLowPowerMode" xml:space="preserve">
     <value>Mac 过热或处于低电量模式，正在等待</value>
@@ -2894,9 +3470,37 @@
     <value>整个对话</value>
     <comment>Whole conversation</comment>
   </data>
+  <data name="WinUI3AndTheAppPlatform" xml:space="preserve">
+    <value>WinUI 3 和应用平台</value>
+    <comment>WinUI 3 and the app platform</comment>
+  </data>
   <data name="Window" xml:space="preserve">
     <value>窗口</value>
     <comment>Window</comment>
+  </data>
+  <data name="WindowsAIIsNotAvailableOnThisPC" xml:space="preserve">
+    <value>这台电脑上无法使用 Windows AI。</value>
+    <comment>Windows AI is not available on this PC.</comment>
+  </data>
+  <data name="WindowsAIIsNotSupportedOnThisPCItNeedsACopilotPC" xml:space="preserve">
+    <value>这台电脑不支持 Windows AI（需要 Copilot+ PC）。</value>
+    <comment>Windows AI is not supported on this PC (it needs a Copilot+ PC).</comment>
+  </data>
+  <data name="WindowsAIIsNotUnlockedForEchoDiar" xml:space="preserve">
+    <value>Windows AI 尚未为 EchoDiar 解锁。</value>
+    <comment>Windows AI is not unlocked for EchoDiar.</comment>
+  </data>
+  <data name="WindowsAIIsTurnedOffSettingsPrivacySecurityTextAndImageGener" xml:space="preserve">
+    <value>Windows AI 已关闭（“设置 › 隐私和安全性 › 文本和图像生成”）。</value>
+    <comment>Windows AI is turned off (Settings › Privacy &amp; security › Text and image generation).</comment>
+  </data>
+  <data name="WindowsAINeedsAWindowsUpdateSettingsWindowsUpdate" xml:space="preserve">
+    <value>Windows AI 需要更新 Windows（“设置 › Windows 更新”）。</value>
+    <comment>Windows AI needs a Windows update (Settings › Windows Update).</comment>
+  </data>
+  <data name="WindowsAISystem" xml:space="preserve">
+    <value>Windows AI（系统）</value>
+    <comment>Windows AI (system)</comment>
   </data>
   <data name="WouldDeleteNowLldConversations" xml:space="preserve">
     <value>现在将删除：{0} 个对话</value>
@@ -2913,6 +3517,10 @@
   <data name="Yesterday" xml:space="preserve">
     <value>昨天</value>
     <comment>Yesterday</comment>
+  </data>
+  <data name="YouReUpToDate" xml:space="preserve">
+    <value>已是最新版本！</value>
+    <comment>You're up to date!</comment>
   </data>
   <data name="YourConversationsAreNotIndexedYet" xml:space="preserve">
     <value>你的对话尚未编入索引。</value>

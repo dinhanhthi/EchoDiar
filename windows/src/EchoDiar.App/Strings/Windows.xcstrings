@@ -22,6 +22,12 @@
             "state" : "needs_review",
             "value" : "\"Phân biệt người nói\" đang bật. Hãy tải về một mô hình để phân biệt những người nói khác."
           }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "“区分说话人”已打开。请下载模型以区分其他说话人。"
+          }
         }
       }
     },
@@ -45,6 +51,12 @@
           "stringUnit" : {
             "state" : "needs_review",
             "value" : "%@ (rời khỏi máy tính này)"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@（离开这台电脑）"
           }
         }
       }
@@ -70,6 +82,12 @@
             "state" : "needs_review",
             "value" : "%@ và %@"
           }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@和%@"
+          }
         }
       }
     },
@@ -93,6 +111,12 @@
           "stringUnit" : {
             "state" : "needs_review",
             "value" : "Không thể đăng ký %@ (lỗi %lld)."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "无法注册 %1$@（错误 %2$lld）。"
           }
         }
       }
@@ -118,6 +142,12 @@
             "state" : "needs_review",
             "value" : "%@ không vượt qua bước kiểm tra tính toàn vẹn. Hãy tải về lại."
           }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ 未通过完整性检查。请重新下载。"
+          }
         }
       }
     },
@@ -142,6 +172,12 @@
             "state" : "needs_review",
             "value" : "%@ là phím tắt \"%@\"."
           }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$@ 是“%2$@”的快捷键。"
+          }
         }
       }
     },
@@ -165,6 +201,12 @@
           "stringUnit" : {
             "state" : "needs_review",
             "value" : "%@ chưa được lưu: hãy nhập khoá vào ô Khoá API, nơi khoá được giữ trong Trình quản lý thông tin xác thực."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "未保存 %@：请将密钥填入“API 密钥”栏，它会保存在凭据管理器中。"
           }
         }
       }
@@ -238,6 +280,12 @@
             "state" : "needs_review",
             "value" : "%lld byte"
           }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld 字节"
+          }
         }
       }
     },
@@ -309,6 +357,12 @@
           "stringUnit" : {
             "state" : "needs_review",
             "value" : "%lld cuộc hội thoại không có âm thanh sẽ trở nên trống: chúng được chuyển toàn bộ vào Thùng rác."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld 个没有音频的对话将变为空：它们会被整个移到回收站。"
           }
         }
       }
@@ -382,6 +436,12 @@
             "state" : "needs_review",
             "value" : "Toàn bộ tệp của %lld cuộc hội thoại sẽ được chuyển vào Thùng rác ở lần chạy tới (khi khởi động hoặc trong vòng một ngày):"
           }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld 个对话的所有文件将在下次运行时（启动时或一天内）移到回收站："
+          }
         }
       }
     },
@@ -453,6 +513,12 @@
           "stringUnit" : {
             "state" : "needs_review",
             "value" : "Toàn bộ tệp của %lld cuộc hội thoại sẽ được chuyển vào Thùng rác ngay bây giờ, sau đó hằng ngày với các cuộc cũ hơn:"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld 个对话的所有文件将立即移到回收站，之后每天处理更旧的对话："
           }
         }
       }
@@ -526,6 +592,12 @@
             "state" : "needs_review",
             "value" : "Toàn bộ tệp của các cuộc hội thoại đã chép lời cũ hơn %lld ngày sẽ được chuyển vào Thùng rác mỗi ngày một lần. Hiện không có gì khớp."
           }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "超过 %lld 天的已转写对话的所有文件将每天移到回收站一次。目前没有匹配项。"
+          }
         }
       }
     },
@@ -549,6 +621,12 @@
           "stringUnit" : {
             "state" : "needs_review",
             "value" : "Có bản cập nhật: bấm Cập nhật trên thanh công cụ để cài đặt."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "有可用更新：点击工具栏中的“更新”即可安装。"
           }
         }
       }
@@ -574,6 +652,12 @@
             "state" : "needs_review",
             "value" : "Trả lời câu hỏi về mọi cuộc hội thoại đã chép lời của bạn, kèm trích dẫn cuộc hội thoại và thời điểm. Chỉ mục được giữ trên máy tính này, trừ khi bạn chọn một trình nhúng qua API."
           }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "回答关于你所有已转写对话的问题，并注明出处对话和时间点。除非你选择 API 嵌入服务，否则索引会保留在这台电脑上。"
+          }
         }
       }
     },
@@ -597,6 +681,12 @@
           "stringUnit" : {
             "state" : "needs_review",
             "value" : "Cấu trúc ứng dụng (MVVM)"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "应用结构（MVVM）"
           }
         }
       }
@@ -622,6 +712,12 @@
             "state" : "needs_review",
             "value" : "Âm thanh và bản chép lời được giữ trên máy tính này."
           }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "音频和转写文本会保留在这台电脑上。"
+          }
         }
       }
     },
@@ -645,6 +741,12 @@
           "stringUnit" : {
             "state" : "needs_review",
             "value" : "Thu và phát âm thanh"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "音频捕获和播放"
           }
         }
       }
@@ -670,6 +772,12 @@
             "state" : "needs_review",
             "value" : "Âm thanh rời khỏi máy tính này: các công cụ đám mây tải bản ghi âm lên nhà cung cấp."
           }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "音频会离开这台电脑：云端引擎会将录音上传到提供商。"
+          }
         }
       }
     },
@@ -693,6 +801,12 @@
           "stringUnit" : {
             "state" : "needs_review",
             "value" : "Âm thanh rời khỏi máy tính này: công cụ phân biệt người nói trên đám mây tải kênh hệ thống lên nhà cung cấp."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "音频会离开这台电脑：云端说话人分离服务会将系统声道上传到提供商。"
           }
         }
       }
@@ -718,6 +832,12 @@
             "state" : "needs_review",
             "value" : "Âm thanh rời khỏi máy tính này: kênh micrô và kênh hệ thống của bản ghi âm được tải lên %@ (%@) để chép lời và do họ tính phí. Nhà cung cấp có thể lưu giữ âm thanh theo chính sách lưu trữ riêng của họ. Bạn chỉ được hỏi một lần cho mỗi nhà cung cấp và nơi nhận."
           }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "音频会离开这台电脑：录音的麦克风声道和系统声道会上传到 %1$@（%2$@）进行转写，并由其计费。提供商可能会按照其自身的保留政策保存音频。每个提供商和目标位置只会询问你一次。"
+          }
         }
       }
     },
@@ -741,6 +861,12 @@
           "stringUnit" : {
             "state" : "needs_review",
             "value" : "Tự động = ngôn ngữ của bản chép lời đối với bản tóm tắt, của câu hỏi đối với câu trả lời."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "自动 = 摘要使用转写文本的语言，回答使用问题的语言。"
           }
         }
       }
@@ -766,6 +892,12 @@
             "state" : "needs_review",
             "value" : "Quyền truy cập lịch đang tắt. Hãy bật EchoDiar trong Cài đặt Windows › Quyền riêng tư & bảo mật › Lịch."
           }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "日历访问已关闭。请在“Windows 设置 › 隐私和安全性 › 日历”中打开 EchoDiar。"
+          }
         }
       }
     },
@@ -789,6 +921,12 @@
           "stringUnit" : {
             "state" : "needs_review",
             "value" : "Kiểm tra bản cập nhật…"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "检查更新…"
           }
         }
       }
@@ -814,6 +952,12 @@
             "state" : "needs_review",
             "value" : "Kiểm tra ngay"
           }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "立即检查"
+          }
         }
       }
     },
@@ -837,6 +981,12 @@
           "stringUnit" : {
             "state" : "needs_review",
             "value" : "Hãy kiểm tra xem URL gốc có kết thúc bằng /v1 không."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "请检查基础 URL 是否以 /v1 结尾。"
           }
         }
       }
@@ -862,6 +1012,12 @@
             "state" : "needs_review",
             "value" : "Hãy kiểm tra loa hoặc tai nghe đã bật và không bị tắt tiếng, rồi kiểm tra lại."
           }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "请检查扬声器或耳机是否已打开且未静音，然后再次测试。"
+          }
         }
       }
     },
@@ -885,6 +1041,12 @@
           "stringUnit" : {
             "state" : "needs_review",
             "value" : "Đang kiểm tra bản cập nhật…"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "正在检查更新…"
           }
         }
       }
@@ -910,6 +1072,12 @@
             "state" : "needs_review",
             "value" : "Phân biệt người nói trên đám mây không thành công và máy tính này chưa cài mô hình phân biệt người nói nào."
           }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "云端说话人分离失败，且这台电脑上未安装说话人分离模型。"
+          }
         }
       }
     },
@@ -933,6 +1101,12 @@
           "stringUnit" : {
             "state" : "needs_review",
             "value" : "Phân biệt người nói trên đám mây không thành công; người nói đã được phân biệt trên máy tính này."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "云端说话人分离失败；已在这台电脑上区分说话人。"
           }
         }
       }
@@ -958,6 +1132,12 @@
             "state" : "needs_review",
             "value" : "Codex chạy mà không dùng ~/.codex/config.toml của bạn (mô hình, máy chủ MCP và hook trong đó), trong một sandbox chỉ đọc và ngoại tuyến, nhưng các công cụ tích hợp sẵn còn lại của Codex vẫn có thể đọc tệp trên máy tính này."
           }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Codex 会在只读、离线的沙盒中运行，不加载你的 ~/.codex/config.toml（其中的模型、MCP 服务器和钩子），但其余内置工具仍可读取这台电脑上的文件。"
+          }
         }
       }
     },
@@ -981,6 +1161,12 @@
           "stringUnit" : {
             "state" : "needs_review",
             "value" : "Không thể kiểm tra bản cập nhật"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "无法检查更新"
           }
         }
       }
@@ -1006,6 +1192,12 @@
             "state" : "needs_review",
             "value" : "Không thể cài đặt bản cập nhật"
           }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "无法安装更新"
+          }
         }
       }
     },
@@ -1029,6 +1221,12 @@
           "stringUnit" : {
             "state" : "needs_review",
             "value" : "Không thể mở âm thanh (%@)."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "无法打开音频（%@）。"
           }
         }
       }
@@ -1054,6 +1252,12 @@
             "state" : "needs_review",
             "value" : "Không thể phát âm thanh (%@)."
           }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "无法播放音频（%@）。"
+          }
         }
       }
     },
@@ -1077,6 +1281,12 @@
           "stringUnit" : {
             "state" : "needs_review",
             "value" : "Dữ liệu gửi đến %@ sẽ rời khỏi máy tính này."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "发送到 %@ 的数据会离开这台电脑。"
           }
         }
       }
@@ -1102,6 +1312,12 @@
             "state" : "needs_review",
             "value" : "Dữ liệu gửi đến nhà cung cấp đám mây hoặc CLI sẽ rời khỏi máy tính này."
           }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "发送到云端提供商或 CLI 的数据会离开这台电脑。"
+          }
         }
       }
     },
@@ -1125,6 +1341,12 @@
           "stringUnit" : {
             "state" : "needs_review",
             "value" : "Tải về mô hình người nói"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "下载说话人模型"
           }
         }
       }
@@ -1150,6 +1372,12 @@
             "state" : "needs_review",
             "value" : "Tải về mô hình chép lời"
           }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "下载转写模型"
+          }
         }
       }
     },
@@ -1173,6 +1401,12 @@
           "stringUnit" : {
             "state" : "needs_review",
             "value" : "EchoDiar %@ hiện là phiên bản mới nhất."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "EchoDiar %@ 已是目前可用的最新版本。"
           }
         }
       }
@@ -1198,6 +1432,12 @@
             "state" : "needs_review",
             "value" : "EchoDiar sẽ đóng, cài đặt phiên bản mới rồi mở lại."
           }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "EchoDiar 将关闭、安装新版本，然后重新打开。"
+          }
         }
       }
     },
@@ -1221,6 +1461,12 @@
           "stringUnit" : {
             "state" : "needs_review",
             "value" : "EchoDiar không nghe thấy gì từ %@. Hãy chọn nguồn khác hoặc kiểm tra xem ứng dụng có đang phát âm thanh không."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "EchoDiar 没有听到来自 %@ 的任何声音。请选择其他来源，或检查该应用是否正在播放。"
           }
         }
       }
@@ -1246,6 +1492,12 @@
             "state" : "needs_review",
             "value" : "EchoDiar sẽ cài đặt bản cập nhật khi việc ghi âm, chép lời và câu trả lời AI đã hoàn tất."
           }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "EchoDiar 会在录音、转写和 AI 回答完成后安装更新。"
+          }
         }
       }
     },
@@ -1269,6 +1521,12 @@
           "stringUnit" : {
             "state" : "needs_review",
             "value" : "EchoDiar ghi lại những người khác trong cuộc gọi từ âm thanh của máy tính. Bài kiểm tra phát một âm thanh ngắn và lắng nghe âm thanh đó."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "EchoDiar 会从你电脑的音频中录制通话中的其他人。测试会播放一段简短的声音并监听它。"
           }
         }
       }
@@ -1294,6 +1552,12 @@
             "state" : "needs_review",
             "value" : "Mọi giấy phép ở trên trong một tệp văn bản."
           }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "上述所有许可证，汇总在一个文本文件中。"
+          }
         }
       }
     },
@@ -1317,6 +1581,12 @@
           "stringUnit" : {
             "state" : "needs_review",
             "value" : "Header bổ sung"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "额外标头"
           }
         }
       }
@@ -1342,6 +1612,12 @@
             "state" : "needs_review",
             "value" : "Gemini CLI từ chối mọi công cụ và không tải máy chủ MCP hay tiện ích mở rộng nào, trừ khi chính sách quản trị toàn hệ thống cho phép."
           }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Gemini CLI 会拒绝所有工具，且不加载任何 MCP 服务器或扩展，除非系统级管理员策略允许它们。"
+          }
         }
       }
     },
@@ -1365,6 +1641,12 @@
           "stringUnit" : {
             "state" : "needs_review",
             "value" : "Xin lưu ý: tôi đang ghi âm cuộc gọi này để ghi chú. Bản ghi âm được lưu giữ trên máy tính của tôi."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "提醒一下：我正在录制这次通话以便记笔记。录音会保留在我的电脑上。"
           }
         }
       }
@@ -1390,6 +1672,12 @@
             "state" : "needs_review",
             "value" : "Việc lập chỉ mục các cuộc hội thoại trên máy tính này cần mô hình nhúng này (%@). Bạn cũng có thể chọn một mô hình khác ở bên dưới."
           }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "在这台电脑上为你的对话编入索引需要此嵌入模型（%@）。你也可以在下方选择其他模型。"
+          }
         }
       }
     },
@@ -1413,6 +1701,12 @@
           "stringUnit" : {
             "state" : "needs_review",
             "value" : "Cài đặt và khởi động lại"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "安装并重新启动"
           }
         }
       }
@@ -1438,6 +1732,12 @@
             "state" : "needs_review",
             "value" : "Cài đặt bản cập nhật?"
           }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "要安装更新吗？"
+          }
         }
       }
     },
@@ -1461,6 +1761,12 @@
           "stringUnit" : {
             "state" : "needs_review",
             "value" : "Đang cài đặt bản cập nhật…"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "正在安装更新…"
           }
         }
       }
@@ -1486,6 +1792,12 @@
             "state" : "needs_review",
             "value" : "Đang cài đặt bản cập nhật… %lld%%"
           }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "正在安装更新… %lld%%"
+          }
         }
       }
     },
@@ -1509,6 +1821,12 @@
           "stringUnit" : {
             "state" : "needs_review",
             "value" : "Cần có chỉ mục các bản chép lời của bạn, mặc định được tạo trên máy tính này."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "这需要为你的转写文本建立索引，默认在这台电脑上建立。"
           }
         }
       }
@@ -1534,6 +1852,12 @@
             "state" : "needs_review",
             "value" : "Các tệp runtime của thư viện này tuân theo Điều khoản cấp phép phần mềm của Microsoft."
           }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "其运行时文件受 Microsoft 软件许可条款约束。"
+          }
         }
       }
     },
@@ -1557,6 +1881,12 @@
           "stringUnit" : {
             "state" : "needs_review",
             "value" : "Giữ ở góc trên bên phải của cửa sổ."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "将它保持在窗口的右上角。"
           }
         }
       }
@@ -1582,6 +1912,12 @@
             "state" : "needs_review",
             "value" : "Ngôn ngữ của bản tóm tắt và câu trả lời"
           }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "摘要和回答的语言"
+          }
         }
       }
     },
@@ -1605,6 +1941,12 @@
           "stringUnit" : {
             "state" : "needs_review",
             "value" : "Kiểm tra lần cuối: %@"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "上次检查：%@"
           }
         }
       }
@@ -1630,6 +1972,12 @@
             "state" : "needs_review",
             "value" : "Rời khỏi máy tính này"
           }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "离开这台电脑"
+          }
         }
       }
     },
@@ -1653,6 +2001,12 @@
           "stringUnit" : {
             "state" : "needs_review",
             "value" : "Đang tải mô hình…"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "正在载入模型…"
           }
         }
       }
@@ -1678,6 +2032,12 @@
             "state" : "needs_review",
             "value" : "Quyền truy cập micrô bị chặn trên máy tính này."
           }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "这台电脑上的麦克风访问已被阻止。"
+          }
         }
       }
     },
@@ -1701,6 +2061,12 @@
           "stringUnit" : {
             "state" : "needs_review",
             "value" : "Mức âm lượng micrô"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "麦克风音量"
           }
         }
       }
@@ -1726,6 +2092,12 @@
             "state" : "needs_review",
             "value" : "Các mô hình EchoDiar tải về khi bạn chọn. Hãy chọn một mục để đọc giấy phép."
           }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "你选择后由 EchoDiar 下载的模型。选择一项以阅读其许可证。"
+          }
         }
       }
     },
@@ -1749,6 +2121,12 @@
           "stringUnit" : {
             "state" : "needs_review",
             "value" : "Chuyển vào Thùng rác"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "移到回收站"
           }
         }
       }
@@ -1774,6 +2152,12 @@
             "state" : "needs_review",
             "value" : "Chuyển âm thanh vào Thùng rác khi chép lời thành công."
           }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "转写成功后将音频移到回收站。"
+          }
         }
       }
     },
@@ -1797,6 +2181,12 @@
           "stringUnit" : {
             "state" : "needs_review",
             "value" : "Cần hơn một nửa bộ nhớ của máy tính này."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "需要这台电脑一半以上的内存。"
           }
         }
       }
@@ -1822,6 +2212,12 @@
             "state" : "needs_review",
             "value" : "Chưa có cuộc hội thoại nào — nhấn Ctrl+R để ghi âm"
           }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "还没有对话 — 按下 Ctrl+R 开始录音"
+          }
         }
       }
     },
@@ -1845,6 +2241,12 @@
           "stringUnit" : {
             "state" : "needs_review",
             "value" : "Chưa kiểm tra"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "尚未检查"
           }
         }
       }
@@ -1870,6 +2272,12 @@
             "state" : "needs_review",
             "value" : "Không tìm thấy: hãy nhập đường dẫn đầy đủ đến tệp .exe, hoặc đến shim .cmd của npm."
           }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "未找到：请提供 .exe 或 npm .cmd 垫片的完整路径。"
+          }
         }
       }
     },
@@ -1893,6 +2301,12 @@
           "stringUnit" : {
             "state" : "needs_review",
             "value" : "Chưa chép lời"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "未转写"
           }
         }
       }
@@ -1918,6 +2332,12 @@
             "state" : "needs_review",
             "value" : "Trên máy tính này"
           }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "在这台电脑上"
+          }
         }
       }
     },
@@ -1941,6 +2361,12 @@
           "stringUnit" : {
             "state" : "needs_review",
             "value" : "Mỗi ngày một lần, chuyển các cuộc hội thoại đã chép lời cũ hơn mốc thời gian bên dưới vào Thùng rác."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "每天一次，将超过以下时长的已转写对话移到回收站。"
           }
         }
       }
@@ -1966,6 +2392,12 @@
             "state" : "needs_review",
             "value" : "Mỗi dòng một header, dạng Tên: giá trị. Được lưu trong tệp cài đặt: hãy nhập khoá API vào ô Khoá API."
           }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "每行一个，格式为“名称: 值”。保存在设置文件中：请将 API 密钥填入“API 密钥”栏。"
+          }
         }
       }
     },
@@ -1989,6 +2421,12 @@
           "stringUnit" : {
             "state" : "needs_review",
             "value" : "Mở cài đặt micrô của Windows"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "打开 Windows 麦克风设置"
           }
         }
       }
@@ -2014,6 +2452,12 @@
             "state" : "needs_review",
             "value" : "Mở cài đặt quyền riêng tư của Windows"
           }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "打开 Windows 隐私设置"
+          }
         }
       }
     },
@@ -2037,6 +2481,12 @@
           "stringUnit" : {
             "state" : "needs_review",
             "value" : "Mở thông báo đầy đủ"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "打开完整声明"
           }
         }
       }
@@ -2062,6 +2512,12 @@
             "state" : "needs_review",
             "value" : "Mở trong File Explorer"
           }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "在文件资源管理器中打开"
+          }
         }
       }
     },
@@ -2085,6 +2541,12 @@
           "stringUnit" : {
             "state" : "needs_review",
             "value" : "OpenCode từ chối mọi công cụ, nhưng các máy chủ MCP trong cấu hình OpenCode của bạn vẫn khởi động (các công cụ của chúng bị từ chối)."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "OpenCode 会拒绝所有工具，但你的 OpenCode 配置中的 MCP 服务器仍会启动（其工具会被拒绝）。"
           }
         }
       }
@@ -2110,6 +2572,12 @@
             "state" : "needs_review",
             "value" : "Chép lời Parakeet"
           }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Parakeet 转写"
+          }
         }
       }
     },
@@ -2133,6 +2601,12 @@
           "stringUnit" : {
             "state" : "needs_review",
             "value" : "Đã dừng phát (%@)."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "播放已停止（%@）。"
           }
         }
       }
@@ -2158,6 +2632,12 @@
             "state" : "needs_review",
             "value" : "Nhấn Ctrl+R để bắt đầu ghi âm."
           }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "按下 Ctrl+R 开始录音。"
+          }
         }
       }
     },
@@ -2181,6 +2661,12 @@
           "stringUnit" : {
             "state" : "needs_review",
             "value" : "Sẵn sàng"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "就绪"
           }
         }
       }
@@ -2206,6 +2692,12 @@
             "state" : "needs_review",
             "value" : "Ghi âm %@"
           }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "录制“%@”"
+          }
         }
       }
     },
@@ -2229,6 +2721,12 @@
           "stringUnit" : {
             "state" : "needs_review",
             "value" : "Bản ghi âm được chép lời trên máy tính này. Hãy chọn một mô hình nhận dạng giọng nói để tải về."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "录音会在这台电脑上转写。请选择要下载的语音识别模型。"
           }
         }
       }
@@ -2254,6 +2752,12 @@
             "state" : "needs_review",
             "value" : "Làm lại"
           }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "重做"
+          }
         }
       }
     },
@@ -2277,6 +2781,12 @@
           "stringUnit" : {
             "state" : "needs_review",
             "value" : "Hiển thị trong Explorer"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "在资源管理器中显示"
           }
         }
       }
@@ -2302,6 +2812,12 @@
             "state" : "needs_review",
             "value" : "Thẻ cài đặt"
           }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "设置卡片"
+          }
         }
       }
     },
@@ -2325,6 +2841,12 @@
           "stringUnit" : {
             "state" : "needs_review",
             "value" : "Hiển thị bản chép lời trong khi ghi âm và giữ lại, nhờ đó bản chép lời sẵn sàng trong vài giây sau khi bấm Dừng. Dùng nhiều CPU và bộ nhớ hơn khi ghi âm. Chỉ dành cho mô hình Whisper và Parakeet; các công cụ khác chép lời sau khi bấm Dừng."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "在录音期间显示转写文本并保留下来，因此停止后几秒内即可就绪。录音时会占用更多 CPU 和内存。仅限 Whisper 和 Parakeet 模型；其他引擎会在停止后转写。"
           }
         }
       }
@@ -2350,6 +2872,12 @@
             "state" : "needs_review",
             "value" : "Mô phỏng trạng thái"
           }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "模拟状态"
+          }
         }
       }
     },
@@ -2373,6 +2901,12 @@
           "stringUnit" : {
             "state" : "needs_review",
             "value" : "Phân biệt người nói"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "说话人分离"
           }
         }
       }
@@ -2398,6 +2932,12 @@
             "state" : "needs_review",
             "value" : "Bắt đầu ghi âm"
           }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "开始录音"
+          }
         }
       }
     },
@@ -2421,6 +2961,12 @@
           "stringUnit" : {
             "state" : "needs_review",
             "value" : "Khoá API dài hơn %lld byte, mức tối đa mà Trình quản lý thông tin xác thực lưu được."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "API 密钥超过 %lld 字节，这是凭据管理器可保存的上限。"
           }
         }
       }
@@ -2446,6 +2992,12 @@
             "state" : "needs_review",
             "value" : "Khoá API được gửi qua http không mã hoá đến %@. Hãy dùng https, hoặc một máy chủ trên máy tính này."
           }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "API 密钥会通过 http 以未加密方式发送到 %@。请使用 https，或这台电脑上的主机。"
+          }
         }
       }
     },
@@ -2469,6 +3021,12 @@
           "stringUnit" : {
             "state" : "needs_review",
             "value" : "Ứng dụng"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "该应用"
           }
         }
       }
@@ -2494,6 +3052,12 @@
             "state" : "needs_review",
             "value" : "Các tệp âm thanh được chuyển vào Thùng rác. Bản chép lời, bản tóm tắt và cuộc trò chuyện vẫn được giữ."
           }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "音频文件会移到回收站。转写文本、摘要和聊天会保留。"
+          }
         }
       }
     },
@@ -2518,6 +3082,12 @@
             "state" : "needs_review",
             "value" : "Các tệp âm thanh được chuyển vào Thùng rác. Bản chép lời, bản tóm tắt và cuộc trò chuyện vẫn được giữ; không thể phát lại và chép lời lại nữa."
           }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "音频文件会移到回收站。转写文本、摘要和聊天会保留；将无法再播放和重新转写。"
+          }
         }
       }
     },
@@ -2541,6 +3111,12 @@
           "stringUnit" : {
             "state" : "needs_review",
             "value" : "Âm thanh được chuyển vào Thùng rác. Bản chép lời, bản tóm tắt và cuộc trò chuyện vẫn được giữ; không thể phát lại và chép lời lại nữa."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "音频会移到回收站。转写文本、摘要和聊天会保留；将无法再播放和重新转写。"
           }
         }
       }
@@ -2614,6 +3190,12 @@
             "state" : "needs_review",
             "value" : "Âm thanh của %lld cuộc hội thoại sẽ được chuyển vào Thùng rác ở lần chạy tới (khi khởi động hoặc trong vòng một ngày):"
           }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld 个对话的音频将在下次运行时（启动时或一天内）移到回收站："
+          }
         }
       }
     },
@@ -2685,6 +3267,12 @@
           "stringUnit" : {
             "state" : "needs_review",
             "value" : "Âm thanh của %lld cuộc hội thoại sẽ được chuyển vào Thùng rác ngay bây giờ, sau đó hằng ngày với các cuộc cũ hơn:"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld 个对话的音频将立即移到回收站，之后每天处理更旧的对话："
           }
         }
       }
@@ -2758,6 +3346,12 @@
             "state" : "needs_review",
             "value" : "Âm thanh của các cuộc hội thoại đã chép lời cũ hơn %lld ngày sẽ được chuyển vào Thùng rác mỗi ngày một lần. Hiện không có gì khớp."
           }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "超过 %lld 天的已转写对话的音频将每天移到回收站一次。目前没有匹配项。"
+          }
         }
       }
     },
@@ -2781,6 +3375,12 @@
           "stringUnit" : {
             "state" : "needs_review",
             "value" : "Không thể thay đổi lịch. Hãy thử lại sau."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "无法更改日历。请稍后再试。"
           }
         }
       }
@@ -2806,6 +3406,12 @@
             "state" : "needs_review",
             "value" : "Tải về không thành công: %@"
           }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "下载失败：%@"
+          }
         }
       }
     },
@@ -2829,6 +3435,12 @@
           "stringUnit" : {
             "state" : "needs_review",
             "value" : "Thẻ mô hình của bản chuyển đổi ggml ghi Apache-2.0; trọng số gốc của VinAI theo giấy phép BSD-3-Clause."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ggml 转换版本的模型卡片标注为 Apache-2.0；VinAI 的原始权重采用 BSD-3-Clause 许可。"
           }
         }
       }
@@ -2854,6 +3466,12 @@
             "state" : "needs_review",
             "value" : "Bản ghi âm và các tệp của nó được chuyển vào Thùng rác."
           }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "该录音及其文件会移到回收站。"
+          }
         }
       }
     },
@@ -2877,6 +3495,12 @@
           "stringUnit" : {
             "state" : "needs_review",
             "value" : "Các bản ghi âm và tệp của chúng được chuyển vào Thùng rác."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "这些录音及其文件会移到回收站。"
           }
         }
       }
@@ -2902,6 +3526,12 @@
             "state" : "needs_review",
             "value" : "Các mô hình chép lời, người nói và AI bị xoá khỏi máy tính này (không chuyển vào Thùng rác). Hãy tải về lại trong Cài đặt › Chép lời và Cài đặt › AI."
           }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "转写模型、说话人模型和 AI 模型会从这台电脑上移除（不会移到回收站）。可在“设置 › 转写”和“设置 › AI”中重新下载。"
+          }
         }
       }
     },
@@ -2925,6 +3555,12 @@
           "stringUnit" : {
             "state" : "needs_review",
             "value" : "Chúng được chuyển vào Thùng rác. Âm thanh vẫn được giữ, nên có thể chép lời lại các cuộc hội thoại."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "它们会移到回收站。音频会保留，因此可以重新转写这些对话。"
           }
         }
       }
@@ -2950,6 +3586,12 @@
             "state" : "needs_review",
             "value" : "Chúng vẫn được chuyển vào Thùng rác."
           }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "它们仍会移到回收站。"
+          }
         }
       }
     },
@@ -2973,6 +3615,12 @@
           "stringUnit" : {
             "state" : "needs_review",
             "value" : "Thông báo của bên thứ ba"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "第三方声明"
           }
         }
       }
@@ -2998,6 +3646,12 @@
             "state" : "needs_review",
             "value" : "Máy tính này"
           }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "这台电脑"
+          }
         }
       }
     },
@@ -3021,6 +3675,12 @@
           "stringUnit" : {
             "state" : "needs_review",
             "value" : "Phần cứng của máy tính này không hỗ trợ Windows AI (cần Copilot+ PC)."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "这台电脑的硬件不支持 Windows AI（需要 Copilot+ PC）。"
           }
         }
       }
@@ -3046,6 +3706,12 @@
             "state" : "needs_review",
             "value" : "Bản dựng EchoDiar này không thể dùng Windows AI (thiếu capability systemAIModels)."
           }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "此版本的 EchoDiar 无法使用 Windows AI（缺少 systemAIModels 功能）。"
+          }
         }
       }
     },
@@ -3069,6 +3735,12 @@
           "stringUnit" : {
             "state" : "needs_review",
             "value" : "Cuộc hội thoại này không có trong thư viện."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "此对话不在资料库中。"
           }
         }
       }
@@ -3094,6 +3766,12 @@
             "state" : "needs_review",
             "value" : "Bản sao này không được cài đặt từ tệp .appinstaller, nên không tự cập nhật."
           }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "此副本不是通过 .appinstaller 文件安装的，因此不会自动更新。"
+          }
         }
       }
     },
@@ -3117,6 +3795,12 @@
           "stringUnit" : {
             "state" : "needs_review",
             "value" : "Bản sao này không được cài đặt từ tệp .appinstaller."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "此副本不是通过 .appinstaller 文件安装的。"
           }
         }
       }
@@ -3142,6 +3826,12 @@
             "state" : "needs_review",
             "value" : "Công cụ này chép lời sau khi bấm Dừng. Mô hình Whisper và Parakeet cũng chép lời trong khi ghi âm."
           }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "此引擎会在停止后转写。Whisper 和 Parakeet 模型还可以在录音时转写。"
+          }
         }
       }
     },
@@ -3165,6 +3855,12 @@
           "stringUnit" : {
             "state" : "needs_review",
             "value" : "Mô hình này không gắn nhãn người nói; một mô hình trên máy tính này sẽ được dùng thay thế."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "此模型不会标注说话人；将改用这台电脑上的模型。"
           }
         }
       }
@@ -3190,6 +3886,12 @@
             "state" : "needs_review",
             "value" : "Chép lời ngay"
           }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "立即转写"
+          }
         }
       }
     },
@@ -3213,6 +3915,12 @@
           "stringUnit" : {
             "state" : "needs_review",
             "value" : "Chép lời ngay, kể cả khi Trình tiết kiệm năng lượng đang bật"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "立即转写，即使节能模式已开启"
           }
         }
       }
@@ -3238,6 +3946,12 @@
             "state" : "needs_review",
             "value" : "Đã chép lời"
           }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "已转写"
+          }
         }
       }
     },
@@ -3261,6 +3975,12 @@
           "stringUnit" : {
             "state" : "needs_review",
             "value" : "Đang chép lời %lld%%"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "正在转写 %lld%%"
           }
         }
       }
@@ -3286,6 +4006,12 @@
             "state" : "needs_review",
             "value" : "Việc chép lời sẽ bắt đầu khi Trình tiết kiệm năng lượng tắt."
           }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "节能模式关闭后即开始转写。"
+          }
         }
       }
     },
@@ -3309,6 +4035,12 @@
           "stringUnit" : {
             "state" : "needs_review",
             "value" : "Hãy thử lại sau."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "请稍后再试。"
           }
         }
       }
@@ -3334,6 +4066,12 @@
             "state" : "needs_review",
             "value" : "Hãy bật EchoDiar trong Cài đặt Windows › Quyền riêng tư & bảo mật › Micrô."
           }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "请在“Windows 设置 › 隐私和安全性 › 麦克风”中打开 EchoDiar。"
+          }
         }
       }
     },
@@ -3357,6 +4095,12 @@
           "stringUnit" : {
             "state" : "needs_review",
             "value" : "Đã bị tổ chức của bạn tắt."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "已由你的组织关闭。"
           }
         }
       }
@@ -3382,6 +4126,12 @@
             "state" : "needs_review",
             "value" : "Đã bị tắt trong Cài đặt Windows > Ứng dụng > Khởi động. Hãy bật EchoDiar ở đó."
           }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "已在“Windows 设置 > 应用 > 启动”中关闭。请在那里打开 EchoDiar。"
+          }
         }
       }
     },
@@ -3405,6 +4155,12 @@
           "stringUnit" : {
             "state" : "needs_review",
             "value" : "Đã được tổ chức của bạn bật."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "已由你的组织打开。"
           }
         }
       }
@@ -3430,6 +4186,12 @@
             "state" : "needs_review",
             "value" : "Hoàn tác"
           }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "撤销"
+          }
         }
       }
     },
@@ -3453,6 +4215,12 @@
           "stringUnit" : {
             "state" : "needs_review",
             "value" : "Cập nhật sau khi xong việc hiện tại"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "当前工作完成后更新"
           }
         }
       }
@@ -3478,6 +4246,12 @@
             "state" : "needs_review",
             "value" : "Có bản cập nhật…"
           }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "有可用更新…"
+          }
         }
       }
     },
@@ -3501,6 +4275,12 @@
           "stringUnit" : {
             "state" : "needs_review",
             "value" : "Cập nhật"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "更新"
           }
         }
       }
@@ -3526,6 +4306,12 @@
             "state" : "needs_review",
             "value" : "Cần cài đặt từ tệp .appinstaller để nhận bản cập nhật"
           }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "更新需要通过 .appinstaller 安装"
+          }
         }
       }
     },
@@ -3549,6 +4335,12 @@
           "stringUnit" : {
             "state" : "needs_review",
             "value" : "Dùng Ctrl hoặc Alt cùng với phím."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "请配合 Ctrl 或 Alt 使用该键。"
           }
         }
       }
@@ -3574,6 +4366,12 @@
             "state" : "needs_review",
             "value" : "Được LLamaSharp sử dụng"
           }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "由 LLamaSharp 使用"
+          }
         }
       }
     },
@@ -3597,6 +4395,12 @@
           "stringUnit" : {
             "state" : "needs_review",
             "value" : "Được Whisper.net sử dụng"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "由 Whisper.net 使用"
           }
         }
       }
@@ -3622,6 +4426,12 @@
             "state" : "needs_review",
             "value" : "Được sherpa-onnx sử dụng"
           }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "由 sherpa-onnx 使用"
+          }
         }
       }
     },
@@ -3645,6 +4455,12 @@
           "stringUnit" : {
             "state" : "needs_review",
             "value" : "Dùng cho bản tóm tắt và câu hỏi. Là mô hình của từng nhà cung cấp đã bật bên dưới, theo lựa chọn ở hàng của nhà cung cấp đó."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "用于摘要和提问。即下方每个已启用提供商的模型，以其所在行中勾选的为准。"
           }
         }
       }
@@ -3670,6 +4486,12 @@
             "state" : "needs_review",
             "value" : "Chép lời tiếng Việt"
           }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "越南语转写"
+          }
         }
       }
     },
@@ -3693,6 +4515,12 @@
           "stringUnit" : {
             "state" : "needs_review",
             "value" : "Chờ việc chép lời và câu trả lời AI hoàn tất"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "等待转写和 AI 回答完成"
           }
         }
       }
@@ -3718,6 +4546,12 @@
             "state" : "needs_review",
             "value" : "Chờ khi Trình tiết kiệm năng lượng đang bật"
           }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "节能模式开启时等待"
+          }
         }
       }
     },
@@ -3741,6 +4575,12 @@
           "stringUnit" : {
             "state" : "needs_review",
             "value" : "Đang chờ phụ đề trực tiếp hoặc việc chép lời hoàn tất…"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "正在等待实时字幕或转写完成…"
           }
         }
       }
@@ -3766,6 +4606,12 @@
             "state" : "needs_review",
             "value" : "Đang chờ: Trình tiết kiệm năng lượng đang bật"
           }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "正在等待：节能模式已开启"
+          }
         }
       }
     },
@@ -3789,6 +4635,12 @@
           "stringUnit" : {
             "state" : "needs_review",
             "value" : "WinUI 3 và nền tảng ứng dụng"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "WinUI 3 和应用平台"
           }
         }
       }
@@ -3814,6 +4666,12 @@
             "state" : "needs_review",
             "value" : "Windows AI (hệ thống)"
           }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Windows AI（系统）"
+          }
         }
       }
     },
@@ -3837,6 +4695,12 @@
           "stringUnit" : {
             "state" : "needs_review",
             "value" : "Windows AI không khả dụng trên máy tính này."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "这台电脑上无法使用 Windows AI。"
           }
         }
       }
@@ -3862,6 +4726,12 @@
             "state" : "needs_review",
             "value" : "Windows AI không được hỗ trợ trên máy tính này (cần Copilot+ PC)."
           }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "这台电脑不支持 Windows AI（需要 Copilot+ PC）。"
+          }
         }
       }
     },
@@ -3885,6 +4755,12 @@
           "stringUnit" : {
             "state" : "needs_review",
             "value" : "Windows AI chưa được mở khoá cho EchoDiar."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Windows AI 尚未为 EchoDiar 解锁。"
           }
         }
       }
@@ -3910,6 +4786,12 @@
             "state" : "needs_review",
             "value" : "Windows AI đang tắt (Cài đặt › Quyền riêng tư & bảo mật › Tạo văn bản và hình ảnh)."
           }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Windows AI 已关闭（“设置 › 隐私和安全性 › 文本和图像生成”）。"
+          }
         }
       }
     },
@@ -3933,6 +4815,12 @@
           "stringUnit" : {
             "state" : "needs_review",
             "value" : "Windows AI cần một bản cập nhật Windows (Cài đặt › Windows Update)."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Windows AI 需要更新 Windows（“设置 › Windows 更新”）。"
           }
         }
       }
@@ -3958,6 +4846,12 @@
             "state" : "needs_review",
             "value" : "Bạn đang dùng phiên bản mới nhất!"
           }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "已是最新版本！"
+          }
         }
       }
     },
@@ -3981,6 +4875,12 @@
           "stringUnit" : {
             "state" : "needs_review",
             "value" : "một cuộc hội thoại khác"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "另一个对话"
           }
         }
       }
@@ -4006,6 +4906,12 @@
             "state" : "needs_review",
             "value" : "ứng dụng"
           }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "该应用"
+          }
         }
       }
     },
@@ -4029,6 +4935,12 @@
           "stringUnit" : {
             "state" : "needs_review",
             "value" : "liên kết này"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "此链接"
           }
         }
       }
