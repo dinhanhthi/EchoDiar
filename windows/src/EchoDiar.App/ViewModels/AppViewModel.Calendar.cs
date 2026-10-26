@@ -3,6 +3,7 @@ using EchoDiar.Core;
 using EchoDiar.Core.Calendar;
 using EchoDiar.Core.Settings;
 using EchoDiar.Platform.Audio;
+using EchoDiar.Platform.Calendar;
 using Microsoft.UI.Dispatching;
 
 namespace EchoDiar.App.ViewModels;
@@ -173,6 +174,58 @@ public sealed partial class AppViewModel
 
     /// <summary>"Grant access", and back from Windows Settings: asks for access again when it is not granted, then syncs.</summary>
     public void RefreshCalendar() => RequestCalendarSync();
+
+    /// <summary>The editor's values for an event of EchoDiar's calendar, and whether it repeats; null when it is not found.</summary>
+    public Task<(CalendarEventDraft Draft, bool IsRecurring)?> CalendarDraftAsync(CalendarEvent @event) =>
+        _services.Calendar.DraftAsync(@event, Settings.Calendar.OwnCalendarID);
+
+    /// <summary>
+    /// Saves a new event, or edits an occurrence, in EchoDiar's calendar (macOS <c>saveCalendarEvent</c>). Returns an
+    /// error message to show, or null. The calendar's id is stored when it changed, or own events count as unconfirmed.
+    /// </summary>
+    public async Task<string?> SaveCalendarEventAsync(CalendarEventDraft draft, CalendarEvent? editing, CalendarSpan span)
+    {
+        try
+        {
+            var id = await _services.Calendar.SaveEventAsync(draft, editing, span, Settings.Calendar.OwnCalendarID);
+            if (_closing) return null;
+            // A new id syncs through the settings change (it changes eligibility); the same id syncs here.
+            if (id != Settings.Calendar.OwnCalendarID) SaveSettings(Settings with { Calendar = Settings.Calendar with { OwnCalendarID = id } });
+            else RefreshCalendar();
+            return null;
+        }
+        catch (Exception e)
+        {
+            Debug.WriteLine($"EchoDiar: could not save the calendar event: {e.Message}");
+            return CalendarErrorMessage(e);
+        }
+    }
+
+    /// <summary>Deletes an occurrence (or the series from it, per <paramref name="span"/>) of EchoDiar's calendar. Returns an
+    /// error message to show, or null.</summary>
+    public async Task<string?> DeleteCalendarEventAsync(CalendarEvent @event, CalendarSpan span)
+    {
+        try
+        {
+            await _services.Calendar.DeleteEventAsync(@event, span, Settings.Calendar.OwnCalendarID);
+            RefreshCalendar();
+            return null;
+        }
+        catch (Exception e)
+        {
+            Debug.WriteLine($"EchoDiar: could not delete the calendar event: {e.Message}");
+            return CalendarErrorMessage(e);
+        }
+    }
+
+    /// <summary>A store failure as the macOS <c>CalendarStoreError</c> texts; the exception's own message is for logs.</summary>
+    private static string CalendarErrorMessage(Exception e) => (e as CalendarStoreException)?.Kind switch
+    {
+        CalendarStoreError.NoAccess => Loc.T("EchoDiar has no access to your calendars."),
+        CalendarStoreError.EventNotFound => Loc.T("The event no longer exists."),
+        CalendarStoreError.NotOwnEvent => Loc.T("Only events in the EchoDiar calendar can be changed."),
+        _ => Loc.T("The calendar could not be changed. Try again later."),
+    };
 
     /// <summary>Starts the calendar sync once the settings are loaded and the system events exist (after <see cref="StartMeetingServices"/>).</summary>
     private void StartCalendar()

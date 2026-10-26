@@ -557,6 +557,10 @@
         }
       }
     },
+    "The calendar could not be changed. Try again later." : {
+      "comment" : "Windows only: ViewModels/AppViewModel.Calendar.cs (the event editor's error when the Appointments API fails).",
+      "extractionState" : "manual"
+    },
     "The download failed: %@" : {
       "comment" : "Windows only: Views/ConversationListView.xaml.cs.",
       "extractionState" : "manual"

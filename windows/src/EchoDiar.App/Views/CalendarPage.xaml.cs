@@ -1,4 +1,5 @@
 using System.ComponentModel;
+using System.Diagnostics;
 using System.Globalization;
 using EchoDiar.App.Services;
 using EchoDiar.App.ViewModels;
@@ -250,8 +251,20 @@ public sealed partial class CalendarPage : UserControl
         }
     }
 
-    /// <summary>The event editor: a new event (null) or one of EchoDiar's own.</summary>
-    private Task OpenEditorAsync(CalendarEvent? @event) => Task.CompletedTask; // The editor arrives in task 9.2.
+    /// <summary>The event editor: a new event (null) or one of EchoDiar's own. It opens at once and reads the event itself.</summary>
+    private async Task OpenEditorAsync(CalendarEvent? @event)
+    {
+        if (XamlRoot is null) return;
+        try
+        {
+            await new EventEditorDialog(_model, @event) { XamlRoot = XamlRoot }.ShowAsync();
+        }
+        catch (Exception e)
+        {
+            // Another dialog is open: WinUI shows one at a time.
+            Debug.WriteLine($"EchoDiar: could not show the event editor: {e.GetType().Name}");
+        }
+    }
 
     private static string DayTitle(DateTime day)
     {

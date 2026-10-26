@@ -705,6 +705,7 @@ public static partial class Loc
         "The audio of transcribed conversations older than %lld days will be moved to the Recycle Bin once a day. Nothing matches now.",
         "The audio of transcribed conversations older than %lld days will be moved to the Trash once a day. Nothing matches now.",
         "The audio system is not running. Try again in a moment.",
+        "The calendar could not be changed. Try again later.",
         "The call seems to be over — stop recording?",
         "The download failed: %@",
         "The embedding model lets a question find passages with the same meaning, in any language. Models are downloaded only when you click Download.",

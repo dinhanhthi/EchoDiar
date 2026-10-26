@@ -3006,6 +3006,10 @@
     <value>The audio system is not running. Try again in a moment.</value>
     <comment>The audio system is not running. Try again in a moment.</comment>
   </data>
+  <data name="TheCalendarCouldNotBeChangedTryAgainLater" xml:space="preserve">
+    <value>The calendar could not be changed. Try again later.</value>
+    <comment>The calendar could not be changed. Try again later.</comment>
+  </data>
   <data name="TheCallSeemsToBeOverStopRecording" xml:space="preserve">
     <value>The call seems to be over — stop recording?</value>
     <comment>The call seems to be over — stop recording?</comment>
