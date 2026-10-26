@@ -216,8 +216,8 @@ public sealed partial class MainWindow : Window
 
     /// <summary>
     /// The window comes back to the front on the Calendar page or Settings › Recording › Calendar (from Windows' privacy
-    /// settings): calendar access is asked again while it is not granted (macOS CalendarView and RecordingSettingsView
-    /// didBecomeActive).
+    /// settings): the calendar syncs, so access granted or turned off there shows at once (macOS CalendarView and
+    /// RecordingSettingsView didBecomeActive).
     /// </summary>
     private void OnActivated(object sender, WindowActivatedEventArgs args)
     {
@@ -225,7 +225,7 @@ public sealed partial class MainWindow : Window
         var showsCalendar = _model.Route.Kind == RouteKind.Calendar
             || (_model.Route.Kind == RouteKind.Settings && _model.SettingsSection == SettingsSearch.Recording
                 && _model.SettingsSubTab == RecordingSettingsPage.CalendarTab);
-        if (showsCalendar && _model.CalendarAccess != CalendarAccess.Granted) _model.RefreshCalendar();
+        if (showsCalendar) _model.RefreshCalendar();
     }
 
     /// <summary>
