@@ -605,7 +605,8 @@ internal static class CalendarSeed
             settingsStore.Save(settings with { Calendar = settings.Calendar with { OwnCalendarID = calendarId } });
             Log($"settings: calendar.ownCalendarID {storedId ?? "null"} -> {calendarId}");
             // A running app keeps its settings in memory and writes them back on its next save.
-            if (System.Diagnostics.Process.GetProcessesByName("EchoDiar").Any(p => p.Id != Environment.ProcessId))
+            using var self = System.Diagnostics.Process.GetCurrentProcess();
+            if (System.Diagnostics.Process.GetProcessesByName(self.ProcessName).Any(p => p.Id != Environment.ProcessId))
                 Log("WARN EchoDiar is running and does not see the new ownCalendarID: quit it and seed again");
         }
 
