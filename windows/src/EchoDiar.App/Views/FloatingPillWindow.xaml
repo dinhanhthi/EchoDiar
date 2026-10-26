@@ -3,7 +3,7 @@
     The floating pill (macOS FloatingPillView.swift): the logo, the recording dot, "Recording <App>" after an automatic
     start, the elapsed time, a level meter and a muted mic's glyph; Pause or Resume, Mute or Unmute, Stop and the
     language menu while the pointer is over it.
-    A meeting prompt takes the indicator's place. The capsule sizes to its content inside a Canvas, so its size is
+    A meeting or calendar prompt takes the indicator's place. The capsule sizes to its content inside a Canvas, so its size is
     the window's, which the controller sets; the window's region clips it to the capsule. Its buttons never take the
     focus: focus would activate the window, which would then take the foreground (and Alt+F4) from the meeting app.
 -->
@@ -124,8 +124,8 @@
                 </StackPanel>
             </StackPanel>
             <!--
-                A prompt (macOS detectedPrompt and endPrompt): the logo, the question, the end prompt's countdown and
-                its buttons. The texts and which buttons show are set in code.
+                A prompt (macOS detectedPrompt, calendarPrompt and endPrompt): the logo, the question, the end prompt's
+                countdown and its buttons. The texts and which buttons show are set in code.
             -->
             <Grid
                 x:Name="PromptHost"
@@ -152,13 +152,22 @@
                         Foreground="{ThemeResource TextFillColorSecondaryBrush}"
                         Style="{StaticResource CaptionTextBlockStyle}" />
                     <StackPanel Orientation="Horizontal" Spacing="8">
-                        <!-- Detected: Record, Not now, Always for <App> (not for browsers). -->
+                        <!--
+                            Detected: Record, Not now, Always for <App> (not for browsers). Calendar: Record, Join (with
+                            a meeting link), Not now.
+                        -->
                         <Button
                             x:Name="RecordPromptButton"
                             AllowFocusOnInteraction="False"
                             Content="{local:T Text='Record'}"
                             IsTabStop="False"
                             Style="{StaticResource AccentButtonStyle}" />
+                        <Button
+                            x:Name="JoinButton"
+                            AllowFocusOnInteraction="False"
+                            Content="{local:T Text='Join'}"
+                            IsTabStop="False"
+                            Visibility="Collapsed" />
                         <Button
                             x:Name="NotNowButton"
                             AllowFocusOnInteraction="False"

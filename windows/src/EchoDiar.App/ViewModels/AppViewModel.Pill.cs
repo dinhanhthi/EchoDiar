@@ -35,8 +35,8 @@ public sealed partial class AppViewModel
     }
 
     /// <summary>
-    /// What the pill asks (meeting detected, meeting ended); null = no question. A prompt shows the pill whatever the
-    /// settings.
+    /// What the pill asks (meeting detected, calendar event, meeting ended); null = no question. A prompt shows the pill
+    /// whatever the settings.
     /// </summary>
     public PillPrompt? PillPrompt
     {
@@ -48,10 +48,25 @@ public sealed partial class AppViewModel
     }
 
     /// <summary>
-    /// The process tree the pill follows with "Attach to meeting window": the detected app while asking, else the
-    /// recorded one (macOS <c>pillAppBundleID</c>).
+    /// The process tree the pill follows with "Attach to meeting window": the detected app while asking (none for a
+    /// calendar prompt without one), else the recorded one (macOS <c>pillAppBundleID</c>).
     /// </summary>
-    public int? PillAppRootPid => PillPrompt is PillPrompt.MeetingDetected asking ? asking.Meeting.RootPid : RecordingSourceRootPid;
+    public int? PillAppRootPid => PillPrompt switch
+    {
+        PillPrompt.MeetingDetected asking => asking.Meeting.RootPid,
+        PillPrompt.CalendarEvent => _detectedMeeting?.RootPid,
+        _ => RecordingSourceRootPid,
+    };
+
+    /// <summary>
+    /// <see cref="PendingCalendarPrompt"/> changed: a calendar prompt replaces what the pill asks (a detection prompt, an
+    /// older event's), and goes when its event is answered, over or recorded (macOS <c>handleCalendar</c>).
+    /// </summary>
+    private void SyncCalendarPillPrompt(CalendarPrompt? pending)
+    {
+        if (pending is not null) PillPrompt = new PillPrompt.CalendarEvent(pending);
+        else if (PillPrompt is PillPrompt.CalendarEvent) PillPrompt = null;
+    }
 
     /// <summary>Where the pill was dragged on the monitor <paramref name="monitorKey"/>, saved at once.</summary>
     /// <param name="quietly">See <see cref="SavePillSettings"/>.</param>
@@ -93,6 +108,9 @@ public abstract record PillPrompt
 
     /// <summary>"&lt;App&gt; call detected — Record?".</summary>
     public sealed record MeetingDetected(DetectedMeeting Meeting) : PillPrompt;
+
+    /// <summary>"&lt;Title&gt; is starting": Record, Join (with a meeting link), Not now.</summary>
+    public sealed record CalendarEvent(CalendarPrompt Prompt) : PillPrompt;
 
     /// <summary>"… — stop recording?": the recording stops at <paramref name="Deadline"/> unless "Keep recording".</summary>
     public sealed record MeetingEnded(MeetingEndMonitor.Reason Reason, DateTimeOffset Deadline) : PillPrompt;

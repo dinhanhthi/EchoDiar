@@ -95,7 +95,10 @@ public sealed partial class AppViewModel
     public CalendarPrompt? PendingCalendarPrompt
     {
         get => _pendingCalendarPrompt;
-        private set => SetProperty(ref _pendingCalendarPrompt, value);
+        private set
+        {
+            if (SetProperty(ref _pendingCalendarPrompt, value)) SyncCalendarPillPrompt(value);
+        }
     }
 
     /// <summary>A due event asks (Ask mode, an unconfirmed or late event, Wait for the call without detection). UI thread.</summary>
@@ -380,7 +383,7 @@ public sealed partial class AppViewModel
     }
 
     /// <summary>
-    /// For the detector (task 8.4): the "Wait for the call" event still in progress, taken (cleared) so only the first
+    /// For the detector (<see cref="OnMeetingDetected"/>): the "Wait for the call" event still in progress, taken (cleared) so only the first
     /// detection starts a recording; null when none or it has ended.
     /// </summary>
     private CalendarEvent? TakeCalendarWaitEvent()

@@ -22,7 +22,7 @@ namespace EchoDiar.App.Views;
 /// <summary>
 /// The floating pill's window and content (macOS FloatingPillView.swift and PillHostingView): the recording
 /// indicator (a muted mic's glyph included), its controls on hover (Pause or Resume, Mute or Unmute, Stop, Language),
-/// and the meeting prompts in its place. <see cref="Services.FloatingPillController"/> owns it: it styles, shows,
+/// and the meeting and calendar prompts in its place. <see cref="Services.FloatingPillController"/> owns it: it styles, shows,
 /// hides, places and closes it. The window reports its content's size in physical pixels and the user's drags
 /// (pointer capture on the capsule: the window has no title bar). A press may make the pill the foreground window: once
 /// the press is over it gives the foreground back to the window that had it.
@@ -86,8 +86,9 @@ public sealed partial class FloatingPillWindow : Window
         PauseButton.Click += (_, _) => _ = _model.TogglePauseAsync();
         MuteButton.Click += (_, _) => _model.ToggleMicMute();
         StopButton.Click += (_, _) => _ = _model.StopRecordingAsync();
-        RecordPromptButton.Click += (_, _) => _model.RecordDetectedMeeting();
-        NotNowButton.Click += (_, _) => _model.DismissMeetingPrompt();
+        RecordPromptButton.Click += (_, _) => OnRecordPromptClick();
+        JoinButton.Click += (_, _) => OnJoinClick();
+        NotNowButton.Click += (_, _) => OnNotNowClick();
         AlwaysButton.Click += (_, _) => _model.RecordDetectedMeeting(always: true);
         KeepRecordingButton.Click += (_, _) => _model.KeepRecording();
         StopNowButton.Click += (_, _) => _model.StopFromEndPrompt();
@@ -240,9 +241,35 @@ public sealed partial class FloatingPillWindow : Window
     private void UpdateMutedIcon() =>
         MutedIcon.Visibility = _model.MicMuted && Controls.Visibility == Visibility.Collapsed ? Visibility.Visible : Visibility.Collapsed;
 
-    /// <summary>The prompt's question, countdown and buttons (macOS detectedPrompt and endPrompt).</summary>
+    /// <summary>"Record" on the detection or calendar prompt.</summary>
+    private void OnRecordPromptClick()
+    {
+        if (_model.PillPrompt is PillPrompt.CalendarEvent calendar) _model.RecordCalendarEvent(calendar.Prompt.Event);
+        else _model.RecordDetectedMeeting();
+    }
+
+    /// <summary>"Join" on the calendar prompt: the only place the pill opens a meeting link.</summary>
+    private void OnJoinClick()
+    {
+        if (_model.PillPrompt is PillPrompt.CalendarEvent calendar) _model.JoinCalendarEvent(calendar.Prompt.Event);
+    }
+
+    /// <summary>"Not now" on the detection or calendar prompt.</summary>
+    private void OnNotNowClick()
+    {
+        if (_model.PillPrompt is PillPrompt.CalendarEvent calendar) _model.NotNowCalendarEvent(calendar.Prompt.Event);
+        else _model.DismissMeetingPrompt();
+    }
+
+    /// <summary>The prompt's question, countdown and buttons (macOS detectedPrompt, calendarPrompt and endPrompt).</summary>
     private void ShowPrompt(PillPrompt? prompt)
     {
+        // Only the calendar prompt's title is cut: it comes from the invite.
+        if (prompt is not PillPrompt.CalendarEvent)
+        {
+            PromptText.MaxWidth = double.PositiveInfinity;
+            PromptText.TextTrimming = TextTrimming.None;
+        }
         switch (prompt)
         {
             case PillPrompt.MeetingDetected detected:
@@ -250,16 +277,29 @@ public sealed partial class FloatingPillWindow : Window
                 RecordingCard.SetText(PromptText, Loc.Format("%@ call detected — Record?", name));
                 CountdownText.Visibility = Visibility.Collapsed;
                 RecordPromptButton.Visibility = NotNowButton.Visibility = Visibility.Visible;
+                JoinButton.Visibility = Visibility.Collapsed;
                 // Not for browsers: any web page using the mic would start a recording.
                 AlwaysButton.Visibility = detected.Meeting.App.IsBrowser ? Visibility.Collapsed : Visibility.Visible;
                 AlwaysButton.Content = Loc.Format("Always for %@", name);
                 KeepRecordingButton.Visibility = StopNowButton.Visibility = Visibility.Collapsed;
                 _countdownTimer.Stop();
                 break;
+            case PillPrompt.CalendarEvent calendar:
+                // One line, cut at 320: a long title cannot widen the pill.
+                PromptText.MaxWidth = 320;
+                PromptText.TextTrimming = TextTrimming.CharacterEllipsis;
+                RecordingCard.SetText(PromptText, Loc.Format("%@ is starting", calendar.Prompt.Event.Title));
+                CountdownText.Visibility = Visibility.Collapsed;
+                RecordPromptButton.Visibility = NotNowButton.Visibility = Visibility.Visible;
+                JoinButton.Visibility = calendar.Prompt.Event.Link is null ? Visibility.Collapsed : Visibility.Visible;
+                AlwaysButton.Visibility = KeepRecordingButton.Visibility = StopNowButton.Visibility = Visibility.Collapsed;
+                _countdownTimer.Stop();
+                break;
             case PillPrompt.MeetingEnded ended:
                 RecordingCard.SetText(PromptText, Question(ended.Reason));
                 CountdownText.Visibility = Visibility.Visible;
                 RecordPromptButton.Visibility = NotNowButton.Visibility = AlwaysButton.Visibility = Visibility.Collapsed;
+                JoinButton.Visibility = Visibility.Collapsed;
                 KeepRecordingButton.Visibility = StopNowButton.Visibility = Visibility.Visible;
                 UpdateCountdown();
                 if (!_countdownTimer.IsRunning) _countdownTimer.Start();
@@ -282,10 +322,7 @@ public sealed partial class FloatingPillWindow : Window
         RecordingCard.SetText(CountdownText, Loc.Format("Stopping in %lld s", left));
     }
 
-    /// <summary>
-    /// The end prompt's question (macOS <c>question(for:)</c>; plain strings there, so English here: not in the
-    /// catalog).
-    /// </summary>
+    /// <summary>The end prompt's question (macOS <c>question(for:)</c>).</summary>
     private string Question(MeetingEndMonitor.Reason reason)
     {
         var app = _model.RecordingSourceName ?? Loc.T("The app");
@@ -299,6 +336,7 @@ public sealed partial class FloatingPillWindow : Window
                 Math.Clamp(_model.Settings.EndMonitor.SilenceMinutes, MeetingEndMonitorConfiguration.SilenceRange.Min, MeetingEndMonitorConfiguration.SilenceRange.Max)),
             MeetingEndMonitor.Reason.ScreenLocked => Loc.T("Screen locked — stop recording?"),
             MeetingEndMonitor.Reason.InputRouteLost => Loc.T("Microphone disconnected — stop recording?"),
+            MeetingEndMonitor.Reason.EventEnded => Loc.T("The meeting has ended — stop recording?"),
             _ => Loc.T("Stop recording?"),
         };
     }

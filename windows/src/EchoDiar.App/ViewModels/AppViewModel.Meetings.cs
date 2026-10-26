@@ -106,7 +106,7 @@ public sealed partial class AppViewModel
     {
         if (_closing || _detectedMeeting is not { } meeting) return;
         SaveSettings(Settings with { PerAppBehavior = new(Settings.PerAppBehavior) { [meeting.App.AppExe] = MeetingBehavior.Ignore } });
-        _detectedMeeting = null;
+        SetDetectedMeeting(null);
         DismissMeetingPrompt();
     }
 
@@ -212,13 +212,14 @@ public sealed partial class AppViewModel
         // The stopped detector raises no Ended: the monitor keeps the last mic state.
         _meetingMics.Clear();
         lock (_raisedMeetings) _raisedMeetings.Clear();
-        _detectedMeeting = null;
+        SetDetectedMeeting(null);
         DismissMeetingPrompt();
     }
 
     /// <summary>
-    /// "Ignore" apps are skipped; "Always" starts recording them (browsers still ask), else the pill asks. Nothing
-    /// starts while recording.
+    /// "Ignore" apps are skipped; "Always" starts recording them (browsers still ask), and so does any app (browsers
+    /// too) during a "Wait for the call" event, with that event; else the pill asks, unless a calendar prompt shows (its
+    /// Record then records this app). Nothing starts while recording (macOS <c>meetingDetected</c>).
     /// </summary>
     private void OnMeetingDetected(DetectedMeeting meeting)
     {
@@ -229,20 +230,22 @@ public sealed partial class AppViewModel
         var behavior = Settings.PerAppBehavior.GetValueOrDefault(meeting.App.AppExe, MeetingBehavior.Ask);
         if (behavior == MeetingBehavior.Ignore) return;
         if (behavior == MeetingBehavior.Always && meeting.App.IsBrowser) behavior = MeetingBehavior.Ask;
-        _detectedMeeting = meeting;
+        SetDetectedMeeting(meeting);
         if (IsRecording || IsStarting) return;
         // Its mic went off before this post ran (its Ended is queued): nothing to record.
         lock (_raisedMeetings)
         {
             if (!_raisedMeetings.Contains(meeting.Exe)) return;
         }
-        if (behavior == MeetingBehavior.Always)
+        var waiting = TakeCalendarWaitEvent();
+        if (behavior == MeetingBehavior.Always || waiting is not null)
         {
-            AutoStartedAppName = meeting.Name;
-            _ = StartRecordingAsync(meeting.Group);
+            AutoStartedAppName = waiting?.Title ?? meeting.Name;
+            _ = StartRecordingAsync(meeting.Group, waiting);
         }
-        else
+        else if (PillPrompt is not PillPrompt.CalendarEvent)
         {
+            // A calendar prompt stays: its Record records this app.
             PillPrompt = new PillPrompt.MeetingDetected(meeting);
         }
     }
@@ -258,11 +261,18 @@ public sealed partial class AppViewModel
         _meetingMics.Remove(meeting.Exe);
         SyncMeetingMic();
         if (!string.Equals(_detectedMeeting?.Exe, meeting.Exe, StringComparison.OrdinalIgnoreCase)) return;
-        _detectedMeeting = null;
+        SetDetectedMeeting(null);
         if (PillPrompt is PillPrompt.MeetingDetected shown && string.Equals(shown.Meeting.Exe, meeting.Exe, StringComparison.OrdinalIgnoreCase))
         {
             PillPrompt = null;
         }
+    }
+
+    /// <summary>The detected app changed: a calendar prompt's pill follows it (<see cref="PillAppRootPid"/>).</summary>
+    private void SetDetectedMeeting(DetectedMeeting? meeting)
+    {
+        _detectedMeeting = meeting;
+        if (PillPrompt is PillPrompt.CalendarEvent) OnPropertyChanged(nameof(PillAppRootPid));
     }
 
     /// <summary>
