@@ -3,12 +3,14 @@ using EchoDiar.AI;
 using EchoDiar.AI.Cloud;
 using EchoDiar.Core;
 using EchoDiar.Core.Audio;
+using EchoDiar.Core.Calendar;
 using EchoDiar.Core.Model;
 using EchoDiar.Core.Models;
 using EchoDiar.Core.Settings;
 using EchoDiar.LocalLLM;
 using EchoDiar.Platform.AI;
 using EchoDiar.Platform.Audio;
+using EchoDiar.Platform.Calendar;
 using EchoDiar.Platform.SystemServices;
 using EchoDiar.Transcribe;
 using EchoDiar.Transcribe.Engines;
@@ -23,7 +25,8 @@ namespace EchoDiar.App.Services;
 /// keys (<see cref="Secrets"/>), Windows AI, the AI jobs (sharing the load gate with transcription), local host
 /// discovery, <see cref="MakeProvider"/> and <see cref="MakeLocalProvider"/>; every child process they start joins
 /// <see cref="ChildProcessJob.Shared"/>. Cloud transcription: the pipeline exports uploads through the same Media
-/// Foundation object, and <see cref="MakeCloudEngine"/> makes a job's cloud engines with their keys.
+/// Foundation object, and <see cref="MakeCloudEngine"/> makes a job's cloud engines with their keys. The calendars:
+/// <see cref="Calendar"/>.
 /// </summary>
 internal sealed class AppServices : IDisposable
 {
@@ -71,6 +74,9 @@ internal sealed class AppServices : IDisposable
         // Route changes in Logs\startup.log; Release builds leave both null and format nothing.
         _routes.Log = message => StartupTrace.Write(message);
         Engine.Log = message => StartupTrace.Write(message);
+        Calendar = new AppointmentCalendarStore(message => StartupTrace.Write(message));
+#else
+        Calendar = new AppointmentCalendarStore(message => Debug.WriteLine(message));
 #endif
     }
 
@@ -88,6 +94,12 @@ internal sealed class AppServices : IDisposable
     public IReadOnlyDictionary<ModelRuntime, TranscriptionPipeline.EngineFactory> Engines { get; }
     public AudioCompressor Compressor { get; }
     public RecordingEngine Engine { get; }
+
+    /// <summary>
+    /// The user's calendars through the Appointments API (every calendar read-only, EchoDiar's own calendar read-write).
+    /// Its calls are asynchronous and never block the calling thread; its log messages never hold event content.
+    /// </summary>
+    public ICalendarStore Calendar { get; }
 
     /// <summary>Launch at login: the package's startup task.</summary>
     public ILaunchAtLogin LaunchAtLogin { get; } = new LaunchAtLogin();

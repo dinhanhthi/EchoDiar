@@ -5,6 +5,7 @@ using CommunityToolkit.Mvvm.ComponentModel;
 using EchoDiar.AI.Cloud;
 using EchoDiar.App.Services;
 using EchoDiar.Core.Audio;
+using EchoDiar.Core.Calendar;
 using EchoDiar.Core.Model;
 using EchoDiar.Core.Models;
 using EchoDiar.Core.Settings;
@@ -127,9 +128,11 @@ public sealed partial class AppViewModel : ObservableObject
         {
             // Turning "wait" off releases a job waiting for energy saver.
             _services.Deferral.Enabled = value.DeferTranscriptionWhenConstrained;
+            var old = _settings;
             if (!SetProperty(ref _settings, value)) return;
             OnPropertyChanged(nameof(RecordingLanguage));
             SyncMeetingDetection();
+            OnCalendarSettingsChanged(old.Calendar, value.Calendar);
         }
     }
 
@@ -269,6 +272,8 @@ public sealed partial class AppViewModel : ObservableObject
         ProvidersModel.Changed += OnProvidersChanged;
         // With the loaded settings (detection on or off).
         StartMeetingServices();
+        // After the system events (its wake sync), with the loaded settings; the window already shows.
+        StartCalendar();
         // With the loaded settings (each shortcut on or off).
         StartHotKeys();
         // With the settings, before the library (macOS AppModel.start()).
@@ -339,6 +344,8 @@ public sealed partial class AppViewModel : ObservableObject
     public bool Shutdown()
     {
         _closing = true;
+        // Before the system events go: its wake handler is removed from them.
+        StopCalendar();
         // On the UI thread, before anything waits (the system events' window lives on it); silent, as _closing is set.
         StopMeetingServices();
         // Same thread rule: the shortcuts' window lives on the UI thread.
@@ -542,10 +549,15 @@ public sealed partial class AppViewModel : ObservableObject
 
     // Recording
 
-    /// <summary>Records <paramref name="app"/>'s audio (null: all system audio) and the mic, after launch recovery.</summary>
-    public async Task StartRecordingAsync(AudioProcessGroup? app)
+    /// <summary>
+    /// Records <paramref name="app"/>'s audio (null: all system audio) and the mic, after launch recovery.
+    /// <paramref name="calendarEvent"/>: the calendar event recorded, which names the recording at its end and, with "Stop
+    /// when the event ends", prompts a stop after its end.
+    /// </summary>
+    public async Task StartRecordingAsync(AudioProcessGroup? app, CalendarEvent? calendarEvent = null)
     {
         if (IsRecording || IsStarting || _closing) return;
+        _recordingEvent = null;
         if (Updater.IsInstalling)
         {
             // Windows closes the app once the update is downloaded: the recording would be cut off.
@@ -584,6 +596,7 @@ public sealed partial class AppViewModel : ObservableObject
             if (_activeFolder is null) return;
             _pollTimer.Start();
             BeginEndWatch(target);
+            CalendarRecordingStarted(calendarEvent);
         }
         catch (Exception e)
         {
@@ -699,6 +712,7 @@ public sealed partial class AppViewModel : ObservableObject
         RecordingSourceRootPid = null;
         if (snapshot.EndReason is not { } reason) return;
         EndEndWatch();
+        var calendarEvent = TakeRecordingEvent();
         // The next recording starts with the remembered or default language again.
         if (_languageOverride is not null)
         {
@@ -709,15 +723,16 @@ public sealed partial class AppViewModel : ObservableObject
         var folder = _activeFolder;
         _activeFolder = null;
         var transcriber = TakeRecordingTranscriber();
-        if (folder is not null) _ = FinishRecordingAsync(folder, transcriber);
+        if (folder is not null) _ = FinishRecordingAsync(folder, transcriber, calendarEvent?.Title);
         else if (transcriber is not null) CancelRecordingTranscriber(transcriber);
     }
 
     /// <summary>
-    /// Lists the recording, opens it when the recording page is showing, then compresses and transcribes it with what
-    /// the live transcriber transcribed, which drains meanwhile.
+    /// Lists the recording, names it <paramref name="title"/> (its calendar event's) when given, opens it when the
+    /// recording page is showing, then compresses and transcribes it with what the live transcriber transcribed, which
+    /// drains meanwhile.
     /// </summary>
-    private async Task FinishRecordingAsync(string folder, RecordingTranscriber? transcriber)
+    private async Task FinishRecordingAsync(string folder, RecordingTranscriber? transcriber, string? title = null)
     {
         var prior = transcriber is null ? null : FinishRecordingTranscriberAsync(transcriber);
         if (_closing) return;
@@ -726,6 +741,11 @@ public sealed partial class AppViewModel : ObservableObject
             var list = await _services.Library.RefreshAsync();
             var session = await Task.Run(() => ReadSession(folder));
             if (_closing) return;
+            if (title is not null && session is not null && list.Any(c => c.Id == session.Id))
+            {
+                await ApplyEventTitleAsync(session.Id, title);
+                if (_closing) return;
+            }
             if (Route.Kind == RouteKind.Recording)
             {
                 DetailTab = DetailTab.Transcript;
