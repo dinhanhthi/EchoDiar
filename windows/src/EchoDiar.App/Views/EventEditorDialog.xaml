@@ -27,23 +27,17 @@
                 <TextBox x:Name="TitleBox" Header="{local:T Text='Title'}" />
                 <CalendarDatePicker x:Name="DayPicker" HorizontalAlignment="Stretch" Header="{local:T Text='Date'}" />
                 <StackPanel Spacing="4">
-                    <Grid ColumnSpacing="12">
-                        <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="*" />
-                            <ColumnDefinition Width="*" />
-                        </Grid.ColumnDefinitions>
+                    <!-- One per row: side by side, a 12-hour picker cuts its AM/PM column. -->
+                    <StackPanel Spacing="12">
                         <TimePicker
                             x:Name="StartPicker"
-                            MinWidth="0"
                             HorizontalAlignment="Stretch"
                             Header="{local:T Text='Start'}" />
                         <TimePicker
                             x:Name="EndPicker"
-                            Grid.Column="1"
-                            MinWidth="0"
                             HorizontalAlignment="Stretch"
                             Header="{local:T Text='End'}" />
-                    </Grid>
+                    </StackPanel>
                     <TextBlock x:Name="EndHint" Style="{StaticResource HintStyle}" Text="{local:T Text='The end must be after the start.'}" />
                 </StackPanel>
                 <StackPanel Spacing="4">

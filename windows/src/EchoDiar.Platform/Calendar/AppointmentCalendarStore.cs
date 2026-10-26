@@ -263,9 +263,11 @@ public sealed class AppointmentCalendarStore(Action<string>? log = null) : ICale
             }
             else
             {
+                var exceptions = await ExceptionsBeforeAsync(calendar, localId, originalStart).ConfigureAwait(false);
                 EndSeriesBefore(recurrence, originalStart);
                 master.Recurrence = recurrence;
                 await Call("SaveAppointmentAsync", () => calendar.SaveAppointmentAsync(master)).ConfigureAwait(false);
+                await RestoreExceptionsAsync(calendar, localId, exceptions).ConfigureAwait(false);
             }
         });
 
@@ -309,6 +311,7 @@ public sealed class AppointmentCalendarStore(Action<string>? log = null) : ICale
     private async Task SplitAsync(AppointmentCalendar calendar, Appointment master, AppointmentRecurrence recurrence,
         DateTimeOffset originalStart, CalendarEventDraft draft, bool keepRule)
     {
+        var exceptions = await ExceptionsBeforeAsync(calendar, master.LocalId, originalStart).ConfigureAwait(false);
         var next = new Appointment
         {
             Location = master.Location,
@@ -341,6 +344,52 @@ public sealed class AppointmentCalendarStore(Action<string>? log = null) : ICale
                 }
             }
             throw;
+        }
+        await RestoreExceptionsAsync(calendar, master.LocalId, exceptions).ConfigureAwait(false);
+    }
+
+    /// <summary>
+    /// The changed or deleted occurrences of a series before <paramref name="before"/>: saving a series' recurrence
+    /// drops its exceptions on Windows, so ending it puts them back after (EventKit keeps them).
+    /// </summary>
+    private static async Task<IReadOnlyList<AppointmentException>> ExceptionsBeforeAsync(
+        AppointmentCalendar calendar, string localId, DateTimeOffset before)
+    {
+        var exceptions = await Call("FindExceptionsFromMasterAsync",
+            () => calendar.FindExceptionsFromMasterAsync(localId)).ConfigureAwait(false);
+        return exceptions.Where(e => e.Appointment.OriginalStartTime is { } start && start < before).ToList();
+    }
+
+    /// <summary>Puts <paramref name="exceptions"/> back on the series: the form's fields of a changed occurrence, or
+    /// its deletion. One that fails is logged; the series itself is already saved.</summary>
+    private async Task RestoreExceptionsAsync(
+        AppointmentCalendar calendar, string localId, IReadOnlyList<AppointmentException> exceptions)
+    {
+        foreach (var exception in exceptions)
+        {
+            var original = exception.Appointment.OriginalStartTime!.Value;
+            try
+            {
+                if (exception.IsDeleted)
+                {
+                    await Call("DeleteAppointmentInstanceAsync(exception)",
+                        () => calendar.DeleteAppointmentInstanceAsync(localId, original)).ConfigureAwait(false);
+                    continue;
+                }
+                var instance = await Call("GetAppointmentInstanceAsync(exception)",
+                    () => calendar.GetAppointmentInstanceAsync(localId, original)).ConfigureAwait(false);
+                if (instance is null) continue;
+                var changed = exception.Appointment;
+                instance.Subject = changed.Subject;
+                instance.StartTime = changed.StartTime;
+                instance.Duration = changed.Duration;
+                instance.Uri = changed.Uri;
+                await Call("SaveAppointmentAsync(exception)", () => calendar.SaveAppointmentAsync(instance)).ConfigureAwait(false);
+            }
+            catch (CalendarStoreException ex)
+            {
+                Log(ex.Message);
+            }
         }
     }
 
