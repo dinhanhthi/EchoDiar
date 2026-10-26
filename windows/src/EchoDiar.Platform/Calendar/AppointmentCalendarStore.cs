@@ -733,7 +733,8 @@ internal static class AppointmentMapping
         RecurrenceRule? rule, DateTimeOffset seriesStart, TimeZoneInfo zone)
     {
         if (rule is null) return (CalendarEventDraft.Repeat.None, null);
-        if (rule.Interval != 1 || rule.Occurrences is not null) return (CalendarEventDraft.Repeat.Custom, null);
+        // Windows reports a date end with its count of occurrences too: only a count without a date is Custom.
+        if (rule.Interval != 1 || (rule.Occurrences is not null && rule.Until is null)) return (CalendarEventDraft.Repeat.Custom, null);
         var start = TimeZoneInfo.ConvertTime(seriesStart, zone);
         var repeat = rule.Unit switch
         {

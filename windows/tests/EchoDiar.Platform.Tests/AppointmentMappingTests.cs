@@ -112,8 +112,19 @@ public sealed class AppointmentMappingTests
     public void ARuleTheFormCantShowReadsAsCustomWithoutEnd(
         AppointmentRecurrenceUnit unit, uint interval, AppointmentDaysOfWeek days, uint day, uint? occurrences)
     {
-        var rule = new AppointmentMapping.RecurrenceRule(unit, interval, days, day, occurrences, Start.AddDays(30));
+        // A count end has no date.
+        var rule = new AppointmentMapping.RecurrenceRule(
+            unit, interval, days, day, occurrences, occurrences is null ? Start.AddDays(30) : null);
         Assert.Equal((Repeat.Custom, (DateTimeOffset?)null), AppointmentMapping.RepeatOf(rule, Start, Zone));
+    }
+
+    [Fact]
+    public void ADateEndReadBackWithItsCountKeepsTheFormsRepeat()
+    {
+        // Windows fills Occurrences when a series is saved with Until (VM QA 9.5: Daily until 11/26 read back as 32).
+        var until = Start.AddDays(31);
+        var rule = new AppointmentMapping.RecurrenceRule(AppointmentRecurrenceUnit.Daily, 1, AppointmentDaysOfWeek.None, 0, 32, until);
+        Assert.Equal((Repeat.Daily, (DateTimeOffset?)until), AppointmentMapping.RepeatOf(rule, Start, Zone));
     }
 
     [Fact]
