@@ -126,6 +126,22 @@
     <value>Después de grabar</value>
     <comment>After recording</comment>
   </data>
+  <data name="AllFilesOfLldConversationsWillBeMovedToTheRecycleBinAtTheNex" xml:space="preserve">
+    <value>Todos los archivos de {0} conversaciones se trasladarán a la Papelera de reciclaje en la próxima ejecución (al iniciar o en un plazo de un día):</value>
+    <comment>All files of %lld conversations will be moved to the Recycle Bin at the next run (at launch or within a day):</comment>
+  </data>
+  <data name="AllFilesOfLldConversationsWillBeMovedToTheRecycleBinAtTheNex__One" xml:space="preserve">
+    <value>Todos los archivos de {0} conversación se trasladarán a la Papelera de reciclaje en la próxima ejecución (al iniciar o en un plazo de un día):</value>
+    <comment>All files of %lld conversations will be moved to the Recycle Bin at the next run (at launch or within a day):</comment>
+  </data>
+  <data name="AllFilesOfLldConversationsWillBeMovedToTheRecycleBinNowThenD" xml:space="preserve">
+    <value>Todos los archivos de {0} conversaciones se trasladarán a la Papelera de reciclaje ahora y, después, a diario los de las más antiguas:</value>
+    <comment>All files of %lld conversations will be moved to the Recycle Bin now, then daily for older ones:</comment>
+  </data>
+  <data name="AllFilesOfLldConversationsWillBeMovedToTheRecycleBinNowThenD__One" xml:space="preserve">
+    <value>Todos los archivos de {0} conversación se trasladarán a la Papelera de reciclaje ahora y, después, a diario los de las más antiguas:</value>
+    <comment>All files of %lld conversations will be moved to the Recycle Bin now, then daily for older ones:</comment>
+  </data>
   <data name="AllFilesOfLldConversationsWillBeMovedToTheTrashAtTheNextRunA" xml:space="preserve">
     <value>Todos los archivos de {0} conversaciones se trasladarán a la Papelera en la próxima ejecución (al iniciar o en un plazo de un día):</value>
     <comment>All files of %lld conversations will be moved to the Trash at the next run (at launch or within a day):</comment>
@@ -142,6 +158,10 @@
     <value>Todos los archivos de {0} conversación se trasladarán a la Papelera ahora y, después, a diario los de las más antiguas:</value>
     <comment>All files of %lld conversations will be moved to the Trash now, then daily for older ones:</comment>
   </data>
+  <data name="AllFilesOfTranscribedConversationsOlderThanLldDaysWillBeMove" xml:space="preserve">
+    <value>Todos los archivos de las conversaciones transcritas con más de {0} días se trasladarán a la Papelera de reciclaje una vez al día. Ahora no hay coincidencias.</value>
+    <comment>All files of transcribed conversations older than %lld days will be moved to the Recycle Bin once a day. Nothing matches now.</comment>
+  </data>
   <data name="AllFilesOfTranscribedConversationsOlderThanLldDaysWillBeMove_2" xml:space="preserve">
     <value>Todos los archivos de las conversaciones transcritas con más de {0} días se trasladarán a la Papelera una vez al día. Ahora no hay coincidencias.</value>
     <comment>All files of transcribed conversations older than %lld days will be moved to the Trash once a day. Nothing matches now.</comment>
@@ -149,6 +169,10 @@
   <data name="AllFilesOfTranscribedConversationsOlderThanLldDaysWillBeMove_2__One" xml:space="preserve">
     <value>Todos los archivos de las conversaciones transcritas con más de {0} día se trasladarán a la Papelera una vez al día. Ahora no hay coincidencias.</value>
     <comment>All files of transcribed conversations older than %lld days will be moved to the Trash once a day. Nothing matches now.</comment>
+  </data>
+  <data name="AllFilesOfTranscribedConversationsOlderThanLldDaysWillBeMove__One" xml:space="preserve">
+    <value>Todos los archivos de las conversaciones transcritas con más de {0} día se trasladarán a la Papelera de reciclaje una vez al día. Ahora no hay coincidencias.</value>
+    <comment>All files of transcribed conversations older than %lld days will be moved to the Recycle Bin once a day. Nothing matches now.</comment>
   </data>
   <data name="AllSystemAudio" xml:space="preserve">
     <value>Todo el audio del sistema</value>
@@ -166,6 +190,14 @@
     <value>Grabar siempre</value>
     <comment>Always record</comment>
   </data>
+  <data name="AnUpdateIsAvailableUpdateInTheToolbarInstallsIt" xml:space="preserve">
+    <value>Hay una actualización disponible: Actualizar, en la barra de herramientas, la instala.</value>
+    <comment>An update is available: Update in the toolbar installs it.</comment>
+  </data>
+  <data name="And" xml:space="preserve">
+    <value>{0} y {1}</value>
+    <comment>%@ and %@</comment>
+  </data>
   <data name="AndLldMore" xml:space="preserve">
     <value>…y {0} más</value>
     <comment>…and %lld more</comment>
@@ -173,6 +205,10 @@
   <data name="AnotherAppIsUsingTheAudioDeviceExclusively" xml:space="preserve">
     <value>Otra app está usando el dispositivo de audio en exclusiva.</value>
     <comment>Another app is using the audio device exclusively.</comment>
+  </data>
+  <data name="AnotherConversation" xml:space="preserve">
+    <value>otra conversación</value>
+    <comment>another conversation</comment>
   </data>
   <data name="AnsweringAQuestionAboutYourConversations" xml:space="preserve">
     <value>Respondiendo a una pregunta sobre tus conversaciones…</value>
@@ -190,6 +226,10 @@
     <value>Responde a preguntas sobre todas tus conversaciones transcritas, citando la conversación y el momento. El índice se queda en este Mac salvo que elijas un modelo de embeddings por API.</value>
     <comment>Answers questions about all your transcribed conversations, citing the conversation and the moment. The index stays on this Mac unless you pick an API embedder.</comment>
   </data>
+  <data name="AnswersQuestionsAboutAllYourTranscribedConversationsCitingTh_2" xml:space="preserve">
+    <value>Responde a preguntas sobre todas tus conversaciones transcritas, citando la conversación y el momento. El índice se queda en este PC salvo que elijas un modelo de embeddings por API.</value>
+    <comment>Answers questions about all your transcribed conversations, citing the conversation and the moment. The index stays on this PC unless you pick an API embedder.</comment>
+  </data>
   <data name="ApiKeyHeader" xml:space="preserve">
     <value>Encabezado api-key</value>
     <comment>api-key header</comment>
@@ -197,6 +237,10 @@
   <data name="AppLanguage" xml:space="preserve">
     <value>Idioma de la app</value>
     <comment>App language</comment>
+  </data>
+  <data name="AppStructureMVVM" xml:space="preserve">
+    <value>Estructura de la app (MVVM)</value>
+    <comment>App structure (MVVM)</comment>
   </data>
   <data name="AppleBasicBuiltIn" xml:space="preserve">
     <value>Apple (básico, integrado)</value>
@@ -270,6 +314,14 @@
     <value>El audio y las transcripciones se quedan en este Mac.</value>
     <comment>Audio and transcripts stay on this Mac.</comment>
   </data>
+  <data name="AudioAndTranscriptsStayOnThisPC" xml:space="preserve">
+    <value>El audio y las transcripciones se quedan en este PC.</value>
+    <comment>Audio and transcripts stay on this PC.</comment>
+  </data>
+  <data name="AudioCaptureAndPlayback" xml:space="preserve">
+    <value>Captura y reproducción de audio</value>
+    <comment>Audio capture and playback</comment>
+  </data>
   <data name="AudioHasBeenRemoved" xml:space="preserve">
     <value>Se ha eliminado el audio</value>
     <comment>Audio has been removed</comment>
@@ -285,6 +337,18 @@
   <data name="AudioLeavesThisMacTheRecordingSMicAndSystemChannelsAreUpload" xml:space="preserve">
     <value>El audio sale de este Mac: los canales del micrófono y del sistema de la grabación se suben para transcribirlos; los recibe y los factura {0} ({1}). El proveedor puede conservar el audio según su propia política de retención. Se te pregunta una vez por proveedor y destino.</value>
     <comment>Audio leaves this Mac: the recording's mic and system channels are uploaded to %@ (%@) for transcription and billed by them. The provider may keep the audio under its own retention policy. You are asked once per provider and destination.</comment>
+  </data>
+  <data name="AudioLeavesThisPCCloudEnginesUploadTheRecordingToTheProvider" xml:space="preserve">
+    <value>El audio sale de este PC: los motores en la nube suben la grabación al proveedor.</value>
+    <comment>Audio leaves this PC: cloud engines upload the recording to the provider.</comment>
+  </data>
+  <data name="AudioLeavesThisPCTheCloudDiarizerUploadsTheSystemChannelToTh" xml:space="preserve">
+    <value>El audio sale de este PC: el diarizador en la nube sube el canal del sistema al proveedor.</value>
+    <comment>Audio leaves this PC: the cloud diarizer uploads the system channel to the provider.</comment>
+  </data>
+  <data name="AudioLeavesThisPCTheRecordingSMicAndSystemChannelsAreUploade" xml:space="preserve">
+    <value>El audio sale de este PC: los canales del micrófono y del sistema de la grabación se suben para transcribirlos; los recibe y los factura {0} ({1}). El proveedor puede conservar el audio según su propia política de retención. Se te pregunta una vez por proveedor y destino.</value>
+    <comment>Audio leaves this PC: the recording's mic and system channels are uploaded to %@ (%@) for transcription and billed by them. The provider may keep the audio under its own retention policy. You are asked once per provider and destination.</comment>
   </data>
   <data name="AudioOnlyKeepTranscriptSummaryAndChat" xml:space="preserve">
     <value>Solo el audio (conservar transcripción, resumen y chat)</value>
@@ -309,6 +373,10 @@
   <data name="AutoStop" xml:space="preserve">
     <value>Detención automática</value>
     <comment>Auto-stop</comment>
+  </data>
+  <data name="AutoTheTranscriptSLanguageForSummariesTheQuestionSForAnswers" xml:space="preserve">
+    <value>Automático = el idioma de la transcripción para los resúmenes, el de la pregunta para las respuestas.</value>
+    <comment>Auto = the transcript's language for summaries, the question's for answers.</comment>
   </data>
   <data name="Available" xml:space="preserve">
     <value>Disponible</value>
@@ -366,6 +434,10 @@
     <value>El acceso a los calendarios está desactivado. Activa EchoDiar en Privacidad y seguridad › Calendarios.</value>
     <comment>Calendar access is off. Turn on EchoDiar in Privacy &amp; Security › Calendars.</comment>
   </data>
+  <data name="CalendarAccessIsOffTurnOnEchoDiarInWindowsSettingsPrivacySec" xml:space="preserve">
+    <value>El acceso al calendario está desactivado. Activa EchoDiar en Configuración de Windows › Privacidad y seguridad › Calendario.</value>
+    <comment>Calendar access is off. Turn on EchoDiar in Windows Settings › Privacy &amp; security › Calendar.</comment>
+  </data>
   <data name="CalendarSettings" xml:space="preserve">
     <value>Ajustes del calendario…</value>
     <comment>Calendar settings…</comment>
@@ -409,6 +481,26 @@
   <data name="CheckForUpdates" xml:space="preserve">
     <value>Buscar actualizaciones…</value>
     <comment>Check for Updates…</comment>
+  </data>
+  <data name="CheckForUpdates_2" xml:space="preserve">
+    <value>Buscar actualizaciones…</value>
+    <comment>Check for updates…</comment>
+  </data>
+  <data name="CheckNow" xml:space="preserve">
+    <value>Buscar ahora</value>
+    <comment>Check now</comment>
+  </data>
+  <data name="CheckThatTheBaseURLEndsWithV1" xml:space="preserve">
+    <value>Comprueba que la URL base termine en /v1.</value>
+    <comment>Check that the base URL ends with /v1.</comment>
+  </data>
+  <data name="CheckThatYourSpeakersOrHeadphonesAreOnAndNotMutedThenTestAga" xml:space="preserve">
+    <value>Comprueba que los altavoces o los auriculares estén encendidos y sin silenciar, y vuelve a probar.</value>
+    <comment>Check that your speakers or headphones are on and not muted, then test again.</comment>
+  </data>
+  <data name="CheckingForUpdates" xml:space="preserve">
+    <value>Buscando actualizaciones…</value>
+    <comment>Checking for updates…</comment>
   </data>
   <data name="ChooseModels" xml:space="preserve">
     <value>Elegir modelos…</value>
@@ -454,9 +546,17 @@
     <value>La diarización en la nube ha fallado y no hay ningún modelo de diarización instalado en este Mac.</value>
     <comment>Cloud diarization failed and no diarization model is installed on this Mac.</comment>
   </data>
+  <data name="CloudDiarizationFailedAndNoDiarizationModelIsInstalledOnThis_2" xml:space="preserve">
+    <value>La diarización en la nube ha fallado y no hay ningún modelo de diarización instalado en este PC.</value>
+    <comment>Cloud diarization failed and no diarization model is installed on this PC.</comment>
+  </data>
   <data name="CloudDiarizationFailedSpeakersWereToldApartOnThisMac" xml:space="preserve">
     <value>La diarización en la nube ha fallado; los hablantes se han distinguido en este Mac.</value>
     <comment>Cloud diarization failed; speakers were told apart on this Mac.</comment>
+  </data>
+  <data name="CloudDiarizationFailedSpeakersWereToldApartOnThisPC" xml:space="preserve">
+    <value>La diarización en la nube ha fallado; los hablantes se han distinguido en este PC.</value>
+    <comment>Cloud diarization failed; speakers were told apart on this PC.</comment>
   </data>
   <data name="CloudTranscriptionEngines" xml:space="preserve">
     <value>Motores de transcripción en la nube</value>
@@ -465,6 +565,10 @@
   <data name="Cloud_2" xml:space="preserve">
     <value>Nube</value>
     <comment>Cloud</comment>
+  </data>
+  <data name="CodexRunsWithoutYourCodexConfigTomlItsModelMCPServersAndHook" xml:space="preserve">
+    <value>Codex se ejecuta sin tu ~/.codex/config.toml (su modelo, servidores MCP y hooks) en un sandbox de solo lectura y sin conexión, pero sus demás herramientas integradas aún pueden leer archivos de este PC.</value>
+    <comment>Codex runs without your ~/.codex/config.toml (its model, MCP servers and hooks) in a read-only, offline sandbox, but its remaining built-in tools can still read files on this PC.</comment>
   </data>
   <data name="Collapse" xml:space="preserve">
     <value>Contraer</value>
@@ -542,6 +646,26 @@
     <value>No se ha podido registrar {0} (error {1}).</value>
     <comment>%@ could not be registered (error %d).</comment>
   </data>
+  <data name="CouldNotBeRegisteredErrorLld" xml:space="preserve">
+    <value>No se ha podido registrar {0} (error {1}).</value>
+    <comment>%@ could not be registered (error %lld).</comment>
+  </data>
+  <data name="CouldNotCheckForUpdates" xml:space="preserve">
+    <value>No se han podido buscar actualizaciones</value>
+    <comment>Could not check for updates</comment>
+  </data>
+  <data name="CouldNotInstallTheUpdate" xml:space="preserve">
+    <value>No se ha podido instalar la actualización</value>
+    <comment>Could not install the update</comment>
+  </data>
+  <data name="CouldNotOpenTheAudio" xml:space="preserve">
+    <value>No se ha podido abrir el audio ({0}).</value>
+    <comment>Could not open the audio (%@).</comment>
+  </data>
+  <data name="CouldNotPlayTheAudio" xml:space="preserve">
+    <value>No se ha podido reproducir el audio ({0}).</value>
+    <comment>Could not play the audio (%@).</comment>
+  </data>
   <data name="Current" xml:space="preserve">
     <value>Actual</value>
     <comment>Current</comment>
@@ -582,9 +706,17 @@
     <value>Los datos enviados a proveedores en la nube o a CLI salen de este Mac.</value>
     <comment>Data sent to cloud providers or CLIs leaves this Mac.</comment>
   </data>
+  <data name="DataSentToCloudProvidersOrCLIsLeavesThisPC" xml:space="preserve">
+    <value>Los datos enviados a proveedores en la nube o a CLI salen de este PC.</value>
+    <comment>Data sent to cloud providers or CLIs leaves this PC.</comment>
+  </data>
   <data name="DataSentToLeavesThisMac" xml:space="preserve">
     <value>Los datos enviados a {0} salen de este Mac.</value>
     <comment>Data sent to %@ leaves this Mac.</comment>
+  </data>
+  <data name="DataSentToLeavesThisPC" xml:space="preserve">
+    <value>Los datos enviados a {0} salen de este PC.</value>
+    <comment>Data sent to %@ leaves this PC.</comment>
   </data>
   <data name="Date" xml:space="preserve">
     <value>Fecha</value>
@@ -790,6 +922,14 @@
     <value>Descargar un modelo…</value>
     <comment>Download a model…</comment>
   </data>
+  <data name="DownloadASpeakerModel" xml:space="preserve">
+    <value>Descargar un modelo de hablantes</value>
+    <comment>Download a speaker model</comment>
+  </data>
+  <data name="DownloadATranscriptionModel" xml:space="preserve">
+    <value>Descargar un modelo de transcripción</value>
+    <comment>Download a transcription model</comment>
+  </data>
   <data name="DownloadATranscriptionModelInSettings" xml:space="preserve">
     <value>Descargar un modelo de transcripción en Ajustes</value>
     <comment>Download a transcription model in Settings</comment>
@@ -830,6 +970,10 @@
     <value>EchoDiar</value>
     <comment>EchoDiar</comment>
   </data>
+  <data name="EchoDiarClosesInstallsTheNewVersionAndOpensAgain" xml:space="preserve">
+    <value>EchoDiar se cierra, instala la nueva versión y vuelve a abrirse.</value>
+    <comment>EchoDiar closes, installs the new version and opens again.</comment>
+  </data>
   <data name="EchoDiarHasNoAccessToYourCalendars" xml:space="preserve">
     <value>EchoDiar no tiene acceso a tus calendarios.</value>
     <comment>EchoDiar has no access to your calendars.</comment>
@@ -846,9 +990,21 @@
     <value>EchoDiar solo ha oído silencio.</value>
     <comment>EchoDiar heard only silence.</comment>
   </data>
+  <data name="EchoDiarHearsNothingFromPickAnotherSourceOrCheckThatTheAppIs" xml:space="preserve">
+    <value>EchoDiar no oye nada de {0}. Elige otra fuente o comprueba que la app esté reproduciendo audio.</value>
+    <comment>EchoDiar hears nothing from %@. Pick another source or check that the app is playing.</comment>
+  </data>
   <data name="EchoDiarIncludesThisOpenSourceSoftwareChooseOneToReadItsLice" xml:space="preserve">
     <value>EchoDiar incluye este software de código abierto. Elige uno para leer su licencia.</value>
     <comment>EchoDiar includes this open-source software. Choose one to read its license.</comment>
+  </data>
+  <data name="EchoDiarInstallsTheUpdateOnceTheRecordingTranscriptionsAndAI" xml:space="preserve">
+    <value>EchoDiar instala la actualización cuando terminan la grabación, las transcripciones y las respuestas de IA.</value>
+    <comment>EchoDiar installs the update once the recording, transcriptions and AI answers have finished.</comment>
+  </data>
+  <data name="EchoDiarIsCurrentlyTheNewestVersionAvailable" xml:space="preserve">
+    <value>EchoDiar {0} es la versión más reciente disponible.</value>
+    <comment>EchoDiar %@ is currently the newest version available.</comment>
   </data>
   <data name="EchoDiarMayLackSystemAudioRecordingPermissionAllowItThenRest" xml:space="preserve">
     <value>Puede que EchoDiar no tenga el permiso de Grabación de audio del sistema. Concédelo y vuelve a iniciar la grabación.</value>
@@ -873,6 +1029,10 @@
   <data name="EchoDiarRecordsTheOtherPeopleOnTheCallFromYourMacSAudioTheTe" xml:space="preserve">
     <value>EchoDiar graba a las demás personas de la llamada a partir del audio de tu Mac. La prueba reproduce un sonido corto y escucha si llega. macOS pide el permiso de Grabación de audio del sistema la primera vez.</value>
     <comment>EchoDiar records the other people on the call from your Mac's audio. The test plays a short sound and listens for it. macOS asks for System Audio Recording permission the first time.</comment>
+  </data>
+  <data name="EchoDiarRecordsTheOtherPeopleOnTheCallFromYourPCSAudioTheTes" xml:space="preserve">
+    <value>EchoDiar graba a las demás personas de la llamada a partir del audio de tu PC. La prueba reproduce un sonido corto y escucha si llega.</value>
+    <comment>EchoDiar records the other people on the call from your PC's audio. The test plays a short sound and listens for it.</comment>
   </data>
   <data name="EchoDiarRecordsYourVoiceOnItsOwnChannelSoTheTranscriptKnowsW" xml:space="preserve">
     <value>EchoDiar graba tu voz en su propio canal, para que la transcripción sepa lo que dijiste.</value>
@@ -930,13 +1090,25 @@
     <value>Introduce el modelo de embeddings de {0} en Ajustes › RAG</value>
     <comment>Enter the embedding model of %@ in Settings › RAG</comment>
   </data>
+  <data name="EveryLicenseAboveInOneTextFile" xml:space="preserve">
+    <value>Todas las licencias anteriores en un solo archivo de texto.</value>
+    <comment>Every license above in one text file.</comment>
+  </data>
   <data name="Expand" xml:space="preserve">
     <value>Expandir</value>
     <comment>Expand</comment>
   </data>
+  <data name="ExtraHeaders" xml:space="preserve">
+    <value>Encabezados adicionales</value>
+    <comment>Extra headers</comment>
+  </data>
   <data name="Failed" xml:space="preserve">
     <value>Error</value>
     <comment>Failed</comment>
+  </data>
+  <data name="FailedItsIntegrityCheckDownloadItAgain" xml:space="preserve">
+    <value>{0} no ha superado la comprobación de integridad. Vuelve a descargarlo.</value>
+    <comment>%@ failed its integrity check. Download it again.</comment>
   </data>
   <data name="Fast" xml:space="preserve">
     <value>Rápido</value>
@@ -982,6 +1154,10 @@
     <value>{0} GB</value>
     <comment>%@ GB</comment>
   </data>
+  <data name="GeminiCLIDeniesEveryToolAndLoadsNoMCPServerOrExtensionUnless" xml:space="preserve">
+    <value>Gemini CLI deniega todas las herramientas y no carga ningún servidor MCP ni extensión, salvo que una directiva de administrador de todo el sistema los permita.</value>
+    <comment>Gemini CLI denies every tool and loads no MCP server or extension, unless a system-wide admin policy allows them.</comment>
+  </data>
   <data name="General" xml:space="preserve">
     <value>General</value>
     <comment>General</comment>
@@ -1013,6 +1189,10 @@
   <data name="HeadsUpIMRecordingThisCallToTakeNotesTheRecordingStaysOnMyMa" xml:space="preserve">
     <value>Aviso: estoy grabando esta llamada para tomar notas. La grabación se queda en mi Mac.</value>
     <comment>Heads up: I'm recording this call to take notes. The recording stays on my Mac.</comment>
+  </data>
+  <data name="HeadsUpIMRecordingThisCallToTakeNotesTheRecordingStaysOnMyPC" xml:space="preserve">
+    <value>Aviso: estoy grabando esta llamada para tomar notas. La grabación se queda en mi PC.</value>
+    <comment>Heads up: I'm recording this call to take notes. The recording stays on my PC.</comment>
   </data>
   <data name="HideEchoDiar" xml:space="preserve">
     <value>Ocultar EchoDiar</value>
@@ -1090,13 +1270,25 @@
     <value>Para indexar tus conversaciones en este Mac hace falta este modelo de embeddings ({0}). También puedes elegir otro modelo abajo.</value>
     <comment>Indexing your conversations on this Mac needs this embedding model (%@). You can also pick another model below.</comment>
   </data>
+  <data name="IndexingYourConversationsOnThisPCNeedsThisEmbeddingModelYouC" xml:space="preserve">
+    <value>Para indexar tus conversaciones en este PC hace falta este modelo de embeddings ({0}). También puedes elegir otro modelo abajo.</value>
+    <comment>Indexing your conversations on this PC needs this embedding model (%@). You can also pick another model below.</comment>
+  </data>
   <data name="IndicatorSize" xml:space="preserve">
     <value>Tamaño del indicador</value>
     <comment>Indicator size</comment>
   </data>
+  <data name="InstallAndRelaunch" xml:space="preserve">
+    <value>Instalar y reiniciar</value>
+    <comment>Install and Relaunch</comment>
+  </data>
   <data name="InstallTheAvailableUpdate" xml:space="preserve">
     <value>Instalar la actualización disponible</value>
     <comment>Install the available update</comment>
+  </data>
+  <data name="InstallTheUpdate" xml:space="preserve">
+    <value>¿Instalar la actualización?</value>
+    <comment>Install the update?</comment>
   </data>
   <data name="InstallTheUpdateFirst" xml:space="preserve">
     <value>Instala primero la actualización</value>
@@ -1113,6 +1305,14 @@
   <data name="Installed_2" xml:space="preserve">
     <value>Instalado: {0}</value>
     <comment>Installed: %@</comment>
+  </data>
+  <data name="InstallingTheUpdate" xml:space="preserve">
+    <value>Instalando la actualización…</value>
+    <comment>Installing the update…</comment>
+  </data>
+  <data name="InstallingTheUpdateLld" xml:space="preserve">
+    <value>Instalando la actualización… {0}%</value>
+    <comment>Installing the update… %lld%%</comment>
   </data>
   <data name="IsAlreadyUsedByAnotherAppPickAnotherShortcut" xml:space="preserve">
     <value>Otra app ya usa {0}. Elige otro atajo.</value>
@@ -1138,9 +1338,21 @@
     <value>{0} es el atajo del menú "{1}".</value>
     <comment>%@ is the "%@" menu shortcut.</comment>
   </data>
+  <data name="IsTheShortcut" xml:space="preserve">
+    <value>{0} es el atajo de "{1}".</value>
+    <comment>%@ is the "%@" shortcut.</comment>
+  </data>
   <data name="ItNeedsAnIndexOfYourTranscriptsBuiltOnThisMacByDefault" xml:space="preserve">
     <value>Necesita un índice de tus transcripciones, que por omisión se crea en este Mac.</value>
     <comment>It needs an index of your transcripts, built on this Mac by default.</comment>
+  </data>
+  <data name="ItNeedsAnIndexOfYourTranscriptsBuiltOnThisPCByDefault" xml:space="preserve">
+    <value>Necesita un índice de tus transcripciones, que por omisión se crea en este PC.</value>
+    <comment>It needs an index of your transcripts, built on this PC by default.</comment>
+  </data>
+  <data name="ItsRuntimeFilesComeUnderTheMicrosoftSoftwareLicenseTerms" xml:space="preserve">
+    <value>Sus archivos de runtime están sujetos a los Términos de licencia del software de Microsoft.</value>
+    <comment>Its runtime files come under the Microsoft Software License Terms.</comment>
   </data>
   <data name="Join" xml:space="preserve">
     <value>Unirse</value>
@@ -1153,6 +1365,10 @@
   <data name="KeepUncompressedAudio" xml:space="preserve">
     <value>Conservar el audio sin comprimir</value>
     <comment>Keep uncompressed audio</comment>
+  </data>
+  <data name="KeepsItAtTheWindowSTopRightCorner" xml:space="preserve">
+    <value>Lo mantiene en la esquina superior derecha de la ventana.</value>
+    <comment>Keeps it at the window's top-right corner.</comment>
   </data>
   <data name="KeepsItAtTheWindowSTopRightCornerNeedsAccessibilityAccess" xml:space="preserve">
     <value>Lo mantiene en la esquina superior derecha de la ventana. Requiere acceso de Accesibilidad.</value>
@@ -1186,6 +1402,10 @@
     <value>Idioma a partir de ahora</value>
     <comment>Language from now on</comment>
   </data>
+  <data name="LanguageOfSummariesAndAnswers" xml:space="preserve">
+    <value>Idioma de los resúmenes y las respuestas</value>
+    <comment>Language of summaries and answers</comment>
+  </data>
   <data name="LanguageOfSummariesAndAnswersAutoTheTranscriptSLanguageForSu" xml:space="preserve">
     <value>Idioma de los resúmenes y las respuestas (Automático = el idioma de la transcripción para los resúmenes, el de la pregunta para las respuestas)</value>
     <comment>Language of summaries and answers (Auto = the transcript's language for summaries, the question's for answers)</comment>
@@ -1198,6 +1418,10 @@
     <value>Conversaciones más grandes</value>
     <comment>Largest conversations</comment>
   </data>
+  <data name="LastChecked" xml:space="preserve">
+    <value>Última comprobación: {0}</value>
+    <comment>Last checked %@</comment>
+  </data>
   <data name="LaunchAtLogin" xml:space="preserve">
     <value>Abrir al iniciar sesión</value>
     <comment>Launch at login</comment>
@@ -1209,6 +1433,14 @@
   <data name="LeavesThisMac_2" xml:space="preserve">
     <value>Sale de este Mac</value>
     <comment>Leaves this Mac</comment>
+  </data>
+  <data name="LeavesThisPC" xml:space="preserve">
+    <value>{0} (sale de este PC)</value>
+    <comment>%@ (leaves this PC)</comment>
+  </data>
+  <data name="LeavesThisPC_2" xml:space="preserve">
+    <value>Sale de este PC</value>
+    <comment>Leaves this PC</comment>
   </data>
   <data name="Library" xml:space="preserve">
     <value>Biblioteca</value>
@@ -1242,6 +1474,18 @@
     <value>La transcripción en directo se ha detenido. La transcripción se hará después de Detener.</value>
     <comment>Live transcript stopped. The transcript is made after Stop.</comment>
   </data>
+  <data name="LldBytes" xml:space="preserve">
+    <value>{0} bytes</value>
+    <comment>%lld bytes</comment>
+  </data>
+  <data name="LldBytes__One" xml:space="preserve">
+    <value>{0} byte</value>
+    <comment>%lld bytes</comment>
+  </data>
+  <data name="LldConversationsWithoutAudioWouldBeLeftEmptyTheyAreMovedToTh" xml:space="preserve">
+    <value>{0} conversaciones sin audio quedarían vacías: se trasladan enteras a la Papelera de reciclaje.</value>
+    <comment>%lld conversations without audio would be left empty: they are moved to the Recycle Bin entirely.</comment>
+  </data>
   <data name="LldConversationsWithoutAudioWouldBeLeftEmptyTheyAreMovedToTh_2" xml:space="preserve">
     <value>{0} conversaciones sin audio quedarían vacías: se trasladan enteras a la Papelera.</value>
     <comment>%lld conversations without audio would be left empty: they are moved to the Trash entirely.</comment>
@@ -1249,6 +1493,10 @@
   <data name="LldConversationsWithoutAudioWouldBeLeftEmptyTheyAreMovedToTh_2__One" xml:space="preserve">
     <value>{0} conversación sin audio quedaría vacía: se traslada entera a la Papelera.</value>
     <comment>%lld conversations without audio would be left empty: they are moved to the Trash entirely.</comment>
+  </data>
+  <data name="LldConversationsWithoutAudioWouldBeLeftEmptyTheyAreMovedToTh__One" xml:space="preserve">
+    <value>{0} conversación sin audio quedaría vacía: se traslada entera a la Papelera de reciclaje.</value>
+    <comment>%lld conversations without audio would be left empty: they are moved to the Recycle Bin entirely.</comment>
   </data>
   <data name="LldKbps" xml:space="preserve">
     <value>{0} kbps</value>
@@ -1326,6 +1574,10 @@
     <value>Cargar modelos</value>
     <comment>Load models</comment>
   </data>
+  <data name="LoadingTheModel" xml:space="preserve">
+    <value>Cargando el modelo…</value>
+    <comment>Loading the model…</comment>
+  </data>
   <data name="LocalHosts" xml:space="preserve">
     <value>Hosts locales</value>
     <comment>Local hosts</comment>
@@ -1398,6 +1650,10 @@
     <value>El acceso al micrófono está bloqueado en este Mac.</value>
     <comment>Microphone access is blocked on this Mac.</comment>
   </data>
+  <data name="MicrophoneAccessIsBlockedOnThisPC" xml:space="preserve">
+    <value>El acceso al micrófono está bloqueado en este PC.</value>
+    <comment>Microphone access is blocked on this PC.</comment>
+  </data>
   <data name="MicrophoneAccessIsOff" xml:space="preserve">
     <value>El acceso al micrófono está desactivado.</value>
     <comment>Microphone access is off.</comment>
@@ -1409,6 +1665,10 @@
   <data name="MicrophoneDisconnectedStopRecording" xml:space="preserve">
     <value>Micrófono desconectado — ¿detener la grabación?</value>
     <comment>Microphone disconnected — stop recording?</comment>
+  </data>
+  <data name="MicrophoneLevel" xml:space="preserve">
+    <value>Nivel del micrófono</value>
+    <comment>Microphone level</comment>
   </data>
   <data name="MicrophoneMuted" xml:space="preserve">
     <value>Micrófono silenciado</value>
@@ -1450,13 +1710,25 @@
     <value>Los modelos solo se descargan al hacer clic en Descargar.</value>
     <comment>Models are downloaded only when you click Download.</comment>
   </data>
+  <data name="ModelsEchoDiarDownloadsWhenYouChooseThemChooseOneToReadItsLi" xml:space="preserve">
+    <value>Modelos que EchoDiar descarga cuando los eliges. Elige uno para leer su licencia.</value>
+    <comment>Models EchoDiar downloads when you choose them. Choose one to read its license.</comment>
+  </data>
   <data name="Monthly" xml:space="preserve">
     <value>Cada mes</value>
     <comment>Monthly</comment>
   </data>
+  <data name="MoveToRecycleBin" xml:space="preserve">
+    <value>Trasladar a la Papelera de reciclaje</value>
+    <comment>Move to Recycle Bin</comment>
+  </data>
   <data name="MoveToTrash" xml:space="preserve">
     <value>Trasladar a la Papelera</value>
     <comment>Move to Trash</comment>
+  </data>
+  <data name="MovesTheAudioToTheRecycleBinOnceATranscriptionSucceeds" xml:space="preserve">
+    <value>Traslada el audio a la Papelera de reciclaje cuando una transcripción sale bien.</value>
+    <comment>Moves the audio to the Recycle Bin once a transcription succeeds.</comment>
   </data>
   <data name="MovesTheAudioToTheTrashOnceATranscriptionSucceeds" xml:space="preserve">
     <value>Traslada el audio a la Papelera cuando una transcripción sale bien.</value>
@@ -1497,6 +1769,10 @@
   <data name="NeedsMoreThanHalfOfThisMacSMemory" xml:space="preserve">
     <value>Requiere más de la mitad de la memoria de este Mac.</value>
     <comment>Needs more than half of this Mac's memory.</comment>
+  </data>
+  <data name="NeedsMoreThanHalfOfThisPCSMemory" xml:space="preserve">
+    <value>Requiere más de la mitad de la memoria de este PC.</value>
+    <comment>Needs more than half of this PC's memory.</comment>
   </data>
   <data name="NeedsTheSpeakerModelDownloadItInTranscriptionDiarizationMode" xml:space="preserve">
     <value>Requiere el modelo de hablantes: descárgalo en Transcripción › Modelo de diarización.</value>
@@ -1557,6 +1833,10 @@
   <data name="NoConversationsYet" xml:space="preserve">
     <value>Aún no hay conversaciones</value>
     <comment>No conversations yet</comment>
+  </data>
+  <data name="NoConversationsYetPressCtrlRToRecord" xml:space="preserve">
+    <value>Aún no hay conversaciones — pulsa Ctrl+R para grabar</value>
+    <comment>No conversations yet — press Ctrl+R to record</comment>
   </data>
   <data name="NoDiarizationModelsListedTypeTheModelId" xml:space="preserve">
     <value>No hay modelos de diarización en la lista; escribe el ID del modelo.</value>
@@ -1626,6 +1906,14 @@
     <value>No disponible en este Mac</value>
     <comment>Not available on this Mac</comment>
   </data>
+  <data name="NotCheckedYet" xml:space="preserve">
+    <value>Aún no se ha comprobado</value>
+    <comment>Not checked yet</comment>
+  </data>
+  <data name="NotFoundGiveTheFullPathToAExeOrToAnNpmCmdShim" xml:space="preserve">
+    <value>No encontrado: indica la ruta completa a un .exe o a un shim .cmd de npm.</value>
+    <comment>Not found: give the full path to a .exe, or to an npm .cmd shim.</comment>
+  </data>
   <data name="NotInstalled" xml:space="preserve">
     <value>No instalado</value>
     <comment>Not installed</comment>
@@ -1637,6 +1925,14 @@
   <data name="NotNow_2" xml:space="preserve">
     <value>Ahora no</value>
     <comment>Not now</comment>
+  </data>
+  <data name="NotSavedPutTheKeyInTheAPIKeyFieldWhichKeepsItInCredentialMan" xml:space="preserve">
+    <value>{0} no se ha guardado: pon la clave en el campo Clave de API, que la guarda en el Administrador de credenciales.</value>
+    <comment>%@ not saved: put the key in the API key field, which keeps it in Credential Manager.</comment>
+  </data>
+  <data name="NotTranscribed" xml:space="preserve">
+    <value>Sin transcribir</value>
+    <comment>Not transcribed</comment>
   </data>
   <data name="NothingIsSentToUntilYouConfirm" xml:space="preserve">
     <value>No se envía nada a {0} hasta que confirmes.</value>
@@ -1678,9 +1974,21 @@
     <value>En este Mac</value>
     <comment>On this Mac</comment>
   </data>
+  <data name="OnThisPC" xml:space="preserve">
+    <value>En este PC</value>
+    <comment>On this PC</comment>
+  </data>
+  <data name="OnceADayMovesTranscribedConversationsOlderThanTheAgeBelowToT" xml:space="preserve">
+    <value>Una vez al día, traslada a la Papelera de reciclaje las conversaciones transcritas con más antigüedad que la indicada abajo.</value>
+    <comment>Once a day, moves transcribed conversations older than the age below to the Recycle Bin.</comment>
+  </data>
   <data name="OnceADayMovesTranscribedConversationsOlderThanTheAgeBelowToT_2" xml:space="preserve">
     <value>Una vez al día, traslada a la Papelera las conversaciones transcritas con más antigüedad que la indicada abajo.</value>
     <comment>Once a day, moves transcribed conversations older than the age below to the Trash.</comment>
+  </data>
+  <data name="OnePerLineNameValueSavedInTheSettingsFilePutAPIKeysInTheAPIK" xml:space="preserve">
+    <value>Uno por línea, Nombre: valor. Se guardan en el archivo de ajustes: pon las claves de API en el campo Clave de API.</value>
+    <comment>One per line, Name: value. Saved in the settings file: put API keys in the API key field.</comment>
   </data>
   <data name="OnlyEventsInTheEchoDiarCalendarCanBeChanged" xml:space="preserve">
     <value>Solo se pueden cambiar los eventos del calendario EchoDiar.</value>
@@ -1706,13 +2014,25 @@
     <value>OpenAI, Groq, Mistral, Google Gemini y los endpoints personalizados también transcriben, con su modelo de transcripción: configúralos en Ajustes › IA.</value>
     <comment>OpenAI, Groq, Mistral, Google Gemini and custom endpoints transcribe too, with their transcription model: set them up in Settings › AI.</comment>
   </data>
+  <data name="OpenCodeDeniesEveryToolButMCPServersInYourOpenCodeConfigStil" xml:space="preserve">
+    <value>OpenCode deniega todas las herramientas, pero los servidores MCP de tu configuración de OpenCode se siguen iniciando (sus herramientas se deniegan).</value>
+    <comment>OpenCode denies every tool, but MCP servers in your OpenCode config still start (their tools are denied).</comment>
+  </data>
   <data name="OpenEchoDiar" xml:space="preserve">
     <value>Abrir EchoDiar</value>
     <comment>Open EchoDiar</comment>
   </data>
+  <data name="OpenFullNotices" xml:space="preserve">
+    <value>Abrir los avisos completos</value>
+    <comment>Open full notices</comment>
+  </data>
   <data name="OpenGeneral" xml:space="preserve">
     <value>Abrir General</value>
     <comment>Open General</comment>
+  </data>
+  <data name="OpenInFileExplorer" xml:space="preserve">
+    <value>Abrir en el Explorador de archivos</value>
+    <comment>Open in File Explorer</comment>
   </data>
   <data name="OpenInFinder" xml:space="preserve">
     <value>Abrir en Finder</value>
@@ -1750,6 +2070,14 @@
     <value>¿Abrir este enlace?</value>
     <comment>Open this link?</comment>
   </data>
+  <data name="OpenWindowsMicrophoneSettings" xml:space="preserve">
+    <value>Abrir la configuración del micrófono de Windows</value>
+    <comment>Open Windows microphone settings</comment>
+  </data>
+  <data name="OpenWindowsPrivacySettings" xml:space="preserve">
+    <value>Abrir la configuración de privacidad de Windows</value>
+    <comment>Open Windows privacy settings</comment>
+  </data>
   <data name="Open_2" xml:space="preserve">
     <value>¿Abrir {0}?</value>
     <comment>Open %@?</comment>
@@ -1761,6 +2089,10 @@
   <data name="OutputApprox" xml:space="preserve">
     <value>{0} + salida (aprox.)</value>
     <comment>%@ + output (approx.)</comment>
+  </data>
+  <data name="ParakeetTranscription" xml:space="preserve">
+    <value>Transcripción con Parakeet</value>
+    <comment>Parakeet transcription</comment>
   </data>
   <data name="ParakeetTranscriptionAndSpeakerDiarization" xml:space="preserve">
     <value>Transcripción con Parakeet y diarización de hablantes</value>
@@ -1874,6 +2206,10 @@
     <value>Posición de reproducción</value>
     <comment>Playback position</comment>
   </data>
+  <data name="PlaybackStopped" xml:space="preserve">
+    <value>La reproducción se ha detenido ({0}).</value>
+    <comment>Playback stopped (%@).</comment>
+  </data>
   <data name="PreparingAudio" xml:space="preserve">
     <value>Preparando el audio…</value>
     <comment>Preparing audio…</comment>
@@ -1881,6 +2217,10 @@
   <data name="PressAShortcut" xml:space="preserve">
     <value>Pulsa un atajo…</value>
     <comment>Press a shortcut…</comment>
+  </data>
+  <data name="PressCtrlRToStartRecording" xml:space="preserve">
+    <value>Pulsa Ctrl+R para empezar a grabar.</value>
+    <comment>Press Ctrl+R to start recording.</comment>
   </data>
   <data name="PressEscToCancel" xml:space="preserve">
     <value>Pulsa Esc para cancelar</value>
@@ -1950,6 +2290,10 @@
     <value>Volver a transcribir con otro modelo o idioma</value>
     <comment>Re-transcribe with another model or language</comment>
   </data>
+  <data name="Ready" xml:space="preserve">
+    <value>Listo</value>
+    <comment>Ready</comment>
+  </data>
   <data name="Rebuild" xml:space="preserve">
     <value>Reconstruir</value>
     <comment>Rebuild</comment>
@@ -1981,6 +2325,10 @@
   <data name="RecordYourFirstConversation" xml:space="preserve">
     <value>Graba tu primera conversación</value>
     <comment>Record your first conversation</comment>
+  </data>
+  <data name="Record_2" xml:space="preserve">
+    <value>Grabar {0}</value>
+    <comment>Record %@</comment>
   </data>
   <data name="Recording" xml:space="preserve">
     <value>Grabación</value>
@@ -2042,6 +2390,10 @@
     <value>Grabaciones</value>
     <comment>Recordings</comment>
   </data>
+  <data name="RecordingsAreTranscribedOnThisPCPickASpeechRecognitionModelT" xml:space="preserve">
+    <value>Las grabaciones se transcriben en este PC. Elige un modelo de reconocimiento de voz para descargarlo.</value>
+    <comment>Recordings are transcribed on this PC. Pick a speech recognition model to download.</comment>
+  </data>
   <data name="RecordsAllSystemAudio" xml:space="preserve">
     <value>{0} (graba todo el audio del sistema)</value>
     <comment>%@ (records all system audio)</comment>
@@ -2049,6 +2401,10 @@
   <data name="Recovered" xml:space="preserve">
     <value>Recuperada</value>
     <comment>Recovered</comment>
+  </data>
+  <data name="Redo" xml:space="preserve">
+    <value>Rehacer</value>
+    <comment>Redo</comment>
   </data>
   <data name="RelaunchNow" xml:space="preserve">
     <value>Reiniciar ahora</value>
@@ -2125,6 +2481,10 @@
   <data name="RetryWithAnotherEngine" xml:space="preserve">
     <value>Reintentar con otro motor</value>
     <comment>Retry with another engine</comment>
+  </data>
+  <data name="RevealInExplorer" xml:space="preserve">
+    <value>Mostrar en el Explorador</value>
+    <comment>Reveal in Explorer</comment>
   </data>
   <data name="RevealInFinder" xml:space="preserve">
     <value>Mostrar en Finder</value>
@@ -2226,6 +2586,10 @@
     <value>Ajustes</value>
     <comment>Settings</comment>
   </data>
+  <data name="SettingsCards" xml:space="preserve">
+    <value>Tarjetas de ajustes</value>
+    <comment>Settings cards</comment>
+  </data>
   <data name="Settings_2" xml:space="preserve">
     <value>Ajustes…</value>
     <comment>Settings…</comment>
@@ -2266,9 +2630,17 @@
     <value>Se muestran las reuniones de los próximos 7 días. La lista se actualiza automáticamente.</value>
     <comment>Showing meetings in the next 7 days. The list updates automatically.</comment>
   </data>
+  <data name="ShowsTheTranscriptDuringTheRecordingAndKeepsItSoItIsReadyWit" xml:space="preserve">
+    <value>Muestra la transcripción durante la grabación y la conserva, para que esté lista segundos después de Detener. Usa más CPU y memoria al grabar. Solo modelos Whisper y Parakeet; los demás motores transcriben después de Detener.</value>
+    <comment>Shows the transcript during the recording and keeps it, so it is ready within seconds of Stop. Uses more CPU and memory while recording. Whisper and Parakeet models only; other engines transcribe after Stop.</comment>
+  </data>
   <data name="ShowsTheTranscriptDuringTheRecordingAndKeepsItSoItIsReadyWit_2" xml:space="preserve">
     <value>Muestra la transcripción durante la grabación y la conserva, para que esté lista segundos después de Detener. Usa más CPU y memoria al grabar. Solo modelos WhisperKit y Parakeet; los demás motores transcriben después de Detener.</value>
     <comment>Shows the transcript during the recording and keeps it, so it is ready within seconds of Stop. Uses more CPU and memory while recording. WhisperKit and Parakeet models only; other engines transcribe after Stop.</comment>
+  </data>
+  <data name="SimulateState" xml:space="preserve">
+    <value>Simular estado</value>
+    <comment>Simulate state</comment>
   </data>
   <data name="Skip" xml:space="preserve">
     <value>Omitir</value>
@@ -2293,6 +2665,10 @@
   <data name="Space" xml:space="preserve">
     <value>Espacio</value>
     <comment>Space</comment>
+  </data>
+  <data name="SpeakerDiarization" xml:space="preserve">
+    <value>Diarización de hablantes</value>
+    <comment>Speaker diarization</comment>
   </data>
   <data name="SpeakerLld" xml:space="preserve">
     <value>Hablante {0}</value>
@@ -2329,6 +2705,10 @@
   <data name="StartRecording" xml:space="preserve">
     <value>Iniciar grabación</value>
     <comment>Start Recording</comment>
+  </data>
+  <data name="StartRecording_2" xml:space="preserve">
+    <value>Iniciar grabación</value>
+    <comment>Start recording</comment>
   </data>
   <data name="Starting" xml:space="preserve">
     <value>Iniciando…</value>
@@ -2478,6 +2858,10 @@
     <value>Distinguir hablantes</value>
     <comment>Tell speakers apart</comment>
   </data>
+  <data name="TellSpeakersApartIsOnDownloadAModelToTellTheOtherSpeakersApa" xml:space="preserve">
+    <value>"Distinguir hablantes" está activado. Descarga un modelo para distinguir a los demás hablantes.</value>
+    <comment>"Tell speakers apart" is on. Download a model to tell the other speakers apart.</comment>
+  </data>
   <data name="TellThePeopleYouRecordYouAreResponsibleForTheirConsent" xml:space="preserve">
     <value>Avisa a las personas que grabas. Eres responsable de su consentimiento.</value>
     <comment>Tell the people you record. You are responsible for their consent.</comment>
@@ -2498,6 +2882,18 @@
     <value>Probar (usa tu suscripción)</value>
     <comment>Test (uses your subscription)</comment>
   </data>
+  <data name="TheAPIKeyIsLongerThanLldBytesTheMostCredentialManagerKeeps" xml:space="preserve">
+    <value>La clave de API ocupa más de {0} bytes, el máximo que guarda el Administrador de credenciales.</value>
+    <comment>The API key is longer than %lld bytes, the most Credential Manager keeps.</comment>
+  </data>
+  <data name="TheAPIKeyIsSentUnencryptedOverHttpToUseHttpsOrAHostOnThisPC" xml:space="preserve">
+    <value>La clave de API se envía sin cifrar por http a {0}. Usa https o un host de este PC.</value>
+    <comment>The API key is sent unencrypted over http to %@. Use https, or a host on this PC.</comment>
+  </data>
+  <data name="TheApp" xml:space="preserve">
+    <value>La app</value>
+    <comment>The app</comment>
+  </data>
   <data name="TheAppQuitStopRecording" xml:space="preserve">
     <value>La app se ha cerrado — ¿detener la grabación?</value>
     <comment>The app quit — stop recording?</comment>
@@ -2506,9 +2902,21 @@
     <value>La app ha dejado de usar el audio — ¿detener la grabación?</value>
     <comment>The app stopped using audio — stop recording?</comment>
   </data>
+  <data name="TheApp_2" xml:space="preserve">
+    <value>la app</value>
+    <comment>the app</comment>
+  </data>
   <data name="TheAudioDeviceChangedWhileRecordingWasStartingTryAgain" xml:space="preserve">
     <value>El dispositivo de audio ha cambiado mientras se iniciaba la grabación. Inténtalo de nuevo.</value>
     <comment>The audio device changed while recording was starting. Try again.</comment>
+  </data>
+  <data name="TheAudioFilesAreMovedToTheRecycleBinTranscriptsSummariesAndC" xml:space="preserve">
+    <value>Los archivos de audio se trasladan a la Papelera de reciclaje. Las transcripciones, los resúmenes y los chats se conservan.</value>
+    <comment>The audio files are moved to the Recycle Bin. Transcripts, summaries and chats stay.</comment>
+  </data>
+  <data name="TheAudioFilesAreMovedToTheRecycleBinTranscriptsSummariesAndC_2" xml:space="preserve">
+    <value>Los archivos de audio se trasladan a la Papelera de reciclaje. Las transcripciones, los resúmenes y los chats se conservan; ya no se podrá reproducir ni volver a transcribir.</value>
+    <comment>The audio files are moved to the Recycle Bin. Transcripts, summaries and chats stay; playback and re-transcribing are no longer possible.</comment>
   </data>
   <data name="TheAudioFilesAreMovedToTheTrashTranscriptsSummariesAndChatsS" xml:space="preserve">
     <value>Los archivos de audio se trasladan a la Papelera. Las transcripciones, los resúmenes y los chats se conservan.</value>
@@ -2518,9 +2926,29 @@
     <value>Los archivos de audio se trasladan a la Papelera. Las transcripciones, los resúmenes y los chats se conservan; ya no se podrá reproducir ni volver a transcribir.</value>
     <comment>The audio files are moved to the Trash. Transcripts, summaries and chats stay; playback and re-transcribing are no longer possible.</comment>
   </data>
+  <data name="TheAudioIsMovedToTheRecycleBinTheTranscriptSummaryAndChatSta" xml:space="preserve">
+    <value>El audio se traslada a la Papelera de reciclaje. La transcripción, el resumen y el chat se conservan; ya no se podrá reproducir ni volver a transcribir.</value>
+    <comment>The audio is moved to the Recycle Bin. The transcript, summary and chat stay; playback and re-transcribing are no longer possible.</comment>
+  </data>
   <data name="TheAudioIsMovedToTheTrashTheTranscriptSummaryAndChatStayPlay" xml:space="preserve">
     <value>El audio se traslada a la Papelera. La transcripción, el resumen y el chat se conservan; ya no se podrá reproducir ni volver a transcribir.</value>
     <comment>The audio is moved to the Trash. The transcript, summary and chat stay; playback and re-transcribing are no longer possible.</comment>
+  </data>
+  <data name="TheAudioOfLldConversationsWillBeMovedToTheRecycleBinAtTheNex" xml:space="preserve">
+    <value>El audio de {0} conversaciones se trasladará a la Papelera de reciclaje en la próxima ejecución (al iniciar o en un plazo de un día):</value>
+    <comment>The audio of %lld conversations will be moved to the Recycle Bin at the next run (at launch or within a day):</comment>
+  </data>
+  <data name="TheAudioOfLldConversationsWillBeMovedToTheRecycleBinAtTheNex__One" xml:space="preserve">
+    <value>El audio de {0} conversación se trasladará a la Papelera de reciclaje en la próxima ejecución (al iniciar o en un plazo de un día):</value>
+    <comment>The audio of %lld conversations will be moved to the Recycle Bin at the next run (at launch or within a day):</comment>
+  </data>
+  <data name="TheAudioOfLldConversationsWillBeMovedToTheRecycleBinNowThenD" xml:space="preserve">
+    <value>El audio de {0} conversaciones se trasladará a la Papelera de reciclaje ahora y, después, a diario el de las más antiguas:</value>
+    <comment>The audio of %lld conversations will be moved to the Recycle Bin now, then daily for older ones:</comment>
+  </data>
+  <data name="TheAudioOfLldConversationsWillBeMovedToTheRecycleBinNowThenD__One" xml:space="preserve">
+    <value>El audio de {0} conversación se trasladará a la Papelera de reciclaje ahora y, después, a diario el de las más antiguas:</value>
+    <comment>The audio of %lld conversations will be moved to the Recycle Bin now, then daily for older ones:</comment>
   </data>
   <data name="TheAudioOfLldConversationsWillBeMovedToTheTrashAtTheNextRunA" xml:space="preserve">
     <value>El audio de {0} conversaciones se trasladará a la Papelera en la próxima ejecución (al iniciar o en un plazo de un día):</value>
@@ -2538,6 +2966,10 @@
     <value>El audio de {0} conversación se trasladará a la Papelera ahora y, después, a diario el de las más antiguas:</value>
     <comment>The audio of %lld conversations will be moved to the Trash now, then daily for older ones:</comment>
   </data>
+  <data name="TheAudioOfTranscribedConversationsOlderThanLldDaysWillBeMove" xml:space="preserve">
+    <value>El audio de las conversaciones transcritas con más de {0} días se trasladará a la Papelera de reciclaje una vez al día. Ahora no hay coincidencias.</value>
+    <comment>The audio of transcribed conversations older than %lld days will be moved to the Recycle Bin once a day. Nothing matches now.</comment>
+  </data>
   <data name="TheAudioOfTranscribedConversationsOlderThanLldDaysWillBeMove_2" xml:space="preserve">
     <value>El audio de las conversaciones transcritas con más de {0} días se trasladará a la Papelera una vez al día. Ahora no hay coincidencias.</value>
     <comment>The audio of transcribed conversations older than %lld days will be moved to the Trash once a day. Nothing matches now.</comment>
@@ -2546,13 +2978,25 @@
     <value>El audio de las conversaciones transcritas con más de {0} día se trasladará a la Papelera una vez al día. Ahora no hay coincidencias.</value>
     <comment>The audio of transcribed conversations older than %lld days will be moved to the Trash once a day. Nothing matches now.</comment>
   </data>
+  <data name="TheAudioOfTranscribedConversationsOlderThanLldDaysWillBeMove__One" xml:space="preserve">
+    <value>El audio de las conversaciones transcritas con más de {0} día se trasladará a la Papelera de reciclaje una vez al día. Ahora no hay coincidencias.</value>
+    <comment>The audio of transcribed conversations older than %lld days will be moved to the Recycle Bin once a day. Nothing matches now.</comment>
+  </data>
   <data name="TheAudioSystemIsNotRunningTryAgainInAMoment" xml:space="preserve">
     <value>El sistema de audio no está en marcha. Inténtalo de nuevo en un momento.</value>
     <comment>The audio system is not running. Try again in a moment.</comment>
   </data>
+  <data name="TheCalendarCouldNotBeChangedTryAgainLater" xml:space="preserve">
+    <value>No se ha podido cambiar el calendario. Inténtalo de nuevo más tarde.</value>
+    <comment>The calendar could not be changed. Try again later.</comment>
+  </data>
   <data name="TheCallSeemsToBeOverStopRecording" xml:space="preserve">
     <value>La llamada parece haber terminado — ¿detener la grabación?</value>
     <comment>The call seems to be over — stop recording?</comment>
+  </data>
+  <data name="TheDownloadFailed" xml:space="preserve">
+    <value>La descarga ha fallado: {0}</value>
+    <comment>The download failed: %@</comment>
   </data>
   <data name="TheEmbeddingModelLetsAQuestionFindPassagesWithTheSameMeaning" xml:space="preserve">
     <value>El modelo de embeddings permite que una pregunta encuentre fragmentos con el mismo significado, en cualquier idioma. Los modelos solo se descargan al hacer clic en Descargar.</value>
@@ -2565,6 +3009,10 @@
   <data name="TheEventNoLongerExists" xml:space="preserve">
     <value>El evento ya no existe.</value>
     <comment>The event no longer exists.</comment>
+  </data>
+  <data name="TheGgmlConversionSModelCardSaysApache20TheOriginalWeightsByV" xml:space="preserve">
+    <value>La ficha del modelo de la conversión ggml indica Apache-2.0; los pesos originales de VinAI son BSD-3-Clause.</value>
+    <comment>The ggml conversion's model card says Apache-2.0; the original weights by VinAI are BSD-3-Clause.</comment>
   </data>
   <data name="TheIndicatorAsksBeforeStoppingWithA15SCountdownLikeTheOtherA" xml:space="preserve">
     <value>El indicador pregunta antes de detener, con una cuenta atrás de 15 s, como las demás detenciones automáticas.</value>
@@ -2590,6 +3038,10 @@
     <value>el proveedor</value>
     <comment>the provider</comment>
   </data>
+  <data name="TheRecordingAndItsFilesAreMovedToTheRecycleBin" xml:space="preserve">
+    <value>La grabación y sus archivos se trasladan a la Papelera de reciclaje.</value>
+    <comment>The recording and its files are moved to the Recycle Bin.</comment>
+  </data>
   <data name="TheRecordingAndItsFilesAreMovedToTheTrash" xml:space="preserve">
     <value>La grabación y sus archivos se trasladan a la Papelera.</value>
     <comment>The recording and its files are moved to the Trash.</comment>
@@ -2605,6 +3057,10 @@
   <data name="TheRecordingFailed" xml:space="preserve">
     <value>La grabación ha fallado.</value>
     <comment>The recording failed.</comment>
+  </data>
+  <data name="TheRecordingsAndTheirFilesAreMovedToTheRecycleBin" xml:space="preserve">
+    <value>Las grabaciones y sus archivos se trasladan a la Papelera de reciclaje.</value>
+    <comment>The recordings and their files are moved to the Recycle Bin.</comment>
   </data>
   <data name="TheRecordingsAndTheirFilesAreMovedToTheTrash" xml:space="preserve">
     <value>Las grabaciones y sus archivos se trasladan a la Papelera.</value>
@@ -2642,17 +3098,33 @@
     <value>Los modelos de transcripción, de hablantes y de IA se eliminan de este Mac (no se trasladan a la Papelera). Vuelve a descargarlos en Ajustes › Transcripción y Ajustes › IA.</value>
     <comment>The transcription, speaker and AI models are removed from this Mac (not moved to the Trash). Download them again in Settings › Transcription and Settings › AI.</comment>
   </data>
+  <data name="TheTranscriptionSpeakerAndAIModelsAreRemovedFromThisPCNotMov" xml:space="preserve">
+    <value>Los modelos de transcripción, de hablantes y de IA se eliminan de este PC (no se trasladan a la Papelera de reciclaje). Vuelve a descargarlos en Ajustes › Transcripción y Ajustes › IA.</value>
+    <comment>The transcription, speaker and AI models are removed from this PC (not moved to the Recycle Bin). Download them again in Settings › Transcription and Settings › AI.</comment>
+  </data>
   <data name="ThereIsNotEnoughFreeDiskSpaceToRecord" xml:space="preserve">
     <value>No hay suficiente espacio libre en el disco para grabar.</value>
     <comment>There is not enough free disk space to record.</comment>
+  </data>
+  <data name="TheyAreMovedToTheRecycleBinTheAudioStaysSoTheConversationsCa" xml:space="preserve">
+    <value>Se trasladan a la Papelera de reciclaje. El audio se conserva, así que las conversaciones se pueden volver a transcribir.</value>
+    <comment>They are moved to the Recycle Bin. The audio stays, so the conversations can be transcribed again.</comment>
   </data>
   <data name="TheyAreMovedToTheTrashTheAudioStaysSoTheConversationsCanBeTr" xml:space="preserve">
     <value>Se trasladan a la Papelera. El audio se conserva, así que las conversaciones se pueden volver a transcribir.</value>
     <comment>They are moved to the Trash. The audio stays, so the conversations can be transcribed again.</comment>
   </data>
+  <data name="TheyStillGoToTheRecycleBin" xml:space="preserve">
+    <value>Igualmente van a la Papelera de reciclaje.</value>
+    <comment>They still go to the Recycle Bin.</comment>
+  </data>
   <data name="TheyStillGoToTheTrash" xml:space="preserve">
     <value>Igualmente van a la Papelera.</value>
     <comment>They still go to the Trash.</comment>
+  </data>
+  <data name="ThirdPartyNotices" xml:space="preserve">
+    <value>Avisos de terceros</value>
+    <comment>Third-party notices</comment>
   </data>
   <data name="ThisAndFutureEvents" xml:space="preserve">
     <value>Todos los eventos futuros</value>
@@ -2662,13 +3134,33 @@
     <value>El audio de esta app no se puede aislar, así que se está grabando todo el audio del sistema.</value>
     <comment>This app's audio cannot be isolated, so all system audio is being recorded.</comment>
   </data>
+  <data name="ThisBuildOfEchoDiarCannotUseWindowsAITheSystemAIModelsCapabi" xml:space="preserve">
+    <value>Esta compilación de EchoDiar no puede usar Windows AI (falta la capacidad systemAIModels).</value>
+    <comment>This build of EchoDiar cannot use Windows AI (the systemAIModels capability is missing).</comment>
+  </data>
   <data name="ThisConversationHasNoTranscriptYet" xml:space="preserve">
     <value>Esta conversación aún no tiene transcripción.</value>
     <comment>This conversation has no transcript yet.</comment>
   </data>
+  <data name="ThisConversationIsNotInTheLibrary" xml:space="preserve">
+    <value>Esta conversación no está en la biblioteca.</value>
+    <comment>This conversation is not in the library.</comment>
+  </data>
   <data name="ThisConversationWasDeleted" xml:space="preserve">
     <value>Esta conversación se ha eliminado</value>
     <comment>This conversation was deleted</comment>
+  </data>
+  <data name="ThisCopyWasNotInstalledFromAnAppinstallerFile" xml:space="preserve">
+    <value>Esta copia no se instaló desde un archivo .appinstaller.</value>
+    <comment>This copy was not installed from an .appinstaller file.</comment>
+  </data>
+  <data name="ThisCopyWasNotInstalledFromAnAppinstallerFileSoItDoesNotUpda" xml:space="preserve">
+    <value>Esta copia no se instaló desde un archivo .appinstaller, así que no se actualiza sola.</value>
+    <comment>This copy was not installed from an .appinstaller file, so it does not update itself.</comment>
+  </data>
+  <data name="ThisEngineTranscribesAfterStopWhisperAndParakeetModelsAlsoTr" xml:space="preserve">
+    <value>Este motor transcribe después de Detener. Los modelos Whisper y Parakeet también transcriben durante la grabación.</value>
+    <comment>This engine transcribes after Stop. Whisper and Parakeet models also transcribe while recording.</comment>
   </data>
   <data name="ThisEngineTranscribesAfterStopWhisperKitAndParakeetModelsAls" xml:space="preserve">
     <value>Este motor transcribe después de Detener. Los modelos WhisperKit y Parakeet también transcriben durante la grabación.</value>
@@ -2682,6 +3174,10 @@
     <value>Solo este evento</value>
     <comment>This Event Only</comment>
   </data>
+  <data name="ThisLink" xml:space="preserve">
+    <value>este enlace</value>
+    <comment>this link</comment>
+  </data>
   <data name="ThisMac" xml:space="preserve">
     <value>Este Mac</value>
     <comment>This Mac</comment>
@@ -2689,6 +3185,18 @@
   <data name="ThisModelDoesNotLabelSpeakersAModelOnThisMacIsUsedInstead" xml:space="preserve">
     <value>Este modelo no etiqueta a los hablantes; en su lugar se usa un modelo de este Mac.</value>
     <comment>This model does not label speakers; a model on this Mac is used instead.</comment>
+  </data>
+  <data name="ThisModelDoesNotLabelSpeakersAModelOnThisPCIsUsedInstead" xml:space="preserve">
+    <value>Este modelo no etiqueta a los hablantes; en su lugar se usa un modelo de este PC.</value>
+    <comment>This model does not label speakers; a model on this PC is used instead.</comment>
+  </data>
+  <data name="ThisPC" xml:space="preserve">
+    <value>Este PC</value>
+    <comment>This PC</comment>
+  </data>
+  <data name="ThisPCSHardwareDoesNotSupportWindowsAIItNeedsACopilotPC" xml:space="preserve">
+    <value>El hardware de este PC no es compatible con Windows AI (requiere un Copilot+ PC).</value>
+    <comment>This PC's hardware does not support Windows AI (it needs a Copilot+ PC).</comment>
   </data>
   <data name="Title" xml:space="preserve">
     <value>Título</value>
@@ -2722,6 +3230,14 @@
     <value>Transcribir automáticamente</value>
     <comment>Transcribe automatically</comment>
   </data>
+  <data name="TranscribeNow" xml:space="preserve">
+    <value>Transcribir ahora</value>
+    <comment>Transcribe now</comment>
+  </data>
+  <data name="TranscribeNowEvenWithEnergySaverOn" xml:space="preserve">
+    <value>Transcribir ahora, aunque el ahorro de energía esté activado</value>
+    <comment>Transcribe now, even with energy saver on</comment>
+  </data>
   <data name="TranscribeThisConversation" xml:space="preserve">
     <value>Transcribir esta conversación</value>
     <comment>Transcribe this conversation</comment>
@@ -2734,9 +3250,17 @@
     <value>"Transcribir durante la grabación" está desactivado. Actívalo en Ajustes › Transcripción.</value>
     <comment>Transcribe while recording is off. Turn it on in Settings › Transcription.</comment>
   </data>
+  <data name="Transcribed" xml:space="preserve">
+    <value>Transcrita</value>
+    <comment>Transcribed</comment>
+  </data>
   <data name="Transcribing" xml:space="preserve">
     <value>Transcribiendo…</value>
     <comment>Transcribing…</comment>
+  </data>
+  <data name="TranscribingLld" xml:space="preserve">
+    <value>Transcribiendo {0}%</value>
+    <comment>Transcribing %lld%%</comment>
   </data>
   <data name="Transcript" xml:space="preserve">
     <value>Transcripción</value>
@@ -2770,6 +3294,10 @@
     <value>Modelos de transcripción</value>
     <comment>Transcription models</comment>
   </data>
+  <data name="TranscriptionStartsOnceEnergySaverIsOff" xml:space="preserve">
+    <value>La transcripción empieza en cuanto se desactive el ahorro de energía.</value>
+    <comment>Transcription starts once energy saver is off.</comment>
+  </data>
   <data name="TranscriptionStartsOnceTheMacIsReady" xml:space="preserve">
     <value>La transcripción empieza en cuanto el Mac esté listo.</value>
     <comment>Transcription starts once the Mac is ready.</comment>
@@ -2794,6 +3322,10 @@
     <value>Las transcripciones, los resúmenes y los chats se conservan; ya no se podrá reproducir ni volver a transcribir.</value>
     <comment>Transcripts, summaries and chats stay; playback and re-transcribing are no longer possible.</comment>
   </data>
+  <data name="TryAgainLater" xml:space="preserve">
+    <value>Inténtalo de nuevo más tarde.</value>
+    <comment>Try again later.</comment>
+  </data>
   <data name="TurnOn" xml:space="preserve">
     <value>Activar</value>
     <comment>Turn On</comment>
@@ -2810,6 +3342,10 @@
     <value>Activa EchoDiar en Privacidad y seguridad › Micrófono.</value>
     <comment>Turn on EchoDiar in Privacy &amp; Security › Microphone.</comment>
   </data>
+  <data name="TurnOnEchoDiarInWindowsSettingsPrivacySecurityMicrophone" xml:space="preserve">
+    <value>Activa EchoDiar en Configuración de Windows › Privacidad y seguridad › Micrófono.</value>
+    <comment>Turn on EchoDiar in Windows Settings › Privacy &amp; security › Microphone.</comment>
+  </data>
   <data name="TurnOnInSettingsAI" xml:space="preserve">
     <value>Activa {0} en Ajustes › IA</value>
     <comment>Turn on %@ in Settings › AI</comment>
@@ -2817,6 +3353,18 @@
   <data name="TurnOnInSettingsRAG" xml:space="preserve">
     <value>Activar en Ajustes › RAG</value>
     <comment>Turn on in Settings › RAG</comment>
+  </data>
+  <data name="TurnedOffByYourOrganization" xml:space="preserve">
+    <value>Desactivado por tu organización.</value>
+    <comment>Turned off by your organization.</comment>
+  </data>
+  <data name="TurnedOffInWindowsSettingsAppsStartupTurnEchoDiarOnThere" xml:space="preserve">
+    <value>Desactivado en Configuración de Windows &gt; Aplicaciones &gt; Inicio. Activa EchoDiar ahí.</value>
+    <comment>Turned off in Windows Settings &gt; Apps &gt; Startup. Turn EchoDiar on there.</comment>
+  </data>
+  <data name="TurnedOnByYourOrganization" xml:space="preserve">
+    <value>Activado por tu organización.</value>
+    <comment>Turned on by your organization.</comment>
   </data>
   <data name="TypeAModelIdAndPressReturnOrLoadTheModelsToPickFrom" xml:space="preserve">
     <value>Escribe un ID de modelo y pulsa Retorno, o carga los modelos para elegir uno.</value>
@@ -2829,6 +3377,10 @@
   <data name="Understood" xml:space="preserve">
     <value>Entendido</value>
     <comment>Understood</comment>
+  </data>
+  <data name="Undo" xml:space="preserve">
+    <value>Deshacer</value>
+    <comment>Undo</comment>
   </data>
   <data name="UnmuteMicrophone" xml:space="preserve">
     <value>Activar micrófono</value>
@@ -2854,9 +3406,25 @@
     <value>Actualizar</value>
     <comment>Update</comment>
   </data>
+  <data name="UpdateAfterTheCurrentWork" xml:space="preserve">
+    <value>Actualizar al terminar el trabajo en curso</value>
+    <comment>Update after the current work</comment>
+  </data>
   <data name="UpdateAvailable" xml:space="preserve">
     <value>Actualización disponible…</value>
     <comment>Update Available…</comment>
+  </data>
+  <data name="UpdateAvailable_2" xml:space="preserve">
+    <value>Actualización disponible…</value>
+    <comment>Update available…</comment>
+  </data>
+  <data name="Updates" xml:space="preserve">
+    <value>Actualizaciones</value>
+    <comment>Updates</comment>
+  </data>
+  <data name="UpdatesNeedAnAppinstallerInstall" xml:space="preserve">
+    <value>Las actualizaciones requieren una instalación desde .appinstaller</value>
+    <comment>Updates need an .appinstaller install</comment>
   </data>
   <data name="Usage" xml:space="preserve">
     <value>Uso</value>
@@ -2870,13 +3438,25 @@
     <value>Usa un enlace https.</value>
     <comment>Use an https link.</comment>
   </data>
+  <data name="UseCtrlOrAltWithTheKey" xml:space="preserve">
+    <value>Usa Ctrl o Alt con la tecla.</value>
+    <comment>Use Ctrl or Alt with the key.</comment>
+  </data>
   <data name="UseOrWithTheKey" xml:space="preserve">
     <value>Usa ⌘, ⌥ o ⌃ con la tecla.</value>
     <comment>Use ⌘, ⌥ or ⌃ with the key.</comment>
   </data>
+  <data name="UsedByLLamaSharp" xml:space="preserve">
+    <value>Usado por LLamaSharp</value>
+    <comment>Used by LLamaSharp</comment>
+  </data>
   <data name="UsedByMLXSwift" xml:space="preserve">
     <value>Usado por MLX Swift</value>
     <comment>Used by MLX Swift</comment>
+  </data>
+  <data name="UsedBySherpaOnnx" xml:space="preserve">
+    <value>Usado por sherpa-onnx</value>
+    <comment>Used by sherpa-onnx</comment>
   </data>
   <data name="UsedBySwiftHuggingface" xml:space="preserve">
     <value>Usado por swift-huggingface</value>
@@ -2885,6 +3465,14 @@
   <data name="UsedBySwiftTransformers" xml:space="preserve">
     <value>Usado por swift-transformers</value>
     <comment>Used by swift-transformers</comment>
+  </data>
+  <data name="UsedByWhisperNet" xml:space="preserve">
+    <value>Usado por Whisper.net</value>
+    <comment>Used by Whisper.net</comment>
+  </data>
+  <data name="UsedForSummariesAndQuestionsTheModelOfEachEnabledProviderBel" xml:space="preserve">
+    <value>Se usa para resúmenes y preguntas. El modelo de cada proveedor activado de abajo, según lo marcado en su fila.</value>
+    <comment>Used for summaries and questions. The model of each enabled provider below, as checked in its row.</comment>
   </data>
   <data name="UsesTheLanguagePickedInTheRecordMenuForTheNextRecordingsInst" xml:space="preserve">
     <value>Usa el idioma elegido en el menú "Grabar" para las próximas grabaciones en lugar del idioma predeterminado. Los idiomas cambiados durante una grabación no cuentan.</value>
@@ -2910,6 +3498,10 @@
     <value>Vietnamita</value>
     <comment>Vietnamese</comment>
   </data>
+  <data name="VietnameseTranscription" xml:space="preserve">
+    <value>Transcripción en vietnamita</value>
+    <comment>Vietnamese transcription</comment>
+  </data>
   <data name="View" xml:space="preserve">
     <value>Visualización</value>
     <comment>View</comment>
@@ -2918,13 +3510,29 @@
     <value>Esperar a la llamada</value>
     <comment>Wait for the call</comment>
   </data>
+  <data name="WaitForTheTranscriptionsAndAIAnswersToFinish" xml:space="preserve">
+    <value>Esperar a que terminen las transcripciones y las respuestas de IA</value>
+    <comment>Wait for the transcriptions and AI answers to finish</comment>
+  </data>
   <data name="WaitWhenTheMacIsHotOrInLowPowerMode" xml:space="preserve">
     <value>Esperar si el Mac está caliente o en modo de bajo consumo</value>
     <comment>Wait when the Mac is hot or in Low Power Mode</comment>
   </data>
+  <data name="WaitWhileEnergySaverIsOn" xml:space="preserve">
+    <value>Esperar mientras el ahorro de energía esté activado</value>
+    <comment>Wait while energy saver is on</comment>
+  </data>
   <data name="Waiting" xml:space="preserve">
     <value>Esperando…</value>
     <comment>Waiting…</comment>
+  </data>
+  <data name="WaitingEnergySaverIsOn" xml:space="preserve">
+    <value>En espera: el ahorro de energía está activado</value>
+    <comment>Waiting: energy saver is on</comment>
+  </data>
+  <data name="WaitingForLiveCaptionsOrTranscriptionToFinish" xml:space="preserve">
+    <value>Esperando a que terminen los subtítulos en directo o la transcripción…</value>
+    <comment>Waiting for live captions or transcription to finish…</comment>
   </data>
   <data name="WaitingWhileTheMacIsHotOrInLowPowerMode" xml:space="preserve">
     <value>Esperando mientras el Mac está caliente o en modo de bajo consumo</value>
@@ -2982,9 +3590,37 @@
     <value>Toda la conversación</value>
     <comment>Whole conversation</comment>
   </data>
+  <data name="WinUI3AndTheAppPlatform" xml:space="preserve">
+    <value>WinUI 3 y la plataforma de apps</value>
+    <comment>WinUI 3 and the app platform</comment>
+  </data>
   <data name="Window" xml:space="preserve">
     <value>Ventana</value>
     <comment>Window</comment>
+  </data>
+  <data name="WindowsAIIsNotAvailableOnThisPC" xml:space="preserve">
+    <value>Windows AI no está disponible en este PC.</value>
+    <comment>Windows AI is not available on this PC.</comment>
+  </data>
+  <data name="WindowsAIIsNotSupportedOnThisPCItNeedsACopilotPC" xml:space="preserve">
+    <value>Windows AI no es compatible con este PC (requiere un Copilot+ PC).</value>
+    <comment>Windows AI is not supported on this PC (it needs a Copilot+ PC).</comment>
+  </data>
+  <data name="WindowsAIIsNotUnlockedForEchoDiar" xml:space="preserve">
+    <value>Windows AI no está desbloqueado para EchoDiar.</value>
+    <comment>Windows AI is not unlocked for EchoDiar.</comment>
+  </data>
+  <data name="WindowsAIIsTurnedOffSettingsPrivacySecurityTextAndImageGener" xml:space="preserve">
+    <value>Windows AI está desactivado (Configuración › Privacidad y seguridad › Generación de texto e imágenes).</value>
+    <comment>Windows AI is turned off (Settings › Privacy &amp; security › Text and image generation).</comment>
+  </data>
+  <data name="WindowsAINeedsAWindowsUpdateSettingsWindowsUpdate" xml:space="preserve">
+    <value>Windows AI requiere una actualización de Windows (Configuración › Windows Update).</value>
+    <comment>Windows AI needs a Windows update (Settings › Windows Update).</comment>
+  </data>
+  <data name="WindowsAISystem" xml:space="preserve">
+    <value>Windows AI (sistema)</value>
+    <comment>Windows AI (system)</comment>
   </data>
   <data name="WouldDeleteNowLldConversations" xml:space="preserve">
     <value>Se eliminarían ahora: {0} conversaciones</value>
@@ -3005,6 +3641,10 @@
   <data name="Yesterday" xml:space="preserve">
     <value>Ayer</value>
     <comment>Yesterday</comment>
+  </data>
+  <data name="YouReUpToDate" xml:space="preserve">
+    <value>¡Ya estás al día!</value>
+    <comment>You're up to date!</comment>
   </data>
   <data name="YourConversationsAreNotIndexedYet" xml:space="preserve">
     <value>Tus conversaciones aún no están indexadas.</value>
