@@ -823,6 +823,17 @@ public sealed partial class TitleBarToolbar : UserControl
         return ShowAsync(dialog, _ => _model?.DismissRecordingError(error));
     }
 
+    /// <summary>
+    /// Shows a page's own dialog (the event editor) as the open one, so the dialogs above wait for it; false when
+    /// another dialog is open.
+    /// </summary>
+    internal async Task<bool> ShowDialogAsync(ContentDialog dialog)
+    {
+        if (_dialog is not null || XamlRoot is null) return false;
+        await ShowAsync(dialog, _ => { });
+        return true;
+    }
+
     private ContentDialog NewDialog(string title, string? content) => new()
     {
         XamlRoot = XamlRoot,

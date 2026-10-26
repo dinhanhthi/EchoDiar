@@ -44,6 +44,9 @@ public sealed partial class CalendarPage : UserControl
 
     private sealed record Row(CalendarEvent Event, UIElement Texts, Button Record, ToggleSwitch Skip);
 
+    /// <summary>Shows the event editor in the toolbar's dialog queue; false when another dialog is open.</summary>
+    internal Func<ContentDialog, Task<bool>>? ShowDialog { get; set; }
+
     public CalendarPage(AppViewModel model)
     {
         _model = model;
@@ -254,16 +257,10 @@ public sealed partial class CalendarPage : UserControl
     /// <summary>The event editor: a new event (null) or one of EchoDiar's own. It opens at once and reads the event itself.</summary>
     private async Task OpenEditorAsync(CalendarEvent? @event)
     {
-        if (XamlRoot is null) return;
-        try
-        {
-            await new EventEditorDialog(_model, @event) { XamlRoot = XamlRoot }.ShowAsync();
-        }
-        catch (Exception e)
-        {
-            // Another dialog is open: WinUI shows one at a time.
-            Debug.WriteLine($"EchoDiar: could not show the event editor: {e.GetType().Name}");
-        }
+        if (XamlRoot is null || ShowDialog is null) return;
+        // False when another dialog is open: WinUI shows one at a time.
+        if (!await ShowDialog(new EventEditorDialog(_model, @event) { XamlRoot = XamlRoot }))
+            Debug.WriteLine("EchoDiar: could not show the event editor: another dialog is open");
     }
 
     private static string DayTitle(DateTime day)
