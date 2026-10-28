@@ -23,6 +23,10 @@
   </ItemGroup>
 
   <ItemGroup>
+    <Compile Include="..\..\src\EchoDiar.Setup\SetupArguments.cs" Link="Setup\SetupArguments.cs" />
+  </ItemGroup>
+
+  <ItemGroup>
     <None Include="Fixtures\**" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 </Project>
