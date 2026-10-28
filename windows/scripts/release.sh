@@ -341,13 +341,14 @@ print(f"    OK: bundle and feed {version}, publisher '{publisher}'; the certific
       f"{len(signers)} signers match the pin {pin[:16]}...")
 PY
 
-# Checks the artifact in $1 (CHECK_PY). $2 the certificate's name, $3 the Publisher, $4 the pin, $5 the bundle Uri.
+# Checks the artifact in $1 (CHECK_PY). $2 the certificate's name, $3 the Publisher, $4 the pin, $5 the bundle Uri,
+# $6 the feed's own Uri.
 check_artifact() {
   local subject
   # RFC 2253 (OpenSSL "subject=CN=...", LibreSSL "subject= CN=..."); empty when it is no certificate.
   subject="$(openssl x509 -inform DER -in "$1/$2" -noout -subject -nameopt RFC2253 2>/dev/null || true)"
   subject="${subject#subject=}"
-  "$PYTHON" -I -c "$CHECK_PY" "$1" "$VERSION4" "$3" "$APPINSTALLER_URI" "$5" "$2" "$4" "$subject" \
+  "$PYTHON" -I -c "$CHECK_PY" "$1" "$VERSION4" "$3" "$6" "$5" "$2" "$4" "$subject" \
     || die "the artifact check failed (see above)"
 }
 
@@ -444,12 +445,14 @@ preflight() {
 
 # --- 3. --dev: tag, watch, download, check, publish -------------------------
 dev_release() {
-  local dirty branch sha start discard run pin bundle bundle_uri out notes files=()
+  local dirty branch sha start discard run pin bundle bundle_uri feed_uri out notes files=()
   [[ -n "$VERSION" ]] || die "--dev needs --version 0.0.N"
   set_version "$VERSION"
   TAG="windows-v$VERSION-dev"
   bundle="EchoDiar_$VERSION4.msixbundle"
   bundle_uri="https://github.com/$GH_REPO/releases/download/$TAG/$bundle"
+  # A dev feed's Uri is its own prerelease asset (App Installer always reads the feed from its Uri).
+  feed_uri="https://github.com/$GH_REPO/releases/download/$TAG/EchoDiar.appinstaller"
   out="$REPO_ROOT/release/windows/$TAG"
   files=("$out/$bundle" "$out/EchoDiar.appinstaller" "$out/EchoDiarDev.cer" "$out/EchoDiar-Setup.exe" "$out/$SUMS")
 
@@ -521,7 +524,7 @@ dev_release() {
   echo "==> Downloading EchoDiar-$TAG into $out"
   mkdir -p "$out"
   gh run download "$run" --repo "$GH_REPO" -n "EchoDiar-$TAG" -D "$out"
-  check_artifact "$out" EchoDiarDev.cer "$DEV_PUBLISHER" "$pin" "$bundle_uri"
+  check_artifact "$out" EchoDiarDev.cer "$DEV_PUBLISHER" "$pin" "$bundle_uri" "$feed_uri"
   ls -l "$out"
 
   # Publish (only with --publish, after a confirmation).
@@ -537,7 +540,7 @@ dev_release() {
 
   notes="EchoDiar for Windows $VERSION (dev channel, package $VERSION4), x64 and arm64, signed with the dev certificate ($DEV_PUBLISHER).
 
-Install: run EchoDiar-Setup.exe --feed https://github.com/$GH_REPO/releases/download/$TAG/EchoDiar.appinstaller (it trusts EchoDiarDev.cer after a UAC prompt). Checksums: $SUMS."
+Install: run EchoDiar-Setup.exe, no --feed needed (it trusts EchoDiarDev.cer after a UAC prompt, then installs from this prerelease's own EchoDiar.appinstaller). Checksums: $SUMS."
 
   echo
   echo "About to create the GitHub prerelease $TAG (dev, not Latest) with:"
@@ -802,7 +805,7 @@ attach() {
   fi
 
   # Checks (before any upload).
-  check_artifact "$out" EchoDiar.cer "$publisher" "$pin" "$bundle_uri"
+  check_artifact "$out" EchoDiar.cer "$publisher" "$pin" "$bundle_uri" "$APPINSTALLER_URI"
 
   # Upload what the release lacks; what it has must be these bytes (never --clobber).
   for name in "${files[@]}"; do

@@ -230,7 +230,7 @@ The workflow runs four jobs: `prepare` (tag, channel, version, Publisher; it fai
 There are three channels:
 
 - **release**: the tag `vX.Y.Z` of the macOS release. Signed in the environment `windows-release-signing` (required reviewer) with the self-signed release certificate (§3.0), Publisher = the repository variable `WINDOWS_PUBLIC_PUBLISHER`, public certificate `EchoDiar.cer`. `prepare` fails when that variable is empty or `CN=EchoDiar Dev`, or when the tag is not the `MARKETING_VERSION` of `project.yml` at the tag's commit. This is the build users get, from the release notes, the website and the feed.
-- **dev**: tag `windows-vX.Y.Z-dev`, from `release.sh --dev` on any branch. Signed in `windows-dev-signing` with the self-signed dev certificate (Publisher `CN=EchoDiar Dev`, public certificate `EchoDiarDev.cer`), through the same jobs as the release channel. For testing only: published, if at all, as a prerelease, and its feed is never deployed. A copy installed from a dev prerelease's `EchoDiar.appinstaller` takes that file's own Uri, the public feed address above, as its update source: it never updates from there, because the public feed has another Publisher. Only a local feed (`serve-update.sh`, §3.1, or a `file://` `.appinstaller`) updates dev installs.
+- **dev**: tag `windows-vX.Y.Z-dev`, from `release.sh --dev` on any branch. Signed in `windows-dev-signing` with the self-signed dev certificate (Publisher `CN=EchoDiar Dev`, public certificate `EchoDiarDev.cer`), through the same jobs as the release channel. For testing only: published, if at all, as a prerelease, and its feed is never deployed. App Installer always reads a feed from the feed's own Uri, so a dev feed's Uri is its prerelease's own `EchoDiar.appinstaller` asset, and the dev Setup is built with it: a dev prerelease installs with its Setup alone (no `--feed`), and its installs check that same prerelease feed for updates, which never offers a newer version. Test updates with a local feed (`serve-update.sh`, §3.1).
 - **public**: tag `windows-vX.Y.Z`, signed with Trusted Signing. Kept for next year: its signing step is a placeholder that throws (§3.0, Trusted Signing). Nothing starts it: `release.sh` has no mode for it.
 
 Each release `vX.Y.Z` carries, next to the macOS DMG and zip, five Windows files with fixed names:
@@ -389,15 +389,11 @@ windows/scripts/release.sh --dev --version 0.0.N --publish  # ... then create th
 
 N must be above the run number of the `windows.yml` CI builds (they are `0.0.<run>.0`): App Installer only moves to a higher version. It runs on any branch whose `HEAD` is pushed (uncommitted changes only warn: CI builds the pushed tag's commit), pushes the tag `windows-v0.0.N-dev`, waits for the run, downloads the artifact into `release/windows/<tag>/` and checks it against the dev pin `windows/packaging/dev-cert.sha256`. With `--publish` it creates a prerelease with the five files (`--latest=false --prerelease`). A tag is never reused: without `--publish` it prints the `gh release create` command and how to discard the tag.
 
-A dev Setup embeds `EchoDiarDev.cer` but, like every Setup, installs from the public feed by default: point it at the prerelease's own feed (or a local one, below), which `--feed` accepts as https, or as http on a private or loopback IPv4 address:
-
-```powershell
-.\EchoDiar-Setup.exe --feed https://github.com/dinhanhthi/EchoDiar/releases/download/windows-v0.0.N-dev/EchoDiar.appinstaller
-```
+A dev Setup embeds `EchoDiarDev.cer` and installs from its prerelease's own feed (`https://github.com/dinhanhthi/EchoDiar/releases/download/windows-v0.0.N-dev/EchoDiar.appinstaller`) by default, so it needs no `--feed`. `--feed` points it at another feed (a local one, below), as https, or as http on a private or loopback IPv4 address.
 
 #### The feed
 
-`--attach` commits the rendered feed on `main`. The Pages workflow deploys it (its `paths` include `windows/EchoDiar.appinstaller`), which also shows the Windows download on the website. Never commit a dev `.appinstaller` there: it has the same Uri but the dev Publisher and a prerelease bundle, and the Pages workflow refuses it. The commit also runs `windows.yml` (it is under `windows/`); that is harmless. To redeploy without a commit: `gh workflow run pages.yml --repo dinhanhthi/EchoDiar --ref main`.
+`--attach` commits the rendered feed on `main`. The Pages workflow deploys it (its `paths` include `windows/EchoDiar.appinstaller`), which also shows the Windows download on the website. Never commit a dev `.appinstaller` there: it has the dev Publisher, its prerelease's Uri and a prerelease bundle, and the Pages workflow refuses it. The commit also runs `windows.yml` (it is under `windows/`); that is harmless. To redeploy without a commit: `gh workflow run pages.yml --repo dinhanhthi/EchoDiar --ref main`.
 
 Verify:
 

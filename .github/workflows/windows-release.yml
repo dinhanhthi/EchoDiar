@@ -19,7 +19,9 @@ name: Windows release
 # public releases the macOS marketing version.
 # Channels and signing:
 #   - dev: the dev certificate (WINDOWS_DEV_CERT_PFX / WINDOWS_DEV_CERT_PASSWORD, secrets of the windows-dev-signing
-#     environment), Publisher CN=EchoDiar Dev, public certificate EchoDiarDev.cer.
+#     environment), Publisher CN=EchoDiar Dev, public certificate EchoDiarDev.cer. Its feed Uri (and Setup's default
+#     feed) is the EchoDiar.appinstaller of its own prerelease; the release and public channels use
+#     https://ed.dinhanhthi.com/windows/EchoDiar.appinstaller.
 #   - release: the self-signed release certificate (WINDOWS_RELEASE_CERT_PFX / WINDOWS_RELEASE_CERT_PASSWORD, secrets
 #     of the windows-release-signing environment, which needs a reviewer's approval), Publisher = the variable
 #     WINDOWS_PUBLIC_PUBLISHER, public certificate EchoDiar.cer. prepare fails when that variable is empty or
@@ -126,10 +128,14 @@ jobs:
             echo "::error::dispatch the release channel on its tag ($tag, e.g. gh workflow run --ref $tag), not on $REF"
             exit 1
           fi
+          # App Installer always fetches a feed from its own Uri: the dev feed names its prerelease asset, so a dev
+          # prerelease installs (and its dev Setup defaults to it); the others name the public feed on main.
+          appinstaller_uri=https://ed.dinhanhthi.com/windows/EchoDiar.appinstaller
           case "$channel" in
             dev)
               publisher='CN=EchoDiar Dev'
               cer_name=EchoDiarDev.cer
+              appinstaller_uri="https://github.com/$GITHUB_REPOSITORY/releases/download/$tag/EchoDiar.appinstaller"
               ;;
             release)
               if [[ -z "$PUBLIC_PUBLISHER" || "$PUBLIC_PUBLISHER" == 'CN=EchoDiar Dev' ]]; then
@@ -154,7 +160,7 @@ jobs:
             echo "cer_name=$cer_name"
             echo "bundle_name=$bundle_name"
             echo "bundle_uri=https://github.com/$GITHUB_REPOSITORY/releases/download/$tag/$bundle_name"
-            echo "appinstaller_uri=https://ed.dinhanhthi.com/windows/EchoDiar.appinstaller"
+            echo "appinstaller_uri=$appinstaller_uri"
           } >> "$GITHUB_OUTPUT"
           echo "Tag $tag: channel $channel, package version $version4, publisher '$publisher'."
 

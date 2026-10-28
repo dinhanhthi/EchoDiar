@@ -125,6 +125,17 @@ internal sealed class SetupForm : Form
         PerformLayout();
     }
 
+    /// <summary>Setup comes to the front: after SmartScreen and Defender's scan, Windows may open it behind other
+    /// windows. Activate alone may lose to the foreground lock; a TopMost round trip raises it anyway.</summary>
+    protected override void OnShown(EventArgs e)
+    {
+        base.OnShown(e);
+        TopMost = true;
+        Activate();
+        BringToFront();
+        TopMost = false;
+    }
+
     protected override void OnFormClosing(FormClosingEventArgs e)
     {
         // Windows goes on with a deployment under way; its result would go unseen.

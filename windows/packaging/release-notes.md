@@ -3,7 +3,8 @@
 Download **EchoDiar-Setup.exe** from the Assets below (Windows 11, x64 and Arm64). The Windows files arrive within about an hour after the macOS ones.
 
 1. Open it. When Windows says "Windows protected your PC", click **More info**, then **Run anyway**.
-2. When Windows asks if you want to allow an app from an "Unknown publisher" to make changes, click **Yes**. This happens only once, to trust the EchoDiar certificate.
+2. If Microsoft Defender then says "Security scan required", wait: it checks Setup online, for up to 10 seconds, then Setup opens.
+3. Click **Install**. When Windows asks if you want to allow an app from an "Unknown publisher" to make changes, click **Yes**. This happens only once, to trust the EchoDiar certificate.
 
 Setup trusts the EchoDiar certificate, installs EchoDiar from ed.dinhanhthi.com and keeps it updated.
 

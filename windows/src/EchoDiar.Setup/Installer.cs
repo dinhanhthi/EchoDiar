@@ -6,6 +6,7 @@ using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 using System.Security.Cryptography.X509Certificates;
 using System.Text.RegularExpressions;
+using System.Threading;
 using System.Threading.Tasks;
 using Windows.Foundation;
 using Windows.Management.Deployment;
@@ -64,6 +65,16 @@ internal sealed class Installer
     private const int EFail = unchecked((int)0x80004005);
 
     private const ushort ImageFileMachineArm64 = 0xAA64;
+
+    // ShellExecuteEx flags: keep the process handle, return only once the launch is done (no message pump on this
+    // thread), no error dialog of Windows' own, and no Attachment Manager check of the Mark of the Web.
+    private const uint SeeMaskNoCloseProcess = 0x00000040;
+    private const uint SeeMaskNoAsync = 0x00000100;
+    private const uint SeeMaskFlagNoUi = 0x00000400;
+    private const uint SeeMaskNoZoneChecks = 0x00800000;
+    private const int SwShowNormal = 1;
+    private const uint Infinite = 0xFFFFFFFF;
+    private const uint WaitFailed = 0xFFFFFFFF;
 
     private readonly Uri _feed;
     private readonly X509Certificate2? _certificate;
@@ -158,26 +169,47 @@ internal sealed class Installer
         return store.Certificates.Find(X509FindType.FindByThumbprint, certificate.Thumbprint, false).Count > 0;
     }
 
-    /// <summary>Relaunches Setup elevated with only <c>--trust-certificate</c> and waits; null, or why it failed.</summary>
+    /// <summary>Relaunches Setup elevated with only <c>--trust-certificate</c> and waits; null, or why it failed.
+    /// ShellExecuteEx rather than Process.Start, for SEE_MASK_NOZONECHECKS: a downloaded Setup carries a Mark of the
+    /// Web, for which Windows would show an "Open File - Security Warning" before UAC.</summary>
     private static string? TrustElevated()
     {
-        var start = new ProcessStartInfo(typeof(Installer).Assembly.Location, SetupArguments.TrustCertificateArgument)
+        var info = new ShellExecuteInfo
         {
-            UseShellExecute = true,
-            Verb = "runas",
+            cbSize = Marshal.SizeOf<ShellExecuteInfo>(),
+            fMask = SeeMaskNoCloseProcess | SeeMaskNoAsync | SeeMaskFlagNoUi | SeeMaskNoZoneChecks,
+            lpVerb = "runas",
+            lpFile = typeof(Installer).Assembly.Location,
+            lpParameters = SetupArguments.TrustCertificateArgument,
+            nShow = SwShowNormal,
         };
+        var error = 0;
+        // On an STA thread, as Process.Start does from this thread-pool (MTA) thread: some shell code needs one.
+        var shell = new Thread(() =>
+        {
+            if (!ShellExecuteEx(ref info)) error = Marshal.GetLastWin32Error();
+        });
+        shell.SetApartmentState(ApartmentState.STA);
+        shell.Start();
+        shell.Join();
+        if (error == UacDeclined)
+            return "EchoDiar was not installed: Windows needs your permission to trust the EchoDiar certificate.";
+        if (error != 0) throw new Win32Exception(error);
+        if (info.hProcess == IntPtr.Zero)
+            return "EchoDiar was not installed: Setup could not ask Windows to trust the EchoDiar certificate.";
+
         try
         {
-            using var process = Process.Start(start);
-            if (process is null) return "EchoDiar was not installed: Setup could not ask Windows to trust the EchoDiar certificate.";
-            process.WaitForExit();
-            return process.ExitCode == 0
+            if (WaitForSingleObject(info.hProcess, Infinite) == WaitFailed
+                || !GetExitCodeProcess(info.hProcess, out var exitCode))
+                throw new Win32Exception(Marshal.GetLastWin32Error());
+            return exitCode == 0
                 ? null
-                : $"EchoDiar was not installed: Windows could not trust the EchoDiar certificate (0x{process.ExitCode:X8}).";
+                : $"EchoDiar was not installed: Windows could not trust the EchoDiar certificate (0x{exitCode:X8}).";
         }
-        catch (Win32Exception e) when (e.NativeErrorCode == UacDeclined)
+        finally
         {
-            return "EchoDiar was not installed: Windows needs your permission to trust the EchoDiar certificate.";
+            CloseHandle(info.hProcess);
         }
     }
 
@@ -381,4 +413,40 @@ internal sealed class Installer
     [DllImport("kernel32.dll", SetLastError = true)]
     [return: MarshalAs(UnmanagedType.Bool)]
     private static extern bool IsWow64Process2(IntPtr process, out ushort processMachine, out ushort nativeMachine);
+
+    /// <summary>SHELLEXECUTEINFOW, its fields in Windows' order.</summary>
+    [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Unicode)]
+    private struct ShellExecuteInfo
+    {
+        public int cbSize;
+        public uint fMask;
+        public IntPtr hwnd;
+        public string? lpVerb;
+        public string? lpFile;
+        public string? lpParameters;
+        public string? lpDirectory;
+        public int nShow;
+        public IntPtr hInstApp;
+        public IntPtr lpIDList;
+        public string? lpClass;
+        public IntPtr hkeyClass;
+        public uint dwHotKey;
+        public IntPtr hIcon;
+        public IntPtr hProcess;
+    }
+
+    [DllImport("shell32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    private static extern bool ShellExecuteEx(ref ShellExecuteInfo info);
+
+    [DllImport("kernel32.dll", SetLastError = true)]
+    private static extern uint WaitForSingleObject(IntPtr handle, uint milliseconds);
+
+    [DllImport("kernel32.dll", SetLastError = true)]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    private static extern bool GetExitCodeProcess(IntPtr process, out uint exitCode);
+
+    [DllImport("kernel32.dll", SetLastError = true)]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    private static extern bool CloseHandle(IntPtr handle);
 }
