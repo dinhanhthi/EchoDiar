@@ -2,10 +2,10 @@ name: Windows release
 
 # Builds a Windows release of the port (windows/): Release MSIX packages for x64 and arm64, signed and bundled with
 # makeappx into one signed .msixbundle, the App Installer feed (EchoDiar.appinstaller) that points at it, the
-# public signing certificate, the installer EchoDiar-Setup.exe (which embeds that certificate) and
-# SHA256SUMS-windows.txt. These five files are uploaded flat as the workflow artifact EchoDiar-<tag>. This workflow
-# never creates or edits a GitHub release (contents: read): windows/scripts/release.sh publishes or attaches them
-# from the Mac (docs/RELEASING.md).
+# public signing certificate and SHA256SUMS-windows.txt. These four files are uploaded flat as the workflow artifact
+# EchoDiar-<tag>. Users install with Windows' own dialogs: the certificate into Local Machine > Trusted People, then
+# EchoDiar.appinstaller in App Installer. This workflow never creates or edits a GitHub release (contents: read):
+# windows/scripts/release.sh publishes or attaches them from the Mac (docs/RELEASING.md).
 #
 # Triggers:
 #   - push of a tag vX.Y.Z (release channel: the tag publish-release.sh pushes for the macOS release),
@@ -19,8 +19,8 @@ name: Windows release
 # public releases the macOS marketing version.
 # Channels and signing:
 #   - dev: the dev certificate (WINDOWS_DEV_CERT_PFX / WINDOWS_DEV_CERT_PASSWORD, secrets of the windows-dev-signing
-#     environment), Publisher CN=EchoDiar Dev, public certificate EchoDiarDev.cer. Its feed Uri (and Setup's default
-#     feed) is the EchoDiar.appinstaller of its own prerelease; the release and public channels use
+#     environment), Publisher CN=EchoDiar Dev, public certificate EchoDiarDev.cer. Its feed Uri is the
+#     EchoDiar.appinstaller of its own prerelease; the release and public channels use
 #     https://ed.dinhanhthi.com/windows/EchoDiar.appinstaller.
 #   - release: the self-signed release certificate (WINDOWS_RELEASE_CERT_PFX / WINDOWS_RELEASE_CERT_PASSWORD, secrets
 #     of the windows-release-signing environment, which needs a reviewer's approval), Publisher = the variable
@@ -33,8 +33,7 @@ name: Windows release
 #     subject) are set, and then stops at the placeholder signing step. The dev certificate never signs it.
 # Jobs: prepare (tag, channel, versions, URIs) -> package (x64, arm64: unsigned MSIX, no environment, no secret) ->
 # sign (the only job with an environment; builds nothing: signs both MSIX, bundles and signs the bundle, exports the
-# public certificate) -> assemble (no environment: builds Setup with that certificate, renders the feed, writes the
-# checksums).
+# public certificate) -> assemble (no environment: renders the feed, writes the checksums).
 
 on:
   push:
@@ -129,7 +128,8 @@ jobs:
             exit 1
           fi
           # App Installer always fetches a feed from its own Uri: the dev feed names its prerelease asset, so a dev
-          # prerelease installs (and its dev Setup defaults to it); the others name the public feed on main.
+          # prerelease installs from its own feed when its EchoDiar.appinstaller is opened; the others name the
+          # public feed on main.
           appinstaller_uri=https://ed.dinhanhthi.com/windows/EchoDiar.appinstaller
           case "$channel" in
             dev)
@@ -509,8 +509,8 @@ jobs:
         if: always()
         run: Remove-Item -LiteralPath $env:PFX_PATH -Force -ErrorAction SilentlyContinue
 
-  # No environment: builds EchoDiar-Setup.exe around the public certificate, renders the feed and writes the
-  # checksums, then uploads the five release files as EchoDiar-<tag>.
+  # No environment: stages the signed bundle and the public certificate, renders the feed and writes the checksums,
+  # then uploads the four release files as EchoDiar-<tag>.
   assemble:
     needs: [prepare, sign]
     runs-on: windows-latest
@@ -529,45 +529,16 @@ jobs:
       - name: Set paths
         run: |
           "SIGNED_DIR=$env:RUNNER_TEMP\signed" >> $env:GITHUB_ENV
-          "SETUP_DIR=$env:RUNNER_TEMP\setup" >> $env:GITHUB_ENV
           "STAGE_DIR=$env:RUNNER_TEMP\release" >> $env:GITHUB_ENV
 
       - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
         with:
           persist-credentials: false
 
-      - uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6.0.0
-        with:
-          global-json-file: windows/global.json
-
       - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
           name: signed-${{ needs.prepare.outputs.tag }}
           path: ${{ runner.temp }}/signed
-
-      # From windows/ so global.json applies. The feed Uri is the rendered feed's own, so Setup and feed agree.
-      - name: Build Setup
-        working-directory: windows
-        run: |
-          $cer = Join-Path $env:SIGNED_DIR $env:CER_NAME
-          if (-not (Test-Path -LiteralPath $cer)) { throw "$env:CER_NAME is not in the signed artifact" }
-          dotnet build src/EchoDiar.Setup/EchoDiar.Setup.csproj -c Release --nologo -o $env:SETUP_DIR "-p:SetupCertificate=$cer" "-p:SetupFeedUri=$env:APPINSTALLER_URI"
-          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-
-      # Users download only EchoDiar-Setup.exe: it must run alone. The .pdb is ignored; the .exe.config is the
-      # supportedRuntime stub, unless it carries binding redirects (then the exe would need it).
-      - name: Check Setup output
-        run: |
-          $rel = @(Get-ChildItem -LiteralPath $env:SETUP_DIR -Recurse -File | ForEach-Object { $_.FullName.Substring($env:SETUP_DIR.Length + 1) } | Sort-Object)
-          "Setup output: $($rel -join ', ')"
-          if ($rel -notcontains 'EchoDiar-Setup.exe') { throw "No EchoDiar-Setup.exe in the Setup output: $($rel -join ', ')" }
-          $extra = @($rel | Where-Object { $_ -notin @('EchoDiar-Setup.exe', 'EchoDiar-Setup.exe.config', 'EchoDiar-Setup.pdb') })
-          if ($extra) { throw "EchoDiar-Setup.exe must run alone, but the build also wrote $($extra -join ', ') (all files: $($rel -join ', '))" }
-          $config = Join-Path $env:SETUP_DIR 'EchoDiar-Setup.exe.config'
-          if ((Test-Path -LiteralPath $config) -and (Select-String -LiteralPath $config -Pattern 'bindingRedirect' -SimpleMatch -Quiet)) {
-            Get-Content -Raw -LiteralPath $config
-            throw 'EchoDiar-Setup.exe.config has binding redirects: the exe would not run without it'
-          }
 
       - name: Stage release files
         run: |
@@ -575,7 +546,6 @@ jobs:
           $files = @(
             (Join-Path $env:SIGNED_DIR $env:BUNDLE_NAME)
             (Join-Path $env:SIGNED_DIR $env:CER_NAME)
-            (Join-Path $env:SETUP_DIR 'EchoDiar-Setup.exe')
           )
           Copy-Item -LiteralPath $files -Destination $env:STAGE_DIR
 
@@ -613,7 +583,7 @@ jobs:
       # GNU sha256sum format (shasum -a 256 -c): lowercase hash, two spaces, name, LF line endings.
       - name: Write SHA256SUMS-windows.txt
         run: |
-          $lines = foreach ($name in @($env:BUNDLE_NAME, 'EchoDiar.appinstaller', $env:CER_NAME, 'EchoDiar-Setup.exe')) {
+          $lines = foreach ($name in @($env:BUNDLE_NAME, 'EchoDiar.appinstaller', $env:CER_NAME)) {
             $hash = (Get-FileHash -Algorithm SHA256 -LiteralPath (Join-Path $env:STAGE_DIR $name)).Hash.ToLowerInvariant()
             "$hash  $name"
           }
@@ -624,7 +594,7 @@ jobs:
       - name: Check artifact
         run: |
           if (Get-ChildItem -LiteralPath $env:STAGE_DIR -Recurse -File -Include '*.pfx', '*.p12') { throw 'Private key in artifact' }
-          $expected = @($env:BUNDLE_NAME, 'EchoDiar.appinstaller', $env:CER_NAME, 'EchoDiar-Setup.exe', 'SHA256SUMS-windows.txt') | Sort-Object
+          $expected = @($env:BUNDLE_NAME, 'EchoDiar.appinstaller', $env:CER_NAME, 'SHA256SUMS-windows.txt') | Sort-Object
           $actual = @(Get-ChildItem -LiteralPath $env:STAGE_DIR -Recurse -File | ForEach-Object { $_.FullName.Substring($env:STAGE_DIR.Length + 1) } | Sort-Object)
           if (($actual -join '|') -ne ($expected -join '|')) { throw "Artifact files: $($actual -join ', '); expected: $($expected -join ', ')" }
           Get-ChildItem -LiteralPath $env:STAGE_DIR -File | ForEach-Object { '{0}  {1:N0} bytes' -f $_.Name, $_.Length }

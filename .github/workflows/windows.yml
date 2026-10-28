@@ -9,7 +9,7 @@ name: Windows
 
 on:
   push:
-    branches: [plan/2026-10-21-windows-port, plan/2026-10-25-windows-macos-parity, plan/2026-10-28-windows-public-release, main]
+    branches: [plan/2026-10-21-windows-port, plan/2026-10-25-windows-macos-parity, plan/2026-10-28-windows-public-release, plan/2026-10-28-windows-gui-install, main]
     paths:
       - 'windows/**'
       - '.github/workflows/windows.yml'
@@ -60,11 +60,6 @@ jobs:
         if: steps.probe.outputs.has_tests == 'true'
         working-directory: windows
         run: dotnet test tests/EchoDiar.Tests/EchoDiar.Tests.csproj --filter "Category!=Native&Category!=NativeLLM"
-
-      # The installer bootstrapper (net48, AnyCPU); windows-release.yml builds it in Release with the certificate.
-      - name: Build Setup
-        working-directory: windows
-        run: dotnet build src/EchoDiar.Setup/EchoDiar.Setup.csproj -c Debug
 
   # Same as test, on a native ARM64 runner (the QA VM is ARM64).
   test-arm64:

@@ -3,13 +3,13 @@
 # release.sh - Build, check and publish the Windows app of EchoDiar (docs/RELEASING.md).
 #
 # Runs on the Mac. The build happens on GitHub Actions (.github/workflows/windows-release.yml), started by a tag push.
-# Its artifact EchoDiar-<tag> holds five files: EchoDiar_X.Y.Z.0.msixbundle, the App Installer feed
-# EchoDiar.appinstaller, the public certificate (EchoDiar.cer; EchoDiarDev.cer on the dev channel), EchoDiar-Setup.exe
-# (which embeds that certificate) and SHA256SUMS-windows.txt. Modes:
+# Its artifact EchoDiar-<tag> holds four files: EchoDiar_X.Y.Z.0.msixbundle, the App Installer feed
+# EchoDiar.appinstaller, the public certificate (EchoDiar.cer; EchoDiarDev.cer on the dev channel) and
+# SHA256SUMS-windows.txt. Modes:
 #   --dev        pushes the tag windows-vX.Y.Z-dev at HEAD (any branch: a tag rather than a dispatch, because GitHub
 #                dispatches only workflows that are on the default branch), watches the run, downloads the artifact
 #                into release/windows/<tag>/ (gitignored) and checks it. With --publish it then creates the GitHub
-#                prerelease of the tag with the five files (never Latest, which stays the release the website links).
+#                prerelease of the tag with the four files (never Latest, which stays the release the website links).
 #   --preflight  read-only check of the release channel's one-time setup (docs/RELEASING.md §3.0): the
 #                windows-release-signing environment, its reviewer, tag policy and secrets, the variable
 #                WINDOWS_PUBLIC_PUBLISHER and the pinned release certificate. /cf-ship runs it before it builds.
@@ -20,12 +20,11 @@
 #                the feed windows/EchoDiar.appinstaller on main (pages.yml serves it). Idempotent: re-run it to finish.
 #
 # The checks (dev and attach) read the downloaded files as data, with an isolated Python (-I), and never run them:
-# exactly the five files and no private key; SHA256SUMS-windows.txt; the bundle (signed, Name, Version, Publisher,
+# exactly the four files and no private key; SHA256SUMS-windows.txt; the bundle (signed, Name, Version, Publisher,
 # x64 and arm64, both inner packages signed) and the feed (Version, Publisher, both Uris, update settings); the
-# certificate's subject is the Publisher; Setup starts with MZ and embeds the certificate. Any self-signed key can
-# claim a subject, so the signer is pinned too: the certificate and the signers of the bundle and of each inner
-# package must have the DER SHA-256 pinned at HEAD in windows/packaging/dev-cert.sha256 (dev) or
-# windows/packaging/release-cert.sha256 (attach).
+# certificate's subject is the Publisher. Any self-signed key can claim a subject, so the signer is pinned too: the
+# certificate and the signers of the bundle and of each inner package must have the DER SHA-256 pinned at HEAD in
+# windows/packaging/dev-cert.sha256 (dev) or windows/packaging/release-cert.sha256 (attach).
 #
 # Version: X.Y.Z gives the 4-part package version X.Y.Z.0 (each part 0-65535, no leading zeros). Dev builds use
 # 0.0.N, with N above the 0.0.<run>.0 of the windows.yml CI builds; a release uses the version of its tag.
@@ -46,7 +45,7 @@ WORKFLOW_PATH=".github/workflows/$WORKFLOW"
 RELEASE_ENV="windows-release-signing"
 DEV_PUBLISHER="CN=EchoDiar Dev"
 APPINSTALLER_URI="https://ed.dinhanhthi.com/windows/EchoDiar.appinstaller"
-SETUP_CSPROJ="windows/src/EchoDiar.Setup/EchoDiar.Setup.csproj"
+APP_CSPROJ="windows/src/EchoDiar.App/EchoDiar.App.csproj"
 FEED="windows/EchoDiar.appinstaller"
 DEV_PIN_FILE="windows/packaging/dev-cert.sha256"
 RELEASE_PIN_FILE="windows/packaging/release-cert.sha256"
@@ -150,7 +149,7 @@ import xml.etree.ElementTree as ET
 out, version, publisher, appinstaller_uri, bundle_uri, cer_name, pin, cer_subject = sys.argv[1:9]
 bundle_name = f"EchoDiar_{version}.msixbundle"
 sums_name = "SHA256SUMS-windows.txt"
-summed = sorted([bundle_name, "EchoDiar.appinstaller", cer_name, "EchoDiar-Setup.exe"])
+summed = sorted([bundle_name, "EchoDiar.appinstaller", cer_name])
 expected = sorted(summed + [sums_name])
 
 def fail(message):
@@ -233,7 +232,7 @@ def signer_sha256(p7x, what):
         fail(f"{what}: {len(signers)} certificates of AppxSignature.p7x are its signer, expected one")
     return hashlib.sha256(signers[0]).hexdigest()
 
-# The five files, flat, and never a private key.
+# The four files, flat, and never a private key.
 entries = sorted(os.listdir(out))
 keys = [name for name in entries if name.lower().endswith((".pfx", ".p12"))]
 if keys:
@@ -241,7 +240,7 @@ if keys:
 if entries != expected or not all(os.path.isfile(path(name)) and not os.path.islink(path(name)) for name in entries):
     fail(f"the artifact holds {entries}, expected the files {expected}")
 
-# GNU format (lowercase hash, two spaces, name, LF) for exactly the four other files.
+# GNU format (lowercase hash, two spaces, name, LF) for exactly the three other files.
 lines = read(sums_name).split(b"\n")
 if lines[-1] != b"":
     fail(f"{sums_name} does not end with a newline")
@@ -257,9 +256,8 @@ bad = [name for name in summed if sha256(name) != listed[name]]
 if bad:
     fail(f"{sums_name} does not match {', '.join(bad)}")
 
-# The certificate, and Setup around it. The Publisher is a Windows name (", " between parts), the subject RFC 2253.
+# The certificate. The Publisher is a Windows name (", " between parts), the subject RFC 2253.
 cer = read(cer_name)
-setup = read("EchoDiar-Setup.exe")
 
 def dn(value):
     return re.sub(r"\s*,\s*", ",", value.strip())
@@ -267,8 +265,6 @@ def dn(value):
 checks = [
     (f"{cer_name} subject", dn(cer_subject), dn(publisher)),
     (f"{cer_name} SHA-256", hashlib.sha256(cer).hexdigest(), pin),
-    ("EchoDiar-Setup.exe header", setup[:2], b"MZ"),
-    (f"EchoDiar-Setup.exe embeds {cer_name}", cer in setup, True),
 ]
 
 # The bundle: signed, its manifest, and each inner package signed; every signer is the pinned certificate.
@@ -337,8 +333,8 @@ bad = [f"{name} is {actual!r}, expected {wanted!r}" for name, actual, wanted in 
 if bad:
     fail("; ".join(bad))
 print(f"    OK: {', '.join(expected)}")
-print(f"    OK: bundle and feed {version}, publisher '{publisher}'; the certificate, Setup's copy and "
-      f"{len(signers)} signers match the pin {pin[:16]}...")
+print(f"    OK: bundle and feed {version}, publisher '{publisher}'; the certificate and {len(signers)} signers "
+      f"match the pin {pin[:16]}...")
 PY
 
 # Checks the artifact in $1 (CHECK_PY). $2 the certificate's name, $3 the Publisher, $4 the pin, $5 the bundle Uri,
@@ -454,7 +450,7 @@ dev_release() {
   # A dev feed's Uri is its own prerelease asset (App Installer always reads the feed from its Uri).
   feed_uri="https://github.com/$GH_REPO/releases/download/$TAG/EchoDiar.appinstaller"
   out="$REPO_ROOT/release/windows/$TAG"
-  files=("$out/$bundle" "$out/EchoDiar.appinstaller" "$out/EchoDiarDev.cer" "$out/EchoDiar-Setup.exe" "$out/$SUMS")
+  files=("$out/$bundle" "$out/EchoDiar.appinstaller" "$out/EchoDiarDev.cer" "$out/$SUMS")
 
   # Pre-flight. Tracked files only, as scripts/ship.sh; uncommitted changes only warn, because CI builds the
   # pushed tag's commit, never the working copy (as scripts/publish-release.sh).
@@ -540,7 +536,11 @@ dev_release() {
 
   notes="EchoDiar for Windows $VERSION (dev channel, package $VERSION4), x64 and arm64, signed with the dev certificate ($DEV_PUBLISHER).
 
-Install: run EchoDiar-Setup.exe, no --feed needed (it trusts EchoDiarDev.cer after a UAC prompt, then installs from this prerelease's own EchoDiar.appinstaller). Checksums: $SUMS."
+Install:
+1. Open EchoDiarDev.cer > Install Certificate > Local Machine > Place all certificates in the following store > Trusted People.
+2. Open EchoDiar.appinstaller > Install (it installs from this prerelease's own feed).
+
+Checksums: $SUMS."
 
   echo
   echo "About to create the GitHub prerelease $TAG (dev, not Latest) with:"
@@ -729,7 +729,7 @@ attach() {
   git merge-base --is-ancestor "$SHA" origin/main \
     || die "the commit $SHA of $TAG is not on origin/main: --attach approves the signing run of main's code only."
   subject="$(git log -1 --format=%s "$SHA")"
-  if ! git cat-file -e "$SHA:$SETUP_CSPROJ" 2>/dev/null; then
+  if ! git cat-file -e "$SHA:$APP_CSPROJ" 2>/dev/null; then
     echo "$TAG has no Windows app (macOS-only release): nothing to attach"
     exit 0
   fi
@@ -742,7 +742,7 @@ attach() {
   bundle="EchoDiar_$VERSION4.msixbundle"
   bundle_uri="https://github.com/$GH_REPO/releases/download/$TAG/$bundle"
   out="$REPO_ROOT/release/windows/$TAG"
-  files=("$bundle" "EchoDiar.appinstaller" "EchoDiar.cer" "EchoDiar-Setup.exe" "$SUMS")
+  files=("$bundle" "EchoDiar.appinstaller" "EchoDiar.cer" "$SUMS")
 
   echo "About to attach the Windows app to the release $TAG:"
   echo "  commit  : $SHA (on main)"
@@ -820,7 +820,7 @@ attach() {
     echo "==> Uploading to $TAG: ${missing//$'\n'/, }"
     gh release upload "$TAG" "${upload[@]}" --repo "$GH_REPO" || die "gh release upload failed; re-run --attach"
   else
-    echo "==> The release $TAG already has the five Windows assets"
+    echo "==> The release $TAG already has the four Windows assets"
   fi
 
   # The feed on main (pages.yml serves it at $APPINSTALLER_URI).
@@ -844,7 +844,7 @@ attach() {
 
   echo
   echo "Done. Windows is attached to $TAG -> https://github.com/$GH_REPO/releases/tag/$TAG"
-  echo "  setup : https://github.com/$GH_REPO/releases/download/$TAG/EchoDiar-Setup.exe"
+  echo "  docs  : https://ed.dinhanhthi.com/docs.html#install-windows"
   echo "  feed  : $APPINSTALLER_URI"
   echo "  next  : curl -fsSI $APPINSTALLER_URI   (Pages deploys the feed within minutes)"
 }

@@ -15,8 +15,6 @@ windows/
   src/EchoDiar.Platform/        net10.0-windows10.0.26100.0: WASAPI mic and loopback capture,
                                 audio sessions, process info, shell files (CsWin32 interop)
   src/EchoDiar.App/             WinUI 3 app, single-project MSIX, win-x64 + win-arm64
-  src/EchoDiar.Setup/           net48 AnyCPU WinForms installer EchoDiar-Setup.exe (x64 + ARM64): trusts the
-                                certificate it embeds (UAC once), installs VCLibs and the app from the feed
   tests/EchoDiar.Tests/         net10.0 xUnit v3 tests for Core, plus the cross-platform Fixtures/
   scripts/vm-install.ps1        installs a CI build in a Windows VM
   scripts/qa-fixtures.sh        makes the QA audio and model fixtures on the Mac
@@ -33,8 +31,7 @@ ProjectReference graph (no cycles):
 - Core: no project references (NAudio.Core package only).
 - Platform → Core.
 - App → Platform (Core comes transitively). App also carries the native engine packages (Whisper.net, sherpa-onnx, LLamaSharp) so their DLLs ship in the MSIX.
-- Setup: no project references (`Microsoft.Windows.SDK.Contracts` package only, for the WinRT `PackageManager`).
-- EchoDiar.Tests → Core. Tests never reference Platform or App, so they build and run on macOS. They compile Setup's `SetupArguments.cs` as a linked file.
+- EchoDiar.Tests → Core. Tests never reference Platform or App, so they build and run on macOS.
 
 Interfaces that Platform implements live in Core. CsWin32 types stay `internal` to Platform; App calls only Platform's public wrappers.
 
@@ -77,7 +74,7 @@ With the variable set, the output must show the writer tests ran, not "skipped".
 
 [.github/workflows/windows.yml](../.github/workflows/windows.yml) runs on pushes to `main` and the plan branches in its `on.push.branches` that touch `windows/**` or the workflow file, on pull requests touching the same paths, and on `workflow_dispatch`. Jobs:
 
-- `test` (windows-latest) and `test-arm64` (windows-11-arm): the same `dotnet test` and filter as above, run from `windows/` so `global.json` applies. `test` also builds `EchoDiar.Setup` in Debug (the release workflow builds it in Release, with the certificate).
+- `test` (windows-latest) and `test-arm64` (windows-11-arm): the same `dotnet test` and filter as above, run from `windows/` so `global.json` applies.
 - `package` (matrix x64, arm64): builds the Debug MSIX with MSBuild (`SideloadOnly`, no bundle, manifest Version `0.0.<run number>.0`) and signs it with the dev certificate from the `windows-dev-signing` environment (pull requests run without the environment and build unsigned). A package contents check then fails the job unless every native DLL (Whisper.net, sherpa-onnx, LLamaSharp) is in the `.msix` for the job's architecture, and the only `onnxruntime.dll` is sherpa-onnx's (the Windows App SDK metapackage is not used for this reason: its ML component ships another `onnxruntime.dll`).
 
 Each `package` job uploads the artifact `EchoDiar-win-<arch>` (kept 14 days): the `.msix`, the public `EchoDiarDev.cer` and `vm-install.ps1`. The private key never leaves the runner; staging fails if a `.pfx` or `.p12` lands in the artifact.
@@ -192,12 +189,12 @@ Releases are signed with a separate self-signed release certificate (subject `CN
 
 [docs/RELEASING.md, §3 Windows](../docs/RELEASING.md#3-windows) has the full steps, the one-time setup and the rollback. macOS and Windows share one version and one GitHub Release `vX.Y.Z`. In short:
 
-- `/cf-ship` (or `scripts/ship.sh`) ships macOS first. The tag `vX.Y.Z` it pushes runs [.github/workflows/windows-release.yml](../.github/workflows/windows-release.yml) on the release channel: unsigned Release builds for x64 and ARM64, then a `sign` job (the only one with the release key) that signs both packages and bundles them into one signed `EchoDiar_X.Y.Z.0.msixbundle`, then an `assemble` job that builds `EchoDiar-Setup.exe` around the public `EchoDiar.cer`, renders `EchoDiar.appinstaller` from [packaging/EchoDiar.appinstaller.template](packaging/EchoDiar.appinstaller.template) and writes `SHA256SUMS-windows.txt`.
-- The last ship step, [scripts/release.sh](scripts/release.sh) `--attach vX.Y.Z --yes`, approves that run, downloads the five files into `release/windows/vX.Y.Z/`, checks them (signers against the pin), uploads the ones the release lacks (never overwriting) and commits the feed `windows/EchoDiar.appinstaller` on `main`. It is idempotent: when it fails, re-run it.
-- Users download `EchoDiar-Setup.exe` from the release. It is not signed by a certificate authority, so SmartScreen and UAC warn ([website](https://ed.dinhanhthi.com/docs.html#windows-warnings)). Setup trusts the release certificate (UAC, once per PC), installs VCLibs when missing and installs EchoDiar for the user from the feed. `--feed <https .appinstaller URI>` (or http on a private or loopback IPv4, for QA) installs from another feed.
+- `/cf-ship` (or `scripts/ship.sh`) ships macOS first. The tag `vX.Y.Z` it pushes runs [.github/workflows/windows-release.yml](../.github/workflows/windows-release.yml) on the release channel: unsigned Release builds for x64 and ARM64, then a `sign` job (the only one with the release key) that signs both packages and bundles them into one signed `EchoDiar_X.Y.Z.0.msixbundle`, then an `assemble` job that stages the signed bundle and the public `EchoDiar.cer`, renders `EchoDiar.appinstaller` from [packaging/EchoDiar.appinstaller.template](packaging/EchoDiar.appinstaller.template) and writes `SHA256SUMS-windows.txt`: four files.
+- The last ship step, [scripts/release.sh](scripts/release.sh) `--attach vX.Y.Z --yes`, approves that run, downloads the four files into `release/windows/vX.Y.Z/`, checks them (signers against the pin), uploads the ones the release lacks (never overwriting) and commits the feed `windows/EchoDiar.appinstaller` on `main`. It is idempotent: when it fails, re-run it.
+- The bundle is not signed by a certificate authority, so users first import the release certificate `EchoDiar.cer` (once per PC), then open the feed `EchoDiar.appinstaller` from the release, following the steps on the [website](https://ed.dinhanhthi.com/docs.html#install-windows).
 - Installed apps update through App Installer from `https://ed.dinhanhthi.com/windows/EchoDiar.appinstaller`, the feed committed on `main` and deployed by the Pages workflow. The website shows its Windows download only once that file is live, and takes the release tag of its download link from it.
-- Dev builds: `scripts/release.sh --dev --version 0.0.N` (N above the CI run number) builds the dev channel (tag `windows-v0.0.N-dev`, dev certificate) through the same jobs, and `--publish` creates a prerelease, never Latest. Its feed's Uri is that prerelease's own `EchoDiar.appinstaller` (App Installer always reads a feed from its Uri), so its Setup installs it without `--feed`, and its installs check that same feed for updates. The public channel (tag `windows-vX.Y.Z`, Trusted Signing) is a placeholder kept for next year.
-- In the app, [Updater](src/EchoDiar.App/Services/Updater.cs) checks at launch and every 6 hours, only in a copy installed from an `.appinstaller`, as Setup does (a sideloaded `.msix`, like the CI builds above, never updates). An available update shows the title bar's Update button; the tray menu has Check for updates…, and Settings > About shows the last check.
+- Dev builds: `scripts/release.sh --dev --version 0.0.N` (N above the CI run number) builds the dev channel (tag `windows-v0.0.N-dev`, dev certificate) through the same jobs, and `--publish` creates a prerelease, never Latest. Its feed's Uri is that prerelease's own `EchoDiar.appinstaller` (App Installer always reads a feed from its Uri), so opening it installs that prerelease, and its installs check that same feed for updates. The public channel (tag `windows-vX.Y.Z`, Trusted Signing) is a placeholder kept for next year.
+- In the app, [Updater](src/EchoDiar.App/Services/Updater.cs) checks at launch and every 6 hours, only in a copy installed from an `.appinstaller` (a sideloaded `.msix`, like the CI builds above, never updates). An available update shows the title bar's Update button; the tray menu has Check for updates…, and Settings > About shows the last check.
 - To test an update in the VM without a release, [scripts/serve-update.sh](scripts/serve-update.sh) serves one signed package from `~/Downloads/EchoDiar-update/` with a rendered feed on port 8765 (only on the Mac's VM bridge address or the IPv4 `--host`; only the package, the feed and `EchoDiarDev.cer`; HTTP Range requests as App Installer makes them); install it in the VM with `Add-AppxPackage -AppInstallerFile http://<host>:8765/EchoDiar.appinstaller`.
 
 ## Constraints

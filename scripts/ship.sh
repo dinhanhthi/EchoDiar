@@ -18,8 +18,8 @@
 # Step 4 can take ~30-60 min (CI build + approval): callers should run ship.sh in the background.
 # When step 4 fails, re-run it (or /cf-ship Resume) to finish Windows.
 #
-# Windows downloads:
-#   Setup: https://github.com/dinhanhthi/EchoDiar/releases/download/vX.Y.Z/EchoDiar-Setup.exe
+# Windows install:
+#   Docs : https://ed.dinhanhthi.com/docs.html#install-windows
 #   Feed : https://ed.dinhanhthi.com/windows/EchoDiar.appinstaller
 #
 # Prereqs (one-time - docs/RELEASING.md):
@@ -122,6 +122,6 @@ echo "========================================"
 echo "  EchoDiar v$VERSION shipped!"
 echo "  GitHub : https://github.com/dinhanhthi/EchoDiar/releases/tag/v$VERSION"
 echo "  Appcast: https://ed.dinhanhthi.com/appcast.xml (live in ~1 min)"
-echo "  Setup  : https://github.com/dinhanhthi/EchoDiar/releases/download/v$VERSION/EchoDiar-Setup.exe"
+echo "  Docs   : https://ed.dinhanhthi.com/docs.html#install-windows"
 echo "  Feed   : https://ed.dinhanhthi.com/windows/EchoDiar.appinstaller (live in a few min)"
 echo "========================================"

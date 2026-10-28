@@ -7,8 +7,8 @@ user's own messages direct the flow.
 
 This is a **version bump + changelog + ship** workflow for EchoDiar. macOS and Windows share
 **one version and one GitHub Release**: tag `vX.Y.Z`, marked Latest, holding the macOS zip + DMG
-and the Windows files (`EchoDiar-Setup.exe` for x64 and Arm64, the bundle, the feed, the
-certificate, `SHA256SUMS-windows.txt`). The release is driven **from this machine** by
+and the four Windows files (the bundle for x64 and Arm64, the feed, the certificate,
+`SHA256SUMS-windows.txt`). The release is driven **from this machine** by
 `scripts/ship.sh` (`docs/RELEASING.md`). The macOS app is built here: XcodeGen → archive →
 Developer ID sign → notarize → zip + DMG → GitHub Release → Sparkle appcast. The Windows app is
 built on GitHub Actions (`windows-release.yml`) from the `vX.Y.Z` tag that `publish-release.sh`
@@ -45,7 +45,7 @@ me="$(git config user.email)"; echo "maintainer: <$me>"
 for ref in HEAD origin/main; do
   for p in .coding-friend/skills/cf-ship-custom/SKILL.md scripts/ project.yml appcast.xml \
       .github/workflows/windows-release.yml windows/scripts/ windows/packaging/ \
-      windows/src/EchoDiar.Setup/ windows/EchoDiar.appinstaller; do
+      windows/EchoDiar.appinstaller; do
     echo "$ref $p: $(git log -1 --format='%an <%ae>' "$ref" -- "$p")"
   done
 done
@@ -184,11 +184,12 @@ windows/scripts/release.sh --preflight
 
   ```bash
   T=$(git describe --tags --abbrev=0 --match 'v[0-9]*' origin/main); V=${T#v}; echo "latest tag: $T"
-  git cat-file -e "$T:windows/src/EchoDiar.Setup/EchoDiar.Setup.csproj" 2>/dev/null && echo "windows app: yes"
+  git cat-file -e "$T:windows/src/EchoDiar.App/EchoDiar.App.csproj" 2>/dev/null && echo "windows app: yes"
   gh release view "$T" --repo dinhanhthi/EchoDiar --json isDraft --jq .isDraft   # false = published
   git show origin/main:appcast.xml 2>/dev/null | grep -qF "/$T/" && echo "appcast: yes"
   gh release view "$T" --repo dinhanhthi/EchoDiar --json assets --jq '.assets[].name' \
-    | grep -qxF EchoDiar-Setup.exe && echo "setup: yes"
+    | grep -cxF -e "EchoDiar_$V.0.msixbundle" -e EchoDiar.appinstaller -e EchoDiar.cer -e SHA256SUMS-windows.txt \
+    | grep -qx 4 && echo "windows assets: yes"
   git show origin/main:windows/EchoDiar.appinstaller 2>/dev/null \
     | grep -qF "Version=\"$V.0\"" && echo "feed: yes"
   ```
@@ -197,14 +198,15 @@ windows/scripts/release.sh --preflight
 
   - No `windows app: yes` → the tag was made before the Windows app (e.g. `v1.1.0`) and is
     macOS-only: go to (e).
-  - `windows app: yes`, `false`, `appcast: yes`, and `setup: yes` or `feed: yes` missing (the
-    release lacks `EchoDiar-Setup.exe`, or `origin/main`'s feed is not at `Version="A.B.C.0"`) →
-    make **one** attempt in this `/cf-ship` run, in the background like Step A1 (it waits for the
-    CI build and its approval) and wait for its exit:
+  - `windows app: yes`, `false`, `appcast: yes`, and `windows assets: yes` or `feed: yes` missing
+    (the release lacks one of the four Windows assets `EchoDiar_A.B.C.0.msixbundle`,
+    `EchoDiar.appinstaller`, `EchoDiar.cer` and `SHA256SUMS-windows.txt`, or `origin/main`'s feed
+    is not at `Version="A.B.C.0"`) → make **one** attempt in this `/cf-ship` run, in the
+    background like Step A1 (it waits for the CI build and its approval) and wait for its exit:
     `windows/scripts/release.sh --attach vA.B.C --yes`. It approves only that tag's run, reruns
     failed jobs once, reuses a download that already verifies, uploads only the missing assets
     and commits the feed (idempotent).
-    - It exits 0 and, after `git fetch origin`, the check above prints `setup: yes` and
+    - It exits 0 and, after `git fetch origin`, the check above prints `windows assets: yes` and
       `feed: yes` → print the summary (Step A2) and stop.
     - Anything else → never retry it in this run. Note `vA.B.C shipped macOS-only: <reason>`
       (`<reason>`: its last `error:` line, or the check that still fails), repeat it in every
@@ -227,10 +229,11 @@ RANGE=${LAST_TAG:+$LAST_TAG..HEAD}; RANGE=${RANGE:-HEAD}
 echo "== macOS";   git log "$RANGE" --oneline --no-merges -- ':!appcast.xml' ':!windows/' ':!.github/workflows/windows*.yml'
 echo "== Windows"; git log "$RANGE" --oneline --no-merges -- windows/ '.github/workflows/windows*.yml'
 
-# Exception check: the last release has the Windows app but not EchoDiar-Setup.exe (a failed attach)
-[ -n "$LAST_TAG" ] && git cat-file -e "$LAST_TAG:windows/src/EchoDiar.Setup/EchoDiar.Setup.csproj" 2>/dev/null \
+# Exception check: the last release has the Windows app but not all four Windows assets (a failed attach)
+[ -n "$LAST_TAG" ] && git cat-file -e "$LAST_TAG:windows/src/EchoDiar.App/EchoDiar.App.csproj" 2>/dev/null \
   && assets=$(gh release view "$LAST_TAG" --repo dinhanhthi/EchoDiar --json assets --jq '.assets[].name') \
-  && ! grep -qxF EchoDiar-Setup.exe <<<"$assets" && echo "exception: Windows release-path commits are user-facing"
+  && test "$(grep -cxF -e "EchoDiar_${LAST_TAG#v}.0.msixbundle" -e EchoDiar.appinstaller -e EchoDiar.cer \
+    -e SHA256SUMS-windows.txt <<<"$assets")" -ne 4 && echo "exception: Windows release-path commits are user-facing"
 ```
 
 Ignore commits that are **not app-facing**:
@@ -241,11 +244,10 @@ Ignore commits that are **not app-facing**:
   `CONTRIBUTING.md`, `LICENSE`, `windows/scripts/`, `windows/tools/`, `windows/packaging/`,
   `windows/README.md`.
 - **Exception:** when the check above prints `exception: …` (the last `v*` release has the
-  Windows app but lacks `EchoDiar-Setup.exe`), commits touching the Windows release path
-  (`.github/workflows/windows-release.yml`, `windows/scripts/`, `windows/packaging/`,
-  `windows/src/EchoDiar.Setup/`) count as user-facing, so a fix version can ship. In
-  `CHANGELOG.md` they become one `### Fixed` entry about the Windows installer, ending with
-  "(Windows)".
+  Windows app but lacks one of its four Windows assets), commits touching the Windows release
+  path (`.github/workflows/windows-release.yml`, `windows/scripts/`, `windows/packaging/`) count
+  as user-facing, so a fix version can ship. In `CHANGELOG.md` they become one `### Fixed` entry
+  about the Windows install, ending with "(Windows)".
 
 **First release** (no tag yet): ship the current `MARKETING_VERSION` from `project.yml` as-is
 (no bump, skip Step B2 and the `bump-version.sh` call in Step B4). The changelog section is
@@ -387,10 +389,10 @@ existing tag `vX.Y.Z` (use Resume), or a Windows release channel that is not set
 4. `windows/scripts/release.sh --attach vX.Y.Z --yes` — approves the `windows-release-signing`
    deployment of that tag's run only, waits for the build, downloads its artifact into
    `release/windows/vX.Y.Z/`, checks it, uploads the Windows assets the release lacks
-   (`EchoDiar-Setup.exe`, the bundle, `EchoDiar.appinstaller`, `EchoDiar.cer`,
-   `SHA256SUMS-windows.txt`), then commits `chore(release): windows appinstaller vX.Y.Z` and
-   pushes the feed `windows/EchoDiar.appinstaller` (Pages serves it within minutes). If it
-   cannot approve, it prints the run's URL and waits up to 30 min: do not ask, wait for the exit.
+   (the bundle, `EchoDiar.appinstaller`, `EchoDiar.cer`, `SHA256SUMS-windows.txt`), then commits
+   `chore(release): windows appinstaller vX.Y.Z` and pushes the feed `windows/EchoDiar.appinstaller`
+   (Pages serves it within minutes). If it cannot approve, it prints the run's URL and waits up
+   to 30 min: do not ask, wait for the exit.
 
 If Keychain prompts appear (codesign, notarytool, generate_appcast), the user clicks **Always Allow**.
 
@@ -410,7 +412,7 @@ Shipped (local flow):
   EchoDiar vX.Y.Z — one release, Latest, for macOS and Windows
   GitHub Release: https://github.com/dinhanhthi/EchoDiar/releases/tag/vX.Y.Z
   macOS  : notarized zip + dmg; Appcast: https://ed.dinhanhthi.com/appcast.xml
-  Windows: Setup: https://github.com/dinhanhthi/EchoDiar/releases/download/vX.Y.Z/EchoDiar-Setup.exe
+  Windows: Docs : https://ed.dinhanhthi.com/docs.html#install-windows
            Feed : https://ed.dinhanhthi.com/windows/EchoDiar.appinstaller (Pages: <curl status>)
 ```
 
