@@ -11,6 +11,7 @@
     <Project Path="src/EchoDiar.Core/EchoDiar.Core.csproj" />
     <Project Path="src/EchoDiar.LocalLLM/EchoDiar.LocalLLM.csproj" />
     <Project Path="src/EchoDiar.Platform/EchoDiar.Platform.csproj" />
+    <Project Path="src/EchoDiar.Setup/EchoDiar.Setup.csproj" />
     <Project Path="src/EchoDiar.Transcribe/EchoDiar.Transcribe.csproj" />
   </Folder>
   <Folder Name="/tests/">
