@@ -59,8 +59,8 @@ concurrency:
 
 jobs:
   # Resolves the tag, channel, versions, publisher and URIs once, and fails fast on a bad tag, on the release channel
-  # without its publisher, or on the public channel without its Trusted Signing secrets (before any Windows runner
-  # builds, and before sign names an environment).
+  # without its publisher or with a tag that is not project.yml's MARKETING_VERSION, or on the public channel without
+  # its Trusted Signing secrets (before any Windows runner builds, and before sign names an environment).
   prepare:
     runs-on: ubuntu-latest
     defaults:
@@ -157,6 +157,30 @@ jobs:
             echo "appinstaller_uri=https://ed.dinhanhthi.com/windows/EchoDiar.appinstaller"
           } >> "$GITHUB_OUTPUT"
           echo "Tag $tag: channel $channel, package version $version4, publisher '$publisher'."
+
+      # The release channel always runs on its tag (a tag push, or a dispatch that resolve held to refs/tags/$tag),
+      # so the default ref checks out the tag commit.
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+        if: steps.resolve.outputs.channel == 'release'
+        with:
+          persist-credentials: false
+
+      # macOS and Windows ship one version (scripts/bump-version.sh): the tag must be the tag commit's MARKETING_VERSION.
+      - name: Check MARKETING_VERSION
+        if: steps.resolve.outputs.channel == 'release'
+        env:
+          TAG: ${{ steps.resolve.outputs.tag }}
+          VERSION: ${{ steps.resolve.outputs.version }}
+        run: |
+          set -euo pipefail
+          marketing="$(git show "refs/tags/$TAG:project.yml" \
+            | sed -nE 's/^[[:space:]]*MARKETING_VERSION:[[:space:]]*"?([0-9]+\.[0-9]+\.[0-9]+)"?.*/\1/p' \
+            | sort -u | paste -sd ' ' -)"
+          if [[ "$marketing" != "$VERSION" ]]; then
+            echo "::error::Tag $TAG does not match MARKETING_VERSION ${marketing:-(none)} in project.yml: macOS and Windows ship one version"
+            exit 1
+          fi
+          echo "Tag $TAG matches MARKETING_VERSION $marketing in project.yml."
 
       # The public channel needs Trusted Signing (docs/RELEASING.md). Only the names of missing secrets are printed.
       - name: Check Trusted Signing secrets

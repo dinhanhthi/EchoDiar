@@ -53,7 +53,11 @@ public sealed partial class AboutSettingsPage : UserControl
         Unloaded += (_, _) => _model.Updater.PropertyChanged -= OnUpdaterChanged;
     }
 
-    /// <summary>The package version ("0.0.12.0", set by CI), or the app's assembly version when run without a package.</summary>
+    /// <summary>
+    /// The package version as X.Y.Z, the same version as macOS ("1.2.0" for the package version 1.2.0.0; dev builds
+    /// "0.0.N"). A non-zero revision is kept ("1.2.0.3"). Run without a package, the app's assembly version, formatted
+    /// the same way.
+    /// </summary>
     internal static string Version
     {
         get
@@ -61,15 +65,20 @@ public sealed partial class AboutSettingsPage : UserControl
             try
             {
                 var v = Package.Current.Id.Version;
-                return $"{v.Major}.{v.Minor}.{v.Build}.{v.Revision}";
+                return FormatVersion(v.Major, v.Minor, v.Build, v.Revision);
             }
             catch (Exception)
             {
                 // No package identity (an unpackaged run).
-                return typeof(AboutSettingsPage).Assembly.GetName().Version?.ToString() ?? "?";
+                return typeof(AboutSettingsPage).Assembly.GetName().Version is { } v
+                    ? FormatVersion(v.Major, v.Minor, v.Build, v.Revision)
+                    : "?";
             }
         }
     }
+
+    private static string FormatVersion(int major, int minor, int build, int revision) =>
+        revision > 0 ? $"{major}.{minor}.{build}.{revision}" : $"{major}.{minor}.{build}";
 
     private void OnUpdaterChanged(object? sender, PropertyChangedEventArgs e) => RefreshUpdates();
 

@@ -8,11 +8,12 @@
   xmlns:systemai="http://schemas.microsoft.com/appx/manifest/systemai/windows10"
   IgnorableNamespaces="uap uap5 rescap desktop6 systemai">
 
-  <!-- Version is patched by CI (0.0.<run number>.0). -->
+  <!-- Version = MARKETING_VERSION of project.yml + ".0" (scripts/bump-version.sh: macOS and Windows share one
+       version). CI patches it: 0.0.<run number>.0 in CI builds, X.Y.Z.0 from the release tag. -->
   <Identity
     Name="dinh.thi.EchoDiar"
     Publisher="CN=EchoDiar Dev"
-    Version="0.0.1.0" />
+    Version="1.1.0.0" />
 
   <Properties>
     <DisplayName>EchoDiar</DisplayName>
