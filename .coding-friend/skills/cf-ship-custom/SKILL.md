@@ -304,7 +304,7 @@ with entries.
   "No changes on macOS in this version." or "No changes on Windows in this version."
 - When `$LAST_TAG` has no Windows app (the first Windows release), describe the Windows app as
   one `### Added` entry (Windows 11, x64 and Arm64, and its main features), not commit by commit.
-- The Windows install block (download, SmartScreen, UAC, certificate) comes from
+- The Windows install block (download, certificate import, App Installer) comes from
   `windows/packaging/release-notes.md`, which `publish-release.sh` appends to the release body.
   Never copy it, or any install or warning note, into `CHANGELOG.md`.
 

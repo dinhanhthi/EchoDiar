@@ -105,16 +105,16 @@
             <section id="install-windows" class="doc">
               <h3>Windows</h3>
 <ol class="steps">
-              <li>Download <strong>EchoDiar-Setup.exe</strong> from the <a href="https://github.com/dinhanhthi/EchoDiar/releases" target="_blank" rel="noopener noreferrer">Releases page</a>, under <strong>Assets</strong> of a release that includes Windows<span data-windows hidden>, or <a href="https://github.com/dinhanhthi/EchoDiar/releases" data-windows-asset="EchoDiar-Setup.exe">download the latest one directly</a></span>. One file for x64 and Arm64.</li>
-              <li>Open it. When Windows says <strong>Windows protected your PC</strong>, click <strong>More info</strong>, then <strong>Run anyway</strong>.</li>
-              <li>If Microsoft Defender then says <strong>Security scan required</strong>, wait: it checks Setup online, for up to 10 seconds, then Setup opens.</li>
-              <li>Click <strong>Install</strong>. When Windows asks if you want to allow an app from an <strong>Unknown publisher</strong> to make changes, click <strong>Yes</strong>. This happens only once, to trust the EchoDiar certificate.</li>
-              <li>Setup installs EchoDiar from <code>ed.dinhanhthi.com</code>. Click <strong>Open EchoDiar</strong>.</li>
+              <li>Download <strong>EchoDiar.cer</strong> and <strong>EchoDiar.appinstaller</strong> from the <a href="https://github.com/dinhanhthi/EchoDiar/releases" target="_blank" rel="noopener noreferrer">Releases page</a>, under <strong>Assets</strong> of a release that includes Windows<span data-windows hidden>, or download the latest ones directly: <a href="https://github.com/dinhanhthi/EchoDiar/releases" data-windows-asset="EchoDiar.cer">EchoDiar.cer</a> and <a href="https://github.com/dinhanhthi/EchoDiar/releases" data-windows-asset="EchoDiar.appinstaller">EchoDiar.appinstaller</a></span>. Take both from an official EchoDiar release only. One set of files works for x64 and Arm64.</li>
+              <li>Open <strong>EchoDiar.cer</strong>. If Windows asks <strong>Do you want to open this file?</strong> (<strong>Open File - Security Warning</strong>, Publisher <strong>Unknown Publisher</strong>), click <strong>Open</strong>. The <strong>Certificate</strong> window says <strong>This CA Root certificate is not trusted...</strong>: that is expected. Do not put the certificate in Trusted Root. Click <strong>Install Certificate...</strong></li>
+              <li>In the <strong>Certificate Import Wizard</strong>, choose <strong>Local Machine</strong> (the default is <strong>Current User</strong>) and click <strong>Next</strong>. Windows asks for permission for <strong>Windows host process (Rundll32)</strong>, verified publisher <strong>Microsoft Windows</strong>: click <strong>Yes</strong>.</li>
+              <li>Choose <strong>Place all certificates in the following store</strong>, click <strong>Browse...</strong>, scroll down to <strong>Trusted People</strong>, then click <strong>OK</strong>, <strong>Next</strong> and <strong>Finish</strong>. Windows says <strong>The import was successful.</strong></li>
+              <li>Open <strong>EchoDiar.appinstaller</strong>. App Installer shows <strong>Install EchoDiar?</strong> with Publisher <strong>Anh-Thi Dinh</strong>. Click <strong>Install</strong>. EchoDiar downloads (about 200 MB) and opens.</li>
 </ol>
 <ul class="list">
               <li>Needs Windows 11 on x64 or Arm64.</li>
               <li>Updates itself through App Installer: the title bar shows <strong>Update</strong> when a new version is out, and tray icon &gt; <strong>Check for updates…</strong> checks now.</li>
-              <li>Why Windows warns, what Setup changes, and what to do if Smart App Control blocks Setup: <a href="#windows-warnings">Windows warnings</a>.</li>
+              <li>Why Windows warns, what these steps change, and what to do if App Installer refuses to install: <a href="#windows-warnings">Windows warnings</a>.</li>
 </ul>
             </section>
           </section>
@@ -122,31 +122,21 @@
           <section id="windows-warnings" class="doc">
             <h2>Windows warnings</h2>
 <ul class="list">
-            <li><strong>Why Windows warns:</strong> EchoDiar for Windows is not yet signed by a public certificate authority. It is signed with EchoDiar's own certificate, which Windows does not know, so SmartScreen says <strong>Windows protected your PC</strong>, Microsoft Defender may say <strong>Security scan required</strong> while it checks Setup online (up to 10 seconds: just wait), and User Account Control says <strong>Unknown publisher</strong>. EchoDiar is open source, and GitHub Actions builds Setup and the app from the source of each release.</li>
-            <li><strong>Check the download</strong> (optional): each release has <code>SHA256SUMS-windows.txt</code> next to <code>EchoDiar-Setup.exe</code>. In PowerShell, in the folder of the download, run the line below and compare the hash with the <code>EchoDiar-Setup.exe</code> line of that file (upper or lower case does not matter).
-<pre><code>Get-FileHash .\EchoDiar-Setup.exe -Algorithm SHA256</code></pre></li>
-            <li><strong>What Setup changes:</strong> it adds one certificate, EchoDiar's, to <strong>Trusted People</strong> of the computer, so Windows accepts the app's signature. That step is the one that asks for <strong>Yes</strong>. Then it installs EchoDiar for your account from the App Installer feed at <code>ed.dinhanhthi.com</code>, which keeps it updated, with the Microsoft Visual C++ Runtime if it is missing.</li>
+            <li><strong>Why Windows warns:</strong> EchoDiar for Windows is signed with EchoDiar's own certificate, not by a public certificate authority, so Windows does not know the publisher until you trust that certificate. The security prompts in the <a href="#install-windows">install steps</a> come from that. EchoDiar is open source, and GitHub Actions builds each release from its source.</li>
+            <li><strong>Check the download</strong> (optional): each release has <code>SHA256SUMS-windows.txt</code>. Before you import <code>EchoDiar.cer</code>, you can compare its SHA-256 hash with the <code>EchoDiar.cer</code> line of that file, and the bundle's too if you download it. In PowerShell, in the folder of the download, run the line below (upper or lower case does not matter).
+<pre><code>Get-FileHash .\EchoDiar.cer -Algorithm SHA256</code></pre></li>
+            <li><strong>What the steps change:</strong> they add one certificate, EchoDiar's, to <strong>Local Machine &gt; Trusted People</strong>, so Windows accepts the app's signature. That step is the one that asks for <strong>Yes</strong>. Then App Installer installs EchoDiar for your account from the feed at <code>ed.dinhanhthi.com</code>, which keeps it updated.</li>
 </ul>
-            <h3>If Smart App Control blocks Setup</h3>
-            <p>Smart App Control can block Setup without a <strong>Run anyway</strong> button. Then install EchoDiar by hand:</p>
-<ol class="steps">
-              <li>Download <strong>EchoDiar.cer</strong> from the <a href="https://github.com/dinhanhthi/EchoDiar/releases" target="_blank" rel="noopener noreferrer">Releases page</a>, under <strong>Assets</strong> of a release that includes Windows<span data-windows hidden>, or <a href="https://github.com/dinhanhthi/EchoDiar/releases" data-windows-asset="EchoDiar.cer">download the latest one directly</a></span>.</li>
-              <li>Open PowerShell as administrator and trust the certificate (change the path if you saved the file elsewhere):
-<pre><code>Import-Certificate -FilePath "$HOME\Downloads\EchoDiar.cer" -CertStoreLocation Cert:\LocalMachine\TrustedPeople</code></pre>
-              Then, in a PowerShell that is not run as administrator, install EchoDiar from its feed, which keeps it updated:
-<pre><code>Add-AppxPackage -AppInstallerFile https://ed.dinhanhthi.com/windows/EchoDiar.appinstaller</code></pre>
-              If that fails because <code>Microsoft.VCLibs</code> is missing, install it with the line for your PC, then run the line above again:
-<pre><code># x64
-Add-AppxPackage https://aka.ms/Microsoft.VCLibs.x64.14.00.Desktop.appx
-# Arm64
-Add-AppxPackage https://aka.ms/Microsoft.VCLibs.arm64.14.00.Desktop.appx</code></pre></li>
-</ol>
-            <p>This may not help while Smart App Control is on: it can block EchoDiar itself too, because the app is not signed by a public certificate authority yet.</p>
+            <h3>If App Installer says the publisher certificate could not be verified</h3>
+            <p>App Installer shows <strong>Publisher: Unknown</strong>, <strong>Install</strong> is greyed out, and it says <strong>This app package's publisher certificate could not be verified.</strong> ... <strong>must be verified (0x800B010A)</strong>. EchoDiar's certificate is not in <strong>Local Machine &gt; Trusted People</strong>, for example because it went to <strong>Current User</strong> or another store. Click <strong>Cancel</strong>, do steps 2 to 4 of the <a href="#install-windows">install steps</a> again, then open <strong>EchoDiar.appinstaller</strong> again.</p>
+            <h3>If App Installer says a framework or dependency is missing</h3>
+            <p>A general Windows tip, not tested with EchoDiar: open <strong>Microsoft Store</strong> &gt; <strong>Library</strong> &gt; <strong>Get updates</strong>, then open <strong>EchoDiar.appinstaller</strong> again.</p>
+            <h3>Smart App Control</h3>
+            <p>Smart App Control may block EchoDiar, because the app is not signed by a public certificate authority yet.</p>
             <h3>After uninstalling</h3>
-            <p>Uninstalling EchoDiar leaves its certificate in Trusted People. To remove it, open <code>certlm.msc</code>, go to <strong>Trusted People &gt; Certificates</strong> and delete the certificate issued to <strong>Anh-Thi Dinh</strong>. Or run this in PowerShell as administrator:</p>
-<pre><code>Get-ChildItem Cert:\LocalMachine\TrustedPeople | Where-Object Subject -eq 'CN=Anh-Thi Dinh' | Remove-Item</code></pre>
+            <p>Uninstall EchoDiar in <strong>Settings &gt; Apps &gt; Installed apps</strong>. Your recordings in <code>%LOCALAPPDATA%\EchoDiar</code> stay. EchoDiar's certificate stays in Trusted People too. To remove it: Start, search "computer certificates", open <strong>Manage computer certificates</strong> (click <strong>Yes</strong> when Windows asks for permission), go to <strong>Trusted People &gt; Certificates</strong>, right-click the certificate issued to <strong>Anh-Thi Dinh</strong>, click <strong>Delete</strong>, then <strong>Yes</strong>.</p>
             <h3>A signed build is planned</h3>
-            <p>A build signed by a public certificate authority is planned. Windows will then know the publisher and Setup will no longer need to trust a certificate. Moving to it takes one reinstall; your recordings stay.</p>
+            <p>A build signed by a public certificate authority is planned. Windows will then know the publisher, and the certificate step goes away. Moving to it takes one reinstall; your recordings stay.</p>
           </section>
 
           <section id="permissions" class="doc">

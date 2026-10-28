@@ -37,7 +37,7 @@
                 <Button x:Name="CheckUpdatesButton" Content="{local:T Text='Check now'}" />
             </controls:SettingsCard>
 
-            <!-- Why Windows warns (SmartScreen, UAC, the certificate): opens the website's explanation. -->
+            <!-- Why Windows warns (the certificate import and its UAC prompt): opens the website's explanation. -->
             <controls:SettingsCard
                 x:Name="WarningsCard"
                 Header="{local:T Text='Why Windows warns about EchoDiar'}"

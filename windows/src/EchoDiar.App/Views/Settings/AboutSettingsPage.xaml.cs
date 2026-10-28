@@ -18,7 +18,7 @@ public sealed partial class AboutSettingsPage : UserControl
     /// <summary>macOS <c>AboutInfo.repository</c>.</summary>
     private static readonly Uri Repository = new("https://github.com/dinhanhthi/EchoDiar");
 
-    /// <summary>The website's explanation of the SmartScreen, UAC and certificate warnings (Windows only).</summary>
+    /// <summary>The website's explanation of the certificate import and its warnings (Windows only).</summary>
     private static readonly Uri WindowsWarnings = new("https://ed.dinhanhthi.com/docs.html#windows-warnings");
 
     /// <summary>The searchable rows (macOS SettingsSearch.swift, About), each the Tag of its card.</summary>

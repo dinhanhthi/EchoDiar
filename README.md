@@ -34,13 +34,12 @@ Download the `.dmg` from [Releases](https://github.com/dinhanhthi/EchoDiar/relea
 
 ### Windows 11 (x64, Arm64)
 
-Download and run `EchoDiar-Setup.exe`, as described in [Install on Windows](https://ed.dinhanhthi.com/docs.html#install-windows). Setup installs EchoDiar and keeps it updated. Windows warns before it runs, because EchoDiar is not yet signed by a public certificate authority:
+Download `EchoDiar.cer` and `EchoDiar.appinstaller` from [Install on Windows](https://ed.dinhanhthi.com/docs.html#install-windows), which links the latest release that includes Windows, and install them with Windows' own dialogs, no command line needed. EchoDiar is not yet signed by a public certificate authority, so Windows trusts it only after you import its certificate:
 
-- "Windows protected your PC": click **More info**, then **Run anyway**.
-- Microsoft Defender may show "Security scan required" for a few seconds: wait, and Setup opens.
-- "Unknown publisher": click **Yes**. This happens only once, to trust the EchoDiar certificate.
+- Open `EchoDiar.cer`, click **Install Certificate...** and import it into **Local Machine** > **Trusted People**.
+- Open `EchoDiar.appinstaller` and click **Install**. App Installer installs EchoDiar and keeps it updated.
 
-Why, how to check the download and what Setup changes: [Windows warnings](https://ed.dinhanhthi.com/docs.html#windows-warnings).
+Step by step, with what each window says: [Install on Windows](https://ed.dinhanhthi.com/docs.html#install-windows). Why, how to check the download and how to remove the certificate: [Windows warnings](https://ed.dinhanhthi.com/docs.html#windows-warnings).
 
 ## Permissions
 

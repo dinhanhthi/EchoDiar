@@ -9,7 +9,7 @@ Each release ships two notarized macOS assets on the GitHub Release:
 - `EchoDiar-X.Y.Z.dmg`: drag-to-install download for new users.
 - `EchoDiar-X.Y.Z.zip`: the Sparkle update archive referenced by the appcast.
 
-The five Windows files (`EchoDiar-Setup.exe` and the others, [§3](#3-windows)) are attached to the same release a while later.
+The four Windows files (`EchoDiar.cer`, `EchoDiar.appinstaller` and the others, [§3](#3-windows)) are attached to the same release a while later.
 
 EchoDiar is Apple Silicon only. `build-and-notarize.sh` passes `ARCHS=arm64` on the `xcodebuild` command line (speech-swift's Float16 code does not build for x86_64, and SPM package targets ignore a project-level `ARCHS`) and refuses an app whose `lipo -archs` is not exactly `arm64`. Pass `ARCHS=arm64` to any manual Release build too.
 
@@ -107,7 +107,7 @@ The repo root holds a valid empty `appcast.xml` (no items) so Pages deploys befo
 
 ### Protect the release files (manual, recommended once the repo is public)
 
-`/cf-ship` and the scripts run whatever `.coding-friend/skills/cf-ship-custom/SKILL.md`, `scripts/`, `project.yml` and `appcast.xml` say on `main`, with your signing keys. The same holds for the Windows release files `.github/workflows/windows-release.yml`, `windows/scripts/`, `windows/packaging/` and `windows/src/EchoDiar.Setup/`, with the Windows release key ([§3.0](#30-one-time-setup)). Once the repo is public, a merged PR could change them. `/cf-ship` stops when the last commit touching one of them (locally or on `origin/main`) is not authored by your `git config user.email`, but author fields can be forged, so set up these GitHub controls yourself (nothing creates them for you):
+`/cf-ship` and the scripts run whatever `.coding-friend/skills/cf-ship-custom/SKILL.md`, `scripts/`, `project.yml` and `appcast.xml` say on `main`, with your signing keys. The same holds for the Windows release files `.github/workflows/windows-release.yml`, `windows/scripts/` and `windows/packaging/`, with the Windows release key ([§3.0](#30-one-time-setup)). Once the repo is public, a merged PR could change them. `/cf-ship` stops when the last commit touching one of them (locally or on `origin/main`) is not authored by your `git config user.email`, but author fields can be forged, so set up these GitHub controls yourself (nothing creates them for you):
 
 - `.github/CODEOWNERS` with you as owner of the release files:
 
@@ -119,7 +119,6 @@ The repo root holds a valid empty `appcast.xml` (no items) so Pages deploys befo
   /.github/                    @dinhanhthi
   /windows/scripts/            @dinhanhthi
   /windows/packaging/          @dinhanhthi
-  /windows/src/EchoDiar.Setup/ @dinhanhthi
   ```
 
 - A branch protection rule (or ruleset) on `main`: require a pull request with review from Code Owners, block force pushes and deletions, and restrict who can push to `main` to you.
@@ -160,7 +159,7 @@ First release: the current `MARKETING_VERSION` (0.1.0) ships as-is, without a bu
    1. `scripts/build-and-notarize.sh`: the macOS zip and DMG.
    2. `scripts/publish-release.sh --yes <zip>`: the tag `vX.Y.Z` and the GitHub Release with the macOS assets. The tag push starts `windows-release.yml` (release channel).
    3. `scripts/publish-appcast.sh <zip>`: the appcast on `main`. macOS is fully shipped here.
-   4. `windows/scripts/release.sh --attach vX.Y.Z --yes`: approves the tag's Windows run, attaches its five files to the release and commits the feed on `main` ([§3.1](#31-per-release)). It takes about 30-60 min (CI build and approval), so run `ship.sh` where it can keep running.
+   4. `windows/scripts/release.sh --attach vX.Y.Z --yes`: approves the tag's Windows run, attaches its four files to the release and commits the feed on `main` ([§3.1](#31-per-release)). It takes about 30-60 min (CI build and approval), so run `ship.sh` where it can keep running.
 
    When step 4 fails, macOS stays shipped: finish Windows with `windows/scripts/release.sh --attach vX.Y.Z --yes` (or `/cf-ship`), see [§3.2](#32-troubleshooting-and-rollback). To ship macOS without step 4, see [Ship macOS only by hand](#ship-macos-only-by-hand).
 
@@ -179,7 +178,7 @@ Verify a release:
 
 ```sh
 curl -fsSL https://ed.dinhanhthi.com/appcast.xml | grep shortVersionString
-gh release view vX.Y.Z --repo dinhanhthi/EchoDiar --json assets --jq '.assets[].name'   # the 2 macOS and 5 Windows files
+gh release view vX.Y.Z --repo dinhanhthi/EchoDiar --json assets --jq '.assets[].name'   # the 2 macOS and 4 Windows files
 curl -fsSL https://ed.dinhanhthi.com/windows/EchoDiar.appinstaller | grep -E 'Version=|Uri='
 ```
 
@@ -225,25 +224,26 @@ Reverting the appcast stops offering the update to installed apps. Users who alr
 
 Unlike the macOS app, the Windows app ([windows/README.md](../windows/README.md)) is built and signed on GitHub Actions by `.github/workflows/windows-release.yml`. The release's tag `vX.Y.Z`, which `publish-release.sh` pushes (`ship.sh` step 2), starts it. `ship.sh` step 4, `windows/scripts/release.sh --attach vX.Y.Z --yes`, then approves that run, checks its files on the Mac, attaches them to the same GitHub Release and commits the feed `windows/EchoDiar.appinstaller` on `main`. The Pages workflow publishes the feed at `https://ed.dinhanhthi.com/windows/EchoDiar.appinstaller`, and installed apps update through App Installer from there.
 
-The workflow runs four jobs: `prepare` (tag, channel, version, Publisher; it fails fast on a bad tag) → `package` (x64 and arm64: unsigned Release MSIX packages; no environment and no secret, because this job restores and builds third-party code) → `sign` (the only job with an environment and a PFX; it builds nothing: it signs both packages, bundles them, signs the bundle and exports the public certificate) → `assemble` (no environment: it builds `EchoDiar-Setup.exe` around that certificate, renders the feed and writes the checksums). Its result is the artifact `EchoDiar-<tag>`, kept 14 days.
+The workflow runs four jobs: `prepare` (tag, channel, version, Publisher; it fails fast on a bad tag) → `package` (x64 and arm64: unsigned Release MSIX packages; no environment and no secret, because this job restores and builds third-party code) → `sign` (the only job with an environment and a PFX; it builds nothing: it signs both packages, bundles them, signs the bundle and exports the public certificate) → `assemble` (no environment: it stages the signed bundle and that certificate, renders the feed and writes the checksums). Its result is the artifact `EchoDiar-<tag>`, kept 14 days.
 
 There are three channels:
 
 - **release**: the tag `vX.Y.Z` of the macOS release. Signed in the environment `windows-release-signing` (required reviewer) with the self-signed release certificate (§3.0), Publisher = the repository variable `WINDOWS_PUBLIC_PUBLISHER`, public certificate `EchoDiar.cer`. `prepare` fails when that variable is empty or `CN=EchoDiar Dev`, or when the tag is not the `MARKETING_VERSION` of `project.yml` at the tag's commit. This is the build users get, from the release notes, the website and the feed.
-- **dev**: tag `windows-vX.Y.Z-dev`, from `release.sh --dev` on any branch. Signed in `windows-dev-signing` with the self-signed dev certificate (Publisher `CN=EchoDiar Dev`, public certificate `EchoDiarDev.cer`), through the same jobs as the release channel. For testing only: published, if at all, as a prerelease, and its feed is never deployed. App Installer always reads a feed from the feed's own Uri, so a dev feed's Uri is its prerelease's own `EchoDiar.appinstaller` asset, and the dev Setup is built with it: a dev prerelease installs with its Setup alone (no `--feed`), and its installs check that same prerelease feed for updates, which never offers a newer version. Test updates with a local feed (`serve-update.sh`, §3.1).
+- **dev**: tag `windows-vX.Y.Z-dev`, from `release.sh --dev` on any branch. Signed in `windows-dev-signing` with the self-signed dev certificate (Publisher `CN=EchoDiar Dev`, public certificate `EchoDiarDev.cer`), through the same jobs as the release channel. For testing only: published, if at all, as a prerelease, and its feed is never deployed. App Installer always reads a feed from the feed's own Uri, so a dev feed's Uri is its prerelease's own `EchoDiar.appinstaller` asset: with `EchoDiarDev.cer` imported into Local Machine > Trusted People, opening that file installs the prerelease, and its installs check that same prerelease feed for updates, which never offers a newer version. Test updates with a local feed (`serve-update.sh`, §3.1).
 - **public**: tag `windows-vX.Y.Z`, signed with Trusted Signing. Kept for next year: its signing step is a placeholder that throws (§3.0, Trusted Signing). Nothing starts it: `release.sh` has no mode for it.
 
-Each release `vX.Y.Z` carries, next to the macOS DMG and zip, five Windows files with fixed names:
+Each release `vX.Y.Z` carries, next to the macOS DMG and zip, four Windows files with fixed names:
 
-- `EchoDiar-Setup.exe`: the installer users download. One exe for x64 and Arm64 (.NET Framework 4.8, in every Windows 11), not signed by a certificate authority. It asks for UAC once, to add the release certificate it embeds to `LocalMachine\TrustedPeople`; it installs `Microsoft.VCLibs.140.00.UWPDesktop` when missing, then installs EchoDiar for the user from the feed, so the app updates itself. Run again, it updates or does nothing, without UAC.
-- `EchoDiar.cer`: the public release certificate, for the manual PowerShell install.
-- `SHA256SUMS-windows.txt`: the SHA-256 of the four other files.
+- `EchoDiar.cer`: the public release certificate, which users import.
+- `SHA256SUMS-windows.txt`: the SHA-256 of the three other files.
 - `EchoDiar_X.Y.Z.0.msixbundle`: the signed x64 and arm64 packages.
 - `EchoDiar.appinstaller`: the feed (its own Uri is the address above, its MainBundle Uri the `.msixbundle` of this release).
 
+Users install with Windows' own dialogs, as the website shows step by step (`https://ed.dinhanhthi.com/docs.html#install-windows`): once per PC, they import `EchoDiar.cer` into Local Machine > Trusted People (Install Certificate > Local Machine > Place all certificates in the following store > Trusted People), then open `EchoDiar.appinstaller` and click Install. App Installer installs EchoDiar for the user from the feed, so the app updates itself. Known gap: the package depends on `Microsoft.VCLibs.140.00.UWPDesktop` 14.0.33728.0 or later, and nothing installs it, so a PC without a recent enough one gets a dependency error from App Installer (§3.2, VCLibs).
+
 Never link these files through `releases/latest/download/`: while a release is shipping, Latest is the new release before its Windows files are attached. The website takes the tag from the live feed, and `README.md` links the docs page.
 
-Setup is not signed by a public certificate authority, so Windows warns: SmartScreen ("Windows protected your PC": More info, then Run anyway) and UAC ("Unknown publisher"). The release notes (`windows/packaging/release-notes.md`), the website (`https://ed.dinhanhthi.com/docs.html#windows-warnings`) and Settings > About in the app explain why. Azure Artifact Signing (§3.0, Trusted Signing) is the planned fix.
+The packages are not signed by a public certificate authority, so the certificate import shows Windows' own prompts: Open File - Security Warning when the `.cer` opens, "This CA Root certificate is not trusted..." in the Certificate window, and UAC for "Windows host process (Rundll32)", verified publisher Microsoft Windows, at Local Machine. There is no SmartScreen prompt, since no exe is downloaded. The release notes (`windows/packaging/release-notes.md`), the website (`https://ed.dinhanhthi.com/docs.html#windows-warnings`) and Settings > About in the app explain why. Azure Artifact Signing (§3.0, Trusted Signing) is the planned fix.
 
 ### §3.0 One-time setup
 
@@ -305,9 +305,9 @@ It does, in this order:
 
 Then check that `windows/scripts/release.sh --preflight` ends with "Preflight OK".
 
-Back up the PFX and its password offline (for example in a password manager and on an offline drive). Losing the PFX, or its expiry after 5 years, means a new certificate: every user must run a new `EchoDiar-Setup.exe` once to trust it, since App Installer refuses an update signed by a certificate the PC does not trust. With the same subject, the app and its updates stay the same package family.
+Back up the PFX and its password offline (for example in a password manager and on an offline drive). Losing the PFX, or its expiry after 5 years, means a new certificate: every user must import the new `EchoDiar.cer` once (the same steps as the install) to trust it, since App Installer refuses an update signed by a certificate the PC does not trust. With the same subject, the app and its updates stay the same package family.
 
-The Publisher (`WINDOWS_PUBLIC_PUBLISHER`, the certificate's subject) is part of the package family name: keep it until the switch to Azure Artifact Signing. A different Publisher is a different app, which installed copies never update to. The Artifact Signing certificate will have its own subject, so at that switch users reinstall once (uninstall, then run the new Setup); their library in `%LOCALAPPDATA%\EchoDiar` stays.
+The Publisher (`WINDOWS_PUBLIC_PUBLISHER`, the certificate's subject) is part of the package family name: keep it until the switch to Azure Artifact Signing. A different Publisher is a different app, which installed copies never update to. The Artifact Signing certificate will have its own subject, so at that switch users reinstall once (uninstall, then open the new feed); their library in `%LOCALAPPDATA%\EchoDiar` stays.
 
 The release Publisher also differs from `CN=EchoDiar Dev`: the first release install is a new app next to any dev install, and a dev install never updates to it. Uninstall dev builds (the library in `%LOCALAPPDATA%\EchoDiar` stays):
 
@@ -324,7 +324,7 @@ The secrets `WINDOWS_DEV_CERT_PFX` (base64 PFX) and `WINDOWS_DEV_CERT_PASSWORD` 
 Repository secrets reach every workflow run of the repository, so both certificates live in GitHub Environments instead (Settings > Environments and Settings > Rules):
 
 1. The tag rulesets "windows release tags" (`refs/tags/windows-v*`, set up 2026-10-24) and "release tags" (`refs/tags/v*`, from the release certificate commands above), both active: they block creating, updating and deleting these tags for everyone but the repository admin role (bypass always), so only you can start a release run; `publish-release.sh` and `release.sh` keep working for you.
-2. The environment `windows-dev-signing`, "Deployment branches and tags" = selected: the tags `windows-v*` and the branches `main`, `plan/2026-10-21-windows-port`, `plan/2026-10-25-windows-macos-parity` and `plan/2026-10-28-windows-public-release`. It holds `WINDOWS_DEV_CERT_PFX` and `WINDOWS_DEV_CERT_PASSWORD` as environment secrets; there are no repository secrets of that name. The jobs that read the dev certificate name it: `package` in `windows.yml` (except on pull requests, which are not allowed by the policy and build unsigned) and `sign` in `windows-release.yml` (dev channel).
+2. The environment `windows-dev-signing`, "Deployment branches and tags" = selected: the tags `windows-v*` and the branches `main`, `plan/2026-10-21-windows-port`, `plan/2026-10-25-windows-macos-parity`, `plan/2026-10-28-windows-public-release` and `plan/2026-10-28-windows-gui-install`. It holds `WINDOWS_DEV_CERT_PFX` and `WINDOWS_DEV_CERT_PASSWORD` as environment secrets; there are no repository secrets of that name. The jobs that read the dev certificate name it: `package` in `windows.yml` (except on pull requests, which are not allowed by the policy and build unsigned) and `sign` in `windows-release.yml` (dev channel).
 3. The environment `windows-release-signing`: required reviewer = you, `prevent_self_review` off, deployments from the tags `v*` only. It holds `WINDOWS_RELEASE_CERT_PFX` and `WINDOWS_RELEASE_CERT_PASSWORD`. Only `sign` in `windows-release.yml` (release channel) names it, and that job runs only the checkout, the artifact download, `signtool` and `makeappx`: the release key never reaches a job that restores or builds third-party code. Every release run waits there for an approval, which `--attach` gives to that run only (§3.1).
 
 Consequences: `windows.yml` runs on pushes to `main` and the plan branches above only, and a `workflow_dispatch` run on any other branch fails at the environment check of `package`. To build another branch, add it to `on.push.branches` and to the environment (Settings > Environments > `windows-dev-signing` > Deployment branches and tags, or `gh api -X POST repos/dinhanhthi/EchoDiar/environments/windows-dev-signing/deployment-branch-policies -f name='<branch>' -f type=branch`). Each signing job shows up as a deployment of its environment.
@@ -333,7 +333,7 @@ Rotate the dev certificate as in [windows/README.md, Dev signing certificate](..
 
 #### Trusted Signing (public channel, next year)
 
-Not used yet. Microsoft's publicly trusted signing service (Trusted Signing, now Azure Artifact Signing) accepts individuals only in the US and Canada for now, so the release channel signs with the self-signed certificate above. These steps stay here for when it becomes available. A publicly trusted signature on Setup and the packages removes the certificate import (and its UAC prompt), lets Smart App Control run them, and closes the accepted risks of §3.2.
+Not used yet. Microsoft's publicly trusted signing service (Trusted Signing, now Azure Artifact Signing) accepts individuals only in the US and Canada for now, so the release channel signs with the self-signed certificate above. These steps stay here for when it becomes available. A publicly trusted signature on the packages removes the certificate import (and its UAC prompt), lets Smart App Control run the app, and closes the accepted risk of §3.2.
 
 1. In Azure, create a Trusted Signing account, complete the identity validation and create a Public Trust certificate profile.
 2. Create an app registration (service principal) with a client secret, and give it the Trusted Signing Certificate Profile Signer role on the account.
@@ -349,7 +349,7 @@ Not used yet. Microsoft's publicly trusted signing service (Trusted Signing, now
 
    `TRUSTED_SIGNING_ENDPOINT` is the account's region endpoint (`https://<region>.codesigning.azure.net/`). `WINDOWS_PUBLIC_PUBLISHER` must be exactly the subject of the Trusted Signing certificate: the workflow writes it into the manifest `Identity Publisher`, the bundle and the `.appinstaller`, and refuses `CN=EchoDiar Dev`. The release channel reads the same variable: changing it changes the Publisher of every later release, so users reinstall once (§3.0, Release certificate).
 
-4. **Before the first public release, implement the signing step.** The Trusted Signing step of `windows-release.yml` is a placeholder that throws. Without the secrets above the run fails at once (the `prepare` job names the missing ones); with them it stops at that step. Replace it with real Trusted Signing (signtool with the Trusted Signing dlib, or Microsoft's signing action) for both packages, the bundle and `EchoDiar-Setup.exe`, and switch the release channel, which `/cf-ship` ships, to it.
+4. **Before the first public release, implement the signing step.** The Trusted Signing step of `windows-release.yml` is a placeholder that throws. Without the secrets above the run fails at once (the `prepare` job names the missing ones); with them it stops at that step. Replace it with real Trusted Signing (signtool with the Trusted Signing dlib, or Microsoft's signing action) for both packages and the bundle, and switch the release channel, which `/cf-ship` ships, to it.
 
 Also still to do then: an environment `windows-public-signing` restricted to the `windows-v*` tags with a required reviewer, holding the Trusted Signing secrets, and named by the job that signs with Trusted Signing (`windows-release.yml` has a comment where). Create the environment first: a job naming a missing environment creates it, unprotected. Prefer OpenID Connect (a federated credential on the app registration, `azure/login` with `id-token: write`) over `AZURE_CLIENT_SECRET`, so no long-lived secret is stored at all.
 
@@ -361,7 +361,7 @@ Windows ships with every release, through `/cf-ship` or `scripts/ship.sh` (§1):
 gh release view --repo dinhanhthi/EchoDiar --json tagName --jq .tagName   # vX.Y.Z
 ```
 
-Releases made before the Windows app (`v1.1.0` and earlier) have no `windows/src/EchoDiar.Setup/` at their tag: `--attach` prints "has no Windows app (macOS-only release)" and does nothing.
+Releases made before the Windows app (`v1.1.0` and earlier) have no `windows/src/EchoDiar.App/EchoDiar.App.csproj` at their tag: `--attach` prints "has no Windows app (macOS-only release)" and does nothing.
 
 #### What --attach does
 
@@ -372,9 +372,9 @@ Releases made before the Windows app (`v1.1.0` and earlier) have no `windows/src
 3. **Approval**: once the run waits at `sign` (after both `package` legs, about 20 min in), it approves the `windows-release-signing` deployment of this run only, as you. When it cannot, it prints the run's URL and waits up to 30 min for you to approve it in the browser.
 4. **Wait**: up to 2 hours per attempt. A failed run is rerun once, its failed jobs only (the whole run when its intermediate artifacts have expired), and approved again. An expired artifact `EchoDiar-vX.Y.Z` also gets a whole rerun.
 5. **Download**: the artifact into `release/windows/vX.Y.Z/` (gitignored). A folder there that already verifies against its `SHA256SUMS-windows.txt` is reused, never downloaded again: a rebuild is signed anew, and its bytes no longer match assets already uploaded.
-6. **Checks**, reading the files as data (isolated Python, never run): exactly the five files and no private key; the checksums; the bundle (signed, Name, Version, Publisher, x64 and arm64, both inner packages signed); the feed (Version, Publisher, both Uris, update settings); the certificate's subject is the Publisher; the certificate and the signers of the bundle and of both inner packages have the pinned SHA-256; Setup is a Windows executable that embeds the certificate.
+6. **Checks**, reading the files as data (isolated Python, never run): exactly the four files and no private key; the checksums; the bundle (signed, Name, Version, Publisher, x64 and arm64, both inner packages signed); the feed (Version, Publisher, both Uris, update settings); the certificate's subject is the Publisher; the certificate and the signers of the bundle and of both inner packages have the pinned SHA-256.
 7. **Upload**: only the assets the release lacks, never with `--clobber`. An asset already there must have the same SHA-256 (its GitHub `digest`), or it stops before uploading anything.
-8. **Feed**: commits `windows/EchoDiar.appinstaller` on `main` (`chore(release): windows appinstaller vX.Y.Z`) and pushes it, unless `origin/main`'s feed already has this version or a higher one: the feed never rolls back. The Pages workflow deploys it within minutes, and the website then offers this release's Setup.
+8. **Feed**: commits `windows/EchoDiar.appinstaller` on `main` (`chore(release): windows appinstaller vX.Y.Z`) and pushes it, unless `origin/main`'s feed already has this version or a higher one: the feed never rolls back. The Pages workflow deploys it within minutes, and the website then offers this release's Windows files.
 
 It is idempotent: when it fails, fix the cause and run the same command again, and it carries on from where the release stands. `/cf-ship` runs it once per `/cf-ship` run for the latest release tag only (§3.2).
 
@@ -387,9 +387,9 @@ windows/scripts/release.sh --dev --version 0.0.N            # build and check on
 windows/scripts/release.sh --dev --version 0.0.N --publish  # ... then create the prerelease (asks first, unless --yes)
 ```
 
-N must be above the run number of the `windows.yml` CI builds (they are `0.0.<run>.0`): App Installer only moves to a higher version. It runs on any branch whose `HEAD` is pushed (uncommitted changes only warn: CI builds the pushed tag's commit), pushes the tag `windows-v0.0.N-dev`, waits for the run, downloads the artifact into `release/windows/<tag>/` and checks it against the dev pin `windows/packaging/dev-cert.sha256`. With `--publish` it creates a prerelease with the five files (`--latest=false --prerelease`). A tag is never reused: without `--publish` it prints the `gh release create` command and how to discard the tag.
+N must be above the run number of the `windows.yml` CI builds (they are `0.0.<run>.0`): App Installer only moves to a higher version. It runs on any branch whose `HEAD` is pushed (uncommitted changes only warn: CI builds the pushed tag's commit), pushes the tag `windows-v0.0.N-dev`, waits for the run, downloads the artifact into `release/windows/<tag>/` and checks it against the dev pin `windows/packaging/dev-cert.sha256`. With `--publish` it creates a prerelease with the four files (`--latest=false --prerelease`). A tag is never reused: without `--publish` it prints the `gh release create` command and how to discard the tag.
 
-A dev Setup embeds `EchoDiarDev.cer` and installs from its prerelease's own feed (`https://github.com/dinhanhthi/EchoDiar/releases/download/windows-v0.0.N-dev/EchoDiar.appinstaller`) by default, so it needs no `--feed`. `--feed` points it at another feed (a local one, below), as https, or as http on a private or loopback IPv4 address.
+A dev prerelease installs like a release, with `EchoDiarDev.cer` instead of `EchoDiar.cer`: import it into Local Machine > Trusted People, then open the prerelease's own feed (`https://github.com/dinhanhthi/EchoDiar/releases/download/windows-v0.0.N-dev/EchoDiar.appinstaller`). To test an update, use a local feed (below).
 
 #### The feed
 
@@ -404,11 +404,10 @@ curl -fsSL https://ed.dinhanhthi.com/windows/EchoDiar.appinstaller | grep -E 'Ve
 
 #### Test an update locally
 
-`windows/scripts/serve-update.sh` serves a local feed to the VMPal VM, without a release. Put exactly one signed `.msix` or `.msixbundle` (a CI artifact or a dev release) in `~/Downloads/EchoDiar-update/`, then run it on the Mac. It renders `EchoDiar.appinstaller` there from the package's own manifest and serves it on port 8765 until Ctrl+C. It listens only on the Mac's address on the VM bridge (`192.168.128.x`), or on the IPv4 address of `--host` (a host name is refused), and serves only the package, `EchoDiar.appinstaller` and `EchoDiarDev.cer` (when present): every other path is a 404, with no folder listing. It answers HTTP Range requests (206, one range per request), which App Installer and Delivery Optimization use to download the package. In the VM, with the dev certificate trusted (`vm-install.ps1 -TrustCert`, or a dev Setup):
+`windows/scripts/serve-update.sh` serves a local feed to the VMPal VM, without a release. Put exactly one signed `.msix` or `.msixbundle` (a CI artifact or a dev release) in `~/Downloads/EchoDiar-update/`, then run it on the Mac. It renders `EchoDiar.appinstaller` there from the package's own manifest and serves it on port 8765 until Ctrl+C. It listens only on the Mac's address on the VM bridge (`192.168.128.x`), or on the IPv4 address of `--host` (a host name is refused), and serves only the package, `EchoDiar.appinstaller` and `EchoDiarDev.cer` (when present): every other path is a 404, with no folder listing. It answers HTTP Range requests (206, one range per request), which App Installer and Delivery Optimization use to download the package. In the VM, with the dev certificate trusted (`vm-install.ps1 -TrustCert`, or `EchoDiarDev.cer` imported as above):
 
 ```powershell
 Add-AppxPackage -AppInstallerFile http://<host>:8765/EchoDiar.appinstaller
-# or: .\EchoDiar-Setup.exe --feed http://<host>:8765/EchoDiar.appinstaller
 ```
 
 To offer the next version, stop the script, replace the package with a higher version and run it again. The app shows its Update button once it finds it. `--render-only` writes the file without serving, `--host` and `--folder` override the defaults.
@@ -421,31 +420,30 @@ To offer the next version, stop the script, replace the package with a higher ve
 - **The run failed**: `--attach` reruns its failed jobs once, approves the new attempt, and stops if it fails again, with `gh run view <id> --repo dinhanhthi/EchoDiar --log-failed`. A transient failure (runner, network, package restore): run `--attach` again, which reruns once more. A failure in the code or the workflow: the tag pins both, so every rerun of `vX.Y.Z` fails the same way. Fix it on `main` and ship a patch version (below).
 - **No run for the tag**: `--attach` dispatches the release channel after 5 minutes. If even that run does not show up, check the Actions tab: dispatch needs `windows-release.yml` on `main`.
 - **Artifact expired**: workflow artifacts are kept 14 days. `--attach` then reruns the whole run (and approves it). The rebuild is signed anew, so its bytes differ from any Windows asset already uploaded (next item). Keep `release/windows/vX.Y.Z/` until the release is complete: `--attach` reuses it instead of rebuilding.
-- **Digest mismatch** (`assets of the release differ from SHA256SUMS-windows.txt (or have no digest): <names>`): the release already holds Windows assets from another build (an attempt before a whole rerun, or a manual upload), and nothing was uploaded. If the release already has all five Windows assets and `main`'s feed has `X.Y.Z.0`, Windows is complete: there is nothing to do. Otherwise delete the release's Windows assets (never the macOS ones) and run `--attach` again, so that all five come from one build:
+- **Digest mismatch** (`assets of the release differ from SHA256SUMS-windows.txt (or have no digest): <names>`): the release already holds Windows assets from another build (an attempt before a whole rerun, or a manual upload), and nothing was uploaded. If the release already has all four Windows assets and `main`'s feed has `X.Y.Z.0`, Windows is complete: there is nothing to do. Otherwise delete the release's Windows assets (never the macOS ones) and run `--attach` again, so that all four come from one build:
 
   ```sh
-  for f in EchoDiar-Setup.exe EchoDiar.cer SHA256SUMS-windows.txt EchoDiar_X.Y.Z.0.msixbundle EchoDiar.appinstaller; do
+  for f in EchoDiar.cer SHA256SUMS-windows.txt EchoDiar_X.Y.Z.0.msixbundle EchoDiar.appinstaller; do
     gh release delete-asset vX.Y.Z "$f" --repo dinhanhthi/EchoDiar --yes
   done
   ```
 
-- **Defender flags Setup** (a false positive is likely for an unsigned exe that elevates and imports a certificate): submit the release's `EchoDiar-Setup.exe` at the Microsoft WDSI file submission portal (Microsoft Security Intelligence, "Submit a file"), as a software developer reporting an incorrect detection. Do it once after the first Windows release anyway, and again whenever a version is flagged.
-- **Smart App Control** blocks unsigned exes outright, with no "Run anyway", and may also block the installed app's unsigned native DLLs. Nothing fixes that before a publicly trusted signature (§3.0, Trusted Signing), and QA cannot test it (once off, Smart App Control cannot be turned back on in the VM). Users install with the PowerShell steps on the website (`https://ed.dinhanhthi.com/docs.html#windows-warnings`): `EchoDiar.cer` into `LocalMachine\TrustedPeople` from an administrator PowerShell, then `Add-AppxPackage -AppInstallerFile https://ed.dinhanhthi.com/windows/EchoDiar.appinstaller` as the user.
-- **VCLibs**: Setup installs `Microsoft.VCLibs.140.00.UWPDesktop` (14.0.33728.0 or later) from Microsoft when it is missing; when the install still fails for it, Setup shows `0x80073CF3`. Install it by hand, then run Setup again: `Add-AppxPackage https://aka.ms/Microsoft.VCLibs.x64.14.00.Desktop.appx` (`arm64` instead of `x64` on Arm PCs). See also the notes in [windows/README.md](../windows/README.md#testing-in-a-windows-vm).
-- **Updates not offered**: check the feed is live with a higher Version (curl above), the copy was installed with Setup or from the `.appinstaller` (a sideloaded `.msix` never updates; Settings > About says so) and has the same Publisher.
+- **Defender flags a release file**: on 2026-10-28, on a real x64 PC, Defender quarantined `EchoDiar-Setup.exe`, the unsigned installer of the dev prerelease `windows-v0.0.911-dev`, as `Trojan:Win32/Bearfoos.B!ml` (a cloud machine-learning verdict), which is why it was removed. If Defender ever flags a release file, submit it at the Microsoft WDSI file submission portal (Microsoft Security Intelligence, "Submit a file"), as a software developer reporting an incorrect detection.
+- **Smart App Control** may block the installed app: it is not signed by a public certificate authority and loads native DLLs. Nothing fixes that before a publicly trusted signature (§3.0, Trusted Signing), and QA cannot test it (once off, Smart App Control cannot be turned back on in the VM). The website says so (`https://ed.dinhanhthi.com/docs.html#windows-warnings`).
+- **VCLibs**: the package depends on `Microsoft.VCLibs.140.00.UWPDesktop` 14.0.33728.0 or later, and nothing installs it, so a PC without a recent enough one gets a dependency error from App Installer. This is a known gap: `https://aka.ms/Microsoft.VCLibs.x64.14.00.Desktop.appx` serves 14.0.33321.0, below that minimum, so it is no fix. The website gives a general tip (`https://ed.dinhanhthi.com/docs.html#windows-warnings`): Microsoft Store > Library > Get updates, then open `EchoDiar.appinstaller` again. See also the notes in [windows/README.md](../windows/README.md#testing-in-a-windows-vm).
+- **Updates not offered**: check the feed is live with a higher Version (curl above), the copy was installed from the `.appinstaller` (a sideloaded `.msix` never updates; Settings > About says so) and has the same Publisher.
 
 #### A release that went out macOS-only
 
-When step 4 fails for good, `vX.Y.Z` stays macOS-only: macOS is shipped, the release has no Windows files and the feed stays at the previous version. The website keeps offering the previous complete release (its download link comes from the live feed), but the release notes describe a Setup that is not there: drop that block as in [Ship macOS only by hand](#ship-macos-only-by-hand).
+When step 4 fails for good, `vX.Y.Z` stays macOS-only: macOS is shipped, the release has no Windows files and the feed stays at the previous version. The website keeps offering the previous complete release (its download link comes from the live feed), but the release notes describe Windows files that are not there: drop that block as in [Ship macOS only by hand](#ship-macos-only-by-hand).
 
-A Windows build that is broken for a tagged version is fixed by shipping a patch version: the tag pins the workflow and the source, so `vX.Y.Z` can never build differently. `/cf-ship` makes one `--attach` attempt per run, for the latest release tag only. When it fails, its summary says "vX.Y.Z shipped macOS-only: <reason>" and it goes on to ship the next version; older versions are never retried. While the latest release lacks `EchoDiar-Setup.exe`, `/cf-ship` counts commits to the Windows release path (`.github/workflows/windows-release.yml`, `windows/scripts/`, `windows/packaging/`, `windows/src/EchoDiar.Setup/`) as user-facing, so that fix can ship on its own.
+A Windows build that is broken for a tagged version is fixed by shipping a patch version: the tag pins the workflow and the source, so `vX.Y.Z` can never build differently. `/cf-ship` makes one `--attach` attempt per run, for the latest release tag only. When it fails, its summary says "vX.Y.Z shipped macOS-only: <reason>" and it goes on to ship the next version; older versions are never retried. While the latest release lacks one of its four Windows assets, `/cf-ship` counts commits to the Windows release path (`.github/workflows/windows-release.yml`, `windows/scripts/`, `windows/packaging/`) as user-facing, so that fix can ship on its own.
 
 #### Accepted risks
 
-Two weaknesses of the self-signed release are known and were accepted on 2026-10-28. Signing Setup with Azure Artifact Signing (§3.0, Trusted Signing) closes both.
+One weakness of the self-signed release is known and was accepted on 2026-10-28. A publicly trusted signature on the packages with Azure Artifact Signing (§3.0, Trusted Signing) closes it.
 
-- **The elevated certificate import trusts the exe on disk.** Someone who can replace the unsigned `EchoDiar-Setup.exe` in the user's Downloads (the same user) runs their own code elevated once the user accepts UAC. A thumbprint check in Setup cannot help, because the replacement simply skips it, and UAC shows "Unknown publisher" either way. This is inherent to any unsigned installer.
-- **Setup is outside the signer pin.** The `assemble` job, which has no secrets, builds it around the pinned certificate, and `release.sh` checks only that it is a Windows executable containing that certificate. Its integrity rests on the same CI build trust as the packages: `package` also builds them without secrets before `sign` signs them, so a compromised build dependency would be signed either way. Signing Setup with the same self-signed certificate would add nothing.
+- **Users trust a self-signed certificate by hand.** Windows cannot tell `EchoDiar.cer` from any other self-signed certificate: anyone who can get a user to import another `.cer` into Trusted People and open another feed can install a package signed by it. Mitigations: the install steps take both files from an official EchoDiar release only, users can check `EchoDiar.cer` against `SHA256SUMS-windows.txt` (optional SHA-256 check), and for what we publish, `release.sh` checks that the certificate and the signers of the bundle and of both inner packages have the pinned SHA-256 (§3.0).
 
 #### Ship macOS only by hand
 
@@ -457,7 +455,7 @@ scripts/publish-release.sh --yes release/export/EchoDiar-X.Y.Z.zip
 scripts/publish-appcast.sh release/export/EchoDiar-X.Y.Z.zip
 ```
 
-Then drop the Windows block from the release notes (everything from its `## Windows` heading on), since it describes a Setup that is not there:
+Then drop the Windows block from the release notes (everything from its `## Windows` heading on), since it describes Windows files that are not there:
 
 ```sh
 notes="$(mktemp)"
@@ -474,7 +472,7 @@ Keep macOS and take Windows back: revert the feed commit first, then delete the 
 ```sh
 git revert '<feed-commit>'   # the "chore(release): windows appinstaller vX.Y.Z" commit
 git push origin main
-for f in EchoDiar-Setup.exe EchoDiar.cer SHA256SUMS-windows.txt EchoDiar_X.Y.Z.0.msixbundle EchoDiar.appinstaller; do
+for f in EchoDiar.cer SHA256SUMS-windows.txt EchoDiar_X.Y.Z.0.msixbundle EchoDiar.appinstaller; do
   gh release delete-asset vX.Y.Z "$f" --repo dinhanhthi/EchoDiar --yes
 done
 ```
