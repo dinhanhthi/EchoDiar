@@ -697,7 +697,7 @@ public sealed partial class TitleBarToolbar : UserControl
         if (_model is null || double.IsInfinity(_availableWidth) || ToolbarGrid.ActualWidth <= 0) return;
         if (!_searchOpened) _trailingWidth = TrailingColumn.ActualWidth;
         var others = ToolbarGrid.Padding.Left + LeadingColumn.ActualWidth + _trailingWidth
-            + TabsColumn.ActualWidth + DragColumn.ActualWidth;
+            + TabsColumn.ActualWidth;
         var asIcon = _availableWidth - others < SearchMinWidth;
         if (_searchOpened)
         {

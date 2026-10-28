@@ -13,22 +13,25 @@
     xmlns:local="using:EchoDiar.App">
 
     <!--
-        The title and Search share the free space 1:1; Search shrinks from 240 to 120, where its placeholder still
-        fits. Where even 120 does not fit, Search becomes an icon button that opens the box (code-behind). The last
-        column stays empty: a drag strip before the caption buttons on every route. Margins space the columns, since a
-        collapsed group's column would keep a ColumnSpacing.
+        The title and Search share the free space 1:1; Search shrinks from 280 to 120, where its placeholder still
+        fits. Where even 120 does not fit, Search becomes an icon button that opens the box (code-behind). Search, or
+        the conversation's tabs, ends at the caption buttons. Margins space the columns, since a collapsed group's
+        column would keep a ColumnSpacing.
     -->
     <Grid x:Name="ToolbarGrid" Padding="12,0,0,0">
         <Grid.ColumnDefinitions>
             <ColumnDefinition x:Name="LeadingColumn" Width="Auto" />
             <ColumnDefinition Width="*" />
             <ColumnDefinition x:Name="TrailingColumn" Width="Auto" />
-            <ColumnDefinition x:Name="SearchColumn" Width="*" MinWidth="120" MaxWidth="240" />
+            <ColumnDefinition x:Name="SearchColumn" Width="*" MinWidth="120" MaxWidth="280" />
             <ColumnDefinition x:Name="TabsColumn" Width="Auto" />
-            <ColumnDefinition x:Name="DragColumn" Width="40" />
         </Grid.ColumnDefinitions>
 
-        <StackPanel Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
+        <!--
+            Stretch, not Center: the group keeps the title bar's height whether the Settings tabs (about 40 px, the
+            buttons 32) show or not, so its buttons stay put when they do.
+        -->
+        <StackPanel Orientation="Horizontal" Spacing="8">
             <Button
                 x:Name="BackButton"
                 Width="32"
