@@ -28,7 +28,18 @@
 
 ## Install
 
+### macOS
+
 Download the `.dmg` from [Releases](https://github.com/dinhanhthi/EchoDiar/releases/latest), drag EchoDiar to `/Applications` and launch it. Requires macOS 15 or later on Apple Silicon.
+
+### Windows 11 (x64, Arm64)
+
+Download and run `EchoDiar-Setup.exe`, as described in [Install on Windows](https://ed.dinhanhthi.com/docs.html#install-windows). Setup installs EchoDiar and keeps it updated. Windows warns twice, because EchoDiar is not yet signed by a public certificate authority:
+
+- "Windows protected your PC": click **More info**, then **Run anyway**.
+- "Unknown publisher": click **Yes**. This happens only once, to trust the EchoDiar certificate.
+
+Why, how to check the download and what Setup changes: [Windows warnings](https://ed.dinhanhthi.com/docs.html#windows-warnings).
 
 ## Permissions
 

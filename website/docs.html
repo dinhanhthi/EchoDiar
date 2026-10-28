@@ -76,6 +76,7 @@
           <nav class="toc" aria-label="Documentation">
             <ul>
               <li><a href="#install">Install</a></li>
+              <li><a href="#windows-warnings">Windows warnings</a></li>
               <li><a href="#permissions">Permissions</a></li>
               <li><a href="#recording">Recording</a></li>
               <li><a href="#meetings">Meeting detection</a></li>
@@ -94,15 +95,57 @@
           <div class="docs-content">
           <section id="install" class="doc">
             <h2>Install</h2>
+            <h3>macOS</h3>
 <ul class="list">
             <li>Download the signed and notarized DMG from <a href="https://github.com/dinhanhthi/EchoDiar/releases/latest" target="_blank" rel="noopener noreferrer">Releases</a>, drag EchoDiar to Applications.</li>
             <li>Needs macOS 15+ on Apple Silicon. Apple Speech and Apple Foundation Models need macOS 26.</li>
             <li>EchoDiar lives in the menu bar. Its Dock icon shows while one of its windows is open.</li>
             <li>Updates itself: menu bar icon &gt; <strong>Check for Updates…</strong></li>
-            <li data-windows hidden><strong>Windows:</strong> download <a href="https://ed.dinhanhthi.com/windows/EchoDiar.appinstaller" download>EchoDiar.appinstaller</a> and open the downloaded file. App Installer shows EchoDiar: click <strong>Install</strong>. If the file does not open, update <strong>App Installer</strong> from the Microsoft Store.</li>
-            <li data-windows hidden>Needs Windows 11 on x64 or Arm64. The link is the file itself: Windows turns off <code>ms-appinstaller:</code> install links by default.</li>
-            <li data-windows hidden>Updates itself through App Installer: the title bar shows <strong>Update</strong> when a new version is out, and tray icon &gt; <strong>Check for updates…</strong> checks now.</li>
 </ul>
+            <section id="install-windows" class="doc">
+              <h3>Windows</h3>
+<ol class="steps">
+              <li>Download <strong>EchoDiar-Setup.exe</strong> from the <a href="https://github.com/dinhanhthi/EchoDiar/releases" target="_blank" rel="noopener noreferrer">Releases page</a>, under <strong>Assets</strong> of a release that includes Windows<span data-windows hidden>, or <a href="https://github.com/dinhanhthi/EchoDiar/releases" data-windows-asset="EchoDiar-Setup.exe">download the latest one directly</a></span>. One file for x64 and Arm64.</li>
+              <li>Open it. When Windows says <strong>Windows protected your PC</strong>, click <strong>More info</strong>, then <strong>Run anyway</strong>.</li>
+              <li>Click <strong>Install</strong>. When Windows asks if you want to allow an app from an <strong>Unknown publisher</strong> to make changes, click <strong>Yes</strong>. This happens only once, to trust the EchoDiar certificate.</li>
+              <li>Setup installs EchoDiar from <code>ed.dinhanhthi.com</code>. Click <strong>Open EchoDiar</strong>.</li>
+</ol>
+<ul class="list">
+              <li>Needs Windows 11 on x64 or Arm64.</li>
+              <li>Updates itself through App Installer: the title bar shows <strong>Update</strong> when a new version is out, and tray icon &gt; <strong>Check for updates…</strong> checks now.</li>
+              <li>Why Windows warns, what Setup changes, and what to do if Smart App Control blocks Setup: <a href="#windows-warnings">Windows warnings</a>.</li>
+</ul>
+            </section>
+          </section>
+
+          <section id="windows-warnings" class="doc">
+            <h2>Windows warnings</h2>
+<ul class="list">
+            <li><strong>Why Windows warns:</strong> EchoDiar for Windows is not yet signed by a public certificate authority. It is signed with EchoDiar's own certificate, which Windows does not know, so SmartScreen says <strong>Windows protected your PC</strong> and User Account Control says <strong>Unknown publisher</strong>. EchoDiar is open source, and GitHub Actions builds Setup and the app from the source of each release.</li>
+            <li><strong>Check the download</strong> (optional): each release has <code>SHA256SUMS-windows.txt</code> next to <code>EchoDiar-Setup.exe</code>. In PowerShell, in the folder of the download, run the line below and compare the hash with the <code>EchoDiar-Setup.exe</code> line of that file (upper or lower case does not matter).
+<pre><code>Get-FileHash .\EchoDiar-Setup.exe -Algorithm SHA256</code></pre></li>
+            <li><strong>What Setup changes:</strong> it adds one certificate, EchoDiar's, to <strong>Trusted People</strong> of the computer, so Windows accepts the app's signature. That step is the one that asks for <strong>Yes</strong>. Then it installs EchoDiar for your account from the App Installer feed at <code>ed.dinhanhthi.com</code>, which keeps it updated, with the Microsoft Visual C++ Runtime if it is missing.</li>
+</ul>
+            <h3>If Smart App Control blocks Setup</h3>
+            <p>Smart App Control can block Setup without a <strong>Run anyway</strong> button. Then install EchoDiar by hand:</p>
+<ol class="steps">
+              <li>Download <strong>EchoDiar.cer</strong> from the <a href="https://github.com/dinhanhthi/EchoDiar/releases" target="_blank" rel="noopener noreferrer">Releases page</a>, under <strong>Assets</strong> of a release that includes Windows<span data-windows hidden>, or <a href="https://github.com/dinhanhthi/EchoDiar/releases" data-windows-asset="EchoDiar.cer">download the latest one directly</a></span>.</li>
+              <li>Open PowerShell as administrator and trust the certificate (change the path if you saved the file elsewhere):
+<pre><code>Import-Certificate -FilePath "$HOME\Downloads\EchoDiar.cer" -CertStoreLocation Cert:\LocalMachine\TrustedPeople</code></pre>
+              Then, in a PowerShell that is not run as administrator, install EchoDiar from its feed, which keeps it updated:
+<pre><code>Add-AppxPackage -AppInstallerFile https://ed.dinhanhthi.com/windows/EchoDiar.appinstaller</code></pre>
+              If that fails because <code>Microsoft.VCLibs</code> is missing, install it with the line for your PC, then run the line above again:
+<pre><code># x64
+Add-AppxPackage https://aka.ms/Microsoft.VCLibs.x64.14.00.Desktop.appx
+# Arm64
+Add-AppxPackage https://aka.ms/Microsoft.VCLibs.arm64.14.00.Desktop.appx</code></pre></li>
+</ol>
+            <p>This may not help while Smart App Control is on: it can block EchoDiar itself too, because the app is not signed by a public certificate authority yet.</p>
+            <h3>After uninstalling</h3>
+            <p>Uninstalling EchoDiar leaves its certificate in Trusted People. To remove it, open <code>certlm.msc</code>, go to <strong>Trusted People &gt; Certificates</strong> and delete the certificate issued to <strong>Anh-Thi Dinh</strong>. Or run this in PowerShell as administrator:</p>
+<pre><code>Get-ChildItem Cert:\LocalMachine\TrustedPeople | Where-Object Subject -eq 'CN=Anh-Thi Dinh' | Remove-Item</code></pre>
+            <h3>A signed build is planned</h3>
+            <p>A build signed by a public certificate authority is planned. Windows will then know the publisher and Setup will no longer need to trust a certificate. Moving to it takes one reinstall; your recordings stay.</p>
           </section>
 
           <section id="permissions" class="doc">
