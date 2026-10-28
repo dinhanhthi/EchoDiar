@@ -1,30 +1,42 @@
 name: Windows release
 
-# Builds a Windows release of the port (windows/): Release MSIX packages for x64 and arm64, bundled with
-# makeappx into one signed .msixbundle, plus the App Installer feed (EchoDiar.appinstaller) that points at it.
-# Both are uploaded as the workflow artifact EchoDiar-<tag> (with EchoDiarDev.cer on the dev channel). This
-# workflow never creates a GitHub release (contents: read): windows/scripts/release.sh publishes one from the
-# Mac, only with --publish and after a confirmation (docs/RELEASING.md).
+# Builds a Windows release of the port (windows/): Release MSIX packages for x64 and arm64, signed and bundled with
+# makeappx into one signed .msixbundle, the App Installer feed (EchoDiar.appinstaller) that points at it, the
+# public signing certificate, the installer EchoDiar-Setup.exe (which embeds that certificate) and
+# SHA256SUMS-windows.txt. These five files are uploaded flat as the workflow artifact EchoDiar-<tag>. This workflow
+# never creates or edits a GitHub release (contents: read): windows/scripts/release.sh publishes or attaches them
+# from the Mac (docs/RELEASING.md).
 #
 # Triggers:
-#   - push of a tag windows-vX.Y.Z (public channel) or windows-vX.Y.Z-dev (dev channel);
-#   - workflow_dispatch with version X.Y.Z and channel dev|public (GitHub dispatches only workflows on the
+#   - push of a tag vX.Y.Z (release channel: the tag publish-release.sh pushes for the macOS release),
+#     windows-vX.Y.Z-dev (dev channel) or windows-vX.Y.Z (public channel);
+#   - workflow_dispatch with version X.Y.Z and channel dev|release|public (GitHub dispatches only workflows on the
 #     default branch, so this works once the file is on main); it builds the dispatched commit for the tag
-#     windows-v<version>[-dev], which the release must then be created on.
+#     windows-v<version>-dev, v<version> or windows-v<version>, which the release must then be created on. The
+#     release channel must be dispatched on its tag (--ref v<version>), so the bundle Uri names the code it built.
 # Version: X.Y.Z gives the 4-part package version X.Y.Z.0 (each part 0-65535, no leading zeros), so a tag always
-# maps to the same version. Dev releases use 0.0.N (N above the 0.0.<run>.0 of windows.yml CI builds), public
-# releases the macOS marketing version.
-# Signing:
+# maps to the same version. Dev releases use 0.0.N (N above the 0.0.<run>.0 of windows.yml CI builds), release and
+# public releases the macOS marketing version.
+# Channels and signing:
 #   - dev: the dev certificate (WINDOWS_DEV_CERT_PFX / WINDOWS_DEV_CERT_PASSWORD, secrets of the windows-dev-signing
-#     environment), Publisher CN=EchoDiar Dev.
+#     environment), Publisher CN=EchoDiar Dev, public certificate EchoDiarDev.cer.
+#   - release: the self-signed release certificate (WINDOWS_RELEASE_CERT_PFX / WINDOWS_RELEASE_CERT_PASSWORD, secrets
+#     of the windows-release-signing environment, which needs a reviewer's approval), Publisher = the variable
+#     WINDOWS_PUBLIC_PUBLISHER, public certificate EchoDiar.cer. prepare fails when that variable is empty or
+#     CN=EchoDiar Dev, before any job names the environment (a job naming a missing environment creates it
+#     unprotected).
 #   - public: Trusted Signing, not implemented yet. The run fails at once unless the secrets AZURE_TENANT_ID,
 #     AZURE_CLIENT_ID, AZURE_CLIENT_SECRET, TRUSTED_SIGNING_ENDPOINT, TRUSTED_SIGNING_ACCOUNT,
 #     TRUSTED_SIGNING_CERT_PROFILE and the variable WINDOWS_PUBLIC_PUBLISHER (the Trusted Signing certificate
 #     subject) are set, and then stops at the placeholder signing step. The dev certificate never signs it.
+# Jobs: prepare (tag, channel, versions, URIs) -> package (x64, arm64: unsigned MSIX, no environment, no secret) ->
+# sign (the only job with an environment; builds nothing: signs both MSIX, bundles and signs the bundle, exports the
+# public certificate) -> assemble (no environment: builds Setup with that certificate, renders the feed, writes the
+# checksums).
 
 on:
   push:
-    tags: ['windows-v*']
+    tags: ['windows-v*', 'v*']
   workflow_dispatch:
     inputs:
       version:
@@ -36,7 +48,7 @@ on:
         required: true
         default: dev
         type: choice
-        options: [dev, public]
+        options: [dev, release, public]
 
 permissions:
   contents: read
@@ -46,8 +58,9 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-  # Resolves the tag, channel, versions, publisher and URIs once, and fails fast on a bad tag or on the public
-  # channel without its Trusted Signing secrets (before any Windows runner builds).
+  # Resolves the tag, channel, versions, publisher and URIs once, and fails fast on a bad tag, on the release channel
+  # without its publisher, or on the public channel without its Trusted Signing secrets (before any Windows runner
+  # builds, and before sign names an environment).
   prepare:
     runs-on: ubuntu-latest
     defaults:
@@ -59,6 +72,7 @@ jobs:
       version: ${{ steps.resolve.outputs.version }}
       version4: ${{ steps.resolve.outputs.version4 }}
       publisher: ${{ steps.resolve.outputs.publisher }}
+      cer_name: ${{ steps.resolve.outputs.cer_name }}
       bundle_name: ${{ steps.resolve.outputs.bundle_name }}
       bundle_uri: ${{ steps.resolve.outputs.bundle_uri }}
       appinstaller_uri: ${{ steps.resolve.outputs.appinstaller_uri }}
@@ -67,6 +81,7 @@ jobs:
         name: Resolve version and channel
         env:
           EVENT_NAME: ${{ github.event_name }}
+          REF: ${{ github.ref }}
           REF_NAME: ${{ github.ref_name }}
           INPUT_VERSION: ${{ inputs.version }}
           INPUT_CHANNEL: ${{ inputs.channel }}
@@ -76,34 +91,59 @@ jobs:
           if [[ "$EVENT_NAME" == "workflow_dispatch" ]]; then
             case "$INPUT_CHANNEL" in
               dev) tag="windows-v${INPUT_VERSION}-dev" ;;
+              release) tag="v${INPUT_VERSION}" ;;
               public) tag="windows-v${INPUT_VERSION}" ;;
-              *) echo "::error::channel must be dev or public"; exit 1 ;;
+              *) echo "::error::channel must be dev, release or public"; exit 1 ;;
             esac
           else
             tag="$REF_NAME"
           fi
-          re='^windows-v(0|[1-9][0-9]{0,4})\.(0|[1-9][0-9]{0,4})\.(0|[1-9][0-9]{0,4})(-dev)?$'
-          if [[ ! "$tag" =~ $re ]]; then
-            echo "::error::'$tag' is not windows-vX.Y.Z or windows-vX.Y.Z-dev (X, Y, Z = 0-65535, no leading zeros)"
+          re_dev='^windows-v(0|[1-9][0-9]{0,4})\.(0|[1-9][0-9]{0,4})\.(0|[1-9][0-9]{0,4})-dev$'
+          re_release='^v(0|[1-9][0-9]{0,4})\.(0|[1-9][0-9]{0,4})\.(0|[1-9][0-9]{0,4})$'
+          re_public='^windows-v(0|[1-9][0-9]{0,4})\.(0|[1-9][0-9]{0,4})\.(0|[1-9][0-9]{0,4})$'
+          if [[ "$tag" =~ $re_dev ]]; then
+            channel=dev
+          elif [[ "$tag" =~ $re_release ]]; then
+            channel=release
+          elif [[ "$tag" =~ $re_public ]]; then
+            channel=public
+          else
+            echo "::error::'$tag' is not vX.Y.Z, windows-vX.Y.Z-dev or windows-vX.Y.Z (X, Y, Z = 0-65535, no leading zeros)"
             exit 1
           fi
-          major="${BASH_REMATCH[1]}"; minor="${BASH_REMATCH[2]}"; patch="${BASH_REMATCH[3]}"; suffix="${BASH_REMATCH[4]}"
+          major="${BASH_REMATCH[1]}"; minor="${BASH_REMATCH[2]}"; patch="${BASH_REMATCH[3]}"
           for part in "$major" "$minor" "$patch"; do
             (( part <= 65535 )) || { echo "::error::version part $part of '$tag' is above 65535"; exit 1; }
           done
           version="$major.$minor.$patch"
           version4="$version.0"
-          if [[ -n "$suffix" ]]; then
-            channel=dev
-            publisher='CN=EchoDiar Dev'
-          else
-            channel=public
-            publisher="$PUBLIC_PUBLISHER"
-          fi
           if [[ "$EVENT_NAME" == "workflow_dispatch" && "$channel" != "$INPUT_CHANNEL" ]]; then
-            echo "::error::version must be X.Y.Z (the channel input picks the -dev suffix)"
+            echo "::error::version must be X.Y.Z (the channel input picks the tag)"
             exit 1
           fi
+          # The bundle Uri names the tag's release asset, so a dispatched release run must build that tag.
+          if [[ "$EVENT_NAME" == "workflow_dispatch" && "$channel" == release && "$REF" != "refs/tags/$tag" ]]; then
+            echo "::error::dispatch the release channel on its tag ($tag, e.g. gh workflow run --ref $tag), not on $REF"
+            exit 1
+          fi
+          case "$channel" in
+            dev)
+              publisher='CN=EchoDiar Dev'
+              cer_name=EchoDiarDev.cer
+              ;;
+            release)
+              if [[ -z "$PUBLIC_PUBLISHER" || "$PUBLIC_PUBLISHER" == 'CN=EchoDiar Dev' ]]; then
+                echo "::error::The release channel needs the variable WINDOWS_PUBLIC_PUBLISHER = the release certificate subject, not empty or CN=EchoDiar Dev (see docs/RELEASING.md)"
+                exit 1
+              fi
+              publisher="$PUBLIC_PUBLISHER"
+              cer_name=EchoDiar.cer
+              ;;
+            public)
+              publisher="$PUBLIC_PUBLISHER"
+              cer_name=EchoDiar.cer
+              ;;
+          esac
           bundle_name="EchoDiar_${version4}.msixbundle"
           {
             echo "tag=$tag"
@@ -111,6 +151,7 @@ jobs:
             echo "version=$version"
             echo "version4=$version4"
             echo "publisher=$publisher"
+            echo "cer_name=$cer_name"
             echo "bundle_name=$bundle_name"
             echo "bundle_uri=https://github.com/$GITHUB_REPOSITORY/releases/download/$tag/$bundle_name"
             echo "appinstaller_uri=https://ed.dinhanhthi.com/windows/EchoDiar.appinstaller"
@@ -144,12 +185,11 @@ jobs:
             exit 1
           fi
 
+  # Builds the unsigned MSIX of one architecture on every channel: no environment and no secret here, since this job
+  # restores and builds third-party code. sign signs them.
   package:
     needs: prepare
     runs-on: windows-latest
-    # Dev channel only. The public channel runs without an environment for now; move its Trusted Signing secrets
-    # into a windows-public-signing environment (docs/RELEASING.md) and name it here and in bundle.
-    environment: ${{ needs.prepare.outputs.channel == 'dev' && 'windows-dev-signing' || '' }}
     timeout-minutes: 45
     defaults:
       run:
@@ -161,13 +201,11 @@ jobs:
     env:
       ARCH: ${{ matrix.arch }}
       PLATFORM_NAME: ${{ matrix.arch == 'arm64' && 'ARM64' || 'x64' }}
-      CHANNEL: ${{ needs.prepare.outputs.channel }}
       VERSION4: ${{ needs.prepare.outputs.version4 }}
       PUBLISHER: ${{ needs.prepare.outputs.publisher }}
     steps:
       - name: Set paths
         run: |
-          "PFX_PATH=$env:RUNNER_TEMP\EchoDiarDev.pfx" >> $env:GITHUB_ENV
           "OUT_DIR=$env:RUNNER_TEMP\AppPackages" >> $env:GITHUB_ENV
           "STAGE_DIR=$env:RUNNER_TEMP\msix" >> $env:GITHUB_ENV
 
@@ -195,22 +233,8 @@ jobs:
           $id = ([xml]$xml).Package.Identity
           "Identity: $($id.GetAttribute('Name')) $($id.GetAttribute('Version')) '$($id.GetAttribute('Publisher'))'"
 
-      - name: Decode signing certificate
-        if: env.CHANNEL == 'dev'
-        env:
-          PFX_BASE64: ${{ secrets.WINDOWS_DEV_CERT_PFX }}
-          PFX_PASSWORD: ${{ secrets.WINDOWS_DEV_CERT_PASSWORD }}
-        run: |
-          if (-not $env:PFX_BASE64) { throw 'WINDOWS_DEV_CERT_PFX is empty' }
-          [IO.File]::WriteAllBytes($env:PFX_PATH, [Convert]::FromBase64String($env:PFX_BASE64))
-          $cert = New-Object System.Security.Cryptography.X509Certificates.X509Certificate2($env:PFX_PATH, $env:PFX_PASSWORD)
-          if ($cert.Subject -ne $env:PUBLISHER) { throw "Certificate subject '$($cert.Subject)' is not the Publisher '$env:PUBLISHER'" }
-
-      # The packages inside the bundle are signed with the dev certificate on the dev channel; on the public
-      # channel they stay unsigned (the bundle signature covers them).
+      # Unsigned on every channel: sign signs each package and the bundle.
       - name: Build MSIX
-        env:
-          PFX_PASSWORD: ${{ secrets.WINDOWS_DEV_CERT_PASSWORD }}
         run: |
           $props = @(
             '/p:Configuration=Release',
@@ -219,16 +243,9 @@ jobs:
             '/p:GenerateAppxPackageOnBuild=true',
             '/p:UapAppxPackageBuildMode=SideloadOnly',
             '/p:AppxBundle=Never',
-            "/p:AppxPackageDir=$env:OUT_DIR\"
+            "/p:AppxPackageDir=$env:OUT_DIR\",
+            '/p:AppxPackageSigningEnabled=false'
           )
-          if ($env:CHANNEL -eq 'dev') {
-            if (-not (Test-Path $env:PFX_PATH)) { throw 'No dev certificate' }
-            $props += '/p:AppxPackageSigningEnabled=true'
-            $props += "/p:PackageCertificateKeyFile=$env:PFX_PATH"
-            $props += "/p:PackageCertificatePassword=$env:PFX_PASSWORD"
-          } else {
-            $props += '/p:AppxPackageSigningEnabled=false'
-          }
           msbuild windows/src/EchoDiar.App/EchoDiar.App.csproj /restore /nologo /v:minimal @props
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
@@ -313,37 +330,32 @@ jobs:
           retention-days: 1
           if-no-files-found: error
 
-      - name: Remove signing certificate
-        if: always()
-        run: Remove-Item -LiteralPath $env:PFX_PATH -Force -ErrorAction SilentlyContinue
-
-  bundle:
+  # The only job that sees a signing key. It checks out and builds nothing: it signs both packages, bundles them,
+  # signs the bundle and exports the public certificate, as the intermediate artifact signed-<tag>.
+  sign:
     needs: [prepare, package]
     runs-on: windows-latest
-    # Same as package: the dev certificate comes from windows-dev-signing; windows-public-signing to come.
-    environment: ${{ needs.prepare.outputs.channel == 'dev' && 'windows-dev-signing' || '' }}
+    # dev: windows-dev-signing; release: windows-release-signing (reviewer approval). The public channel runs without
+    # an environment for now; move its Trusted Signing secrets into a windows-public-signing environment
+    # (docs/RELEASING.md) and name it here.
+    environment: ${{ needs.prepare.outputs.channel == 'dev' && 'windows-dev-signing' || needs.prepare.outputs.channel == 'release' && 'windows-release-signing' || '' }}
     timeout-minutes: 20
     defaults:
       run:
         shell: pwsh
     env:
-      TAG: ${{ needs.prepare.outputs.tag }}
       CHANNEL: ${{ needs.prepare.outputs.channel }}
       VERSION4: ${{ needs.prepare.outputs.version4 }}
       PUBLISHER: ${{ needs.prepare.outputs.publisher }}
+      CER_NAME: ${{ needs.prepare.outputs.cer_name }}
       BUNDLE_NAME: ${{ needs.prepare.outputs.bundle_name }}
-      BUNDLE_URI: ${{ needs.prepare.outputs.bundle_uri }}
-      APPINSTALLER_URI: ${{ needs.prepare.outputs.appinstaller_uri }}
+      TIMESTAMP_URL: http://timestamp.digicert.com
     steps:
       - name: Set paths
         run: |
-          "PFX_PATH=$env:RUNNER_TEMP\EchoDiarDev.pfx" >> $env:GITHUB_ENV
+          "PFX_PATH=$env:RUNNER_TEMP\signing.pfx" >> $env:GITHUB_ENV
           "MSIX_DIR=$env:RUNNER_TEMP\msix" >> $env:GITHUB_ENV
-          "STAGE_DIR=$env:RUNNER_TEMP\release" >> $env:GITHUB_ENV
-
-      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
-        with:
-          persist-credentials: false
+          "STAGE_DIR=$env:RUNNER_TEMP\signed" >> $env:GITHUB_ENV
 
       - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
@@ -364,33 +376,56 @@ jobs:
           "MAKEAPPX=$(Join-Path $bin 'makeappx.exe')" >> $env:GITHUB_ENV
           "SIGNTOOL=$(Join-Path $bin 'signtool.exe')" >> $env:GITHUB_ENV
 
+      # Each channel reads only its own secrets (the trailing '' keeps an empty release secret from falling through
+      # to the dev one).
+      - name: Decode signing certificate
+        if: env.CHANNEL == 'dev' || env.CHANNEL == 'release'
+        env:
+          PFX_BASE64: ${{ env.CHANNEL == 'release' && secrets.WINDOWS_RELEASE_CERT_PFX || env.CHANNEL == 'dev' && secrets.WINDOWS_DEV_CERT_PFX || '' }}
+          PFX_PASSWORD: ${{ env.CHANNEL == 'release' && secrets.WINDOWS_RELEASE_CERT_PASSWORD || env.CHANNEL == 'dev' && secrets.WINDOWS_DEV_CERT_PASSWORD || '' }}
+        run: |
+          $secret = if ($env:CHANNEL -eq 'release') { 'WINDOWS_RELEASE_CERT_PFX' } else { 'WINDOWS_DEV_CERT_PFX' }
+          if (-not $env:PFX_BASE64) { throw "$secret is empty" }
+          [IO.File]::WriteAllBytes($env:PFX_PATH, [Convert]::FromBase64String($env:PFX_BASE64))
+          $cert = New-Object System.Security.Cryptography.X509Certificates.X509Certificate2($env:PFX_PATH, $env:PFX_PASSWORD)
+          if ($cert.Subject -ne $env:PUBLISHER) { throw "Certificate subject '$($cert.Subject)' is not the Publisher '$env:PUBLISHER'" }
+          # Public certificate only: the PFX never leaves this job.
+          New-Item -ItemType Directory -Path $env:STAGE_DIR | Out-Null
+          $der = $cert.Export([System.Security.Cryptography.X509Certificates.X509ContentType]::Cert)
+          [IO.File]::WriteAllBytes((Join-Path $env:STAGE_DIR $env:CER_NAME), $der)
+          "Certificate: '$($cert.Subject)', thumbprint $($cert.Thumbprint), expires $($cert.NotAfter.ToString('yyyy-MM-dd'))"
+
+      - name: Sign packages
+        if: env.CHANNEL == 'dev' || env.CHANNEL == 'release'
+        env:
+          PFX_PASSWORD: ${{ env.CHANNEL == 'release' && secrets.WINDOWS_RELEASE_CERT_PASSWORD || env.CHANNEL == 'dev' && secrets.WINDOWS_DEV_CERT_PASSWORD || '' }}
+        run: |
+          $msix = @(Get-ChildItem -LiteralPath $env:MSIX_DIR -File -Filter '*.msix')
+          if ($msix.Count -ne 2) { throw "Expected two .msix (x64 and arm64) in $env:MSIX_DIR, found $($msix.Count)" }
+          foreach ($file in $msix) {
+            & $env:SIGNTOOL sign /fd SHA256 /tr $env:TIMESTAMP_URL /td SHA256 /f $env:PFX_PATH /p $env:PFX_PASSWORD $file.FullName
+            if ($LASTEXITCODE -ne 0) { throw "signtool sign $($file.Name) failed ($LASTEXITCODE)" }
+          }
+
       - name: Make bundle
         run: |
           $msix = @(Get-ChildItem -LiteralPath $env:MSIX_DIR -File -Filter '*.msix')
           $msix | ForEach-Object Name
           if ($msix.Count -ne 2) { throw "Expected two .msix (x64 and arm64) in $env:MSIX_DIR, found $($msix.Count)" }
-          New-Item -ItemType Directory -Path $env:STAGE_DIR | Out-Null
+          New-Item -ItemType Directory -Path $env:STAGE_DIR -Force | Out-Null
           $bundle = Join-Path $env:STAGE_DIR $env:BUNDLE_NAME
           # /bv: the bundle version is the package version (makeappx stamps a date-based one otherwise).
           & $env:MAKEAPPX bundle /d $env:MSIX_DIR /p $bundle /bv $env:VERSION4 /o
           if ($LASTEXITCODE -ne 0) { throw "makeappx bundle failed ($LASTEXITCODE)" }
 
-      - name: Sign bundle (dev certificate)
-        if: env.CHANNEL == 'dev'
+      - name: Sign bundle
+        if: env.CHANNEL == 'dev' || env.CHANNEL == 'release'
         env:
-          PFX_BASE64: ${{ secrets.WINDOWS_DEV_CERT_PFX }}
-          PFX_PASSWORD: ${{ secrets.WINDOWS_DEV_CERT_PASSWORD }}
+          PFX_PASSWORD: ${{ env.CHANNEL == 'release' && secrets.WINDOWS_RELEASE_CERT_PASSWORD || env.CHANNEL == 'dev' && secrets.WINDOWS_DEV_CERT_PASSWORD || '' }}
         run: |
-          if (-not $env:PFX_BASE64) { throw 'WINDOWS_DEV_CERT_PFX is empty' }
-          [IO.File]::WriteAllBytes($env:PFX_PATH, [Convert]::FromBase64String($env:PFX_BASE64))
-          $cert = New-Object System.Security.Cryptography.X509Certificates.X509Certificate2($env:PFX_PATH, $env:PFX_PASSWORD)
-          if ($cert.Subject -ne $env:PUBLISHER) { throw "Certificate subject '$($cert.Subject)' is not the Publisher '$env:PUBLISHER'" }
           $bundle = Join-Path $env:STAGE_DIR $env:BUNDLE_NAME
-          & $env:SIGNTOOL sign /fd SHA256 /f $env:PFX_PATH /p $env:PFX_PASSWORD $bundle
+          & $env:SIGNTOOL sign /fd SHA256 /tr $env:TIMESTAMP_URL /td SHA256 /f $env:PFX_PATH /p $env:PFX_PASSWORD $bundle
           if ($LASTEXITCODE -ne 0) { throw "signtool sign failed ($LASTEXITCODE)" }
-          # Public certificate only: the PFX never leaves the runner.
-          $der = $cert.Export([System.Security.Cryptography.X509Certificates.X509ContentType]::Cert)
-          [IO.File]::WriteAllBytes((Join-Path $env:STAGE_DIR 'EchoDiarDev.cer'), $der)
 
       # Placeholder, gated on the public channel: prepare already failed unless the Trusted Signing secrets are
       # set. Replace with the Trusted Signing step (signtool + the Azure dlib, or azure/trusted-signing-action)
@@ -421,6 +456,95 @@ jobs:
             ForEach-Object { "$($_.GetAttribute('Architecture'))/$($_.GetAttribute('Version'))" } | Sort-Object)
           "Packages: $($arches -join ', ')"
           if (($arches -join ',') -ne "arm64/$env:VERSION4,x64/$env:VERSION4") { throw "Bundle packages: $($arches -join ', ')" }
+
+      - name: Stage signed files
+        run: |
+          if (Get-ChildItem -LiteralPath $env:STAGE_DIR -Recurse -File -Include '*.pfx', '*.p12') { throw 'Private key in artifact' }
+          $expected = @($env:BUNDLE_NAME, $env:CER_NAME) | Sort-Object
+          $actual = @(Get-ChildItem -LiteralPath $env:STAGE_DIR -Recurse -File | ForEach-Object { $_.FullName.Substring($env:STAGE_DIR.Length + 1) } | Sort-Object)
+          if (($actual -join '|') -ne ($expected -join '|')) { throw "Signed files: $($actual -join ', '); expected: $($expected -join ', ')" }
+          Get-ChildItem -LiteralPath $env:STAGE_DIR -File | ForEach-Object { '{0}  {1:N0} bytes' -f $_.Name, $_.Length }
+
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: signed-${{ needs.prepare.outputs.tag }}
+          path: ${{ runner.temp }}/signed
+          retention-days: 1
+          if-no-files-found: error
+
+      - name: Remove signing certificate
+        if: always()
+        run: Remove-Item -LiteralPath $env:PFX_PATH -Force -ErrorAction SilentlyContinue
+
+  # No environment: builds EchoDiar-Setup.exe around the public certificate, renders the feed and writes the
+  # checksums, then uploads the five release files as EchoDiar-<tag>.
+  assemble:
+    needs: [prepare, sign]
+    runs-on: windows-latest
+    timeout-minutes: 20
+    defaults:
+      run:
+        shell: pwsh
+    env:
+      VERSION4: ${{ needs.prepare.outputs.version4 }}
+      PUBLISHER: ${{ needs.prepare.outputs.publisher }}
+      CER_NAME: ${{ needs.prepare.outputs.cer_name }}
+      BUNDLE_NAME: ${{ needs.prepare.outputs.bundle_name }}
+      BUNDLE_URI: ${{ needs.prepare.outputs.bundle_uri }}
+      APPINSTALLER_URI: ${{ needs.prepare.outputs.appinstaller_uri }}
+    steps:
+      - name: Set paths
+        run: |
+          "SIGNED_DIR=$env:RUNNER_TEMP\signed" >> $env:GITHUB_ENV
+          "SETUP_DIR=$env:RUNNER_TEMP\setup" >> $env:GITHUB_ENV
+          "STAGE_DIR=$env:RUNNER_TEMP\release" >> $env:GITHUB_ENV
+
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6.0.0
+        with:
+          global-json-file: windows/global.json
+
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: signed-${{ needs.prepare.outputs.tag }}
+          path: ${{ runner.temp }}/signed
+
+      # From windows/ so global.json applies. The feed Uri is the rendered feed's own, so Setup and feed agree.
+      - name: Build Setup
+        working-directory: windows
+        run: |
+          $cer = Join-Path $env:SIGNED_DIR $env:CER_NAME
+          if (-not (Test-Path -LiteralPath $cer)) { throw "$env:CER_NAME is not in the signed artifact" }
+          dotnet build src/EchoDiar.Setup/EchoDiar.Setup.csproj -c Release --nologo -o $env:SETUP_DIR "-p:SetupCertificate=$cer" "-p:SetupFeedUri=$env:APPINSTALLER_URI"
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
+      # Users download only EchoDiar-Setup.exe: it must run alone. The .pdb is ignored; the .exe.config is the
+      # supportedRuntime stub, unless it carries binding redirects (then the exe would need it).
+      - name: Check Setup output
+        run: |
+          $rel = @(Get-ChildItem -LiteralPath $env:SETUP_DIR -Recurse -File | ForEach-Object { $_.FullName.Substring($env:SETUP_DIR.Length + 1) } | Sort-Object)
+          "Setup output: $($rel -join ', ')"
+          if ($rel -notcontains 'EchoDiar-Setup.exe') { throw "No EchoDiar-Setup.exe in the Setup output: $($rel -join ', ')" }
+          $extra = @($rel | Where-Object { $_ -notin @('EchoDiar-Setup.exe', 'EchoDiar-Setup.exe.config', 'EchoDiar-Setup.pdb') })
+          if ($extra) { throw "EchoDiar-Setup.exe must run alone, but the build also wrote $($extra -join ', ') (all files: $($rel -join ', '))" }
+          $config = Join-Path $env:SETUP_DIR 'EchoDiar-Setup.exe.config'
+          if ((Test-Path -LiteralPath $config) -and (Select-String -LiteralPath $config -Pattern 'bindingRedirect' -SimpleMatch -Quiet)) {
+            Get-Content -Raw -LiteralPath $config
+            throw 'EchoDiar-Setup.exe.config has binding redirects: the exe would not run without it'
+          }
+
+      - name: Stage release files
+        run: |
+          New-Item -ItemType Directory -Path $env:STAGE_DIR | Out-Null
+          $files = @(
+            (Join-Path $env:SIGNED_DIR $env:BUNDLE_NAME)
+            (Join-Path $env:SIGNED_DIR $env:CER_NAME)
+            (Join-Path $env:SETUP_DIR 'EchoDiar-Setup.exe')
+          )
+          Copy-Item -LiteralPath $files -Destination $env:STAGE_DIR
 
       - name: Render EchoDiar.appinstaller
         run: |
@@ -453,10 +577,24 @@ jobs:
           if ($doc.GetElementsByTagName('AutomaticBackgroundTask').Count -ne 1) { throw 'No AutomaticBackgroundTask' }
           Get-Content -Raw $path
 
-      - name: Stage artifact
+      # GNU sha256sum format (shasum -a 256 -c): lowercase hash, two spaces, name, LF line endings.
+      - name: Write SHA256SUMS-windows.txt
+        run: |
+          $lines = foreach ($name in @($env:BUNDLE_NAME, 'EchoDiar.appinstaller', $env:CER_NAME, 'EchoDiar-Setup.exe')) {
+            $hash = (Get-FileHash -Algorithm SHA256 -LiteralPath (Join-Path $env:STAGE_DIR $name)).Hash.ToLowerInvariant()
+            "$hash  $name"
+          }
+          $text = ($lines -join "`n") + "`n"
+          [IO.File]::WriteAllText((Join-Path $env:STAGE_DIR 'SHA256SUMS-windows.txt'), $text, (New-Object Text.UTF8Encoding($false)))
+          $text
+
+      - name: Check artifact
         run: |
           if (Get-ChildItem -LiteralPath $env:STAGE_DIR -Recurse -File -Include '*.pfx', '*.p12') { throw 'Private key in artifact' }
-          Get-ChildItem -LiteralPath $env:STAGE_DIR -Recurse -File | ForEach-Object { '{0}  {1:N0} bytes' -f $_.Name, $_.Length }
+          $expected = @($env:BUNDLE_NAME, 'EchoDiar.appinstaller', $env:CER_NAME, 'EchoDiar-Setup.exe', 'SHA256SUMS-windows.txt') | Sort-Object
+          $actual = @(Get-ChildItem -LiteralPath $env:STAGE_DIR -Recurse -File | ForEach-Object { $_.FullName.Substring($env:STAGE_DIR.Length + 1) } | Sort-Object)
+          if (($actual -join '|') -ne ($expected -join '|')) { throw "Artifact files: $($actual -join ', '); expected: $($expected -join ', ')" }
+          Get-ChildItem -LiteralPath $env:STAGE_DIR -File | ForEach-Object { '{0}  {1:N0} bytes' -f $_.Name, $_.Length }
 
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
@@ -464,7 +602,3 @@ jobs:
           path: ${{ runner.temp }}/release
           retention-days: 14
           if-no-files-found: error
-
-      - name: Remove signing certificate
-        if: always()
-        run: Remove-Item -LiteralPath $env:PFX_PATH -Force -ErrorAction SilentlyContinue
