@@ -7,7 +7,8 @@
 #   - version : MARKETING_VERSION in the COMMITTED project.yml at HEAD (= the app's
 #               CFBundleShortVersionString, so the tag always matches the app)
 #   - tag     : vX.Y.Z, created at HEAD and pushed
-#   - notes   : the `## [X.Y.Z]` section of CHANGELOG.md, written to a sibling
+#   - notes   : the `## [X.Y.Z]` section of CHANGELOG.md, then the Windows install block
+#               windows/packaging/release-notes.md at HEAD, written to a sibling
 #               EchoDiar-X.Y.Z.md next to the zip and used as the release body
 #   - release : `gh release create` with that tag, the zip asset, and the notes;
 #               the sibling .dmg (manual-download asset) is uploaded when present
@@ -99,6 +100,10 @@ if [[ -z "$(printf '%s' "$NOTES_BODY" | tr -d '[:space:]')" ]]; then
   exit 1
 fi
 
+# The fixed Windows install block follows the CHANGELOG section (read from HEAD, like the version).
+WINDOWS_NOTES="$(git show HEAD:windows/packaging/release-notes.md 2>/dev/null)" \
+  || { echo "error: windows/packaging/release-notes.md not found at HEAD" >&2; exit 1; }
+
 # Path fixed here (for the confirmation echo); written only after the confirm below
 # so an aborted run leaves no stray file behind.
 NOTES_FILE="$(dirname "$ZIP")/EchoDiar-${VERSION}.md"
@@ -147,7 +152,7 @@ if [[ "$YES" == false ]]; then
 fi
 
 # --- 6. Tag + GitHub Release -----------------------------------------------
-printf '%s\n' "$NOTES_BODY" > "$NOTES_FILE"
+printf '%s\n\n%s\n' "$NOTES_BODY" "$WINDOWS_NOTES" > "$NOTES_FILE"
 
 echo "==> Tagging $TAG"
 git tag -a "$TAG" -m "EchoDiar $VERSION"
