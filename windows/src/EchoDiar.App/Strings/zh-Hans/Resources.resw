@@ -3470,6 +3470,10 @@
     <value>整个对话</value>
     <comment>Whole conversation</comment>
   </data>
+  <data name="WhyWindowsWarnsAboutEchoDiar" xml:space="preserve">
+    <value>为什么 Windows 会对 EchoDiar 发出警告</value>
+    <comment>Why Windows warns about EchoDiar</comment>
+  </data>
   <data name="WinUI3AndTheAppPlatform" xml:space="preserve">
     <value>WinUI 3 和应用平台</value>
     <comment>WinUI 3 and the app platform</comment>
@@ -3501,6 +3505,10 @@
   <data name="WindowsAISystem" xml:space="preserve">
     <value>Windows AI（系统）</value>
     <comment>Windows AI (system)</comment>
+  </data>
+  <data name="WindowsShowsAWarningWhenYouInstallEchoDiarBecauseItIsNotYetS" xml:space="preserve">
+    <value>安装 EchoDiar 时，Windows 会显示警告，因为它尚未使用公共证书颁发机构的证书签名。EchoDiar 是开源软件，由 GitHub Actions 构建；每个版本都会列出其 SHA-256 校验和。EchoDiar 自己的证书已在这台电脑上受信任，以便安装更新。</value>
+    <comment>Windows shows a warning when you install EchoDiar because it is not yet signed with a certificate from a public authority. EchoDiar is open source and built by GitHub Actions; every release lists its SHA-256 checksums. EchoDiar's own certificate is trusted on this PC so that updates install.</comment>
   </data>
   <data name="WouldDeleteNowLldConversations" xml:space="preserve">
     <value>现在将删除：{0} 个对话</value>

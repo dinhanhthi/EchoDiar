@@ -1,8 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!--
     Settings › About (macOS SettingsWindow.swift AboutSettingsView): the logo, name and version, the updates (Windows
-    only: the last check and Check now), the license and the GitHub link, as Windows 11 Settings cards. Each searchable
-    card's Tag is its search entry's title (SearchEntries).
+    only: the last check and Check now), why Windows warns (Windows only), the license and the GitHub link, as Windows 11
+    Settings cards. Each searchable card's Tag is its search entry's title (SearchEntries).
 -->
 <UserControl
     x:Class="EchoDiar.App.Views.AboutSettingsPage"
@@ -35,6 +35,20 @@
                     <FontIcon FontFamily="{ThemeResource SymbolThemeFontFamily}" Glyph="&#xE895;" />
                 </controls:SettingsCard.HeaderIcon>
                 <Button x:Name="CheckUpdatesButton" Content="{local:T Text='Check now'}" />
+            </controls:SettingsCard>
+
+            <!-- Why Windows warns (SmartScreen, UAC, the certificate): opens the website's explanation. -->
+            <controls:SettingsCard
+                x:Name="WarningsCard"
+                Header="{local:T Text='Why Windows warns about EchoDiar'}"
+                IsClickEnabled="True"
+                Tag="Why Windows warns about EchoDiar">
+                <controls:SettingsCard.HeaderIcon>
+                    <FontIcon FontFamily="{ThemeResource SymbolThemeFontFamily}" Glyph="&#xEA18;" />
+                </controls:SettingsCard.HeaderIcon>
+                <controls:SettingsCard.ActionIcon>
+                    <FontIcon FontFamily="{ThemeResource SymbolThemeFontFamily}" Glyph="&#xE8A7;" />
+                </controls:SettingsCard.ActionIcon>
             </controls:SettingsCard>
 
             <controls:SettingsCard

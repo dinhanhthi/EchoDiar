@@ -3470,6 +3470,10 @@
     <value>Toàn bộ cuộc hội thoại</value>
     <comment>Whole conversation</comment>
   </data>
+  <data name="WhyWindowsWarnsAboutEchoDiar" xml:space="preserve">
+    <value>Vì sao Windows cảnh báo về EchoDiar</value>
+    <comment>Why Windows warns about EchoDiar</comment>
+  </data>
   <data name="WinUI3AndTheAppPlatform" xml:space="preserve">
     <value>WinUI 3 và nền tảng ứng dụng</value>
     <comment>WinUI 3 and the app platform</comment>
@@ -3501,6 +3505,10 @@
   <data name="WindowsAISystem" xml:space="preserve">
     <value>Windows AI (hệ thống)</value>
     <comment>Windows AI (system)</comment>
+  </data>
+  <data name="WindowsShowsAWarningWhenYouInstallEchoDiarBecauseItIsNotYetS" xml:space="preserve">
+    <value>Windows hiển thị cảnh báo khi bạn cài đặt EchoDiar vì ứng dụng chưa được ký bằng chứng chỉ của một tổ chức cấp chứng chỉ công khai. EchoDiar là phần mềm nguồn mở, được GitHub Actions xây dựng; mỗi bản phát hành đều liệt kê các mã băm SHA-256 của mình. Chứng chỉ riêng của EchoDiar được tin cậy trên máy tính này để các bản cập nhật có thể cài đặt.</value>
+    <comment>Windows shows a warning when you install EchoDiar because it is not yet signed with a certificate from a public authority. EchoDiar is open source and built by GitHub Actions; every release lists its SHA-256 checksums. EchoDiar's own certificate is trusted on this PC so that updates install.</comment>
   </data>
   <data name="WouldDeleteNowLldConversations" xml:space="preserve">
     <value>Sẽ xoá ngay: {0} cuộc hội thoại</value>

@@ -3610,6 +3610,10 @@
     <value>Whole conversation</value>
     <comment>Whole conversation</comment>
   </data>
+  <data name="WhyWindowsWarnsAboutEchoDiar" xml:space="preserve">
+    <value>Why Windows warns about EchoDiar</value>
+    <comment>Why Windows warns about EchoDiar</comment>
+  </data>
   <data name="WinUI3AndTheAppPlatform" xml:space="preserve">
     <value>WinUI 3 and the app platform</value>
     <comment>WinUI 3 and the app platform</comment>
@@ -3641,6 +3645,10 @@
   <data name="WindowsAISystem" xml:space="preserve">
     <value>Windows AI (system)</value>
     <comment>Windows AI (system)</comment>
+  </data>
+  <data name="WindowsShowsAWarningWhenYouInstallEchoDiarBecauseItIsNotYetS" xml:space="preserve">
+    <value>Windows shows a warning when you install EchoDiar because it is not yet signed with a certificate from a public authority. EchoDiar is open source and built by GitHub Actions; every release lists its SHA-256 checksums. EchoDiar's own certificate is trusted on this PC so that updates install.</value>
+    <comment>Windows shows a warning when you install EchoDiar because it is not yet signed with a certificate from a public authority. EchoDiar is open source and built by GitHub Actions; every release lists its SHA-256 checksums. EchoDiar's own certificate is trusted on this PC so that updates install.</comment>
   </data>
   <data name="WouldDeleteNowLldConversations" xml:space="preserve">
     <value>Would delete now: {0} conversations</value>

@@ -4615,6 +4615,36 @@
         }
       }
     },
+    "Why Windows warns about EchoDiar" : {
+      "comment" : "Windows only: Views/Settings/AboutSettingsPage.xaml.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Por qué Windows advierte sobre EchoDiar"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Pourquoi Windows affiche un avertissement pour EchoDiar"
+          }
+        },
+        "vi" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Vì sao Windows cảnh báo về EchoDiar"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "为什么 Windows 会对 EchoDiar 发出警告"
+          }
+        }
+      }
+    },
     "WinUI 3 and the app platform" : {
       "comment" : "Windows only: Views/Settings/AcknowledgementsSettingsPage.xaml.cs.",
       "extractionState" : "manual",
@@ -4821,6 +4851,36 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Windows AI 需要更新 Windows（“设置 › Windows 更新”）。"
+          }
+        }
+      }
+    },
+    "Windows shows a warning when you install EchoDiar because it is not yet signed with a certificate from a public authority. EchoDiar is open source and built by GitHub Actions; every release lists its SHA-256 checksums. EchoDiar's own certificate is trusted on this PC so that updates install." : {
+      "comment" : "Windows only: Views/Settings/AboutSettingsPage.xaml.cs.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Windows muestra una advertencia al instalar EchoDiar porque todavía no está firmado con un certificado de una autoridad pública. EchoDiar es de código abierto y se compila con GitHub Actions; cada versión indica sus sumas de comprobación SHA-256. El certificado propio de EchoDiar es de confianza en este PC para que se instalen las actualizaciones."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Windows affiche un avertissement lorsque vous installez EchoDiar, car il n’est pas encore signé avec un certificat d’une autorité publique. EchoDiar est open source et compilé par GitHub Actions ; chaque version indique ses sommes de contrôle SHA-256. Le certificat propre à EchoDiar est approuvé sur ce PC pour que les mises à jour s’installent."
+          }
+        },
+        "vi" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Windows hiển thị cảnh báo khi bạn cài đặt EchoDiar vì ứng dụng chưa được ký bằng chứng chỉ của một tổ chức cấp chứng chỉ công khai. EchoDiar là phần mềm nguồn mở, được GitHub Actions xây dựng; mỗi bản phát hành đều liệt kê các mã băm SHA-256 của mình. Chứng chỉ riêng của EchoDiar được tin cậy trên máy tính này để các bản cập nhật có thể cài đặt."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "安装 EchoDiar 时，Windows 会显示警告，因为它尚未使用公共证书颁发机构的证书签名。EchoDiar 是开源软件，由 GitHub Actions 构建；每个版本都会列出其 SHA-256 校验和。EchoDiar 自己的证书已在这台电脑上受信任，以便安装更新。"
           }
         }
       }

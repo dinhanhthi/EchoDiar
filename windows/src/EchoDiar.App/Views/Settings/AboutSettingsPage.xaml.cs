@@ -18,11 +18,17 @@ public sealed partial class AboutSettingsPage : UserControl
     /// <summary>macOS <c>AboutInfo.repository</c>.</summary>
     private static readonly Uri Repository = new("https://github.com/dinhanhthi/EchoDiar");
 
+    /// <summary>The website's explanation of the SmartScreen, UAC and certificate warnings (Windows only).</summary>
+    private static readonly Uri WindowsWarnings = new("https://ed.dinhanhthi.com/docs.html#windows-warnings");
+
     /// <summary>The searchable rows (macOS SettingsSearch.swift, About), each the Tag of its card.</summary>
     public static IReadOnlyList<SettingsEntry> SearchEntries { get; } =
     [
         new("Version", ["about", "build", "update"]),
         new("Updates", ["update", "check for updates", "App Installer", "appinstaller", "last check"]),
+        new(
+            "Why Windows warns about EchoDiar",
+            ["SmartScreen", "certificate", "signature", "unknown publisher", "UAC", "security"]),
         new("Licensed under AGPL-3.0", ["license", "open source"]),
         new("github.com/dinhanhthi/EchoDiar", ["GitHub", "source code", "repository"]),
     ];
@@ -34,6 +40,9 @@ public sealed partial class AboutSettingsPage : UserControl
         _model = model;
         InitializeComponent();
         VersionCard.Description = Loc.Format("Version %@", Version);
+        WarningsCard.Description = Loc.T(
+            "Windows shows a warning when you install EchoDiar because it is not yet signed with a certificate from a public authority. EchoDiar is open source and built by GitHub Actions; every release lists its SHA-256 checksums. EchoDiar's own certificate is trusted on this PC so that updates install.");
+        WarningsCard.Click += (_, _) => _ = Launcher.LaunchUriAsync(WindowsWarnings);
         RepositoryCard.Click += (_, _) => _ = Launcher.LaunchUriAsync(Repository);
         CheckUpdatesButton.Click += (_, _) => _ = _model.Updater.CheckNowAsync();
         Loaded += (_, _) =>

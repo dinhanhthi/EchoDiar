@@ -3590,6 +3590,10 @@
     <value>Toda la conversación</value>
     <comment>Whole conversation</comment>
   </data>
+  <data name="WhyWindowsWarnsAboutEchoDiar" xml:space="preserve">
+    <value>Por qué Windows advierte sobre EchoDiar</value>
+    <comment>Why Windows warns about EchoDiar</comment>
+  </data>
   <data name="WinUI3AndTheAppPlatform" xml:space="preserve">
     <value>WinUI 3 y la plataforma de apps</value>
     <comment>WinUI 3 and the app platform</comment>
@@ -3621,6 +3625,10 @@
   <data name="WindowsAISystem" xml:space="preserve">
     <value>Windows AI (sistema)</value>
     <comment>Windows AI (system)</comment>
+  </data>
+  <data name="WindowsShowsAWarningWhenYouInstallEchoDiarBecauseItIsNotYetS" xml:space="preserve">
+    <value>Windows muestra una advertencia al instalar EchoDiar porque todavía no está firmado con un certificado de una autoridad pública. EchoDiar es de código abierto y se compila con GitHub Actions; cada versión indica sus sumas de comprobación SHA-256. El certificado propio de EchoDiar es de confianza en este PC para que se instalen las actualizaciones.</value>
+    <comment>Windows shows a warning when you install EchoDiar because it is not yet signed with a certificate from a public authority. EchoDiar is open source and built by GitHub Actions; every release lists its SHA-256 checksums. EchoDiar's own certificate is trusted on this PC so that updates install.</comment>
   </data>
   <data name="WouldDeleteNowLldConversations" xml:space="preserve">
     <value>Se eliminarían ahora: {0} conversaciones</value>
