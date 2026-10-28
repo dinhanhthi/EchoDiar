@@ -323,11 +323,12 @@ jobs:
           Copy-Item -LiteralPath $msix[0].FullName -Destination $env:STAGE_DIR
           'Package contents OK.'
 
+      # Kept as long as EchoDiar-<tag>: a rerun of failed jobs (release.sh --attach) downloads it. No secret in it.
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: msix-${{ matrix.arch }}
           path: ${{ runner.temp }}/msix
-          retention-days: 1
+          retention-days: 14
           if-no-files-found: error
 
   # The only job that sees a signing key. It checks out and builds nothing: it signs both packages, bundles them,
@@ -465,11 +466,12 @@ jobs:
           if (($actual -join '|') -ne ($expected -join '|')) { throw "Signed files: $($actual -join ', '); expected: $($expected -join ', ')" }
           Get-ChildItem -LiteralPath $env:STAGE_DIR -File | ForEach-Object { '{0}  {1:N0} bytes' -f $_.Name, $_.Length }
 
+      # Kept as long as EchoDiar-<tag>: a rerun of failed jobs (release.sh --attach) downloads it. Public files only.
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: signed-${{ needs.prepare.outputs.tag }}
           path: ${{ runner.temp }}/signed
-          retention-days: 1
+          retention-days: 14
           if-no-files-found: error
 
       - name: Remove signing certificate

@@ -602,6 +602,30 @@ if bad:
 print("\n".join(missing))
 PY
 
+# origin/main's feed (stdin; empty when there is none) against the package version argv[1]: prints "none", or
+# "older", "same" or "newer" and the feed's Version. Fails when the feed or its Version cannot be read.
+read -r -d '' FEED_PY <<'PY' || true
+import re
+import sys
+import xml.etree.ElementTree as ET
+
+def parts(version, what):
+    if not re.fullmatch(r"(0|[1-9][0-9]{0,4})(\.(0|[1-9][0-9]{0,4})){3}", version or ""):
+        sys.exit(f"error: {what} {version!r} is not a four-part version")
+    return tuple(int(part) for part in version.split("."))
+
+data = sys.stdin.buffer.read()
+if not data.strip():
+    print("none")
+    sys.exit(0)
+try:
+    current = ET.fromstring(data).get("Version")
+except ET.ParseError as error:
+    sys.exit(f"error: origin/main's feed is not well-formed: {error}")
+mine, theirs = parts(sys.argv[1], "the package version"), parts(current, "origin/main's feed Version")
+print("older" if theirs < mine else "same" if theirs == mine else "newer", current)
+PY
+
 # Sets RUN to the newest run of the tag (RUNS_PY); fails when there is none yet.
 find_run() {
   local json
@@ -669,8 +693,8 @@ rerun() {
 }
 
 attach() {
-  local dirty refs publisher pin bundle bundle_uri out name assets missing feed_main
-  local reran_failed=false reran_all=false conclusion live upload=() hashes=() files=()
+  local dirty refs subject publisher pin bundle bundle_uri out name assets missing feed_main feed_state feed_version
+  local reran_failed=false reran_all=false conclusion live expired upload=() hashes=() files=()
 
   # Guards, in this order. Nothing but fetches happens before the prompt.
   [[ "$TAG" =~ ^v(.+)$ ]] || die "--attach takes the release tag vX.Y.Z, not '$TAG'"
@@ -697,6 +721,11 @@ attach() {
     || die "the GitHub release $TAG does not exist or is not published yet (publish-release.sh creates it)."
   git cat-file -e "$SHA^{commit}" 2>/dev/null || git fetch -q origin "refs/tags/$TAG" \
     || die "cannot fetch the commit of $TAG"
+  # The approval below lets the tag's workflow see the release signing key: only main's code may get it, never a
+  # tag planted on a side branch's commit (origin/main was fetched above).
+  git merge-base --is-ancestor "$SHA" origin/main \
+    || die "the commit $SHA of $TAG is not on origin/main: --attach approves the signing run of main's code only."
+  subject="$(git log -1 --format=%s "$SHA")"
   if ! git cat-file -e "$SHA:$SETUP_CSPROJ" 2>/dev/null; then
     echo "$TAG has no Windows app (macOS-only release): nothing to attach"
     exit 0
@@ -713,7 +742,8 @@ attach() {
   files=("$bundle" "EchoDiar.appinstaller" "EchoDiar.cer" "EchoDiar-Setup.exe" "$SUMS")
 
   echo "About to attach the Windows app to the release $TAG:"
-  echo "  commit  : ${SHA:0:7}"
+  echo "  commit  : $SHA (on main)"
+  echo "  subject : $subject"
   echo "  version : $VERSION4, publisher '$publisher'"
   echo "  output  : $out"
   echo "  then    : approve this tag's $WORKFLOW run ($RELEASE_ENV), upload the missing assets, commit $FEED on main"
@@ -741,8 +771,18 @@ attach() {
       if [[ "$conclusion" != success ]]; then
         [[ "$reran_failed" == false ]] \
           || die "run $RUN failed again ($conclusion): gh run view $RUN --repo $GH_REPO --log-failed"
-        echo "==> Run $RUN ended '$conclusion': rerunning its failed jobs once"
-        rerun --failed
+        # A rerun of the failed jobs downloads the earlier jobs' intermediate artifacts (msix-*, signed-<tag>): once one
+        # of them has expired, only a full rerun can rebuild it.
+        expired="$(gh api "repos/$GH_REPO/actions/runs/$RUN/artifacts?per_page=100" \
+          --jq "[.artifacts[] | select(.expired == true and ((.name | startswith(\"msix-\")) or .name == \"signed-$TAG\"))] | length")" \
+          || die "cannot list the artifacts of run $RUN"
+        if (( expired > 0 )); then
+          echo "==> Run $RUN ended '$conclusion' and its intermediate artifacts have expired: rerunning the whole run once"
+          rerun
+        else
+          echo "==> Run $RUN ended '$conclusion': rerunning its failed jobs once"
+          rerun --failed
+        fi
         reran_failed=true
         continue
       fi
@@ -783,8 +823,12 @@ attach() {
   # The feed on main (pages.yml serves it at $APPINSTALLER_URI).
   git fetch -q origin main || die "git fetch origin main failed"
   feed_main="$(git show "origin/main:$FEED" 2>/dev/null || true)"
-  if grep -qF "Version=\"$VERSION4\"" <<<"$feed_main"; then
-    echo "==> origin/main's $FEED already has $VERSION4"
+  # Never roll the feed back: attaching an older tag after a newer one leaves main's feed as it is.
+  feed_state="$("$PYTHON" -I -c "$FEED_PY" "$VERSION4" <<<"$feed_main")" \
+    || die "cannot read the Version of origin/main's $FEED (see above): fix it, then re-run --attach"
+  read -r feed_state feed_version <<<"$feed_state"
+  if [[ "$feed_state" == same || "$feed_state" == newer ]]; then
+    echo "==> origin/main's $FEED already has $feed_version (not older than $VERSION4): not committing the feed"
   else
     [[ "$(git rev-parse HEAD)" == "$(git rev-parse origin/main)" ]] \
       || die "main moved during the attach: git pull --ff-only, then re-run --attach to commit the feed"
