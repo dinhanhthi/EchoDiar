@@ -83,7 +83,8 @@ public sealed partial class MainWindow : Window
 
         ExtendsContentIntoTitleBar = true;
         SetTitleBar(TitleBarGrid);
-        AppWindow.TitleBar.PreferredHeightOption = TitleBarHeightOption.Tall;
+        // Standard: 32 px caption buttons at the top of the 40 px title bar row (Tall would make them 48 px).
+        AppWindow.TitleBar.PreferredHeightOption = TitleBarHeightOption.Standard;
         ApplyCaptionButtonColors();
         RootGrid.ActualThemeChanged += OnActualThemeChanged;
 
