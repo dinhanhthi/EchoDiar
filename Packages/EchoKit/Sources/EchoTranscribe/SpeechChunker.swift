@@ -2,10 +2,10 @@ import Accelerate
 
 /// Splits a 16 kHz mono stream into speech chunks for transcribe-while-recording, with an energy VAD over 20 ms
 /// frames. A chunk opens on speech (with pre-roll), closes at a pause (with post-roll) and is cut at its quietest
-/// frame when it reaches `maxChunkSeconds`, so every chunk fits the model window. The length a chunk needs before a
-/// short pause closes it is per instance (`shortPauseMinSeconds`): the batch gap fill keeps the default, the live path
-/// passes a shorter one. Silence between chunks is never emitted: it counts as covered. The clock is the sample index
-/// of the stream, so chunk starts are file time.
+/// frame when it reaches `maxChunkSeconds`, so every chunk fits the model window. The short pause and the length a
+/// chunk needs before the pause closes it are per instance (`shortPauseFrames`, `shortPauseMinSeconds`): the batch
+/// gap fill keeps the defaults, the live path passes shorter ones. Silence between chunks is never emitted: it counts
+/// as covered. The clock is the sample index of the stream, so chunk starts are file time.
 ///
 /// Pure and bounded: only the open chunk and the pre-roll are retained.
 struct SpeechChunker {
@@ -36,7 +36,7 @@ struct SpeechChunker {
     static let openFrames = 2
     static let preRollFrames = 15  // 300 ms
     static let postRollFrames = 10  // 200 ms
-    /// A pause this long closes a chunk of at least `shortPauseMinFrames`.
+    /// The default pause that closes a chunk of at least `shortPauseMinFrames`.
     static let shortPauseFrames = 30  // 0.6 s
     /// A pause this long closes a chunk of any length.
     static let longPauseFrames = 75  // 1.5 s
@@ -52,6 +52,7 @@ struct SpeechChunker {
     }
 
     private let maxFrames: Int
+    private let shortPauseFrames: Int
     private let shortPauseMinFrames: Int
     private let floorRisePerFrame = floorRiseDBPerSecond / Float(framesPerSecond)
 
@@ -67,8 +68,12 @@ struct SpeechChunker {
     private var partial: [Float] = []
     private var partialLanguage: String?
 
-    init(maxChunkSeconds: Int, shortPauseMinSeconds: Int = SpeechChunker.shortPauseMinSeconds) {
+    init(
+        maxChunkSeconds: Int, shortPauseMinSeconds: Int = SpeechChunker.shortPauseMinSeconds,
+        shortPauseFrames: Int = SpeechChunker.shortPauseFrames
+    ) {
         maxFrames = max(1, maxChunkSeconds) * Self.framesPerSecond
+        self.shortPauseFrames = shortPauseFrames
         shortPauseMinFrames = min(shortPauseMinSeconds * Self.framesPerSecond, maxFrames / 2)
     }
 
@@ -144,7 +149,7 @@ struct SpeechChunker {
         let speechEnd = frames.count - trailingSilence
         let end = min(speechEnd + Self.postRollFrames, frames.count)
         if trailingSilence >= Self.longPauseFrames
-            || (trailingSilence >= Self.shortPauseFrames && end >= shortPauseMinFrames)
+            || (trailingSilence >= shortPauseFrames && end >= shortPauseMinFrames)
         {
             return close(at: end, hasSpeech: speechEnd > 0)
         }

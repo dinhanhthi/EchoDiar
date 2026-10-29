@@ -96,7 +96,7 @@ struct RecordingTranscriberBufferTests {
     }
 
     /// Guards "partials never starve finals": no partial while a closed chunk waits to be decoded, nor on a channel
-    /// whose last final decode took more than `partialMaxDecodeShare` of its chunk's duration.
+    /// whose last final decode took longer than `partialMaxDecodeSeconds`.
     @Test func noPartialWhileAChunkIsQueuedOrTheLastDecodeWasSlow() {
         var buffer = Buffer(maxChunkSeconds: 30)
         for _ in 0..<Self.minHalves { _ = Self.appendHalfSecond(&buffer) }
@@ -105,11 +105,11 @@ struct RecordingTranscriberBufferTests {
         _ = buffer.take()
         #expect(buffer.takePartial()?.channel == Self.mic)
 
-        let share = RecordingTranscriber.partialMaxDecodeShare
-        buffer.recordDecode(channel: Self.mic, wallSeconds: (share + 0.1) * 10, chunkSeconds: 10)
+        let limit = RecordingTranscriber.partialMaxDecodeSeconds
+        buffer.recordDecode(channel: Self.mic, wallSeconds: limit + 0.5)
         for _ in 0..<Self.stepHalves { #expect(!Self.appendHalfSecond(&buffer)) }
         #expect(buffer.takePartial() == nil)
-        buffer.recordDecode(channel: Self.mic, wallSeconds: (share - 0.1) * 10, chunkSeconds: 10)
+        buffer.recordDecode(channel: Self.mic, wallSeconds: limit - 0.5)
         #expect(buffer.takePartial()?.chunk.samples.count == (Self.minHalves + Self.stepHalves) * Self.half)
     }
 
