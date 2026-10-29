@@ -65,6 +65,32 @@ public sealed class TranscriptMergerTests
         Assert.Equal(["en", "fr"], segments.Select(s => s.Language));
     }
 
+    // Guards the lone "Merci." rule: on a near-silent mic, the other party's residual voice comes out as a lone
+    // "Merci." on the mic while they talk, so it is dropped only when it overlaps system speech.
+    [Fact]
+    public void LoneMerciOnMicIsDroppedOnlyWhenItOverlapsSystemSpeech()
+    {
+        RawSegment[] mic =
+        [
+            new(Start: 30.0, End: 31.1, Text: "Merci."), // overlaps system speech: dropped
+            new(Start: 40.0, End: 41.0, Text: "Merci."), // no system speech within 0.5 s: kept
+            new(Start: 50.0, End: 51.0, Text: "Merci beaucoup."), // not a lone "Merci.": kept
+        ];
+        RawSegment[] system =
+        [
+            new(Start: 28.9, End: 31.1, Text: "On se voit demain"),
+            new(Start: 49.5, End: 51.5, Text: "Tu as le fichier"),
+            new(Start: 60.0, End: 61.0, Text: "Merci."), // system channel: kept
+        ];
+
+        var segments = TranscriptMerger.Merge(mic, system, [], []);
+
+        Assert.Equal(["On se voit demain", "Merci.", "Tu as le fichier", "Merci beaucoup.", "Merci."], segments.Select(s => s.Text));
+        Assert.Equal(
+            [TranscriptChannel.System, TranscriptChannel.Mic, TranscriptChannel.System, TranscriptChannel.Mic, TranscriptChannel.System],
+            segments.Select(s => s.Channel));
+    }
+
     [Fact]
     public void HandWrittenV1TranscriptDecodes()
     {

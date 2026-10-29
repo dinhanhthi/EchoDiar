@@ -43,7 +43,9 @@ public static class TranscriptMerger
     /// engine-detected language.</item>
     /// <item>Speaker bleed: a mic segment is dropped when its normalized text equals an overlapping system
     /// segment's, or when it has at least <see cref="BleedMinTokens"/> tokens and at least
-    /// <see cref="BleedTokenRatio"/> of them occur in the combined text of the overlapping system segments.</item>
+    /// <see cref="BleedTokenRatio"/> of them occur in the combined text of the overlapping system segments. A mic
+    /// segment that is a lone "Merci." is dropped when any system segment overlaps it (Whisper's reading of the
+    /// other party's residual voice).</item>
     /// <item>Output is sorted by start; ties put the mic first.</item>
     /// </list>
     /// </summary>
@@ -117,6 +119,12 @@ public static class TranscriptMerger
         return tokens;
     }
 
+    /// <summary>
+    /// Whether <paramref name="text"/> is a lone "Merci." (any case or punctuation), Whisper's usual reading of
+    /// residual voice.
+    /// </summary>
+    public static bool IsLoneMerci(string text) => Tokens(text) is ["merci"];
+
     private static Transcript.Segment Segment(
         RawSegment raw,
         TranscriptChannel channel,
@@ -170,6 +178,7 @@ public static class TranscriptMerger
             .Where(i => Overlap(micStart, micEnd, system[i].Start, system[i].End) > 0)
             .ToList();
         if (overlapping.Any(i => systemTokens[i].SequenceEqual(micTokens, StringComparer.Ordinal))) return true;
+        if (overlapping.Count > 0 && IsLoneMerci(mic.Text)) return true;
         if (micTokens.Count < BleedMinTokens) return false;
 
         var bag = new Dictionary<string, int>(StringComparer.Ordinal);

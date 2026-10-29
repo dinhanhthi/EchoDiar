@@ -119,6 +119,36 @@ public sealed class SpeechChunkerTests
         Assert.Equal("en", flushed[0].Language);
     }
 
+    // Guards the open-chunk peek the live transcriber reads ("others speaking now", tentative text): null while no
+    // chunk is open, every sample fed since the chunk's start while one is, the start and a prefix of the chunk Flush
+    // later emits, and pure, so a twin chunker that is never peeked emits the same chunks.
+    [Fact]
+    public void OpenChunkIsAPurePeekAtTheChunkFlushWillEmit()
+    {
+        float[][] parts = [NoiseFloor(1), [.. Speech(3), .. NoiseFloor(2), .. Speech(2)], NoiseFloor(0.3)];
+        var chunker = new SpeechChunker(maxChunkSeconds: 30);
+        var twin = new SpeechChunker(maxChunkSeconds: 30);
+
+        var closed = Feed(parts[0], chunker);
+        Assert.Null(chunker.OpenChunk());
+        closed.AddRange(Feed(parts[1], chunker));
+        var open = ToPiece(Assert.IsType<SpeechChunker.Chunk>(chunker.OpenChunk()));
+        AssertSame([open], [ToPiece(chunker.OpenChunk()!)]);
+        closed.AddRange(Feed(parts[2], chunker));
+        var flushed = Flush(chunker);
+        Assert.Null(chunker.OpenChunk());
+
+        Assert.Single(closed);
+        var last = Assert.Single(flushed);
+        Assert.Equal(last.Start, open.Start);
+        Assert.Equal(At(8), open.End);
+        Assert.True(open.Samples.Length < last.Samples.Length);
+        Assert.Equal(last.Samples[..open.Samples.Length], open.Samples);
+        Assert.Equal("en", open.Language);
+        AssertSame(closed, parts.SelectMany(part => Feed(part, twin)).ToList());
+        AssertSame(flushed, Flush(twin));
+    }
+
     // Helpers
 
     /// A chunk as sample range + content, so the tests do not depend on the chunk type's shape.
@@ -142,6 +172,16 @@ public sealed class SpeechChunkerTests
     private static List<Piece> Flush(SpeechChunker chunker) => chunker.Flush().Select(ToPiece).ToList();
 
     private static Piece ToPiece(SpeechChunker.Chunk chunk) => new((int)chunk.StartSample, chunk.Samples, chunk.Language);
+
+    private static void AssertSame(List<Piece> expected, List<Piece> actual)
+    {
+        Assert.Equal(expected.Count, actual.Count);
+        for (var i = 0; i < expected.Count; i++)
+        {
+            Assert.Equal((expected[i].Start, expected[i].Language), (actual[i].Start, actual[i].Language));
+            Assert.Equal(expected[i].Samples, actual[i].Samples);
+        }
+    }
 
     private static int At(double seconds) => (int)Math.Round(seconds * Rate, MidpointRounding.AwayFromZero);
 

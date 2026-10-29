@@ -21,6 +21,20 @@ public sealed class WhisperSpeechTextTests
         Assert.Equal("Hello there", WhisperEngine.SpeechText("[Music] Hello there (laughs)"));
     }
 
+    // Guards the "..." lines on a silent mic: text with no letter or digit left is dropped, short speech is kept.
+    [Fact]
+    public void DropsPunctuationOnlyText()
+    {
+        foreach (var raw in new[] { "...", "…", " - ", "?!", "<|endoftext|> ..." })
+        {
+            Assert.True(WhisperEngine.SpeechText(raw) == "", raw);
+        }
+        foreach (var raw in new[] { "Ok.", "1, 2, 3", "Hum." })
+        {
+            Assert.Equal(raw, WhisperEngine.SpeechText(raw));
+        }
+    }
+
     // Guards the "Thank you." hallucinations: a segment over near silence is dropped, one over speech is kept, and a
     // NaN or infinite timestamp counts as silent.
     [Fact]

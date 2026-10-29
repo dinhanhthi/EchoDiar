@@ -1,8 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!--
     Live captions on the recording page, under its header (macOS LiveTranscriptView.swift, setting "Transcribe while
-    recording"): the transcriber's state, then the newest lines, scrolled to the bottom as they arrive unless the user
-    scrolled up, filling the page. The lines are built in code.
+    recording"): the transcriber's state, then the newest lines and the open chunks' greyed tentative text, scrolled to
+    the bottom as they arrive unless the user scrolled up, filling the page. The lines are built in code.
 -->
 <UserControl
     x:Class="EchoDiar.App.Views.LiveTranscriptView"
@@ -23,6 +23,9 @@
         <Style x:Key="LiveLineText" BasedOn="{StaticResource BodyTextBlockStyle}" TargetType="TextBlock">
             <Setter Property="TextWrapping" Value="Wrap" />
             <Setter Property="IsTextSelectionEnabled" Value="True" />
+        </Style>
+        <Style x:Key="LiveTentativeText" BasedOn="{StaticResource LiveLineText}" TargetType="TextBlock">
+            <Setter Property="Foreground" Value="{ThemeResource TextFillColorSecondaryBrush}" />
         </Style>
 
         <!-- The state: secondary text, or caution when the transcriber stopped. -->
@@ -83,7 +86,10 @@
                 VerticalScrollBarVisibility="Auto"
                 Visibility="Collapsed">
                 <!-- Right padding keeps the text clear of the scroll bar. -->
-                <StackPanel x:Name="LinesPanel" Padding="0,0,16,0" Spacing="6" />
+                <StackPanel Padding="0,0,16,0" Spacing="6">
+                    <StackPanel x:Name="LinesPanel" Spacing="6" />
+                    <StackPanel x:Name="TentativePanel" Spacing="6" />
+                </StackPanel>
             </ScrollViewer>
         </Grid>
     </Border>

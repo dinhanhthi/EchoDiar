@@ -89,6 +89,19 @@ struct SpeechChunker {
         return chunks
     }
 
+    /// A copy of the open chunk so far (nil when none is open): every retained sample, with its trailing silence and
+    /// the incomplete frame, for the live transcriber's tentative text and its "others speaking now" check. Changes
+    /// nothing, so the chunks emitted later are the same.
+    var openChunk: Chunk? {
+        guard isOpen else { return nil }
+        return Chunk(startSample: startSample, samples: samples + partial, language: frames.first?.language)
+    }
+
+    /// The open chunk's start and length so far (`openChunk` without copying its samples), nil when none is open.
+    var openSpan: (startSample: Int, count: Int)? {
+        isOpen ? (startSample, samples.count + partial.count) : nil
+    }
+
     /// Emits the open chunk, trimmed to its post-roll (which may take in the incomplete frame), and drops the rest;
     /// the clock and the floor carry on, so the stream can continue (as after a pause).
     mutating func flush() -> [Chunk] {

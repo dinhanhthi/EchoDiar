@@ -51,6 +51,26 @@ struct TranscriptMergerTests {
         #expect(segments.map(\.language) == ["en", "fr"])
     }
 
+    /// Guards the lone "Merci." rule: on a near-silent mic, the other party's residual voice comes out as a lone
+    /// "Merci." on the mic while they talk, so it is dropped only when it overlaps system speech.
+    @Test func loneMerciOnMicIsDroppedOnlyWhenItOverlapsSystemSpeech() {
+        let mic = [
+            RawSegment(start: 30.0, end: 31.1, text: "Merci."),           // overlaps system speech: dropped
+            RawSegment(start: 40.0, end: 41.0, text: "Merci."),           // no system speech within 0.5 s: kept
+            RawSegment(start: 50.0, end: 51.0, text: "Merci beaucoup."),  // not a lone "Merci.": kept
+        ]
+        let system = [
+            RawSegment(start: 28.9, end: 31.1, text: "On se voit demain"),
+            RawSegment(start: 49.5, end: 51.5, text: "Tu as le fichier"),
+            RawSegment(start: 60.0, end: 61.0, text: "Merci."),           // system channel: kept
+        ]
+
+        let segments = TranscriptMerger.merge(mic: mic, system: system, turns: [], languageMarkers: [])
+
+        #expect(segments.map(\.text) == ["On se voit demain", "Merci.", "Tu as le fichier", "Merci beaucoup.", "Merci."])
+        #expect(segments.map(\.channel) == [.system, .mic, .system, .mic, .system])
+    }
+
     @Test func handWrittenV1TranscriptDecodes() throws {
         let json = #"""
         {

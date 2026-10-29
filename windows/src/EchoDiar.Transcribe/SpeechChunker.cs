@@ -91,6 +91,26 @@ public sealed class SpeechChunker
     }
 
     /// <summary>
+    /// A copy of the open chunk so far (null when none is open): every retained sample, with its trailing silence and
+    /// the incomplete frame, for the live transcriber's tentative text and its "others speaking now" check (Swift
+    /// <c>openChunk</c>). Changes nothing, so the chunks emitted later are the same.
+    /// </summary>
+    public Chunk? OpenChunk()
+    {
+        if (!_isOpen) return null;
+        var all = new float[_samples.Count + _partialCount];
+        _samples.CopyTo(all);
+        _partial.AsSpan(0, _partialCount).CopyTo(all.AsSpan(_samples.Count));
+        return new Chunk(_startSample, all, _frames.Count > 0 ? _frames[0].Language : null);
+    }
+
+    /// <summary>
+    /// The open chunk's start and length so far (<see cref="OpenChunk"/> without copying its samples; Swift
+    /// <c>openSpan</c>), null when none is open.
+    /// </summary>
+    public (long StartSample, int Count)? OpenSpan() => _isOpen ? (_startSample, _samples.Count + _partialCount) : null;
+
+    /// <summary>
     /// Emits the open chunk, trimmed to its post-roll (which may take in the incomplete frame), and drops the rest;
     /// the clock and the floor carry on, so the stream can continue (as after a pause).
     /// </summary>
