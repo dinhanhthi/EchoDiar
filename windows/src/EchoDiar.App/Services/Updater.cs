@@ -5,6 +5,7 @@ using EchoDiar.App.ViewModels;
 using Microsoft.UI.Dispatching;
 using Windows.ApplicationModel;
 using Windows.Management.Deployment;
+using Windows.Services.Store;
 using Windows.Storage;
 
 namespace EchoDiar.App.Services;
@@ -12,20 +13,25 @@ namespace EchoDiar.App.Services;
 /// <summary>What a check or an install the user asked for ended with; the toolbar's dialog queue shows it.</summary>
 internal enum UpdateReportKind { UpToDate, Available, CheckFailed, InstallFailed }
 
+/// <summary>Where updates come from, chosen once at launch: none (a dev run, a sideloaded MSIX), the .appinstaller feed or the Microsoft Store.</summary>
+internal enum UpdateSource { None, AppInstaller, Store }
+
 /// <param name="Reason">A short reason for a failure (one line, no exception dump).</param>
 internal sealed record UpdateReport(UpdateReportKind Kind, string? Reason = null);
 
 /// <summary>
-/// App Installer updates (the Windows counterpart of macOS Updater.swift, which drives Sparkle). Active only when the
-/// app was installed from an .appinstaller file (<c>Package.GetAppInstallerInfo</c>); a sideloaded MSIX, or a run
-/// without a package, never checks. Background checks (at <see cref="Start"/>, then every <see cref="CheckInterval"/>)
-/// run off the UI thread and never show a dialog: a found update sets <see cref="UpdateAvailable"/>, which shows the
-/// toolbar's Update button and turns the tray item into "Update available…". A check the user asks for
-/// (<see cref="CheckNowAsync"/>) ends in a <see cref="Report"/> the toolbar shows. <see cref="InstallAsync"/> installs
-/// from the .appinstaller with ForceTargetAppShutdown: Windows closes the app (the tray window's WM_ENDSESSION stops
-/// everything) and relaunches it, as it was registered with RegisterApplicationRestart just before. The last finished
-/// check is kept in LocalSettings (macOS: Sparkle's defaults), not in the shared settings.json. State changes on the UI
-/// thread only; <see cref="Dispose"/> cancels a check under way (an install goes on: Windows ends the app for it).
+/// App Installer and Microsoft Store updates (the Windows counterpart of macOS Updater.swift, which drives Sparkle).
+/// Active only when the package is signed by the Store (<c>StoreContext</c>, see the Store section below) or was
+/// installed from an .appinstaller file (<c>Package.GetAppInstallerInfo</c>); a sideloaded MSIX, or a run without a
+/// package, never checks. Background checks (at <see cref="Start"/>, then every <see cref="CheckInterval"/>) run off
+/// the UI thread (a Store check hops to it: StoreContext needs it) and never show a dialog: a found update sets
+/// <see cref="UpdateAvailable"/>, which shows the toolbar's Update button and turns the tray item into "Update
+/// available…". A check the user asks for (<see cref="CheckNowAsync"/>) ends in a <see cref="Report"/> the toolbar
+/// shows. <see cref="InstallAsync"/> installs from the .appinstaller with ForceTargetAppShutdown: Windows closes the
+/// app (the tray window's WM_ENDSESSION stops everything) and relaunches it, as it was registered with
+/// RegisterApplicationRestart just before. The last finished check is kept in LocalSettings (macOS: Sparkle's
+/// defaults), not in the shared settings.json. State changes on the UI thread only; <see cref="Dispose"/> cancels a
+/// check under way (an install goes on: Windows ends the app for it).
 /// </summary>
 internal sealed partial class Updater : ObservableObject, IDisposable
 {
@@ -42,8 +48,17 @@ internal sealed partial class Updater : ObservableObject, IDisposable
     /// <summary>One check at a time: the schedule's and the user's.</summary>
     private readonly SemaphoreSlim _checkGate = new(1, 1);
 
-    /// <summary>The .appinstaller the app was installed from; null: the updater is off.</summary>
+    /// <summary>The .appinstaller the app was installed from; null on the Store backend and when the updater is off.</summary>
     private readonly Uri? _appInstaller;
+
+    /// <summary>The main window's handle, which the Store's dialogs belong to; 0 until <see cref="SetWindow"/>.</summary>
+    private nint _window;
+
+    /// <summary>Made once, on the UI thread, once the window is known (<see cref="StoreContextForWindow"/>).</summary>
+    private StoreContext? _storeContext;
+
+    /// <summary>What the last Store check found, installed as is by <see cref="InstallFromStoreAsync"/> (UI thread only).</summary>
+    private IReadOnlyList<StorePackageUpdate>? _storeUpdates;
 
     private bool _started;
     private bool _isChecking;
@@ -56,12 +71,23 @@ internal sealed partial class Updater : ObservableObject, IDisposable
     public Updater(DispatcherQueue dispatcher)
     {
         _dispatcher = dispatcher;
-        _appInstaller = AppInstallerUri();
-        if (_appInstaller is not null) _lastCheck = ReadLastCheck();
+        if (IsStoreSigned())
+        {
+            Source = UpdateSource.Store;
+        }
+        else
+        {
+            _appInstaller = AppInstallerUri();
+            if (_appInstaller is not null) Source = UpdateSource.AppInstaller;
+        }
+        if (IsActive) _lastCheck = ReadLastCheck();
     }
 
-    /// <summary>Installed from an .appinstaller file: checks run and an update can be installed.</summary>
-    public bool IsActive => _appInstaller is not null;
+    /// <summary>The backend chosen at launch.</summary>
+    public UpdateSource Source { get; }
+
+    /// <summary>Installed from the Store or from an .appinstaller file: checks run and an update can be installed.</summary>
+    public bool IsActive => Source != UpdateSource.None;
 
     public bool IsChecking
     {
@@ -123,6 +149,12 @@ internal sealed partial class Updater : ObservableObject, IDisposable
         _ = Task.Run(() => RunScheduleAsync(token));
     }
 
+    /// <summary>
+    /// The main window (UI thread, before <see cref="Start"/>): StoreContext needs it for its dialogs. Until it is set,
+    /// a Store check fails (logged) and nothing is installed.
+    /// </summary>
+    public void SetWindow(nint hwnd) => _window = hwnd;
+
     /// <summary>No more checks, a check under way is cancelled, and no state changes any more.</summary>
     public void Dispose()
     {
@@ -156,12 +188,18 @@ internal sealed partial class Updater : ObservableObject, IDisposable
     public void DismissReport() => Report = null;
 
     /// <summary>
-    /// Installs the update from the .appinstaller. Windows closes the app on success and relaunches it; a failure ends
-    /// in a <see cref="Report"/>. The caller has checked that nothing is running that the close would cut off.
+    /// Installs the update from the .appinstaller or the Store. Windows closes the app on success and relaunches it; a
+    /// failure ends in a <see cref="Report"/>. The caller (UI thread) has checked that nothing is running that the close
+    /// would cut off.
     /// </summary>
     public async Task InstallAsync()
     {
         if (IsInstalling) return;
+        if (Source == UpdateSource.Store)
+        {
+            await InstallFromStoreAsync();
+            return;
+        }
         if (_appInstaller is not { } uri)
         {
             // Only the DEBUG --fake-update button gets here.
@@ -229,6 +267,7 @@ internal sealed partial class Updater : ObservableObject, IDisposable
         Post(() => IsChecking = true);
         try
         {
+            if (Source == UpdateSource.Store) return await CheckStoreAsync(token);
             var result = await Package.Current.CheckUpdateAvailabilityAsync().AsTask(token);
             switch (result.Availability)
             {
@@ -283,6 +322,159 @@ internal sealed partial class Updater : ObservableObject, IDisposable
         {
             if (!_stop.IsCancellationRequested) action();
         });
+    }
+
+    // Microsoft Store backend.
+    //
+    // https://learn.microsoft.com/en-us/windows/apps/package-and-deploy/package-updates-from-store
+    // - StoreContext needs package identity (a Store-installed package).
+    // - In a desktop app (WinUI 3) the context is tied to a window with WinRT.Interop.InitializeWithWindow before its
+    //   first call; calls run on the UI thread (otherwise 0x80070578 ERROR_INVALID_WINDOW_HANDLE).
+    // - RequestDownloadAndInstallStorePackageUpdatesAsync reports PackageDownloadProgress from 0 to 0.8 while it
+    //   downloads and from 0.8 to 1.0 while it installs; the install may close the app (hence RegisterApplicationRestart).
+    // - After a submission is certified, it can take up to a day before a check sees the new version.
+    // https://learn.microsoft.com/en-us/uwp/api/windows.applicationmodel.packagesignaturekind
+    // - Store: the package is signed by the Windows Store; a self-signed sideload (the .appinstaller feed, a dev
+    //   install) reports Developer.
+
+    /// <summary>One Store check, on the UI thread; a failure is logged and shows no exception text.</summary>
+    private async Task<UpdateReport> CheckStoreAsync(CancellationToken token)
+    {
+        try
+        {
+            var available = await OnUIThreadAsync<bool?>(async () =>
+            {
+                if (StoreContextForWindow() is not { } context) return null;
+                var updates = await context.GetAppAndOptionalStorePackageUpdatesAsync().AsTask(token);
+                _storeUpdates = updates;
+                return updates.Count > 0;
+            });
+            if (available is not { } found)
+            {
+                Debug.WriteLine("EchoDiar: Store update check: no window yet.");
+                return new UpdateReport(UpdateReportKind.CheckFailed);
+            }
+            Post(() => Checked(available: found));
+            return new UpdateReport(found ? UpdateReportKind.Available : UpdateReportKind.UpToDate);
+        }
+        catch (OperationCanceledException)
+        {
+            throw;
+        }
+        catch (Exception e)
+        {
+            Debug.WriteLine($"EchoDiar: Store update check failed: {e.GetType().Name} 0x{e.HResult:X8}");
+            return new UpdateReport(UpdateReportKind.CheckFailed);
+        }
+    }
+
+    /// <summary>
+    /// Installs what the last Store check found (UI thread). The Store may close the app and relaunch it; Completed with
+    /// the app still running means the new version waits for the next launch; Canceled (the user said no in the Store's
+    /// dialog) is not a failure.
+    /// </summary>
+    private async Task InstallFromStoreAsync()
+    {
+        IsInstalling = true;
+        InstallPercent = 0;
+        // Not cancelled by Dispose: the Store closing the app for the update ends in Shutdown, which must not stop it.
+        var stopped = _stop.Token;
+        var failed = false;
+        try
+        {
+            // Before the update starts: Windows relaunches an app it closed for an update only when it was registered.
+            var registered = RegisterApplicationRestart(null, RestartOnUpdateOnly);
+            if (registered != 0) Debug.WriteLine($"EchoDiar: RegisterApplicationRestart failed (0x{registered:X8}).");
+            if (StoreContextForWindow() is not { } context || _storeUpdates is not { Count: > 0 } updates)
+            {
+                Debug.WriteLine("EchoDiar: Store update: no window or nothing found to install.");
+                failed = true;
+                return;
+            }
+            // Download 0 to 0.8, install 0.8 to 1.0: one scale, shown as a percent.
+            var progress = new Progress<StorePackageUpdateStatus>(status =>
+                Post(() => InstallPercent = (int)Math.Clamp(Math.Round(status.PackageDownloadProgress * 100), 0, 100)));
+            var result = await context.RequestDownloadAndInstallStorePackageUpdatesAsync(updates)
+                .AsTask(CancellationToken.None, progress);
+            switch (result.OverallState)
+            {
+                case StorePackageUpdateState.Completed:
+                    // Still running: the Store did not need to close it (the update waits for the next launch).
+                    _storeUpdates = null;
+                    if (!stopped.IsCancellationRequested) UpdateAvailable = false;
+                    break;
+                case StorePackageUpdateState.Canceled:
+                    break;
+                default:
+                    Debug.WriteLine($"EchoDiar: Store update failed: {result.OverallState}");
+                    failed = true;
+                    break;
+            }
+        }
+        catch (Exception e)
+        {
+            Debug.WriteLine($"EchoDiar: Store update failed: {e.GetType().Name} 0x{e.HResult:X8}");
+            failed = true;
+        }
+        finally
+        {
+            if (!stopped.IsCancellationRequested) IsInstalling = false;
+            if (failed && !stopped.IsCancellationRequested) Report = new UpdateReport(UpdateReportKind.InstallFailed);
+        }
+    }
+
+    /// <summary>The Store's context for the main window, made once on the UI thread; null until the window is known.</summary>
+    private StoreContext? StoreContextForWindow()
+    {
+        if (_storeContext is not null || _window == 0) return _storeContext;
+        try
+        {
+            var context = StoreContext.GetDefault();
+            WinRT.Interop.InitializeWithWindow.Initialize(context, _window);
+            _storeContext = context;
+        }
+        catch (Exception e)
+        {
+            Debug.WriteLine($"EchoDiar: could not open the Store context: {e.GetType().Name} 0x{e.HResult:X8}");
+        }
+        return _storeContext;
+    }
+
+    /// <summary>Runs <paramref name="work"/> on the UI thread (StoreContext needs it) and hands back its result or error.</summary>
+    private Task<T> OnUIThreadAsync<T>(Func<Task<T>> work)
+    {
+        var done = new TaskCompletionSource<T>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var queued = _dispatcher.TryEnqueue(async () =>
+        {
+            try
+            {
+                done.TrySetResult(await work());
+            }
+            catch (OperationCanceledException e)
+            {
+                done.TrySetCanceled(e.CancellationToken);
+            }
+            catch (Exception e)
+            {
+                done.TrySetException(e);
+            }
+        });
+        if (!queued) done.TrySetException(new InvalidOperationException("The UI thread has stopped."));
+        return done.Task;
+    }
+
+    /// <summary>Signed by the Microsoft Store; false for a self-signed package or a run without a package.</summary>
+    private static bool IsStoreSigned()
+    {
+        try
+        {
+            return Package.Current.SignatureKind == PackageSignatureKind.Store;
+        }
+        catch (Exception)
+        {
+            // No package identity (an unpackaged run).
+            return false;
+        }
     }
 
     /// <summary>The .appinstaller's address, or null for a sideloaded MSIX or a run without a package.</summary>

@@ -10,8 +10,9 @@ using Windows.System;
 namespace EchoDiar.App.Views;
 
 /// <summary>
-/// Settings › About (macOS SettingsWindow.swift <c>AboutSettingsView</c> and <c>AboutInfo</c>), plus the App Installer
-/// updates (<see cref="Updater"/>): the last check and Check now, or why this copy does not update itself.
+/// Settings › About (macOS SettingsWindow.swift <c>AboutSettingsView</c> and <c>AboutInfo</c>), plus the updates
+/// (<see cref="Updater"/>): the last check and Check now (App Installer), that they come from the Microsoft Store, or why
+/// this copy does not update itself. A Store copy has no certificate to explain: the warnings card hides.
 /// </summary>
 public sealed partial class AboutSettingsPage : UserControl
 {
@@ -25,7 +26,7 @@ public sealed partial class AboutSettingsPage : UserControl
     public static IReadOnlyList<SettingsEntry> SearchEntries { get; } =
     [
         new("Version", ["about", "build", "update"]),
-        new("Updates", ["update", "check for updates", "App Installer", "appinstaller", "last check"]),
+        new("Updates", ["update", "check for updates", "App Installer", "appinstaller", "Microsoft Store", "last check"]),
         new(
             "Why Windows warns about EchoDiar",
             ["SmartScreen", "certificate", "signature", "unknown publisher", "UAC", "security"]),
@@ -43,6 +44,7 @@ public sealed partial class AboutSettingsPage : UserControl
         WarningsCard.Description = Loc.T(
             "Windows shows a warning when you install EchoDiar because it is not yet signed with a certificate from a public authority. EchoDiar is open source and built by GitHub Actions; every release lists its SHA-256 checksums. EchoDiar's own certificate is trusted on this PC so that updates install.");
         WarningsCard.Click += (_, _) => _ = Launcher.LaunchUriAsync(WindowsWarnings);
+        if (_model.Updater.Source == UpdateSource.Store) WarningsCard.Visibility = Visibility.Collapsed;
         RepositoryCard.Click += (_, _) => _ = Launcher.LaunchUriAsync(Repository);
         CheckUpdatesButton.Click += (_, _) => _ = _model.Updater.CheckNowAsync();
         Loaded += (_, _) =>
@@ -92,6 +94,8 @@ public sealed partial class AboutSettingsPage : UserControl
             : updater.IsInstalling ? Loc.Format("Installing the update… %lld%%", updater.InstallPercent)
             : updater.IsChecking ? Loc.T("Checking for updates…")
             : updater.UpdateAvailable ? Loc.T("An update is available: Update in the toolbar installs it.")
+            : updater.Source == UpdateSource.Store
+                ? Loc.T("Updates come from the Microsoft Store. A new version can take up to a day to appear after its release.")
             : updater.LastCheck is { } last ? Loc.Format("Last checked %@", last.ToString("g", CultureInfo.CurrentCulture))
             : Loc.T("Not checked yet");
     }

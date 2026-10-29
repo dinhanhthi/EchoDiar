@@ -13,18 +13,34 @@
 #   --preflight  read-only check of the release channel's one-time setup (docs/RELEASING.md §3.0): the
 #                windows-release-signing environment, its reviewer, tag policy and secrets, the variable
 #                WINDOWS_PUBLIC_PUBLISHER and the pinned release certificate. /cf-ship runs it before it builds.
+#                The Microsoft Store setup (the WINDOWS_STORE_* variables; with WINDOWS_STORE_PUBLISH 'true', the
+#                windows-store-publish environment's secrets) only warns (docs/RELEASING.md §3.3).
 #   --attach     the Windows step of scripts/ship.sh, once the release vX.Y.Z is published. Its tag, pushed by
 #                publish-release.sh, started the workflow on the release channel: this approves that run's
 #                windows-release-signing deployment (running /cf-ship is the approval), waits for it, downloads the
 #                artifact into release/windows/vX.Y.Z/, checks it, uploads the assets the release lacks and commits
 #                the feed windows/EchoDiar.appinstaller on main (pages.yml serves it). Idempotent: re-run it to finish.
+#                It judges only the jobs it needs (prepare, the sideload package legs, sign, assemble): the Store jobs
+#                of the run (package store legs, store, store-publish) failing or waiting never block it. To rerun a
+#                failed needed job it rejects a waiting windows-store-publish deployment (GitHub reruns only a
+#                completed run): that run then never submits to the Store, and --store gives the manual upload steps.
+#   --store      the Microsoft Store step of scripts/ship.sh, after --attach. In the same run of the tag, approves the
+#                windows-store-publish deployment of store-publish when it waits (CI publishes only when the variable
+#                WINDOWS_STORE_PUBLISH is 'true'), downloads the artifact EchoDiar-store-<tag> into
+#                release/windows/vX.Y.Z/store/ (gitignored) and checks it, then prints "Submitted to the Microsoft
+#                Store by CI" or the Partner Center upload steps ending with "manual Store upload pending" (also when
+#                store-publish failed or was rejected); without the WINDOWS_STORE_* variables it prints "Store not set
+#                up yet", and for a run that built no Store bundle (older than the Store variables) "no Store bundle
+#                for this tag". Idempotent: re-run it to finish.
 #
 # The checks (dev and attach) read the downloaded files as data, with an isolated Python (-I), and never run them:
 # exactly the four files and no private key; SHA256SUMS-windows.txt; the bundle (signed, Name, Version, Publisher,
 # x64 and arm64, both inner packages signed) and the feed (Version, Publisher, both Uris, update settings); the
 # certificate's subject is the Publisher. Any self-signed key can claim a subject, so the signer is pinned too: the
 # certificate and the signers of the bundle and of each inner package must have the DER SHA-256 pinned at HEAD in
-# windows/packaging/dev-cert.sha256 (dev) or windows/packaging/release-cert.sha256 (attach).
+# windows/packaging/dev-cert.sha256 (dev) or windows/packaging/release-cert.sha256 (attach). The Store check (--store)
+# reads its .msixupload the same way: one unsigned bundle with the Store identity (Name, Publisher and
+# PublisherDisplayName), x64 and arm64, no packageManagement.
 #
 # Version: X.Y.Z gives the 4-part package version X.Y.Z.0 (each part 0-65535, no leading zeros). Dev builds use
 # 0.0.N, with N above the 0.0.<run>.0 of the windows.yml CI builds; a release uses the version of its tag.
@@ -34,6 +50,7 @@
 #   windows/scripts/release.sh --dev --version 0.0.900 --publish [--yes]  # ... then create the prerelease
 #   windows/scripts/release.sh --preflight                                # check the release channel's setup
 #   windows/scripts/release.sh --attach v1.2.0 [--yes]                    # attach Windows to the release v1.2.0
+#   windows/scripts/release.sh --store v1.2.0 [--yes]                     # the Microsoft Store step of v1.2.0
 # --yes answers every prompt (scripts/ship.sh and unattended runs).
 #
 set -euo pipefail
@@ -43,6 +60,10 @@ GH_REPO="dinhanhthi/EchoDiar"
 WORKFLOW="windows-release.yml"
 WORKFLOW_PATH=".github/workflows/$WORKFLOW"
 RELEASE_ENV="windows-release-signing"
+STORE_ENV="windows-store-publish"
+STORE_VARS=(WINDOWS_STORE_IDENTITY_NAME WINDOWS_STORE_PUBLISHER WINDOWS_STORE_PUBLISHER_DISPLAY_NAME
+  WINDOWS_STORE_PRODUCT_ID)
+STORE_SECRETS=(STORE_TENANT_ID STORE_SELLER_ID STORE_CLIENT_ID STORE_CLIENT_SECRET)
 DEV_PUBLISHER="CN=EchoDiar Dev"
 APPINSTALLER_URI="https://ed.dinhanhthi.com/windows/EchoDiar.appinstaller"
 APP_CSPROJ="windows/src/EchoDiar.App/EchoDiar.App.csproj"
@@ -50,17 +71,21 @@ FEED="windows/EchoDiar.appinstaller"
 DEV_PIN_FILE="windows/packaging/dev-cert.sha256"
 RELEASE_PIN_FILE="windows/packaging/release-cert.sha256"
 SETUP_DOC="docs/RELEASING.md §3.0"
+STORE_DOC="docs/RELEASING.md §3.3"
 SUMS="SHA256SUMS-windows.txt"
-RUN_TIMEOUT=7200      # seconds one run attempt may take, approval included, before --attach gives up
-APPROVAL_TIMEOUT=1800 # seconds --attach waits for a manual approval when it cannot approve itself
+RUN_TIMEOUT=7200      # seconds one run attempt may take, approval included, before --attach or --store gives up
+APPROVAL_TIMEOUT=1800 # seconds --attach or --store waits for a manual approval when it cannot approve itself
 PYTHON=/usr/bin/python3
 
 USAGE="usage: windows/scripts/release.sh --dev --version 0.0.N [--publish] [--yes]
        windows/scripts/release.sh --preflight
        windows/scripts/release.sh --attach vX.Y.Z [--yes]
+       windows/scripts/release.sh --store vX.Y.Z [--yes]
   --dev        build and check a dev build (tag windows-v0.0.N-dev at HEAD); --publish creates its prerelease
-  --preflight  read-only check of the release channel's one-time setup ($SETUP_DOC)
+  --preflight  read-only check of the release channel's one-time setup ($SETUP_DOC; Store setup: warnings only)
   --attach     approve, check and attach the Windows build of the published release vX.Y.Z; commit its feed
+  --store      approve the Store publish of vX.Y.Z's run, download and check its Store bundle
+               (release/windows/vX.Y.Z/store/), or print the Partner Center upload steps ($STORE_DOC)
   --yes        answer every prompt"
 
 usage() { echo "$USAGE" >&2; exit 1; }
@@ -89,6 +114,7 @@ while (( $# > 0 )); do
     --publish) PUBLISH=true ;;
     --preflight) set_mode preflight ;;
     --attach) (( $# > 1 )) || usage; set_mode attach; TAG="$2"; shift ;;
+    --store) (( $# > 1 )) || usage; set_mode store; TAG="$2"; shift ;;
     --yes|-y) YES=true ;;
     -h|--help) echo "$USAGE"; exit 0 ;;
     *) usage ;;
@@ -232,8 +258,9 @@ def signer_sha256(p7x, what):
         fail(f"{what}: {len(signers)} certificates of AppxSignature.p7x are its signer, expected one")
     return hashlib.sha256(signers[0]).hexdigest()
 
-# The four files, flat, and never a private key.
-entries = sorted(os.listdir(out))
+# The four files, flat, and never a private key. The folder store/ holds the Store bundle of --store (its own check).
+entries = sorted(name for name in os.listdir(out)
+                 if not (name == "store" and os.path.isdir(path(name)) and not os.path.islink(path(name))))
 keys = [name for name in entries if name.lower().endswith((".pfx", ".p12"))]
 if keys:
     fail(f"private key in the artifact: {', '.join(keys)}")
@@ -348,6 +375,23 @@ check_artifact() {
     || die "the artifact check failed (see above)"
 }
 
+# The value of the repository variable argv[1] (stdin: gh variable list --json name,value); empty when it is not
+# set or holds a line break (the workflow's prepare job counts such a value as not set). Fails on unreadable JSON.
+read -r -d '' VARS_PY <<'PY' || true
+import json
+import sys
+
+try:
+    variables = {v.get("name"): v.get("value") for v in json.load(sys.stdin)}
+except (ValueError, AttributeError, TypeError):
+    sys.exit("error: cannot read the repository variables")
+value = variables.get(sys.argv[1])
+print(value if isinstance(value, str) and "\r" not in value and "\n" not in value else "")
+PY
+
+# Prints the value of the repository variable $2 from the listing $1 (VARS_PY).
+var_value() { "$PYTHON" -I -c "$VARS_PY" "$2" <<<"$1"; }
+
 # --- 2. --preflight: the release channel's one-time setup (read-only) -------
 pf_ok() { echo "  ok    $*"; }
 pf_fail() {
@@ -356,33 +400,43 @@ pf_fail() {
   exit 1
 }
 
-# The environment (stdin) and its deployment policies (argv): reviewer, self review, tag policy.
+# The environment (stdin) and its deployment policies (argv): reviewer, self review, tag policy. With argv[3] "warn"
+# (and argv[4] the doc to point to), each failed check prints a warning instead and the exit status is 0.
 read -r -d '' ENV_PY <<'PY' || true
 import json
 import sys
 
 me, policies_json = sys.argv[1:3]
+warn = sys.argv[3:4] == ["warn"]
+doc = sys.argv[4] if len(sys.argv) > 4 else ""
 env = json.load(sys.stdin)
 name = env.get("name")
+label = f"{name}: " if warn else ""
 
 def ok(message):
-    print(f"  ok    {message}", flush=True)
+    print(f"  ok    {label}{message}", flush=True)
 
 def fail(message):
+    if warn:
+        print(f"  warn  {message} ({doc})", flush=True)
+        return
     print(f"  FAIL  {message}", file=sys.stderr)
     sys.exit(1)
 
 rules = [r for r in env.get("protection_rules") or [] if r.get("type") == "required_reviewers"]
-if not rules:
-    fail(f"{name} has no required reviewers")
 logins = [(r.get("reviewer") or {}).get("login") for rule in rules for r in rule.get("reviewers") or []
           if r.get("type") == "User"]
-if me not in logins:
+if not rules:
+    fail(f"{name} has no required reviewers")
+elif me not in logins:
     fail(f"the required reviewers of {name} ({', '.join(map(str, logins)) or 'no user'}) do not list you ({me})")
-ok(f"required reviewer: {me}")
-if any(rule.get("prevent_self_review") is not False for rule in rules):
-    fail("prevent_self_review is on: you could not approve your own release run")
-ok("prevent_self_review is off")
+else:
+    ok(f"required reviewer: {me}")
+if rules:
+    if any(rule.get("prevent_self_review") is not False for rule in rules):
+        fail(f"prevent_self_review is on in {name}: you could not approve your own run")
+    else:
+        ok("prevent_self_review is off")
 branch_policy = env.get("deployment_branch_policy") or {}
 try:
     policies = json.loads(policies_json) if policies_json else {}
@@ -392,11 +446,12 @@ names = [(p.get("type"), p.get("name")) for p in policies.get("branch_policies")
 if branch_policy.get("custom_branch_policies") is not True or branch_policy.get("protected_branches") is not False \
         or names != [("tag", "v*")]:
     fail(f"the deployment policy of {name} is {branch_policy or 'none'} {names}, expected exactly the tag pattern v*")
-ok("deployment policy: the tag pattern v* only")
+else:
+    ok("deployment policy: the tag pattern v* only")
 PY
 
 preflight() {
-  local me env_json policies secrets name publisher pin ids id include covered=false
+  local me env_json policies secrets name publisher pin ids id include covered=false vars missing=()
   echo "==> Preflight of the Windows release channel (read-only)"
   gh auth status >/dev/null 2>&1 || pf_fail "gh is not authenticated - run 'gh auth login'"
   me="$(gh api user --jq .login 2>/dev/null)" || pf_fail "cannot read the authenticated GitHub user"
@@ -435,6 +490,44 @@ preflight() {
     pf_ok "an active tag ruleset covers refs/tags/v*"
   else
     echo "  warn  no active tag ruleset covers refs/tags/v*: anyone with push access can create a release tag ($SETUP_DOC)"
+  fi
+  # The Microsoft Store: warnings only, never a failure (the self-signed release ships without it).
+  if ! vars="$(gh variable list --repo "$GH_REPO" --json name,value 2>/dev/null)"; then
+    echo "  warn  cannot list the repository variables: the Microsoft Store setup was not checked ($STORE_DOC)"
+  else
+    for name in "${STORE_VARS[@]}"; do
+      [[ -n "$(var_value "$vars" "$name" 2>/dev/null)" ]] || missing+=("$name")
+    done
+    if (( ${#missing[@]} > 0 )); then
+      echo "  warn  not set: ${missing[*]}: releases build no Microsoft Store bundle ($STORE_DOC)"
+    else
+      pf_ok "the Microsoft Store variables are set: ${STORE_VARS[*]}"
+    fi
+    if [[ "$(var_value "$vars" WINDOWS_STORE_PUBLISH 2>/dev/null)" == true ]]; then
+      echo "  info  WINDOWS_STORE_PUBLISH is true: CI submits each release to the Store (environment $STORE_ENV)"
+      # Names only: secret values are never readable.
+      if ! secrets="$(gh secret list --env "$STORE_ENV" --repo "$GH_REPO" --json name -q '.[].name' 2>/dev/null)"; then
+        echo "  warn  the environment $STORE_ENV does not exist or its secrets cannot be listed: CI cannot publish ($STORE_DOC)"
+      else
+        missing=()
+        for name in "${STORE_SECRETS[@]}"; do
+          grep -qxF "$name" <<<"$secrets" || missing+=("$name")
+        done
+        if (( ${#missing[@]} > 0 )); then
+          echo "  warn  secrets of $STORE_ENV not set: ${missing[*]}: CI cannot publish ($STORE_DOC)"
+        else
+          pf_ok "secrets of $STORE_ENV are set: ${STORE_SECRETS[*]}"
+        fi
+      fi
+      # Its protection (reviewer, self review, tag policy) as for the release environment, warnings only.
+      if env_json="$(gh api "repos/$GH_REPO/environments/$STORE_ENV" 2>/dev/null)"; then
+        policies="$(gh api "repos/$GH_REPO/environments/$STORE_ENV/deployment-branch-policies" 2>/dev/null || true)"
+        "$PYTHON" -I -c "$ENV_PY" "$me" "$policies" warn "$STORE_DOC" <<<"$env_json" 2>/dev/null \
+          || echo "  warn  cannot read the protection of $STORE_ENV ($STORE_DOC)"
+      fi
+    else
+      echo "  info  WINDOWS_STORE_PUBLISH is not true: upload each release's Store bundle in Partner Center (--store)"
+    fi
   fi
   echo "Preflight OK: the Windows release channel is set up."
 }
@@ -586,6 +679,73 @@ for item in pending if isinstance(pending, list) else []:
         break
 PY
 
+# The run's jobs (stdin: actions/runs/<id>/jobs?filter=latest; argv[1] the run's status). --attach needs only the
+# self-signed jobs (prepare, the sideload package legs, sign, assemble; a tag older than the Store variant names its
+# legs "package (x64)"); the Store jobs (the store package legs, store, store-publish) never block it. The jobs
+# endpoint may list a job only once it is created, so "ok" needs assemble done or the whole run completed. Prints
+# seven lines:
+#   1. running (a needed job has not completed), ok (all succeeded) or failed
+#   2. what a rerun targets when failed: --job=<id> when the earliest failed needed job is sign or assemble (that job
+#      and its dependents only), else --failed (a failed package leg or prepare skips the Store jobs, so they never
+#      fail on their own then); "-" otherwise
+#   3. the needed jobs that did not succeed, 4. the Store jobs that failed, 5. the Store jobs not completed yet
+#      ("; "-separated names, or "-")
+#   6. the store job's, 7. the store-publish job's conclusion (or status while not completed; "absent")
+read -r -d '' JOBS_PY <<'PY' || true
+import json
+import re
+import sys
+
+run_status = sys.argv[1]
+try:
+    jobs = json.load(sys.stdin)["jobs"]
+    if not isinstance(jobs, list):
+        raise TypeError("jobs is not a list")
+except (ValueError, KeyError, TypeError) as error:
+    sys.exit(f"error: cannot read the jobs of the run ({error})")
+jobs = [j for j in jobs if isinstance(j, dict) and isinstance(j.get("name"), str)]
+
+def is_store(name):
+    return name in ("store", "store-publish") or re.match(r"package \(.*\bstore\b", name) is not None
+
+def done(job):
+    return job.get("status") == "completed"
+
+def state(name):
+    job = next((j for j in jobs if j["name"] == name), None)
+    if job is None:
+        return "absent"
+    return (job.get("conclusion") if done(job) else job.get("status")) or "unknown"
+
+def names(items):
+    return "; ".join(j["name"] for j in items) or "-"
+
+ORDER = {"prepare": 0, "sign": 2, "assemble": 3}  # package legs and anything else: 1
+needed = [j for j in jobs if not is_store(j["name"])]
+store = [j for j in jobs if is_store(j["name"])]
+bad = sorted((j for j in needed if done(j) and j.get("conclusion") != "success"),
+             key=lambda j: ORDER.get(j["name"], 1))
+if any(not done(j) for j in needed):
+    verdict = "running"
+elif run_status == "completed":
+    verdict = "failed" if bad or not needed else "ok"
+elif bad:
+    verdict = "failed"
+else:
+    verdict = "ok" if state("assemble") == "success" else "running"
+rerun = "-"
+if verdict == "failed":
+    first = bad[0] if bad else None
+    rerun = f"--job={first['id']}" if first and first["name"] in ("sign", "assemble") else "--failed"
+print(verdict)
+print(rerun)
+print(names(bad))
+print(names([j for j in store if done(j) and j.get("conclusion") not in ("success", "skipped", "neutral")]))
+print(names([j for j in store if not done(j)]))
+print(state("store"))
+print(state("store-publish"))
+PY
+
 # The release's assets (stdin: gh release view --json assets) against name=sha256 arguments: prints the names it
 # lacks; fails when one it has differs (its digest is "sha256:<hex>").
 read -r -d '' ASSETS_PY <<'PY' || true
@@ -648,32 +808,67 @@ poll_run() {
   done
 }
 
-# Waits until the current attempt of RUN completes. On the way, approves the release environment's deployment of
-# this run only (a new attempt waits for approval again). When it cannot (not allowed, or the approval fails), it
-# prints the run's URL and waits up to APPROVAL_TIMEOUT for a manual approval.
+# Prints RUN's status ("unknown" when gh fails).
+run_status() { gh run view "$RUN" --repo "$GH_REPO" --json status -q .status 2>/dev/null || echo unknown; }
+
+# Prints JOBS_PY's seven lines on RUN's jobs; $1 is the run's status. Fails when the jobs cannot be listed or read.
+run_jobs() {
+  local json
+  json="$(gh api "repos/$GH_REPO/actions/runs/$RUN/jobs?filter=latest&per_page=100" 2>/dev/null)" || return 1
+  "$PYTHON" -I -c "$JOBS_PY" "$1" <<<"$json"
+}
+
+# Waits for the current attempt of RUN: $1 = needed (until the jobs --attach needs are done, JOBS_PY; the Store
+# jobs may still run or wait) or run (until the whole run completes). On the way, approves the APPROVE_ENV
+# deployment of this run only (a new attempt waits for approval again). When it cannot (not allowed, or the approval
+# fails), it prints the run's URL and waits up to APPROVAL_TIMEOUT for a manual approval. With $1 = run, a waiting
+# deployment of OTHER_ENV, which this mode never approves, stops it with OTHER_HINT; with $2 = reject, it rejects
+# that deployment instead (when the user may, else it stops) and sets OTHER_REJECTED=true.
 wait_run() {
-  local started=$SECONDS manual_since="" status last="" printed=0 pending env_id can_approve
+  local until="$1" on_other="${2:-}" started=$SECONDS manual_since="" status last="" printed=0 pending env_id
+  local can_approve verdict other_id other_can
   while :; do
-    status="$(gh run view "$RUN" --repo "$GH_REPO" --json status -q .status 2>/dev/null || echo unknown)"
+    status="$(run_status)"
     [[ "$status" == completed ]] && return 0
+    if [[ "$until" == needed ]]; then
+      verdict="$(run_jobs "$status" 2>/dev/null)" || verdict=running
+      [[ "${verdict%%$'\n'*}" == running ]] || return 0
+    fi
     pending="$(gh api "repos/$GH_REPO/actions/runs/$RUN/pending_deployments" 2>/dev/null || echo '[]')"
-    read -r env_id can_approve <<<"$("$PYTHON" -I -c "$PENDING_PY" "$RELEASE_ENV" <<<"$pending" || true)" || true
+    if [[ "$until" == run ]]; then
+      read -r other_id other_can <<<"$("$PYTHON" -I -c "$PENDING_PY" "$OTHER_ENV" <<<"$pending" || true)" || true
+      if [[ -n "${other_id:-}" && "${OTHER_REJECTED:-}" != true ]]; then
+        [[ "$on_other" == reject ]] \
+          || die "run $RUN waits for the $OTHER_ENV approval, which --$MODE does not give: $OTHER_HINT"
+        [[ "$other_can" == true ]] \
+          && gh api -X POST "repos/$GH_REPO/actions/runs/$RUN/pending_deployments" -F "environment_ids[]=$other_id" \
+            -f state=rejected \
+            -f comment="Rejected by release.sh --attach to rerun the self-signed jobs; use release.sh --store $TAG for the Store build" \
+            >/dev/null \
+          || die "run $RUN waits for the $OTHER_ENV approval and --$MODE cannot reject it: $OTHER_HINT"
+        OTHER_REJECTED=true
+        echo "    rejected the $OTHER_ENV deployment of run $RUN, so that its failed jobs can be rerun: this attempt"
+        echo "    does not submit $TAG to the Microsoft Store (windows/scripts/release.sh --store $TAG gives the manual"
+        echo "    upload steps, or approves store-publish if a rerun queues it again)"
+      fi
+    fi
+    read -r env_id can_approve <<<"$("$PYTHON" -I -c "$PENDING_PY" "$APPROVE_ENV" <<<"$pending" || true)" || true
     if [[ -z "${env_id:-}" ]]; then
       manual_since=""
     elif [[ -z "$manual_since" && "$can_approve" == true ]] \
         && gh api -X POST "repos/$GH_REPO/actions/runs/$RUN/pending_deployments" -F "environment_ids[]=$env_id" \
           -f state=approved -f comment="Approved by /cf-ship for $TAG" >/dev/null; then
-      echo "    approved the $RELEASE_ENV deployment of run $RUN"
+      echo "    approved the $APPROVE_ENV deployment of run $RUN"
     else
       if [[ -z "$manual_since" ]]; then
         manual_since=$SECONDS
-        echo "    cannot approve the $RELEASE_ENV deployment: approve it at $RUN_URL (waiting up to $(( APPROVAL_TIMEOUT / 60 )) min)" >&2
+        echo "    cannot approve the $APPROVE_ENV deployment: approve it at $RUN_URL (waiting up to $(( APPROVAL_TIMEOUT / 60 )) min)" >&2
       fi
       (( SECONDS - manual_since < APPROVAL_TIMEOUT )) \
-        || die "run $RUN was not approved within $(( APPROVAL_TIMEOUT / 60 )) min: $RUN_URL; re-run --attach after approving"
+        || die "run $RUN was not approved within $(( APPROVAL_TIMEOUT / 60 )) min: $RUN_URL; re-run --$MODE after approving"
     fi
     (( SECONDS - started < RUN_TIMEOUT )) \
-      || die "run $RUN did not complete within $(( RUN_TIMEOUT / 60 )) min: $RUN_URL; re-run --attach later"
+      || die "run $RUN did not complete within $(( RUN_TIMEOUT / 60 )) min: $RUN_URL; re-run --$MODE later"
     if [[ "$status" != "$last" ]] || (( SECONDS - printed >= 300 )); then
       echo "    run $RUN: $status ($(( (SECONDS - started) / 60 )) min)"
       last="$status"
@@ -681,6 +876,15 @@ wait_run() {
     fi
     sleep 30
   done
+}
+
+# Sets SHA to the commit of the tag TAG on origin (the peeled line of an annotated tag, else the tag's own line).
+resolve_tag_sha() {
+  local refs
+  refs="$(git ls-remote --tags origin "refs/tags/$TAG" "refs/tags/$TAG^{}")" || die "git ls-remote origin failed"
+  [[ -n "$refs" ]] || die "tag $TAG is not on origin."
+  SHA="$(awk -v ref="refs/tags/$TAG^{}" '$2 == ref { print $1 }' <<<"$refs")"
+  [[ -n "$SHA" ]] || SHA="$(awk -v ref="refs/tags/$TAG" '$2 == ref { print $1 }' <<<"$refs")"
 }
 
 # Reruns RUN (gh run rerun "$@") and waits until its new attempt has started.
@@ -696,8 +900,9 @@ rerun() {
 }
 
 attach() {
-  local dirty refs subject publisher pin bundle bundle_uri out name assets missing feed_main feed_state feed_version
-  local reran_failed=false reran_all=false conclusion live expired upload=() hashes=() files=()
+  local dirty subject publisher pin bundle bundle_uri out name assets missing feed_main feed_state feed_version
+  local reran_failed=false reran_all=false live expired upload=() hashes=() files=()
+  local verdict state rerun_arg failed_jobs store_failed="-" store_pending="-"
 
   # Guards, in this order. Nothing but fetches happens before the prompt.
   [[ "$TAG" =~ ^v(.+)$ ]] || die "--attach takes the release tag vX.Y.Z, not '$TAG'"
@@ -715,11 +920,7 @@ attach() {
     printf '%s\n' "$dirty" | sed 's/^/  /' >&2
     exit 1
   fi
-  refs="$(git ls-remote --tags origin "refs/tags/$TAG" "refs/tags/$TAG^{}")" || die "git ls-remote origin failed"
-  [[ -n "$refs" ]] || die "tag $TAG is not on origin."
-  # The commit: the peeled line of an annotated tag, else the tag's own line.
-  SHA="$(awk -v ref="refs/tags/$TAG^{}" '$2 == ref { print $1 }' <<<"$refs")"
-  [[ -n "$SHA" ]] || SHA="$(awk -v ref="refs/tags/$TAG" '$2 == ref { print $1 }' <<<"$refs")"
+  resolve_tag_sha
   [[ "$(gh release view "$TAG" --repo "$GH_REPO" --json isDraft -q .isDraft 2>/dev/null || true)" == false ]] \
     || die "the GitHub release $TAG does not exist or is not published yet (publish-release.sh creates it)."
   git cat-file -e "$SHA^{commit}" 2>/dev/null || git fetch -q origin "refs/tags/$TAG" \
@@ -768,23 +969,50 @@ attach() {
     fi
     RUN_URL="https://github.com/$GH_REPO/actions/runs/$RUN"
     echo "    run $RUN: $RUN_URL"
+    # Only the jobs this release needs count (JOBS_PY): a Store job failing, or store-publish waiting for its
+    # approval (--store gives it), never blocks the attach.
+    APPROVE_ENV="$RELEASE_ENV"
+    OTHER_ENV="$STORE_ENV"
+    OTHER_HINT="approve or reject it at $RUN_URL (windows/scripts/release.sh --store $TAG approves it), then re-run --attach"
+    OTHER_REJECTED=false
     while :; do
-      wait_run
-      conclusion="$(gh run view "$RUN" --repo "$GH_REPO" --json conclusion -q .conclusion)"
-      if [[ "$conclusion" != success ]]; then
+      wait_run needed
+      verdict="$(run_jobs "$(run_status)")" || die "cannot list the jobs of run $RUN: $RUN_URL"
+      { read -r state; read -r rerun_arg; read -r failed_jobs; read -r store_failed; read -r store_pending; } <<<"$verdict"
+      if [[ "$state" == running ]]; then
+        sleep 15
+        continue
+      fi
+      if [[ "$state" != ok ]]; then
         [[ "$reran_failed" == false ]] \
-          || die "run $RUN failed again ($conclusion): gh run view $RUN --repo $GH_REPO --log-failed"
-        # A rerun of the failed jobs downloads the earlier jobs' intermediate artifacts (msix-*, signed-<tag>): once one
-        # of them has expired, only a full rerun can rebuild it.
+          || die "run $RUN failed again ($failed_jobs): gh run view $RUN --repo $GH_REPO --log-failed"
+        # GitHub reruns only a completed run: let its Store jobs end first, and reject a waiting store-publish
+        # (store-publish needs only prepare and store, so it can wait while the failed job ended the rest).
+        if [[ "$(run_status)" != completed ]]; then
+          echo "==> Run $RUN failed in: $failed_jobs; waiting for its Store jobs to end before rerunning"
+          wait_run run reject
+        fi
+        # A rerun of the failed jobs downloads the earlier jobs' intermediate artifacts (msix-sideload-*, msix-<arch>
+        # before the Store variant, signed-<tag>): once one of them has expired, only a full rerun can rebuild it.
         expired="$(gh api "repos/$GH_REPO/actions/runs/$RUN/artifacts?per_page=100" \
-          --jq "[.artifacts[] | select(.expired == true and ((.name | startswith(\"msix-\")) or .name == \"signed-$TAG\"))] | length")" \
+          --jq "[.artifacts[] | select(.expired == true and (((.name | startswith(\"msix-\")) and (.name | startswith(\"msix-store-\") | not)) or .name == \"signed-$TAG\"))] | length")" \
           || die "cannot list the artifacts of run $RUN"
         if (( expired > 0 )); then
-          echo "==> Run $RUN ended '$conclusion' and its intermediate artifacts have expired: rerunning the whole run once"
+          echo "==> Run $RUN failed in: $failed_jobs, and its intermediate artifacts have expired: rerunning the whole run once"
+          if [[ "$OTHER_REJECTED" == true ]]; then
+            echo "    the full rerun queues store-publish again: windows/scripts/release.sh --store $TAG approves it"
+          fi
           rerun
         else
-          echo "==> Run $RUN ended '$conclusion': rerunning its failed jobs once"
-          rerun --failed
+          echo "==> Run $RUN failed in: $failed_jobs: rerunning once ($rerun_arg)"
+          if [[ "$OTHER_REJECTED" == true && "$rerun_arg" == --job=* ]]; then
+            echo "    the Microsoft Store publish of run $RUN was rejected: this run will not submit $TAG to the Store;"
+            echo "    windows/scripts/release.sh --store $TAG gives the manual upload steps (its Store bundle stays valid)"
+          elif [[ "$OTHER_REJECTED" == true ]]; then
+            echo "    the Microsoft Store publish of run $RUN was rejected: windows/scripts/release.sh --store $TAG approves it"
+            echo "    if the rerun queues it again, else gives the manual upload steps"
+          fi
+          rerun "$rerun_arg"
         fi
         reran_failed=true
         continue
@@ -798,8 +1026,19 @@ attach() {
       reran_all=true
     done
 
+    if [[ "$store_failed" != - ]]; then
+      echo "warning: the Store jobs of run $RUN did not succeed ($store_failed): the self-signed release is not affected;" >&2
+      echo "         see windows/scripts/release.sh --store $TAG" >&2
+    fi
+    if [[ "$store_pending" != - ]]; then
+      echo "    Store jobs still running or waiting: $store_pending (windows/scripts/release.sh --store $TAG finishes them)"
+    fi
+
     echo "==> Downloading EchoDiar-$TAG into $out"
-    rm -rf "$out"
+    # Everything but store/ (the Store bundle of --store, unrelated to this artifact).
+    if [[ -d "$out" ]]; then
+      find "$out" -mindepth 1 -maxdepth 1 ! -name store -exec rm -rf {} +
+    fi
     mkdir -p "$out"
     gh run download "$RUN" --repo "$GH_REPO" -n "EchoDiar-$TAG" -D "$out" || die "gh run download failed"
   fi
@@ -849,8 +1088,231 @@ attach() {
   echo "  next  : curl -fsSI $APPINSTALLER_URI   (Pages deploys the feed within minutes)"
 }
 
+# --- 5. --store: the Microsoft Store step of vX.Y.Z ----------------------------
+# The downloaded Store artifact is data, read by an isolated Python (-I), never run. Arguments: the artifact folder,
+# the package version, the Store Identity Name, Publisher and PublisherDisplayName (the repo variables). The folder
+# holds exactly the file EchoDiar_<version>_x64_arm64.msixupload, a zip holding exactly one unsigned
+# EchoDiar_<version>_x64_arm64.msixbundle: the Store identity at the version, x64 and arm64, each inner package
+# unsigned, the same identity, the Store PublisherDisplayName and no packageManagement capability (the Store signs
+# the bundle).
+read -r -d '' STORE_PY <<'PY' || true
+import io
+import os
+import sys
+import zipfile
+import xml.etree.ElementTree as ET
+
+out, version, name, publisher, display_name = sys.argv[1:6]
+upload_name = f"EchoDiar_{version}_x64_arm64.msixupload"
+bundle_name = f"EchoDiar_{version}_x64_arm64.msixbundle"
+
+def fail(message):
+    sys.exit(f"error: {message}")
+
+def local(tag):
+    return tag.rsplit("}", 1)[-1]
+
+def child(element, tag):
+    return next((e for e in element if local(e.tag) == tag), None)
+
+def open_zip(source, what):
+    try:
+        return zipfile.ZipFile(io.BytesIO(source) if isinstance(source, bytes) else source)
+    except (zipfile.BadZipFile, OSError) as error:
+        fail(f"{what} is not a zip file ({error})")
+
+def read_entry(archive, entry, what):
+    try:
+        return archive.read(entry)
+    except (zipfile.BadZipFile, OSError, KeyError, RuntimeError) as error:
+        fail(f"cannot read {entry} in {what} ({error})")
+
+def read_xml(archive, entry, what):
+    if entry not in archive.namelist():
+        fail(f"{what} has no {entry}")
+    try:
+        return ET.fromstring(read_entry(archive, entry, what))
+    except ET.ParseError as error:
+        fail(f"{entry} in {what} is not well-formed: {error}")
+
+# Exactly the upload file, flat (so never a private key).
+entries = sorted(os.listdir(out))
+upload_path = os.path.join(out, upload_name)
+if entries != [upload_name] or not os.path.isfile(upload_path) or os.path.islink(upload_path):
+    fail(f"the Store artifact holds {entries}, expected only the file {upload_name}")
+
+# The .msixupload holds exactly the bundle.
+with open_zip(upload_path, upload_name) as upload:
+    if upload.namelist() != [bundle_name]:
+        fail(f"{upload_name} holds {upload.namelist()}, expected only {bundle_name}")
+    bundle_data = read_entry(upload, bundle_name, upload_name)
+
+# The bundle: unsigned, the Store identity, x64 and arm64 at the tag's version.
+checks = []
+with open_zip(bundle_data, bundle_name) as bundle:
+    names = set(bundle.namelist())
+    if "AppxSignature.p7x" in names:
+        fail(f"{bundle_name} is signed (AppxSignature.p7x): the Store bundle must be unsigned")
+    manifest = read_xml(bundle, "AppxMetadata/AppxBundleManifest.xml", bundle_name)
+    identity = child(manifest, "Identity")
+    if identity is None:
+        fail("AppxBundleManifest.xml has no Identity")
+    packages = [e for e in manifest.iter() if local(e.tag) == "Package" and e.get("Type") == "application"]
+    checks += [
+        ("bundle Name", identity.get("Name"), name),
+        ("bundle Publisher", identity.get("Publisher"), publisher),
+        ("bundle Version", identity.get("Version"), version),
+        ("bundle packages", sorted((e.get("Architecture"), e.get("Version")) for e in packages),
+         [("arm64", version), ("x64", version)]),
+    ]
+    # Each inner package: unsigned, the same identity, the Store PublisherDisplayName, no packageManagement.
+    for package in packages:
+        file_name = package.get("FileName") or ""
+        if file_name not in names:
+            fail(f"{bundle_name} has no {file_name!r}, which its manifest lists")
+        with open_zip(read_entry(bundle, file_name, bundle_name), file_name) as inner:
+            if "AppxSignature.p7x" in inner.namelist():
+                fail(f"{file_name} in {bundle_name} is signed: the Store packages must be unsigned")
+            root = read_xml(inner, "AppxManifest.xml", file_name)
+        inner_id = child(root, "Identity")
+        properties = child(root, "Properties")
+        if inner_id is None or properties is None:
+            fail(f"AppxManifest.xml of {file_name} has no Identity or Properties")
+        shown = child(properties, "PublisherDisplayName")
+        capabilities = {e.get("Name") for e in root.iter() if local(e.tag) == "Capability"}
+        checks += [
+            (f"{file_name} Name", inner_id.get("Name"), name),
+            (f"{file_name} Publisher", inner_id.get("Publisher"), publisher),
+            (f"{file_name} Version", inner_id.get("Version"), version),
+            (f"{file_name} ProcessorArchitecture", inner_id.get("ProcessorArchitecture"), package.get("Architecture")),
+            (f"{file_name} PublisherDisplayName", shown.text if shown is not None else None, display_name),
+            (f"{file_name} packageManagement capability", "packageManagement" in capabilities, False),
+        ]
+bad = [f"{what} is {actual!r}, expected {wanted!r}" for what, actual, wanted in checks if actual != wanted]
+if bad:
+    fail("; ".join(bad))
+print(f"    OK: {upload_name} holds only the unsigned {bundle_name}: {name} {version} '{publisher}', "
+      f"x64 and arm64, PublisherDisplayName '{display_name}', no packageManagement")
+PY
+
+# Checks the Store artifact folder $1 (STORE_PY) against $2 the Identity Name, $3 the Publisher and $4 the
+# PublisherDisplayName.
+check_store() { "$PYTHON" -I -c "$STORE_PY" "$1" "$VERSION4" "$2" "$3" "$4"; }
+
+store_release() {
+  local vars store_name store_publisher store_display store_product out upload_name verdict state rerun_arg failed_jobs store_failed store_pending
+  local store_job publish_job live
+
+  # Guards. Nothing but fetches happens before the prompt. No branch or clean tree needed: nothing is committed.
+  [[ "$TAG" =~ ^v(.+)$ ]] || die "--store takes the release tag vX.Y.Z, not '$TAG'"
+  set_version "${BASH_REMATCH[1]}"
+  gh auth status >/dev/null 2>&1 || die "gh is not authenticated - run 'gh auth login'."
+  check_origin
+  git fetch -q origin main || die "git fetch origin main failed"
+  resolve_tag_sha
+  git cat-file -e "$SHA^{commit}" 2>/dev/null || git fetch -q origin "refs/tags/$TAG" \
+    || die "cannot fetch the commit of $TAG"
+  # The approval below lets the tag's workflow see the Store credentials: only main's code may get them.
+  git merge-base --is-ancestor "$SHA" origin/main \
+    || die "the commit $SHA of $TAG is not on origin/main: --store approves the Store publish of main's code only."
+  if ! git cat-file -e "$SHA:$APP_CSPROJ" 2>/dev/null; then
+    echo "$TAG has no Windows app (macOS-only release): nothing to submit to the Store"
+    exit 0
+  fi
+  # One listing: a failed call must not pass for variables that are not set.
+  vars="$(gh variable list --repo "$GH_REPO" --json name,value)" || die "cannot list the repository variables"
+  store_name="$(var_value "$vars" WINDOWS_STORE_IDENTITY_NAME)" || die "cannot read the repository variables"
+  store_publisher="$(var_value "$vars" WINDOWS_STORE_PUBLISHER)" || die "cannot read the repository variables"
+  store_display="$(var_value "$vars" WINDOWS_STORE_PUBLISHER_DISPLAY_NAME)" || die "cannot read the repository variables"
+  store_product="$(var_value "$vars" WINDOWS_STORE_PRODUCT_ID)" || die "cannot read the repository variables"
+  # The workflow builds the Store bundle only with all four set (prepare).
+  if [[ -z "$store_name" || -z "$store_publisher" || -z "$store_display" || -z "$store_product" ]]; then
+    echo "No Store bundle for $TAG: set WINDOWS_STORE_* variables ($STORE_DOC)"
+    echo "Store not set up yet"
+    exit 0
+  fi
+
+  out="$REPO_ROOT/release/windows/$TAG/store"
+  upload_name="EchoDiar_${VERSION4}_x64_arm64.msixupload"
+  echo "About to finish the Microsoft Store step of $TAG:"
+  echo "  commit   : $SHA (on main)"
+  echo "  identity : $store_name $VERSION4, publisher '$store_publisher' ('$store_display')"
+  echo "  output   : $out/$upload_name"
+  echo "  then     : approve this tag's store-publish job ($STORE_ENV) if it waits, check the Store bundle"
+  echo
+  confirm "Continue?" || { echo "aborted."; exit 1; }
+
+  # The run: --attach found or started it; this mode never dispatches or reruns.
+  echo "==> Looking for the $WORKFLOW run of $TAG (${SHA:0:7})"
+  RUN=""
+  find_run || die "no $WORKFLOW run for $TAG yet: windows/scripts/release.sh --attach $TAG --yes starts one"
+  RUN_URL="https://github.com/$GH_REPO/actions/runs/$RUN"
+  echo "    run $RUN: $RUN_URL"
+  APPROVE_ENV="$STORE_ENV"
+  OTHER_ENV="$RELEASE_ENV"
+  OTHER_HINT="approve or reject it at $RUN_URL (windows/scripts/release.sh --attach $TAG --yes approves it), then re-run --store"
+  wait_run run
+  verdict="$(run_jobs completed)" || die "cannot list the jobs of run $RUN: $RUN_URL"
+  { read -r state; read -r rerun_arg; read -r failed_jobs; read -r store_failed; read -r store_pending
+    read -r store_job; read -r publish_job; } <<<"$verdict"
+
+  # Download (a folder that already passes the check, from an earlier --store, is reused as it is).
+  if [[ -d "$out" ]] && check_store "$out" "$store_name" "$store_publisher" "$store_display" >/dev/null 2>&1; then
+    echo "==> $out already holds a checked $upload_name: not downloading again (delete it to download again)"
+  else
+    case "$store_job" in
+      success) ;;
+      absent|skipped)
+        if [[ "$state" == ok ]]; then
+          echo "Run $RUN built no Store bundle (it predates the Store variables): nothing to submit for $TAG"
+          echo "no Store bundle for this tag"
+          exit 0
+        fi
+        die "run $RUN built no Store bundle: its build failed ($failed_jobs). Finish --attach first (windows/scripts/release.sh --attach $TAG --yes), then re-run --store" ;;
+      *)
+        die "the Store build of run $RUN ended '$store_job' ($store_failed): gh run view $RUN --repo $GH_REPO --log-failed; rerun it (gh run rerun $RUN --repo $GH_REPO --failed), then re-run --store" ;;
+    esac
+    live="$(gh api "repos/$GH_REPO/actions/runs/$RUN/artifacts?name=EchoDiar-store-$TAG" \
+      --jq '[.artifacts[] | select(.expired == false)] | length')" || die "cannot list the artifacts of run $RUN"
+    (( live > 0 )) || die "the artifact EchoDiar-store-$TAG of run $RUN has expired (kept 14 days): re-run the workflow for $TAG (gh run rerun $RUN --repo $GH_REPO; its $RELEASE_ENV deployment then waits: approve or reject it at $RUN_URL), then re-run --store"
+    echo "==> Downloading EchoDiar-store-$TAG into $out"
+    rm -rf "$out"
+    mkdir -p "$out"
+    gh run download "$RUN" --repo "$GH_REPO" -n "EchoDiar-store-$TAG" -D "$out" || die "gh run download failed"
+  fi
+  check_store "$out" "$store_name" "$store_publisher" "$store_display" || die "the Store bundle check failed (see above)"
+
+  echo
+  if [[ "$publish_job" == success ]]; then
+    echo "Submitted to the Microsoft Store by CI (certification can take up to 3 business days)."
+    echo "  run    : $RUN_URL"
+    echo "  bundle : $out/$upload_name"
+    return 0
+  fi
+  case "$publish_job" in
+    absent|skipped)
+      echo "CI does not submit $TAG to the Store (WINDOWS_STORE_PUBLISH is not 'true'): upload it in Partner Center." ;;
+    *)
+      # A rejected deployment fails the job: --attach rejects a waiting one to rerun the self-signed jobs.
+      if [[ "$(gh api "repos/$GH_REPO/actions/runs/$RUN/approvals" \
+          --jq "any(.[]; .state == \"rejected\" and any(.environments[]?; .name == \"$STORE_ENV\"))" \
+          2>/dev/null || true)" == true ]]; then
+        echo "warning: the $STORE_ENV deployment of run $RUN was rejected (release.sh --attach rejects it to rerun the self-signed jobs): CI did not submit $TAG" >&2
+      else
+        echo "warning: the store-publish job of run $RUN ended '$publish_job' (a submission still in certification blocks the next): $RUN_URL" >&2
+      fi
+      echo "Upload it in Partner Center instead." ;;
+  esac
+  echo "  1. https://partner.microsoft.com/dashboard > Apps and games > EchoDiar > Start update"
+  echo "     (or open the pending submission)"
+  echo "  2. Packages > upload $out/$upload_name"
+  echo "  3. Save, then Submit to the Store (certification can take up to 3 business days)"
+  echo "manual Store upload pending"
+}
+
 case "$MODE" in
   dev) dev_release ;;
   preflight) preflight ;;
   attach) attach ;;
+  store) store_release ;;
 esac

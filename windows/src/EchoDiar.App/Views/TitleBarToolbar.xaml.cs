@@ -354,8 +354,8 @@ public sealed partial class TitleBarToolbar : UserControl
     }
 
     /// <summary>
-    /// Update: asks first, then installs (Windows closes EchoDiar and opens the new version). Work that started meanwhile
-    /// is not cut off: it is said instead.
+    /// Update: asks first, then installs (Windows closes EchoDiar and opens the new version). A Store update asks in the
+    /// Store's own dialog, so it installs without this one. Work that started meanwhile is not cut off: it is said instead.
     /// </summary>
     private async Task ConfirmUpdateAsync()
     {
@@ -363,6 +363,11 @@ public sealed partial class TitleBarToolbar : UserControl
         if (model.UpdateBlocked)
         {
             await ShowUpdateBlockedAsync();
+            return;
+        }
+        if (model.Updater.Source == UpdateSource.Store)
+        {
+            if (!await model.InstallUpdateAsync() && _model is not null) await ShowUpdateBlockedAsync();
             return;
         }
         var dialog = NewDialog(Loc.T("Install the update?"), Loc.T("EchoDiar closes, installs the new version and opens again."));

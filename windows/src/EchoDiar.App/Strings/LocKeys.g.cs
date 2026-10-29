@@ -812,6 +812,7 @@ public static partial class Loc
         "Update after the current work",
         "Update available…",
         "Updates",
+        "Updates come from the Microsoft Store. A new version can take up to a day to appear after its release.",
         "Updates need an .appinstaller install",
         "Usage",
         "Use %@",

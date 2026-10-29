@@ -1,10 +1,10 @@
 #!/usr/bin/env bash
 #
 # ship.sh - End-to-end local release: build -> sign -> notarize -> GitHub Release -> appcast
-#           -> Windows app attached to the same release.
+#           -> Windows app attached to the same release -> Microsoft Store step.
 #
 # Run this AFTER the version-bump commit (project.yml + CHANGELOG.md) is pushed to main.
-# It chains the four release scripts in sequence with no interactive prompts.
+# It chains the release scripts in five steps with no interactive prompts.
 # Before building it requires: branch main, HEAD == origin/main (only pushed commits ship),
 # a clean tree of tracked files, gh authenticated, a `## [X.Y.Z]` CHANGELOG.md section,
 # no existing tag vX.Y.Z and the Windows release channel set up (release.sh --preflight).
@@ -15,8 +15,12 @@
 #   3. scripts/publish-appcast.sh - appcast on main; macOS is fully shipped here
 #   4. windows/scripts/release.sh --attach vX.Y.Z --yes - the tag pushed in step 2 started
 #      windows-release.yml: approve that run, attach its files to the release, commit the feed
+#   5. windows/scripts/release.sh --store vX.Y.Z --yes - the same run's Microsoft Store bundle: approve its
+#      store-publish job when CI publishes, check the bundle, else print the Partner Center upload steps
+#      ("manual Store upload pending"; "Store not set up yet" without the WINDOWS_STORE_* variables;
+#      "no Store bundle for this tag" when the run predates them)
 # Step 4 can take ~30-60 min (CI build + approval): callers should run ship.sh in the background.
-# When step 4 fails, re-run it (or /cf-ship Resume) to finish Windows.
+# When step 4 fails, re-run it (or /cf-ship Resume) to finish Windows; when step 5 fails, re-run step 5.
 #
 # Windows install:
 #   Docs : https://ed.dinhanhthi.com/docs.html#install-windows
@@ -30,6 +34,8 @@
 #   - gh CLI authenticated
 #   - Windows release channel: the windows-release-signing environment, its secrets,
 #     WINDOWS_PUBLIC_PUBLISHER and windows/packaging/release-cert.sha256 (RELEASING §3.0)
+#   - Microsoft Store (optional until set up): the WINDOWS_STORE_* variables, and for CI publishing
+#     the windows-store-publish environment and its secrets (RELEASING §3.3)
 #
 # Usage:
 #   scripts/ship.sh
@@ -91,7 +97,7 @@ echo "========================================"
 echo
 
 # Step 1 - Build, sign, notarize, DMG (Keychain prompt -> Always Allow)
-echo "==> Step 1/4: build + notarize"
+echo "==> Step 1/5: build + notarize"
 scripts/build-and-notarize.sh
 
 if [[ "$(git rev-parse HEAD)" != "$release_sha" || -n "$(git status --porcelain --untracked-files=no)" ]]; then
@@ -100,20 +106,30 @@ if [[ "$(git rev-parse HEAD)" != "$release_sha" || -n "$(git status --porcelain 
 fi
 
 # Step 2 - Tag + GitHub Release (zip + DMG uploaded); the tag push starts windows-release.yml
-echo "==> Step 2/4: tag + GitHub Release"
+echo "==> Step 2/5: tag + GitHub Release"
 scripts/publish-release.sh --yes "$ZIP"
 
 # Step 3 - Generate + commit + push the appcast
-echo "==> Step 3/4: appcast"
+echo "==> Step 3/5: appcast"
 scripts/publish-appcast.sh "$ZIP"
 
 # Step 4 - Approve the tag's Windows run, attach its files to the release, commit the feed
-echo "==> Step 4/4: Windows (CI build + approval, ~30-60 min)"
+echo "==> Step 4/5: Windows (CI build + approval, ~30-60 min)"
 if ! windows/scripts/release.sh --attach "$TAG" --yes; then
   echo >&2
   echo "error: the Windows step failed. macOS v$VERSION is fully shipped (release + appcast)." >&2
   echo "       finish Windows by re-running: windows/scripts/release.sh --attach $TAG --yes" >&2
   echo "       (or /cf-ship Resume); troubleshooting: docs/RELEASING.md §3.2" >&2
+  exit 1
+fi
+
+# Step 5 - The Microsoft Store: approve the run's store-publish job, check the Store bundle, or print the manual upload
+echo "==> Step 5/5: Microsoft Store"
+if ! windows/scripts/release.sh --store "$TAG" --yes; then
+  echo >&2
+  echo "error: the Microsoft Store step failed. macOS v$VERSION and the self-signed Windows release are shipped." >&2
+  echo "       finish the Store step by re-running: windows/scripts/release.sh --store $TAG --yes" >&2
+  echo "       (or /cf-ship Resume); troubleshooting: docs/RELEASING.md §3.3" >&2
   exit 1
 fi
 
@@ -124,4 +140,5 @@ echo "  GitHub : https://github.com/dinhanhthi/EchoDiar/releases/tag/v$VERSION"
 echo "  Appcast: https://ed.dinhanhthi.com/appcast.xml (live in ~1 min)"
 echo "  Docs   : https://ed.dinhanhthi.com/docs.html#install-windows"
 echo "  Feed   : https://ed.dinhanhthi.com/windows/EchoDiar.appinstaller (live in a few min)"
+echo "  Store  : see step 5 (submitted by CI, manual Store upload pending, Store not set up yet, or no Store bundle for this tag)"
 echo "========================================"
