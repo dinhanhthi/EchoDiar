@@ -42,6 +42,26 @@ public sealed class RecordingTranscriberLineTests
         Assert.False(asked);
     }
 
+    // Guards the tentative text of the open chunks: at most one per speaker, ordered by start; a newer partial replaces
+    // the speaker's text, a partial with no text removes it, and a final clears it only when it is the same chunk. An
+    // unchanged list is the same array, so the snapshot does not change (Snapshot compares it by reference).
+    [Fact]
+    public void ATentativePerSpeakerIsReplacedThenClearedByItsFinal()
+    {
+        var me = new RecordingTranscriber.Tentative(RecordingTranscriber.Speaker.Me, "On commence la réunion", 48_000);
+        var others = new RecordingTranscriber.Tentative(RecordingTranscriber.Speaker.Others, "Bonjour", 32_000);
+        var tentative = RecordingTranscriber.WithTentative([], others.Speaker, "Bonjour", 32_000);
+        tentative = RecordingTranscriber.WithTentative(tentative, me.Speaker, "On commence", 16_000);
+        Assert.Equal([new RecordingTranscriber.Tentative(me.Speaker, "On commence", 16_000), others], tentative);
+        tentative = RecordingTranscriber.WithTentative(tentative, me.Speaker, me.Text, 48_000);
+        Assert.Equal([others, me], tentative);
+        Assert.Same(tentative, RecordingTranscriber.WithTentative(tentative, me.Speaker, me.Text, 48_000));
+        Assert.Equal([me], RecordingTranscriber.WithTentative(tentative, others.Speaker, null, 64_000));
+
+        Assert.Same(tentative, RecordingTranscriber.WithoutTentative(tentative, me.Speaker, 16_000));
+        Assert.Equal([others], RecordingTranscriber.WithoutTentative(tentative, me.Speaker, 48_000));
+    }
+
     private static List<RawSegment> Raw(params string[] texts) =>
         [.. texts.Select((text, i) => new RawSegment(i, i + 1, text))];
 }

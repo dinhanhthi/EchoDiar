@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using System.Runtime.InteropServices;
 using System.Threading.Channels;
 using EchoDiar.Core;
@@ -10,8 +11,10 @@ namespace EchoDiar.Transcribe;
 /// Transcribes a recording while it is made (Swift <c>RecordingTranscriber</c>): takes the writer's 16 kHz blocks,
 /// cuts each channel into speech chunks (<see cref="SpeechChunker"/>) and decodes them with one Whisper or Parakeet
 /// session (mic lines "Me", system lines "Others"). Live chunks are at most 12 s and close at a short pause from 4 s,
-/// and each decoded chunk becomes one line, so a line follows continuous speech within seconds.
-/// <see cref="FinishAsync"/> at Stop hands the segments, in file time, and the spans not transcribed (gaps) to the
+/// and each decoded chunk becomes one line, so a line follows continuous speech within seconds. While no closed chunk
+/// waits, an open chunk is decoded every <see cref="PartialStepSeconds"/> as greyed tentative text
+/// (<see cref="Snapshot.Tentative"/>) that its line replaces, unless the channel's last final decode was slow
+/// (<see cref="PartialMaxDecodeShare"/>). <see cref="FinishAsync"/> at Stop hands the segments, in file time, and the spans not transcribed (gaps) to the
 /// pipeline as a <see cref="PriorTranscription"/>.
 /// </summary>
 /// <remarks>
@@ -46,7 +49,17 @@ public sealed class RecordingTranscriber : IAsyncDisposable
     /// <param name="Lines">Oldest first, at most <see cref="MaxLines"/>; a new array whenever a line is added.</param>
     /// <param name="PendingSeconds">Seconds of speech waiting to be decoded, both channels summed.</param>
     /// <param name="Error">The error message when <paramref name="State"/> is <see cref="TranscriberState.Failed"/>.</param>
-    public sealed record Snapshot(TranscriberState State, IReadOnlyList<Line> Lines, double PendingSeconds, string? Error = null);
+    public sealed record Snapshot(TranscriberState State, IReadOnlyList<Line> Lines, double PendingSeconds, string? Error = null)
+    {
+        /// <summary>
+        /// At most one per speaker, ordered by <see cref="RecordingTranscriber.Tentative.StartSample"/>, shown after
+        /// <see cref="Lines"/> (Swift <c>tentative</c>); a new array whenever it changes.
+        /// </summary>
+        public IReadOnlyList<Tentative> Tentative { get; init; } = [];
+    }
+
+    /// <summary>The text of a chunk still open, decoded so far; its line replaces it once the chunk closes (Swift <c>Tentative</c>).</summary>
+    public sealed record Tentative(Speaker Speaker, string Text, long StartSample);
 
     /// <summary>Chunks per outcome, both channels summed.</summary>
     public sealed record ChunkStats(int Transcribed, int Silence, int Dropped, int Failed, int Pending);
@@ -65,6 +78,18 @@ public sealed class RecordingTranscriber : IAsyncDisposable
     public const int LiveMaxChunkSeconds = 12;
     /// <summary>The length a live chunk needs before a 0.6 s pause closes it: <c>min(4·50, 600/2) = 200</c> frames, so from 4 s.</summary>
     public const int LiveShortPauseMinSeconds = 4;
+    /// <summary>The length an open chunk needs before its first partial decode (the greyed tentative text; Swift <c>partialMinSeconds</c>).</summary>
+    public const int PartialMinSeconds = 2;
+    /// <summary>
+    /// How much an open chunk grows between two partials of it (Swift <c>partialStepSeconds</c>): the first knob to turn
+    /// if the decode budget is exceeded.
+    /// </summary>
+    public const int PartialStepSeconds = 3;
+    /// <summary>
+    /// No partial on a channel while its last final decode took more than this share of its chunk's duration, so
+    /// partials never starve the finals on a slow decoder (Swift <c>partialMaxDecodeShare</c>).
+    /// </summary>
+    public const double PartialMaxDecodeShare = 0.5;
 
     private readonly ModelEntry _entry;
     private readonly ISessionTranscriptionEngine _engine;
@@ -82,6 +107,7 @@ public sealed class RecordingTranscriber : IAsyncDisposable
     private TranscriberState _state = TranscriberState.Loading;
     private string? _error;
     private Line[] _lines = [];
+    private Tentative[] _tentative = [];
     private int _nextLineID;
     private Snapshot? _published;
     private Task? _decoder;
@@ -300,38 +326,81 @@ public sealed class RecordingTranscriber : IAsyncDisposable
         }
     }
 
-    /// <summary>Decodes the waiting chunks in order. A failed load ends the decode task; a failed chunk becomes a gap.</summary>
+    /// <summary>
+    /// Decodes the waiting chunks in order, then a partial of an open chunk when one is due; a final queued meanwhile
+    /// goes first. A failed load ends the decode task; a failed chunk becomes a gap. Ends by dropping the tentative text
+    /// no final will replace.
+    /// </summary>
     private async Task DrainAsync(IdleModel<ITranscriptionSession> model, CancellationToken token)
     {
         while (true)
         {
             Item? item;
+            Partial? partial = null;
             lock (_buffer) item = _buffer.Take();
-            if (item is null) return;
-            var segments = await model.UseAsync<IReadOnlyList<RawSegment>?>(async (session, t) =>
-            {
-                try
-                {
-                    return await session.TranscribeAsync(item.Chunk.Samples, item.Chunk.Language, t).ConfigureAwait(false);
-                }
-                catch (Exception) when (!t.IsCancellationRequested)
-                {
-                    return null;
-                }
-            }, token).ConfigureAwait(false);
-            var offset = (double)item.Chunk.StartSample / SampleRate;
-            var shifted = segments?.Select(s => s with { Start = s.Start + offset, End = s.End + offset }).ToList();
-            lock (_buffer) _buffer.Complete(item, shifted);
-            if (shifted is null) continue;
-            var mic = item.Channel == RecordingSession.Channel.Mic;
+            if (item is null) lock (_buffer) partial = _buffer.TakePartial();
+            if (item is not null) await DecodeFinalAsync(item, model, token).ConfigureAwait(false);
+            else if (partial is not null) await DecodePartialAsync(partial, model, token).ConfigureAwait(false);
+            else break;
+        }
+        PruneTentative();
+    }
+
+    /// <summary>Records a closed chunk's segments and decode share, and shows its line in place of its tentative text.</summary>
+    private async Task DecodeFinalAsync(Item item, IdleModel<ITranscriptionSession> model, CancellationToken token)
+    {
+        var watch = Stopwatch.StartNew();
+        var segments = await TranscribeAsync(model, item.Chunk, token).ConfigureAwait(false);
+        var wallSeconds = watch.Elapsed.TotalSeconds;
+        var offset = (double)item.Chunk.StartSample / SampleRate;
+        var shifted = segments?.Select(s => s with { Start = s.Start + offset, End = s.End + offset }).ToList();
+        lock (_buffer)
+        {
+            _buffer.Complete(item, shifted);
+            _buffer.RecordDecode(item.Channel, wallSeconds, (double)item.Chunk.Samples.Length / SampleRate);
+        }
+        var mic = item.Channel == RecordingSession.Channel.Mic;
+        string? text = null;
+        if (shifted is not null)
+        {
             var span = new Span(offset, (double)(item.Chunk.StartSample + item.Chunk.Samples.Length) / SampleRate);
-            var text = LiveLine(shifted, mic, () =>
+            text = LiveLine(shifted, mic, () =>
             {
                 lock (_buffer) return _buffer.OthersSpeak(span);
             });
-            if (text is not null) AddLine(mic ? Speaker.Me : Speaker.Others, text);
         }
+        AddLine(mic ? Speaker.Me : Speaker.Others, text, item.Chunk.StartSample);
     }
+
+    /// <summary>Shows an open chunk's text so far as its speaker's tentative text; a failed decode changes nothing.</summary>
+    private async Task DecodePartialAsync(Partial partial, IdleModel<ITranscriptionSession> model, CancellationToken token)
+    {
+        var segments = await TranscribeAsync(model, partial.Chunk, token).ConfigureAwait(false);
+        if (segments is null) return;
+        var mic = partial.Channel == RecordingSession.Channel.Mic;
+        var span = new Span((double)partial.Chunk.StartSample / SampleRate,
+            (double)(partial.Chunk.StartSample + partial.Chunk.Samples.Length) / SampleRate);
+        var text = LiveLine(segments, mic, () =>
+        {
+            lock (_buffer) return _buffer.OthersSpeak(span);
+        });
+        SetTentative(mic ? Speaker.Me : Speaker.Others, text, partial.Chunk.StartSample);
+    }
+
+    /// <summary>The chunk's segments (chunk time), or null when the ASR failed on it; cancellation propagates.</summary>
+    private static Task<IReadOnlyList<RawSegment>?> TranscribeAsync(
+        IdleModel<ITranscriptionSession> model, SpeechChunker.Chunk chunk, CancellationToken token) =>
+        model.UseAsync<IReadOnlyList<RawSegment>?>(async (session, t) =>
+        {
+            try
+            {
+                return await session.TranscribeAsync(chunk.Samples, chunk.Language, t).ConfigureAwait(false);
+            }
+            catch (Exception) when (!t.IsCancellationRequested)
+            {
+                return null;
+            }
+        }, token);
 
     // State
 
@@ -340,9 +409,13 @@ public sealed class RecordingTranscriber : IAsyncDisposable
     {
         if (_ended) return;
         _state = state;
+        if (state == TranscriberState.Failed) _tentative = [];
         double pending;
         lock (_buffer) pending = _buffer.PendingSeconds;
-        var snapshot = new Snapshot(_state, _lines, pending, _state == TranscriberState.Failed ? _error : null);
+        var snapshot = new Snapshot(_state, _lines, pending, _state == TranscriberState.Failed ? _error : null)
+        {
+            Tentative = _tentative,
+        };
         if (snapshot == _published) return;
         _published = snapshot;
         Updated?.Invoke(snapshot);
@@ -364,12 +437,44 @@ public sealed class RecordingTranscriber : IAsyncDisposable
         }
     }
 
-    private void AddLine(Speaker speaker, string text)
+    /// <summary>
+    /// The final of the chunk starting at <paramref name="startSample"/> (Swift <c>add</c>): its line (none when
+    /// <paramref name="text"/> is null) replaces the speaker's tentative text of that chunk, in one publish.
+    /// </summary>
+    private void AddLine(Speaker speaker, string? text, long startSample)
     {
         lock (_lock)
         {
-            var lines = new List<Line>(_lines) { new(_nextLineID++, speaker, text) };
-            _lines = [.. lines.Skip(Math.Max(0, lines.Count - MaxLines))];
+            _tentative = WithoutTentative(_tentative, speaker, startSample);
+            if (text is not null)
+            {
+                var lines = new List<Line>(_lines) { new(_nextLineID++, speaker, text) };
+                _lines = [.. lines.Skip(Math.Max(0, lines.Count - MaxLines))];
+            }
+        }
+        PublishRunning();
+    }
+
+    private void SetTentative(Speaker speaker, string? text, long startSample)
+    {
+        lock (_lock) _tentative = WithTentative(_tentative, speaker, text, startSample);
+        PublishRunning();
+    }
+
+    /// <summary>Drops the tentative text no final will replace (<see cref="Buffer.KeepsTentative"/>; Swift <c>pruneTentative</c>).</summary>
+    private void PruneTentative()
+    {
+        lock (_lock)
+        {
+            Tentative[] kept;
+            lock (_buffer)
+            {
+                kept = [.. _tentative.Where(t => _buffer.KeepsTentative(
+                    t.Speaker == Speaker.Me ? RecordingSession.Channel.Mic : RecordingSession.Channel.System,
+                    t.StartSample))];
+            }
+            if (kept.Length == _tentative.Length) return;
+            _tentative = kept;
         }
         PublishRunning();
     }
@@ -416,6 +521,29 @@ public sealed class RecordingTranscriber : IAsyncDisposable
         return text is not null && mic && TranscriptMerger.IsLoneMerci(text) && othersSpeak() ? null : text;
     }
 
+    /// <summary>
+    /// <paramref name="current"/> with <paramref name="speaker"/>'s tentative text set to <paramref name="text"/> from
+    /// <paramref name="startSample"/> (removed when null; Swift <c>tentative(_:setting:text:startSample:)</c>): at most
+    /// one per speaker, ordered by start (then speaker); <paramref name="current"/> itself when nothing changes.
+    /// </summary>
+    internal static Tentative[] WithTentative(Tentative[] current, Speaker speaker, string? text, long startSample)
+    {
+        var kept = current.Where(t => t.Speaker != speaker);
+        if (text is not null) kept = kept.Append(new Tentative(speaker, text, startSample));
+        Tentative[] next = [.. kept.OrderBy(t => t.StartSample).ThenBy(t => t.Speaker)];
+        return next.SequenceEqual(current) ? current : next;
+    }
+
+    /// <summary>
+    /// <paramref name="current"/> without <paramref name="speaker"/>'s tentative text when it is of the chunk starting
+    /// at <paramref name="startSample"/>, its final came (Swift <c>tentative(_:clearing:startSample:)</c>);
+    /// <paramref name="current"/> itself when nothing changes.
+    /// </summary>
+    internal static Tentative[] WithoutTentative(Tentative[] current, Speaker speaker, long startSample) =>
+        current.Any(t => t.Speaker == speaker && t.StartSample == startSample)
+            ? [.. current.Where(t => t.Speaker != speaker || t.StartSample != startSample)]
+            : current;
+
     private static float Peak(ReadOnlySpan<float> samples)
     {
         var peak = 0f;
@@ -428,12 +556,22 @@ public sealed class RecordingTranscriber : IAsyncDisposable
     /// <param name="Index">The chunk's index in <see cref="ChannelState.Chunks"/>.</param>
     public sealed record Item(int Channel, int Index, SpeechChunker.Chunk Chunk);
 
+    /// <summary>An open chunk to decode as tentative text; its outcome is not recorded (Swift <c>Partial</c>).</summary>
+    /// <param name="Channel">A <see cref="RecordingSession.Channel"/> index.</param>
+    public sealed record Partial(int Channel, SpeechChunker.Chunk Chunk);
+
     /// <summary>One channel's chunker, chunk outcomes (file order) and decoded segments (file time).</summary>
     public sealed class ChannelState(int maxChunkSeconds, int shortPauseMinSeconds)
     {
         public SpeechChunker Chunker { get; } = new(maxChunkSeconds, shortPauseMinSeconds);
         public List<(Span Span, PriorTranscription.ChunkOutcome Outcome)> Chunks { get; } = [];
         public List<RawSegment> Segments { get; } = [];
+        /// <summary>The open chunk's start and length at its last partial.</summary>
+        internal (long StartSample, int Count)? LastPartial { get; set; }
+        /// <summary>The open chunk's start and length when <see cref="Buffer.Append"/> last woke the decoder for a partial.</summary>
+        internal (long StartSample, int Count)? SignalledPartial { get; set; }
+        /// <summary>The last final decode's wall seconds over its chunk's seconds.</summary>
+        internal double DecodeShare { get; set; }
     }
 
     /// <summary>
@@ -463,7 +601,10 @@ public sealed class RecordingTranscriber : IAsyncDisposable
 
         public double PendingSeconds => (double)_queuedSamples / SampleRate;
 
-        /// <summary>Splits an interleaved Int16 block per channel and chunks it; true when a chunk was queued or the recording resumed.</summary>
+        /// <summary>
+        /// Splits an interleaved Int16 block per channel and chunks it; true when a chunk was queued, the recording
+        /// resumed or a partial became due.
+        /// </summary>
         public bool Append(ReadOnlySpan<short> interleaved, int frames, int channels, string? language)
         {
             if (Closed || Finishing) return false;
@@ -473,7 +614,9 @@ public sealed class RecordingTranscriber : IAsyncDisposable
             if (_scratch.Length < frames) _scratch = new float[frames];
             var micQueued = ChunkChannel(interleaved, frames, channels, RecordingSession.Channel.Mic, language);
             var systemQueued = ChunkChannel(interleaved, frames, channels, RecordingSession.Channel.System, language);
-            return resumed || micQueued || systemQueued;
+            var partialDue = false;
+            for (var channel = 0; channel < Channels.Count; channel++) partialDue |= SignalPartial(channel);
+            return resumed || micQueued || systemQueued || partialDue;
         }
 
         public void Flush(bool paused)
@@ -539,6 +682,50 @@ public sealed class RecordingTranscriber : IAsyncDisposable
             return item;
         }
 
+        /// <summary>
+        /// The open chunk to decode as tentative text (Swift <c>takePartial()</c>), only while no closed chunk waits
+        /// (partials never starve the finals) and not paused, finishing, closed or failed: among the channels with a
+        /// partial due (<see cref="PartialDue"/>), the one whose open chunk started first.
+        /// </summary>
+        public Partial? TakePartial()
+        {
+            if (_queue.Count > 0 || Paused || Finishing || Closed || _failed) return null;
+            int? channel = null;
+            (long StartSample, int Count) open = default;
+            for (var c = 0; c < Channels.Count; c++)
+            {
+                if (PartialDue(c) is not { } due || (channel is not null && due.StartSample >= open.StartSample)) continue;
+                channel = c;
+                open = due;
+            }
+            if (channel is not { } picked || Channels[picked].Chunker.OpenChunk() is not { } chunk) return null;
+            Channels[picked].LastPartial = open;
+            return new Partial(picked, chunk);
+        }
+
+        /// <summary>
+        /// True while a final of <paramref name="channel"/>'s chunk starting at <paramref name="startSample"/> may still
+        /// come and replace its tentative text: the chunk waits in the queue or is still open (Swift
+        /// <c>keepsTentative(channel:startSample:)</c>). False once finishing (what is left is decoded or a gap by
+        /// then) or closed.
+        /// </summary>
+        public bool KeepsTentative(int channel, long startSample)
+        {
+            if (Closed || Finishing) return false;
+            return _queue.Any(i => i.Channel == channel && i.Chunk.StartSample == startSample)
+                || Channels[channel].Chunker.OpenSpan()?.StartSample == startSample;
+        }
+
+        /// <summary>
+        /// Stores the share of a final decode of <paramref name="channel"/> (wall seconds over chunk seconds) for the
+        /// partial gate (Swift <c>recordDecode(channel:wallSeconds:chunkSeconds:)</c>).
+        /// </summary>
+        public void RecordDecode(int channel, double wallSeconds, double chunkSeconds)
+        {
+            if (Closed || chunkSeconds <= 0) return;
+            Channels[channel].DecodeShare = wallSeconds / chunkSeconds;
+        }
+
         /// <summary><paramref name="segments"/> null: the ASR failed on the chunk.</summary>
         public void Complete(Item item, IReadOnlyList<RawSegment>? segments)
         {
@@ -562,6 +749,38 @@ public sealed class RecordingTranscriber : IAsyncDisposable
             _queue.Clear();
             _queuedSamples = 0;
             Channels = [];
+        }
+
+        /// <summary>
+        /// The open chunk's span of <paramref name="channel"/> when a partial of it is due (Swift <c>partialDue(_:)</c>):
+        /// at least <see cref="PartialMinSeconds"/> long, grown <see cref="PartialStepSeconds"/> since the last partial
+        /// of the same chunk (a new start is a new chunk), and the channel's last decode share at most
+        /// <see cref="PartialMaxDecodeShare"/>.
+        /// </summary>
+        private (long StartSample, int Count)? PartialDue(int channel)
+        {
+            var state = Channels[channel];
+            if (state.Chunker.OpenSpan() is not { } open || open.Count < PartialMinSeconds * SampleRate
+                || state.DecodeShare > PartialMaxDecodeShare)
+                return null;
+            if (state.LastPartial is { } last && last.StartSample == open.StartSample
+                && open.Count - last.Count < PartialStepSeconds * SampleRate)
+                return null;
+            return open;
+        }
+
+        /// <summary>
+        /// True once per due step (Swift <c>signalPartial(_:)</c>): a partial of <paramref name="channel"/> is due and
+        /// <see cref="Append"/> has not woken the decoder for it yet.
+        /// </summary>
+        private bool SignalPartial(int channel)
+        {
+            if (_failed || PartialDue(channel) is not { } open) return false;
+            if (Channels[channel].SignalledPartial is { } signalled && signalled.StartSample == open.StartSample
+                && open.Count - signalled.Count < PartialStepSeconds * SampleRate)
+                return false;
+            Channels[channel].SignalledPartial = open;
+            return true;
         }
 
         private bool ChunkChannel(ReadOnlySpan<short> interleaved, int frames, int channels, int channel, string? language)

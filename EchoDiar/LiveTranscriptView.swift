@@ -2,7 +2,8 @@ import EchoTranscribe
 import SwiftUI
 
 /// Live captions on the recording page, under its header (setting "Transcribe while recording"): the transcriber's
-/// state, then the newest lines, scrolled to the bottom as they arrive, filling the page.
+/// state, then the newest lines and the open chunks' greyed tentative text, scrolled to the bottom as they arrive,
+/// filling the page.
 struct LiveTranscriptView: View {
     let snapshot: RecordingTranscriber.Snapshot
 
@@ -12,7 +13,7 @@ struct LiveTranscriptView: View {
                 .font(.caption)
                 .foregroundStyle(statusIsError ? AnyShapeStyle(.orange) : AnyShapeStyle(.secondary))
                 .help(failureMessage ?? "")
-            if !snapshot.lines.isEmpty {
+            if !snapshot.lines.isEmpty || !snapshot.tentative.isEmpty {
                 ScrollViewReader { proxy in
                     ScrollView {
                         LazyVStack(alignment: .leading, spacing: 4) {
@@ -21,11 +22,19 @@ struct LiveTranscriptView: View {
                                     .frame(maxWidth: .infinity, alignment: .leading)
                                     .id(line.id)
                             }
+                            ForEach(snapshot.tentative, id: \.speaker) { tentative in
+                                let name = Text(Self.name(tentative.speaker)).bold()
+                                    .foregroundStyle(Self.color(tentative.speaker))
+                                Text("\(name): \(Text(tentative.text).foregroundStyle(.secondary))")
+                                    .frame(maxWidth: .infinity, alignment: .leading)
+                                    .id(Self.tentativeID(tentative.speaker))
+                            }
                         }
                         .textSelection(.enabled)
                     }
                     .onAppear { scrollToBottom(proxy) }
                     .onChange(of: snapshot.lines.last?.id) { scrollToBottom(proxy) }
+                    .onChange(of: snapshot.tentative) { scrollToBottom(proxy) }
                 }
             }
         }
@@ -41,7 +50,8 @@ struct LiveTranscriptView: View {
         case .paused: "Live transcript: paused"
         case .listening where snapshot.deferred:
             "Paused while the Mac is hot or in Low Power Mode. The rest is transcribed after Stop."
-        case .listening: snapshot.lines.isEmpty ? "Live transcript: listening…" : "Live transcript"
+        case .listening:
+            snapshot.lines.isEmpty && snapshot.tentative.isEmpty ? "Live transcript: listening…" : "Live transcript"
         case .failed: "Live transcript stopped. The transcript is made after Stop."
         }
     }
@@ -71,8 +81,17 @@ struct LiveTranscriptView: View {
         speaker == .me ? .accentColor : .orange
     }
 
+    /// A tentative row's scroll id, apart from the lines' `Int` ids.
+    private static func tentativeID(_ speaker: RecordingTranscriber.Speaker) -> String {
+        "t-\(speaker.rawValue)"
+    }
+
+    /// To the last tentative row when there is one, else to the last line.
     private func scrollToBottom(_ proxy: ScrollViewProxy) {
-        guard let id = snapshot.lines.last?.id else { return }
-        proxy.scrollTo(id, anchor: .bottom)
+        if let tentative = snapshot.tentative.last {
+            proxy.scrollTo(Self.tentativeID(tentative.speaker), anchor: .bottom)
+        } else if let id = snapshot.lines.last?.id {
+            proxy.scrollTo(id, anchor: .bottom)
+        }
     }
 }

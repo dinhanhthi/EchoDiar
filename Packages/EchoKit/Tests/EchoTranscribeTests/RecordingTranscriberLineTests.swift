@@ -39,6 +39,23 @@ struct RecordingTranscriberLineTests {
         #expect(!asked)
     }
 
+    /// Guards the tentative text of the open chunks: at most one per speaker, ordered by start; a newer partial replaces
+    /// the speaker's text, a partial with no text removes it, and a final clears it only when it is the same chunk.
+    @Test func aTentativePerSpeakerIsReplacedThenClearedByItsFinal() {
+        typealias Tentative = RecordingTranscriber.Tentative
+        let me = Tentative(speaker: .me, text: "On commence la réunion", startSample: 48_000)
+        let others = Tentative(speaker: .others, text: "Bonjour", startSample: 32_000)
+        var tentative = RecordingTranscriber.tentative([], setting: .others, text: "Bonjour", startSample: 32_000)
+        tentative = RecordingTranscriber.tentative(tentative, setting: .me, text: "On commence", startSample: 16_000)
+        #expect(tentative == [Tentative(speaker: .me, text: "On commence", startSample: 16_000), others])
+        tentative = RecordingTranscriber.tentative(tentative, setting: .me, text: me.text, startSample: 48_000)
+        #expect(tentative == [others, me])
+        #expect(RecordingTranscriber.tentative(tentative, setting: .others, text: nil, startSample: 64_000) == [me])
+
+        #expect(RecordingTranscriber.tentative(tentative, clearing: .me, startSample: 16_000) == tentative)
+        #expect(RecordingTranscriber.tentative(tentative, clearing: .me, startSample: 48_000) == [others])
+    }
+
     private static func raw(_ texts: [String]) -> [RawSegment] {
         texts.enumerated().map { RawSegment(start: Double($0.offset), end: Double($0.offset + 1), text: $0.element) }
     }

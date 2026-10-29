@@ -10,8 +10,8 @@ namespace EchoDiar.App.Views;
 /// <summary>
 /// Live captions on the recording page (macOS LiveTranscriptView.swift): <see cref="AppViewModel.RecordingCaptions"/>'s
 /// state and lines. Each line ("Me" or "Others", then its text) is built in code once, in a plain panel: at most
-/// <see cref="RecordingTranscriber.MaxLines"/>, so nothing is virtualized or recycled. The newest line is scrolled into
-/// view unless the user scrolled up.
+/// <see cref="RecordingTranscriber.MaxLines"/>, so nothing is virtualized or recycled. The open chunks' greyed
+/// tentative text follows in its own panel. The newest line is scrolled into view unless the user scrolled up.
 /// </summary>
 public sealed partial class LiveTranscriptView : UserControl
 {
@@ -22,6 +22,9 @@ public sealed partial class LiveTranscriptView : UserControl
 
     /// <summary>The lines shown, oldest first, with their rows in <c>LinesPanel</c>.</summary>
     private readonly List<(RecordingTranscriber.Line Line, FrameworkElement Row)> _rows = [];
+
+    /// <summary>The tentative text shown in <c>TentativePanel</c>; a snapshot has a new list only on change.</summary>
+    private IReadOnlyList<RecordingTranscriber.Tentative> _tentative = [];
 
     /// <summary>The view is at the newest line: new lines scroll it along.</summary>
     private bool _followsNewest = true;
@@ -37,6 +40,7 @@ public sealed partial class LiveTranscriptView : UserControl
         };
         // After a layout pass: the scroll range includes the new lines, or the new viewport.
         LinesPanel.SizeChanged += (_, _) => FollowNewest();
+        TentativePanel.SizeChanged += (_, _) => FollowNewest();
         Scroller.SizeChanged += (_, _) => FollowNewest();
         Loaded += (_, _) =>
         {
@@ -61,6 +65,10 @@ public sealed partial class LiveTranscriptView : UserControl
         }
         ShowState(snapshot);
         ShowLines(snapshot.Lines);
+        ShowTentative(snapshot.Tentative);
+        Scroller.Visibility = snapshot.Lines.Count > 0 || snapshot.Tentative.Count > 0
+            ? Visibility.Visible
+            : Visibility.Collapsed;
     }
 
     /// <summary>The state line; why the transcriber stopped as its tooltip.</summary>
@@ -71,9 +79,10 @@ public sealed partial class LiveTranscriptView : UserControl
         {
             RecordingTranscriber.TranscriberState.Loading => Loc.T("Live transcript: loading the model…"),
             RecordingTranscriber.TranscriberState.Paused => Loc.T("Live transcript: paused"),
-            RecordingTranscriber.TranscriberState.Listening => snapshot.Lines.Count == 0
-                ? Loc.T("Live transcript: listening…")
-                : Loc.T("Live transcript"),
+            RecordingTranscriber.TranscriberState.Listening =>
+                snapshot.Lines.Count == 0 && snapshot.Tentative.Count == 0
+                    ? Loc.T("Live transcript: listening…")
+                    : Loc.T("Live transcript"),
             _ => Loc.T("Live transcript stopped. The transcript is made after Stop."),
         });
         var textStyle = (Style)Resources[failed ? "LiveStatusErrorText" : "LiveStatusText"];
@@ -100,11 +109,19 @@ public sealed partial class LiveTranscriptView : UserControl
         foreach (var line in lines)
         {
             if (line.Id <= lastShown) continue;
-            var row = Row(line);
+            var row = Row(line.Speaker, line.Text, "LiveLineText");
             _rows.Add((line, row));
             LinesPanel.Children.Add(row);
         }
-        Scroller.Visibility = lines.Count > 0 ? Visibility.Visible : Visibility.Collapsed;
+    }
+
+    /// <summary>Rebuilds the tentative rows when the snapshot has another list (a new one only on change).</summary>
+    private void ShowTentative(IReadOnlyList<RecordingTranscriber.Tentative> tentative)
+    {
+        if (ReferenceEquals(tentative, _tentative)) return;
+        _tentative = tentative;
+        TentativePanel.Children.Clear();
+        foreach (var item in tentative) TentativePanel.Children.Add(Row(item.Speaker, item.Text, "LiveTentativeText"));
     }
 
     private bool IsAnotherTranscriber(IReadOnlyList<RecordingTranscriber.Line> lines)
@@ -124,19 +141,24 @@ public sealed partial class LiveTranscriptView : UserControl
     {
         _rows.Clear();
         LinesPanel.Children.Clear();
+        _tentative = [];
+        TentativePanel.Children.Clear();
         _followsNewest = true;
     }
 
-    /// <summary>The speaker in the transcript's color (the macOS labels "Me" and "Others"), then the selectable text.</summary>
-    private Grid Row(RecordingTranscriber.Line line)
+    /// <summary>
+    /// The speaker in the transcript's color (the macOS labels "Me" and "Others"), then the selectable text in
+    /// <paramref name="textStyle"/>.
+    /// </summary>
+    private Grid Row(RecordingTranscriber.Speaker who, string lineText, string textStyle)
     {
-        var me = line.Speaker == RecordingTranscriber.Speaker.Me;
+        var me = who == RecordingTranscriber.Speaker.Me;
         var speaker = new TextBlock
         {
             Text = Loc.T(me ? "Me" : "Others") + ":",
             Style = (Style)Resources[me ? "LiveSpeakerMe" : "LiveSpeakerOthers"],
         };
-        var text = new TextBlock { Text = line.Text.Trim(), Style = (Style)Resources["LiveLineText"] };
+        var text = new TextBlock { Text = lineText.Trim(), Style = (Style)Resources[textStyle] };
         Grid.SetColumn(text, 1);
         var row = new Grid { ColumnSpacing = 6 };
         row.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
@@ -148,7 +170,7 @@ public sealed partial class LiveTranscriptView : UserControl
 
     private void FollowNewest()
     {
-        if (!_followsNewest || _rows.Count == 0 || _model.IsClosing) return;
+        if (!_followsNewest || (_rows.Count == 0 && _tentative.Count == 0) || _model.IsClosing) return;
         Scroller.ChangeView(null, Scroller.ScrollableHeight, null, disableAnimation: true);
     }
 }

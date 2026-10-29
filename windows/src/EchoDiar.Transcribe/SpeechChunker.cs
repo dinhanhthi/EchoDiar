@@ -105,6 +105,12 @@ public sealed class SpeechChunker
     }
 
     /// <summary>
+    /// The open chunk's start and length so far (<see cref="OpenChunk"/> without copying its samples; Swift
+    /// <c>openSpan</c>), null when none is open.
+    /// </summary>
+    public (long StartSample, int Count)? OpenSpan() => _isOpen ? (_startSample, _samples.Count + _partialCount) : null;
+
+    /// <summary>
     /// Emits the open chunk, trimmed to its post-roll (which may take in the incomplete frame), and drops the rest;
     /// the clock and the floor carry on, so the stream can continue (as after a pause).
     /// </summary>
