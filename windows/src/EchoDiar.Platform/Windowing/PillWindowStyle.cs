@@ -43,12 +43,17 @@ public static class PillWindowStyle
     public const double Inset = 8;
 
     /// <summary>
-    /// WS_EX_TOOLWINDOW, WS_EX_NOACTIVATE and topmost (through <c>SetWindowPos(HWND_TOPMOST)</c>: setting
-    /// WS_EX_TOPMOST alone does not take), plus the DWM round corner preference. False when Windows refused.
+    /// No frame at all, WS_EX_TOOLWINDOW, WS_EX_NOACTIVATE and topmost (through <c>SetWindowPos(HWND_TOPMOST)</c>:
+    /// setting WS_EX_TOPMOST alone does not take), plus the DWM round corner preference. False when Windows refused.
     /// </summary>
     public static unsafe bool Apply(nint hwnd)
     {
         var window = (HWND)hwnd;
+        // SetBorderAndTitleBar(false, false) with IsResizable = false keeps WS_DLGFRAME: a 3 px frame on every side
+        // that moves the client area (and the capsule) 3 px down and right of the window rect the region clips to.
+        var frame = (WINDOW_STYLE)PInvoke.GetWindowLong(window, WINDOW_LONG_PTR_INDEX.GWL_STYLE)
+            & ~(WINDOW_STYLE.WS_CAPTION | WINDOW_STYLE.WS_THICKFRAME | WINDOW_STYLE.WS_DLGFRAME | WINDOW_STYLE.WS_BORDER);
+        PInvoke.SetWindowLong(window, WINDOW_LONG_PTR_INDEX.GWL_STYLE, (int)frame);
         var style = (WINDOW_EX_STYLE)PInvoke.GetWindowLong(window, WINDOW_LONG_PTR_INDEX.GWL_EXSTYLE);
         style = (style | WINDOW_EX_STYLE.WS_EX_TOOLWINDOW | WINDOW_EX_STYLE.WS_EX_NOACTIVATE | WINDOW_EX_STYLE.WS_EX_TOPMOST)
             & ~WINDOW_EX_STYLE.WS_EX_APPWINDOW;
