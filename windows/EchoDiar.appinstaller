@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  App Installer feed for EchoDiar (Windows). Rendered by .github/workflows/windows-release.yml (and by the local
+  test feed script windows/scripts/serve-update.sh), which replace each placeholder: the 4-part package version
+  (tag vX.Y.Z, windows-vX.Y.Z or windows-vX.Y.Z-dev gives X.Y.Z.0), the signing certificate subject (= the Identity
+  Publisher of Package.appxmanifest), the address of this file itself (App Installer always reads the feed from
+  there; on the dev channel it is the prerelease's own asset) and the address of the .msixbundle (the GitHub release
+  asset of the tag). Never edit a rendered copy by hand.
+  The app prompts before it updates (Updater.cs), so App Installer shows no prompt of its own (no ShowPrompt).
+  App Installer may also install an update on its own while the app is not running (OnLaunch checks at each launch,
+  AutomaticBackgroundTask every 8 hours), silently: there is no in-app prompt then.
+-->
+<AppInstaller
+  xmlns="http://schemas.microsoft.com/appx/appinstaller/2018"
+  Version="1.2.0.0"
+  Uri="https://ed.dinhanhthi.com/windows/EchoDiar.appinstaller">
+
+  <MainBundle
+    Name="dinh.thi.EchoDiar"
+    Publisher="CN=Anh-Thi Dinh"
+    Version="1.2.0.0"
+    Uri="https://github.com/dinhanhthi/EchoDiar/releases/download/v1.2.0/EchoDiar_1.2.0.0.msixbundle" />
+
+  <UpdateSettings>
+    <OnLaunch HoursBetweenUpdateChecks="0" />
+    <AutomaticBackgroundTask />
+  </UpdateSettings>
+</AppInstaller>
