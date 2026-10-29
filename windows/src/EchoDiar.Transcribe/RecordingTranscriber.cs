@@ -87,9 +87,19 @@ public sealed class RecordingTranscriber : IAsyncDisposable
     public const int PartialStepSeconds = 3;
     /// <summary>
     /// No partial on a channel while its last final decode took more than this share of its chunk's duration, so
-    /// partials never starve the finals on a slow decoder (Swift <c>partialMaxDecodeShare</c>).
+    /// partials never starve the finals on a slow decoder (Swift <c>partialMaxDecodeShare</c>). A partial costs about
+    /// as much as a final (Whisper pads to a fixed window), so a ~10 s chunk at <see cref="PartialStepSeconds"/> 3
+    /// costs ~3 partials + 1 final, twice that while both channels speak: above this share partials would keep the
+    /// decoder busy and delay each final by one partial.
     /// </summary>
-    public const double PartialMaxDecodeShare = 0.5;
+    public const double PartialMaxDecodeShare = 0.2;
+    /// <summary>
+    /// The speech waiting to be decoded from which the live transcript says how far behind it is
+    /// (<see cref="BehindSeconds"/>; Swift <c>behindNoticeSeconds</c>): <see cref="Snapshot.PendingSeconds"/> sums
+    /// both channels, and one waiting chunk per channel is up to 2 × <see cref="LiveMaxChunkSeconds"/> (24 s) while the
+    /// decoder keeps up, so below this nothing is behind.
+    /// </summary>
+    public const int BehindNoticeSeconds = 25;
 
     private readonly ModelEntry _entry;
     private readonly ISessionTranscriptionEngine _engine;
@@ -497,6 +507,16 @@ public sealed class RecordingTranscriber : IAsyncDisposable
         var trimmed = language?.Trim() ?? "";
         return trimmed.Length == 0 || trimmed.Equals("auto", StringComparison.OrdinalIgnoreCase) ? null : trimmed;
     }
+
+    /// <summary>
+    /// How far behind decoding is, in rounded seconds of speech waiting (<see cref="Snapshot.PendingSeconds"/>), for
+    /// the live transcript's status (Swift <c>behindSeconds</c>): null unless listening with at least
+    /// <see cref="BehindNoticeSeconds"/> waiting. Halves round away from zero, as Swift's <c>rounded()</c>.
+    /// </summary>
+    public static int? BehindSeconds(Snapshot snapshot) =>
+        snapshot.State == TranscriberState.Listening && snapshot.PendingSeconds >= BehindNoticeSeconds
+            ? (int)Math.Round(snapshot.PendingSeconds, MidpointRounding.AwayFromZero)
+            : null;
 
     /// <summary>
     /// A chunk's segments as one line (Swift <c>lineText</c>): trimmed, blank ones skipped, joined with a space; null

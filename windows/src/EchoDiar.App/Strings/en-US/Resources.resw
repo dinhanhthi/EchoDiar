@@ -1462,6 +1462,10 @@
     <value>Live transcript: listening…</value>
     <comment>Live transcript: listening…</comment>
   </data>
+  <data name="LiveTranscriptLldSBehind" xml:space="preserve">
+    <value>Live transcript: {0} s behind</value>
+    <comment>Live transcript: %lld s behind</comment>
+  </data>
   <data name="LiveTranscriptLoadingTheModel" xml:space="preserve">
     <value>Live transcript: loading the model…</value>
     <comment>Live transcript: loading the model…</comment>

@@ -95,8 +95,14 @@ public actor RecordingTranscriber {
     /// How much an open chunk grows between two partials of it: the first knob to turn if the decode budget is exceeded.
     static let partialStepSeconds = 3
     /// No partial on a channel while its last final decode took more than this share of its chunk's duration, so
-    /// partials never starve the finals on a slow decoder.
-    static let partialMaxDecodeShare = 0.5
+    /// partials never starve the finals on a slow decoder. A partial costs about as much as a final (Whisper pads to a
+    /// fixed window), so a ~10 s chunk at `partialStepSeconds` 3 costs ~3 partials + 1 final, twice that while both
+    /// channels speak: above this share partials would keep the decoder busy and delay each final by one partial.
+    static let partialMaxDecodeShare = 0.2
+    /// The speech waiting to be decoded from which the live transcript says how far behind it is (`behindSeconds`):
+    /// `pendingSeconds` sums both channels, and one waiting chunk per channel is up to 2 × `liveMaxChunkSeconds`
+    /// (24 s) while the decoder keeps up, so below this nothing is behind.
+    static let behindNoticeSeconds = 25
 
     /// Every change, for a single consumer; finished by `finish()` or `cancel()`.
     public nonisolated let updates: AsyncStream<Snapshot>
@@ -394,6 +400,13 @@ public actor RecordingTranscriber {
     private static func chunkLanguage(_ language: String?) -> String? {
         let trimmed = language?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
         return trimmed.isEmpty || trimmed.lowercased() == "auto" ? nil : trimmed
+    }
+
+    /// How far behind decoding is, in rounded seconds of speech waiting (`Snapshot.pendingSeconds`), for the live
+    /// transcript's status: nil unless listening with at least `behindNoticeSeconds` waiting.
+    public static func behindSeconds(_ snapshot: Snapshot) -> Int? {
+        guard snapshot.state == .listening, snapshot.pendingSeconds >= Double(behindNoticeSeconds) else { return nil }
+        return Int(snapshot.pendingSeconds.rounded())
     }
 
     /// A chunk's segments as one line: trimmed, blank ones skipped, joined with a space; nil when no text is left.

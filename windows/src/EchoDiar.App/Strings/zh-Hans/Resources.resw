@@ -1410,6 +1410,10 @@
     <value>实时转写：正在聆听…</value>
     <comment>Live transcript: listening…</comment>
   </data>
+  <data name="LiveTranscriptLldSBehind" xml:space="preserve">
+    <value>实时转写：落后 {0} 秒</value>
+    <comment>Live transcript: %lld s behind</comment>
+  </data>
   <data name="LiveTranscriptLoadingTheModel" xml:space="preserve">
     <value>实时转写：正在载入模型…</value>
     <comment>Live transcript: loading the model…</comment>

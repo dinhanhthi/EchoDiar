@@ -1462,6 +1462,10 @@
     <value>Transcripción en directo: escuchando…</value>
     <comment>Live transcript: listening…</comment>
   </data>
+  <data name="LiveTranscriptLldSBehind" xml:space="preserve">
+    <value>Transcripción en directo: {0} s de retraso</value>
+    <comment>Live transcript: %lld s behind</comment>
+  </data>
   <data name="LiveTranscriptLoadingTheModel" xml:space="preserve">
     <value>Transcripción en directo: cargando el modelo…</value>
     <comment>Live transcript: loading the model…</comment>

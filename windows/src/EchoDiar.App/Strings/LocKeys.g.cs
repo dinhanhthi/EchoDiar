@@ -370,6 +370,7 @@ public static partial class Loc
         "Listening…",
         "Live transcript",
         "Live transcript stopped. The transcript is made after Stop.",
+        "Live transcript: %lld s behind",
         "Live transcript: listening…",
         "Live transcript: loading the model…",
         "Live transcript: paused",

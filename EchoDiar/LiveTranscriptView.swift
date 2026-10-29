@@ -2,8 +2,8 @@ import EchoTranscribe
 import SwiftUI
 
 /// Live captions on the recording page, under its header (setting "Transcribe while recording"): the transcriber's
-/// state, then the newest lines and the open chunks' greyed tentative text, scrolled to the bottom as they arrive,
-/// filling the page.
+/// state (how far behind decoding is when it falls behind), then the newest lines and the open chunks' greyed
+/// tentative text, scrolled to the bottom as they arrive, filling the page.
 struct LiveTranscriptView: View {
     let snapshot: RecordingTranscriber.Snapshot
 
@@ -51,7 +51,13 @@ struct LiveTranscriptView: View {
         case .listening where snapshot.deferred:
             "Paused while the Mac is hot or in Low Power Mode. The rest is transcribed after Stop."
         case .listening:
-            snapshot.lines.isEmpty && snapshot.tentative.isEmpty ? "Live transcript: listening…" : "Live transcript"
+            if let behind = RecordingTranscriber.behindSeconds(snapshot) {
+                "Live transcript: \(behind) s behind"
+            } else if snapshot.lines.isEmpty && snapshot.tentative.isEmpty {
+                "Live transcript: listening…"
+            } else {
+                "Live transcript"
+            }
         case .failed: "Live transcript stopped. The transcript is made after Stop."
         }
     }

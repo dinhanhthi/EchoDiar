@@ -9576,6 +9576,34 @@
         }
       }
     },
+    "Live transcript: %lld s behind" : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Transcripción en directo: %lld s de retraso"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Transcription en direct : %lld s de retard"
+          }
+        },
+        "vi" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Chép lời trực tiếp: chậm %lld giây"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "实时转写：落后 %lld 秒"
+          }
+        }
+      }
+    },
     "Live transcript: listening…" : {
       "localizations" : {
         "es" : {

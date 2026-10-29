@@ -105,10 +105,11 @@ struct RecordingTranscriberBufferTests {
         _ = buffer.take()
         #expect(buffer.takePartial()?.channel == Self.mic)
 
-        buffer.recordDecode(channel: Self.mic, wallSeconds: 3, chunkSeconds: 4)
+        let share = RecordingTranscriber.partialMaxDecodeShare
+        buffer.recordDecode(channel: Self.mic, wallSeconds: (share + 0.1) * 10, chunkSeconds: 10)
         for _ in 0..<Self.stepHalves { #expect(!Self.appendHalfSecond(&buffer)) }
         #expect(buffer.takePartial() == nil)
-        buffer.recordDecode(channel: Self.mic, wallSeconds: 2, chunkSeconds: 4)
+        buffer.recordDecode(channel: Self.mic, wallSeconds: (share - 0.1) * 10, chunkSeconds: 10)
         #expect(buffer.takePartial()?.chunk.samples.count == (Self.minHalves + Self.stepHalves) * Self.half)
     }
 

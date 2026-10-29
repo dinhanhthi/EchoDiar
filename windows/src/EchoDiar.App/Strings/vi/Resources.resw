@@ -1410,6 +1410,10 @@
     <value>Chép lời trực tiếp: đang nghe…</value>
     <comment>Live transcript: listening…</comment>
   </data>
+  <data name="LiveTranscriptLldSBehind" xml:space="preserve">
+    <value>Chép lời trực tiếp: chậm {0} giây</value>
+    <comment>Live transcript: %lld s behind</comment>
+  </data>
   <data name="LiveTranscriptLoadingTheModel" xml:space="preserve">
     <value>Chép lời trực tiếp: đang tải mô hình…</value>
     <comment>Live transcript: loading the model…</comment>

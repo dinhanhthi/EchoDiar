@@ -126,10 +126,11 @@ public sealed class RecordingTranscriberBufferTests
         _ = buffer.Take();
         Assert.Equal(Mic, buffer.TakePartial()?.Channel);
 
-        buffer.RecordDecode(Mic, wallSeconds: 3, chunkSeconds: 4);
+        const double share = RecordingTranscriber.PartialMaxDecodeShare;
+        buffer.RecordDecode(Mic, wallSeconds: (share + 0.1) * 10, chunkSeconds: 10);
         for (var i = 0; i < StepHalves; i++) Assert.False(AppendHalfSecond(buffer));
         Assert.Null(buffer.TakePartial());
-        buffer.RecordDecode(Mic, wallSeconds: 2, chunkSeconds: 4);
+        buffer.RecordDecode(Mic, wallSeconds: (share - 0.1) * 10, chunkSeconds: 10);
         Assert.Equal((MinHalves + StepHalves) * Half, buffer.TakePartial()?.Chunk.Samples.Length);
     }
 

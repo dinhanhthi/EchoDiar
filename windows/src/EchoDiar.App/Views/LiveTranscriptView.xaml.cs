@@ -71,7 +71,9 @@ public sealed partial class LiveTranscriptView : UserControl
             : Visibility.Collapsed;
     }
 
-    /// <summary>The state line; why the transcriber stopped as its tooltip.</summary>
+    /// <summary>
+    /// The state line (how far behind decoding is when it falls behind); why the transcriber stopped as its tooltip.
+    /// </summary>
     private void ShowState(RecordingTranscriber.Snapshot snapshot)
     {
         var failed = snapshot.State == RecordingTranscriber.TranscriberState.Failed;
@@ -80,9 +82,11 @@ public sealed partial class LiveTranscriptView : UserControl
             RecordingTranscriber.TranscriberState.Loading => Loc.T("Live transcript: loading the model…"),
             RecordingTranscriber.TranscriberState.Paused => Loc.T("Live transcript: paused"),
             RecordingTranscriber.TranscriberState.Listening =>
-                snapshot.Lines.Count == 0 && snapshot.Tentative.Count == 0
-                    ? Loc.T("Live transcript: listening…")
-                    : Loc.T("Live transcript"),
+                RecordingTranscriber.BehindSeconds(snapshot) is { } behind
+                    ? Loc.Format("Live transcript: %lld s behind", behind)
+                    : snapshot.Lines.Count == 0 && snapshot.Tentative.Count == 0
+                        ? Loc.T("Live transcript: listening…")
+                        : Loc.T("Live transcript"),
             _ => Loc.T("Live transcript stopped. The transcript is made after Stop."),
         });
         var textStyle = (Style)Resources[failed ? "LiveStatusErrorText" : "LiveStatusText"];
