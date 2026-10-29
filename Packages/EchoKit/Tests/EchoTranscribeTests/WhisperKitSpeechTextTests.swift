@@ -17,6 +17,16 @@ struct WhisperKitSpeechTextTests {
         #expect(WhisperKitEngine.speechText("[Music] Hello there (laughs)") == "Hello there")
     }
 
+    /// Guards the "..." lines on a silent mic: text with no letter or digit left is dropped, short speech is kept.
+    @Test func dropsPunctuationOnlyText() {
+        for raw in ["...", "…", " - ", "?!", "<|endoftext|> ..."] {
+            #expect(WhisperKitEngine.speechText(raw) == "", "\(raw)")
+        }
+        for raw in ["Ok.", "1, 2, 3", "Hum."] {
+            #expect(WhisperKitEngine.speechText(raw) == raw)
+        }
+    }
+
     /// Guards the "Thank you." hallucinations: a segment over near silence is dropped, one over speech is kept, and a
     /// NaN timestamp counts as silent instead of trapping.
     @Test func dropsSegmentsOverNearSilence() {

@@ -177,6 +177,7 @@ public struct WhisperKitEngine: TranscriptionEngine {
     ///   `[ Silence ]`, `(music)`, `*music*`.
     /// - At the start or end of speech, only annotations naming a known non-speech sound are removed, so speech
     ///   that merely contains brackets is kept.
+    /// - Text left with no letter or digit, e.g. `...` on a silent mic, is removed.
     static func speechText(_ raw: String) -> String {
         let annotation = #/\[[^\[\]]*\]|\([^()]*\)|\*[^*]+\*/#
         let trailingAnnotation = #/(?:\[[^\[\]]*\]|\([^()]*\)|\*[^*]+\*)\s*$/#
@@ -189,7 +190,7 @@ public struct WhisperKitEngine: TranscriptionEngine {
         while let match = text.firstMatch(of: trailingAnnotation), match.output.contains(nonSpeech) {
             text = text[..<match.range.lowerBound].trimmingCharacters(in: .whitespacesAndNewlines)
         }
-        return text
+        return text.contains { $0.isLetter || $0.isNumber } ? text : ""
     }
 
     /// True when no 100 ms frame of `samples` from `start` to `end` (seconds) reaches `speechRMS`: Whisper made the

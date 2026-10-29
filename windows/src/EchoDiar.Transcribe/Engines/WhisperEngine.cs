@@ -1,4 +1,5 @@
 using System.Globalization;
+using System.Text;
 using System.Text.RegularExpressions;
 using EchoDiar.Core;
 using EchoDiar.Core.Models;
@@ -211,6 +212,7 @@ public sealed partial class WhisperEngine(ModelEntry entry, string folder) : ISe
     /// <c>[BLANK_AUDIO]</c>, <c>[ Silence ]</c>, <c>(music)</c>, <c>*music*</c>.</item>
     /// <item>At the start or end of speech, only annotations naming a known non-speech sound are removed, so speech
     /// that merely contains brackets is kept.</item>
+    /// <item>Text left with no letter or digit, e.g. <c>...</c> on a silent mic, is removed.</item>
     /// </list>
     /// </summary>
     public static string SpeechText(string raw)
@@ -225,7 +227,22 @@ public sealed partial class WhisperEngine(ModelEntry entry, string folder) : ISe
         {
             text = text[..match.Index].Trim();
         }
-        return text;
+        return HasLetterOrDigit(text) ? text : "";
+    }
+
+    /// <summary>
+    /// True when a character of <paramref name="text"/> is a letter or digit; like Swift, a character (grapheme
+    /// cluster) counts by its first scalar.
+    /// </summary>
+    private static bool HasLetterOrDigit(string text)
+    {
+        var elements = StringInfo.GetTextElementEnumerator(text);
+        while (elements.MoveNext())
+        {
+            var first = Rune.GetRuneAt(elements.GetTextElement(), 0);
+            if (Rune.IsLetter(first) || Rune.IsNumber(first)) return true;
+        }
+        return false;
     }
 
     /// <summary>

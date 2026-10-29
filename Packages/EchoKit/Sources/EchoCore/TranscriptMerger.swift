@@ -56,7 +56,8 @@ public enum TranscriptMerger {
     ///   engine-detected language.
     /// - Speaker bleed: a mic segment is dropped when its normalized text equals an overlapping system
     ///   segment's, or when it has at least `bleedMinTokens` tokens and at least `bleedTokenRatio` of them occur
-    ///   in the combined text of the overlapping system segments.
+    ///   in the combined text of the overlapping system segments. A mic segment that is a lone "Merci." is
+    ///   dropped when any system segment overlaps it (Whisper's reading of the other party's residual voice).
     /// - Output is sorted by start; ties put the mic first.
     public static func merge(
         mic: [RawSegment],
@@ -107,6 +108,9 @@ public enum TranscriptMerger {
             .map(String.init)
     }
 
+    /// Whether `text` is a lone "Merci." (any case or punctuation), Whisper's usual reading of residual voice.
+    public static func isLoneMerci(_ text: String) -> Bool { tokens(of: text) == ["merci"] }
+
     private static func segment(
         _ raw: RawSegment,
         channel: Transcript.Channel,
@@ -154,6 +158,7 @@ public enum TranscriptMerger {
         let micEnd = max(mic.start, mic.end) + bleedTimeTolerance
         let overlapping = system.indices.filter { overlap(micStart, micEnd, system[$0].start, system[$0].end) > 0 }
         if overlapping.contains(where: { systemTokens[$0] == micTokens }) { return true }
+        if !overlapping.isEmpty && isLoneMerci(mic.text) { return true }
         guard micTokens.count >= bleedMinTokens else { return false }
 
         var bag: [String: Int] = [:]
