@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.2.0] - 2026-10-29
+
+### Added
+
+- EchoDiar for Windows 11 (x64 and Arm64): a native app that records the microphone and system audio, transcribes on your PC with live transcription while recording, and keeps the same conversation library, AI panel and chat, Calendar page, floating recording indicator, tray icon and settings as the macOS app, in the same five languages. It reads and writes the same library format as the macOS app, installs with App Installer and updates itself. (Windows)
+
+### Fixed
+
+- Clicking a conversation in the list selects it at once and shows a loading pane until the conversation has loaded. (macOS)
+
 ## [1.1.0] - 2026-10-24
 
 ### Added
