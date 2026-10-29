@@ -4,10 +4,10 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Privacy · EchoDiar</title>
-    <meta name="description" content="EchoDiar keeps your recordings on your Mac. Audio and transcripts leave it only for the cloud services you set up." />
+    <meta name="description" content="EchoDiar keeps your recordings on your Mac or PC. Audio and transcripts leave it only for the cloud services you set up." />
     <meta property="og:type" content="website" />
     <meta property="og:title" content="Privacy · EchoDiar" />
-    <meta property="og:description" content="EchoDiar keeps your recordings on your Mac. Audio and transcripts leave it only for the cloud services you set up." />
+    <meta property="og:description" content="EchoDiar keeps your recordings on your Mac or PC. Audio and transcripts leave it only for the cloud services you set up." />
     <meta property="og:image" content="https://ed.dinhanhthi.com/poster.jpg" />
     <meta name="twitter:card" content="summary_large_image" />
     <link rel="icon" href="logo.png" type="image/png" />
@@ -69,32 +69,34 @@
       <main>
         <section class="hero">
           <h1>Privacy</h1>
-          <p>EchoDiar keeps your recordings on your Mac. Audio and transcripts leave it only for the cloud services you set up.</p>
+          <p>EchoDiar keeps your recordings on your Mac or PC. Audio and transcripts leave it only for the cloud services you set up.</p>
         </section>
 
         <section>
           <h2>What the app sends over the network</h2>
           <ul class="list">
-            <li><strong>Update checks.</strong> EchoDiar fetches its update feed (<code>appcast.xml</code>) from this website and downloads updates from GitHub Releases.</li>
-            <li><strong>Model downloads.</strong> Only when you click Download, from huggingface.co, at pinned versions. Apple Speech language assets are installed by macOS from Apple.</li>
+            <li><strong>Update checks.</strong> EchoDiar fetches its update feed (<code>appcast.xml</code>) from this website and downloads updates from GitHub Releases. On Windows, the feed is <code>EchoDiar.appinstaller</code>, from the same places; a copy from the Microsoft Store is updated by the Store.</li>
+            <li><strong>Model downloads.</strong> Only when you click Download, from huggingface.co, at pinned versions. Apple Speech language assets are installed by macOS from Apple. On Copilot+ PCs, Phi Silica is installed by Windows from Microsoft.</li>
             <li><strong>Cloud transcription.</strong> Only if you set up a cloud engine and confirm once for that provider and address. The recording's audio then goes to that provider, with your key.</li>
             <li><strong>AI.</strong> Only when you generate a summary or ask a question, and only to the provider you picked: the transcript (or parts of it), the meeting title and date, speaker names, the saved summary, your question and recent chat messages.</li>
             <li><strong>Provider setup.</strong> Testing a key or loading a model list contacts that provider.</li>
             <li><strong>Subscription CLIs.</strong> Claude Code, Codex, OpenCode and Gemini CLI send the same data to their own service, with your login.</li>
-            <li><strong>Local AI.</strong> MLX models and Apple Foundation Models run on your Mac. LM Studio, Ollama, Jan, llama.cpp and vLLM are reached at <code>127.0.0.1</code> unless you change the address.</li>
+            <li><strong>Local AI.</strong> MLX models and Apple Foundation Models run on your Mac, Phi Silica on your PC. LM Studio, Ollama, Jan, llama.cpp, vLLM and Foundry Local are reached at <code>127.0.0.1</code> unless you change the address.</li>
             <li><strong>Nothing else.</strong> No analytics, usage, crash or install reporting.</li>
           </ul>
         </section>
 
         <section>
-          <h2>What stays on your Mac</h2>
+          <h2>What stays on your Mac or PC</h2>
           <ul class="list">
-            <li>Recordings, transcripts, summaries and chats are in <code>~/Library/Application Support/EchoDiar/Conversations</code>.</li>
+            <li>Recordings, transcripts, summaries and chats are in <code>~/Library/Application Support/EchoDiar/Conversations</code> on macOS and in <code>%LOCALAPPDATA%\EchoDiar\Conversations</code> on Windows.</li>
             <li>Downloaded models and <code>settings.json</code> are in the same <code>EchoDiar</code> folder.</li>
-            <li>API keys are stored in the Keychain, not in the settings file.</li>
+            <li>API keys are stored in the Keychain on macOS and in Windows Credential Manager on Windows, not in the settings file.</li>
             <li>Calendars are read on your Mac. EchoDiar writes only to its own "EchoDiar" calendar (On My Mac when available, otherwise your default calendar account, e.g. iCloud, which then syncs those events like any other) and stores only that calendar's id, the ids of calendars you don't watch and the ids of meetings you skip. Don't share the EchoDiar calendar: anyone who can add events to it could start a recording. A recording started from an event takes the event's title, which goes to an AI provider only like any other conversation title, when you use one.</li>
-            <li>Copy as prompt puts the text on the clipboard, marked as transient for clipboard managers.</li>
-            <li>Settings &gt; Storage can move old conversations, or only their audio, to the Trash.</li>
+            <li>On Windows, calendars are read on your PC and EchoDiar's own "EchoDiar" calendar is an app calendar that only EchoDiar can add events to. EchoDiar stores the same ids as on macOS.</li>
+            <li>On Windows, microphone and calendar access can be turned off in Settings &gt; Privacy &amp; security.</li>
+            <li>Copy as prompt puts the text on the clipboard, marked as transient for clipboard managers (kept out of the clipboard history on Windows).</li>
+            <li>Settings &gt; Storage can move old conversations, or only their audio, to the Trash (the Recycle Bin on Windows).</li>
           </ul>
         </section>
 

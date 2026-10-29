@@ -4285,6 +4285,36 @@
         }
       }
     },
+    "Updates come from the Microsoft Store. A new version can take up to a day to appear after its release." : {
+      "comment" : "Windows only: Views/Settings/AboutSettingsPage.xaml.cs.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Las actualizaciones llegan desde Microsoft Store. Una nueva versión puede tardar hasta un día en aparecer después de su publicación."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Les mises à jour viennent du Microsoft Store. Une nouvelle version peut prendre au plus un jour pour apparaître après sa sortie."
+          }
+        },
+        "vi" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Bản cập nhật đến từ Microsoft Store. Phiên bản mới có thể mất tới một ngày mới xuất hiện sau khi phát hành."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "更新来自 Microsoft Store。新版本发布后，最多可能需要一天才会出现。"
+          }
+        }
+      }
+    },
     "Updates need an .appinstaller install" : {
       "comment" : "Windows only: Services/Updater.cs.",
       "extractionState" : "manual",

@@ -3422,6 +3422,10 @@
     <value>Actualizaciones</value>
     <comment>Updates</comment>
   </data>
+  <data name="UpdatesComeFromTheMicrosoftStoreANewVersionCanTakeUpToADayTo" xml:space="preserve">
+    <value>Las actualizaciones llegan desde Microsoft Store. Una nueva versión puede tardar hasta un día en aparecer después de su publicación.</value>
+    <comment>Updates come from the Microsoft Store. A new version can take up to a day to appear after its release.</comment>
+  </data>
   <data name="UpdatesNeedAnAppinstallerInstall" xml:space="preserve">
     <value>Las actualizaciones requieren una instalación desde .appinstaller</value>
     <comment>Updates need an .appinstaller install</comment>

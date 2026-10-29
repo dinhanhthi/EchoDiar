@@ -3302,6 +3302,10 @@
     <value>更新</value>
     <comment>Updates</comment>
   </data>
+  <data name="UpdatesComeFromTheMicrosoftStoreANewVersionCanTakeUpToADayTo" xml:space="preserve">
+    <value>更新来自 Microsoft Store。新版本发布后，最多可能需要一天才会出现。</value>
+    <comment>Updates come from the Microsoft Store. A new version can take up to a day to appear after its release.</comment>
+  </data>
   <data name="UpdatesNeedAnAppinstallerInstall" xml:space="preserve">
     <value>更新需要通过 .appinstaller 安装</value>
     <comment>Updates need an .appinstaller install</comment>

@@ -103,6 +103,8 @@ public partial class App : Application
         StartupTrace.Write("end AppServices");
         _model = new AppViewModel(_services, dispatcher);
         _window = new MainWindow(_model);
+        // Before StartAsync starts the updater: the Store's dialogs belong to this window.
+        _model.Updater.SetWindow(WinRT.Interop.WindowNative.GetWindowHandle(_window));
         _pill = new FloatingPillController(_model, _window, dispatcher);
         // X and Alt+F4 hide the window to the tray (macOS: the menu bar app runs on); Quit closes it.
         _window.AppWindow.Closing += OnMainWindowClosing;

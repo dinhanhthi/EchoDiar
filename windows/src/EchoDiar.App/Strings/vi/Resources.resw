@@ -3302,6 +3302,10 @@
     <value>Cập nhật</value>
     <comment>Updates</comment>
   </data>
+  <data name="UpdatesComeFromTheMicrosoftStoreANewVersionCanTakeUpToADayTo" xml:space="preserve">
+    <value>Bản cập nhật đến từ Microsoft Store. Phiên bản mới có thể mất tới một ngày mới xuất hiện sau khi phát hành.</value>
+    <comment>Updates come from the Microsoft Store. A new version can take up to a day to appear after its release.</comment>
+  </data>
   <data name="UpdatesNeedAnAppinstallerInstall" xml:space="preserve">
     <value>Cần cài đặt từ tệp .appinstaller để nhận bản cập nhật</value>
     <comment>Updates need an .appinstaller install</comment>
