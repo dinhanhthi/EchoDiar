@@ -10,8 +10,9 @@ namespace EchoDiar.Transcribe;
 /// Transcribes a recording while it is made (Swift <c>RecordingTranscriber</c>): takes the writer's 16 kHz blocks,
 /// cuts each channel into speech chunks (<see cref="SpeechChunker"/>) and decodes them with one Whisper or Parakeet
 /// session (mic lines "Me", system lines "Others"). Live chunks are at most 12 s and close at a short pause from 4 s,
-/// so a line follows continuous speech within seconds. <see cref="FinishAsync"/> at Stop hands the segments, in file
-/// time, and the spans not transcribed (gaps) to the pipeline as a <see cref="PriorTranscription"/>.
+/// and each decoded chunk becomes one line, so a line follows continuous speech within seconds.
+/// <see cref="FinishAsync"/> at Stop hands the segments, in file time, and the spans not transcribed (gaps) to the
+/// pipeline as a <see cref="PriorTranscription"/>.
 /// </summary>
 /// <remarks>
 /// <para>
@@ -39,6 +40,7 @@ public sealed class RecordingTranscriber : IAsyncDisposable
     /// <summary>Who spoke a line: <c>ToString()</c> is the macOS label ("Me", "Others").</summary>
     public enum Speaker { Me, Others }
 
+    /// <summary>One decoded chunk's text (<see cref="LineText"/>), not one per Whisper segment.</summary>
     public sealed record Line(int Id, Speaker Speaker, string Text);
 
     /// <param name="Lines">Oldest first, at most <see cref="MaxLines"/>; a new array whenever a line is added.</param>
@@ -322,7 +324,8 @@ public sealed class RecordingTranscriber : IAsyncDisposable
             lock (_buffer) _buffer.Complete(item, shifted);
             if (shifted is null) continue;
             var speaker = item.Channel == RecordingSession.Channel.Mic ? Speaker.Me : Speaker.Others;
-            AddLines(speaker, shifted);
+            var text = LineText(shifted);
+            if (text is not null) AddLine(speaker, text);
         }
     }
 
@@ -357,12 +360,11 @@ public sealed class RecordingTranscriber : IAsyncDisposable
         }
     }
 
-    private void AddLines(Speaker speaker, List<RawSegment> segments)
+    private void AddLine(Speaker speaker, string text)
     {
         lock (_lock)
         {
-            var lines = new List<Line>(_lines);
-            foreach (var segment in segments) lines.Add(new Line(_nextLineID++, speaker, segment.Text));
+            var lines = new List<Line>(_lines) { new(_nextLineID++, speaker, text) };
             _lines = [.. lines.Skip(Math.Max(0, lines.Count - MaxLines))];
         }
         PublishRunning();
@@ -385,6 +387,16 @@ public sealed class RecordingTranscriber : IAsyncDisposable
     {
         var trimmed = language?.Trim() ?? "";
         return trimmed.Length == 0 || trimmed.Equals("auto", StringComparison.OrdinalIgnoreCase) ? null : trimmed;
+    }
+
+    /// <summary>
+    /// A chunk's segments as one line (Swift <c>lineText</c>): trimmed, blank ones skipped, joined with a space; null
+    /// when no text is left.
+    /// </summary>
+    internal static string? LineText(IReadOnlyList<RawSegment> segments)
+    {
+        var texts = segments.Select(s => s.Text.Trim()).Where(t => t.Length > 0).ToList();
+        return texts.Count == 0 ? null : string.Join(" ", texts);
     }
 
     private static float Peak(ReadOnlySpan<float> samples)

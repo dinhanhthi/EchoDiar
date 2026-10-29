@@ -5,9 +5,9 @@ import Synchronization
 
 /// Transcribes a recording while it is made: takes the writer's 16 kHz blocks, cuts each channel into speech chunks
 /// (`SpeechChunker`) and decodes them with one WhisperKit or Parakeet session (mic lines "Me", system lines
-/// "Others"). Live chunks are at most 12 s and close at a short pause from 4 s, so a line follows continuous speech
-/// within seconds. `finish()` at Stop hands the segments, in file time, and the spans not transcribed (gaps) to the
-/// pipeline as a `PriorTranscription`.
+/// "Others"). Live chunks are at most 12 s and close at a short pause from 4 s, and each decoded chunk becomes one
+/// line, so a line follows continuous speech within seconds. `finish()` at Stop hands the segments, in file time, and
+/// the spans not transcribed (gaps) to the pipeline as a `PriorTranscription`.
 ///
 /// Clock: the running sample count of each channel is file time. Every frame written to the CAF passes the sink,
 /// silence padding included, and a pause adds no silence to the file. `RecordingEngine.pause()` and `stop()` flush
@@ -32,6 +32,7 @@ public actor RecordingTranscriber {
         case me = "Me", others = "Others"
     }
 
+    /// One decoded chunk's text (`lineText`), not one per Whisper segment.
     public struct Line: Sendable, Equatable, Identifiable {
         public let id: Int
         public let speaker: Speaker
@@ -243,7 +244,7 @@ public actor RecordingTranscriber {
                 }
                 buffer.withLock { $0.complete(item, segments: shifted) }
                 let speaker: Speaker = item.channel == RecordingSession.Channel.mic ? .me : .others
-                await add(shifted.map { (speaker, $0.text) })
+                if let text = Self.lineText(shifted) { await add(speaker, text) }
             } catch is CancellationError {
                 throw CancellationError()
             } catch {
@@ -271,11 +272,9 @@ public actor RecordingTranscriber {
         publish(buffer.withLock { $0.paused } ? .paused : .listening)
     }
 
-    private func add(_ lines: [(Speaker, String)]) {
-        for (speaker, text) in lines {
-            snapshot.lines.append(Line(id: nextLineID, speaker: speaker, text: text))
-            nextLineID += 1
-        }
+    private func add(_ speaker: Speaker, _ text: String) {
+        snapshot.lines.append(Line(id: nextLineID, speaker: speaker, text: text))
+        nextLineID += 1
         snapshot.lines.removeFirst(max(0, snapshot.lines.count - Self.maxLines))
         publishRunning()
     }
@@ -300,6 +299,12 @@ public actor RecordingTranscriber {
     private static func chunkLanguage(_ language: String?) -> String? {
         let trimmed = language?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
         return trimmed.isEmpty || trimmed.lowercased() == "auto" ? nil : trimmed
+    }
+
+    /// A chunk's segments as one line: trimmed, blank ones skipped, joined with a space; nil when no text is left.
+    static func lineText(_ segments: [RawSegment]) -> String? {
+        let texts = segments.map { $0.text.trimmingCharacters(in: .whitespacesAndNewlines) }.filter { !$0.isEmpty }
+        return texts.isEmpty ? nil : texts.joined(separator: " ")
     }
 
     private static func channel(_ index: Int, of samples: UnsafePointer<Int16>, frames: Int, channels: Int) -> [Float] {
