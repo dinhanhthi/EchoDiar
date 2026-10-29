@@ -5,10 +5,10 @@ import Synchronization
 
 /// Transcribes a recording while it is made: takes the writer's 16 kHz blocks, cuts each channel into speech chunks
 /// (`SpeechChunker`) and decodes them with one WhisperKit or Parakeet session (mic lines "Me", system lines
-/// "Others"). Live chunks are at most 12 s and close at a short pause from 4 s, and each decoded chunk becomes one
+/// "Others"). Live chunks are at most 12 s and close at a 0.5 s pause from 1 s, and each decoded chunk becomes one
 /// line, so a line follows continuous speech within seconds. While no closed chunk waits, an open chunk is decoded
 /// every `partialStepSeconds` as greyed tentative text (`Snapshot.tentative`) that its line replaces, unless the
-/// channel's last final decode was slow (`partialMaxDecodeShare`). `finish()` at Stop hands the segments, in file
+/// channel's last final decode was slow (`partialMaxDecodeSeconds`). `finish()` at Stop hands the segments, in file
 /// time, and the spans not transcribed (gaps) to the pipeline as a `PriorTranscription`.
 ///
 /// Clock: the running sample count of each channel is file time. Every frame written to the CAF passes the sink,
@@ -86,19 +86,22 @@ public actor RecordingTranscriber {
     static let tickInterval = Duration.seconds(15)
     /// The longest live chunk (at most the model window): the hard cut searches its last third, 8–12 s. With
     /// `liveShortPauseMinSeconds` it bounds the time to a live line under continuous speech (the batch tuning waits up
-    /// to 30 s), while keeping chunks long enough that Whisper does not fall back on memorised boilerplate.
+    /// to 30 s). Short chunks are left to the text filters (`speechText`, the lone-Merci rule) and the WER gate.
     static let liveMaxChunkSeconds = 12
-    /// The length a live chunk needs before a 0.6 s pause closes it: `min(4·50, 600/2) = 200` frames, so from 4 s.
-    static let liveShortPauseMinSeconds = 4
+    /// The pause that closes a live chunk of at least `liveShortPauseMinSeconds` (the batch tuning waits 0.6 s).
+    static let liveShortPauseFrames = 25  // 0.5 s
+    /// The length a live chunk needs before a 0.5 s pause closes it: `min(1·50, 600/2) = 50` frames, so from 1 s.
+    static let liveShortPauseMinSeconds = 1
     /// The length an open chunk needs before its first partial decode (the greyed tentative text).
-    static let partialMinSeconds = 2
+    static let partialMinSeconds = 1
     /// How much an open chunk grows between two partials of it: the first knob to turn if the decode budget is exceeded.
-    static let partialStepSeconds = 3
-    /// No partial on a channel while its last final decode took more than this share of its chunk's duration, so
-    /// partials never starve the finals on a slow decoder. A partial costs about as much as a final (Whisper pads to a
-    /// fixed window), so a ~10 s chunk at `partialStepSeconds` 3 costs ~3 partials + 1 final, twice that while both
-    /// channels speak: above this share partials would keep the decoder busy and delay each final by one partial.
-    static let partialMaxDecodeShare = 0.2
+    static let partialStepSeconds = 2
+    /// No partial on a channel while its last final decode took longer than this, so partials never starve the finals
+    /// on a slow decoder: 0.2 × `liveMaxChunkSeconds`, a full 12 s chunk decoding within 20 %. A partial costs about
+    /// as much as a final, and a Whisper decode costs about the same whatever the chunk length (it pads to a fixed
+    /// window), so a share of the chunk's duration would turn partials off for short chunks. A ~10 s chunk at
+    /// `partialStepSeconds` 2 costs ~5 partials + 1 final, twice that while both channels speak.
+    static let partialMaxDecodeSeconds = 2.4
     /// The speech waiting to be decoded from which the live transcript says how far behind it is (`behindSeconds`):
     /// `pendingSeconds` sums both channels, and one waiting chunk per channel is up to 2 × `liveMaxChunkSeconds`
     /// (24 s) while the decoder keeps up, so below this nothing is behind.
@@ -141,7 +144,8 @@ public actor RecordingTranscriber {
         self.deferWhenConstrained = deferWhenConstrained
         self.language = language
         buffer = Mutex(Buffer(maxChunkSeconds: min(entry.windowSeconds ?? 30, Self.liveMaxChunkSeconds),
-                              shortPauseMinSeconds: Self.liveShortPauseMinSeconds))
+                              shortPauseMinSeconds: Self.liveShortPauseMinSeconds,
+                              shortPauseFrames: Self.liveShortPauseFrames))
         (updates, updatesContinuation) = AsyncStream.makeStream(bufferingPolicy: .bufferingNewest(1))
         (wake, wakeContinuation) = AsyncStream.makeStream(bufferingPolicy: .bufferingNewest(1))
     }
@@ -276,7 +280,7 @@ public actor RecordingTranscriber {
         await pruneTentative()
     }
 
-    /// Records a closed chunk's segments and decode share, and shows its line in place of its tentative text.
+    /// Records a closed chunk's segments and decode time, and shows its line in place of its tentative text.
     private nonisolated func decodeFinal(_ item: Item, _ model: IdleModel<any TranscriptionSession>) async throws {
         let session = try await model.get()
         let mic = item.channel == RecordingSession.Channel.mic
@@ -300,10 +304,7 @@ public actor RecordingTranscriber {
             buffer.withLock { $0.complete(item, segments: nil) }
         }
         let wallSeconds = (ContinuousClock.now - started) / .seconds(1)
-        buffer.withLock {
-            $0.recordDecode(channel: item.channel, wallSeconds: wallSeconds,
-                            chunkSeconds: Double(item.chunk.samples.count) / Double(Self.sampleRate))
-        }
+        buffer.withLock { $0.recordDecode(channel: item.channel, wallSeconds: wallSeconds) }
         await add(mic ? .me : .others, text, startSample: item.chunk.startSample)
     }
 
@@ -477,8 +478,8 @@ public actor RecordingTranscriber {
         var lastPartial: (startSample: Int, count: Int)?
         /// The open chunk's start and length when `append` last woke the decoder for a partial.
         var signalledPartial: (startSample: Int, count: Int)?
-        /// The last final decode's wall seconds over its chunk's seconds.
-        var decodeShare = 0.0
+        /// The last final decode's wall seconds.
+        var decodeSeconds = 0.0
     }
 
     /// Both channels grow in step (the writer writes equal frames per channel); index = `RecordingSession.Channel`.
@@ -501,11 +502,13 @@ public actor RecordingTranscriber {
 
         init(
             maxChunkSeconds: Int, shortPauseMinSeconds: Int = SpeechChunker.shortPauseMinSeconds,
+            shortPauseFrames: Int = SpeechChunker.shortPauseFrames,
             maxQueuedSamples: Int = RecordingTranscriber.maxQueuedSeconds * RecordingTranscriber.sampleRate
         ) {
             self.maxQueuedSamples = maxQueuedSamples
             let mic = Channel(chunker: SpeechChunker(maxChunkSeconds: maxChunkSeconds,
-                                                     shortPauseMinSeconds: shortPauseMinSeconds))
+                                                     shortPauseMinSeconds: shortPauseMinSeconds,
+                                                     shortPauseFrames: shortPauseFrames))
             channels = [mic, mic]
         }
 
@@ -602,20 +605,20 @@ public actor RecordingTranscriber {
                 || channels[channel].chunker.openSpan?.startSample == startSample
         }
 
-        /// Stores the share of a final decode of `channel` (wall seconds over chunk seconds) for the partial gate.
-        mutating func recordDecode(channel: Int, wallSeconds: Double, chunkSeconds: Double) {
-            guard !closed, chunkSeconds > 0 else { return }
-            channels[channel].decodeShare = wallSeconds / chunkSeconds
+        /// Stores the wall seconds of a final decode of `channel` for the partial gate.
+        mutating func recordDecode(channel: Int, wallSeconds: Double) {
+            guard !closed else { return }
+            channels[channel].decodeSeconds = wallSeconds
         }
 
         /// The open chunk's span of `channel` when a partial of it is due: at least `partialMinSeconds` long, grown
         /// `partialStepSeconds` since the last partial of the same chunk (a new start is a new chunk), and the
-        /// channel's last decode share at most `partialMaxDecodeShare`.
+        /// channel's last final decode took at most `partialMaxDecodeSeconds`.
         private func partialDue(_ channel: Int) -> (startSample: Int, count: Int)? {
             let rate = RecordingTranscriber.sampleRate
             let state = channels[channel]
             guard let open = state.chunker.openSpan, open.count >= RecordingTranscriber.partialMinSeconds * rate,
-                  state.decodeShare <= RecordingTranscriber.partialMaxDecodeShare
+                  state.decodeSeconds <= RecordingTranscriber.partialMaxDecodeSeconds
             else { return nil }
             if let last = state.lastPartial, last.startSample == open.startSample,
                open.count - last.count < RecordingTranscriber.partialStepSeconds * rate

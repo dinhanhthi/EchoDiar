@@ -54,11 +54,13 @@ struct SpeechChunkerTests {
         #expect(chunks.last?.end == signal.count)
     }
 
-    /// The live tuning bounds the time to a live line: a 0.6 s pause closes a chunk from 4 s (the batch tuning waits
-    /// for 8 s), and continuous speech is cut into contiguous chunks of at most 12 s, in the last third (8–12 s).
-    @Test func liveChunksCloseAtAShortPauseFrom4SecondsAndNeverExceed12() throws {
-        let paused = Self.noiseFloor(1) + Self.speech(5) + Self.noiseFloor(0.7)
-        var live = SpeechChunker(maxChunkSeconds: 12, shortPauseMinSeconds: 4)
+    /// The live tuning bounds the time to a live line: a 0.5 s pause closes a chunk from the live minimum (the batch
+    /// tuning waits for a 0.6 s pause and 8 s), and continuous speech is cut into contiguous chunks of at most 12 s, in
+    /// the last third (8–12 s).
+    @Test func liveChunksCloseAtAHalfSecondPauseFromTheLiveMinimumAndNeverExceed12() throws {
+        let speechSeconds = Double(RecordingTranscriber.liveShortPauseMinSeconds) + 1
+        let paused = Self.noiseFloor(1) + Self.speech(speechSeconds) + Self.noiseFloor(0.55)
+        var live = Self.liveChunker()
         var batch = SpeechChunker(maxChunkSeconds: 30)
 
         let closed = Self.feed(paused, to: &live)
@@ -66,11 +68,12 @@ struct SpeechChunkerTests {
         #expect(closed.count == 1)
         #expect(Self.feed(paused, to: &batch).isEmpty)
         let chunk = try #require(closed.first)
-        #expect((Self.at(6)...Self.at(6.2) + 2 * Self.frame).contains(chunk.end))
+        let speechEnd = 1 + speechSeconds
+        #expect((Self.at(speechEnd)...Self.at(speechEnd + 0.2) + 2 * Self.frame).contains(chunk.end))
         #expect(chunk.samples == Array(paused[chunk.start..<chunk.end]))
 
         let continuous = Self.noiseFloor(1) + Self.speech(20)
-        live = SpeechChunker(maxChunkSeconds: 12, shortPauseMinSeconds: 4)
+        live = Self.liveChunker()
         let cut = Self.feed(continuous, to: &live)
         let chunks = cut + Self.flush(&live)
 
@@ -153,6 +156,13 @@ struct SpeechChunkerTests {
             }
         }
         return pieces
+    }
+
+    /// The chunker of one live channel (`RecordingTranscriber.Buffer`).
+    private static func liveChunker() -> SpeechChunker {
+        SpeechChunker(maxChunkSeconds: RecordingTranscriber.liveMaxChunkSeconds,
+                      shortPauseMinSeconds: RecordingTranscriber.liveShortPauseMinSeconds,
+                      shortPauseFrames: RecordingTranscriber.liveShortPauseFrames)
     }
 
     private static func flush(_ chunker: inout SpeechChunker) -> [Piece] {
