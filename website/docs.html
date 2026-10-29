@@ -69,7 +69,7 @@
       <main>
         <section class="hero">
           <h1>Docs</h1>
-          <p>Short guides to everything in EchoDiar.</p>
+          <p>Short guides to everything in EchoDiar, on Mac and Windows.</p>
         </section>
 
         <div class="docs-layout">
@@ -145,10 +145,10 @@
           <section id="permissions" class="doc">
             <h2>Permissions</h2>
 <ul class="list">
-            <li><strong>Microphone:</strong> records your voice.</li>
-            <li><strong>System Audio Recording:</strong> records the meeting's audio. The first-run onboarding tests it and opens the right Privacy &amp; Security pane.</li>
-            <li><strong>Accessibility</strong> (optional): only to keep the floating indicator on the meeting window.</li>
-            <li><strong>Calendars</strong> (optional): reads your meetings from macOS Calendar to offer recording when they start and to name the recording, and adds the events you create to an "EchoDiar" calendar (On My Mac when available, otherwise your default account, e.g. iCloud, which syncs them). EchoDiar writes to no other calendar.</li>
+            <li><strong>Microphone:</strong> records your voice. On Windows, if it is off, turn on EchoDiar in <strong>Windows Settings &gt; Privacy &amp; security &gt; Microphone</strong>.</li>
+            <li><strong>System Audio Recording</strong> (on Mac): records the meeting's audio. The first-run onboarding tests it and opens the right Privacy &amp; Security pane. On Windows, the onboarding's <strong>Test System Audio</strong> checks that EchoDiar hears it.</li>
+            <li><strong>Accessibility</strong> (optional, on Mac): only to keep the floating indicator on the meeting window. Windows needs no permission for that.</li>
+            <li><strong>Calendars</strong> (optional): reads your meetings to offer recording when they start and to name the recording, and adds the events you create to an "EchoDiar" calendar. EchoDiar writes to no other calendar. On Mac, it reads macOS Calendar, and the "EchoDiar" calendar is On My Mac when available, otherwise in your default account, e.g. iCloud, which syncs it. On Windows, click <strong>Grant Access</strong> in <strong>Settings &gt; Recording &gt; Calendar</strong>; if access is off, turn on EchoDiar in <strong>Windows Settings &gt; Privacy &amp; security &gt; Calendar</strong>.</li>
             <li>Tell the people you record. Onboarding and Settings &gt; General have a <strong>Copy consent message</strong> button.</li>
 </ul>
           </section>
@@ -158,8 +158,9 @@
 <ul class="list">
             <li>Record one app's audio or all system audio, plus your mic. Mic and system audio go to separate channels of one file.</li>
             <li>When an app's audio cannot be isolated, EchoDiar records all system audio and says so.</li>
-            <li>Start or stop with <kbd>Cmd+R</kbd> in the app, or <kbd>Cmd+Option+R</kbd> from any app. Pause with <kbd>Cmd+Shift+P</kbd>.</li>
-            <li>Live level meters while recording, and live captions with <strong>Transcribe while recording</strong>. The menu bar icon shows idle, recording, paused and processing.</li>
+            <li>On Mac, start or stop with <kbd>Cmd+R</kbd> in the app, or <kbd>Cmd+Option+R</kbd> from any app. Pause with <kbd>Cmd+Shift+P</kbd> in the app, or <kbd>Cmd+Option+P</kbd> from any app.</li>
+            <li>On Windows, start or stop with <kbd>Ctrl+R</kbd> in the app, or <kbd>Ctrl+Alt+R</kbd> from any app. Pause with <kbd>Ctrl+Shift+P</kbd> in the app, or <kbd>Ctrl+Alt+P</kbd> from any app.</li>
+            <li>Live level meters while recording, and live captions with <strong>Transcribe while recording</strong>. The menu bar icon on Mac shows idle, recording, paused and processing. On Windows, the notification area icon shows a red dot while recording and an orange badge while paused; a left click opens EchoDiar.</li>
             <li>Pick the microphone, and what happens when it disconnects, in <strong>Settings &gt; Recording</strong>.</li>
             <li>Each recording is compressed to AAC (64 kbps by default) once it is transcribed. A recording cut short by a crash is recovered and transcribed at next launch.</li>
 </ul>
@@ -168,7 +169,7 @@
           <section id="meetings" class="doc">
             <h2>Meeting detection</h2>
 <ul class="list">
-            <li>Offers to record when a meeting app starts using the mic: Zoom, Teams, Slack, Webex, FaceTime, Discord, Skype, and browsers for web calls such as Meet.</li>
+            <li>Offers to record when a meeting app starts using the mic: Zoom, Teams, Slack, Webex, Discord, Skype, FaceTime on Mac, and browsers for web calls such as Meet.</li>
             <li>Per app: <strong>Ask</strong>, <strong>Always record</strong> or <strong>Ignore</strong> (browsers: Ask or Ignore).</li>
             <li>A floating indicator shows while recording. Drag it, hide it while EchoDiar is in front, or attach it to the meeting window.</li>
             <li>Auto-stop: when the meeting app quits, the call goes quiet or the screen locks, the indicator asks before stopping, with a 15 s countdown.</li>
@@ -178,17 +179,17 @@
           <section id="calendar" class="doc">
             <h2>Calendar</h2>
 <ul class="list">
-            <li>Works with any account added to macOS Calendar: iCloud, Google, Outlook/Exchange, CalDAV. Set it up in <strong>Settings &gt; Recording &gt; Calendar</strong>, with the optional Calendars permission.</li>
+            <li>On Mac, works with any account added to macOS Calendar: iCloud, Google, Outlook/Exchange, CalDAV. On Windows, reads the calendars Windows shares with apps. Set it up in <strong>Settings &gt; Recording &gt; Calendar</strong>, with the optional Calendars permission.</li>
             <li><strong>When a meeting starts:</strong> <strong>Off</strong>, <strong>Ask</strong> (the default: the floating indicator offers <strong>Record</strong>, <strong>Join</strong> or <strong>Not now</strong>), <strong>Wait for the call</strong> (records the meeting app as soon as the call starts) or <strong>Record at start</strong> (records all system audio and the mic at the start time).</li>
-            <li>The automatic modes start without asking only for events you organize, accepted or answered Maybe to, and events without invitees in the EchoDiar calendar or a calendar On My Mac. Other events ask.</li>
+            <li>The automatic modes start without asking only for events you organize, accepted or answered Maybe to, and events without invitees in the EchoDiar calendar (or, on Mac, a calendar On My Mac). Other events ask.</li>
             <li>Choose the calendars to watch, and keep only events with a meeting link (Zoom, Google Meet, Microsoft Teams, Webex).</li>
             <li><strong>Stop when the event ends</strong>, plus a few minutes (10 by default). The indicator asks before stopping, with a 15 s countdown.</li>
             <li>A recording started from an event is named after it.</li>
-            <li>The <strong>Calendar</strong> page (toolbar button next to Settings) lists the meetings of the next 7 days (updated automatically) with <strong>Join</strong>, <strong>Record</strong> and <strong>Skip</strong>. The menu bar menu lists upcoming meetings.</li>
-            <li><strong>New Event…</strong> on the Calendar page creates a meeting: title, date, start and end, and an optional meeting link (https). It goes to an "EchoDiar" calendar (On My Mac when available, otherwise your default account, e.g. iCloud, which syncs those events like any other).</li>
+            <li>The <strong>Calendar</strong> page (toolbar button next to Settings) lists the meetings of the next 7 days (updated automatically) with <strong>Join</strong>, <strong>Record</strong> and <strong>Skip</strong>. The menu bar menu on Mac, and the notification area icon's menu on Windows, list upcoming meetings.</li>
+            <li><strong>New Event…</strong> on the Calendar page creates a meeting: title, date, start and end, and an optional meeting link (https). It goes to an "EchoDiar" calendar: on Mac, On My Mac when available, otherwise your default account, e.g. iCloud, which syncs those events like any other; on Windows, EchoDiar's own calendar, which no other app can add events to.</li>
             <li><strong>Repeat:</strong> <strong>None</strong>, <strong>Daily</strong>, <strong>Weekdays</strong>, <strong>Weekly</strong> or <strong>Monthly</strong>, with <strong>End Repeat</strong> never or on a date.</li>
             <li><strong>Edit…</strong> on events in the EchoDiar calendar changes them, and <strong>Delete Event…</strong> is in the editor. For a repeating event, choose <strong>This Event Only</strong> or <strong>This and Future Events</strong>; when <strong>Repeat</strong> or <strong>End Repeat</strong> changed, Save offers only <strong>This and Future Events</strong>.</li>
-            <li>Events in the EchoDiar calendar count even without a meeting link, and follow the same <strong>When a meeting starts</strong> mode. Don't share the EchoDiar calendar: anyone who can add events to it could start a recording.</li>
+            <li>Events in the EchoDiar calendar count even without a meeting link, and follow the same <strong>When a meeting starts</strong> mode. On Mac, don't share the EchoDiar calendar: anyone who can add events to it could start a recording.</li>
             <li>Works while EchoDiar runs, so turn on <strong>Launch at login</strong> in <strong>Settings &gt; General</strong>.</li>
 </ul>
           </section>
@@ -197,20 +198,23 @@
             <h2>Transcription</h2>
 <ul class="list">
             <li>Starts on its own: while you record with <strong>Transcribe while recording</strong>, otherwise after Stop. Turn it off with <strong>Transcribe automatically</strong> in <strong>Settings &gt; Recording</strong>.</li>
-            <li>Engines: WhisperKit, Parakeet, Qwen3-ASR, and Apple Speech on macOS 26. WhisperKit, Parakeet and Qwen3-ASR models are downloaded only when you click <strong>Download</strong> in <strong>Settings &gt; Transcription</strong>; macOS installs Apple Speech language assets the first time you use a language.</li>
+            <li>Engines on Mac: WhisperKit, Parakeet, Qwen3-ASR, and Apple Speech on macOS 26.</li>
+            <li>Engines on Windows: Whisper (whisper.cpp: Large v3 Turbo by default, Small, Base, Large v3, and PhoWhisper Medium, Vietnamese only) and Parakeet TDT 0.6B v3.</li>
+            <li>Models are downloaded only when you click <strong>Download</strong> in <strong>Settings &gt; Transcription</strong>. On Mac, macOS installs Apple Speech language assets the first time you use a language.</li>
             <li>Speakers: your mic is <strong>Me</strong>. Turn on <strong>Tell speakers apart</strong> in <strong>Settings &gt; Recording</strong> (or <strong>Settings &gt; Transcription &gt; Diarization model</strong>) to label each voice in the meeting audio: Speaker 1, Speaker 2… Set the number of other speakers there as a hint. Off (the default), the meeting audio is one speaker, Speaker 1, and cloud transcription is asked for no speaker labels.</li>
-            <li><strong>Transcribe while recording</strong> (on by default, WhisperKit and Parakeet): transcribes during the recording and shows live captions, so the transcript is ready seconds after Stop. Uses more CPU and memory while recording. Turn it off in <strong>Settings &gt; Transcription &gt; General</strong>. See <a href="#how-it-works">How it works</a>.</li>
+            <li><strong>Transcribe while recording</strong> (on by default, Whisper and Parakeet): transcribes during the recording and shows live captions, so the transcript is ready seconds after Stop. Uses more CPU and memory while recording. Turn it off in <strong>Settings &gt; Transcription &gt; General</strong>. See <a href="#how-it-works">How it works</a>.</li>
             <li>Re-transcribe a conversation with another engine or language.</li>
-            <li>Can wait while the Mac is hot or in Low Power Mode: what is left after Stop is done once the Mac cools down or leaves Low Power Mode.</li>
+            <li>On Mac, can wait while the Mac is hot or in Low Power Mode: what is left after Stop is done once the Mac cools down or leaves Low Power Mode.</li>
+            <li>On Windows, can wait while energy saver is on, with <strong>Wait while energy saver is on</strong> (on by default) in <strong>Settings &gt; Recording &gt; After recording</strong>: what is left after Stop is done once energy saver is off.</li>
 </ul>
           </section>
 
           <section id="how-it-works" class="doc">
             <h2>How it works</h2>
 <ul class="list">
-            <li>With <strong>Transcribe while recording</strong> on (the default), the recording is transcribed while it happens. Each channel, your mic and the meeting audio, is cut into chunks at pauses in speech, at most the model's window (30 s for Whisper); with no pause, the cut falls on the quietest moment.</li>
-            <li>Chunks wait in a queue that keeps up to about 10 minutes of audio, and one speech model, loaded once for the recording, transcribes them. Its lines are the live captions, <strong>Me</strong> and <strong>Others</strong>, and they become the saved transcript. WhisperKit and Parakeet only.</li>
-            <li>Nothing is lost: chunks held while the Mac is hot or in Low Power Mode (with <strong>Wait when the Mac is hot or in Low Power Mode</strong> on) stay in the queue and are transcribed once the Mac recovers. Chunks beyond the queue, chunks that fail, and chunks still held at Stop become gaps, transcribed from the recording after Stop.</li>
+            <li>With <strong>Transcribe while recording</strong> on (the default), the recording is transcribed while it happens. Each channel, your mic and the meeting audio, is cut into chunks at pauses in speech, at most 12 s; with no pause, the cut falls on the quietest moment. Each chunk becomes one line of the live transcript. While a chunk is still open, its text so far shows in grey and is refreshed every few seconds; the chunk's line replaces it. When decoding falls behind, on a slower computer, the status says how many seconds behind it is.</li>
+            <li>Chunks wait in a queue that keeps up to about 10 minutes of audio, and one speech model, loaded once for the recording, transcribes them. Its lines are the live captions, <strong>Me</strong> and <strong>Others</strong>, and they become the saved transcript. Whisper and Parakeet only.</li>
+            <li>Nothing is lost: chunks beyond the queue and chunks that fail become gaps, transcribed from the recording after Stop. On Mac, chunks held while the Mac is hot or in Low Power Mode (with <strong>Wait when the Mac is hot or in Low Power Mode</strong> on) stay in the queue and are transcribed once the Mac recovers; chunks still held at Stop become gaps too.</li>
 </ul>
 <pre class="diagram">+-----------+   +------------------------+   +-------------------------+
 | Recording |--&gt;| channel writer, 16 kHz |--&gt;| audio.caf               |
@@ -219,7 +223,7 @@
 +-----------+               v
              +-----------------------------+
              | speech chunker, per channel |
-             | ends on a pause, 30 s max   |
+             | ends on a pause, 12 s max   |
              +-----------------------------+
                             |
                             v
@@ -230,14 +234,14 @@
                             v                   transcribed from
              +-----------------------------+    audio.caf after Stop
              | speech model, loaded once   |
-             | WhisperKit or Parakeet      |
+             | Whisper or Parakeet         |
              +-----------------------------+
                             |
                             v
              segments --&gt; live captions (Me, Others)</pre>
 <ul class="list">
             <li>At Stop, the same model transcribes the last chunk and what is left in the queue, then fills the gaps. The transcript is written before the audio is compressed.</li>
-            <li>Speakers: with <strong>Tell speakers apart</strong> off (the default), the meeting audio is Speaker 1 and the transcript is ready about 1 s after Stop: 0.8 s for a 15-minute meeting, against about 95 s when the whole recording is transcribed after Stop. On, the speaker model runs after Stop and labels Speaker 1, Speaker 2…: about 10 s for the same meeting.</li>
+            <li>Speakers: with <strong>Tell speakers apart</strong> off (the default), the meeting audio is Speaker 1 and the transcript is ready about 1 s after Stop (measured on a Mac): 0.8 s for a 15-minute meeting, against about 95 s when the whole recording is transcribed after Stop. On, the speaker model runs after Stop and labels Speaker 1, Speaker 2…: about 10 s for the same meeting.</li>
             <li>The transcript is made from the uncompressed audio, which is slightly more accurate: 0.0 % word error rate on the same meeting, against about 1 % from the compressed file.</li>
 </ul>
 <pre class="diagram"> Stop
@@ -271,13 +275,14 @@
    v
  +------------------------------------------------+
  | compress to audio.m4a, audio.caf deleted       |
- | (moved to the Trash, not compressed, with      |
- | "Delete audio after transcription")            |
+ | (moved to the Trash, or the Recycle Bin on     |
+ | Windows, not compressed, with "Delete audio    |
+ | after transcription")                          |
  +------------------------------------------------+</pre>
 <ul class="list">
-            <li>Extra cost while recording, on top of recording alone: about 190 MB more memory for EchoDiar and about 20 s more CPU time per 15 minutes, about 2 % more of one core (debug build, averaged over a 15-minute meeting, MacBook Pro, M4 Pro). In a macOS virtual machine, which has no Neural Engine, the transcript is ready 3.1 s after Stop instead of 282 s.</li>
+            <li>Extra cost while recording, on top of recording alone, measured on a Mac: about 190 MB more memory for EchoDiar and about 20 s more CPU time per 15 minutes, about 2 % more of one core (debug build, averaged over a 15-minute meeting, MacBook Pro, M4 Pro). In a macOS virtual machine, which has no Neural Engine, the transcript is ready 3.1 s after Stop instead of 282 s.</li>
             <li>While a recording stays paused longer than <strong>Free unused models after</strong>, its model is freed; it loads again when you resume.</li>
-            <li>Local AI (summaries, chat and semantic search on this Mac) waits until Stop while a recording holds the speech model.</li>
+            <li>Local AI (summaries, chat and semantic search on this computer) waits until Stop while a recording holds the speech model.</li>
             <li>Other cases take the slower path:</li>
 </ul>
 <pre class="diagram"> Fallbacks
@@ -294,7 +299,7 @@
   +-- cloud engine or cloud speaker model waiting for your OK
   |     --&gt; compress, ask, then upload
   |
-  +-- Qwen3-ASR or Apple Speech
+  +-- Qwen3-ASR or Apple Speech (Mac)
   |     --&gt; whole recording after Stop
   |
   +-- engine changed, a language the engine cannot transcribe,
@@ -304,7 +309,8 @@
   |         path: each chunk carries its own language)
   |
   +-- Mac hot or in Low Power Mode, with "Wait when the Mac
-  |   is hot or in Low Power Mode" on
+  |   is hot or in Low Power Mode" on (on Windows: energy
+  |   saver on, with "Wait while energy saver is on" on)
   |     |
   |     +-- no gaps, speakers off
   |     |     --&gt; transcript built while recording saved at once,
@@ -314,7 +320,8 @@
   |           or no transcript built while recording
   |           --&gt; compress first; gaps, speakers and the transcript
   |               wait until the Mac cools down or leaves Low
-  |               Power Mode
+  |               Power Mode (on Windows: until energy saver
+  |               is off)
   |
   +-- crash
   |     --&gt; the recovered audio.caf is compressed, then the
@@ -328,9 +335,9 @@
             <h2>Cloud transcription</h2>
 <ul class="list">
             <li>Optional: OpenAI, Groq, Mistral, Gemini, ElevenLabs, Deepgram, AssemblyAI or a custom OpenAI-compatible endpoint. Set up ElevenLabs, Deepgram and AssemblyAI in <strong>Settings &gt; Transcription &gt; Transcription model</strong>, the others in <strong>Settings &gt; AI</strong>.</li>
-            <li>The first run for each provider and address asks before any audio leaves your Mac. A changed URL asks again.</li>
+            <li>The first run for each provider and address asks before any audio leaves your computer. A changed URL asks again.</li>
             <li>The mic and system channels are uploaded, and billed, separately.</li>
-            <li>API keys are stored in the Keychain.</li>
+            <li>API keys are stored in the Keychain on Mac, in Credential Manager on Windows.</li>
 </ul>
           </section>
 
@@ -338,21 +345,21 @@
             <h2>Transcript &amp; playback</h2>
 <ul class="list">
             <li>Click a line to hear it. <kbd>Space</kbd> plays or pauses, <kbd>Esc</kbd> goes back.</li>
-            <li>Edit the title, rename speakers, copy the transcript or reveal the folder in Finder.</li>
+            <li>Edit the title, rename speakers, copy the transcript or reveal the folder in Finder on Mac, File Explorer on Windows.</li>
 </ul>
           </section>
 
           <section id="ai" class="doc">
             <h2>AI summaries &amp; chat</h2>
 <ul class="list">
-            <li>Open the AI panel with <kbd>Cmd+I</kbd>. Generate a summary or ask questions about a conversation.</li>
+            <li>Open the AI panel with <kbd>Cmd+I</kbd> on Mac, <kbd>Ctrl+I</kbd> on Windows. Generate a summary or ask questions about a conversation.</li>
             <li>Answers cite <code>[mm:ss]</code> timestamps. Click one to jump to that moment in the transcript and recording.</li>
             <li>Response language, for summaries and answers: automatic (the transcript's language for summaries, the question's for answers), English, French or Vietnamese.</li>
-            <li><strong>On-device:</strong> MLX models, and Apple Foundation Models on macOS 26.</li>
-            <li><strong>Local servers:</strong> LM Studio, Ollama, Jan, llama.cpp, vLLM. <strong>Scan</strong> finds the ones running on this Mac.</li>
-            <li><strong>Cloud APIs:</strong> OpenAI, Anthropic, xAI, Gemini, Mistral, Azure OpenAI, OpenRouter, Groq, DeepSeek or a custom endpoint. Keys go in the Keychain.</li>
+            <li><strong>On-device:</strong> on Mac, MLX models, and Apple Foundation Models on macOS 26. On Windows, GGUF models (Qwen3.5 2B, 4B or 9B, Gemma 4 E2B or E4B), and Phi Silica on Copilot+ PCs.</li>
+            <li><strong>Local servers:</strong> LM Studio, Ollama, Jan, llama.cpp, vLLM, plus Foundry Local on Windows. <strong>Scan</strong> finds the ones running on this computer.</li>
+            <li><strong>Cloud APIs:</strong> OpenAI, Anthropic, xAI, Gemini, Mistral, Azure OpenAI, OpenRouter, Groq, DeepSeek or a custom endpoint. Keys go in the Keychain on Mac, in Credential Manager on Windows.</li>
             <li><strong>Subscription CLIs:</strong> Claude Code, Codex, OpenCode or Gemini CLI, with your own login.</li>
-            <li><strong>Copy as prompt</strong> copies the transcript and your question, ready to paste into any chat app.</li>
+            <li><strong>Copy as prompt</strong> copies the transcript and your question, ready to paste into any chat app. On Windows, <kbd>Ctrl+Shift+C</kbd> does it from the Summary or Chat tab.</li>
 </ul>
           </section>
 
@@ -360,18 +367,18 @@
             <h2>Library &amp; search</h2>
 <ul class="list">
             <li>Conversations grouped by day, with their size on disk.</li>
-            <li>Rename, reveal in Finder or move to the Trash.</li>
-            <li>Search titles and transcripts with <kbd>Cmd+F</kbd>.</li>
+            <li>Rename, reveal in Finder (Explorer on Windows) or move to the Trash (the Recycle Bin on Windows).</li>
+            <li>Search titles and transcripts with <kbd>Cmd+F</kbd> on Mac, <kbd>Ctrl+F</kbd> on Windows.</li>
 </ul>
           </section>
 
           <section id="storage" class="doc">
             <h2>Storage</h2>
 <ul class="list">
-            <li>Data lives in <code>~/Library/Application Support/EchoDiar</code>. <strong>Settings &gt; Storage</strong> shows the space used.</li>
-            <li>Auto-delete: once a day, moves transcribed conversations older than an age you set to the Trash, whole or audio only.</li>
+            <li>Data lives in <code>~/Library/Application Support/EchoDiar</code> on Mac, <code>%LOCALAPPDATA%\EchoDiar</code> on Windows, with the same layout. <strong>Settings &gt; Storage</strong> shows the space used.</li>
+            <li>Auto-delete: once a day, moves transcribed conversations older than an age you set to the Trash (the Recycle Bin on Windows), whole or audio only.</li>
             <li>The uncompressed audio (<code>audio.caf</code>) is kept until the transcript is written, then compressed to <code>audio.m4a</code> and deleted. If transcription can't start right away, the audio is compressed first.</li>
-            <li>Optionally delete the audio once a transcription succeeds: with <strong>Delete audio after transcription</strong>, a new recording's uncompressed audio is moved to the Trash instead of being compressed. The transcript, summary and chat stay.</li>
+            <li>Optionally delete the audio once a transcription succeeds: with <strong>Delete audio after transcription</strong>, a new recording's uncompressed audio is moved to the Trash (the Recycle Bin on Windows) instead of being compressed. The transcript, summary and chat stay.</li>
             <li>Choose the compression bitrate, or keep the uncompressed audio too.</li>
 </ul>
           </section>
@@ -379,8 +386,8 @@
           <section id="settings" class="doc">
             <h2>Settings &amp; shortcuts</h2>
 <ul class="list">
-            <li>Open with <kbd>Cmd+,</kbd>. Sections: General, Recording, Transcription, AI, Storage, Shortcuts, About.</li>
-            <li>Change the global record shortcut, and view the app's shortcuts, in <strong>Settings &gt; Shortcuts</strong>.</li>
+            <li>Open with <kbd>Cmd+,</kbd> on Mac, <kbd>Ctrl+,</kbd> on Windows. Sections: General, Recording, Transcription, AI, RAG, Storage, Shortcuts, About, Acknowledgements.</li>
+            <li>Change the global record and pause shortcuts, and view the app's shortcuts, in <strong>Settings &gt; Shortcuts</strong>.</li>
             <li>Launch at login and the floating indicator are in <strong>Settings &gt; General</strong>.</li>
             <li>Default language, <strong>Remember last record language</strong> (off by default: keeps the language picked in the Record button's menu for the next recordings), <strong>Transcribe while recording</strong> and <strong>Free unused models after</strong> are in <strong>Settings &gt; Transcription &gt; General</strong>. <strong>Tell speakers apart</strong> is in both <strong>Settings &gt; Recording</strong> and <strong>Settings &gt; Transcription &gt; Diarization model</strong>.</li>
 </ul>
