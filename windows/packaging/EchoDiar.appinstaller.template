@@ -2,7 +2,7 @@
 <!--
   App Installer feed for EchoDiar (Windows). Rendered by .github/workflows/windows-release.yml (and by the local
   test feed script windows/scripts/serve-update.sh), which replace each placeholder: the 4-part package version
-  (tag vX.Y.Z, windows-vX.Y.Z or windows-vX.Y.Z-dev gives X.Y.Z.0), the signing certificate subject (= the Identity
+  (tag vX.Y.Z or windows-vX.Y.Z-dev gives X.Y.Z.0), the signing certificate subject (= the Identity
   Publisher of Package.appxmanifest), the address of this file itself (App Installer always reads the feed from
   there; on the dev channel it is the prerelease's own asset) and the address of the .msixbundle (the GitHub release
   asset of the tag). Never edit a rendered copy by hand.

@@ -154,14 +154,15 @@ First release: the current `MARKETING_VERSION` (0.1.0) ships as-is, without a bu
    scripts/ship.sh
    ```
 
-   After its checks, `ship.sh` runs four steps:
+   After its checks, `ship.sh` runs five steps:
 
    1. `scripts/build-and-notarize.sh`: the macOS zip and DMG.
    2. `scripts/publish-release.sh --yes <zip>`: the tag `vX.Y.Z` and the GitHub Release with the macOS assets. The tag push starts `windows-release.yml` (release channel).
    3. `scripts/publish-appcast.sh <zip>`: the appcast on `main`. macOS is fully shipped here.
    4. `windows/scripts/release.sh --attach vX.Y.Z --yes`: approves the tag's Windows run, attaches its four files to the release and commits the feed on `main` ([§3.1](#31-per-release)). It takes about 30-60 min (CI build and approval), so run `ship.sh` where it can keep running.
+   5. `windows/scripts/release.sh --store vX.Y.Z --yes`: fetches the Microsoft Store bundle of the same run and either confirms the CI submission or prints the Partner Center upload steps ([§3.3](#33-microsoft-store)).
 
-   When step 4 fails, macOS stays shipped: finish Windows with `windows/scripts/release.sh --attach vX.Y.Z --yes` (or `/cf-ship`), see [§3.2](#32-troubleshooting-and-rollback). To ship macOS without step 4, see [Ship macOS only by hand](#ship-macos-only-by-hand).
+   When step 4 fails, macOS stays shipped: finish Windows with `windows/scripts/release.sh --attach vX.Y.Z --yes` (or `/cf-ship`), see [§3.2](#32-troubleshooting-and-rollback). To ship macOS without step 4, see [Ship macOS only by hand](#ship-macos-only-by-hand). When step 5 fails, macOS and the self-signed Windows release stay shipped: run `windows/scripts/release.sh --store vX.Y.Z --yes` again ([§3.3](#33-microsoft-store)).
 
 Outputs land in `release/export/` (gitignored): `EchoDiar.app`, `EchoDiar-X.Y.Z.zip`, `EchoDiar-X.Y.Z.dmg` and the release notes `EchoDiar-X.Y.Z.md`. The Windows files land in `release/windows/vX.Y.Z/` (gitignored).
 
@@ -171,8 +172,9 @@ Outputs land in `release/export/` (gitignored): `EchoDiar.app`, `EchoDiar-X.Y.Z.
 - `scripts/build-and-notarize.sh`: checks Xcode 27+, exactly one Developer ID Application identity of team `86H6CNLN4C` (it signs by that identity's hash), a non-empty `SUPublicEDKey`, an https `SUFeedURL` and the notary profile before anything slow; runs `xcodegen generate`; archives the Release build with `ARCHS=arm64` to `release/EchoDiar.xcarchive` (default DerivedData, so `publish-appcast.sh` finds the Sparkle tools); checks the arm64-only binary, signing, hardened runtime, no `get-task-allow`, macOS 15.0 minimum, Sparkle.framework and the compiled app icon; re-signs nested code inside-out with Developer ID (Sparkle's XPC services, Autoupdate and Updater.app, the SPM resource bundles such as the MLX metallib bundle and the WhisperKit, FluidAudio and speech-swift bundles, frameworks and dylibs), then the app with its entitlements, and checks that the app and every nested item carry `TeamIdentifier=86H6CNLN4C`; prints the embedded Sparkle version; notarizes and staples the app, zips it; builds, signs, notarizes and staples the DMG.
 - `scripts/publish-release.sh [--yes] [<zip>]`: reads the version from the committed `project.yml` (the zip defaults to `release/export/EchoDiar-<version>.zip`), requires branch `main`, `gh` auth, `origin` = `github.com/dinhanhthi/EchoDiar`, `HEAD` already on `origin/main`, a new tag and a `## [X.Y.Z]` section in `CHANGELOG.md`; writes that section, followed by the Windows install block `windows/packaging/release-notes.md` (read from `HEAD`), to `release/export/EchoDiar-X.Y.Z.md`; creates and pushes tag `vX.Y.Z` (which starts `windows-release.yml`); creates the GitHub Release with the zip and uploads the DMG.
 - `scripts/publish-appcast.sh <zip>`: needs a zip named `EchoDiar-X.Y.Z.zip` and verifies it before signing anything: same SHA-256 as `release/export/EchoDiar-X.Y.Z.zip` when that file exists and is not the zip given, and always (after unzipping to a temp dir) team `86H6CNLN4C` (`codesign -dvvv`), `codesign --verify --deep --strict`, "Notarized Developer ID" (`spctl -a -t exec -vv`) and `CFBundleShortVersionString` == `X.Y.Z`. It then runs Sparkle's `generate_appcast --account EchoDiar --maximum-versions 0 --maximum-deltas 0` (keeps every past item, no deltas) over a fresh `release/appcast-archives/` holding the new zip plus the existing `appcast.xml`, with the release asset URL as download prefix and `CHANGELOG.md` on `main` as the full release notes link; checks that the new item's enclosure URL is `https://github.com/dinhanhthi/EchoDiar/releases/download/vX.Y.Z/EchoDiar-X.Y.Z.zip` and carries a `sparkle:edSignature`, prints the Sparkle version of the tools, copies the result to the repo root, commits `chore(release): appcast vX.Y.Z` and pushes; the Pages workflow deploys it in about a minute.
-- `scripts/ship.sh`: before building, refuses a branch other than `main`, `HEAD` != `origin/main` (after `git fetch origin main`: only pushed commits ship), `gh` not authenticated, uncommitted changes to tracked files, no `## [X.Y.Z]` section in `CHANGELOG.md`, an existing tag `vX.Y.Z` (local or on origin), or a Windows release channel that `windows/scripts/release.sh --preflight` rejects ([§3.0](#30-one-time-setup)); then runs the three scripts above in order (it aborts if `HEAD` changes during the build), and last `windows/scripts/release.sh --attach vX.Y.Z --yes`. When that step fails, it says that macOS is fully shipped and how to finish Windows, and exits non-zero.
+- `scripts/ship.sh`: before building, refuses a branch other than `main`, `HEAD` != `origin/main` (after `git fetch origin main`: only pushed commits ship), `gh` not authenticated, uncommitted changes to tracked files, no `## [X.Y.Z]` section in `CHANGELOG.md`, an existing tag `vX.Y.Z` (local or on origin), or a Windows release channel that `windows/scripts/release.sh --preflight` rejects ([§3.0](#30-one-time-setup)); then runs the three scripts above in order (it aborts if `HEAD` changes during the build), then `windows/scripts/release.sh --attach vX.Y.Z --yes`, and last `windows/scripts/release.sh --store vX.Y.Z --yes`. When one of the Windows steps fails, it says that macOS (and, for the Store step, the self-signed Windows release) is fully shipped and how to finish, and exits non-zero.
 - `windows/scripts/release.sh --attach vX.Y.Z [--yes]`: approves the release channel run of the tag, checks its files, uploads the ones the release lacks and commits the feed ([§3.1](#31-per-release)). Safe to re-run.
+- `windows/scripts/release.sh --store vX.Y.Z [--yes]`: approves the tag's CI Store publish when it waits, then downloads and checks the Microsoft Store bundle of that run and says whether CI submitted it or what to upload by hand ([§3.3](#33-microsoft-store)). Safe to re-run.
 
 Verify a release:
 
@@ -224,13 +226,12 @@ Reverting the appcast stops offering the update to installed apps. Users who alr
 
 Unlike the macOS app, the Windows app ([windows/README.md](../windows/README.md)) is built and signed on GitHub Actions by `.github/workflows/windows-release.yml`. The release's tag `vX.Y.Z`, which `publish-release.sh` pushes (`ship.sh` step 2), starts it. `ship.sh` step 4, `windows/scripts/release.sh --attach vX.Y.Z --yes`, then approves that run, checks its files on the Mac, attaches them to the same GitHub Release and commits the feed `windows/EchoDiar.appinstaller` on `main`. The Pages workflow publishes the feed at `https://ed.dinhanhthi.com/windows/EchoDiar.appinstaller`, and installed apps update through App Installer from there.
 
-The workflow runs four jobs: `prepare` (tag, channel, version, Publisher; it fails fast on a bad tag) → `package` (x64 and arm64: unsigned Release MSIX packages; no environment and no secret, because this job restores and builds third-party code) → `sign` (the only job with an environment and a PFX; it builds nothing: it signs both packages, bundles them, signs the bundle and exports the public certificate) → `assemble` (no environment: it stages the signed bundle and that certificate, renders the feed and writes the checksums). Its result is the artifact `EchoDiar-<tag>`, kept 14 days.
+The workflow runs four jobs: `prepare` (tag, channel, version, Publisher; it fails fast on a bad tag) → `package` (x64 and arm64: unsigned Release MSIX packages; no environment and no secret, because this job restores and builds third-party code) → `sign` (the only job with an environment and a PFX; it builds nothing: it signs both packages, bundles them, signs the bundle and exports the public certificate) → `assemble` (no environment: it stages the signed bundle and that certificate, renders the feed and writes the checksums). Its result is the artifact `EchoDiar-<tag>`, kept 14 days. When the Microsoft Store variables are set, two more jobs build the Store bundle (`store`, no environment and no secret) and, optionally, submit it (`store-publish`), see [§3.3](#33-microsoft-store).
 
-There are three channels:
+There are two channels:
 
 - **release**: the tag `vX.Y.Z` of the macOS release. Signed in the environment `windows-release-signing` (required reviewer) with the self-signed release certificate (§3.0), Publisher = the repository variable `WINDOWS_PUBLIC_PUBLISHER`, public certificate `EchoDiar.cer`. `prepare` fails when that variable is empty or `CN=EchoDiar Dev`, or when the tag is not the `MARKETING_VERSION` of `project.yml` at the tag's commit. This is the build users get, from the release notes, the website and the feed.
 - **dev**: tag `windows-vX.Y.Z-dev`, from `release.sh --dev` on any branch. Signed in `windows-dev-signing` with the self-signed dev certificate (Publisher `CN=EchoDiar Dev`, public certificate `EchoDiarDev.cer`), through the same jobs as the release channel. For testing only: published, if at all, as a prerelease, and its feed is never deployed. App Installer always reads a feed from the feed's own Uri, so a dev feed's Uri is its prerelease's own `EchoDiar.appinstaller` asset: with `EchoDiarDev.cer` imported into Local Machine > Trusted People, opening that file installs the prerelease, and its installs check that same prerelease feed for updates, which never offers a newer version. Test updates with a local feed (`serve-update.sh`, §3.1).
-- **public**: tag `windows-vX.Y.Z`, signed with Trusted Signing. Kept for next year: its signing step is a placeholder that throws (§3.0, Trusted Signing). Nothing starts it: `release.sh` has no mode for it.
 
 Each release `vX.Y.Z` carries, next to the macOS DMG and zip, four Windows files with fixed names:
 
@@ -243,7 +244,7 @@ Users install with Windows' own dialogs, as the website shows step by step (`htt
 
 Never link these files through `releases/latest/download/`: while a release is shipping, Latest is the new release before its Windows files are attached. The website takes the tag from the live feed, and `README.md` links the docs page.
 
-The packages are not signed by a public certificate authority, so the certificate import shows Windows' own prompts: Open File - Security Warning when the `.cer` opens, "This CA Root certificate is not trusted..." in the Certificate window, and UAC for "Windows host process (Rundll32)", verified publisher Microsoft Windows, at Local Machine. There is no SmartScreen prompt, since no exe is downloaded. The release notes (`windows/packaging/release-notes.md`), the website (`https://ed.dinhanhthi.com/docs.html#windows-warnings`) and Settings > About in the app explain why. Azure Artifact Signing (§3.0, Trusted Signing) is the planned fix.
+The packages are not signed by a public certificate authority, so the certificate import shows Windows' own prompts: Open File - Security Warning when the `.cer` opens, "This CA Root certificate is not trusted..." in the Certificate window, and UAC for "Windows host process (Rundll32)", verified publisher Microsoft Windows, at Local Machine. There is no SmartScreen prompt, since no exe is downloaded. The release notes (`windows/packaging/release-notes.md`), the website (`https://ed.dinhanhthi.com/docs.html#windows-warnings`) and Settings > About in the app explain why. The Microsoft Store ([§3.3](#33-microsoft-store)) is the fix: the Store signs its packages.
 
 ### §3.0 One-time setup
 
@@ -307,7 +308,7 @@ Then check that `windows/scripts/release.sh --preflight` ends with "Preflight OK
 
 Back up the PFX and its password offline (for example in a password manager and on an offline drive). Losing the PFX, or its expiry after 5 years, means a new certificate: every user must import the new `EchoDiar.cer` once (the same steps as the install) to trust it, since App Installer refuses an update signed by a certificate the PC does not trust. With the same subject, the app and its updates stay the same package family.
 
-The Publisher (`WINDOWS_PUBLIC_PUBLISHER`, the certificate's subject) is part of the package family name: keep it until the switch to Azure Artifact Signing. A different Publisher is a different app, which installed copies never update to. The Artifact Signing certificate will have its own subject, so at that switch users reinstall once (uninstall, then open the new feed); their library in `%LOCALAPPDATA%\EchoDiar` stays.
+The Publisher (`WINDOWS_PUBLIC_PUBLISHER`, the certificate's subject) is part of the package family name: keep it for as long as the self-signed channel ships. A different Publisher is a different app, which installed copies never update to.
 
 The release Publisher also differs from `CN=EchoDiar Dev`: the first release install is a new app next to any dev install, and a dev install never updates to it. Uninstall dev builds (the library in `%LOCALAPPDATA%\EchoDiar` stays):
 
@@ -324,34 +325,12 @@ The secrets `WINDOWS_DEV_CERT_PFX` (base64 PFX) and `WINDOWS_DEV_CERT_PASSWORD` 
 Repository secrets reach every workflow run of the repository, so both certificates live in GitHub Environments instead (Settings > Environments and Settings > Rules):
 
 1. The tag rulesets "windows release tags" (`refs/tags/windows-v*`, set up 2026-10-24) and "release tags" (`refs/tags/v*`, from the release certificate commands above), both active: they block creating, updating and deleting these tags for everyone but the repository admin role (bypass always), so only you can start a release run; `publish-release.sh` and `release.sh` keep working for you.
-2. The environment `windows-dev-signing`, "Deployment branches and tags" = selected: the tags `windows-v*` and the branches `main`, `plan/2026-10-21-windows-port`, `plan/2026-10-25-windows-macos-parity`, `plan/2026-10-28-windows-public-release` and `plan/2026-10-28-windows-gui-install`. It holds `WINDOWS_DEV_CERT_PFX` and `WINDOWS_DEV_CERT_PASSWORD` as environment secrets; there are no repository secrets of that name. The jobs that read the dev certificate name it: `package` in `windows.yml` (except on pull requests, which are not allowed by the policy and build unsigned) and `sign` in `windows-release.yml` (dev channel).
+2. The environment `windows-dev-signing`, "Deployment branches and tags" = selected: the tags `windows-v*` and the branches `main`, `plan/2026-10-21-windows-port`, `plan/2026-10-25-windows-macos-parity`, `plan/2026-10-28-windows-public-release`, `plan/2026-10-28-windows-gui-install` and `plan/2026-10-29-windows-microsoft-store`. It holds `WINDOWS_DEV_CERT_PFX` and `WINDOWS_DEV_CERT_PASSWORD` as environment secrets; there are no repository secrets of that name. The jobs that read the dev certificate name it: `package` in `windows.yml` (except on pull requests, which are not allowed by the policy and build unsigned) and `sign` in `windows-release.yml` (dev channel).
 3. The environment `windows-release-signing`: required reviewer = you, `prevent_self_review` off, deployments from the tags `v*` only. It holds `WINDOWS_RELEASE_CERT_PFX` and `WINDOWS_RELEASE_CERT_PASSWORD`. Only `sign` in `windows-release.yml` (release channel) names it, and that job runs only the checkout, the artifact download, `signtool` and `makeappx`: the release key never reaches a job that restores or builds third-party code. Every release run waits there for an approval, which `--attach` gives to that run only (§3.1).
 
 Consequences: `windows.yml` runs on pushes to `main` and the plan branches above only, and a `workflow_dispatch` run on any other branch fails at the environment check of `package`. To build another branch, add it to `on.push.branches` and to the environment (Settings > Environments > `windows-dev-signing` > Deployment branches and tags, or `gh api -X POST repos/dinhanhthi/EchoDiar/environments/windows-dev-signing/deployment-branch-policies -f name='<branch>' -f type=branch`). Each signing job shows up as a deployment of its environment.
 
 Rotate the dev certificate as in [windows/README.md, Dev signing certificate](../windows/README.md#dev-signing-certificate-one-time): it sets the two environment secrets (`gh secret set ... --env windows-dev-signing`, value on stdin). Check with `gh secret list --env windows-dev-signing`.
-
-#### Trusted Signing (public channel, next year)
-
-Not used yet. Microsoft's publicly trusted signing service (Trusted Signing, now Azure Artifact Signing) accepts individuals only in the US and Canada for now, so the release channel signs with the self-signed certificate above. These steps stay here for when it becomes available. A publicly trusted signature on the packages removes the certificate import (and its UAC prompt), lets Smart App Control run the app, and closes the accepted risk of §3.2.
-
-1. In Azure, create a Trusted Signing account, complete the identity validation and create a Public Trust certificate profile.
-2. Create an app registration (service principal) with a client secret, and give it the Trusted Signing Certificate Profile Signer role on the account.
-3. Store its values as repository secrets (`gh secret set` prompts for each value, so it never lands in shell history), and the certificate subject as a variable:
-
-   ```sh
-   for name in AZURE_TENANT_ID AZURE_CLIENT_ID AZURE_CLIENT_SECRET \
-               TRUSTED_SIGNING_ENDPOINT TRUSTED_SIGNING_ACCOUNT TRUSTED_SIGNING_CERT_PROFILE; do
-     gh secret set "$name" --repo dinhanhthi/EchoDiar
-   done
-   gh variable set WINDOWS_PUBLIC_PUBLISHER --repo dinhanhthi/EchoDiar --body '<certificate subject, e.g. CN=..., O=..., C=...>'
-   ```
-
-   `TRUSTED_SIGNING_ENDPOINT` is the account's region endpoint (`https://<region>.codesigning.azure.net/`). `WINDOWS_PUBLIC_PUBLISHER` must be exactly the subject of the Trusted Signing certificate: the workflow writes it into the manifest `Identity Publisher`, the bundle and the `.appinstaller`, and refuses `CN=EchoDiar Dev`. The release channel reads the same variable: changing it changes the Publisher of every later release, so users reinstall once (§3.0, Release certificate).
-
-4. **Before the first public release, implement the signing step.** The Trusted Signing step of `windows-release.yml` is a placeholder that throws. Without the secrets above the run fails at once (the `prepare` job names the missing ones); with them it stops at that step. Replace it with real Trusted Signing (signtool with the Trusted Signing dlib, or Microsoft's signing action) for both packages and the bundle, and switch the release channel, which `/cf-ship` ships, to it.
-
-Also still to do then: an environment `windows-public-signing` restricted to the `windows-v*` tags with a required reviewer, holding the Trusted Signing secrets, and named by the job that signs with Trusted Signing (`windows-release.yml` has a comment where). Create the environment first: a job naming a missing environment creates it, unprotected. Prefer OpenID Connect (a federated credential on the app registration, `azure/login` with `id-token: write`) over `AZURE_CLIENT_SECRET`, so no long-lived secret is stored at all.
 
 ### §3.1 Per release
 
@@ -378,7 +357,7 @@ Releases made before the Windows app (`v1.1.0` and earlier) have no `windows/src
 
 It is idempotent: when it fails, fix the cause and run the same command again, and it carries on from where the release stands. `/cf-ship` runs it once per `/cf-ship` run for the latest release tag only (§3.2).
 
-`windows/scripts/release.sh --preflight` is read-only: it checks the environment `windows-release-signing` (exists, lists you as required reviewer, `prevent_self_review` off, deployment policy exactly the tags `v*`), its two secrets (names only), `WINDOWS_PUBLIC_PUBLISHER` (set, not `CN=EchoDiar Dev`), `windows-release.yml` and `windows/packaging/release-cert.sha256` at `HEAD`, and warns when no tag ruleset covers `refs/tags/v*`. It stops at the first failure with a pointer to §3.0. `ship.sh` and `/cf-ship` run it before building.
+`windows/scripts/release.sh --preflight` is read-only: it checks the environment `windows-release-signing` (exists, lists you as required reviewer, `prevent_self_review` off, deployment policy exactly the tags `v*`), its two secrets (names only), `WINDOWS_PUBLIC_PUBLISHER` (set, not `CN=EchoDiar Dev`), `windows-release.yml` and `windows/packaging/release-cert.sha256` at `HEAD`, and warns when no tag ruleset covers `refs/tags/v*` or when the Microsoft Store variables or secrets are missing ([§3.3](#33-microsoft-store)). It stops at the first failure with a pointer to §3.0. `ship.sh` and `/cf-ship` run it before building.
 
 #### Dev builds and prereleases
 
@@ -415,7 +394,7 @@ To offer the next version, stop the script, replace the package with a higher ve
 ### §3.2 Troubleshooting and rollback
 
 - **`--preflight` fails** (`ship.sh` and `/cf-ship` stop before building): its `FAIL` line names the missing piece. Set it up as in §3.0.
-- **`prepare` fails**: on the release channel, `WINDOWS_PUBLIC_PUBLISHER` is unset or the dev subject, or the tag is not `MARKETING_VERSION` at its commit (only possible for a tag pushed by hand). On the public channel, its error names the missing Trusted Signing secrets or variable; with them set, the run stops at the placeholder signing step.
+- **`prepare` fails**: on the release channel, `WINDOWS_PUBLIC_PUBLISHER` is unset or the dev subject, or the tag is not `MARKETING_VERSION` at its commit (only possible for a tag pushed by hand).
 - **Approval pending**: nothing can be approved until both `package` legs finish (about 20 min); `--attach` then approves on its own. **Approval not possible** (`cannot approve the windows-release-signing deployment: approve it at <url>`): you are not a required reviewer, `prevent_self_review` is on, or the API call failed. Approve the run in the browser (the run's page > Review deployments > `windows-release-signing` > Approve and deploy) within the 30 minutes `--attach` waits, or approve it later and run `--attach` again: the run keeps waiting. Then fix the environment (`--preflight` names what is wrong).
 - **The run failed**: `--attach` reruns its failed jobs once, approves the new attempt, and stops if it fails again, with `gh run view <id> --repo dinhanhthi/EchoDiar --log-failed`. A transient failure (runner, network, package restore): run `--attach` again, which reruns once more. A failure in the code or the workflow: the tag pins both, so every rerun of `vX.Y.Z` fails the same way. Fix it on `main` and ship a patch version (below).
 - **No run for the tag**: `--attach` dispatches the release channel after 5 minutes. If even that run does not show up, check the Actions tab: dispatch needs `windows-release.yml` on `main`.
@@ -429,7 +408,7 @@ To offer the next version, stop the script, replace the package with a higher ve
   ```
 
 - **Defender flags a release file**: on 2026-10-28, on a real x64 PC, Defender quarantined `EchoDiar-Setup.exe`, the unsigned installer of the dev prerelease `windows-v0.0.911-dev`, as `Trojan:Win32/Bearfoos.B!ml` (a cloud machine-learning verdict), which is why it was removed. If Defender ever flags a release file, submit it at the Microsoft WDSI file submission portal (Microsoft Security Intelligence, "Submit a file"), as a software developer reporting an incorrect detection.
-- **Smart App Control** may block the installed app: it is not signed by a public certificate authority and loads native DLLs. Nothing fixes that before a publicly trusted signature (§3.0, Trusted Signing), and QA cannot test it (once off, Smart App Control cannot be turned back on in the VM). The website says so (`https://ed.dinhanhthi.com/docs.html#windows-warnings`).
+- **Smart App Control** may block the installed app: it is not signed by a public certificate authority and loads native DLLs. Nothing fixes that for the self-signed copy (the Store copy is signed by the Store, [§3.3](#33-microsoft-store)), and QA cannot test it (once off, Smart App Control cannot be turned back on in the VM). The website says so (`https://ed.dinhanhthi.com/docs.html#windows-warnings`).
 - **VCLibs**: the package depends on `Microsoft.VCLibs.140.00.UWPDesktop` 14.0.33728.0 or later, and nothing installs it, so a PC without a recent enough one gets a dependency error from App Installer. This is a known gap: `https://aka.ms/Microsoft.VCLibs.x64.14.00.Desktop.appx` serves 14.0.33321.0, below that minimum, so it is no fix. The website gives a general tip (`https://ed.dinhanhthi.com/docs.html#windows-warnings`): Microsoft Store > Library > Get updates, then open `EchoDiar.appinstaller` again. See also the notes in [windows/README.md](../windows/README.md#testing-in-a-windows-vm).
 - **Updates not offered**: check the feed is live with a higher Version (curl above), the copy was installed from the `.appinstaller` (a sideloaded `.msix` never updates; Settings > About says so) and has the same Publisher.
 
@@ -441,7 +420,7 @@ A Windows build that is broken for a tagged version is fixed by shipping a patch
 
 #### Accepted risks
 
-One weakness of the self-signed release is known and was accepted on 2026-10-28. A publicly trusted signature on the packages with Azure Artifact Signing (§3.0, Trusted Signing) closes it.
+One weakness of the self-signed release is known and was accepted on 2026-10-28. The Microsoft Store ([§3.3](#33-microsoft-store)), which signs its packages, closes it once the self-signed channel is retired.
 
 - **Users trust a self-signed certificate by hand.** Windows cannot tell `EchoDiar.cer` from any other self-signed certificate: anyone who can get a user to import another `.cer` into Trusted People and open another feed can install a package signed by it. Mitigations: the install steps take both files from an official EchoDiar release only, users can check `EchoDiar.cer` against `SHA256SUMS-windows.txt` (optional SHA-256 check), and for what we publish, `release.sh` checks that the certificate and the signers of the bundle and of both inner packages have the pinned SHA-256 (§3.0).
 
@@ -479,4 +458,91 @@ done
 
 Then drop the Windows block from the release notes as in [Ship macOS only by hand](#ship-macos-only-by-hand). Revert first: the previous feed points at the previous release's `.msixbundle`, so keep that release. Reverting the first feed removes it, and the website hides the Windows download again. App Installer does not downgrade: users who already updated keep that version; ship a fixed, higher version to move them on. While `vX.Y.Z` is the latest release, the next `/cf-ship` makes its one `--attach` attempt for it and would attach that build again: ship the fix with the manual steps of §1 (`scripts/ship.sh` never goes back to an older tag), or roll back the whole release.
 
+This takes back the self-signed channel only: a Store submission rolls back as in [§3.3, Rollback](#rollback).
+
 To roll back the whole release, revert the feed commit as above, then roll back macOS as in [§2, Roll back a bad release](#roll-back-a-bad-release): it deletes the release with all its assets and the tag `vX.Y.Z` (the `v*` tag ruleset lets only the admin role delete it).
+
+### §3.3 Microsoft Store
+
+The Windows app is moving to the Microsoft Store, under an individual Partner Center account: the Store signs the package, users click Install with no certificate to import, and the Store installs VCLibs. During the move the self-signed channel above (`.cer` and `.appinstaller`) still ships with every release. A last self-signed release tells its users once that EchoDiar moved to the Store; after that farewell release the self-signed channel is retired and the feed stays at that version.
+
+The Store build is the release build with the Store identity patched in (Name, Publisher and PublisherDisplayName from the four variables below) and without the `packageManagement` capability, bundled unsigned (the Store signs it): `EchoDiar_X.Y.Z.0_x64_arm64.msixupload`, a zip holding `EchoDiar_X.Y.Z.0_x64_arm64.msixbundle`. The `store` job of `windows-release.yml` builds and checks it on both channels and uploads it as the artifact `EchoDiar-store-<tag>`, kept 14 days. It is never a GitHub Release asset: users cannot install it. Only the release channel can submit it (`store-publish`); dev runs never do.
+
+#### One-time setup
+
+1. **Partner Center account**: open https://storedeveloper.microsoft.com > Get started for free > Individual developer, sign in with your Microsoft account, scan your government ID, take the selfie and finish the profile.
+2. **Reserve the name**: Partner Center > Apps and games > New product > MSIX or PWA app > "EchoDiar".
+3. **Product identity**: Product management > Product identity. Copy `Package/Identity/Name`, `Package/Identity/Publisher` (`CN=<GUID>`), `Package/Properties/PublisherDisplayName` and the Store ID into four repository variables:
+
+   ```sh
+   gh variable set WINDOWS_STORE_IDENTITY_NAME --repo dinhanhthi/EchoDiar --body '<Package/Identity/Name>'
+   gh variable set WINDOWS_STORE_PUBLISHER --repo dinhanhthi/EchoDiar --body '<Package/Identity/Publisher>'
+   gh variable set WINDOWS_STORE_PUBLISHER_DISPLAY_NAME --repo dinhanhthi/EchoDiar --body '<Package/Properties/PublisherDisplayName>'
+   gh variable set WINDOWS_STORE_PRODUCT_ID --repo dinhanhthi/EchoDiar --body '<Store ID>'
+   ```
+
+   Without all four the release still ships: the run shows a warning in `prepare` and builds no Store bundle, and `release.sh --preflight` warns (never fails).
+
+#### Optional: publish from CI
+
+Only when Partner Center offers Account settings > User management > Microsoft Entra applications. Microsoft documents it for company accounts; an individual account may not have it, and then every release is a manual upload (below). CI publishing also needs the app to be live in the Store already: the first submission is always manual.
+
+1. Associate a Microsoft Entra tenant with the Partner Center account, then add an Entra application with the Manager role (User management > Microsoft Entra applications). Note the tenant ID, the client ID, a client secret of that application, and the Seller ID of the account.
+2. Create the protected environment `windows-store-publish` first (a job naming a missing environment creates it, unprotected), then its four secrets (`gh secret set` prompts for each value, so it never lands in shell history), and last the switch:
+
+   ```sh
+   ME_ID="$(gh api user --jq .id)"
+   gh api -X PUT repos/dinhanhthi/EchoDiar/environments/windows-store-publish --input - <<JSON
+   {"reviewers":[{"type":"User","id":$ME_ID}],"prevent_self_review":false,
+    "deployment_branch_policy":{"protected_branches":false,"custom_branch_policies":true}}
+   JSON
+   gh api -X POST repos/dinhanhthi/EchoDiar/environments/windows-store-publish/deployment-branch-policies -f name='v*' -f type=tag
+   for name in STORE_TENANT_ID STORE_SELLER_ID STORE_CLIENT_ID STORE_CLIENT_SECRET; do
+     gh secret set "$name" --env windows-store-publish --repo dinhanhthi/EchoDiar
+   done
+   gh variable set WINDOWS_STORE_PUBLISH --repo dinhanhthi/EchoDiar --body true
+   ```
+
+   You are the required reviewer with `prevent_self_review` off, so `release.sh --store` can approve the deployment as you; deployments come from the tags `v*` only. Only `store-publish` names this environment: it downloads the `.msixupload` and runs the msstore CLI (`microsoft/microsoft-store-apppublisher`, pinned by SHA), with the secrets passed through the environment, never echoed.
+
+#### First submission
+
+Partner Center > Apps and games > EchoDiar > Start your submission:
+
+1. **Pricing and availability**: Free; all markets; Visibility = Private audience first (your Microsoft account and the test VM's), Public once a QA round on a Store install has passed.
+2. **Properties**: category Productivity; privacy policy URL `https://ed.dinhanhthi.com/privacy.html`.
+3. **Age ratings**: answer the IARC questionnaire.
+4. **Packages**: upload `release/windows/vX.Y.Z/store/EchoDiar_X.Y.Z.0_x64_arm64.msixupload` (from `release.sh --store`) and wait for its validation.
+5. **Store listings**: en-US, description from the website, screenshots.
+6. **Submission options** > restricted capabilities, the justifications:
+   - `runFullTrust`: "WinUI 3 / Windows App SDK desktop app"
+   - `unvirtualizedResources`: "The user's recordings library lives at %LOCALAPPDATA%\EchoDiar. Users open, back up and move it in File Explorer; it can hold several GB of audio and models; it must survive uninstall and reinstall and is shared with existing installs. Virtualizing it would hide it and delete it at uninstall."
+
+   Certification notes: no account needed; the microphone records meetings.
+7. Submit. Partner Center shows "In certification", then "Published".
+
+To see Partner Center's validation before a real release, upload a dev run's artifact (`EchoDiar-store-windows-v0.0.N-dev`, from `release.sh --dev`) to a draft submission, read the result, then delete that package: a `0.0.N.0` version is never submitted.
+
+#### Per release
+
+`/cf-ship` (and `scripts/ship.sh`) runs `windows/scripts/release.sh --store vX.Y.Z --yes` as its last step, after `--attach`. It:
+
+1. Finds the tag's `windows-release.yml` run and, when CI publish is on (`WINDOWS_STORE_PUBLISH` = `true`), approves its pending `windows-store-publish` deployment, then waits for the run. What gates the CI publish is the `store` job's own check of the bundle, in CI before its upload: `store-publish` runs only after it passed.
+2. Downloads the artifact `EchoDiar-store-vX.Y.Z` into `release/windows/vX.Y.Z/store/` and checks it again as data (isolated `python3 -I`), after the approval: unsigned, the Store Name, Publisher and PublisherDisplayName, the version `X.Y.Z.0`, x64 and arm64, no `packageManagement`. This local check is for the bundle you may upload by hand; it does not hold back a CI submission.
+3. Prints "Submitted to the Microsoft Store by CI", or the Partner Center upload steps ending with "manual Store upload pending" (exit 0), also when `store-publish` failed or its deployment was rejected. For a run older than the Store variables (it built no Store bundle) it prints "no Store bundle for this tag": there is nothing to submit.
+
+When a self-signed job (`sign`, `assemble`) fails while `store-publish` waits for its approval, `--attach` rejects that deployment so that it can rerun the failed job (GitHub reruns only a completed run, and `store-publish` does not need the failed job). That run then never submits to the Store: `--store` gives the manual upload steps, and its Store bundle stays valid. After a full rerun (expired intermediate artifacts), `store-publish` waits again and `--store` approves it.
+
+For a manual upload: Partner Center > Apps and games > EchoDiar > Start update > Packages, upload the `.msixupload` from `release/windows/vX.Y.Z/store/`, wait for its validation, then Submit to the Store. The artifact expires after 14 days: keep `release/windows/vX.Y.Z/store/` until the submission is published.
+
+It is idempotent: run the same command again after a failure. A Store failure never blocks the self-signed release: `--attach` has already shipped it, and the Store package build does not stop the self-signed build.
+
+#### Timing and limits
+
+- Certification takes a few hours to about 3 business days, so the Store copy lags macOS and the self-signed copy. The in-app Update button of a Store copy sees a new version up to a day after certification.
+- A submission still in certification blocks the next one. `msstore publish` replaces a pending draft with a new submission from the last published one. Before shipping again soon after a Windows release, check `msstore submission status <productId>` or Partner Center.
+- A macOS-only hotfix tag also builds a Store bundle. Skip uploading it when Windows did not change: macOS and Windows share one version, so the next release's Store submission is higher anyway.
+
+#### Rollback
+
+The Store cannot go back to a lower version. Fix forward: resubmit a higher version. To stop new installs meanwhile, hide the listing (Partner Center > Pricing and availability > Visibility). Users who already updated keep that version. Until it is retired, the self-signed channel keeps serving its own users, and rolls back as in [Roll back a Windows release](#roll-back-a-windows-release).

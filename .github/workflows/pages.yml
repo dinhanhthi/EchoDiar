@@ -44,11 +44,11 @@ jobs:
           if [ -f windows/EchoDiar.appinstaller ]; then
             # Never a dev feed: the dev Publisher, a package of a -dev tag or a plain http:// address.
             if grep -qE 'Publisher="CN=EchoDiar Dev"' windows/EchoDiar.appinstaller; then
-              echo "::error::windows/EchoDiar.appinstaller has the dev Publisher CN=EchoDiar Dev; commit the public channel's feed (docs/RELEASING.md §3.1)"
+              echo "::error::windows/EchoDiar.appinstaller has the dev Publisher CN=EchoDiar Dev; commit the release channel's feed (docs/RELEASING.md §3.1)"
               exit 1
             fi
             if grep -qE 'Uri="(http://|[^"]*-dev/)' windows/EchoDiar.appinstaller; then
-              echo "::error::windows/EchoDiar.appinstaller has an http:// Uri or one pointing at a -dev tag; commit the public channel's feed (docs/RELEASING.md §3.1)"
+              echo "::error::windows/EchoDiar.appinstaller has an http:// Uri or one pointing at a -dev tag; commit the release channel's feed (docs/RELEASING.md §3.1)"
               exit 1
             fi
             mkdir -p _site/windows

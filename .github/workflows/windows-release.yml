@@ -8,32 +8,40 @@ name: Windows release
 # windows/scripts/release.sh publishes or attaches them from the Mac (docs/RELEASING.md).
 #
 # Triggers:
-#   - push of a tag vX.Y.Z (release channel: the tag publish-release.sh pushes for the macOS release),
-#     windows-vX.Y.Z-dev (dev channel) or windows-vX.Y.Z (public channel);
-#   - workflow_dispatch with version X.Y.Z and channel dev|release|public (GitHub dispatches only workflows on the
-#     default branch, so this works once the file is on main); it builds the dispatched commit for the tag
-#     windows-v<version>-dev, v<version> or windows-v<version>, which the release must then be created on. The
-#     release channel must be dispatched on its tag (--ref v<version>), so the bundle Uri names the code it built.
+#   - push of a tag vX.Y.Z (release channel: the tag publish-release.sh pushes for the macOS release) or
+#     windows-vX.Y.Z-dev (dev channel);
+#   - workflow_dispatch with version X.Y.Z and channel dev|release (GitHub dispatches only workflows on the default
+#     branch, so this works once the file is on main); it builds the dispatched commit for the tag
+#     windows-v<version>-dev or v<version>, which the release must then be created on. The release channel must be
+#     dispatched on its tag (--ref v<version>), so the bundle Uri names the code it built.
 # Version: X.Y.Z gives the 4-part package version X.Y.Z.0 (each part 0-65535, no leading zeros), so a tag always
-# maps to the same version. Dev releases use 0.0.N (N above the 0.0.<run>.0 of windows.yml CI builds), release and
-# public releases the macOS marketing version.
+# maps to the same version. Dev releases use 0.0.N (N above the 0.0.<run>.0 of windows.yml CI builds), releases the
+# macOS marketing version.
 # Channels and signing:
 #   - dev: the dev certificate (WINDOWS_DEV_CERT_PFX / WINDOWS_DEV_CERT_PASSWORD, secrets of the windows-dev-signing
 #     environment), Publisher CN=EchoDiar Dev, public certificate EchoDiarDev.cer. Its feed Uri is the
-#     EchoDiar.appinstaller of its own prerelease; the release and public channels use
+#     EchoDiar.appinstaller of its own prerelease; the release channel uses
 #     https://ed.dinhanhthi.com/windows/EchoDiar.appinstaller.
 #   - release: the self-signed release certificate (WINDOWS_RELEASE_CERT_PFX / WINDOWS_RELEASE_CERT_PASSWORD, secrets
 #     of the windows-release-signing environment, which needs a reviewer's approval), Publisher = the variable
 #     WINDOWS_PUBLIC_PUBLISHER, public certificate EchoDiar.cer. prepare fails when that variable is empty or
 #     CN=EchoDiar Dev, before any job names the environment (a job naming a missing environment creates it
 #     unprotected).
-#   - public: Trusted Signing, not implemented yet. The run fails at once unless the secrets AZURE_TENANT_ID,
-#     AZURE_CLIENT_ID, AZURE_CLIENT_SECRET, TRUSTED_SIGNING_ENDPOINT, TRUSTED_SIGNING_ACCOUNT,
-#     TRUSTED_SIGNING_CERT_PROFILE and the variable WINDOWS_PUBLIC_PUBLISHER (the Trusted Signing certificate
-#     subject) are set, and then stops at the placeholder signing step. The dev certificate never signs it.
-# Jobs: prepare (tag, channel, versions, URIs) -> package (x64, arm64: unsigned MSIX, no environment, no secret) ->
-# sign (the only job with an environment; builds nothing: signs both MSIX, bundles and signs the bundle, exports the
-# public certificate) -> assemble (no environment: renders the feed, writes the checksums).
+# Microsoft Store variant (both channels), built only when the four repo variables WINDOWS_STORE_IDENTITY_NAME,
+# WINDOWS_STORE_PUBLISHER (CN=<GUID>), WINDOWS_STORE_PUBLISHER_DISPLAY_NAME and WINDOWS_STORE_PRODUCT_ID (Partner
+# Center > Product identity) are all set; otherwise prepare warns and the run ships the self-signed files only. The
+# same build with the Store identity patched in and without the packageManagement capability, bundled unsigned (the
+# Store signs it) as EchoDiar_X.Y.Z.0_x64_arm64.msixbundle inside EchoDiar_X.Y.Z.0_x64_arm64.msixupload, the workflow
+# artifact EchoDiar-store-<tag>: never a GitHub release asset (users cannot install it). Publishing it to the Store
+# (msstore CLI) runs only on the release channel and only when the repo variable WINDOWS_STORE_PUBLISH is 'true',
+# which is set once the windows-store-publish environment holds the secrets STORE_TENANT_ID, STORE_SELLER_ID,
+# STORE_CLIENT_ID and STORE_CLIENT_SECRET (an Entra app with the Manager role in Partner Center); otherwise the
+# .msixupload is uploaded by hand in Partner Center (docs/RELEASING.md).
+# Jobs: prepare (tag, channel, versions, URIs, Store switches) -> package (x64, arm64 x sideload[, store]: unsigned
+# MSIX, no environment, no secret) -> sign (sideload only; the only job with a signing key; builds nothing: signs
+# both MSIX, bundles and signs the bundle, exports the public certificate) -> assemble (no environment: renders the
+# feed, writes the checksums). store (needs package; no environment, no secret): bundles and checks the Store
+# packages -> store-publish (environment windows-store-publish: submits the .msixupload to the Store).
 
 on:
   push:
@@ -49,7 +57,7 @@ on:
         required: true
         default: dev
         type: choice
-        options: [dev, release, public]
+        options: [dev, release]
 
 permissions:
   contents: read
@@ -59,9 +67,9 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-  # Resolves the tag, channel, versions, publisher and URIs once, and fails fast on a bad tag, on the release channel
-  # without its publisher or with a tag that is not project.yml's MARKETING_VERSION, or on the public channel without
-  # its Trusted Signing secrets (before any Windows runner builds, and before sign names an environment).
+  # Resolves the tag, channel, versions, publisher, URIs and Store switches once, and fails fast on a bad tag, or on
+  # the release channel without its publisher or with a tag that is not project.yml's MARKETING_VERSION (before any
+  # Windows runner builds, and before sign names an environment). Missing Store variables only warn.
   prepare:
     runs-on: ubuntu-latest
     defaults:
@@ -77,6 +85,13 @@ jobs:
       bundle_name: ${{ steps.resolve.outputs.bundle_name }}
       bundle_uri: ${{ steps.resolve.outputs.bundle_uri }}
       appinstaller_uri: ${{ steps.resolve.outputs.appinstaller_uri }}
+      store_variant: ${{ steps.store.outputs.store_variant }}
+      store_publish: ${{ steps.store.outputs.store_publish }}
+      package_variants: ${{ steps.store.outputs.package_variants }}
+      store_identity_name: ${{ steps.store.outputs.identity_name }}
+      store_publisher: ${{ steps.store.outputs.publisher }}
+      store_publisher_display_name: ${{ steps.store.outputs.publisher_display_name }}
+      store_product_id: ${{ steps.store.outputs.product_id }}
     steps:
       - id: resolve
         name: Resolve version and channel
@@ -93,23 +108,19 @@ jobs:
             case "$INPUT_CHANNEL" in
               dev) tag="windows-v${INPUT_VERSION}-dev" ;;
               release) tag="v${INPUT_VERSION}" ;;
-              public) tag="windows-v${INPUT_VERSION}" ;;
-              *) echo "::error::channel must be dev, release or public"; exit 1 ;;
+              *) echo "::error::channel must be dev or release"; exit 1 ;;
             esac
           else
             tag="$REF_NAME"
           fi
           re_dev='^windows-v(0|[1-9][0-9]{0,4})\.(0|[1-9][0-9]{0,4})\.(0|[1-9][0-9]{0,4})-dev$'
           re_release='^v(0|[1-9][0-9]{0,4})\.(0|[1-9][0-9]{0,4})\.(0|[1-9][0-9]{0,4})$'
-          re_public='^windows-v(0|[1-9][0-9]{0,4})\.(0|[1-9][0-9]{0,4})\.(0|[1-9][0-9]{0,4})$'
           if [[ "$tag" =~ $re_dev ]]; then
             channel=dev
           elif [[ "$tag" =~ $re_release ]]; then
             channel=release
-          elif [[ "$tag" =~ $re_public ]]; then
-            channel=public
           else
-            echo "::error::'$tag' is not vX.Y.Z, windows-vX.Y.Z-dev or windows-vX.Y.Z (X, Y, Z = 0-65535, no leading zeros)"
+            echo "::error::'$tag' is not vX.Y.Z or windows-vX.Y.Z-dev (X, Y, Z = 0-65535, no leading zeros)"
             exit 1
           fi
           major="${BASH_REMATCH[1]}"; minor="${BASH_REMATCH[2]}"; patch="${BASH_REMATCH[3]}"
@@ -128,8 +139,8 @@ jobs:
             exit 1
           fi
           # App Installer always fetches a feed from its own Uri: the dev feed names its prerelease asset, so a dev
-          # prerelease installs from its own feed when its EchoDiar.appinstaller is opened; the others name the
-          # public feed on main.
+          # prerelease installs from its own feed when its EchoDiar.appinstaller is opened; the release channel names
+          # the public feed on main.
           appinstaller_uri=https://ed.dinhanhthi.com/windows/EchoDiar.appinstaller
           case "$channel" in
             dev)
@@ -142,10 +153,6 @@ jobs:
                 echo "::error::The release channel needs the variable WINDOWS_PUBLIC_PUBLISHER = the release certificate subject, not empty or CN=EchoDiar Dev (see docs/RELEASING.md)"
                 exit 1
               fi
-              publisher="$PUBLIC_PUBLISHER"
-              cer_name=EchoDiar.cer
-              ;;
-            public)
               publisher="$PUBLIC_PUBLISHER"
               cer_name=EchoDiar.cer
               ;;
@@ -189,35 +196,57 @@ jobs:
           fi
           echo "Tag $TAG matches MARKETING_VERSION $marketing in project.yml."
 
-      # The public channel needs Trusted Signing (docs/RELEASING.md). Only the names of missing secrets are printed.
-      - name: Check Trusted Signing secrets
-        if: steps.resolve.outputs.channel == 'public'
+      # The Store variant needs the four Store identity variables (Partner Center > Product identity). Until they are
+      # all set it is skipped with a warning, never an error: the self-signed release ships without it.
+      # Publishing needs the secrets STORE_TENANT_ID, STORE_SELLER_ID, STORE_CLIENT_ID and STORE_CLIENT_SECRET, which
+      # live in the windows-store-publish environment, so this job cannot see them (and secrets cannot gate a job):
+      # the repo variable WINDOWS_STORE_PUBLISH = 'true', set once that environment and its secrets exist, is the
+      # switch. Only the release channel publishes; dev runs build and check the Store bundle but never submit it.
+      - id: store
+        name: Store variant and publish switch
         env:
-          AZURE_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
-          AZURE_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
-          AZURE_CLIENT_SECRET: ${{ secrets.AZURE_CLIENT_SECRET }}
-          TRUSTED_SIGNING_ENDPOINT: ${{ secrets.TRUSTED_SIGNING_ENDPOINT }}
-          TRUSTED_SIGNING_ACCOUNT: ${{ secrets.TRUSTED_SIGNING_ACCOUNT }}
-          TRUSTED_SIGNING_CERT_PROFILE: ${{ secrets.TRUSTED_SIGNING_CERT_PROFILE }}
-          WINDOWS_PUBLIC_PUBLISHER: ${{ vars.WINDOWS_PUBLIC_PUBLISHER }}
+          CHANNEL: ${{ steps.resolve.outputs.channel }}
+          WINDOWS_STORE_IDENTITY_NAME: ${{ vars.WINDOWS_STORE_IDENTITY_NAME }}
+          WINDOWS_STORE_PUBLISHER: ${{ vars.WINDOWS_STORE_PUBLISHER }}
+          WINDOWS_STORE_PUBLISHER_DISPLAY_NAME: ${{ vars.WINDOWS_STORE_PUBLISHER_DISPLAY_NAME }}
+          WINDOWS_STORE_PRODUCT_ID: ${{ vars.WINDOWS_STORE_PRODUCT_ID }}
+          WINDOWS_STORE_PUBLISH: ${{ vars.WINDOWS_STORE_PUBLISH }}
         run: |
           set -euo pipefail
           missing=()
-          for name in AZURE_TENANT_ID AZURE_CLIENT_ID AZURE_CLIENT_SECRET TRUSTED_SIGNING_ENDPOINT \
-                      TRUSTED_SIGNING_ACCOUNT TRUSTED_SIGNING_CERT_PROFILE WINDOWS_PUBLIC_PUBLISHER; do
-            [[ -n "${!name:-}" ]] || missing+=("$name")
+          for name in WINDOWS_STORE_IDENTITY_NAME WINDOWS_STORE_PUBLISHER WINDOWS_STORE_PUBLISHER_DISPLAY_NAME \
+                      WINDOWS_STORE_PRODUCT_ID; do
+            # A line break would end the value in GITHUB_OUTPUT: such a value counts as not set.
+            [[ -n "${!name}" && "${!name}" != *[$'\r\n']* ]] || missing+=("$name")
           done
+          store_variant=true
           if (( ${#missing[@]} > 0 )); then
-            echo "::error::The public channel needs Trusted Signing; not set: ${missing[*]} (see docs/RELEASING.md)"
-            exit 1
+            store_variant=false
+            echo "::warning::No Microsoft Store bundle in this run; not set: ${missing[*]} (see docs/RELEASING.md)"
           fi
-          if [[ "$WINDOWS_PUBLIC_PUBLISHER" == 'CN=EchoDiar Dev' ]]; then
-            echo "::error::WINDOWS_PUBLIC_PUBLISHER must be the Trusted Signing certificate subject, not the dev one"
-            exit 1
+          store_publish=false
+          if [[ "$CHANNEL" == release && "$store_variant" == true && "$WINDOWS_STORE_PUBLISH" == true ]]; then
+            store_publish=true
           fi
+          {
+            echo "store_variant=$store_variant"
+            echo "store_publish=$store_publish"
+            if [[ "$store_variant" == true ]]; then
+              echo 'package_variants=["sideload","store"]'
+              echo "identity_name=$WINDOWS_STORE_IDENTITY_NAME"
+              echo "publisher=$WINDOWS_STORE_PUBLISHER"
+              echo "publisher_display_name=$WINDOWS_STORE_PUBLISHER_DISPLAY_NAME"
+              echo "product_id=$WINDOWS_STORE_PRODUCT_ID"
+            else
+              echo 'package_variants=["sideload"]'
+            fi
+          } >> "$GITHUB_OUTPUT"
+          echo "Store variant: $store_variant; Store publish: $store_publish."
 
-  # Builds the unsigned MSIX of one architecture on every channel: no environment and no secret here, since this job
-  # restores and builds third-party code. sign signs them.
+  # Builds the unsigned MSIX of one architecture and variant on every channel: no environment and no secret here,
+  # since this job restores and builds third-party code. sideload: the committed identity with the channel's
+  # Publisher, signed by sign. store (only when prepare found the Store variables): the Store identity, no
+  # packageManagement capability, bundled unsigned by store.
   package:
     needs: prepare
     runs-on: windows-latest
@@ -225,15 +254,22 @@ jobs:
     defaults:
       run:
         shell: pwsh
+    # A failing Store build neither cancels the sideload builds (fail-fast) nor skips sign: store then fails on its
+    # missing package instead.
+    continue-on-error: ${{ matrix.variant == 'store' }}
     strategy:
       fail-fast: true
       matrix:
+        variant: ${{ fromJSON(needs.prepare.outputs.package_variants) }}
         arch: [x64, arm64]
     env:
       ARCH: ${{ matrix.arch }}
+      VARIANT: ${{ matrix.variant }}
       PLATFORM_NAME: ${{ matrix.arch == 'arm64' && 'ARM64' || 'x64' }}
       VERSION4: ${{ needs.prepare.outputs.version4 }}
-      PUBLISHER: ${{ needs.prepare.outputs.publisher }}
+      PUBLISHER: ${{ matrix.variant == 'store' && needs.prepare.outputs.store_publisher || needs.prepare.outputs.publisher }}
+      STORE_IDENTITY_NAME: ${{ needs.prepare.outputs.store_identity_name }}
+      STORE_PUBLISHER_DISPLAY_NAME: ${{ needs.prepare.outputs.store_publisher_display_name }}
     steps:
       - name: Set paths
         run: |
@@ -250,19 +286,36 @@ jobs:
 
       - uses: microsoft/setup-msbuild@30375c66a4eea26614e0d39710365f22f8b0af57 # v3.0.0
 
-      - name: Patch manifest version and publisher
+      # sideload: Version and Publisher. store: also Identity Name and PublisherDisplayName from the Store
+      # variables, and no packageManagement capability (only the App Installer update path uses it).
+      - name: Patch manifest identity
         run: |
           $path = 'windows/src/EchoDiar.App/Package.appxmanifest'
           $xml = Get-Content -Raw $path
-          foreach ($attr in @{ Version = $env:VERSION4; Publisher = $env:PUBLISHER }.GetEnumerator()) {
+          $attrs = @{ Version = $env:VERSION4; Publisher = $env:PUBLISHER }
+          if ($env:VARIANT -eq 'store') { $attrs.Name = $env:STORE_IDENTITY_NAME }
+          foreach ($attr in $attrs.GetEnumerator()) {
             $pattern = '(<Identity\b[^>]*?\b' + $attr.Key + '=")[^"]*(")'
             if ($xml -notmatch $pattern) { throw "Identity $($attr.Key) not found in $path" }
             $value = [Security.SecurityElement]::Escape($attr.Value)
             $xml = [regex]::Replace($xml, $pattern, { param($m) $m.Groups[1].Value + $value + $m.Groups[2].Value })
           }
+          if ($env:VARIANT -eq 'store') {
+            $pattern = '(<PublisherDisplayName>)[^<]*(</PublisherDisplayName>)'
+            if ($xml -notmatch $pattern) { throw "PublisherDisplayName not found in $path" }
+            $value = [Security.SecurityElement]::Escape($env:STORE_PUBLISHER_DISPLAY_NAME)
+            $xml = [regex]::Replace($xml, $pattern, { param($m) $m.Groups[1].Value + $value + $m.Groups[2].Value })
+            # Tolerant: a manifest without the capability stays as it is.
+            $xml = [regex]::Replace($xml, '[ \t]*<rescap:Capability\s+Name="packageManagement"\s*/>[ \t]*\r?\n?', '')
+          }
           Set-Content -Path $path -Value $xml -NoNewline -Encoding utf8
-          $id = ([xml]$xml).Package.Identity
+          $doc = [xml]$xml
+          $id = $doc.Package.Identity
           "Identity: $($id.GetAttribute('Name')) $($id.GetAttribute('Version')) '$($id.GetAttribute('Publisher'))'"
+          if ($env:VARIANT -eq 'store') {
+            "PublisherDisplayName: '$($doc.Package.Properties.PublisherDisplayName)'"
+            if ($xml -match 'Name="packageManagement"') { throw "packageManagement capability left in $path" }
+          }
 
       # Unsigned on every channel: sign signs each package and the bundle.
       - name: Build MSIX
@@ -357,19 +410,17 @@ jobs:
       # Kept as long as EchoDiar-<tag>: a rerun of failed jobs (release.sh --attach) downloads it. No secret in it.
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
-          name: msix-${{ matrix.arch }}
+          name: msix-${{ matrix.variant }}-${{ matrix.arch }}
           path: ${{ runner.temp }}/msix
           retention-days: 14
           if-no-files-found: error
 
-  # The only job that sees a signing key. It checks out and builds nothing: it signs both packages, bundles them,
-  # signs the bundle and exports the public certificate, as the intermediate artifact signed-<tag>.
+  # The only job that sees a signing key. It checks out and builds nothing: it signs both sideload packages, bundles
+  # them, signs the bundle and exports the public certificate, as the intermediate artifact signed-<tag>.
   sign:
     needs: [prepare, package]
     runs-on: windows-latest
-    # dev: windows-dev-signing; release: windows-release-signing (reviewer approval). The public channel runs without
-    # an environment for now; move its Trusted Signing secrets into a windows-public-signing environment
-    # (docs/RELEASING.md) and name it here.
+    # dev: windows-dev-signing; release: windows-release-signing (reviewer approval).
     environment: ${{ needs.prepare.outputs.channel == 'dev' && 'windows-dev-signing' || needs.prepare.outputs.channel == 'release' && 'windows-release-signing' || '' }}
     timeout-minutes: 20
     defaults:
@@ -391,7 +442,7 @@ jobs:
 
       - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
-          pattern: msix-*
+          pattern: msix-sideload-*
           path: ${{ runner.temp }}/msix
           merge-multiple: true
 
@@ -411,7 +462,6 @@ jobs:
       # Each channel reads only its own secrets (the trailing '' keeps an empty release secret from falling through
       # to the dev one).
       - name: Decode signing certificate
-        if: env.CHANNEL == 'dev' || env.CHANNEL == 'release'
         env:
           PFX_BASE64: ${{ env.CHANNEL == 'release' && secrets.WINDOWS_RELEASE_CERT_PFX || env.CHANNEL == 'dev' && secrets.WINDOWS_DEV_CERT_PFX || '' }}
           PFX_PASSWORD: ${{ env.CHANNEL == 'release' && secrets.WINDOWS_RELEASE_CERT_PASSWORD || env.CHANNEL == 'dev' && secrets.WINDOWS_DEV_CERT_PASSWORD || '' }}
@@ -428,7 +478,6 @@ jobs:
           "Certificate: '$($cert.Subject)', thumbprint $($cert.Thumbprint), expires $($cert.NotAfter.ToString('yyyy-MM-dd'))"
 
       - name: Sign packages
-        if: env.CHANNEL == 'dev' || env.CHANNEL == 'release'
         env:
           PFX_PASSWORD: ${{ env.CHANNEL == 'release' && secrets.WINDOWS_RELEASE_CERT_PASSWORD || env.CHANNEL == 'dev' && secrets.WINDOWS_DEV_CERT_PASSWORD || '' }}
         run: |
@@ -451,21 +500,12 @@ jobs:
           if ($LASTEXITCODE -ne 0) { throw "makeappx bundle failed ($LASTEXITCODE)" }
 
       - name: Sign bundle
-        if: env.CHANNEL == 'dev' || env.CHANNEL == 'release'
         env:
           PFX_PASSWORD: ${{ env.CHANNEL == 'release' && secrets.WINDOWS_RELEASE_CERT_PASSWORD || env.CHANNEL == 'dev' && secrets.WINDOWS_DEV_CERT_PASSWORD || '' }}
         run: |
           $bundle = Join-Path $env:STAGE_DIR $env:BUNDLE_NAME
           & $env:SIGNTOOL sign /fd SHA256 /tr $env:TIMESTAMP_URL /td SHA256 /f $env:PFX_PATH /p $env:PFX_PASSWORD $bundle
           if ($LASTEXITCODE -ne 0) { throw "signtool sign failed ($LASTEXITCODE)" }
-
-      # Placeholder, gated on the public channel: prepare already failed unless the Trusted Signing secrets are
-      # set. Replace with the Trusted Signing step (signtool + the Azure dlib, or azure/trusted-signing-action)
-      # when the public channel is set up (docs/RELEASING.md).
-      - name: Sign bundle (Trusted Signing)
-        if: env.CHANNEL == 'public'
-        run: |
-          throw 'Trusted Signing is not implemented yet: the public channel cannot be built (docs/RELEASING.md).'
 
       - name: Check bundle
         run: |
@@ -605,3 +645,222 @@ jobs:
           path: ${{ runner.temp }}/release
           retention-days: 14
           if-no-files-found: error
+
+  # No environment and no secret: bundles the two Store packages unsigned (the Store signs them), wraps the bundle in
+  # an .msixupload (a zip holding the .msixbundle: msstore publish -i takes an .msix or .msixupload, not an
+  # .msixbundle, https://learn.microsoft.com/en-us/windows/apps/publish/msstore-dev-cli/commands), checks it and
+  # uploads it as the workflow artifact EchoDiar-store-<tag>. Never a GitHub release asset: users cannot install it.
+  store:
+    needs: [prepare, package]
+    if: needs.prepare.outputs.store_variant == 'true'
+    runs-on: windows-latest
+    timeout-minutes: 20
+    defaults:
+      run:
+        shell: pwsh
+    env:
+      VERSION4: ${{ needs.prepare.outputs.version4 }}
+      STORE_IDENTITY_NAME: ${{ needs.prepare.outputs.store_identity_name }}
+      STORE_PUBLISHER: ${{ needs.prepare.outputs.store_publisher }}
+      STORE_PUBLISHER_DISPLAY_NAME: ${{ needs.prepare.outputs.store_publisher_display_name }}
+      STORE_BUNDLE_NAME: EchoDiar_${{ needs.prepare.outputs.version4 }}_x64_arm64.msixbundle
+      STORE_UPLOAD_NAME: EchoDiar_${{ needs.prepare.outputs.version4 }}_x64_arm64.msixupload
+    steps:
+      - name: Set paths
+        run: |
+          "MSIX_DIR=$env:RUNNER_TEMP\msix-store" >> $env:GITHUB_ENV
+          "BUNDLE_DIR=$env:RUNNER_TEMP\store-bundle" >> $env:GITHUB_ENV
+          "STAGE_DIR=$env:RUNNER_TEMP\store" >> $env:GITHUB_ENV
+
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          pattern: msix-store-*
+          path: ${{ runner.temp }}/msix-store
+          merge-multiple: true
+
+      - name: Find SDK tools
+        run: |
+          $kits = Join-Path ${env:ProgramFiles(x86)} 'Windows Kits\10\bin'
+          $bin = Get-ChildItem -LiteralPath $kits -Directory -Filter '10.*' |
+            Sort-Object { [version]$_.Name } -Descending |
+            ForEach-Object { Join-Path $_.FullName 'x64' } |
+            Where-Object { Test-Path (Join-Path $_ 'makeappx.exe') } |
+            Select-Object -First 1
+          if (-not $bin) { throw "makeappx.exe not found under $kits" }
+          "SDK tools: $bin"
+          "MAKEAPPX=$(Join-Path $bin 'makeappx.exe')" >> $env:GITHUB_ENV
+
+      - name: Make Store bundle and upload file
+        run: |
+          $msix = @(Get-ChildItem -LiteralPath $env:MSIX_DIR -File -Filter '*.msix')
+          $msix | ForEach-Object Name
+          if ($msix.Count -ne 2) { throw "Expected two .msix (x64 and arm64) in $env:MSIX_DIR, found $($msix.Count)" }
+          New-Item -ItemType Directory -Path $env:BUNDLE_DIR, $env:STAGE_DIR | Out-Null
+          $bundle = Join-Path $env:BUNDLE_DIR $env:STORE_BUNDLE_NAME
+          # Unsigned: the Store signs it. /bv: the bundle version is the package version.
+          & $env:MAKEAPPX bundle /d $env:MSIX_DIR /p $bundle /bv $env:VERSION4 /o
+          if ($LASTEXITCODE -ne 0) { throw "makeappx bundle failed ($LASTEXITCODE)" }
+          Add-Type -AssemblyName System.IO.Compression.FileSystem
+          [IO.Compression.ZipFile]::CreateFromDirectory($env:BUNDLE_DIR, (Join-Path $env:STAGE_DIR $env:STORE_UPLOAD_NAME))
+          Get-ChildItem -LiteralPath $env:BUNDLE_DIR, $env:STAGE_DIR -File | ForEach-Object { '{0}  {1:N0} bytes' -f $_.Name, $_.Length }
+
+      # Reads the files as data with an isolated Python (-I), like windows/scripts/release.sh. Arguments: the
+      # .msixupload, the package version, the Store Identity Name, Publisher and PublisherDisplayName.
+      - name: Check Store upload
+        shell: bash
+        run: |
+          set -euo pipefail
+          read -r -d '' STORE_CHECK_PY <<'PY' || true
+          import io
+          import os
+          import sys
+          import zipfile
+          import xml.etree.ElementTree as ET
+
+          upload_path, version, name, publisher, display_name = sys.argv[1:6]
+          upload_name = f"EchoDiar_{version}_x64_arm64.msixupload"
+          bundle_name = f"EchoDiar_{version}_x64_arm64.msixbundle"
+
+          def fail(message):
+              sys.exit(f"error: {message}")
+
+          def local(tag):
+              return tag.rsplit("}", 1)[-1]
+
+          def child(element, tag):
+              return next((e for e in element if local(e.tag) == tag), None)
+
+          def open_zip(source, what):
+              try:
+                  return zipfile.ZipFile(io.BytesIO(source) if isinstance(source, bytes) else source)
+              except (zipfile.BadZipFile, OSError) as error:
+                  fail(f"{what} is not a zip file ({error})")
+
+          def read_xml(archive, entry, what):
+              if entry not in archive.namelist():
+                  fail(f"{what} has no {entry}")
+              try:
+                  return ET.fromstring(archive.read(entry))
+              except ET.ParseError as error:
+                  fail(f"{entry} in {what} is not well-formed: {error}")
+
+          # The .msixupload holds exactly the bundle.
+          if os.path.basename(upload_path) != upload_name:
+              fail(f"the upload file is {os.path.basename(upload_path)}, expected {upload_name}")
+          with open_zip(upload_path, upload_name) as upload:
+              entries = upload.namelist()
+              if entries != [bundle_name]:
+                  fail(f"{upload_name} holds {entries}, expected only {bundle_name}")
+              bundle_data = upload.read(bundle_name)
+
+          # The bundle: unsigned, the Store identity, x64 and arm64 at the tag's version.
+          checks = []
+          with open_zip(bundle_data, bundle_name) as bundle:
+              names = set(bundle.namelist())
+              if "AppxSignature.p7x" in names:
+                  fail(f"{bundle_name} is signed (AppxSignature.p7x): the Store bundle must be unsigned")
+              manifest = read_xml(bundle, "AppxMetadata/AppxBundleManifest.xml", bundle_name)
+              identity = child(manifest, "Identity")
+              if identity is None:
+                  fail("AppxBundleManifest.xml has no Identity")
+              packages = [e for e in manifest.iter() if local(e.tag) == "Package" and e.get("Type") == "application"]
+              checks += [
+                  ("bundle Name", identity.get("Name"), name),
+                  ("bundle Publisher", identity.get("Publisher"), publisher),
+                  ("bundle Version", identity.get("Version"), version),
+                  ("bundle packages", sorted((e.get("Architecture"), e.get("Version")) for e in packages),
+                   [("arm64", version), ("x64", version)]),
+              ]
+              # Each inner package: unsigned, the same identity, the Store PublisherDisplayName, no packageManagement.
+              for package in packages:
+                  file_name = package.get("FileName") or ""
+                  if file_name not in names:
+                      fail(f"{bundle_name} has no {file_name!r}, which its manifest lists")
+                  with open_zip(bundle.read(file_name), file_name) as inner:
+                      if "AppxSignature.p7x" in inner.namelist():
+                          fail(f"{file_name} in {bundle_name} is signed: the Store packages must be unsigned")
+                      root = read_xml(inner, "AppxManifest.xml", file_name)
+                  inner_id = child(root, "Identity")
+                  properties = child(root, "Properties")
+                  if inner_id is None or properties is None:
+                      fail(f"AppxManifest.xml of {file_name} has no Identity or Properties")
+                  shown = child(properties, "PublisherDisplayName")
+                  capabilities = sorted({e.get("Name") for e in root.iter() if local(e.tag) == "Capability"})
+                  checks += [
+                      (f"{file_name} Name", inner_id.get("Name"), name),
+                      (f"{file_name} Publisher", inner_id.get("Publisher"), publisher),
+                      (f"{file_name} Version", inner_id.get("Version"), version),
+                      (f"{file_name} ProcessorArchitecture", inner_id.get("ProcessorArchitecture"),
+                       package.get("Architecture")),
+                      (f"{file_name} PublisherDisplayName", shown.text if shown is not None else None, display_name),
+                      (f"{file_name} packageManagement capability", "packageManagement" in capabilities, False),
+                  ]
+          bad = [f"{what} is {actual!r}, expected {wanted!r}" for what, actual, wanted in checks if actual != wanted]
+          if bad:
+              fail("; ".join(bad))
+          print(f"OK: {upload_name} holds only the unsigned {bundle_name}: {name} {version} '{publisher}', "
+                f"x64 and arm64, PublisherDisplayName '{display_name}', no packageManagement")
+          PY
+          python -I -c "$STORE_CHECK_PY" "$STAGE_DIR/$STORE_UPLOAD_NAME" "$VERSION4" "$STORE_IDENTITY_NAME" \
+            "$STORE_PUBLISHER" "$STORE_PUBLISHER_DISPLAY_NAME"
+
+      # The Partner Center upload file (release.sh --store downloads it). No secret in it.
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: EchoDiar-store-${{ needs.prepare.outputs.tag }}
+          path: ${{ runner.temp }}/store
+          retention-days: 14
+          if-no-files-found: error
+
+  # Submits the .msixupload to the Microsoft Store with the msstore CLI
+  # (https://learn.microsoft.com/en-us/windows/apps/publish/msstore-dev-cli/github-actions). Only on the release
+  # channel with the repo variable WINDOWS_STORE_PUBLISH = 'true' (prepare): the job-level if keeps a run without it
+  # from naming the environment (a job naming a missing environment creates it unprotected). The secrets live in the
+  # windows-store-publish environment (an Entra app with the Manager role in Partner Center; v* tags only, a
+  # reviewer). The app must already be published and live in the Store; when it has a published submission,
+  # msstore publish deletes a pending draft and creates a new submission from the last published one, and a
+  # submission still in certification blocks the next.
+  store-publish:
+    needs: [prepare, store]
+    if: needs.prepare.outputs.store_publish == 'true'
+    runs-on: windows-latest
+    environment: windows-store-publish
+    timeout-minutes: 30
+    defaults:
+      run:
+        shell: pwsh
+    env:
+      PRODUCT_ID: ${{ needs.prepare.outputs.store_product_id }}
+      STORE_UPLOAD_NAME: EchoDiar_${{ needs.prepare.outputs.version4 }}_x64_arm64.msixupload
+    steps:
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: EchoDiar-store-${{ needs.prepare.outputs.tag }}
+          path: ${{ runner.temp }}/store
+
+      # Installs the msstore CLI.
+      - uses: microsoft/microsoft-store-apppublisher@cc9910a8d59f2eb55cbb83df0a3800cf3b5300e0 # v1.4
+        with:
+          version: v0.4.3
+
+      # The credentials only reach msstore through env (never echoed); only the names of missing ones are printed.
+      - name: Configure Store credentials
+        env:
+          STORE_TENANT_ID: ${{ secrets.STORE_TENANT_ID }}
+          STORE_SELLER_ID: ${{ secrets.STORE_SELLER_ID }}
+          STORE_CLIENT_ID: ${{ secrets.STORE_CLIENT_ID }}
+          STORE_CLIENT_SECRET: ${{ secrets.STORE_CLIENT_SECRET }}
+        run: |
+          $missing = @('STORE_TENANT_ID', 'STORE_SELLER_ID', 'STORE_CLIENT_ID', 'STORE_CLIENT_SECRET' |
+            Where-Object { -not [Environment]::GetEnvironmentVariable($_) })
+          if ($missing) { throw "Not set in the windows-store-publish environment: $($missing -join ', ')" }
+          msstore reconfigure --tenantId $env:STORE_TENANT_ID --sellerId $env:STORE_SELLER_ID `
+            --clientId $env:STORE_CLIENT_ID --clientSecret $env:STORE_CLIENT_SECRET
+          if ($LASTEXITCODE -ne 0) { throw "msstore reconfigure failed ($LASTEXITCODE)" }
+
+      - name: Publish to the Microsoft Store
+        run: |
+          $upload = Join-Path $env:RUNNER_TEMP "store\$env:STORE_UPLOAD_NAME"
+          if (-not (Test-Path -LiteralPath $upload -PathType Leaf)) { throw "$upload not found" }
+          msstore publish "$PWD" -i $upload -id $env:PRODUCT_ID
+          if ($LASTEXITCODE -ne 0) { throw "msstore publish failed ($LASTEXITCODE)" }
