@@ -5,7 +5,7 @@ import Synchronization
 
 /// Transcribes a recording while it is made: takes the writer's 16 kHz blocks, cuts each channel into speech chunks
 /// (`SpeechChunker`) and decodes them with one WhisperKit or Parakeet session (mic lines "Me", system lines
-/// "Others"). Live chunks are at most 12 s and close at a 0.5 s pause from 1 s, and each decoded chunk becomes one
+/// "Others"). Live chunks are at most 12 s and close at a 0.5 s pause from 2 s, and each decoded chunk becomes one
 /// line, so a line follows continuous speech within seconds. While no closed chunk waits, an open chunk is decoded
 /// every `partialStepSeconds` as greyed tentative text (`Snapshot.tentative`) that its line replaces, unless the
 /// channel's last final decode was slow (`partialMaxDecodeSeconds`). `finish()` at Stop hands the segments, in file
@@ -90,8 +90,9 @@ public actor RecordingTranscriber {
     static let liveMaxChunkSeconds = 12
     /// The pause that closes a live chunk of at least `liveShortPauseMinSeconds` (the batch tuning waits 0.6 s).
     static let liveShortPauseFrames = 25  // 0.5 s
-    /// The length a live chunk needs before a 0.5 s pause closes it: `min(1·50, 600/2) = 50` frames, so from 1 s.
-    static let liveShortPauseMinSeconds = 1
+    /// The length a live chunk needs before a 0.5 s pause closes it: `min(2·50, 600/2) = 100` frames, so from 2 s
+    /// (measured: 1 s chunks lost real speech and invented short lines).
+    static let liveShortPauseMinSeconds = 2
     /// The length an open chunk needs before its first partial decode (the greyed tentative text).
     static let partialMinSeconds = 1
     /// How much an open chunk grows between two partials of it: the first knob to turn if the decode budget is exceeded.
