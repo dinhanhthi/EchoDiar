@@ -323,9 +323,13 @@ public sealed class RecordingTranscriber : IAsyncDisposable
             var shifted = segments?.Select(s => s with { Start = s.Start + offset, End = s.End + offset }).ToList();
             lock (_buffer) _buffer.Complete(item, shifted);
             if (shifted is null) continue;
-            var speaker = item.Channel == RecordingSession.Channel.Mic ? Speaker.Me : Speaker.Others;
-            var text = LineText(shifted);
-            if (text is not null) AddLine(speaker, text);
+            var mic = item.Channel == RecordingSession.Channel.Mic;
+            var span = new Span(offset, (double)(item.Chunk.StartSample + item.Chunk.Samples.Length) / SampleRate);
+            var text = LiveLine(shifted, mic, () =>
+            {
+                lock (_buffer) return _buffer.OthersSpeak(span);
+            });
+            if (text is not null) AddLine(mic ? Speaker.Me : Speaker.Others, text);
         }
     }
 
@@ -397,6 +401,19 @@ public sealed class RecordingTranscriber : IAsyncDisposable
     {
         var texts = segments.Select(s => s.Text.Trim()).Where(t => t.Length > 0).ToList();
         return texts.Count == 0 ? null : string.Join(" ", texts);
+    }
+
+    /// <summary>
+    /// The line a decoded chunk shows (Swift <c>liveLine</c>, <see cref="LineText"/>), or null when it shows none: a mic
+    /// line that is a lone "Merci." (<see cref="TranscriptMerger.IsLoneMerci"/>) while <paramref name="othersSpeak"/> is
+    /// the residual of others' voices on a near-silent mic. <paramref name="othersSpeak"/> is called only for a mic lone
+    /// Merci. Live uses the energy chunk's span while the final transcript (<c>TranscriptMerger.IsBleed</c>) uses
+    /// Whisper segment times, so the two can rarely disagree; accepted, the final transcript is the source of truth.
+    /// </summary>
+    internal static string? LiveLine(IReadOnlyList<RawSegment> segments, bool mic, Func<bool> othersSpeak)
+    {
+        var text = LineText(segments);
+        return text is not null && mic && TranscriptMerger.IsLoneMerci(text) && othersSpeak() ? null : text;
     }
 
     private static float Peak(ReadOnlySpan<float> samples)
@@ -496,6 +513,23 @@ public sealed class RecordingTranscriber : IAsyncDisposable
                 Channels[channel].Chunks.Add((span, outcome));
             }
             return queued;
+        }
+
+        /// <summary>
+        /// True when the system channel has speech near <paramref name="span"/> (widened by
+        /// <see cref="TranscriptMerger.BleedTimeTolerance"/>): a chunk that is not silence overlapping it, or the open
+        /// chunk starting by its end (Swift <c>othersSpeak(during:)</c>).
+        /// </summary>
+        public bool OthersSpeak(Span span)
+        {
+            if (Closed) return false;
+            var start = span.Start - TranscriptMerger.BleedTimeTolerance;
+            var end = span.End + TranscriptMerger.BleedTimeTolerance;
+            var system = Channels[RecordingSession.Channel.System];
+            if (system.Chunks.Any(c => c.Outcome != PriorTranscription.ChunkOutcome.Silence && c.Span.Start < end && c.Span.End > start))
+                return true;
+            var open = system.Chunker.OpenChunk();
+            return open is not null && (double)open.StartSample / SampleRate <= end;
         }
 
         public Item? Take()

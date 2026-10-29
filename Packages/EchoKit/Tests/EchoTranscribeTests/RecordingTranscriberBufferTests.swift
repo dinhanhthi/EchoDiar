@@ -43,8 +43,30 @@ struct RecordingTranscriberBufferTests {
         #expect(Self.gaps(buffer) == [Span(start: 0, end: 1), Span(start: 2, end: 3)])
     }
 
+    /// Guards the live Merci regression's "others speak" check: a system chunk that is not silence within
+    /// `TranscriptMerger.bleedTimeTolerance` of the span, or a system chunk still open that started by the span's end
+    /// (plus the tolerance); a silence chunk, a mic chunk or system speech further away is not.
+    @Test func othersSpeakDuringASpanOnlyWhenTheSystemChannelHasSpeechNearIt() {
+        var closed = Buffer(maxChunkSeconds: 30)
+        closed.enqueue([Self.speech(at: 2)], channel: Self.system)
+        closed.enqueue([Self.speech(at: 6)], channel: Self.mic)
+        #expect(closed.othersSpeak(during: Span(start: 1, end: 1.8)))
+        #expect(!closed.othersSpeak(during: Span(start: 5.5, end: 7)))
+
+        var silence = Buffer(maxChunkSeconds: 30)
+        silence.enqueue([Self.silence(at: 2)], channel: Self.system)
+        #expect(!silence.othersSpeak(during: Span(start: 1.8, end: 2.5)))
+
+        var open = Buffer(maxChunkSeconds: 30)
+        _ = open.append(mic: [Float](repeating: 0, count: Self.rate),
+                        system: [Float](repeating: 0.5, count: Self.rate), language: nil)
+        #expect(open.channels[Self.system].chunks.isEmpty)
+        #expect(open.othersSpeak(during: Span(start: 0.5, end: 0.9)))
+    }
+
     private static let rate = RecordingTranscriber.sampleRate
     private static let mic = RecordingSession.Channel.mic
+    private static let system = RecordingSession.Channel.system
 
     private static func speech(at second: Int) -> SpeechChunker.Chunk {
         SpeechChunker.Chunk(startSample: second * rate, samples: [Float](repeating: 0.5, count: rate), language: nil)

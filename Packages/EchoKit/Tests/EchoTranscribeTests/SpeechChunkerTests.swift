@@ -101,13 +101,41 @@ struct SpeechChunkerTests {
         #expect(flushed[0].language == "en")
     }
 
+    /// Guards the open-chunk peek the live transcriber reads ("others speaking now", tentative text): nil while no
+    /// chunk is open, every sample fed since the chunk's start while one is, the start and a prefix of the chunk
+    /// `flush()` later emits, and pure, so a twin chunker that is never peeked emits the same chunks.
+    @Test func openChunkIsAPurePeekAtTheChunkFlushWillEmit() throws {
+        let parts = [Self.noiseFloor(1), Self.speech(3) + Self.noiseFloor(2) + Self.speech(2), Self.noiseFloor(0.3)]
+        var chunker = SpeechChunker(maxChunkSeconds: 30)
+        var twin = SpeechChunker(maxChunkSeconds: 30)
+
+        var closed = Self.feed(parts[0], to: &chunker)
+        #expect(chunker.openChunk == nil)
+        closed += Self.feed(parts[1], to: &chunker)
+        let open = try #require(chunker.openChunk)
+        #expect(chunker.openChunk == open)
+        closed += Self.feed(parts[2], to: &chunker)
+        let flushed = Self.flush(&chunker)
+        #expect(chunker.openChunk == nil)
+
+        #expect(closed.count == 1)
+        let last = try #require(flushed.first)
+        #expect(open.startSample == last.start)
+        #expect(open.startSample + open.samples.count == Self.at(8))
+        #expect(open.samples.count < last.samples.count)
+        #expect(Array(last.samples.prefix(open.samples.count)) == open.samples)
+        #expect(open.language == "en")
+        #expect(closed == parts.flatMap { Self.feed($0, to: &twin) })
+        #expect(flushed == Self.flush(&twin))
+    }
+
     // MARK: - Helpers
 
     private static let rate = 16_000
     private static let frame = 320
 
     /// A chunk as sample range + content, so the tests do not depend on the chunk type's name.
-    private struct Piece {
+    private struct Piece: Equatable {
         var start: Int
         var samples: [Float]
         var language: String?

@@ -243,8 +243,13 @@ public actor RecordingTranscriber {
                                detectedLanguage: $0.detectedLanguage, speaker: $0.speaker)
                 }
                 buffer.withLock { $0.complete(item, segments: shifted) }
-                let speaker: Speaker = item.channel == RecordingSession.Channel.mic ? .me : .others
-                if let text = Self.lineText(shifted) { await add(speaker, text) }
+                let mic = item.channel == RecordingSession.Channel.mic
+                let rate = Double(Self.sampleRate)
+                let span = Span(start: Double(item.chunk.startSample) / rate,
+                                end: Double(item.chunk.startSample + item.chunk.samples.count) / rate)
+                if let text = Self.liveLine(shifted, mic: mic, othersSpeak: {
+                    buffer.withLock { $0.othersSpeak(during: span) }
+                }) { await add(mic ? .me : .others, text) }
             } catch is CancellationError {
                 throw CancellationError()
             } catch {
@@ -305,6 +310,16 @@ public actor RecordingTranscriber {
     static func lineText(_ segments: [RawSegment]) -> String? {
         let texts = segments.map { $0.text.trimmingCharacters(in: .whitespacesAndNewlines) }.filter { !$0.isEmpty }
         return texts.isEmpty ? nil : texts.joined(separator: " ")
+    }
+
+    /// The line a decoded chunk shows (`lineText`), or nil when it shows none: a mic line that is a lone "Merci."
+    /// (`TranscriptMerger.isLoneMerci`) while `othersSpeak` is the residual of others' voices on a near-silent mic.
+    /// `othersSpeak` is called only for a mic lone Merci. Live uses the energy chunk's span while the final transcript
+    /// (`TranscriptMerger.isBleed`) uses Whisper segment times, so the two can rarely disagree; accepted, the final
+    /// transcript is the source of truth.
+    static func liveLine(_ segments: [RawSegment], mic: Bool, othersSpeak: () -> Bool) -> String? {
+        guard let text = lineText(segments) else { return nil }
+        return mic && TranscriptMerger.isLoneMerci(text) && othersSpeak() ? nil : text
     }
 
     private static func channel(_ index: Int, of samples: UnsafePointer<Int16>, frames: Int, channels: Int) -> [Float] {
@@ -410,6 +425,20 @@ public actor RecordingTranscriber {
                 channels[channel].chunks.append((span, outcome))
             }
             return queued
+        }
+
+        /// True when the system channel has speech near `span` (widened by `TranscriptMerger.bleedTimeTolerance`): a
+        /// chunk that is not silence overlapping it, or the open chunk starting by its end.
+        func othersSpeak(during span: Span) -> Bool {
+            guard !closed else { return false }
+            let start = span.start - TranscriptMerger.bleedTimeTolerance
+            let end = span.end + TranscriptMerger.bleedTimeTolerance
+            let system = channels[RecordingSession.Channel.system]
+            if system.chunks.contains(where: { $0.outcome != .silence && $0.span.start < end && $0.span.end > start }) {
+                return true
+            }
+            guard let open = system.chunker.openChunk else { return false }
+            return Double(open.startSample) / Double(RecordingTranscriber.sampleRate) <= end
         }
 
         mutating func take() -> Item? {

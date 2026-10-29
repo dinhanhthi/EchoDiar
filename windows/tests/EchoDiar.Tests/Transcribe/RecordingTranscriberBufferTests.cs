@@ -14,6 +14,7 @@ public sealed class RecordingTranscriberBufferTests
 {
     private const int Rate = RecordingTranscriber.SampleRate;
     private const int Mic = RecordingSession.Channel.Mic;
+    private const int System = RecordingSession.Channel.System;
 
     [Fact]
     public void AChunkOverTheCapIsDroppedAndAGap()
@@ -53,6 +54,30 @@ public sealed class RecordingTranscriberBufferTests
 
         Assert.Equal([Outcome.Pending, Outcome.Failed], Outcomes(buffer));
         Assert.Equal([new Span(0, 1), new Span(2, 3)], Gaps(buffer));
+    }
+
+    // Guards the live Merci regression's "others speak" check: a system chunk that is not silence within
+    // TranscriptMerger.BleedTimeTolerance of the span, or a system chunk still open that started by the span's end (plus
+    // the tolerance); a silence chunk, a mic chunk or system speech further away is not.
+    [Fact]
+    public void OthersSpeakDuringASpanOnlyWhenTheSystemChannelHasSpeechNearIt()
+    {
+        var closed = new RecordingTranscriber.Buffer(maxChunkSeconds: 30);
+        closed.Enqueue([Speech(at: 2)], System);
+        closed.Enqueue([Speech(at: 6)], Mic);
+        Assert.True(closed.OthersSpeak(new Span(1, 1.8)));
+        Assert.False(closed.OthersSpeak(new Span(5.5, 7)));
+
+        var silence = new RecordingTranscriber.Buffer(maxChunkSeconds: 30);
+        silence.Enqueue([Silence(at: 2)], System);
+        Assert.False(silence.OthersSpeak(new Span(1.8, 2.5)));
+
+        var open = new RecordingTranscriber.Buffer(maxChunkSeconds: 30);
+        var interleaved = new short[2 * Rate];
+        for (var i = 0; i < Rate; i++) interleaved[2 * i + System] = 16_384;
+        open.Append(interleaved, Rate, 2, null);
+        Assert.Empty(open.Channels[System].Chunks);
+        Assert.True(open.OthersSpeak(new Span(0.5, 0.9)));
     }
 
     private static SpeechChunker.Chunk Speech(int at) => new((long)at * Rate, Enumerable.Repeat(0.5f, Rate).ToArray(), null);
