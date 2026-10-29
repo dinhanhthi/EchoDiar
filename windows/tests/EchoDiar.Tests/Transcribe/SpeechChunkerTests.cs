@@ -66,24 +66,27 @@ public sealed class SpeechChunkerTests
         Assert.Equal(signal.Length, chunks[^1].End);
     }
 
-    // The live tuning bounds the time to a live line: a 0.6 s pause closes a chunk from 4 s (the batch tuning waits
-    // for 8 s), and continuous speech is cut into contiguous chunks of at most 12 s, in the last third (8–12 s).
+    // The live tuning bounds the time to a live line: a 0.5 s pause closes a chunk from the live minimum (the batch
+    // tuning waits for a 0.6 s pause and 8 s), and continuous speech is cut into contiguous chunks of at most 12 s, in
+    // the last third (8–12 s).
     [Fact]
-    public void LiveChunksCloseAtAShortPauseFrom4SecondsAndNeverExceed12()
+    public void LiveChunksCloseAtAHalfSecondPauseFromTheLiveMinimumAndNeverExceed12()
     {
-        float[] paused = [.. NoiseFloor(1), .. Speech(5), .. NoiseFloor(0.7)];
-        var live = new SpeechChunker(maxChunkSeconds: 12, shortPauseMinSeconds: 4);
+        const double speechSeconds = RecordingTranscriber.LiveShortPauseMinSeconds + 1;
+        float[] paused = [.. NoiseFloor(1), .. Speech(speechSeconds), .. NoiseFloor(0.55)];
+        var live = LiveChunker();
         var batch = new SpeechChunker(maxChunkSeconds: 30);
 
         var closed = Feed(paused, live);
 
         var chunk = Assert.Single(closed);
         Assert.Empty(Feed(paused, batch));
-        Assert.InRange(chunk.End, At(6), At(6.2) + 2 * Frame);
+        const double speechEnd = 1 + speechSeconds;
+        Assert.InRange(chunk.End, At(speechEnd), At(speechEnd + 0.2) + 2 * Frame);
         Assert.Equal(paused[chunk.Start..chunk.End], chunk.Samples);
 
         float[] continuous = [.. NoiseFloor(1), .. Speech(20)];
-        live = new SpeechChunker(maxChunkSeconds: 12, shortPauseMinSeconds: 4);
+        live = LiveChunker();
         var cut = Feed(continuous, live);
         var chunks = cut.Concat(Flush(live)).ToList();
 
@@ -168,6 +171,12 @@ public sealed class SpeechChunkerTests
         }
         return pieces;
     }
+
+    /// The chunker of one live channel (RecordingTranscriber.Buffer).
+    private static SpeechChunker LiveChunker() => new(
+        RecordingTranscriber.LiveMaxChunkSeconds,
+        shortPauseMinSeconds: RecordingTranscriber.LiveShortPauseMinSeconds,
+        shortPauseFrames: RecordingTranscriber.LiveShortPauseFrames);
 
     private static List<Piece> Flush(SpeechChunker chunker) => chunker.Flush().Select(ToPiece).ToList();
 

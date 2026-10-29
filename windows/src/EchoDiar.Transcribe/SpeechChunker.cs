@@ -4,9 +4,10 @@ namespace EchoDiar.Transcribe;
 /// Splits a 16 kHz mono stream into speech chunks for transcribe-while-recording, with an energy VAD over 20 ms
 /// frames (Swift <c>SpeechChunker</c>). A chunk opens on speech (with pre-roll), closes at a pause (with post-roll)
 /// and is cut at its quietest frame when it reaches <c>maxChunkSeconds</c>, so every chunk fits the model window. The
-/// length a chunk needs before a short pause closes it is per instance (<c>shortPauseMinSeconds</c>): the batch gap
-/// fill keeps the default, the live path passes a shorter one. Silence between chunks is never emitted: it counts as
-/// covered. The clock is the sample index of the stream, so chunk starts are file time.
+/// short pause and the length a chunk needs before the pause closes it are per instance (<c>shortPauseFrames</c>,
+/// <c>shortPauseMinSeconds</c>): the batch gap fill keeps the defaults, the live path passes shorter ones. Silence
+/// between chunks is never emitted: it counts as covered. The clock is the sample index of the stream, so chunk starts
+/// are file time.
 /// </summary>
 /// <remarks>Pure and bounded: only the open chunk and the pre-roll are retained. Not thread-safe.</remarks>
 public sealed class SpeechChunker
@@ -34,7 +35,7 @@ public sealed class SpeechChunker
     public const int OpenFrames = 2;
     public const int PreRollFrames = 15; // 300 ms
     public const int PostRollFrames = 10; // 200 ms
-    /// <summary>A pause this long closes a chunk of at least the short-pause minimum.</summary>
+    /// <summary>The default pause that closes a chunk of at least the short-pause minimum.</summary>
     public const int ShortPauseFrames = 30; // 0.6 s
     /// <summary>A pause this long closes a chunk of any length.</summary>
     public const int LongPauseFrames = 75; // 1.5 s
@@ -48,6 +49,7 @@ public sealed class SpeechChunker
     private readonly record struct Frame(float Db, bool IsSpeech, string? Language);
 
     private readonly int _maxFrames;
+    private readonly int _shortPauseFrames;
     private readonly int _shortPauseMinFrames;
 
     private float _floorDb = InitialFloorDb;
@@ -63,9 +65,11 @@ public sealed class SpeechChunker
     private int _partialCount;
     private string? _partialLanguage;
 
-    public SpeechChunker(int maxChunkSeconds, int shortPauseMinSeconds = ShortPauseMinSeconds)
+    public SpeechChunker(
+        int maxChunkSeconds, int shortPauseMinSeconds = ShortPauseMinSeconds, int shortPauseFrames = ShortPauseFrames)
     {
         _maxFrames = Math.Max(1, maxChunkSeconds) * FramesPerSecond;
+        _shortPauseFrames = shortPauseFrames;
         _shortPauseMinFrames = Math.Min(shortPauseMinSeconds * FramesPerSecond, _maxFrames / 2);
     }
 
@@ -167,7 +171,8 @@ public sealed class SpeechChunker
         }
         var speechEnd = _frames.Count - _trailingSilence;
         var end = Math.Min(speechEnd + PostRollFrames, _frames.Count);
-        if (_trailingSilence >= LongPauseFrames || (_trailingSilence >= ShortPauseFrames && end >= _shortPauseMinFrames))
+        if (_trailingSilence >= LongPauseFrames
+            || (_trailingSilence >= _shortPauseFrames && end >= _shortPauseMinFrames))
         {
             return Close(end, hasSpeech: speechEnd > 0);
         }

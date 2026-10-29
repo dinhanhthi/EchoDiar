@@ -115,7 +115,7 @@ public sealed class RecordingTranscriberBufferTests
     }
 
     // Guards "partials never starve finals": no partial while a closed chunk waits to be decoded, nor on a channel whose
-    // last final decode took more than PartialMaxDecodeShare of its chunk's duration.
+    // last final decode took longer than PartialMaxDecodeSeconds.
     [Fact]
     public void NoPartialWhileAChunkIsQueuedOrTheLastDecodeWasSlow()
     {
@@ -126,11 +126,11 @@ public sealed class RecordingTranscriberBufferTests
         _ = buffer.Take();
         Assert.Equal(Mic, buffer.TakePartial()?.Channel);
 
-        const double share = RecordingTranscriber.PartialMaxDecodeShare;
-        buffer.RecordDecode(Mic, wallSeconds: (share + 0.1) * 10, chunkSeconds: 10);
+        const double limit = RecordingTranscriber.PartialMaxDecodeSeconds;
+        buffer.RecordDecode(Mic, wallSeconds: limit + 0.5);
         for (var i = 0; i < StepHalves; i++) Assert.False(AppendHalfSecond(buffer));
         Assert.Null(buffer.TakePartial());
-        buffer.RecordDecode(Mic, wallSeconds: (share - 0.1) * 10, chunkSeconds: 10);
+        buffer.RecordDecode(Mic, wallSeconds: limit - 0.5);
         Assert.Equal((MinHalves + StepHalves) * Half, buffer.TakePartial()?.Chunk.Samples.Length);
     }
 

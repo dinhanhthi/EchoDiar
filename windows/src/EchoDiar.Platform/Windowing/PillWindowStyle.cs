@@ -44,7 +44,8 @@ public static class PillWindowStyle
 
     /// <summary>
     /// No frame at all, WS_EX_TOOLWINDOW, WS_EX_NOACTIVATE and topmost (through <c>SetWindowPos(HWND_TOPMOST)</c>:
-    /// setting WS_EX_TOPMOST alone does not take), plus the DWM round corner preference. False when Windows refused.
+    /// setting WS_EX_TOPMOST alone does not take), with no DWM corner rounding and no DWM border, so only the region
+    /// (<see cref="UpdateShape"/>) shapes the pill. False when Windows refused.
     /// </summary>
     public static unsafe bool Apply(nint hwnd)
     {
@@ -61,11 +62,16 @@ public static class PillWindowStyle
         var placed = PInvoke.SetWindowPos(window, HWND.HWND_TOPMOST, 0, 0, 0, 0,
             SET_WINDOW_POS_FLAGS.SWP_NOMOVE | SET_WINDOW_POS_FLAGS.SWP_NOSIZE | SET_WINDOW_POS_FLAGS.SWP_NOACTIVATE
             | SET_WINDOW_POS_FLAGS.SWP_FRAMECHANGED);
-        // Rounds what the region below leaves to DWM; a window with a region gets no DWM corners, border or shadow.
-        var corner = DWM_WINDOW_CORNER_PREFERENCE.DWMWCP_ROUND;
+        // A region does not stop DWM: measured in a Windows 11 VM, it still drew a 1 px border with its own ~8 px
+        // rounding outside the pill's ~17 px region. No DWM rounding and no border color (DWMWA_COLOR_NONE, Windows 11
+        // 22000+) leave the shape to the region.
+        var corner = DWM_WINDOW_CORNER_PREFERENCE.DWMWCP_DONOTROUND;
         var rounded = PInvoke.DwmSetWindowAttribute(
             window, DWMWINDOWATTRIBUTE.DWMWA_WINDOW_CORNER_PREFERENCE, &corner, (uint)sizeof(DWM_WINDOW_CORNER_PREFERENCE));
-        return placed && rounded.Succeeded;
+        uint border = 0xFFFFFFFE; // DWMWA_COLOR_NONE (a COLORREF)
+        var bordered = PInvoke.DwmSetWindowAttribute(
+            window, DWMWINDOWATTRIBUTE.DWMWA_BORDER_COLOR, &border, sizeof(uint));
+        return placed && rounded.Succeeded && bordered.Succeeded;
     }
 
     /// <summary>False once the window is destroyed (closed by the system or the user).</summary>

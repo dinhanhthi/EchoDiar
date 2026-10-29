@@ -10,12 +10,12 @@ namespace EchoDiar.Transcribe;
 /// <summary>
 /// Transcribes a recording while it is made (Swift <c>RecordingTranscriber</c>): takes the writer's 16 kHz blocks,
 /// cuts each channel into speech chunks (<see cref="SpeechChunker"/>) and decodes them with one Whisper or Parakeet
-/// session (mic lines "Me", system lines "Others"). Live chunks are at most 12 s and close at a short pause from 4 s,
+/// session (mic lines "Me", system lines "Others"). Live chunks are at most 12 s and close at a 0.5 s pause from 2 s,
 /// and each decoded chunk becomes one line, so a line follows continuous speech within seconds. While no closed chunk
 /// waits, an open chunk is decoded every <see cref="PartialStepSeconds"/> as greyed tentative text
 /// (<see cref="Snapshot.Tentative"/>) that its line replaces, unless the channel's last final decode was slow
-/// (<see cref="PartialMaxDecodeShare"/>). <see cref="FinishAsync"/> at Stop hands the segments, in file time, and the spans not transcribed (gaps) to the
-/// pipeline as a <see cref="PriorTranscription"/>.
+/// (<see cref="PartialMaxDecodeSeconds"/>). <see cref="FinishAsync"/> at Stop hands the segments, in file time, and
+/// the spans not transcribed (gaps) to the pipeline as a <see cref="PriorTranscription"/>.
 /// </summary>
 /// <remarks>
 /// <para>
@@ -73,26 +73,38 @@ public sealed class RecordingTranscriber : IAsyncDisposable
     /// <summary>
     /// The longest live chunk (at most the model window): the hard cut searches its last third, 8–12 s. With
     /// <see cref="LiveShortPauseMinSeconds"/> it bounds the time to a live line under continuous speech (the batch
-    /// tuning waits up to 30 s), while keeping chunks long enough that Whisper does not fall back on memorised boilerplate.
+    /// tuning waits up to 30 s). Short chunks are left to the text filters
+    /// (<see cref="Engines.WhisperEngine.SpeechText"/>, the lone-Merci rule).
     /// </summary>
     public const int LiveMaxChunkSeconds = 12;
-    /// <summary>The length a live chunk needs before a 0.6 s pause closes it: <c>min(4·50, 600/2) = 200</c> frames, so from 4 s.</summary>
-    public const int LiveShortPauseMinSeconds = 4;
+    /// <summary>
+    /// The pause that closes a live chunk of at least <see cref="LiveShortPauseMinSeconds"/> (Swift
+    /// <c>liveShortPauseFrames</c>; the batch tuning waits 0.6 s).
+    /// </summary>
+    public const int LiveShortPauseFrames = 25; // 0.5 s
+    /// <summary>
+    /// The length a live chunk needs before a 0.5 s pause closes it: <c>min(2·50, 600/2) = 100</c> frames, so from 2 s
+    /// (measured on macOS: 1 s chunks lost real speech and invented short lines).
+    /// </summary>
+    public const int LiveShortPauseMinSeconds = 2;
     /// <summary>The length an open chunk needs before its first partial decode (the greyed tentative text; Swift <c>partialMinSeconds</c>).</summary>
-    public const int PartialMinSeconds = 2;
+    public const int PartialMinSeconds = 1;
     /// <summary>
     /// How much an open chunk grows between two partials of it (Swift <c>partialStepSeconds</c>): the first knob to turn
     /// if the decode budget is exceeded.
     /// </summary>
-    public const int PartialStepSeconds = 3;
+    public const int PartialStepSeconds = 2;
     /// <summary>
-    /// No partial on a channel while its last final decode took more than this share of its chunk's duration, so
-    /// partials never starve the finals on a slow decoder (Swift <c>partialMaxDecodeShare</c>). A partial costs about
-    /// as much as a final (Whisper pads to a fixed window), so a ~10 s chunk at <see cref="PartialStepSeconds"/> 3
-    /// costs ~3 partials + 1 final, twice that while both channels speak: above this share partials would keep the
-    /// decoder busy and delay each final by one partial.
+    /// No partial on a channel while its last final decode took longer than this, so partials never starve the finals
+    /// on a slow decoder (Swift <c>partialMaxDecodeSeconds</c>, 2.4 s there; lower here on purpose). A partial costs
+    /// about as much as a final, and a Whisper decode costs about the same whatever the chunk length (it pads to a
+    /// fixed window), so a share of the chunk's duration would turn partials off for short chunks. At one partial
+    /// every <see cref="PartialStepSeconds"/> (2 s), a decode of at most 1.2 s (0.6 × the step) keeps one channel's
+    /// partials at most ~60 % of the single decoder; with both channels speaking they would fill it, but finals go
+    /// first and wait for at most one running partial. CPU Whisper.net on a slow PC stays above it and shows finals only
+    /// (with the "N s behind" notice, <see cref="BehindSeconds"/>).
     /// </summary>
-    public const double PartialMaxDecodeShare = 0.2;
+    public const double PartialMaxDecodeSeconds = 1.2;
     /// <summary>
     /// The speech waiting to be decoded from which the live transcript says how far behind it is
     /// (<see cref="BehindSeconds"/>; Swift <c>behindNoticeSeconds</c>): <see cref="Snapshot.PendingSeconds"/> sums
@@ -143,7 +155,7 @@ public sealed class RecordingTranscriber : IAsyncDisposable
         _language = language;
         _buffer = new Buffer(
             Math.Min(entry.WindowSeconds ?? TranscriptionPipeline.DefaultWindowSeconds, LiveMaxChunkSeconds),
-            shortPauseMinSeconds: LiveShortPauseMinSeconds);
+            shortPauseMinSeconds: LiveShortPauseMinSeconds, shortPauseFrames: LiveShortPauseFrames);
     }
 
     /// <summary>
@@ -356,18 +368,20 @@ public sealed class RecordingTranscriber : IAsyncDisposable
         PruneTentative();
     }
 
-    /// <summary>Records a closed chunk's segments and decode share, and shows its line in place of its tentative text.</summary>
+    /// <summary>
+    /// Records a closed chunk's segments and decode time (the session's transcribe only, not a model reload after the
+    /// idle release, as Swift starts its clock after <c>model.get()</c>), and shows its line in place of its tentative
+    /// text.
+    /// </summary>
     private async Task DecodeFinalAsync(Item item, IdleModel<ITranscriptionSession> model, CancellationToken token)
     {
-        var watch = Stopwatch.StartNew();
-        var segments = await TranscribeAsync(model, item.Chunk, token).ConfigureAwait(false);
-        var wallSeconds = watch.Elapsed.TotalSeconds;
+        var (segments, wallSeconds) = await TranscribeAsync(model, item.Chunk, token).ConfigureAwait(false);
         var offset = (double)item.Chunk.StartSample / SampleRate;
         var shifted = segments?.Select(s => s with { Start = s.Start + offset, End = s.End + offset }).ToList();
         lock (_buffer)
         {
             _buffer.Complete(item, shifted);
-            _buffer.RecordDecode(item.Channel, wallSeconds, (double)item.Chunk.Samples.Length / SampleRate);
+            _buffer.RecordDecode(item.Channel, wallSeconds);
         }
         var mic = item.Channel == RecordingSession.Channel.Mic;
         string? text = null;
@@ -385,7 +399,7 @@ public sealed class RecordingTranscriber : IAsyncDisposable
     /// <summary>Shows an open chunk's text so far as its speaker's tentative text; a failed decode changes nothing.</summary>
     private async Task DecodePartialAsync(Partial partial, IdleModel<ITranscriptionSession> model, CancellationToken token)
     {
-        var segments = await TranscribeAsync(model, partial.Chunk, token).ConfigureAwait(false);
+        var (segments, _) = await TranscribeAsync(model, partial.Chunk, token).ConfigureAwait(false);
         if (segments is null) return;
         var mic = partial.Channel == RecordingSession.Channel.Mic;
         var span = new Span((double)partial.Chunk.StartSample / SampleRate,
@@ -397,18 +411,23 @@ public sealed class RecordingTranscriber : IAsyncDisposable
         SetTentative(mic ? Speaker.Me : Speaker.Others, text, partial.Chunk.StartSample);
     }
 
-    /// <summary>The chunk's segments (chunk time), or null when the ASR failed on it; cancellation propagates.</summary>
-    private static Task<IReadOnlyList<RawSegment>?> TranscribeAsync(
+    /// <summary>
+    /// The chunk's segments (chunk time), or null when the ASR failed on it, and the wall seconds of the session's
+    /// transcribe (without a model load); cancellation propagates.
+    /// </summary>
+    private static Task<(IReadOnlyList<RawSegment>? Segments, double WallSeconds)> TranscribeAsync(
         IdleModel<ITranscriptionSession> model, SpeechChunker.Chunk chunk, CancellationToken token) =>
-        model.UseAsync<IReadOnlyList<RawSegment>?>(async (session, t) =>
+        model.UseAsync<(IReadOnlyList<RawSegment>?, double)>(async (session, t) =>
         {
+            var watch = Stopwatch.StartNew();
             try
             {
-                return await session.TranscribeAsync(chunk.Samples, chunk.Language, t).ConfigureAwait(false);
+                var segments = await session.TranscribeAsync(chunk.Samples, chunk.Language, t).ConfigureAwait(false);
+                return (segments, watch.Elapsed.TotalSeconds);
             }
             catch (Exception) when (!t.IsCancellationRequested)
             {
-                return null;
+                return (null, watch.Elapsed.TotalSeconds);
             }
         }, token);
 
@@ -581,17 +600,17 @@ public sealed class RecordingTranscriber : IAsyncDisposable
     public sealed record Partial(int Channel, SpeechChunker.Chunk Chunk);
 
     /// <summary>One channel's chunker, chunk outcomes (file order) and decoded segments (file time).</summary>
-    public sealed class ChannelState(int maxChunkSeconds, int shortPauseMinSeconds)
+    public sealed class ChannelState(int maxChunkSeconds, int shortPauseMinSeconds, int shortPauseFrames)
     {
-        public SpeechChunker Chunker { get; } = new(maxChunkSeconds, shortPauseMinSeconds);
+        public SpeechChunker Chunker { get; } = new(maxChunkSeconds, shortPauseMinSeconds, shortPauseFrames);
         public List<(Span Span, PriorTranscription.ChunkOutcome Outcome)> Chunks { get; } = [];
         public List<RawSegment> Segments { get; } = [];
         /// <summary>The open chunk's start and length at its last partial.</summary>
         internal (long StartSample, int Count)? LastPartial { get; set; }
         /// <summary>The open chunk's start and length when <see cref="Buffer.Append"/> last woke the decoder for a partial.</summary>
         internal (long StartSample, int Count)? SignalledPartial { get; set; }
-        /// <summary>The last final decode's wall seconds over its chunk's seconds.</summary>
-        internal double DecodeShare { get; set; }
+        /// <summary>The last final decode's wall seconds.</summary>
+        internal double DecodeSeconds { get; set; }
     }
 
     /// <summary>
@@ -600,7 +619,7 @@ public sealed class RecordingTranscriber : IAsyncDisposable
     /// </summary>
     public sealed class Buffer(
         int maxChunkSeconds, int shortPauseMinSeconds = SpeechChunker.ShortPauseMinSeconds,
-        int maxQueuedSamples = MaxQueuedSeconds * SampleRate)
+        int shortPauseFrames = SpeechChunker.ShortPauseFrames, int maxQueuedSamples = MaxQueuedSeconds * SampleRate)
     {
         private readonly Queue<Item> _queue = new();
         private int _queuedSamples;
@@ -609,7 +628,8 @@ public sealed class RecordingTranscriber : IAsyncDisposable
         private float[] _scratch = [];
 
         public List<ChannelState> Channels { get; private set; } =
-            [new(maxChunkSeconds, shortPauseMinSeconds), new(maxChunkSeconds, shortPauseMinSeconds)];
+            [new(maxChunkSeconds, shortPauseMinSeconds, shortPauseFrames),
+                new(maxChunkSeconds, shortPauseMinSeconds, shortPauseFrames)];
         public long SamplesSeen { get; private set; }
         /// <summary>The session loaded once; until then <see cref="FinishAsync"/> has nothing to wait for.</summary>
         public bool Loaded { get; set; }
@@ -737,13 +757,13 @@ public sealed class RecordingTranscriber : IAsyncDisposable
         }
 
         /// <summary>
-        /// Stores the share of a final decode of <paramref name="channel"/> (wall seconds over chunk seconds) for the
-        /// partial gate (Swift <c>recordDecode(channel:wallSeconds:chunkSeconds:)</c>).
+        /// Stores the wall seconds of a final decode of <paramref name="channel"/> for the partial gate (Swift
+        /// <c>recordDecode(channel:wallSeconds:)</c>).
         /// </summary>
-        public void RecordDecode(int channel, double wallSeconds, double chunkSeconds)
+        public void RecordDecode(int channel, double wallSeconds)
         {
-            if (Closed || chunkSeconds <= 0) return;
-            Channels[channel].DecodeShare = wallSeconds / chunkSeconds;
+            if (Closed) return;
+            Channels[channel].DecodeSeconds = wallSeconds;
         }
 
         /// <summary><paramref name="segments"/> null: the ASR failed on the chunk.</summary>
@@ -774,14 +794,14 @@ public sealed class RecordingTranscriber : IAsyncDisposable
         /// <summary>
         /// The open chunk's span of <paramref name="channel"/> when a partial of it is due (Swift <c>partialDue(_:)</c>):
         /// at least <see cref="PartialMinSeconds"/> long, grown <see cref="PartialStepSeconds"/> since the last partial
-        /// of the same chunk (a new start is a new chunk), and the channel's last decode share at most
-        /// <see cref="PartialMaxDecodeShare"/>.
+        /// of the same chunk (a new start is a new chunk), and the channel's last final decode took at most
+        /// <see cref="PartialMaxDecodeSeconds"/>.
         /// </summary>
         private (long StartSample, int Count)? PartialDue(int channel)
         {
             var state = Channels[channel];
             if (state.Chunker.OpenSpan() is not { } open || open.Count < PartialMinSeconds * SampleRate
-                || state.DecodeShare > PartialMaxDecodeShare)
+                || state.DecodeSeconds > PartialMaxDecodeSeconds)
                 return null;
             if (state.LastPartial is { } last && last.StartSample == open.StartSample
                 && open.Count - last.Count < PartialStepSeconds * SampleRate)
