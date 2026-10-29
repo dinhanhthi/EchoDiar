@@ -9,6 +9,7 @@
 [![Latest release](https://img.shields.io/github/v/release/dinhanhthi/EchoDiar)](https://github.com/dinhanhthi/EchoDiar/releases/latest)
 [![License: AGPLv3](https://img.shields.io/badge/license-AGPLv3-blue)](LICENSE)
 ![macOS 15+](https://img.shields.io/badge/macOS-15%2B-blue)
+![Windows 11](https://img.shields.io/badge/Windows-11-blue)
 
 [Website](https://ed.dinhanhthi.com) · [Download](https://github.com/dinhanhthi/EchoDiar/releases/latest) · [Docs](https://ed.dinhanhthi.com/docs.html) · [Changelog](CHANGELOG.md)
 
@@ -34,7 +35,10 @@ Download the `.dmg` from [Releases](https://github.com/dinhanhthi/EchoDiar/relea
 
 ### Windows 11 (x64, Arm64)
 
-Download `EchoDiar.cer` and `EchoDiar.appinstaller` from [Install on Windows](https://ed.dinhanhthi.com/docs.html#install-windows), which links the latest release that includes Windows, and install them with Windows' own dialogs, no command line needed. EchoDiar is not yet signed by a public certificate authority, so Windows trusts it only after you import its certificate:
+> [!NOTE]
+> Installing an app on Windows usually takes one click. EchoDiar is not yet signed by a public certificate authority, so Windows first needs you to trust EchoDiar's own certificate (the first step below). You do it once per PC: updates install without it. A signed build is planned, which removes this step.
+
+Download `EchoDiar.cer` and `EchoDiar.appinstaller` from [Install on Windows](https://ed.dinhanhthi.com/docs.html#install-windows), which links the latest release that includes Windows, and install them with Windows' own dialogs, no command line needed:
 
 - Open `EchoDiar.cer`, click **Install Certificate...** and import it into **Local Machine** > **Trusted People**.
 - Open `EchoDiar.appinstaller` and click **Install**. App Installer installs EchoDiar and keeps it updated.

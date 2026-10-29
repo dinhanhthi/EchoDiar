@@ -516,6 +516,34 @@ section p {
   margin-top: var(--space-xs);
 }
 
+.steps + .list {
+  margin-top: var(--space-lg);
+}
+
+.callout {
+  display: flex;
+  gap: var(--space-xs);
+  margin: 0 0 var(--space-md);
+  padding: var(--space-sm) var(--space-md);
+  border: var(--rule);
+  border-left: 3px solid var(--color-accent);
+  border-radius: var(--radius-sm);
+  background: var(--color-paper-2);
+  font-size: var(--text-sm);
+}
+
+.callout svg {
+  flex: none;
+  width: 1.1rem;
+  height: 1.1rem;
+  margin-top: 0.15rem;
+  color: var(--color-accent);
+}
+
+.callout p {
+  margin: 0;
+}
+
 .steps li::before {
   content: counter(step);
   position: absolute;
