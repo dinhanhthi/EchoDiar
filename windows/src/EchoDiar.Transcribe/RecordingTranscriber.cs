@@ -101,8 +101,8 @@ public sealed class RecordingTranscriber : IAsyncDisposable
     /// fixed window), so a share of the chunk's duration would turn partials off for short chunks. At one partial
     /// every <see cref="PartialStepSeconds"/> (2 s), a decode of at most 1.2 s (0.6 × the step) keeps one channel's
     /// partials at most ~60 % of the single decoder; with both channels speaking they would fill it, but finals go
-    /// first and wait for at most one running partial. CPU Whisper.net on a slow PC stays above it and shows finals only
-    /// (with the "N s behind" notice, <see cref="BehindSeconds"/>).
+    /// first and wait for at most one running partial. CPU Whisper.net on a slow PC stays above it and shows finals
+    /// only (with the "N s behind" notice, <see cref="BehindSeconds"/>).
     /// </summary>
     public const double PartialMaxDecodeSeconds = 1.2;
     /// <summary>
