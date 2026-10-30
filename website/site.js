@@ -82,36 +82,6 @@
   badge.href = `https://github.com/${repo}/releases/tag/v${version}`;
 })();
 
-// Windows download. The [data-windows] blocks ship hidden and show only once the same-origin App Installer
-// feed exists, which is committed after a release's Windows files are attached (docs/RELEASING.md). The feed's
-// MainBundle Uri names that release's tag, which gives each [data-windows-asset="<name>"] link its
-// releases/download/<tag>/<name> address. Never releases/latest: during a release it points at one whose
-// Windows files are not attached yet. Each link's static href (the Releases page) is the no-JS fallback.
-// Any failure keeps the blocks hidden.
-(async () => {
-  const blocks = document.querySelectorAll("[data-windows]");
-  if (!blocks.length) return;
-  let tag = null;
-  try {
-    const response = await fetch("windows/EchoDiar.appinstaller", { cache: "no-store" });
-    if (!response.ok) return;
-    const xml = new DOMParser().parseFromString(await response.text(), "application/xml");
-    if (xml.getElementsByTagName("parsererror").length) return;
-    const uri = xml.getElementsByTagName("MainBundle")[0]?.getAttribute("Uri") ?? "";
-    tag = /\/releases\/download\/(v\d+(?:\.\d+)*)\//.exec(uri)?.[1] ?? null;
-  } catch {
-    // Offline or no Windows release yet (local preview): keep the Windows blocks hidden.
-    return;
-  }
-  if (!tag) return;
-  document.querySelectorAll("[data-windows-asset]").forEach((link) => {
-    link.href = `https://github.com/dinhanhthi/EchoDiar/releases/download/${tag}/${link.dataset.windowsAsset}`;
-  });
-  blocks.forEach((block) => block.removeAttribute("hidden"));
-  // The shown blocks move the page: bring a linked element (docs.html#windows-warnings) back into view.
-  if (location.hash) document.getElementById(location.hash.slice(1))?.scrollIntoView();
-})();
-
 // Screenshot lightbox: click the poster or a thumbnail to open a full-screen carousel. Left/Right
 // buttons or arrow keys navigate (looping); click anywhere or press Esc to close.
 (() => {

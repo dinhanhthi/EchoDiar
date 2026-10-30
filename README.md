@@ -35,15 +35,9 @@ Download the `.dmg` from [Releases](https://github.com/dinhanhthi/EchoDiar/relea
 
 ### Windows 11 (x64, Arm64)
 
-> [!NOTE]
-> Installing an app on Windows usually takes one click. EchoDiar is not yet signed by a public certificate authority, so Windows first needs you to trust EchoDiar's own certificate (the first step below). You do it once per PC: updates install without it. A signed build is planned, which removes this step.
+Get EchoDiar from the [Microsoft Store](https://apps.microsoft.com/detail/9N5X564S1F2D?mode=direct): the Store installs it in one click and keeps it updated.
 
-Download `EchoDiar.cer` and `EchoDiar.appinstaller` from [Install on Windows](https://ed.dinhanhthi.com/docs.html#install-windows), which links the latest release that includes Windows, and install them with Windows' own dialogs, no command line needed:
-
-- Open `EchoDiar.cer`, click **Install Certificate...** and import it into **Local Machine** > **Trusted People**.
-- Open `EchoDiar.appinstaller` and click **Install**. App Installer installs EchoDiar and keeps it updated.
-
-Step by step, with what each window says: [Install on Windows](https://ed.dinhanhthi.com/docs.html#install-windows). Why, how to check the download and how to remove the certificate: [Windows warnings](https://ed.dinhanhthi.com/docs.html#windows-warnings).
+Installed EchoDiar earlier with its certificate (`EchoDiar.cer`)? [Move to the Microsoft Store](https://ed.dinhanhthi.com/docs.html#windows-warnings): your recordings and API keys stay.
 
 ## Permissions
 
