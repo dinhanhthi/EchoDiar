@@ -151,7 +151,7 @@ struct RecordingDetailView: View {
         } else if !model.settings.transcribeWhileRecording {
             "Transcribe while recording is off. Turn it on in Settings › Transcription."
         } else {
-            "This engine transcribes after Stop. WhisperKit and Parakeet models also transcribe while recording."
+            "This engine transcribes after Stop. WhisperKit and Parakeet models, and Apple Speech (macOS 26+), also show the transcript while recording."
         }
     }
 

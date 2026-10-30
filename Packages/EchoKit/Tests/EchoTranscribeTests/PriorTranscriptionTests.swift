@@ -55,24 +55,19 @@ struct PriorTranscriptionTests {
     // MARK: - Pipeline
 
     /// No gaps and speakers off: the prior's segments are the transcript, written without any model (the Models root
-    /// is empty, so a batch run would stop at "Needs model"). An Apple Speech prior is kept too, where Apple Speech
-    /// is available.
+    /// is empty, so a batch run would stop at "Needs model").
     @Test func usablePriorWithoutGapsIsTheTranscriptWithoutAModel() async throws {
-        var engineIDs = ["parakeet-v3"]
-        if #available(macOS 26, *), AppleSpeechEngine.isAvailable { engineIDs.append("apple-speech") }
-        for engineID in engineIDs {
-            let (pipeline, job, root) = try Self.pipelineJob(prior: Self.recorded(duration: 2, engineID: engineID))
-            defer { try? FileManager.default.removeItem(at: root) }
-            _ = try await pipeline.transcribe(job)
+        let (pipeline, job, root) = try Self.pipelineJob(prior: Self.recorded(duration: 2))
+        defer { try? FileManager.default.removeItem(at: root) }
+        _ = try await pipeline.transcribe(job)
 
-            let transcript = try Transcript.read(from: job.folder)
-            #expect(transcript.engineID == engineID)
-            #expect(transcript.segments.map(\.text) == ["hello there", "general kenobi"])
-            #expect(transcript.segments.map(\.speaker) == [Transcript.Speaker.me, Transcript.Speaker.system(1)])
-            let conversation = try Conversation.read(from: job.folder)
-            #expect(conversation.status == .transcribed)
-            #expect(conversation.hasTranscript)
-        }
+        let transcript = try Transcript.read(from: job.folder)
+        #expect(transcript.engineID == "parakeet-v3")
+        #expect(transcript.segments.map(\.text) == ["hello there", "general kenobi"])
+        #expect(transcript.segments.map(\.speaker) == [Transcript.Speaker.me, Transcript.Speaker.system(1)])
+        let conversation = try Conversation.read(from: job.folder)
+        #expect(conversation.status == .transcribed)
+        #expect(conversation.hasTranscript)
     }
 
     /// A gap needs the model: with none installed the job stops at "Needs model".
@@ -144,10 +139,10 @@ struct PriorTranscriptionTests {
         return nil
     }
 
-    /// `engineID`'s segments of a 2 s recording: one on the mic, one on the system channel, no gaps.
-    private static func recorded(duration: Double, engineID: String = "parakeet-v3") -> PriorTranscription {
+    /// Parakeet segments of a 2 s recording: one on the mic, one on the system channel, no gaps.
+    private static func recorded(duration: Double) -> PriorTranscription {
         PriorTranscription(
-            engineID: engineID, mic: [RawSegment(start: 0, end: 0.8, text: "hello there")],
+            engineID: "parakeet-v3", mic: [RawSegment(start: 0, end: 0.8, text: "hello there")],
             system: [RawSegment(start: 1, end: 1.8, text: "general kenobi")], micGaps: [], systemGaps: [],
             duration: duration)
     }

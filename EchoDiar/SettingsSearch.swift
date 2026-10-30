@@ -91,7 +91,7 @@ struct SettingsSearchItem: Identifiable {
               keywords: ["language", "remember", "last", "record", "chevron", "menu"],
               tab: .transcription, subTab: "general"),
         .init(title: "Transcribe while recording",
-              keywords: ["live transcript", "captions", "real-time", "subtitles", "WhisperKit", "Parakeet"],
+              keywords: ["live transcript", "captions", "real-time", "subtitles", "WhisperKit", "Parakeet", "Apple Speech"],
               tab: .transcription, subTab: "general"),
         .init(title: "Free unused models after", keywords: ["memory", "RAM", "idle", "unload", "pause"],
               tab: .transcription, subTab: "general"),

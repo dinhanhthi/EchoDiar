@@ -29,8 +29,9 @@ import Synchronization
 /// runner, its volatile results become the speaker's tentative text and each final result a line. A missing language
 /// is installed first (`.preparing`) while its audio waits in the runner's stream (at most `maxQueuedSeconds` across
 /// both channels, else the transcriber fails). No model gate, no idle release, no constrained deferral: the model
-/// lives in a system process. The prior is all or nothing, never with gaps: `finish()` returns nil when no analyzer
-/// started, anything failed or no final came, and the pipeline then transcribes the whole recording.
+/// lives in a system process. Apple live is display only: `finish()` returns nil and batch Apple Speech writes the
+/// transcript after Stop, because the forced finals that bring a line ~0.6 s after a phrase lose words (measured WER
+/// 11.6 % live against 0.8 % batch on the same recording).
 public actor RecordingTranscriber {
     public enum State: Sendable, Equatable {
         /// `preparing`: Apple Speech is installing a language; its audio waits.
@@ -206,7 +207,8 @@ public actor RecordingTranscriber {
     public func flush() {
         buffer.withLock { $0.flush(paused: true) }
         wakeContinuation.yield()
-        // Apple Speech: finalizes what each runner was fed; its chunkers stay empty.
+        // Apple Speech: each runner ends its analysis (its finals come) and starts a new one at the next block; its
+        // chunkers stay empty.
         live?.feeds.forEach { $0.yield(.finalize) }
         publishRunning()
     }
@@ -217,7 +219,7 @@ public actor RecordingTranscriber {
     public func finish() async -> PriorTranscription? {
         guard !finished else { return nil }
         finished = true
-        if let live { return await finishLive(live) }
+        if live != nil { return finishLive() }
         guard buffer.withLock({ $0.loaded }) else {
             cancel()
             return nil
@@ -247,29 +249,13 @@ public actor RecordingTranscriber {
             duration: duration)
     }
 
-    /// Apple Speech at Stop: ends both streams (each runner finalizes the rest) and waits for the last finals; nil when
-    /// no analyzer started, the transcriber failed or no final came. A language still installing is waited for.
-    private func finishLive(_ live: Live) async -> PriorTranscription? {
-        guard buffer.withLock({ $0.loaded }) else {
-            cancel()
-            return nil
-        }
-        buffer.withLock { $0.finishing = true }
-        live.feeds.forEach { $0.finish() }
-        await decoder?.value
-        decoder = nil
-        updatesContinuation.finish()
-        guard let (result, duration, failed) = buffer.withLock({ buffer -> ([Channel], Double, Bool)? in
-            guard !buffer.closed else { return nil }
-            defer { buffer.close() }
-            return (buffer.channels, Double(buffer.samplesSeen) / Double(Self.sampleRate), buffer.failed)
-        }) else { return nil }
-        stats = Stats(transcribed: result.reduce(0) { $0 + $1.segments.count })
-        guard !failed, result.contains(where: { !$0.segments.isEmpty }) else { return nil }
-        let mic = result[RecordingSession.Channel.mic], system = result[RecordingSession.Channel.system]
-        return PriorTranscription(
-            engineID: entry.id, mic: mic.segments.sorted { $0.start < $1.start },
-            system: system.segments.sorted { $0.start < $1.start }, micGaps: [], systemGaps: [], duration: duration)
+    /// Apple Speech at Stop: always nil (display only; batch Apple Speech writes the transcript). Cancels the runners
+    /// without waiting for them, so it returns at once even with a `finalize(through:)` in flight. `stats.transcribed`
+    /// counts the lines shown, once an analyzer started.
+    private func finishLive() -> PriorTranscription? {
+        if buffer.withLock({ $0.loaded }) { stats = Stats(transcribed: nextLineID) }
+        cancel()
+        return nil
     }
 
     /// Stops at once, keeping nothing; the decode task unloads the model on its way out.
@@ -332,8 +318,8 @@ public actor RecordingTranscriber {
         await model.release()
     }
 
-    /// Apple Speech: runs both channels' runners and applies their results in order, until both streams end (`finish()`)
-    /// or something throws (the other runner is then cancelled).
+    /// Apple Speech: runs both channels' runners and applies their results in order, until both streams end or the
+    /// task is cancelled (`finish()`, `cancel()`), or something throws (the other runner is then cancelled).
     private nonisolated func runLive(_ live: Live) async throws {
         guard #available(macOS 26, *) else { throw TranscriptionError.unknownEngine(entry.id) }
         try await withThrowingTaskGroup(of: Void.self) { group in

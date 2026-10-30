@@ -11,7 +11,7 @@ enum AppleSpeechLiveEvent: Sendable {
     /// 16 kHz mono samples starting at `startSample` of the file. `language` is the marker's BCP-47 code; nil, empty
     /// or "auto" means the default language (Apple Speech has no audio language ID).
     case audio(samples: [Float], startSample: Int, language: String?)
-    /// Finalizes the audio fed so far: the recording paused.
+    /// Ends the analysis, delivering its finals: the recording paused.
     case finalize
 }
 
@@ -25,9 +25,15 @@ enum AppleSpeechLiveEvent: Sendable {
 /// spike 2026-10-30: a fresh analyzer honours a non-zero first `bufferStartTime`).
 ///
 /// Without help the analyzer finalizes only every 10–20 s of audio, so an energy pause detector calls
-/// `finalize(through:)` once per 0.5 s pause, and only when a volatile result came since the last final: finalizing
-/// at every pause invents mic lines like "Oui." on noise (measured: phrase end → final 0.65 s median, 0 invented lines,
-/// against 11.2 s without finalize and 16 invented lines over 315 s when ungated).
+/// `finalize(through:)` once per 0.5 s pause, and only when a volatile result with letters came since the last final:
+/// finalizing at every pause invents mic lines like "Oui." on noise (measured: phrase end → final 0.65 s median, 0
+/// invented lines, against 11.2 s without finalize and 16 invented lines over 315 s when ungated). These forced finals
+/// lose words (WER 11.6 % against 0.8 % for batch Apple Speech on the same audio, measured), so they are for the live
+/// display only. Results with no letters (a "." on noise) are dropped.
+///
+/// `finalize(through:)` does not return until more audio comes or the input ends (measured), so it is never awaited
+/// before `finalizeAndFinishThroughEndOfInput()`, which releases it (it throws) and delivers the finals in ~0.05 s.
+/// A pause (`.finalize`) therefore ends the analysis, and the next block starts a new one at its file time.
 ///
 /// Speech objects never leave the task that calls `run` (`SpeechTranscriber` is not Sendable); results come back
 /// through the callbacks, from another task.
@@ -42,9 +48,10 @@ enum AppleSpeechLiveStream {
 
     /// Runs one channel until `events` ends (finalizes the rest, delivering its finals, then returns) or the task is
     /// cancelled (drops the rest and throws `CancellationError`). `onPreparing` runs when a locale's assets must be
-    /// downloaded, `onStarted` each time an analyzer started. `onVolatile` gets the non-empty text pending and its start
-    /// in file samples, never before the channel's last final; `onFinal` each non-empty final in file seconds. Errors
-    /// (an unsupported language, a failed install or analysis) are thrown.
+    /// downloaded, `onStarted` each time an analyzer started (also after each pause). `onVolatile` gets the text
+    /// pending, when it has letters, and its start in file samples, never before the channel's last final; `onFinal`
+    /// each final with letters in file seconds. Errors (an unsupported language, a failed install or analysis) are
+    /// thrown.
     static func run(
         events: AsyncStream<AppleSpeechLiveEvent>,
         onPreparing: @escaping @Sendable () -> Void,
@@ -63,10 +70,14 @@ enum AppleSpeechLiveStream {
         var fedEnd = 0
         do {
             for await event in events {
+                try Task.checkCancellation()
                 if let error = shared.withLock({ $0.error }) { throw error }
                 switch event {
                 case .finalize:
-                    analysis?.finalize(through: fedEnd)
+                    if let current = analysis {
+                        try await current.finish()
+                        analysis = nil
+                    }
                 case .audio(let samples, let startSample, let language):
                     guard !samples.isEmpty else { continue }
                     if analysis == nil || language != marker {
@@ -77,8 +88,8 @@ enum AppleSpeechLiveStream {
                         }
                         if locale.identifier(.bcp47) != analysis?.localeID {
                             if let current = analysis {
-                                analysis = nil
                                 try await current.finish()
+                                analysis = nil
                             }
                             analysis = try await Analysis.start(locale: locale, shared: shared, callbacks: callbacks)
                             onStarted()
@@ -96,8 +107,8 @@ enum AppleSpeechLiveStream {
             }
             try Task.checkCancellation()
             if let current = analysis {
-                analysis = nil
                 try await current.finish()
+                analysis = nil
             }
         } catch {
             await analysis?.cancel()
@@ -117,7 +128,7 @@ enum AppleSpeechLiveStream {
 
     /// What a channel's results task and its feed share, across analyzers.
     private struct Shared {
-        /// A non-empty volatile result arrived since the last final: the pause may finalize.
+        /// A volatile result with letters arrived since the last final: the pause may finalize.
         var volatilePending = false
         /// The end of the channel's last final, in file samples; a volatile never starts before it.
         var finalEndSample = 0
@@ -139,7 +150,7 @@ enum AppleSpeechLiveStream {
         let inputFormat: AVAudioFormat
         let converter: AVAudioConverter
         let results: Task<Void, any Error>
-        /// The latest `finalize(through:)`, chained after the previous one and awaited before the analyzer finishes.
+        /// The latest `finalize(through:)`, chained after the previous one; never awaited (see `finish()`).
         var finalizing: Task<Void, Never>?
 
         /// Reserves the locale and installs its assets (`preparing` only when something must be downloaded: the
@@ -202,29 +213,32 @@ enum AppleSpeechLiveStream {
             inputs.yield(AnalyzerInput(buffer: output, bufferStartTime: start))
         }
 
-        /// Finalizes the results through `sample` without blocking the feed (it takes ~0.15 s, measured). A failure
-        /// only delays the final: the end of input finalizes that audio again.
+        /// Finalizes the results through `sample` without blocking the feed: the final comes ~0.05 s later, but the
+        /// call returns only once more audio came (measured). A failure only delays the final: the end of input
+        /// finalizes that audio again. Cancelled, a chained call that has not started yet is skipped.
         mutating func finalize(through sample: Int) {
             let analyzer = analyzer
             let previous = finalizing
             let time = CMTime(value: CMTimeValue(sample), timescale: CMTimeScale(AppleSpeechLiveStream.sampleRate))
             finalizing = Task {
                 await previous?.value
+                guard !Task.isCancelled else { return }
                 try? await analyzer.finalize(through: time)
             }
         }
 
-        /// Finalizes everything fed and waits for the last results.
+        /// Finalizes everything fed and waits for the last results. A pending `finalize(through:)` would wait for audio
+        /// that never comes, so it is cancelled, not awaited: the end of input releases it (measured).
         func finish() async throws {
             inputs.finish()
-            await finalizing?.value
+            finalizing?.cancel()
             do {
                 try await analyzer.finalizeAndFinishThroughEndOfInput()
+                try await results.value
             } catch {
                 await cancel()
                 throw error
             }
-            try await results.value
         }
 
         /// Drops what is not finalized and ends the results.
@@ -248,9 +262,9 @@ enum AppleSpeechLiveStream {
                         $0.volatilePending = false
                         $0.finalEndSample = max($0.finalEndSample, end)
                     }
-                    guard !text.isEmpty else { continue }
+                    guard text.contains(where: \.isLetter) else { continue }
                     callbacks.final(RawSegment(start: result.range.start.seconds, end: result.range.end.seconds, text: text))
-                } else if !text.isEmpty {
+                } else if text.contains(where: \.isLetter) {
                     // A volatile's range starts at the finalization frontier, leading silence included (measured).
                     let floor = shared.withLock {
                         $0.volatilePending = true
