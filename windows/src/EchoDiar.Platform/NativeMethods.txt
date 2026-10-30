@@ -45,6 +45,9 @@ ILCreateFromPathW
 ILFree
 IMMNotificationClient
 PKEY_AudioEngine_DeviceFormat
+PKEY_Device_EnumeratorName
+PKEY_Device_ContainerId
+PKEY_AudioEndpoint_FormFactor
 GetWindowLong
 SetWindowLong
 SetWindowPos

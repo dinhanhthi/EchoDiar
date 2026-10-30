@@ -19,7 +19,7 @@ public readonly record struct AudioInputDevice(string Id, string Name);
 /// device format (sample rate) changes. Notifications within 300 ms are coalesced and the state is compared as a
 /// whole, since a disconnect fires its notifications (state changed, removed, defaults changed) in no guaranteed order.
 /// <para>
-/// The input in use is the picked endpoint while it is active, else the default capture endpoint (eConsole, as
+/// The input in use is the picked endpoint while it is active, else <see cref="DefaultMicId"/> (as
 /// <see cref="MicCapture"/>); the output is the default render endpoint (eConsole, as <see cref="LoopbackCapture.Endpoint"/>).
 /// </para>
 /// <para>
@@ -31,6 +31,9 @@ public readonly record struct AudioInputDevice(string Id, string Name);
 public sealed class AudioRouteMonitor : IAudioRouteSource, IDisposable
 {
     private static readonly TimeSpan Coalesce = TimeSpan.FromMilliseconds(300);
+
+    // The container id of the devices built into the computer (its own mic and speakers).
+    private const string ComputerContainer = "00000000-0000-0000-ffff-ffffffffffff";
 
     // Clients whose unregistration failed: the audio service may still call them, so they are never collected.
     private static readonly List<Listener> Unreleased = [];
@@ -253,7 +256,7 @@ public sealed class AudioRouteMonitor : IAudioRouteSource, IDisposable
         else Task.Run(action).GetAwaiter().GetResult();
     }
 
-    /// <summary>The picked endpoint while it is active, else the default capture endpoint.</summary>
+    /// <summary>The picked endpoint while it is active, else <see cref="DefaultMicId"/>.</summary>
     private static Endpoint ResolveInput(IMMDeviceEnumerator enumerator, string? pinnedId)
     {
         if (pinnedId is not null)
@@ -273,8 +276,108 @@ public sealed class AudioRouteMonitor : IAudioRouteSource, IDisposable
                 if (device is not null) Marshal.ReleaseComObject(device);
             }
         }
-        return DefaultEndpoint(enumerator, EDataFlow.eCapture);
+        IMMDevice? fallback = null;
+        try
+        {
+            var id = DefaultMicId(enumerator);
+            enumerator.GetDevice(id, out fallback);
+            return new Endpoint(id, Rate(fallback));
+        }
+        catch (COMException)
+        {
+            return default; // E_NOTFOUND: no capture endpoint
+        }
+        finally
+        {
+            if (fallback is not null) Marshal.ReleaseComObject(fallback);
+        }
     }
+
+    /// <summary>
+    /// The capture endpoint used when none is picked (the counterpart of macOS <c>MicCapture.inputDevice(uid:)</c>): the
+    /// default one (eConsole), unless it is the Bluetooth hands-free mic (enumerator BTHHFENUM) of the headset that is
+    /// also the default render endpoint (same container id). Opening that one switches the headset to its hands-free
+    /// profile, which drops its playback quality, so <see cref="ReplacementMicId"/> is used instead when there is one.
+    /// Throws when there is no capture endpoint, as GetDefaultAudioEndpoint does.
+    /// </summary>
+    internal static string DefaultMicId(IMMDeviceEnumerator enumerator)
+    {
+        IMMDevice? input = null;
+        IMMDevice? output = null;
+        try
+        {
+            enumerator.GetDefaultAudioEndpoint(EDataFlow.eCapture, ERole.eConsole, out input);
+            var id = Id(input);
+            if (!string.Equals(Text(input, PInvoke.PKEY_Device_EnumeratorName), "BTHHFENUM", StringComparison.OrdinalIgnoreCase)) return id;
+            var container = Text(input, PInvoke.PKEY_Device_ContainerId);
+            if (container is null || container == ComputerContainer) return id;
+            try
+            {
+                enumerator.GetDefaultAudioEndpoint(EDataFlow.eRender, ERole.eConsole, out output);
+            }
+            catch (COMException)
+            {
+                return id; // no render endpoint
+            }
+            return container == Text(output, PInvoke.PKEY_Device_ContainerId) ? ReplacementMicId(enumerator) ?? id : id;
+        }
+        finally
+        {
+            if (output is not null) Marshal.ReleaseComObject(output);
+            if (input is not null) Marshal.ReleaseComObject(input);
+        }
+    }
+
+    /// <summary>
+    /// In place of the headset's mic, skipping Bluetooth and virtual endpoints: the first active capture endpoint in the
+    /// computer's own container (built in) whose form factor is a microphone or headset (or unreadable), else the first
+    /// other one by friendly name (a USB webcam, a wired mic), else null.
+    /// </summary>
+    private static string? ReplacementMicId(IMMDeviceEnumerator enumerator)
+    {
+        IMMDeviceCollection? devices = null;
+        string? builtIn = null;
+        var others = new List<(string Name, string Id)>();
+        try
+        {
+            enumerator.EnumAudioEndpoints(EDataFlow.eCapture, DEVICE_STATE.DEVICE_STATE_ACTIVE, out devices);
+            devices.GetCount(out var count);
+            for (uint i = 0; i < count; i++)
+            {
+                IMMDevice? device = null;
+                try
+                {
+                    devices.Item(i, out device);
+                    // Virtual devices have no physical container, so Windows puts them in the computer's.
+                    if (Text(device, PInvoke.PKEY_Device_EnumeratorName) is { } enumeratorName && IsBluetoothOrVirtual(enumeratorName)) continue;
+                    var id = Id(device);
+                    if (Text(device, PInvoke.PKEY_Device_ContainerId) != ComputerContainer) others.Add((CaptureLoop.FriendlyName(device) ?? id, id));
+                    else if (FormFactor(device) is null or 4 or 5) builtIn ??= id; // Microphone, Headset (not Stereo Mix)
+                }
+                catch (COMException)
+                {
+                    // The endpoint went away meanwhile: skip it.
+                }
+                finally
+                {
+                    if (device is not null) Marshal.ReleaseComObject(device);
+                }
+            }
+        }
+        catch (COMException)
+        {
+            // No endpoint list: what was read so far.
+        }
+        finally
+        {
+            if (devices is not null) Marshal.ReleaseComObject(devices);
+        }
+        return builtIn ?? others.OrderBy(o => o.Name, StringComparer.OrdinalIgnoreCase).Select(o => o.Id).FirstOrDefault();
+    }
+
+    /// <summary>Bluetooth (BTH*) or software (ROOT, SWD: virtual cables, app mics) enumerators.</summary>
+    private static bool IsBluetoothOrVirtual(string enumeratorName) =>
+        new[] { "BTH", "ROOT", "SWD" }.Any(prefix => enumeratorName.StartsWith(prefix, StringComparison.OrdinalIgnoreCase));
 
     /// <summary>The default endpoint (eConsole) for <paramref name="flow"/>; no id when there is none.</summary>
     private static Endpoint DefaultEndpoint(IMMDeviceEnumerator enumerator, EDataFlow flow)
@@ -335,6 +438,53 @@ public sealed class AudioRouteMonitor : IAudioRouteSource, IDisposable
         finally
         {
             PInvoke.CoTaskMemFree(id.Value);
+        }
+    }
+
+    /// <summary>A string (VT_LPWSTR) or GUID (VT_CLSID, lowercase, no braces) endpoint property, or null when it cannot be read.</summary>
+    private static unsafe string? Text(IMMDevice device, PROPERTYKEY key)
+    {
+        IPropertyStore? store = null;
+        var value = default(PROPVARIANT);
+        try
+        {
+            device.OpenPropertyStore(STGM.STGM_READ, out store);
+            store.GetValue(&key, out value);
+            if (value.vt == VARENUM.VT_LPWSTR && value.pwszVal.Value != null) return value.pwszVal.ToString();
+            if (value.vt == VARENUM.VT_CLSID && value.puuid != null) return value.puuid->ToString();
+            return null;
+        }
+        catch (COMException)
+        {
+            return null;
+        }
+        finally
+        {
+            PInvoke.PropVariantClear(ref value);
+            if (store is not null) Marshal.ReleaseComObject(store);
+        }
+    }
+
+    /// <summary>The endpoint's form factor (PKEY_AudioEndpoint_FormFactor, an EndpointFormFactor), or null when it cannot be read.</summary>
+    private static unsafe uint? FormFactor(IMMDevice device)
+    {
+        IPropertyStore? store = null;
+        var value = default(PROPVARIANT);
+        try
+        {
+            device.OpenPropertyStore(STGM.STGM_READ, out store);
+            var key = PInvoke.PKEY_AudioEndpoint_FormFactor;
+            store.GetValue(&key, out value);
+            return value.vt == VARENUM.VT_UI4 ? value.ulVal : null;
+        }
+        catch (COMException)
+        {
+            return null;
+        }
+        finally
+        {
+            PInvoke.PropVariantClear(ref value);
+            if (store is not null) Marshal.ReleaseComObject(store);
         }
     }
 

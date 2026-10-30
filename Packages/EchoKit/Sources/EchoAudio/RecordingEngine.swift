@@ -590,10 +590,9 @@ public final class RecordingEngine: @unchecked Sendable {
         return try? url.resourceValues(forKeys: [.volumeAvailableCapacityForImportantUsageKey]).volumeAvailableCapacityForImportantUsage
     }
 
-    /// The picked device's name while it exists, else the default input's.
+    /// The name of the device `MicCapture` opens for `uid` (see `MicCapture.inputDevice(uid:)`).
     private static func inputDeviceName(uid: String?) -> String? {
-        if let uid, let device = MicCapture.deviceID(forUID: uid) { return deviceName(device) }
-        return defaultDeviceName(kAudioHardwarePropertyDefaultInputDevice)
+        MicCapture.inputDevice(uid: uid).flatMap(deviceName)
     }
 
     private static func defaultDeviceName(_ selector: AudioObjectPropertySelector) -> String? {
