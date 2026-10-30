@@ -449,12 +449,16 @@ internal static class ConversationText
         return string.Create(CultureInfo.InvariantCulture, $"{whole / 60:00}:{whole % 60:00}");
     }
 
-    /// <summary>The date, the duration and the status.</summary>
-    public static string Detail(Conversation conversation, AppViewModel model)
+    /// <summary>The date and the duration (the title bar's details).</summary>
+    public static string When(Conversation conversation)
     {
         var created = conversation.CreatedAt.ToLocalTime().ToString("g", CultureInfo.CurrentCulture);
-        return $"{created} · {Clock(conversation.Duration)} · {Status(conversation, model)}";
+        return $"{created} · {Clock(conversation.Duration)}";
     }
+
+    /// <summary>The date, the duration and the status.</summary>
+    public static string Detail(Conversation conversation, AppViewModel model) =>
+        $"{When(conversation)} · {Status(conversation, model)}";
 
     /// <summary>
     /// The job's step and percent while one is queued or running, else the stored status. The macOS texts where macOS

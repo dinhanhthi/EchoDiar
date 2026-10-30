@@ -1,10 +1,11 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!--
-    The title bar's toolbar (macOS MainView.swift toolbar) in Windows 11 title bar controls. Leading: Back, the record
-    group, a Settings section's inner tabs, the conversation's title. Trailing: Update, Reveal and Delete, Settings, Calendar and Ask across conversations, Search,
-    the conversation's tabs. The title and the empty space drag the window (MainWindow makes only the groups, the lone
-    buttons, the search box and the tabs passthrough). Icon buttons are 32 x 32 subtle buttons with 16 px Segoe Fluent
-    Icons; 4 px between the buttons of a group, 8 px between groups.
+    The window's header (macOS MainView.swift toolbar) in two rows on the window's Mica, like Paint. The title row is
+    the window's title bar (MainWindow.SetTitleBar): the logo, the page's or the conversation's title and, for a
+    conversation, its date and duration; all of it drags the window, the caption buttons sit at its right. The toolbar
+    row below, from the left: Back, the record group, Reveal and Delete, Settings, Calendar and Ask across conversations,
+    Update; at the right edge the conversation's tabs (or a Settings section's inner tabs), then Search. Icon buttons
+    are 32 x 32 subtle buttons with 16 px Segoe Fluent Icons; 4 px between the buttons of a group, 8 px between groups.
 -->
 <UserControl
     x:Class="EchoDiar.App.Views.TitleBarToolbar"
@@ -12,86 +13,259 @@
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
     xmlns:local="using:EchoDiar.App">
 
-    <!--
-        The title and Search share the free space 1:1; Search shrinks from 280 to 120, where its placeholder still
-        fits. Where even 120 does not fit, Search becomes an icon button that opens the box (code-behind). Search, or
-        the conversation's tabs, ends at the caption buttons. Margins space the columns, since a collapsed group's
-        column would keep a ColumnSpacing.
-    -->
-    <Grid x:Name="ToolbarGrid" Padding="12,0,0,0">
-        <Grid.ColumnDefinitions>
-            <ColumnDefinition x:Name="LeadingColumn" Width="Auto" />
-            <ColumnDefinition Width="*" />
-            <ColumnDefinition x:Name="TrailingColumn" Width="Auto" />
-            <ColumnDefinition x:Name="SearchColumn" Width="*" MinWidth="120" MaxWidth="280" />
-            <ColumnDefinition x:Name="TabsColumn" Width="Auto" />
-        </Grid.ColumnDefinitions>
+    <Grid>
+        <Grid.RowDefinitions>
+            <!-- The Standard caption buttons' height. -->
+            <RowDefinition Height="32" />
+            <RowDefinition Height="44" />
+        </Grid.RowDefinitions>
+
+        <!-- The title bar: everything in it drags the window; the inset columns keep the title off the caption buttons. -->
+        <Grid x:Name="TitleBarGrid" Background="Transparent">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition x:Name="LeftInsetColumn" Width="0" />
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition x:Name="RightInsetColumn" Width="0" />
+            </Grid.ColumnDefinitions>
+
+            <!-- Left-aligned, so the title takes only its width and the details follow it; a long title ends in "…". -->
+            <Grid
+                Grid.Column="1"
+                Margin="16,0,12,0"
+                HorizontalAlignment="Left"
+                VerticalAlignment="Center"
+                ColumnSpacing="8">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
+
+                <Image
+                    Width="16"
+                    Height="16"
+                    AutomationProperties.AccessibilityView="Raw"
+                    Source="ms-appx:///Assets/Square44x44Logo.png" />
+                <TextBlock
+                    x:Name="TitleText"
+                    Grid.Column="1"
+                    VerticalAlignment="Center"
+                    Style="{StaticResource CaptionTextBlockStyle}"
+                    MaxLines="1"
+                    TextTrimming="CharacterEllipsis"
+                    TextWrapping="NoWrap" />
+                <!-- A conversation's date and duration. -->
+                <TextBlock
+                    x:Name="DetailText"
+                    Grid.Column="2"
+                    VerticalAlignment="Center"
+                    Style="{StaticResource CaptionTextBlockStyle}"
+                    Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                    MaxLines="1"
+                    TextTrimming="CharacterEllipsis"
+                    TextWrapping="NoWrap"
+                    Visibility="Collapsed" />
+            </Grid>
+        </Grid>
 
         <!--
-            Stretch, not Center: the group keeps the title bar's height whether the Settings tabs (about 40 px, the
-            buttons 32) show or not, so its buttons stay put when they do.
+            The toolbar: ordinary content, it does not drag the window. Search takes the free space first (its weight
+            dwarfs the spacer's), from 120 up to 280; the spacer takes the rest, so the tabs and Search keep to the right
+            edge. Where even 120 does not fit, Search becomes an icon button that opens the box (code-behind). Margins
+            space the columns, since a collapsed group's column would keep a ColumnSpacing.
         -->
-        <StackPanel Orientation="Horizontal" Spacing="8">
-            <Button
-                x:Name="BackButton"
-                Width="32"
-                Height="32"
-                Padding="0"
-                Style="{StaticResource SubtleButtonStyle}"
-                AutomationProperties.Name="{local:T Text='Back'}"
-                ToolTipService.ToolTip="{local:T Text='Back'}"
-                Visibility="Collapsed">
-                <FontIcon FontFamily="{ThemeResource SymbolThemeFontFamily}" FontSize="16" Glyph="&#xE72B;" />
-            </Button>
+        <Grid x:Name="ToolbarGrid" Grid.Row="1" Padding="8,0,8,0">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition x:Name="LeadingColumn" Width="Auto" />
+                <ColumnDefinition x:Name="ActionsColumn" Width="Auto" />
+                <ColumnDefinition x:Name="SpacerColumn" Width="*" />
+                <ColumnDefinition x:Name="TabsColumn" Width="Auto" />
+                <ColumnDefinition x:Name="SearchColumn" Width="1000*" MinWidth="120" MaxWidth="280" />
+            </Grid.ColumnDefinitions>
 
-            <!--
-                Idle: Record and its menu of targets and the language, a split button with no fill at rest and the
-                default hover, pressed and menu-open fills. Recording: Stop and Pause or Resume.
-            -->
-            <StackPanel x:Name="RecordGroup" Orientation="Horizontal" Spacing="4" VerticalAlignment="Center">
-                <SplitButton
-                    x:Name="RecordSplitButton"
-                    Height="32"
-                    Padding="8,0"
-                    Background="Transparent"
-                    BorderBrush="Transparent"
-                    AutomationProperties.Name="{local:T Text='Record'}"
-                    ToolTipService.ToolTip="{local:T Text='Record'}">
-                    <FontIcon FontFamily="{ThemeResource SymbolThemeFontFamily}" FontSize="16" Glyph="&#xE7C8;" />
-                    <SplitButton.Flyout>
-                        <MenuFlyout x:Name="TargetMenu" Placement="BottomEdgeAlignedLeft" />
-                    </SplitButton.Flyout>
-                </SplitButton>
+            <StackPanel Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
+                <!-- Always shown; enabled where there is a page to go back to (or the library chat to close). -->
                 <Button
-                    x:Name="StopButton"
+                    x:Name="BackButton"
                     Width="32"
                     Height="32"
                     Padding="0"
                     Style="{StaticResource SubtleButtonStyle}"
-                    AutomationProperties.Name="{local:T Text='Stop recording'}"
-                    ToolTipService.ToolTip="{local:T Text='Stop recording'}"
-                    Visibility="Collapsed">
-                    <FontIcon
-                        x:Name="StopIcon"
-                        FontFamily="{ThemeResource SymbolThemeFontFamily}"
-                        FontSize="16"
-                        Foreground="{ThemeResource SystemFillColorCriticalBrush}"
-                        Glyph="&#xE71A;" />
+                    AutomationProperties.Name="{local:T Text='Back'}"
+                    ToolTipService.ToolTip="{local:T Text='Back'}">
+                    <FontIcon FontFamily="{ThemeResource SymbolThemeFontFamily}" FontSize="16" Glyph="&#xE76B;" />
                 </Button>
+
+                <!--
+                    Idle: Record and its menu of targets and the language, a split button with no fill at rest and the
+                    default hover, pressed and menu-open fills. Recording: Stop and Pause or Resume.
+                -->
+                <StackPanel x:Name="RecordGroup" Orientation="Horizontal" Spacing="4" VerticalAlignment="Center">
+                    <SplitButton
+                        x:Name="RecordSplitButton"
+                        Height="32"
+                        Padding="8,0"
+                        Background="Transparent"
+                        BorderBrush="Transparent"
+                        AutomationProperties.Name="{local:T Text='Record'}"
+                        ToolTipService.ToolTip="{local:T Text='Record'}">
+                        <FontIcon FontFamily="{ThemeResource SymbolThemeFontFamily}" FontSize="16" Glyph="&#xE7C8;" />
+                        <SplitButton.Flyout>
+                            <MenuFlyout x:Name="TargetMenu" Placement="BottomEdgeAlignedLeft" />
+                        </SplitButton.Flyout>
+                    </SplitButton>
+                    <Button
+                        x:Name="StopButton"
+                        Width="32"
+                        Height="32"
+                        Padding="0"
+                        Style="{StaticResource SubtleButtonStyle}"
+                        AutomationProperties.Name="{local:T Text='Stop recording'}"
+                        ToolTipService.ToolTip="{local:T Text='Stop recording'}"
+                        Visibility="Collapsed">
+                        <FontIcon
+                            x:Name="StopIcon"
+                            FontFamily="{ThemeResource SymbolThemeFontFamily}"
+                            FontSize="16"
+                            Foreground="{ThemeResource SystemFillColorCriticalBrush}"
+                            Glyph="&#xE71A;" />
+                    </Button>
+                    <Button
+                        x:Name="PauseButton"
+                        Width="32"
+                        Height="32"
+                        Padding="0"
+                        Style="{StaticResource SubtleButtonStyle}"
+                        Visibility="Collapsed">
+                        <FontIcon
+                            x:Name="PauseIcon"
+                            FontFamily="{ThemeResource SymbolThemeFontFamily}"
+                            FontSize="16"
+                            Glyph="&#xE769;" />
+                    </Button>
+                </StackPanel>
+            </StackPanel>
+
+            <StackPanel
+                x:Name="ActionsPanel"
+                Grid.Column="1"
+                Margin="8,0,0,0"
+                Orientation="Horizontal"
+                Spacing="8"
+                VerticalAlignment="Center">
+                <!-- Always shown, so the buttons after them never move; enabled on a conversation. -->
+                <StackPanel x:Name="FileGroup" Orientation="Horizontal" Spacing="4" VerticalAlignment="Center">
+                    <Button
+                        x:Name="RevealButton"
+                        Width="32"
+                        Height="32"
+                        Padding="0"
+                        Style="{StaticResource SubtleButtonStyle}"
+                        AutomationProperties.Name="{local:T Text='Reveal in Explorer'}"
+                        ToolTipService.ToolTip="{local:T Text='Reveal in Explorer'}">
+                        <FontIcon FontFamily="{ThemeResource SymbolThemeFontFamily}" FontSize="16" Glyph="&#xE8B7;" />
+                    </Button>
+                    <Button
+                        x:Name="DeleteButton"
+                        Width="32"
+                        Height="32"
+                        Padding="0"
+                        Style="{StaticResource SubtleButtonStyle}"
+                        AutomationProperties.Name="{local:T Text='Delete'}"
+                        ToolTipService.ToolTip="{local:T Text='Delete the audio or the whole conversation'}">
+                        <FontIcon FontFamily="{ThemeResource SymbolThemeFontFamily}" FontSize="16" Glyph="&#xE74D;" />
+                        <Button.Flyout>
+                            <MenuFlyout x:Name="DeleteMenu" Placement="BottomEdgeAlignedRight">
+                                <MenuFlyoutItem x:Name="DeleteAudioItem" />
+                                <MenuFlyoutItem x:Name="DeleteConversationItem" />
+                            </MenuFlyout>
+                        </Button.Flyout>
+                    </Button>
+                </StackPanel>
+
+                <!--
+                    Settings opens the Settings page, or goes back from it, and Calendar the Calendar page; Ask across
+                    conversations opens or closes the library chat.
+                -->
+                <StackPanel x:Name="AppGroup" Orientation="Horizontal" Spacing="4" VerticalAlignment="Center">
+                    <Button
+                        x:Name="SettingsButton"
+                        Width="32"
+                        Height="32"
+                        Padding="0"
+                        Style="{StaticResource SubtleButtonStyle}"
+                        AutomationProperties.Name="{local:T Text='Settings'}"
+                        ToolTipService.ToolTip="{local:T Text='Settings'}">
+                        <FontIcon FontFamily="{ThemeResource SymbolThemeFontFamily}" FontSize="16" Glyph="&#xE9E9;" />
+                    </Button>
+                    <Button
+                        x:Name="CalendarButton"
+                        Width="32"
+                        Height="32"
+                        Padding="0"
+                        Style="{StaticResource SubtleButtonStyle}"
+                        AutomationProperties.Name="{local:T Text='Calendar'}"
+                        ToolTipService.ToolTip="{local:T Text='Calendar'}">
+                        <FontIcon FontFamily="{ThemeResource SymbolThemeFontFamily}" FontSize="16" Glyph="&#xE787;" />
+                    </Button>
+                    <Button
+                        x:Name="AskButton"
+                        Width="32"
+                        Height="32"
+                        Padding="0"
+                        Style="{StaticResource SubtleButtonStyle}"
+                        AutomationProperties.Name="{local:T Text='Ask across conversations'}"
+                        ToolTipService.ToolTip="{local:T Text='Ask across conversations'}">
+                        <FontIcon FontFamily="{ThemeResource SymbolThemeFontFamily}" FontSize="16" Glyph="&#xE8BD;" />
+                    </Button>
+                </StackPanel>
+
+                <!--
+                    Shown while an update is available and nothing runs that installing would cut off; while it installs,
+                    a ring shows how far (code-behind). Last, so showing it moves no other button.
+                -->
                 <Button
-                    x:Name="PauseButton"
+                    x:Name="UpdateButton"
                     Width="32"
                     Height="32"
                     Padding="0"
                     Style="{StaticResource SubtleButtonStyle}"
+                    AutomationProperties.Name="{local:T Text='Update'}"
+                    ToolTipService.ToolTip="{local:T Text='Install the available update'}"
                     Visibility="Collapsed">
-                    <FontIcon
-                        x:Name="PauseIcon"
-                        FontFamily="{ThemeResource SymbolThemeFontFamily}"
-                        FontSize="16"
-                        Glyph="&#xE769;" />
+                    <Grid>
+                        <FontIcon
+                            x:Name="UpdateIcon"
+                            FontFamily="{ThemeResource SymbolThemeFontFamily}"
+                            FontSize="16"
+                            Foreground="{ThemeResource SystemFillColorSuccessBrush}"
+                            Glyph="&#xE896;" />
+                        <ProgressRing
+                            x:Name="UpdateProgress"
+                            Width="16"
+                            Height="16"
+                            IsIndeterminate="False"
+                            Maximum="100"
+                            Visibility="Collapsed" />
+                    </Grid>
                 </Button>
             </StackPanel>
+
+            <!--
+                The conversation page's tab (AppViewModel.DetailTab): Transcript, or Summary and Chat (the AI panel). Never
+                shown with the Settings tabs below, which take the same place.
+            -->
+            <SelectorBar
+                x:Name="TabsBar"
+                Grid.Column="3"
+                Margin="0,0,8,0"
+                Padding="0"
+                VerticalAlignment="Center"
+                Visibility="Collapsed">
+                <SelectorBarItem x:Name="TranscriptTab" Text="{local:T Text='Transcript'}" />
+                <SelectorBarItem x:Name="SummaryTab" Text="{local:T Text='Summary'}" />
+                <SelectorBarItem x:Name="ChatTab" Text="{local:T Text='Chat'}" />
+            </SelectorBar>
 
             <!--
                 The shown Settings section's inner tabs (macOS settingsTabsItem), built per section; collapsed for a
@@ -99,177 +273,35 @@
             -->
             <SelectorBar
                 x:Name="SettingsTabsBar"
+                Grid.Column="3"
+                Margin="0,0,8,0"
                 Padding="0"
                 VerticalAlignment="Center"
                 Visibility="Collapsed" />
-        </StackPanel>
 
-        <!-- The shown conversation's title and details; not passthrough, so it drags the window like on macOS. -->
-        <StackPanel
-            x:Name="TitlePanel"
-            Grid.Column="1"
-            Margin="12,0,0,0"
-            VerticalAlignment="Center"
-            Visibility="Collapsed">
-            <TextBlock
-                x:Name="TitleText"
-                Style="{StaticResource BodyStrongTextBlockStyle}"
-                MaxLines="1"
-                TextTrimming="CharacterEllipsis"
-                TextWrapping="NoWrap" />
-            <TextBlock
-                x:Name="DetailText"
-                Style="{StaticResource CaptionTextBlockStyle}"
-                Foreground="{ThemeResource TextFillColorSecondaryBrush}"
-                MaxLines="1"
-                TextTrimming="CharacterEllipsis"
-                TextWrapping="NoWrap" />
-        </StackPanel>
+            <!-- Filters the library and the sidebar as typed, or on Settings the settings; Esc clears it. -->
+            <AutoSuggestBox
+                x:Name="SearchBox"
+                Grid.Column="4"
+                HorizontalAlignment="Stretch"
+                VerticalAlignment="Center"
+                AutomationProperties.Name="{local:T Text='Search conversations'}"
+                PlaceholderText="{local:T Text='Search'}"
+                QueryIcon="Find" />
 
-        <StackPanel
-            x:Name="TrailingPanel"
-            Grid.Column="2"
-            Margin="12,0,8,0"
-            Orientation="Horizontal"
-            Spacing="8"
-            VerticalAlignment="Center">
-            <!--
-                Shown while an update is available and nothing runs that installing would cut off; while it installs,
-                a ring shows how far (code-behind).
-            -->
+            <!-- Where the box does not fit: opens it in place of the action buttons until it is left empty. -->
             <Button
-                x:Name="UpdateButton"
+                x:Name="SearchButton"
+                Grid.Column="4"
                 Width="32"
                 Height="32"
                 Padding="0"
                 Style="{StaticResource SubtleButtonStyle}"
-                AutomationProperties.Name="{local:T Text='Update'}"
-                ToolTipService.ToolTip="{local:T Text='Install the available update'}"
+                AutomationProperties.Name="{local:T Text='Search conversations'}"
+                ToolTipService.ToolTip="{local:T Text='Search'}"
                 Visibility="Collapsed">
-                <Grid>
-                    <FontIcon
-                        x:Name="UpdateIcon"
-                        FontFamily="{ThemeResource SymbolThemeFontFamily}"
-                        FontSize="16"
-                        Foreground="{ThemeResource SystemFillColorSuccessBrush}"
-                        Glyph="&#xE896;" />
-                    <ProgressRing
-                        x:Name="UpdateProgress"
-                        Width="16"
-                        Height="16"
-                        IsIndeterminate="False"
-                        Maximum="100"
-                        Visibility="Collapsed" />
-                </Grid>
+                <FontIcon FontFamily="{ThemeResource SymbolThemeFontFamily}" FontSize="16" Glyph="&#xE721;" />
             </Button>
-
-            <StackPanel
-                x:Name="FileGroup"
-                Orientation="Horizontal"
-                Spacing="4"
-                VerticalAlignment="Center"
-                Visibility="Collapsed">
-                <Button
-                    x:Name="RevealButton"
-                    Width="32"
-                    Height="32"
-                    Padding="0"
-                    Style="{StaticResource SubtleButtonStyle}"
-                    AutomationProperties.Name="{local:T Text='Reveal in Explorer'}"
-                    ToolTipService.ToolTip="{local:T Text='Reveal in Explorer'}">
-                    <FontIcon FontFamily="{ThemeResource SymbolThemeFontFamily}" FontSize="16" Glyph="&#xE8B7;" />
-                </Button>
-                <Button
-                    x:Name="DeleteButton"
-                    Width="32"
-                    Height="32"
-                    Padding="0"
-                    Style="{StaticResource SubtleButtonStyle}"
-                    AutomationProperties.Name="{local:T Text='Delete'}"
-                    ToolTipService.ToolTip="{local:T Text='Delete the audio or the whole conversation'}">
-                    <FontIcon FontFamily="{ThemeResource SymbolThemeFontFamily}" FontSize="16" Glyph="&#xE74D;" />
-                    <Button.Flyout>
-                        <MenuFlyout x:Name="DeleteMenu" Placement="BottomEdgeAlignedRight">
-                            <MenuFlyoutItem x:Name="DeleteAudioItem" />
-                            <MenuFlyoutItem x:Name="DeleteConversationItem" />
-                        </MenuFlyout>
-                    </Button.Flyout>
-                </Button>
-            </StackPanel>
-
-            <!--
-                Settings opens the Settings page, or goes back from it, and Calendar the Calendar page; Ask across
-                conversations opens or closes the library chat.
-            -->
-            <StackPanel x:Name="AppGroup" Orientation="Horizontal" Spacing="4" VerticalAlignment="Center">
-                <Button
-                    x:Name="SettingsButton"
-                    Width="32"
-                    Height="32"
-                    Padding="0"
-                    Style="{StaticResource SubtleButtonStyle}"
-                    AutomationProperties.Name="{local:T Text='Settings'}"
-                    ToolTipService.ToolTip="{local:T Text='Settings'}">
-                    <FontIcon FontFamily="{ThemeResource SymbolThemeFontFamily}" FontSize="16" Glyph="&#xE9E9;" />
-                </Button>
-                <Button
-                    x:Name="CalendarButton"
-                    Width="32"
-                    Height="32"
-                    Padding="0"
-                    Style="{StaticResource SubtleButtonStyle}"
-                    AutomationProperties.Name="{local:T Text='Calendar'}"
-                    ToolTipService.ToolTip="{local:T Text='Calendar'}">
-                    <FontIcon FontFamily="{ThemeResource SymbolThemeFontFamily}" FontSize="16" Glyph="&#xE787;" />
-                </Button>
-                <Button
-                    x:Name="AskButton"
-                    Width="32"
-                    Height="32"
-                    Padding="0"
-                    Style="{StaticResource SubtleButtonStyle}"
-                    AutomationProperties.Name="{local:T Text='Ask across conversations'}"
-                    ToolTipService.ToolTip="{local:T Text='Ask across conversations'}">
-                    <FontIcon FontFamily="{ThemeResource SymbolThemeFontFamily}" FontSize="16" Glyph="&#xE8BD;" />
-                </Button>
-            </StackPanel>
-        </StackPanel>
-
-        <!-- Filters the library and the sidebar as typed, or on Settings the settings; Esc clears it. -->
-        <AutoSuggestBox
-            x:Name="SearchBox"
-            Grid.Column="3"
-            HorizontalAlignment="Stretch"
-            VerticalAlignment="Center"
-            AutomationProperties.Name="{local:T Text='Search conversations'}"
-            PlaceholderText="{local:T Text='Search'}"
-            QueryIcon="Find" />
-
-        <!-- Where the box does not fit: opens it in place of the trailing buttons until it is left empty. -->
-        <Button
-            x:Name="SearchButton"
-            Grid.Column="3"
-            Width="32"
-            Height="32"
-            Padding="0"
-            Style="{StaticResource SubtleButtonStyle}"
-            AutomationProperties.Name="{local:T Text='Search conversations'}"
-            ToolTipService.ToolTip="{local:T Text='Search'}"
-            Visibility="Collapsed">
-            <FontIcon FontFamily="{ThemeResource SymbolThemeFontFamily}" FontSize="16" Glyph="&#xE721;" />
-        </Button>
-
-        <!-- The conversation page's tab (AppViewModel.DetailTab): Transcript, or Summary and Chat (the AI panel). -->
-        <SelectorBar
-            x:Name="TabsBar"
-            Grid.Column="4"
-            Margin="8,0,0,0"
-            Padding="0"
-            VerticalAlignment="Center"
-            Visibility="Collapsed">
-            <SelectorBarItem x:Name="TranscriptTab" Text="{local:T Text='Transcript'}" />
-            <SelectorBarItem x:Name="SummaryTab" Text="{local:T Text='Summary'}" />
-            <SelectorBarItem x:Name="ChatTab" Text="{local:T Text='Chat'}" />
-        </SelectorBar>
+        </Grid>
     </Grid>
 </UserControl>

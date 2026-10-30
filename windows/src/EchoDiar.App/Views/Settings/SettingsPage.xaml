@@ -4,7 +4,8 @@
     (Services/SettingsSearch.cs) with their icons, the selected section's page on the right. While the toolbar's search
     has a term, the sidebar lists only the sections with a matching row, none selected, and the right side lists the
     matching rows (macOS SettingsSearchResults); a row opens its section and inner tab and clears the search.
-    A NavigationView in Left mode, pane always open: it sits below the custom title bar, so it never draws its own.
+    A NavigationView in Left mode, pane always open: it sits below the custom title bar, so it never draws its own. Its
+    content area draws no layer of its own: it sits on the window body's layer, like the other pages.
 -->
 <UserControl
     x:Class="EchoDiar.App.Views.SettingsPage"
@@ -22,6 +23,11 @@
         IsTitleBarAutoPaddingEnabled="False"
         OpenPaneLength="200"
         PaneDisplayMode="Left">
+
+        <NavigationView.Resources>
+            <SolidColorBrush x:Key="NavigationViewContentBackground" Color="Transparent" />
+            <Thickness x:Key="NavigationViewContentGridBorderThickness">0</Thickness>
+        </NavigationView.Resources>
 
         <Grid>
             <!-- The selected section's page; each section's page is made the first time it shows, then kept. -->

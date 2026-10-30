@@ -9,55 +9,59 @@
     <!-- The theme's solid background where no system backdrop is set; cleared in code under Mica or Acrylic. -->
     <Grid x:Name="RootGrid" Background="{ThemeResource SolidBackgroundFillColorBaseBrush}">
         <Grid.RowDefinitions>
-            <RowDefinition Height="40" />
             <RowDefinition Height="Auto" />
             <RowDefinition Height="*" />
         </Grid.RowDefinitions>
 
-        <!-- Title bar: the whole row drags the window except the toolbar's controls (passthrough regions). -->
-        <Grid x:Name="TitleBarGrid" Grid.Row="0" Background="Transparent">
-            <Grid.ColumnDefinitions>
-                <ColumnDefinition x:Name="LeftInsetColumn" Width="0" />
-                <ColumnDefinition Width="*" />
-                <ColumnDefinition x:Name="RightInsetColumn" Width="0" />
-            </Grid.ColumnDefinitions>
+        <!-- The header on the window's backdrop, like Paint: the title row (the title bar) and the toolbar row. -->
+        <views:TitleBarToolbar x:Name="Toolbar" />
 
-            <views:TitleBarToolbar x:Name="Toolbar" Grid.Column="1" />
-        </Grid>
-
-        <!-- GlobalTapNote (macOS MainView.swift): before recording, the picked app cannot be recorded on its own. -->
-        <InfoBar
-            x:Name="GlobalTapNote"
+        <!-- The body on its own layer, a line below the header (the Windows 11 layer on Mica). -->
+        <Border
             Grid.Row="1"
-            Margin="12,12,12,0"
-            IsClosable="False"
-            IsOpen="False"
-            Severity="Informational"
-            Visibility="Collapsed" />
+            Background="{ThemeResource LayerFillColorDefaultBrush}"
+            BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
+            BorderThickness="0,1,0,0">
+            <Grid>
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="*" />
+                </Grid.RowDefinitions>
 
-        <!--
-            The library as a 360 px sidebar, then the detail: a conversation, the recording, or the welcome pane when
-            nothing is open. Settings: its page alone, with its own sidebar.
-        -->
-        <Grid Grid.Row="2">
-            <Grid.ColumnDefinitions>
-                <ColumnDefinition x:Name="SidebarColumn" Width="360" />
-                <ColumnDefinition x:Name="DetailColumn" Width="*" />
-            </Grid.ColumnDefinitions>
+                <!-- GlobalTapNote (macOS MainView.swift): before recording, the picked app cannot be recorded on its own. -->
+                <InfoBar
+                    x:Name="GlobalTapNote"
+                    Margin="12,12,12,0"
+                    IsClosable="False"
+                    IsOpen="False"
+                    Severity="Informational"
+                    Visibility="Collapsed" />
 
-            <ContentControl
-                x:Name="ListHost"
-                HorizontalContentAlignment="Stretch"
-                VerticalContentAlignment="Stretch"
-                IsTabStop="False" />
+                <!--
+                    The library as a 360 px sidebar, then the detail: a conversation, the recording, or the welcome pane
+                    when nothing is open. Settings: its page alone, with its own sidebar.
+                -->
+                <Grid Grid.Row="1">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition x:Name="SidebarColumn" Width="360" />
+                        <ColumnDefinition x:Name="DetailColumn" Width="*" />
+                    </Grid.ColumnDefinitions>
 
-            <!-- The recording page, one conversation, the welcome pane or Settings. -->
-            <ContentControl
-                x:Name="RouteHost"
-                Grid.Column="1"
-                HorizontalContentAlignment="Stretch"
-                VerticalContentAlignment="Stretch"
-                IsTabStop="False" />
-        </Grid>
+                    <ContentControl
+                        x:Name="ListHost"
+                        HorizontalContentAlignment="Stretch"
+                        VerticalContentAlignment="Stretch"
+                        IsTabStop="False" />
+
+                    <!-- The recording page, one conversation, the welcome pane or Settings. -->
+                    <ContentControl
+                        x:Name="RouteHost"
+                        Grid.Column="1"
+                        HorizontalContentAlignment="Stretch"
+                        VerticalContentAlignment="Stretch"
+                        IsTabStop="False" />
+                </Grid>
+            </Grid>
+        </Border>
     </Grid>
 </Window>

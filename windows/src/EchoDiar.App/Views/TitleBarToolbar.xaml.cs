@@ -12,24 +12,25 @@ using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Input;
 using Microsoft.UI.Xaml.Media;
 using Windows.Foundation;
-using Windows.Graphics;
 using VirtualKey = Windows.System.VirtualKey;
 using Windows.UI.ViewManagement;
 
 namespace EchoDiar.App.Views;
 
 /// <summary>
-/// The title bar's button groups (macOS MainView.swift toolbar), shown by route: Back off the list (and on it while the
-/// library chat shows); Record with its menu of targets and the language (Stop, blinking, and Pause or Resume while
-/// recording); on a conversation its title, Reveal, Delete and the tabs (a SelectorBar); on Settings the section's inner
-/// tabs after Record; Settings (opens the Settings page, or goes back from it), Calendar (the same for the Calendar
-/// page), Ask across conversations (opens or closes the library chat) and Search everywhere, an icon button that opens
-/// the box where the box does not fit. Update shows while an App Installer update is available and nothing runs that
-/// installing would cut off (macOS hides it while recording). It also hosts the window's dialogs (it lives as long as
-/// the window): the delete confirmations (of this conversation, and of the library's cards and selection), "Recording
-/// problem", the cloud confirmations (audio for transcription, transcripts for the library index), the update's
-/// confirmation and answers, and the Settings pages' confirmations (<see cref="AppViewModel.Confirm"/>), one at a time.
-/// The lost-mic question is the pill's end prompt.
+/// The window's header (macOS MainView.swift toolbar) in two rows. The title row is the window's title bar: the logo,
+/// then the conversation's title with its date and duration, or the page's name (Settings, Calendar, Recording while
+/// recording, else EchoDiar). The toolbar row: Back, always shown and enabled off the list (and on it while the library
+/// chat shows); Record with its menu of targets and the language (Stop, blinking, and Pause or Resume while recording);
+/// Reveal and Delete, always shown and enabled on a conversation; Settings (opens the Settings page, or goes back from
+/// it), Calendar (the same for the Calendar page), Ask across conversations (opens or closes the library chat); Update
+/// while an App Installer update is available and nothing runs that installing would cut off (macOS hides it while
+/// recording). At the right edge: a conversation's tabs (a SelectorBar) or a Settings section's inner tabs, then Search
+/// everywhere, an icon button that opens the box where the box does not fit. It also hosts the window's dialogs (it
+/// lives as long as the window): the delete confirmations (of this conversation, and of the library's cards and
+/// selection), "Recording problem", the cloud confirmations (audio for transcription, transcripts for the library
+/// index), the update's confirmation and answers, and the Settings pages' confirmations
+/// (<see cref="AppViewModel.Confirm"/>), one at a time. The lost-mic question is the pill's end prompt.
 /// </summary>
 public sealed partial class TitleBarToolbar : UserControl
 {
@@ -44,6 +45,9 @@ public sealed partial class TitleBarToolbar : UserControl
 
     /// <summary>The search box's narrowest width that still shows its placeholder whole.</summary>
     private const double SearchMinWidth = 120;
+
+    /// <summary>The search column's star weight (XAML): it dwarfs the spacer's, so the box takes the free space first.</summary>
+    private const double SearchWeight = 1000;
 
     private static readonly UISettings UISettings = new();
 
@@ -74,17 +78,17 @@ public sealed partial class TitleBarToolbar : UserControl
     private bool _searchAsIcon;
 
     /// <summary>
-    /// The icon button (or narrowing with text in the box) opened the box, which takes the trailing buttons' place until
+    /// The icon button (or narrowing with text in the box) opened the box, which takes the action buttons' place until
     /// it is left empty.
     /// </summary>
     private bool _searchOpened;
 
-    /// <summary>The trailing buttons' width when last shown, which the opened box takes over.</summary>
-    private double _trailingWidth;
+    /// <summary>The action buttons' width when last shown, which the opened box takes over.</summary>
+    private double _actionsWidth;
 
     /// <summary>
-    /// The width the title bar gives the toolbar: ActualWidth is never less than the desired width (an overflowing
-    /// toolbar is clipped), so it cannot tell that the box does not fit.
+    /// The width the window gives the header: ActualWidth is never less than the desired width (an overflowing toolbar
+    /// is clipped), so it cannot tell that the box does not fit.
     /// </summary>
     private double _availableWidth = double.PositiveInfinity;
 
@@ -168,35 +172,24 @@ public sealed partial class TitleBarToolbar : UserControl
         _searchTimer = null;
     }
 
-    /// <summary>
-    /// The window-space rects (physical pixels at <paramref name="scale"/>) of every visible interactive element: the
-    /// title bar passes clicks there to the controls, and drags the window everywhere else.
-    /// </summary>
-    public IReadOnlyList<RectInt32> PassthroughRects(double scale)
+    /// <summary>The title row, the window's title bar (<c>MainWindow.SetTitleBar</c>): all of it drags the window.</summary>
+    public FrameworkElement TitleBar => TitleBarGrid;
+
+    /// <summary>Keeps the title off the caption buttons (the title bar's insets, in view pixels).</summary>
+    public void SetCaptionInsets(double left, double right)
     {
-        FrameworkElement[] elements = [BackButton, RecordGroup, SettingsTabsBar, UpdateButton, FileGroup, AppGroup, SearchBox, SearchButton, TabsBar];
-        var rects = new List<RectInt32>();
-        foreach (var element in elements)
-        {
-            if (!IsShown(element) || element.ActualWidth <= 0 || element.ActualHeight <= 0) continue;
-            var bounds = element.TransformToVisual(null).TransformBounds(new Rect(0, 0, element.ActualWidth, element.ActualHeight));
-            rects.Add(new RectInt32(
-                (int)Math.Round(bounds.X * scale),
-                (int)Math.Round(bounds.Y * scale),
-                (int)Math.Round(bounds.Width * scale),
-                (int)Math.Round(bounds.Height * scale)));
-        }
-        return rects;
+        SetWidth(LeftInsetColumn, left);
+        SetWidth(RightInsetColumn, right);
     }
 
-    /// <summary>The element and its parents up to the toolbar are visible: a hidden panel's children keep their last size.</summary>
-    private bool IsShown(FrameworkElement element)
+    /// <summary>GridLength throws on a negative, NaN or infinite width: those set 0, so LayoutUpdated never throws.</summary>
+    private static void SetWidth(ColumnDefinition column, double width)
     {
-        for (DependencyObject? e = element; e is not null && e != this; e = VisualTreeHelper.GetParent(e))
+        var length = new GridLength(double.IsFinite(width) && width > 0 ? width : 0);
+        if (!column.Width.Equals(length))
         {
-            if (e is UIElement { Visibility: not Visibility.Visible }) return false;
+            column.Width = length;
         }
-        return true;
     }
 
     private void OnModelChanged(object? sender, PropertyChangedEventArgs e)
@@ -244,7 +237,7 @@ public sealed partial class TitleBarToolbar : UserControl
     private void Update()
     {
         if (_model is null) return;
-        BackButton.Visibility = Shown(_model.Route.Kind != RouteKind.List || _model.GlobalChatOpen);
+        BackButton.IsEnabled = _model.Route.Kind != RouteKind.List || _model.GlobalChatOpen;
         // Another page (list, entry, Settings) clears the search (the model has cleared the term: AppViewModel.Route);
         // another conversation keeps it, for the sidebar it filters. Typing not applied yet is dropped too.
         var page = AppViewModel.PageOf(_model.Route);
@@ -284,14 +277,19 @@ public sealed partial class TitleBarToolbar : UserControl
         UpdateUpdateButton();
         var conversation = ShownConversation();
         var onConversation = conversation is not null;
-        TitlePanel.Visibility = Shown(onConversation);
-        FileGroup.Visibility = Shown(onConversation);
+        RevealButton.IsEnabled = onConversation;
+        DeleteButton.IsEnabled = conversation is not null && _model.CanDelete(conversation);
         TabsBar.Visibility = Shown(onConversation);
         UpdateTabs();
-        if (conversation is null) return;
-        TitleText.Text = conversation.Title;
-        DetailText.Text = ConversationText.Detail(conversation, _model);
-        DeleteButton.IsEnabled = _model.CanDelete(conversation);
+        TitleText.Text = conversation?.Title ?? _model.Route.Kind switch
+        {
+            RouteKind.Settings => Loc.T("Settings"),
+            RouteKind.Calendar => Loc.T("Calendar"),
+            RouteKind.Recording when recording => Loc.T("Recording"),
+            _ => "EchoDiar",
+        };
+        DetailText.Text = conversation is null ? "" : ConversationText.When(conversation);
+        DetailText.Visibility = Shown(onConversation);
     }
 
     /// <summary>The conversation page's conversation, while it exists; null on the other pages.</summary>
@@ -694,14 +692,14 @@ public sealed partial class TitleBarToolbar : UserControl
 
     /// <summary>
     /// Search is an icon button where the box would get less than <see cref="SearchMinWidth"/> next to the other columns
-    /// (the compact minimum, if the caption buttons take more than expected), and the box again once it fits. A box with
-    /// text stays shown, opened in the trailing buttons' place; once the normal box fits again it goes back to it.
+    /// (the spacer aside), and the box again once it fits. A box with text stays shown, opened in the action buttons'
+    /// place; once the normal box fits again it goes back to it.
     /// </summary>
     private void UpdateSearchMode()
     {
         if (_model is null || double.IsInfinity(_availableWidth) || ToolbarGrid.ActualWidth <= 0) return;
-        if (!_searchOpened) _trailingWidth = TrailingColumn.ActualWidth;
-        var others = ToolbarGrid.Padding.Left + LeadingColumn.ActualWidth + _trailingWidth
+        if (!_searchOpened) _actionsWidth = ActionsColumn.ActualWidth;
+        var others = ToolbarGrid.Padding.Left + ToolbarGrid.Padding.Right + LeadingColumn.ActualWidth + _actionsWidth
             + TabsColumn.ActualWidth;
         var asIcon = _availableWidth - others < SearchMinWidth;
         if (_searchOpened)
@@ -734,9 +732,9 @@ public sealed partial class TitleBarToolbar : UserControl
         var box = !_searchAsIcon || _searchOpened;
         SearchBox.Visibility = Shown(box);
         SearchButton.Visibility = Shown(!box);
-        SearchColumn.Width = box ? new GridLength(1, GridUnitType.Star) : GridLength.Auto;
+        SearchColumn.Width = box ? new GridLength(SearchWeight, GridUnitType.Star) : GridLength.Auto;
         SearchColumn.MinWidth = box ? SearchMinWidth : 0;
-        TrailingPanel.Visibility = Shown(!_searchOpened);
+        ActionsPanel.Visibility = Shown(!_searchOpened);
     }
 
     /// <summary>Ctrl+F (macOS <c>showSearch</c>): the focus goes to the page's search box, opened first where Search is an icon.</summary>
