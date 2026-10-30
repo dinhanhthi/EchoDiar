@@ -2,7 +2,8 @@ import CoreAudio
 import Foundation
 
 /// Route changes during a recording, from Core Audio listeners: default input and output device, the device list,
-/// and `DeviceIsAlive`/`NominalSampleRate` of the input device in use and of the default output.
+/// and `DeviceIsAlive`/`NominalSampleRate` of the input device in use and of the default output; plus the MacBook lid,
+/// polled each second, since closing it cuts off the built-in mic without any Core Audio change.
 /// Events within 300 ms are coalesced and the state is compared as a whole, since a disconnect fires its
 /// notifications (device dead, defaults changed, list changed) in no guaranteed order.
 ///
@@ -18,6 +19,7 @@ public final class AudioRouteMonitor: @unchecked Sendable {
     }
 
     private static let coalesce = DispatchTimeInterval.milliseconds(300)
+    private static let lidPollInterval = DispatchTimeInterval.seconds(1)
     private static let systemSelectors = [
         kAudioHardwarePropertyDefaultInputDevice, kAudioHardwarePropertyDefaultOutputDevice, kAudioHardwarePropertyDevices,
     ]
@@ -33,6 +35,8 @@ public final class AudioRouteMonitor: @unchecked Sendable {
     private var generation: UInt64 = 0
     private var listener: AudioObjectPropertyListenerBlock?
     private var pending: DispatchWorkItem?
+    private var lidPoll: DispatchSourceTimer?
+    private var lidClosed = false
     private var input = (device: AudioDeviceID(kAudioObjectUnknown), rate: 0.0)
     private var output = (device: AudioDeviceID(kAudioObjectUnknown), rate: 0.0)
     /// Devices whose `deviceSelectors` are listened to.
@@ -69,6 +73,7 @@ public final class AudioRouteMonitor: @unchecked Sendable {
             let device = Self.defaultDevice(kAudioHardwarePropertyDefaultOutputDevice)
             output = (device, Self.nominalRate(device))
             watchDevices()
+            pollLid(generation: generation)
         }
     }
 
@@ -89,6 +94,8 @@ public final class AudioRouteMonitor: @unchecked Sendable {
         pending?.cancel()
         pending = nil
         handler = nil
+        lidPoll?.cancel()
+        lidPoll = nil
         guard let listener else { return }
         for selector in Self.systemSelectors {
             var address = Self.address(selector)
@@ -96,6 +103,23 @@ public final class AudioRouteMonitor: @unchecked Sendable {
         }
         unwatchDevices()
         self.listener = nil
+    }
+
+    /// A lid that opens or closes changes `MicCapture.inputDevice(uid:)` when the default input is the headset's mic.
+    private func pollLid(generation: UInt64) {
+        lidPoll?.cancel()
+        lidClosed = MicCapture.isLidClosed()
+        let timer = DispatchSource.makeTimerSource(queue: queue)
+        timer.schedule(deadline: .now() + Self.lidPollInterval, repeating: Self.lidPollInterval, leeway: .milliseconds(250))
+        timer.setEventHandler { [weak self] in
+            guard let self, generation == self.generation else { return }
+            let closed = MicCapture.isLidClosed()
+            guard closed != self.lidClosed else { return }
+            self.lidClosed = closed
+            self.scheduleEvaluate(generation: generation)
+        }
+        timer.resume()
+        lidPoll = timer
     }
 
     private func scheduleEvaluate(generation: UInt64) {
@@ -134,10 +158,10 @@ public final class AudioRouteMonitor: @unchecked Sendable {
         events.forEach(handler)
     }
 
-    /// The picked device while it exists and is alive, else the default input.
+    /// The device `MicCapture` opens: the picked one while it is usable, else the default input (or another mic in
+    /// place of the default output's Bluetooth mic, see `MicCapture.inputDevice(uid:)`).
     private func resolveInput() -> AudioDeviceID {
-        if let pinnedUID, let device = MicCapture.deviceID(forUID: pinnedUID), Self.isAlive(device) { return device }
-        return Self.defaultDevice(kAudioHardwarePropertyDefaultInputDevice)
+        MicCapture.inputDevice(uid: pinnedUID) ?? AudioDeviceID(kAudioObjectUnknown)
     }
 
     private func watchDevices() {

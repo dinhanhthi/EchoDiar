@@ -7,7 +7,7 @@ public struct ModelEntry: Sendable, Hashable, Identifiable {
     }
 
     public enum Tier: String, Sendable, Hashable, CaseIterable {
-        case fast, balanced, quality
+        case fast, balanced, quality, system
     }
 
     public enum Runtime: String, Sendable, Hashable, CaseIterable {
@@ -274,7 +274,7 @@ public enum ModelCatalog {
                 vi: "Not supported"),
             license: "CC-BY-4.0"),
         ModelEntry(
-            id: "apple-speech", kind: .asr, tier: .fast,
+            id: "apple-speech", kind: .asr, tier: .system,
             displayName: "Apple Speech (system)",
             repo: nil, revision: nil,
             runtime: .appleSpeech, diskMB: 0, ramMB: 0, ramIsEstimate: false,
@@ -395,7 +395,7 @@ public enum ModelCatalog {
 
     public static let llm: [ModelEntry] = [
         ModelEntry(
-            id: "apple-foundation-models", kind: .llm, tier: .fast,
+            id: "apple-foundation-models", kind: .llm, tier: .system,
             displayName: "Apple Foundation Models (system)",
             repo: nil, revision: nil,
             runtime: .foundationModels, diskMB: 0, ramMB: 0, ramIsEstimate: false,

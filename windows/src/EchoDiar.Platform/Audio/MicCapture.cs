@@ -17,7 +17,7 @@ using Windows.Win32.UI.Shell.PropertiesSystem;
 namespace EchoDiar.Platform.Audio;
 
 /// <summary>
-/// Captures a microphone (the default capture endpoint, or the one with <c>endpointId</c>) in WASAPI
+/// Captures a microphone (the one with <c>endpointId</c>, else <see cref="AudioRouteMonitor.DefaultMicId"/>) in WASAPI
 /// shared, event-driven mode at the device mix format, downmixed to mono Float32.
 /// </summary>
 public sealed class MicCapture : ICaptureSource
@@ -186,7 +186,8 @@ internal sealed class CaptureLoop : IDisposable
         IMMDevice? device = null;
         try
         {
-            if (endpointId is null) enumerator.GetDefaultAudioEndpoint(flow, ERole.eConsole, out device);
+            if (endpointId is null && flow == EDataFlow.eCapture) enumerator.GetDevice(AudioRouteMonitor.DefaultMicId(enumerator), out device);
+            else if (endpointId is null) enumerator.GetDefaultAudioEndpoint(flow, ERole.eConsole, out device);
             else enumerator.GetDevice(endpointId, out device);
             if (onName is not null && FriendlyName(device) is { } name) onName(name);
             device.Activate(typeof(IAudioClient).GUID, CLSCTX.CLSCTX_ALL, null, out var client);

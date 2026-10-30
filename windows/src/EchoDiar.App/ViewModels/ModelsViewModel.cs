@@ -63,7 +63,7 @@ public sealed partial class ModelsViewModel : ObservableObject
     /// <summary>The speech and speaker models the page lists, in catalog order (macOS <c>ModelsSettingsView.entries</c>).</summary>
     public IReadOnlyList<ModelEntry> Entries { get; }
 
-    /// <summary>One section per tier (Fast, Balanced, Quality) that has <paramref name="kind"/> entries.</summary>
+    /// <summary>One section per tier (Fast, Balanced, Quality, System) that has <paramref name="kind"/> entries.</summary>
     public IReadOnlyList<(ModelTier Tier, IReadOnlyList<ModelEntry> Entries)> Sections(ModelKind kind) =>
     [
         .. Enum.GetValues<ModelTier>()
@@ -182,11 +182,7 @@ public sealed partial class ModelsViewModel : ObservableObject
     {
         List<string> parts = [TierName(entry.Tier)];
         if (entry.Kind == ModelKind.Diarization) parts.Add(Loc.T("Speakers"));
-        if (entry.Repo is null)
-        {
-            parts.Add(Loc.T("System"));
-        }
-        else
+        if (entry.Repo is not null) // a system model's tier already says "System"
         {
             parts.Add(SizeText(entry.DiskMB));
             parts.Add(Loc.Format("%@ RAM", (entry.RamIsEstimate ? "~" : "") + RamText(entry.RamMB)));
@@ -196,7 +192,7 @@ public sealed partial class ModelsViewModel : ObservableObject
         return string.Join(" · ", parts);
     }
 
-    /// <summary>The tier as its section and its row name it: "Fast", "Balanced", "Quality".</summary>
+    /// <summary>The tier as its section and its row name it: "Fast", "Balanced", "Quality", "System".</summary>
     public static string TierName(ModelTier tier) => Loc.T(tier.ToString());
 
     /// <summary>

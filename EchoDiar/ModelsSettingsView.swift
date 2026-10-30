@@ -210,9 +210,7 @@ struct ModelRow: View {
             HStack(spacing: 4) {
                 Badge(text: Self.tierTitle(entry.tier), color: Self.tierColor(entry.tier))
                 if entry.kind == .diarization { Badge(text: String(localized: "Speakers")) }
-                if entry.repo == nil {
-                    Badge(text: String(localized: "System"))
-                } else {
+                if entry.repo != nil {  // a system model's tier badge already says "System"
                     Badge(text: Self.sizeText(entry.diskMB))
                     let ram = (entry.ramIsEstimate ? "~" : "") + Self.ramText(entry.ramMB)
                     Badge(text: String(localized: "\(ram) RAM"))
@@ -368,15 +366,18 @@ struct ModelRow: View {
         case .fast: String(localized: "Fast")
         case .balanced: String(localized: "Balanced")
         case .quality: String(localized: "Quality")
+        case .system: String(localized: "System")
         }
     }
 
-    /// Fast is orange (speed), balanced teal, quality purple (best output); none is the accent blue of Default.
+    /// Fast is orange (speed), balanced teal, quality purple (best output), system pink (built into macOS); none is the
+    /// accent blue of Default nor the green of Installed.
     private static func tierColor(_ tier: ModelEntry.Tier) -> Color {
         switch tier {
         case .fast: .orange
         case .balanced: .teal
         case .quality: .purple.mix(with: .white, by: 0.35)  // plain purple is hard to read on the dark cards
+        case .system: .pink
         }
     }
 
