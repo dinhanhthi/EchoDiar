@@ -1474,6 +1474,10 @@
     <value>Transcription en direct : en pause</value>
     <comment>Live transcript: paused</comment>
   </data>
+  <data name="LiveTranscriptPreparingTheLanguage" xml:space="preserve">
+    <value>Transcription en direct : préparation de la langue…</value>
+    <comment>Live transcript: preparing the language…</comment>
+  </data>
   <data name="LiveTranscriptStoppedTheTranscriptIsMadeAfterStop" xml:space="preserve">
     <value>Transcription en direct arrêtée. La transcription est faite après l’arrêt.</value>
     <comment>Live transcript stopped. The transcript is made after Stop.</comment>
@@ -2638,9 +2642,9 @@
     <value>Affiche la transcription pendant l’enregistrement et la conserve, pour qu’elle soit prête quelques secondes après l’arrêt. Utilise plus de processeur et de mémoire pendant l’enregistrement. Modèles Whisper et Parakeet uniquement ; les autres moteurs transcrivent après l’arrêt.</value>
     <comment>Shows the transcript during the recording and keeps it, so it is ready within seconds of Stop. Uses more CPU and memory while recording. Whisper and Parakeet models only; other engines transcribe after Stop.</comment>
   </data>
-  <data name="ShowsTheTranscriptDuringTheRecordingAndKeepsItSoItIsReadyWit_2" xml:space="preserve">
-    <value>Affiche la transcription pendant l’enregistrement et la conserve, pour qu’elle soit prête quelques secondes après l’arrêt. Utilise plus de processeur et de mémoire pendant l’enregistrement. Modèles WhisperKit et Parakeet uniquement ; les autres moteurs transcrivent après l’arrêt.</value>
-    <comment>Shows the transcript during the recording and keeps it, so it is ready within seconds of Stop. Uses more CPU and memory while recording. WhisperKit and Parakeet models only; other engines transcribe after Stop.</comment>
+  <data name="ShowsTheTranscriptDuringTheRecordingWhisperKitAndParakeetMod" xml:space="preserve">
+    <value>Affiche la transcription pendant l’enregistrement. Les modèles WhisperKit et Parakeet la conservent, pour qu’elle soit prête quelques secondes après l’arrêt ; Apple Speech (macOS 26+) l’affiche seulement et transcrit après l’arrêt. Utilise plus de processeur et de mémoire pendant l’enregistrement. Les autres moteurs transcrivent après l’arrêt.</value>
+    <comment>Shows the transcript during the recording. WhisperKit and Parakeet models keep it, so it is ready within seconds of Stop; Apple Speech (macOS 26+) only shows it and transcribes after Stop. Uses more CPU and memory while recording. Other engines transcribe after Stop.</comment>
   </data>
   <data name="SimulateState" xml:space="preserve">
     <value>Simuler un état</value>
@@ -3166,9 +3170,9 @@
     <value>Ce moteur transcrit après l’arrêt. Les modèles Whisper et Parakeet transcrivent aussi pendant l’enregistrement.</value>
     <comment>This engine transcribes after Stop. Whisper and Parakeet models also transcribe while recording.</comment>
   </data>
-  <data name="ThisEngineTranscribesAfterStopWhisperKitAndParakeetModelsAls" xml:space="preserve">
-    <value>Ce moteur transcrit après l’arrêt. Les modèles WhisperKit et Parakeet transcrivent aussi pendant l’enregistrement.</value>
-    <comment>This engine transcribes after Stop. WhisperKit and Parakeet models also transcribe while recording.</comment>
+  <data name="ThisEngineTranscribesAfterStopWhisperKitAndParakeetModelsAnd" xml:space="preserve">
+    <value>Ce moteur transcrit après l’arrêt. Les modèles WhisperKit et Parakeet, ainsi qu’Apple Speech (macOS 26+), affichent aussi la transcription pendant l’enregistrement.</value>
+    <comment>This engine transcribes after Stop. WhisperKit and Parakeet models, and Apple Speech (macOS 26+), also show the transcript while recording.</comment>
   </data>
   <data name="ThisEventCanTBeEditedHere" xml:space="preserve">
     <value>Cet événement ne peut pas être modifié ici.</value>
