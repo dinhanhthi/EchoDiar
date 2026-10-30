@@ -399,11 +399,13 @@ public actor TranscriptionPipeline {
 
     /// The entry that keeps `prior`: `job`'s engine, else the prior's (the one resolved when the recording started),
     /// when `prior.isUsable` for it, the session's language fallback, `job.language` and the session audio's
-    /// duration; nil runs the whole batch.
+    /// duration; nil runs the whole batch. An Apple Speech prior with gaps is refused: Apple has no gap fill, so the
+    /// whole batch runs instead of stopping at "Needs model".
     private func usableEntry(
         for prior: PriorTranscription, job: TranscriptionJob, session: RecordingSession
     ) async -> ModelEntry? {
-        guard let entry = ModelCatalog.entry(id: job.engineID ?? prior.engineID), Self.transcribesChunks(entry),
+        guard let entry = ModelCatalog.entry(id: job.engineID ?? prior.engineID), Self.transcribesLive(entry),
+              entry.runtime != .appleSpeech || (prior.micGaps.isEmpty && prior.systemGaps.isEmpty),
               let audio = ConversationFiles.audioURL(in: job.folder, fileName: session.audioFileName),
               let duration = try? MonoAudio.duration(of: audio) else { return nil }
         let firstLanguage = session.languageMarkers.min { $0.fileTime < $1.fileTime }?.language ?? "auto"
@@ -524,7 +526,8 @@ public actor TranscriptionPipeline {
 
     /// The entry a recording transcriber runs so that the pipeline keeps its segments at Stop: the batch resolution
     /// for `engineID` (explicit, else `defaultEngine(language:isUsable:)`) and the recording's `language` ("auto" or a
-    /// code), when it is a usable WhisperKit or Parakeet entry that needs no language fallback; nil otherwise.
+    /// code), when it is a usable WhisperKit, Parakeet or Apple Speech entry (`transcribesLive`) that needs no language
+    /// fallback; nil otherwise.
     public static func incrementalEntry(
         engineID: String?, language: String, isUsable: (ModelEntry) -> Bool
     ) -> ModelEntry? {
@@ -536,7 +539,7 @@ public actor TranscriptionPipeline {
         } else {
             selected = defaultEngine(language: language, isUsable: isUsable)
         }
-        guard let entry = selected, transcribesChunks(entry) else { return nil }
+        guard let entry = selected, transcribesLive(entry) else { return nil }
         let markers = LanguageRange.ranges(from: [.init(fileTime: 0, language: language)])
             .compactMap(\.language).map(WhisperKitEngine.whisperLanguage)
         let resolved = languageFallback(
@@ -548,6 +551,12 @@ public actor TranscriptionPipeline {
     /// A batch ASR entry that also loads as a `TranscriptionSession`: WhisperKit or Parakeet.
     static func transcribesChunks(_ entry: ModelEntry) -> Bool {
         entry.kind == .asr && (entry.runtime == .whisperKit || entry.runtime == .fluidAudio)
+    }
+
+    /// A batch ASR entry that runs as a recording transcriber: one that `transcribesChunks`, or Apple Speech, which
+    /// streams each channel and has no gap fill.
+    static func transcribesLive(_ entry: ModelEntry) -> Bool {
+        transcribesChunks(entry) || (entry.kind == .asr && entry.runtime == .appleSpeech)
     }
 
     /// Selectable for `language` and, for a code, listed in `supportedLanguages(for:)` by its primary code. An

@@ -194,7 +194,7 @@ struct SpeechChunker {
         startSample += count * Self.frameSamples
     }
 
-    private static func rmsDB(_ frame: [Float]) -> Float {
+    static func rmsDB(_ frame: [Float]) -> Float {
         var rms: Float = 0
         frame.withUnsafeBufferPointer { vDSP_rmsqv($0.baseAddress!, 1, &rms, vDSP_Length($0.count)) }
         return rms > 0 ? max(silenceDB, 20 * log10(rms)) : silenceDB

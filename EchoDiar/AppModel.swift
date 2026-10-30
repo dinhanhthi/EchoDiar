@@ -452,8 +452,9 @@ final class AppModel {
     /// A started transcriber for a recording in `language` ("auto" or a code; the language markers once the engine
     /// runs), its model loading meanwhile; nil unless auto-transcribe and "Transcribe while recording" are on, the
     /// default engines are local and the engine the Stop job resolves to (as `submitTranscription` does) is an
-    /// installed WhisperKit or Parakeet entry. The caller sets `engine.liveSink` to its `append` before `engine.start`
-    /// (the writer reads the sink once), calls `flush()` after a pause and `finish()` after the `.idle` snapshot.
+    /// installed WhisperKit or Parakeet entry, or Apple Speech on macOS 26+ (its folder is the models root, unused).
+    /// The caller sets `engine.liveSink` to its `append` before `engine.start` (the writer reads the sink once), calls
+    /// `flush()` after a pause and `finish()` after the `.idle` snapshot.
     func startRecordingTranscriber(language: String) -> RecordingTranscriber? {
         guard settings.autoTranscribe, settings.transcribeWhileRecording, autoEngine() == .local else { return nil }
         let isUsable = { [modelStore] (entry: ModelEntry) in TranscriptionPipeline.isUsable(entry, in: modelStore) }
@@ -1870,9 +1871,9 @@ extension AppModel {
     /// English, pace 1.
     /// `--diarization on|off` (on, never the saved setting) sets "Tell speakers apart"; `--incremental on|off` (off,
     /// never the saved setting) sets "Transcribe while recording": `on` starts the transcriber that
-    /// `startRecordingTranscriber` gives, feeds it the fixture in 100 ms blocks at `--pace` (absolute deadlines,
-    /// `duration / pace` in all), then at Stop awaits its `finish()` and passes the prior to `finishRecording`
-    /// (`result.json` gains `transcriber`). Other flags are ignored.
+    /// `startRecordingTranscriber` gives (WhisperKit, Parakeet, or Apple Speech on macOS 26+), feeds it the fixture in
+    /// 100 ms blocks at `--pace` (absolute deadlines, `duration / pace` in all), then at Stop awaits its `finish()` and
+    /// passes the prior to `finishRecording` (`result.json` gains `transcriber`). Other flags are ignored.
     private func runMeasureHarness() -> Bool {
         guard ProcessInfo.processInfo.arguments.contains("--measure") else { return false }
         guard let fixturePath = Self.harnessValue(after: "--measure"), let outPath = Self.harnessValue(after: "--out")
@@ -1984,7 +1985,7 @@ extension AppModel {
         if incremental == "on" {
             guard let started = startRecordingTranscriber(language: language) else {
                 fail("error: \(engine) does not transcribe while recording (not an installed WhisperKit or Parakeet "
-                    + "model usable for \(language) without a fallback)")
+                    + "model, or Apple Speech on macOS 26+, usable for \(language) without a fallback)")
             }
             transcriber = started
         }
@@ -2056,9 +2057,9 @@ extension AppModel {
     }
 
     /// What `--measure` sees of a recording transcriber's `updates` until they finish: seconds from `start` to the
-    /// first snapshot past `loading` (nil if none), the largest `pendingSeconds` seen (the stream keeps the newest
-    /// snapshot only, and nothing is published while the transcriber waits for the gate, so this can under-report)
-    /// and the `failed` message.
+    /// first snapshot past `loading` and `preparing` (nil if none), the largest `pendingSeconds` seen (the stream
+    /// keeps the newest snapshot only, and nothing is published while the transcriber waits for the gate, so this can
+    /// under-report) and the `failed` message.
     private static func watch(_ transcriber: RecordingTranscriber, from start: ContinuousClock.Instant)
         -> Task<(loadSeconds: Double?, maxPendingSeconds: Double, failure: String?), Never>
     {
@@ -2069,7 +2070,7 @@ extension AppModel {
             for await snapshot in transcriber.updates {
                 maxPending = max(maxPending, snapshot.pendingSeconds)
                 if case .failed(let message) = snapshot.state { failure = message }
-                if loadSeconds == nil, snapshot.state != .loading {
+                if loadSeconds == nil, snapshot.state != .loading, snapshot.state != .preparing {
                     loadSeconds = (ContinuousClock.now - start) / .seconds(1)
                 }
             }

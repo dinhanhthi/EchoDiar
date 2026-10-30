@@ -102,7 +102,7 @@ public struct AppleSpeechEngine: TranscriptionEngine {
     }
 
     /// At `maximumReservedLocales`, the least recently used reserved locale (unknown ones first) is released first.
-    private static func reserve(_ locale: Locale) async throws {
+    static func reserve(_ locale: Locale) async throws {
         let id = locale.identifier(.bcp47)
         let usage = UserDefaults.standard.stringArray(forKey: usageKey) ?? []
         let reserved = await AssetInventory.reservedLocales
@@ -189,19 +189,41 @@ public struct AppleSpeechEngine: TranscriptionEngine {
     // MARK: - Locales
 
     /// The settings' default language, or the system language when it is Auto too.
-    private static func defaultLanguage() -> String {
+    static func defaultLanguage() -> String {
         let setting = SettingsStore().load().defaultLanguage
         if setting != "auto", !setting.isEmpty { return setting }
         return Locale.current.language.languageCode?.identifier ?? "en"
     }
 
-    /// The supported locale for a BCP-47 code: Apple's equivalent, else one with the same language (the current
-    /// region first).
-    private static func locale(for code: String) async -> Locale? {
+    /// The supported locale for a BCP-47 code, the same on every call so live and batch use one regional model. A
+    /// code with a region gets Apple's equivalent. A bare language (same script) prefers a locale this app reserved,
+    /// then an installed one, then the current region, then the language's likely region (`fr` → fr-FR), then the
+    /// first by identifier. `supportedLocale(equivalentTo:)` alone returns a random region for a bare language when
+    /// none is reserved (measured: fr_BE, fr_CA, fr_CH or fr_FR across launches, spike 2026-10-30).
+    static func locale(for code: String) async -> Locale? {
         let requested = Locale(identifier: code)
-        if let locale = await SpeechTranscriber.supportedLocale(equivalentTo: requested) { return locale }
+        if requested.region != nil, let locale = await SpeechTranscriber.supportedLocale(equivalentTo: requested) {
+            return locale
+        }
         guard let language = requested.language.languageCode else { return nil }
-        let matches = await SpeechTranscriber.supportedLocales.filter { $0.language.languageCode == language }
-        return matches.first { $0.region == Locale.current.region } ?? matches.first
+        let likely = Locale.Language(identifier: requested.language.maximalIdentifier)
+        let matches = await SpeechTranscriber.supportedLocales
+            .filter {
+                $0.language.languageCode == language
+                    && Locale.Language(identifier: $0.language.maximalIdentifier).script == likely.script
+            }
+            .sorted { $0.identifier(.bcp47) < $1.identifier(.bcp47) }
+        let ids = Set(matches.map { $0.identifier(.bcp47) })
+        let reserved = await AssetInventory.reservedLocales.map { $0.identifier(.bcp47) }.sorted()
+        let installed = await SpeechTranscriber.installedLocales.map { $0.identifier(.bcp47) }.sorted()
+        if let id = reserved.first(where: ids.contains) ?? installed.first(where: ids.contains) {
+            return matches.first { $0.identifier(.bcp47) == id }
+        }
+        let regions = [Locale.current.region, likely.region].compactMap { $0 }
+        if let locale = regions.lazy.compactMap({ region in matches.first { $0.region == region } }).first
+            ?? matches.first {
+            return locale
+        }
+        return await SpeechTranscriber.supportedLocale(equivalentTo: requested)
     }
 }

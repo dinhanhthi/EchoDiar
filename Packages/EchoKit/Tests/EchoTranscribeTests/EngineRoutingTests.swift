@@ -49,9 +49,10 @@ struct EngineRoutingTests {
         #expect(prefer(nil, installed, "auto") == nil)
     }
 
-    /// The transcribe-while-recording entry: the batch resolution when it is a usable WhisperKit or Parakeet entry
-    /// that needs no language fallback, else nil (the pipeline then transcribes the whole recording at Stop).
-    @Test func incrementalEntryIsTheBatchEngineWhenItCanTranscribeChunks() {
+    /// The transcribe-while-recording entry: the batch resolution when it is a usable WhisperKit, Parakeet or Apple
+    /// Speech entry that needs no language fallback, else nil (the pipeline then transcribes the whole recording at
+    /// Stop). The Apple rows run only where Apple Speech is available.
+    @Test func incrementalEntryIsTheBatchEngineWhenItTranscribesLive() {
         let resolve = { (id: String?, language: String, ids: Set<String>) in
             TranscriptionPipeline.incrementalEntry(engineID: id, language: language, isUsable: Self.usable(ids))?.id
         }
@@ -62,6 +63,10 @@ struct EngineRoutingTests {
         #expect(resolve("parakeet-v3", "auto", []) == nil)
         #expect(resolve(nil, "vi", ["qwen3-asr-0.6b"]) == nil)
         #expect(resolve(nil, "auto", []) == nil)
+        if #available(macOS 26, *), AppleSpeechEngine.isAvailable {
+            #expect(resolve(nil, "auto", ["apple-speech"]) == "apple-speech")
+            #expect(resolve("apple-speech", "auto", ["apple-speech"]) == "apple-speech")
+        }
     }
 
     // MARK: - Local diarizer
