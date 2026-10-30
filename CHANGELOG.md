@@ -7,6 +7,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.3.0] - 2026-10-30
+
+### Added
+
+- Live transcript with Apple Speech on macOS 26 and later: the transcript shows while recording and the recording is transcribed after Stop. (macOS)
+- The live transcript shows the words still being decoded in grey, and says how many seconds it is behind when decoding falls behind.
+- Pressing Record opens and selects the new recording at once.
+- Models provided by the operating system are grouped under "System" in the Models settings.
+- A two-row window header: the title bar on top, the toolbar below. (Windows)
+
+### Changed
+
+- The live transcript appears sooner: shorter chunks and earlier partial text.
+
+### Fixed
+
+- The live transcript shows one line per decoded chunk, no lines with only punctuation, and no lone "Merci" invented while others speak.
+- Recording with Bluetooth headphones such as AirPods no longer switches them to their low-quality hands-free mode.
+- The floating recording indicator is centred again. (Windows)
+
 ## [1.2.0] - 2026-10-29
 
 ### Added
