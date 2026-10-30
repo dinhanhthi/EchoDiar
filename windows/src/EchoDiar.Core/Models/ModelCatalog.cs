@@ -2,7 +2,7 @@ namespace EchoDiar.Core.Models;
 
 public enum ModelKind { Asr, Diarization, Llm, Embedding }
 
-public enum ModelTier { Fast, Balanced, Quality }
+public enum ModelTier { Fast, Balanced, Quality, System }
 
 /// <summary>The engine that runs a catalog entry.</summary>
 public enum ModelRuntime
@@ -248,7 +248,7 @@ public static class ModelCatalog
         // Swift apple-foundation-models: the system model, no download (Repo and Revision null).
         new()
         {
-            Id = "windows-phi-silica", Kind = ModelKind.Llm, Tier = ModelTier.Fast,
+            Id = "windows-phi-silica", Kind = ModelKind.Llm, Tier = ModelTier.System,
             DisplayName = "Windows AI Phi Silica (system)",
             Repo = null, Revision = null,
             Runtime = ModelRuntime.WindowsAI, DiskBytes = 0, RamMB = 0, RamIsEstimate = false,
