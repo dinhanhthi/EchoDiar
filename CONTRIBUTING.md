@@ -89,6 +89,7 @@ scripts/measure-transcribe.sh report <result dir>...                  # one Mark
 - Before the first VM run, do a 1-minute warm-up (`fixture --minutes 1`, then `vm --label warmup --minutes 1 --install-models`): the first launch compiles the CoreML models, which would inflate the first real run.
 - VM numbers are only good for before/after ratios: the VM has no Neural Engine, so its absolute times say nothing about a real Mac.
 - CPU and footprint cover the EchoDiar process only: work done in other processes (such as CoreML's compiler) is not counted.
+- Apple Speech live: `scripts/measure-transcribe.sh host --label apple-live -- --engine apple-speech --incremental on --diarization off` (the QA runs used no diarization). Its live text is display only, so `priorReturned` is `false`, the gaps show as n/a, "chunks done" counts its final lines, and the WER is the batch transcript's, made after Stop. `result.json` has no live latency: add a temporary `NSLog` where `RecordingTranscriber` publishes a tentative or final line (never commit it) and compute (samples seen at publish − phrase start or end sample) / 16000 / pace, with phrases cut by `SpeechChunker`'s energy VAD (start = speech onset, end = last speech frame before a 0.5 s pause). Apple Speech does not run in VMPal VMs (`SpeechTranscriber.isAvailable` is false there), so measure it on a real Mac with `host`, not `vm`.
 
 ## Xcode cache
 

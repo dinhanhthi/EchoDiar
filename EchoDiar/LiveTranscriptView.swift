@@ -47,6 +47,7 @@ struct LiveTranscriptView: View {
     private var statusText: LocalizedStringKey {
         switch snapshot.state {
         case .loading: "Live transcript: loading the model…"
+        case .preparing: "Live transcript: preparing the language…"
         case .paused: "Live transcript: paused"
         case .listening where snapshot.deferred:
             "Paused while the Mac is hot or in Low Power Mode. The rest is transcribed after Stop."
@@ -70,7 +71,7 @@ struct LiveTranscriptView: View {
     private var statusIsError: Bool {
         switch snapshot.state {
         case .failed: true
-        case .loading, .listening, .paused: false
+        case .loading, .preparing, .listening, .paused: false
         }
     }
 

@@ -78,7 +78,7 @@ struct ModelsSettingsView: View {
             }
             Toggle(isOn: model.setting(\.transcribeWhileRecording)) {
                 Text("Transcribe while recording")
-                Text("Shows the transcript during the recording and keeps it, so it is ready within seconds of Stop. Uses more CPU and memory while recording. WhisperKit and Parakeet models only; other engines transcribe after Stop.")
+                Text("Shows the transcript during the recording. WhisperKit and Parakeet models keep it, so it is ready within seconds of Stop; Apple Speech (macOS 26+) only shows it and transcribes after Stop. Uses more CPU and memory while recording. Other engines transcribe after Stop.")
             }
             Picker(selection: model.setting(\.modelIdleMinutes)) {
                 ForEach(idleMinutesOptions, id: \.self) { Text("\($0) min").tag($0) }

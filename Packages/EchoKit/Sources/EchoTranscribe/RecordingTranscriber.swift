@@ -24,9 +24,18 @@ import Synchronization
 ///
 /// Holds the model gate as `.liveTranscript` from load to unload. The session lives only inside the decode task,
 /// never in actor state (`WhisperKit` is not Sendable).
+///
+/// Apple Speech (macOS 26+) streams instead of chunking: each channel's blocks go to its own `AppleSpeechLiveStream`
+/// runner, its volatile results become the speaker's tentative text and each final result a line. A missing language
+/// is installed first (`.preparing`) while its audio waits in the runner's stream (at most `maxQueuedSeconds` across
+/// both channels, else the transcriber fails). No model gate, no idle release, no constrained deferral: the model
+/// lives in a system process. Apple live is display only: `finish()` returns nil and batch Apple Speech writes the
+/// transcript after Stop, because the forced finals that bring a line ~0.6 s after a phrase lose words (measured WER
+/// 11.6 % live against 0.8 % batch on the same recording).
 public actor RecordingTranscriber {
     public enum State: Sendable, Equatable {
-        case loading, listening, paused
+        /// `preparing`: Apple Speech is installing a language; its audio waits.
+        case loading, preparing, listening, paused
         case failed(String)
     }
 
@@ -122,6 +131,8 @@ public actor RecordingTranscriber {
     private nonisolated let idleRelease: Duration?
     private nonisolated let deferWhenConstrained: Bool
     private nonisolated let language: @Sendable () -> String?
+    /// The Apple Speech streams; nil for WhisperKit and Parakeet.
+    private nonisolated let live: Live?
     private var snapshot = Snapshot(state: .loading)
     private var published: Snapshot?
     private var nextLineID = 0
@@ -130,10 +141,11 @@ public actor RecordingTranscriber {
     /// What `finish()` left; nil before it, or when the model never loaded or `cancel()` ran.
     public private(set) var stats: Stats?
 
-    /// `entry` is an installed WhisperKit or Parakeet entry in `folder`. `idleRelease` frees the model once no chunk
-    /// came for that long (a paused recording) and loads it again for the next one; nil keeps it until `finish()`.
-    /// `deferWhenConstrained` stops decoding while the Mac is hot or in Low Power Mode. `language` gives the current
-    /// marker language ("auto", a BCP-47 code, or nil = detect), read per block.
+    /// `entry` is an installed WhisperKit or Parakeet entry in `folder`, or Apple Speech (`folder` and `gate` unused).
+    /// `idleRelease` frees the model once no chunk came for that long (a paused recording) and loads it again for the
+    /// next one; nil keeps it until `finish()`. `deferWhenConstrained` stops decoding while the Mac is hot or in Low
+    /// Power Mode. Apple Speech ignores both. `language` gives the current marker language ("auto", a BCP-47 code, or
+    /// nil = detect; Apple Speech: the default language), read per block.
     public init(
         entry: ModelEntry, folder: URL, gate: ModelLoadGate, idleRelease: Duration? = nil,
         deferWhenConstrained: Bool, language: @escaping @Sendable () -> String?
@@ -149,9 +161,11 @@ public actor RecordingTranscriber {
                               shortPauseFrames: Self.liveShortPauseFrames))
         (updates, updatesContinuation) = AsyncStream.makeStream(bufferingPolicy: .bufferingNewest(1))
         (wake, wakeContinuation) = AsyncStream.makeStream(bufferingPolicy: .bufferingNewest(1))
+        live = entry.runtime == .appleSpeech ? Live() : nil
     }
 
-    /// Waits for the model gate, loads the model at `.utility` QoS and starts decoding.
+    /// Waits for the model gate, loads the model at `.utility` QoS and starts decoding (Apple Speech: no gate, starts
+    /// the channel runners).
     public func start() {
         guard decoder == nil, !finished else { return }
         publish(.loading)
@@ -165,22 +179,47 @@ public actor RecordingTranscriber {
         let mic = Self.channel(RecordingSession.Channel.mic, of: samples, frames: frames, channels: channels)
         let system = Self.channel(RecordingSession.Channel.system, of: samples, frames: frames, channels: channels)
         let language = Self.chunkLanguage(language())
+        if let live {
+            stream(live, mic: mic, system: system, language: language)
+            return
+        }
         if buffer.withLock({ $0.append(mic: mic, system: system, language: language) }) { wakeContinuation.yield() }
+    }
+
+    /// Apple Speech: yields the block to both runners, counted as waiting until each runner takes it (`counted`).
+    /// Never blocks: the streams are unbounded, and over `maxQueuedSeconds` the transcriber fails instead.
+    private nonisolated func stream(_ live: Live, mic: [Float], system: [Float], language: String?) {
+        switch buffer.withLock({ $0.appendLive(mic.count) }) {
+        case nil:
+            return
+        case .overflow:
+            live.resultsContinuation.yield(.overflow)
+        case .queued(let startSample, let resumed):
+            live.feeds[RecordingSession.Channel.mic].yield(
+                .audio(samples: mic, startSample: startSample, language: language))
+            live.feeds[RecordingSession.Channel.system].yield(
+                .audio(samples: system, startSample: startSample, language: language))
+            if resumed { live.resultsContinuation.yield(.resumed) }
+        }
     }
 
     /// On pause: closes the open chunk of each channel so it is decoded now.
     public func flush() {
         buffer.withLock { $0.flush(paused: true) }
         wakeContinuation.yield()
+        // Apple Speech: each runner ends its analysis (its finals come) and starts a new one at the next block; its
+        // chunkers stay empty.
+        live?.feeds.forEach { $0.yield(.finalize) }
         publishRunning()
     }
 
     /// At Stop: decodes what is left (unless the Mac is constrained and `deferWhenConstrained`: then it stays a gap),
     /// unloads the model and returns what was transcribed; nil when no chunk was, or the model never loaded (the
-    /// pipeline then transcribes the whole recording).
+    /// pipeline then transcribes the whole recording). Apple Speech: see `finishLive`.
     public func finish() async -> PriorTranscription? {
         guard !finished else { return nil }
         finished = true
+        if live != nil { return finishLive() }
         guard buffer.withLock({ $0.loaded }) else {
             cancel()
             return nil
@@ -210,12 +249,22 @@ public actor RecordingTranscriber {
             duration: duration)
     }
 
+    /// Apple Speech at Stop: always nil (display only; batch Apple Speech writes the transcript). Cancels the runners
+    /// without waiting for them, so it returns at once even with a `finalize(through:)` in flight. `stats.transcribed`
+    /// counts the lines shown, once an analyzer started.
+    private func finishLive() -> PriorTranscription? {
+        if buffer.withLock({ $0.loaded }) { stats = Stats(transcribed: nextLineID) }
+        cancel()
+        return nil
+    }
+
     /// Stops at once, keeping nothing; the decode task unloads the model on its way out.
     public func cancel() {
         finished = true
         snapshot.tentative = []
         buffer.withLock { $0.close() }
         wakeContinuation.finish()
+        live?.feeds.forEach { $0.finish() }
         decoder?.cancel()
         decoder = nil
         updatesContinuation.finish()
@@ -223,10 +272,14 @@ public actor RecordingTranscriber {
 
     // MARK: - Decode task
 
-    /// Holds the model gate from load to unload.
+    /// Holds the model gate from load to unload (Apple Speech: no gate).
     private nonisolated func decode() async {
         do {
-            try await gate.withExclusiveModel(owner: .liveTranscript) { [self] in try await run() }
+            if let live {
+                try await runLive(live)
+            } else {
+                try await gate.withExclusiveModel(owner: .liveTranscript) { [self] in try await run() }
+            }
         } catch {
             buffer.withLock { $0.fail() }
             if !Task.isCancelled { await publish(.failed(error.localizedDescription)) }
@@ -263,6 +316,63 @@ public actor RecordingTranscriber {
             throw error
         }
         await model.release()
+    }
+
+    /// Apple Speech: runs both channels' runners and applies their results in order, until both streams end or the
+    /// task is cancelled (`finish()`, `cancel()`), or something throws (the other runner is then cancelled).
+    private nonisolated func runLive(_ live: Live) async throws {
+        guard #available(macOS 26, *) else { throw TranscriptionError.unknownEngine(entry.id) }
+        try await withThrowingTaskGroup(of: Void.self) { group in
+            for channel in [RecordingSession.Channel.mic, RecordingSession.Channel.system] {
+                let results = live.resultsContinuation
+                group.addTask { [self] in
+                    try await AppleSpeechLiveStream.run(
+                        events: counted(live.events[channel], channel: channel),
+                        onPreparing: { [self] in
+                            buffer.withLock { _ = $0.preparing.insert(channel) }
+                            results.yield(.preparing)
+                        },
+                        onStarted: { [self] in
+                            buffer.withLock {
+                                $0.loaded = true
+                                $0.preparing.remove(channel)
+                            }
+                            results.yield(.started)
+                        },
+                        onVolatile: { results.yield(.volatile(channel: channel, text: $0, startSample: $1)) },
+                        onFinal: { results.yield(.final(channel: channel, segment: $0)) })
+                }
+            }
+            group.addTask { [self] in
+                for await result in live.results {
+                    if case .overflow = result {
+                        throw TranscriptionError.engineFailed(
+                            "over \(Self.maxQueuedSeconds) s of audio waited for the live transcript")
+                    }
+                    await apply(result)
+                }
+            }
+            // Both runners first (the consumer only ends once `results` is finished), then the last results.
+            _ = try await group.next()
+            _ = try await group.next()
+            live.resultsContinuation.finish()
+            _ = try await group.next()
+        }
+        await apply(.ended)
+    }
+
+    /// `events` as the runner takes them: each block leaves `Buffer.queuedSamples` when pulled, so what waits during
+    /// an install is counted, and a cancelled runner ends it.
+    private nonisolated func counted(_ events: AsyncStream<AppleSpeechLiveEvent>, channel: Int)
+        -> AsyncStream<AppleSpeechLiveEvent>
+    {
+        // Safe: the runner is the only consumer and pulls one event at a time.
+        nonisolated(unsafe) var iterator = events.makeAsyncIterator()
+        return AsyncStream { [self] in
+            let event = await iterator.next()
+            if case .audio(let samples, _, _) = event { buffer.withLock { $0.fedLive(samples.count) } }
+            return event
+        }
     }
 
     /// Decodes the waiting chunks in order, then a partial of an open chunk when one is due, unless the Mac is
@@ -337,17 +447,59 @@ public actor RecordingTranscriber {
         snapshot.state = state
         if case .failed = state { snapshot.tentative = [] }
         snapshot.pendingSeconds = buffer.withLock { $0.pendingSeconds }
-        snapshot.deferred = deferWhenConstrained && TranscriptionPipeline.isConstrained
+        snapshot.deferred = live == nil && deferWhenConstrained && TranscriptionPipeline.isConstrained
         guard snapshot != published else { return }
         published = snapshot
         updatesContinuation.yield(snapshot)
     }
 
-    /// Listening or paused once loaded; leaves `loading` and `failed` alone.
+    /// Listening or paused once loaded and no language is installing; leaves `loading`, `preparing` and `failed` alone
+    /// until then (a pause while installing shows once it is done).
     private func publishRunning() {
-        guard snapshot.state != .loading || buffer.withLock({ $0.loaded }) else { return }
+        let (loaded, preparing) = buffer.withLock { ($0.loaded, !$0.preparing.isEmpty) }
+        guard snapshot.state != .loading || loaded, snapshot.state != .preparing || !preparing else { return }
         if case .failed = snapshot.state { return }
         publish(buffer.withLock { $0.paused } ? .paused : .listening)
+    }
+
+    /// Apple Speech: one runner result or `append` notice, in the order they came.
+    private func apply(_ result: LiveResult) {
+        if case .failed = snapshot.state { return }
+        switch result {
+        case .preparing:
+            publish(.preparing)
+        case .started, .resumed, .overflow:
+            publishRunning()
+        case .volatile(let channel, let text, let startSample):
+            setTentative(Self.speaker(channel), text, startSample: startSample)
+        case .final(let channel, let segment):
+            addFinal(channel, segment)
+        case .ended:
+            snapshot.tentative = []
+            publishRunning()
+        }
+    }
+
+    /// Apple Speech: records a final and shows its line in place of the speaker's tentative text.
+    private func addFinal(_ channel: Int, _ segment: RawSegment) {
+        buffer.withLock { $0.addLive(segment, channel: channel) }
+        let speaker = Self.speaker(channel)
+        let span = Span(start: segment.start, end: segment.end)
+        // The system's text still volatile counts like the chunk path's open chunk: its final lags the mic's.
+        let othersPending = snapshot.tentative.contains {
+            $0.speaker == .others
+                && Double($0.startSample) / Double(Self.sampleRate) <= span.end + TranscriptMerger.bleedTimeTolerance
+        }
+        let text = Self.liveLine([segment], mic: speaker == .me, othersSpeak: {
+            othersPending || buffer.withLock { $0.othersFinal(during: span) }
+        })
+        snapshot.tentative = Self.tentative(snapshot.tentative, setting: speaker, text: nil, startSample: 0)
+        if let text {
+            snapshot.lines.append(Line(id: nextLineID, speaker: speaker, text: text))
+            nextLineID += 1
+            snapshot.lines.removeFirst(max(0, snapshot.lines.count - Self.maxLines))
+        }
+        publishRunning()
     }
 
     /// The final of the chunk starting at `startSample`: its line (none when `text` is nil) replaces the speaker's
@@ -383,6 +535,10 @@ public actor RecordingTranscriber {
     }
 
     // MARK: - Helpers
+
+    private static func speaker(_ channel: Int) -> Speaker {
+        channel == RecordingSession.Channel.mic ? .me : .others
+    }
 
     private static func stats(_ channels: [Channel]) -> Stats {
         var stats = Stats()
@@ -457,6 +613,43 @@ public actor RecordingTranscriber {
         return peak
     }
 
+    /// Apple Speech: the runners' event streams (unbounded: audio waits there while a language installs) and their
+    /// results, applied in order by one consumer.
+    struct Live: Sendable {
+        /// Index = `RecordingSession.Channel`.
+        let events: [AsyncStream<AppleSpeechLiveEvent>]
+        let feeds: [AsyncStream<AppleSpeechLiveEvent>.Continuation]
+        let results: AsyncStream<LiveResult>
+        let resultsContinuation: AsyncStream<LiveResult>.Continuation
+
+        init() {
+            let mic = AsyncStream<AppleSpeechLiveEvent>.makeStream(bufferingPolicy: .unbounded)
+            let system = AsyncStream<AppleSpeechLiveEvent>.makeStream(bufferingPolicy: .unbounded)
+            events = [mic.stream, system.stream]
+            feeds = [mic.continuation, system.continuation]
+            (results, resultsContinuation) = AsyncStream.makeStream(bufferingPolicy: .unbounded)
+        }
+    }
+
+    /// What `RecordingTranscriber.apply` handles; channel = `RecordingSession.Channel`.
+    enum LiveResult: Sendable {
+        case preparing, started
+        case volatile(channel: Int, text: String, startSample: Int)
+        case final(channel: Int, segment: RawSegment)
+        /// The first block after a pause.
+        case resumed
+        /// More than `maxQueuedSeconds` waits: the transcriber fails.
+        case overflow
+        /// Both runners ended.
+        case ended
+    }
+
+    /// What `Buffer.appendLive` did with a block.
+    enum LiveAppend {
+        case queued(startSample: Int, resumed: Bool)
+        case overflow
+    }
+
     /// A chunk waiting to be decoded, and where its outcome is recorded.
     struct Item: Sendable {
         var channel: Int
@@ -500,6 +693,8 @@ public actor RecordingTranscriber {
         /// The decode task ended with an error: chunks are failed, not queued.
         var failed = false
         var closed = false
+        /// Apple Speech: the channels whose runner is installing a language.
+        var preparing: Set<Int> = []
 
         init(
             maxChunkSeconds: Int, shortPauseMinSeconds: Int = SpeechChunker.shortPauseMinSeconds,
@@ -529,6 +724,42 @@ public actor RecordingTranscriber {
             var partialDue = false
             for channel in channels.indices where signalPartial(channel) { partialDue = true }
             return resumed || micQueued || systemQueued || partialDue
+        }
+
+        /// Apple Speech: counts a block of `count` samples per channel as waiting for both runners; nil when it is not
+        /// yielded (closed, finishing or failed), `.overflow` (and failed) when over `maxQueuedSamples`.
+        mutating func appendLive(_ count: Int) -> LiveAppend? {
+            guard !closed, !finishing, !failed else { return nil }
+            guard queuedSamples + 2 * count <= maxQueuedSamples else {
+                fail()
+                return .overflow
+            }
+            let startSample = samplesSeen
+            let resumed = paused
+            paused = false
+            samplesSeen += count
+            queuedSamples += 2 * count
+            return .queued(startSample: startSample, resumed: resumed)
+        }
+
+        /// Apple Speech: a runner took a block of `count` samples.
+        mutating func fedLive(_ count: Int) {
+            guard !closed, !failed else { return }
+            queuedSamples = max(0, queuedSamples - count)
+        }
+
+        /// Apple Speech: a final result of `channel`, in file seconds.
+        mutating func addLive(_ segment: RawSegment, channel: Int) {
+            guard !closed else { return }
+            channels[channel].segments.append(segment)
+        }
+
+        /// Apple Speech: true when a system final overlaps `span` widened by `TranscriptMerger.bleedTimeTolerance`.
+        func othersFinal(during span: Span) -> Bool {
+            guard !closed else { return false }
+            let start = span.start - TranscriptMerger.bleedTimeTolerance
+            let end = span.end + TranscriptMerger.bleedTimeTolerance
+            return channels[RecordingSession.Channel.system].segments.contains { $0.start < end && $0.end > start }
         }
 
         mutating func flush(paused: Bool) {
