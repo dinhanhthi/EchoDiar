@@ -125,12 +125,13 @@ public sealed partial class AppViewModel
         if (_closing) return;
         DismissCalendarPrompt(@event);
         if (IsRecording || IsStarting) return;
-        _ = StartRecordingAsync(RecordableDetectedMeeting()?.Group, @event);
+        _ = StartRecordingAsync(RecordableDetectedMeeting()?.Group, @event, bringForward: false);
     }
 
     /// <summary>
     /// "Join" on the calendar prompt, a user's click only: opens the meeting link, then records all system audio (no
-    /// call app yet) with the event's title and auto-stop (macOS <c>joinCalendarEvent</c>).
+    /// call app yet) with the event's title and auto-stop, the main window kept behind the meeting (macOS
+    /// <c>joinCalendarEvent</c>).
     /// </summary>
     public void JoinCalendarEvent(CalendarEvent @event)
     {
@@ -138,7 +139,7 @@ public sealed partial class AppViewModel
         DismissCalendarPrompt(@event);
         OpenCalendarEventLink(@event);
         if (IsRecording || IsStarting) return;
-        _ = StartRecordingAsync(null, @event);
+        _ = StartRecordingAsync(null, @event, bringForward: false);
     }
 
     /// <summary>"Not now" on the calendar prompt: the event stays triggered (in memory), so it does not ask again until a relaunch.</summary>
@@ -421,13 +422,13 @@ public sealed partial class AppViewModel
         if (mode == CalendarScheduler.Mode.RecordAtStart)
         {
             AutoStartedAppName = @event.Title;
-            _ = StartRecordingAsync(null, @event);
+            _ = StartRecordingAsync(null, @event, bringForward: false);
         }
         else if (RecordableDetectedMeeting() is { } meeting)
         {
             // Its mic was already on: the detector will not report it again.
             AutoStartedAppName = @event.Title;
-            _ = StartRecordingAsync(meeting.Group, @event);
+            _ = StartRecordingAsync(meeting.Group, @event, bringForward: false);
         }
         else
         {

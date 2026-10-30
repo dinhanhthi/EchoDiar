@@ -89,7 +89,7 @@ public sealed partial class AppViewModel
         {
             SaveSettings(Settings with { PerAppBehavior = new(Settings.PerAppBehavior) { [app.AppExe] = MeetingBehavior.Always } });
         }
-        _ = StartRecordingAsync(asking.Meeting.Group);
+        _ = StartRecordingAsync(asking.Meeting.Group, bringForward: false);
     }
 
     /// <summary>"Not now" on the detection prompt.</summary>
@@ -241,7 +241,7 @@ public sealed partial class AppViewModel
         if (behavior == MeetingBehavior.Always || waiting is not null)
         {
             AutoStartedAppName = waiting?.Title ?? meeting.Name;
-            _ = StartRecordingAsync(meeting.Group, waiting);
+            _ = StartRecordingAsync(meeting.Group, waiting, bringForward: false);
         }
         else if (PillPrompt is not PillPrompt.CalendarEvent)
         {

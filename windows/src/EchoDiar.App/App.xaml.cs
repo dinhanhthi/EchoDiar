@@ -108,6 +108,8 @@ public partial class App : Application
         _pill = new FloatingPillController(_model, _window, dispatcher);
         // X and Alt+F4 hide the window to the tray (macOS: the menu bar app runs on); Quit closes it.
         _window.AppWindow.Closing += OnMainWindowClosing;
+        // An automatic recording start selects the recording only in a shown window (AppViewModel.StartRecordingAsync).
+        _model.MainWindowOpen = () => _window?.AppWindow.IsVisible == true;
         // A shortcut recorder in Settings › Shortcuts stops taking keys once the window is not in front (macOS
         // didResignKey); the global shortcuts come back.
         _window.Activated += (_, e) =>
@@ -166,7 +168,7 @@ public partial class App : Application
         }
         // At launch (after the main window shows, once the settings are loaded) and from Settings › General.
         _model.OnboardingRequested += ShowOnboarding;
-        // A cloud confirmation waits: the window that asks comes back from the tray.
+        // A cloud confirmation waits, or the user starts a recording: the window comes back from the tray.
         _model.MainWindowRequested += ShowWindow;
         if (atLogin && _tray is not null)
         {
