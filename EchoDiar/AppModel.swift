@@ -395,9 +395,18 @@ final class AppModel {
     }
 
     /// Waits for launch recovery, then starts the engine off the main thread. `event`: the calendar event recorded.
-    func startRecording(target: CaptureTarget, event: CalendarEvent? = nil) {
+    /// The recording page shows at once ("Starting…" until it runs). A start from EchoDiar's own windows, shortcuts or
+    /// menus brings the main window forward on it; without `bringForward` (the pill's Record and Join, automatic
+    /// starts) it is only selected in an open window, so the meeting app keeps the focus.
+    func startRecording(target: CaptureTarget, event: CalendarEvent? = nil, bringForward: Bool = true) {
         guard !isRecording, !isStarting else { return }
         isStarting = true
+        if bringForward {
+            route = .recording
+            (NSApp.delegate as? AppDelegate)?.showMainWindow()
+        } else if mainWindowOpen {
+            route = .recording
+        }
         let language = recordingLanguage
         Task {
             _ = await recovery?.value
@@ -428,7 +437,7 @@ final class AppModel {
                 autoStartedAppName = nil
                 recordingEvent = nil
                 recordingError = Self.captureFailureMessage(error, action: .start)
-                // The welcome pane's Record opens the recording page before the start; nothing to show there now.
+                // The recording page opened before the start; nothing to show there now.
                 if route == .recording { route = .list }
             }
             isStarting = false
@@ -592,8 +601,8 @@ final class AppModel {
                 guard let self else { return }
                 let wasRecording = isRecording
                 self.snapshot = snapshot
-                // A start does not navigate. An end on the recording page shows the list, then the finished entry
-                // once the library lists it; Settings opened from that page returns to the list.
+                // A start navigates in `startRecording`. An end on the recording page shows the list, then the
+                // finished entry once the library lists it; Settings opened from that page returns to the list.
                 if wasRecording && !isRecording {
                     if route == .recording {
                         pendingOpenFolder = activeFolder
@@ -1053,9 +1062,14 @@ final class AppModel {
     /// Opens (or deminiaturizes) the main window so the cloud confirmation is seen, e.g. after a recording made
     /// from the menu bar.
     private func showMainWindowIfHidden() {
-        guard let delegate = NSApp.delegate as? AppDelegate else { return }
+        if !mainWindowOpen { (NSApp.delegate as? AppDelegate)?.showMainWindow() }
+    }
+
+    /// The main window is on screen, even behind other apps (unlike `mainWindowVisible`).
+    private var mainWindowOpen: Bool {
+        guard let delegate = NSApp.delegate as? AppDelegate else { return false }
         // The main window is the only one whose delegate is the AppDelegate.
-        if !NSApp.windows.contains(where: { $0.delegate === delegate && $0.isVisible }) { delegate.showMainWindow() }
+        return NSApp.windows.contains { $0.delegate === delegate && $0.isVisible }
     }
 
     /// Installed batch ASR models, in catalog order.
@@ -2222,7 +2236,7 @@ extension AppModel {
         pillPrompt = nil
         // Never for browsers: any web page using the mic would start a recording.
         if always, !meeting.app.isBrowser { updateSettings { $0.perAppBehavior[meeting.app.appBundleID] = .always } }
-        startRecording(target: .app(meeting.group))
+        startRecording(target: .app(meeting.group), bringForward: false)
     }
 
     /// "Not now" on the detection prompt.
@@ -2242,15 +2256,16 @@ extension AppModel {
     func recordCalendarEvent() {
         guard case .calendarEvent(let event)? = pillPrompt else { return }
         pillPrompt = nil
-        startRecording(target: detectedMeeting.map { .app($0.group) } ?? .global, event: event)
+        startRecording(target: detectedMeeting.map { .app($0.group) } ?? .global, event: event, bringForward: false)
     }
 
-    /// "Join" on the calendar prompt: opens the meeting link, then records all system audio (no call app yet).
+    /// "Join" on the calendar prompt: opens the meeting link, then records all system audio (no call app yet), the
+    /// main window kept behind the meeting.
     func joinCalendarEvent() {
         guard case .calendarEvent(let event)? = pillPrompt else { return }
         pillPrompt = nil
         openMeetingLink(event)
-        startRecording(target: .global, event: event)
+        startRecording(target: .global, event: event, bringForward: false)
     }
 
     /// "Not now" on the calendar prompt; the event stays triggered, so it does not ask again.
@@ -2413,7 +2428,7 @@ extension AppModel {
                 pillPrompt = .calendarEvent(event)
             } else {
                 autoStartedAppName = event.title
-                startRecording(target: .global, event: event)
+                startRecording(target: .global, event: event, bringForward: false)
             }
         case .waitForCall:
             // An invite not accepted asks too: any app, browsers included, would start the wait's recording.
@@ -2422,7 +2437,7 @@ extension AppModel {
             } else if let meeting = detectedMeeting, settings.perAppBehavior[meeting.app.appBundleID] != .ignore {
                 // Its mic was already on: the detector will not report it again.
                 autoStartedAppName = event.title
-                startRecording(target: .app(meeting.group), event: event)
+                startRecording(target: .app(meeting.group), event: event, bringForward: false)
             } else {
                 calendarWaitEvent = event
             }
@@ -2458,7 +2473,7 @@ extension AppModel {
         if behavior == .always || waiting != nil {
             calendarWaitEvent = nil
             autoStartedAppName = waiting?.title ?? meeting.name
-            startRecording(target: .app(meeting.group), event: waiting)
+            startRecording(target: .app(meeting.group), event: waiting, bringForward: false)
         } else if case .calendarEvent? = pillPrompt {
             return
         } else {

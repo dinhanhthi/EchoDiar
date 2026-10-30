@@ -1,8 +1,9 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!--
     The detail when no entry is shown (macOS WelcomeView.swift): the logo, "Welcome to EchoDiar" and a hint to pick a
-    conversation in the sidebar; with an empty library and nothing recording, the invite to the first recording (the
-    shortcut that starts one and Record). In a card filling the detail, like the transcript's.
+    conversation in the sidebar ("Starting…" while a recording starts); with an empty library and nothing recording,
+    the invite to the first recording (the shortcut that starts one and Record). In a card filling the detail, like the
+    transcript's.
 -->
 <UserControl
     x:Class="EchoDiar.App.Views.WelcomeView"
@@ -42,6 +43,29 @@
                 Style="{StaticResource BodyTextBlockStyle}"
                 Text="{local:T Text='Pick a conversation in the sidebar.'}"
                 TextAlignment="Center" />
+
+            <!--
+                In place of the hint while a recording starts: the recording page's placeholder. It fades in once the
+                start takes 150 ms (as ConversationView's loading ring), so a fast start does not flash it.
+            -->
+            <StackPanel
+                x:Name="StartingHint"
+                HorizontalAlignment="Center"
+                Opacity="0"
+                Orientation="Horizontal"
+                Spacing="6"
+                Visibility="Collapsed">
+                <ProgressRing
+                    x:Name="StartingHintRing"
+                    Width="16"
+                    Height="16"
+                    VerticalAlignment="Center"
+                    IsActive="False" />
+                <TextBlock
+                    Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                    Style="{StaticResource BodyTextBlockStyle}"
+                    Text="{local:T Text='Starting…'}" />
+            </StackPanel>
 
             <!-- The library is empty and nothing records: the first recording's invite. -->
             <StackPanel x:Name="FirstRecording" Spacing="10" Visibility="Collapsed">

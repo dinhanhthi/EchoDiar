@@ -232,7 +232,10 @@ public sealed partial class AppViewModel
         private set => SetProperty(ref _pendingCloudRuns, value);
     }
 
-    /// <summary>A cloud confirmation waits: the main window must show (it may be hidden in the tray).</summary>
+    /// <summary>
+    /// A cloud confirmation waits, or a recording starts from the user: the main window must show (it may be hidden in
+    /// the tray).
+    /// </summary>
     public event Action? MainWindowRequested;
 
     /// <summary>

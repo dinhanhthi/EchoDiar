@@ -1,9 +1,9 @@
 import SwiftUI
 
-/// The library page's detail when no entry is shown (the list, a conversation that is gone, a recording that has
-/// ended): the logo, "Welcome to EchoDiar" and a hint to pick a conversation in the sidebar. With an empty library and
-/// nothing recording, it invites the first recording instead: the shortcut that starts one and a Record button
-/// ("Starting…" while the recording starts).
+/// The library page's detail when no entry is shown (the list, a conversation that is gone, a recording that starts or
+/// has ended): the logo, "Welcome to EchoDiar" and a hint to pick a conversation in the sidebar ("Starting…" while a
+/// recording starts). With an empty library and nothing recording, it invites the first recording instead: the
+/// shortcut that starts one and a Record button ("Starting…" while the recording starts).
 /// In a card filling the detail, like `TranscriptView`'s panes.
 struct WelcomeView: View {
     let model: AppModel
@@ -24,11 +24,10 @@ struct WelcomeView: View {
                 Text(shortcutHint)
                     .font(.callout)
                     .foregroundStyle(.secondary)
-                // The toolbar's Record and ⌘R, then the recording page for the live transcript (this pane while it
-                // starts: the button turns to a disabled "Starting…", as the toolbar's Record is disabled meanwhile).
+                // The toolbar's Record and ⌘R, which open the recording page for the live transcript (this pane while
+                // it starts: the button turns to a disabled "Starting…", as the toolbar's Record is disabled meanwhile).
                 Button {
                     model.toggleRecording()
-                    model.route = .recording
                 } label: {
                     if model.isStarting {
                         HStack(spacing: 6) {
@@ -41,6 +40,9 @@ struct WelcomeView: View {
                 }
                 .disabled(model.isStarting)
                 .padding(.top, 6)
+            } else if model.isStarting {
+                // The recording page's placeholder until the recording runs.
+                StartingHint()
             } else {
                 Text("Pick a conversation in the sidebar.")
                     .foregroundStyle(.secondary)
@@ -65,6 +67,27 @@ struct WelcomeView: View {
             "Press \(model.settings.globalHotKey.displayString) to start recording from anywhere."
         } else {
             "Press ⌘R to start recording."
+        }
+    }
+}
+
+/// "Starting…" with a spinner, in place of the hint while a recording starts; it fades in once the start takes 150 ms,
+/// as `DetailLoadingPane`'s spinner, so a fast start does not flash it.
+private struct StartingHint: View {
+    @State private var shown = false
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
+    var body: some View {
+        HStack(spacing: 6) {
+            ProgressView().controlSize(.small)
+            Text("Starting…")
+        }
+        .foregroundStyle(.secondary)
+        .opacity(shown ? 1 : 0)
+        .task {
+            try? await Task.sleep(for: .milliseconds(150))
+            guard !Task.isCancelled else { return }
+            withAnimation(reduceMotion ? nil : Motion.standard) { shown = true }
         }
     }
 }

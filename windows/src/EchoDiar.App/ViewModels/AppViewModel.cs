@@ -464,6 +464,9 @@ public sealed partial class AppViewModel : ObservableObject
         GlobalChatOpen = false;
     }
 
+    /// <summary>The main window is shown (not hidden in the tray), even behind other apps or minimized; set by the App.</summary>
+    internal Func<bool> MainWindowOpen { get; set; } = () => false;
+
     /// <summary>The main window was closed to the tray: it opens again on the list, without a search (macOS windowWillClose).</summary>
     internal void MainWindowHidden()
     {
@@ -584,9 +587,12 @@ public sealed partial class AppViewModel : ObservableObject
     /// <summary>
     /// Records <paramref name="app"/>'s audio (null: all system audio) and the mic, after launch recovery.
     /// <paramref name="calendarEvent"/>: the calendar event recorded, which names the recording at its end and, with "Stop
-    /// when the event ends", prompts a stop after its end.
+    /// when the event ends", prompts a stop after its end. The recording page shows at once ("Starting…" until it runs). A
+    /// start from EchoDiar's own windows, shortcuts or tray brings the main window forward on it; without
+    /// <paramref name="bringForward"/> (the pill's Record and Join, automatic starts) it is only selected in a shown window,
+    /// so the meeting app keeps the focus (macOS <c>startRecording</c>).
     /// </summary>
-    public async Task StartRecordingAsync(AudioProcessGroup? app, CalendarEvent? calendarEvent = null)
+    public async Task StartRecordingAsync(AudioProcessGroup? app, CalendarEvent? calendarEvent = null, bool bringForward = true)
     {
         if (IsRecording || IsStarting || _closing) return;
         _recordingEvent = null;
@@ -599,6 +605,15 @@ public sealed partial class AppViewModel : ObservableObject
         }
         IsStarting = true;
         RecordingError = null;
+        if (bringForward)
+        {
+            ShowRecording();
+            MainWindowRequested?.Invoke();
+        }
+        else if (MainWindowOpen())
+        {
+            ShowRecording();
+        }
         RecordingSourceName = app?.Name;
         RecordingSourceRootPid = app?.RootPid;
         var root = _services.Paths.Conversations;
@@ -640,6 +655,8 @@ public sealed partial class AppViewModel : ObservableObject
             RecordingError = e is RecordingDiskFullException
                 ? Loc.T("There is not enough free disk space to record.")
                 : $"{Loc.T("The recording could not start.")} ({e.Message})";
+            // The recording page opened before the start; nothing to show there now.
+            if (Route.Kind == RouteKind.Recording) Route = Route.List;
         }
         finally
         {
