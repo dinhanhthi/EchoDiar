@@ -6,14 +6,12 @@ using EchoDiar.Core.Calendar;
 using EchoDiar.Core.Settings;
 using Microsoft.UI.Composition.SystemBackdrops;
 using Microsoft.UI.Dispatching;
-using Microsoft.UI.Input;
 using Microsoft.UI.Windowing;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Controls.Primitives;
 using Microsoft.UI.Xaml.Input;
 using Microsoft.UI.Xaml.Media;
-using Windows.Graphics;
 using Windows.UI;
 using VirtualKey = Windows.System.VirtualKey;
 using VirtualKeyModifiers = Windows.System.VirtualKeyModifiers;
@@ -31,7 +29,6 @@ public sealed partial class MainWindow : Window
 
     /// <summary>The welcome pane, made when first shown and kept while the window lives.</summary>
     private WelcomeView? _welcome;
-    private IReadOnlyList<RectInt32> _passthrough = [];
 
     /// <summary>
     /// Set first in <see cref="Window.Closed"/>: the window then puts its content to null and fails every call on its
@@ -81,15 +78,16 @@ public sealed partial class MainWindow : Window
             RootGrid.Background = null;
         }
 
+        // The header's title row only: the toolbar row below it is ordinary content, like Paint's menu row.
         ExtendsContentIntoTitleBar = true;
-        SetTitleBar(TitleBarGrid);
-        // Standard: 32 px caption buttons at the top of the 40 px title bar row (Tall would make them 48 px).
+        SetTitleBar(Toolbar.TitleBar);
+        // Standard: 32 px caption buttons, the title row's height (Tall would make them 48 px).
         AppWindow.TitleBar.PreferredHeightOption = TitleBarHeightOption.Standard;
         ApplyCaptionButtonColors();
         RootGrid.ActualThemeChanged += OnActualThemeChanged;
 
-        TitleBarGrid.SizeChanged += OnTitleBarSizeChanged;
-        TitleBarGrid.LayoutUpdated += OnTitleBarLayoutUpdated;
+        Toolbar.TitleBar.SizeChanged += OnTitleBarSizeChanged;
+        Toolbar.TitleBar.LayoutUpdated += OnTitleBarLayoutUpdated;
 
         Toolbar.Attach(_model);
         // One library, always the sidebar beside the detail. Its deletes ask through the toolbar, which shows the
@@ -207,8 +205,8 @@ public sealed partial class MainWindow : Window
         UntraceWindowEvents();
 #endif
         RootGrid.ActualThemeChanged -= OnActualThemeChanged;
-        TitleBarGrid.SizeChanged -= OnTitleBarSizeChanged;
-        TitleBarGrid.LayoutUpdated -= OnTitleBarLayoutUpdated;
+        Toolbar.TitleBar.SizeChanged -= OnTitleBarSizeChanged;
+        Toolbar.TitleBar.LayoutUpdated -= OnTitleBarLayoutUpdated;
         if (_xamlRoot is not null) _xamlRoot.Changed -= OnXamlRootChanged;
         _model.PropertyChanged -= OnModelChanged;
         Toolbar.Detach();
@@ -550,12 +548,12 @@ public sealed partial class MainWindow : Window
         return false;
     }
 
-    private void OnTitleBarSizeChanged(object sender, SizeChangedEventArgs e) => UpdateTitleBarRegions();
+    private void OnTitleBarSizeChanged(object sender, SizeChangedEventArgs e) => UpdateCaptionInsets();
 
-    private void OnTitleBarLayoutUpdated(object? sender, object e) => UpdateTitleBarRegions();
+    private void OnTitleBarLayoutUpdated(object? sender, object e) => UpdateCaptionInsets();
 
-    // Keeps the toolbar's controls clickable: everything else in the title bar row drags the window.
-    private void UpdateTitleBarRegions()
+    // Keeps the title off the caption buttons; the whole title row drags the window.
+    private void UpdateCaptionInsets()
     {
         // RootGrid's, not Content's: Window.Content throws once the window is closed.
         if (_closing || RootGrid.XamlRoot is not { } root)
@@ -569,37 +567,14 @@ public sealed partial class MainWindow : Window
         var titleBar = AppWindow.TitleBar;
         if (!double.IsFinite(scale) || scale <= 0)
         {
-            StartupTrace.Write($"title bar regions skipped: scale {scale}, insets {titleBar.LeftInset},{titleBar.RightInset}");
+            StartupTrace.Write($"caption insets skipped: scale {scale}, insets {titleBar.LeftInset},{titleBar.RightInset}");
             return;
         }
         if (titleBar.LeftInset < 0 || titleBar.RightInset < 0)
         {
             StartupTrace.Write($"title bar insets {titleBar.LeftInset},{titleBar.RightInset} clamped (scale {scale})");
         }
-        SetWidth(LeftInsetColumn, titleBar.LeftInset / scale);
-        SetWidth(RightInsetColumn, titleBar.RightInset / scale);
-
-        // LayoutUpdated fires often: only a change of the rects goes to the window.
-        var rects = Toolbar.PassthroughRects(scale);
-        if (rects.SequenceEqual(_passthrough))
-        {
-            return;
-        }
-
-        _passthrough = rects;
-        StartupTrace.Write($"SetRegionRects ({rects.Count} rects)");
-        InputNonClientPointerSource.GetForWindowId(AppWindow.Id)
-            .SetRegionRects(NonClientRegionKind.Passthrough, [.. rects]);
-    }
-
-    /// <summary>GridLength throws on a negative, NaN or infinite width: those set 0, so LayoutUpdated never throws.</summary>
-    private static void SetWidth(ColumnDefinition column, double width)
-    {
-        var length = new GridLength(double.IsFinite(width) && width > 0 ? width : 0);
-        if (!column.Width.Equals(length))
-        {
-            column.Width = length;
-        }
+        Toolbar.SetCaptionInsets(titleBar.LeftInset / scale, titleBar.RightInset / scale);
     }
 
 #if DEBUG
