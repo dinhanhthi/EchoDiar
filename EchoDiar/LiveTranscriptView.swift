@@ -3,7 +3,8 @@ import SwiftUI
 
 /// Live captions on the recording page, under its header (setting "Transcribe while recording"): the transcriber's
 /// state (how far behind decoding is when it falls behind), then the newest lines and the open chunks' greyed
-/// tentative text, scrolled to the bottom as they arrive, filling the page.
+/// tentative text as one selectable text (`LiveCaptionsTextView`), scrolled to the bottom as they arrive, filling the
+/// page.
 struct LiveTranscriptView: View {
     let snapshot: RecordingTranscriber.Snapshot
 
@@ -14,28 +15,9 @@ struct LiveTranscriptView: View {
                 .foregroundStyle(statusIsError ? AnyShapeStyle(.orange) : AnyShapeStyle(.secondary))
                 .help(failureMessage ?? "")
             if !snapshot.lines.isEmpty || !snapshot.tentative.isEmpty {
-                ScrollViewReader { proxy in
-                    ScrollView {
-                        LazyVStack(alignment: .leading, spacing: 4) {
-                            ForEach(snapshot.lines) { line in
-                                Text("\(Text(Self.name(line.speaker)).bold().foregroundStyle(Self.color(line.speaker))): \(line.text)")
-                                    .frame(maxWidth: .infinity, alignment: .leading)
-                                    .id(line.id)
-                            }
-                            ForEach(snapshot.tentative, id: \.speaker) { tentative in
-                                let name = Text(Self.name(tentative.speaker)).bold()
-                                    .foregroundStyle(Self.color(tentative.speaker))
-                                Text("\(name): \(Text(tentative.text).foregroundStyle(.secondary))")
-                                    .frame(maxWidth: .infinity, alignment: .leading)
-                                    .id(Self.tentativeID(tentative.speaker))
-                            }
-                        }
-                        .textSelection(.enabled)
-                    }
-                    .onAppear { scrollToBottom(proxy) }
-                    .onChange(of: snapshot.lines.last?.id) { scrollToBottom(proxy) }
-                    .onChange(of: snapshot.tentative) { scrollToBottom(proxy) }
-                }
+                LiveCaptionsTextView(
+                    lines: snapshot.lines, tentative: snapshot.tentative, name: Self.name,
+                    color: { NSColor(Self.color($0)) })
             }
         }
         .padding(.horizontal, 14)
@@ -76,29 +58,15 @@ struct LiveTranscriptView: View {
     }
 
     /// The line's label; `Speaker` raw values stay English.
-    private static func name(_ speaker: RecordingTranscriber.Speaker) -> LocalizedStringKey {
+    private static func name(_ speaker: RecordingTranscriber.Speaker) -> String {
         switch speaker {
-        case .me: "Me"
-        case .others: "Others"
+        case .me: String(localized: "Me")
+        case .others: String(localized: "Others")
         }
     }
 
     /// Same colors as the transcript: Me in the accent color.
     private static func color(_ speaker: RecordingTranscriber.Speaker) -> Color {
         speaker == .me ? .accentColor : .orange
-    }
-
-    /// A tentative row's scroll id, apart from the lines' `Int` ids.
-    private static func tentativeID(_ speaker: RecordingTranscriber.Speaker) -> String {
-        "t-\(speaker.rawValue)"
-    }
-
-    /// To the last tentative row when there is one, else to the last line.
-    private func scrollToBottom(_ proxy: ScrollViewProxy) {
-        if let tentative = snapshot.tentative.last {
-            proxy.scrollTo(Self.tentativeID(tentative.speaker), anchor: .bottom)
-        } else if let id = snapshot.lines.last?.id {
-            proxy.scrollTo(id, anchor: .bottom)
-        }
     }
 }

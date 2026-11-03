@@ -9,9 +9,9 @@ extension Notification.Name {
 }
 
 /// One conversation inside the main window (its title, date, duration and size, its tabs and Reveal in Finder are in
-/// the toolbar). The Transcript tab ends with a bar of speakers (click to rename), actions and playback. A click on a
-/// segment plays from its start; Space plays or pauses. Stays mounted across tabs, so playback goes on in Summary and
-/// Chat.
+/// the toolbar). The Transcript tab ends with a bar of speakers (click to rename), actions and playback. The segments
+/// are one selectable text; a click on a segment's timestamp or name plays from its start; Space plays or pauses.
+/// Stays mounted across tabs, so playback goes on in Summary and Chat.
 struct TranscriptView: View {
     let conversation: Conversation
     let model: AppModel
@@ -24,6 +24,8 @@ struct TranscriptView: View {
     @State private var shownVersion: Int?
     /// The audio file `playback` opened, to reload its segments when another version is shown.
     @State private var audioURL: URL?
+    /// `shownTranscript` as the text the card shows; the first one is built off the main thread with the files.
+    @State private var shownText: TranscriptText?
     /// Speaker ids of `shownTranscript`: me first, then s1, s2…
     @State private var speakers: [String] = []
     /// `transcript.json` exists but could not be read.
@@ -437,6 +439,7 @@ struct TranscriptView: View {
         guard var updated = transcript, updated.speakerNames[speaker] != (name.isEmpty ? nil : name) else { return }
         updated.speakerNames[speaker] = name.isEmpty ? nil : name
         transcript = updated
+        updateShownText()
         let folder = conversation.folder
         let id = conversation.id
         let model = model
@@ -454,13 +457,13 @@ struct TranscriptView: View {
 
     /// `Transcript.displayName(for:)` with the default names localized: the user's name for `speaker`, else "Me",
     /// "Speaker N" or the raw id. Display only: search and the AI prompts keep EchoCore's English names.
-    static func displayName(for speaker: String, in transcript: Transcript) -> String {
+    nonisolated static func displayName(for speaker: String, in transcript: Transcript) -> String {
         let name = transcript.displayName(for: speaker)
         return name == Transcript.defaultName(for: speaker) ? defaultName(for: speaker) : name
     }
 
     /// `Transcript.defaultName(for:)`, localized.
-    static func defaultName(for speaker: String) -> String {
+    nonisolated static func defaultName(for speaker: String) -> String {
         if speaker == Transcript.Speaker.me { return String(localized: "Me") }
         if speaker.hasPrefix("s"), let number = Int(speaker.dropFirst()) {
             return String(localized: "Speaker \(number)")
@@ -469,7 +472,7 @@ struct TranscriptView: View {
     }
 
     /// Me in the accent color; other speakers by number from a fixed list, so a speaker keeps its color.
-    static func color(for speaker: String) -> Color {
+    nonisolated static func color(for speaker: String) -> Color {
         if speaker == Transcript.Speaker.me { return .accentColor }
         let colors: [Color] = [.orange, .green, .pink, .purple, .teal, .yellow, .mint, .indigo]
         let number = speaker.hasPrefix("s") ? Int(speaker.dropFirst()) : nil
@@ -499,8 +502,8 @@ struct TranscriptView: View {
                     .padding(.top, 16)
             }
             Group {
-                if let shown = shownTranscript, !shown.segments.isEmpty {
-                    SegmentList(transcript: shown, playback: playback, scrollTarget: $scrollTarget)
+                if let shownText, shownTranscript?.segments.isEmpty == false {
+                    TranscriptTextView(text: shownText, playback: playback, scrollTarget: $scrollTarget)
                 } else if loading {
                     ProgressView()
                 } else {
@@ -574,14 +577,14 @@ struct TranscriptView: View {
 
     // MARK: - Actions
 
-    /// Reads the transcript and resolves the audio file off the main thread; runs again when the conversation
-    /// changes (e.g. a re-transcription finished). No playback while the audio is being recorded or compressed, or
-    /// once it was deleted (which stops it).
+    /// Reads the transcript, builds its text and resolves the audio file off the main thread; runs again when the
+    /// conversation changes (e.g. a re-transcription finished). No playback while the audio is being recorded or
+    /// compressed, or once it was deleted (which stops it).
     private func load() async {
         let folder = conversation.folder
         let wantsTranscript = conversation.hasTranscript
         let playable = conversation.hasAudio && conversation.status != .recording && conversation.status != .compressing
-        let (loaded, audio) = await Task.detached(priority: .utility) {
+        let (loaded, audio, text) = await Task.detached(priority: .utility) {
             // The newest version is transcript.json itself.
             let versions = wantsTranscript ? Transcript.readVersions(from: folder) : []
             let audio = playable
@@ -589,29 +592,41 @@ struct TranscriptView: View {
                     ConversationFiles.audioURL(in: folder, fileName: $0.audioFileName)
                 }
                 : nil
-            return (versions, audio)
+            return (versions, audio, versions.last.map { TranscriptText($0.transcript) })
         }.value
         guard !Task.isCancelled else { return }
         versions = loaded
         transcript = loaded.last?.transcript
         shownVersion = nil
         audioURL = audio
+        shownText = text
         loadFailed = wantsTranscript && loaded.isEmpty
         applyShownVersion()
         self.loaded = true
         showPendingTime()
     }
 
-    /// The speakers and the playback highlight of `shownTranscript` (same audio, so only the segments change); closes
-    /// a rename popover when an older, view-only version shows.
+    /// The speakers, text and playback highlight of `shownTranscript` (same audio, so only the segments change);
+    /// closes a rename popover when an older, view-only version shows.
     private func applyShownVersion() {
         speakers = shownTranscript.map(Self.speakers) ?? []
+        updateShownText()
         playback.load(url: audioURL, segments: shownTranscript?.segments ?? [],
                       channels: model.settings.playbackChannels)
         if shownVersion != nil {
             renaming = nil
             showingMoreSpeakers = false
         }
+    }
+
+    /// Builds the text again when `shownTranscript` changed since (a version switch or a rename), on the main thread:
+    /// only the conversation's first text is built with the files.
+    private func updateShownText() {
+        guard let shown = shownTranscript else {
+            shownText = nil
+            return
+        }
+        if shownText?.transcript != shown { shownText = TranscriptText(shown) }
     }
 
     /// Takes the time of a clicked AI citation (`AppModel.pendingTranscriptTime`) once the transcript is loaded:
@@ -752,111 +767,5 @@ private struct SpeakerChipShape: ViewModifier {
             .frame(height: BottomBarButtonStyle.height)
             .background(Palette.hoverFill, in: Capsule())
             .contentShape(Capsule())
-    }
-}
-
-/// The segments; redrawn when the play head enters another segment, not at every tick. While playing, the list
-/// follows the play head: Play scrolls to its segment, and so does each next segment, until the user scrolls away
-/// (or jumps to a search result); the next Play, or a click on a segment, follows again.
-private struct SegmentList: View {
-    let transcript: Transcript
-    let playback: PlaybackController
-    @Binding var scrollTarget: UUID?
-    @State private var following = false
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
-
-    var body: some View {
-        let active = playback.activeSegmentID
-        ScrollViewReader { proxy in
-            ScrollView {
-                LazyVStack(alignment: .leading, spacing: 2) {
-                    ForEach(transcript.segments) { segment in
-                        SegmentRow(
-                            segment: segment, name: TranscriptView.displayName(for: segment.speaker, in: transcript),
-                            active: segment.id == active, speaking: segment.id == active && playback.isPlaying
-                        ) {
-                            following = true
-                            playback.play(from: segment.start)
-                        }
-                    }
-                }
-                // With the rows' own padding, the text sits as far from the card's edges as the summary's.
-                .padding(.horizontal, 4)
-                .padding(.vertical, 10)
-            }
-            // The user's own scrolling (wheel, trackpad, scroller); `.animating` is `follow`'s scrollTo.
-            .onScrollPhaseChange { _, phase in
-                if phase != .idle && phase != .animating { following = false }
-            }
-            .onChange(of: scrollTarget, initial: true) {
-                guard let scrollTarget else { return }
-                following = false
-                proxy.scrollTo(scrollTarget, anchor: .center)
-                self.scrollTarget = nil
-            }
-            .onChange(of: active) { follow(active, proxy) }
-            .onChange(of: playback.isPlaying) {
-                following = playback.isPlaying
-                follow(active, proxy)
-            }
-        }
-    }
-
-    private func follow(_ segment: UUID?, _ proxy: ScrollViewProxy) {
-        guard playback.isPlaying, following, let segment else { return }
-        withAnimation(reduceMotion ? nil : .easeInOut(duration: 0.25)) {
-            proxy.scrollTo(segment, anchor: .center)
-        }
-    }
-}
-
-/// Timestamp, speaker dot and name, text. A click anywhere on the row, the text included, plays from the segment
-/// start. The text is not selectable: selectable text shows an I-beam over the row's pointer.
-private struct SegmentRow: View {
-    let segment: Transcript.Segment
-    let name: String
-    let active: Bool
-    let speaking: Bool
-    let play: () -> Void
-    @State private var hovered = false
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
-
-    var body: some View {
-        HStack(alignment: .firstTextBaseline, spacing: 10) {
-            VStack(spacing: 4) {
-                Button(action: play) {
-                    Text(TranscriptView.timestamp(segment.start)).monospacedDigit()
-                }
-                .buttonStyle(.plain)
-                .foregroundStyle(.secondary)
-                .help("Play from here")
-                // The segment being played back.
-                if speaking {
-                    Image(systemName: "waveform")
-                        .foregroundStyle(TranscriptView.color(for: segment.speaker))
-                        .symbolEffect(.variableColor.iterative, options: .repeating, isActive: !reduceMotion)
-                        .accessibilityHidden(true)
-                }
-            }
-            .font(.caption)
-            VStack(alignment: .leading, spacing: 2) {
-                HStack(spacing: 5) {
-                    Circle().fill(TranscriptView.color(for: segment.speaker)).frame(width: 7, height: 7)
-                    Text(name).font(.caption.weight(.semibold))
-                }
-                Text(segment.text)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-            }
-        }
-        .padding(.horizontal, 10)
-        .padding(.vertical, 6)
-        .background(
-            RoundedRectangle(cornerRadius: 10, style: .continuous)
-                .fill(active ? Palette.pressedFill : hovered ? Palette.hoverFill : .clear))
-        .contentShape(Rectangle())
-        .onHover { hovered = $0 }
-        .pointerStyle(.link)
-        .onTapGesture(perform: play)
-        .accessibilityAddTraits(active ? .isSelected : [])
     }
 }
