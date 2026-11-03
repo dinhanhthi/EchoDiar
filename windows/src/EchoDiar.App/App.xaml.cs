@@ -235,6 +235,7 @@ public partial class App : Application
     private void OnNotificationInvoked(AppNotificationManager sender, AppNotificationActivatedEventArgs args)
     {
         var activation = EndPromptNotifier.ParseAction(args.Arguments);
+        StartupTrace.Write($"end prompt toast invoked: {activation.Response}");
         _dispatcher?.TryEnqueue(() => _model?.HandleEndPromptResponse(activation));
     }
 
@@ -244,6 +245,7 @@ public partial class App : Application
     /// </summary>
     private void OnRedirectedActivation(AppActivationArguments args)
     {
+        StartupTrace.Write($"redirected activation: {args.Kind}");
         if (args.Kind == ExtendedActivationKind.AppNotification && args.Data is AppNotificationActivatedEventArgs notification)
         {
             _model?.HandleEndPromptResponse(EndPromptNotifier.ParseAction(notification.Arguments));

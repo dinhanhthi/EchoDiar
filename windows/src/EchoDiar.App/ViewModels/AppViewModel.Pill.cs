@@ -75,6 +75,7 @@ public sealed partial class AppViewModel
         if (_closing) return;
         // A notification left over from an earlier prompt never stops or keeps the recording.
         var current = PillPrompt is PillPrompt.MeetingEnded ended && EndPromptNotifier.IsFor(activation, ended.Deadline);
+        StartupTrace.Write($"end prompt toast response: {activation.Response}, for the current prompt {current}");
         switch (activation.Response)
         {
             case EndPromptNotifier.Response.Stop:

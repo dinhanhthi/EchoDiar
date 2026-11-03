@@ -71,9 +71,17 @@ internal sealed class EndPromptNotifier
         AppNotification notification;
         try
         {
-            if (!_enabled() || PillWindowStyle.ForegroundProcessId() == Environment.ProcessId) return;
+            if (!_enabled() || PillWindowStyle.ForegroundProcessId() == Environment.ProcessId)
+            {
+                StartupTrace.Write("end prompt toast skipped: setting off or EchoDiar in front");
+                return;
+            }
             manager = AppNotificationManager.Default;
-            if (manager.Setting != AppNotificationSetting.Enabled) return;
+            if (manager.Setting != AppNotificationSetting.Enabled)
+            {
+                StartupTrace.Write($"end prompt toast skipped: notifications {manager.Setting}");
+                return;
+            }
             var token = deadline.UtcTicks.ToString(CultureInfo.InvariantCulture);
             var left = Math.Max(0, (int)Math.Ceiling((deadline - DateTimeOffset.Now).TotalSeconds));
             var stop = new AppNotificationButton(Loc.T("Stop now"))
@@ -104,6 +112,7 @@ internal sealed class EndPromptNotifier
         _last = After(_last, () =>
         {
             manager.Show(notification);
+            StartupTrace.Write("end prompt toast shown");
             return Task.CompletedTask;
         }, "show");
     }
