@@ -589,10 +589,26 @@ private final class TranscriptNSTextView: NSTextView {
         return pboard.setString(document.copyText(for: selectedRange()), forType: .string)
     }
 
+    override func menu(for event: NSEvent) -> NSMenu? { readOnlyMenu(super.menu(for: event)) }
+
     override func scrollWheel(with event: NSEvent) {
         onUserScroll?()
         super.scrollWheel(with: event)
     }
+}
+
+/// A copy of a text view's context menu without the editing-only submenus (Spelling and Grammar, Substitutions,
+/// Transformations), for read-only text. A copy: the proposed menu may be shared between text views.
+private func readOnlyMenu(_ menu: NSMenu?) -> NSMenu? {
+    guard let menu = menu?.copy() as? NSMenu else { return menu }
+    let editing: Set<Selector> = [#selector(NSText.showGuessPanel(_:)),
+                                  #selector(NSTextView.orderFrontSubstitutionsPanel(_:)),
+                                  #selector(NSResponder.uppercaseWord(_:))]
+    for item in menu.items
+    where item.submenu?.items.contains(where: { $0.action.map(editing.contains) ?? false }) == true {
+        menu.removeItem(item)
+    }
+    return menu
 }
 
 // MARK: - Live captions
@@ -884,6 +900,15 @@ private final class LiveCaptionsNSTextView: NSTextView {
     var onUserScroll: (() -> Void)?
 
     override var writablePasteboardTypes: [NSPasteboard.PasteboardType] { [.string] }
+
+    /// NSTextView's own `writeSelection(to:type:)` returns false and writes nothing for `.string`, so with `.string`
+    /// as the only writable type a copy would just clear the pasteboard.
+    override func writeSelection(to pboard: NSPasteboard, type: NSPasteboard.PasteboardType) -> Bool {
+        guard type == .string else { return super.writeSelection(to: pboard, type: type) }
+        return pboard.setString((string as NSString).substring(with: selectedRange()), forType: .string)
+    }
+
+    override func menu(for event: NSEvent) -> NSMenu? { readOnlyMenu(super.menu(for: event)) }
 
     override func scrollWheel(with event: NSEvent) {
         super.scrollWheel(with: event)
