@@ -68,11 +68,14 @@ public sealed record Conversation
     /// <summary>The folder still has audio files; not stored in the file, set by the library.</summary>
     [JsonIgnore] public bool HasAudio { get; set; } = true;
 
-    /// <summary>Metadata for a folder that has no <c>conversation.json</c> yet. <paramref name="duration"/> is the audio length.</summary>
+    /// <summary>
+    /// Metadata for a folder that has no <c>conversation.json</c> yet. <paramref name="duration"/> is the audio length.
+    /// The session's title, when it has one, is a custom title.
+    /// </summary>
     public static Conversation FromSession(RecordingSession session, string folder, double duration)
     {
         var app = session.SourceApps.FirstOrDefault();
-        return new Conversation
+        var conversation = new Conversation
         {
             Id = session.Id,
             CreatedAt = session.StartedAt,
@@ -89,6 +92,12 @@ public sealed record Conversation
             },
             Folder = folder,
         };
+        if (session.Title is { } title)
+        {
+            conversation.Title = title;
+            conversation.CustomTitle = true;
+        }
+        return conversation;
     }
 
     /// <summary><c>"&lt;Source app&gt; call · 18 Oct 2026, 14:05"</c>, or <c>"Recording · …"</c> without a source app, in local time.</summary>

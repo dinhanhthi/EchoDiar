@@ -53,9 +53,10 @@ struct SessionRecoveryTests {
         }
     }
 
+    /// Recovery rewrites `session.json`, so it must keep the title set while recording.
     @Test func missingCAFFails() throws {
         try withTemporaryRoot { root in
-            let session = RecordingSession(pid: 999_999, state: .recording)
+            let session = RecordingSession(pid: 999_999, state: .recording, title: "Weekly sync")
             let folder = session.folder(in: root)
             try session.write(to: folder)
 
@@ -63,7 +64,9 @@ struct SessionRecoveryTests {
 
             #expect(results.map(\.state) == [.failed])
             #expect(results.first?.duration == 0)
-            #expect(try RecordingSession.read(from: folder).state == .failed)
+            let recovered = try RecordingSession.read(from: folder)
+            #expect(recovered.state == .failed)
+            #expect(recovered.title == "Weekly sync")
         }
     }
 

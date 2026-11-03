@@ -60,16 +60,20 @@ public sealed class RecordingEngineTests : IDisposable
     public void PauseThenResumeClosesThePauseAndTheFileKeepsCounting()
     {
         var engine = Engine();
-        var folder = engine.Start(CaptureTarget.Global, "auto", micEndpointId: null, _root);
+        var folder = engine.Start(CaptureTarget.Global, "auto", micEndpointId: null, _root, title: "  Weekly sync  ");
         EmitBlock();
         engine.Pause();
 
         var paused = RecordingSession.Read(folder);
         Assert.Equal(SessionState.Paused, paused.State);
+        Assert.Equal("Weekly sync", paused.Title); // trimmed, and kept by the pause rewrite
         var pause = Assert.Single(paused.Pauses);
         Assert.Equal(0.1, pause.FileTime, 0.005);
         Assert.Null(pause.End);
 
+        engine.SetTitle("  ");
+        Assert.Null(RecordingSession.Read(folder).Title); // blank goes back to the default title
+        engine.SetTitle(" Retro ");
         _now += 5 * TicksPerSecond; // paused wall-clock time adds no silence
         engine.Resume();
         EmitBlock();
@@ -79,6 +83,9 @@ public sealed class RecordingEngineTests : IDisposable
         var stored = RecordingSession.Read(folder);
         Assert.Equal(SessionState.Stopped, stored.State);
         Assert.Equal("user", stored.EndReason);
+        Assert.Equal("Retro", stored.Title); // kept through the resume and stop rewrites
+        engine.SetTitle("Other"); // idle: no-op
+        Assert.Equal("Retro", RecordingSession.Read(folder).Title);
         pause = Assert.Single(stored.Pauses);
         Assert.Equal(0.1, pause.FileTime, 0.005);
         Assert.NotNull(pause.End);

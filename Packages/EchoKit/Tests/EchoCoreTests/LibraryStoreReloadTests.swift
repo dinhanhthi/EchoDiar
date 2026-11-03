@@ -30,4 +30,27 @@ struct LibraryStoreReloadTests {
         await store.reload(id: newer.id)
         #expect(await store.conversations.map(\.id) == [older.id])
     }
+
+    /// A recording has only `session.json` until it is compressed: its title (typed or from the calendar) is what the
+    /// library lists, as a custom title; a session without one (written by an older build) gets the default title.
+    @Test func sessionWithoutConversationIsListedWithItsTitle() async throws {
+        let fileManager = FileManager.default
+        let root = fileManager.temporaryDirectory.appendingPathComponent("titled-\(UUID().uuidString)", isDirectory: true)
+        defer { try? fileManager.removeItem(at: root) }
+        let titled = RecordingSession(state: .recording, title: "Weekly sync")
+        let untitled = RecordingSession(state: .stopped, startedAt: Date(timeIntervalSinceNow: -60))
+        try titled.write(to: titled.folder(in: root))
+        try untitled.write(to: untitled.folder(in: root))
+
+        let store = LibraryStore(root: root)
+        await store.refresh()
+        let conversations = await store.conversations
+
+        let listed = try #require(conversations.first { $0.id == titled.id })
+        #expect(listed.title == "Weekly sync")
+        #expect(listed.customTitle)
+        let old = try #require(conversations.first { $0.id == untitled.id })
+        #expect(old.title == Conversation.defaultTitle(sourceAppName: nil, createdAt: untitled.startedAt))
+        #expect(!old.customTitle)
+    }
 }

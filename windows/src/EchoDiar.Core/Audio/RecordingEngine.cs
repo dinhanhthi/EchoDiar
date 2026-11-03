@@ -242,15 +242,17 @@ public sealed class RecordingEngine : IDisposable
     /// Writes <c>session.json</c> before any IO, then starts the system source, the mic (silence if unavailable) and
     /// the writer. Returns the session folder. Throws if the disk is nearly full or the system source cannot start; the
     /// folder is then removed. <paramref name="micEndpointId"/> null (or an input that is gone) records the default input.
+    /// <paramref name="title"/> (e.g. the calendar event's) goes into the first <c>session.json</c>, trimmed; blank or
+    /// null leaves the default title.
     /// </summary>
-    public string Start(CaptureTarget target, string language, string? micEndpointId, string root)
+    public string Start(CaptureTarget target, string language, string? micEndpointId, string root, string? title = null)
     {
-        var folder = StartRecording(target, language, micEndpointId, root);
+        var folder = StartRecording(target, language, micEndpointId, root, NormalizedTitle(title));
         SyncRoutes();
         return folder;
     }
 
-    private string StartRecording(CaptureTarget target, string language, string? micEndpointId, string root)
+    private string StartRecording(CaptureTarget target, string language, string? micEndpointId, string root, string? title)
     {
         lock (_gate)
         {
@@ -272,6 +274,7 @@ public sealed class RecordingEngine : IDisposable
                 TapMode = target.TapMode,
                 GlobalTapFallback = target.GlobalTapFallback,
                 LanguageMarkers = [new() { FileTime = 0, Language = language }],
+                Title = title,
             };
             var folder = session.Folder(root);
             session.Write(folder);
@@ -439,6 +442,20 @@ public sealed class RecordingEngine : IDisposable
             lock (_shared) _language = language;
         }
     }
+
+    /// <summary>Sets the recording's title in <c>session.json</c>, trimmed; blank or null goes back to the default title. No-op when idle.</summary>
+    public void SetTitle(string? title)
+    {
+        title = NormalizedTitle(title);
+        lock (_gate)
+        {
+            if (_state == State.Idle || _session is null) return;
+            _session.Title = title;
+            Save();
+        }
+    }
+
+    private static string? NormalizedTitle(string? title) => string.IsNullOrWhiteSpace(title) ? null : title.Trim();
 
     /// <summary>The language of the last marker ("auto" or BCP-47), or null when idle.</summary>
     public string? CurrentLanguage()

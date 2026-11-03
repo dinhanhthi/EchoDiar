@@ -95,6 +95,7 @@ struct CrossPlatformFixturesTests {
             languageMarkers: [.init(fileTime: 0, language: "vi")], probe: true)
         session.pauses = [.init(fileTime: 12.5, start: at.addingTimeInterval(-30), end: at)]
         session.endReason = "user"
+        session.title = vietnamese
         return session
     }
 
@@ -138,6 +139,7 @@ struct CrossPlatformFixturesTests {
         #expect(session.id == Self.conversationID)
         #expect(session.state == .stopped)
         #expect(session.tapMode == .perApp)
+        #expect(session.title == Self.vietnamese)
         Self.expectDate(session.startedAt, Self.at)
         let pause = try #require(session.pauses.first)
         Self.expectDate(pause.start, Self.at.addingTimeInterval(-30))

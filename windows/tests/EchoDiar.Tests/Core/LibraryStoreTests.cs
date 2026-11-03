@@ -100,6 +100,26 @@ public sealed class LibraryStoreTests : IDisposable
         }
     }
 
+    // A recording has only session.json until it is compressed: its title (typed or from the calendar) is what the
+    // library lists, as a custom title; a session without one (written by an older build) gets the default title.
+    [Fact]
+    public async Task SessionWithoutConversationIsListedWithItsTitle()
+    {
+        var titled = new RecordingSession { State = SessionState.Recording, Title = "Weekly sync" };
+        var untitled = new RecordingSession { State = SessionState.Stopped, StartedAt = DateTimeOffset.UtcNow.AddMinutes(-1) };
+        titled.Write(titled.Folder(_dir));
+        untitled.Write(untitled.Folder(_dir));
+
+        var conversations = await new LibraryStore(_dir, new DeletingTrash()).RefreshAsync();
+
+        var listed = Assert.Single(conversations, c => c.Id == titled.Id);
+        Assert.Equal("Weekly sync", listed.Title);
+        Assert.True(listed.CustomTitle);
+        var old = Assert.Single(conversations, c => c.Id == untitled.Id);
+        Assert.Equal(Conversation.DefaultTitle(null, untitled.StartedAt), old.Title);
+        Assert.False(old.CustomTitle);
+    }
+
     // conversation.json may arrive by sync before transcript.json: the library (and so free space, which trusts the
     // flag) must not count a transcript whose file is not in the folder, on a refresh as after a rename.
     [Fact]

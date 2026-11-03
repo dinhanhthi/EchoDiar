@@ -65,7 +65,8 @@ public struct Conversation: Codable, Equatable, Identifiable, Sendable {
         self.folder = folder
     }
 
-    /// Metadata for a folder that has no `conversation.json` yet. `duration` is the audio length.
+    /// Metadata for a folder that has no `conversation.json` yet. `duration` is the audio length. The session's title,
+    /// when it has one, is a custom title.
     public init(session: RecordingSession, folder: URL, duration: Double) {
         let app = session.sourceApps.first
         let status: Status = switch session.state {
@@ -77,6 +78,8 @@ public struct Conversation: Codable, Equatable, Identifiable, Sendable {
         }
         self.init(
             id: session.id,
+            title: session.title,
+            customTitle: session.title != nil,
             createdAt: session.startedAt,
             duration: duration,
             sourceAppName: app?.name,

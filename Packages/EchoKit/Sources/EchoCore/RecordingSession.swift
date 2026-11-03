@@ -94,6 +94,9 @@ public struct RecordingSession: Codable, Equatable, Sendable {
     public var audioFileName: String
     /// Recorded by the DEBUG `--capture-probe` harness.
     public var probe: Bool
+    /// The recording's title, typed while recording or from its calendar event; nil = the default title. The
+    /// conversation built from this session takes it as a custom title.
+    public var title: String?
 
     public init(
         id: UUID = UUID(),
@@ -107,7 +110,8 @@ public struct RecordingSession: Codable, Equatable, Sendable {
         outputDeviceName: String? = nil,
         languageMarkers: [LanguageMarker] = [],
         audioFileName: String = "audio.caf",
-        probe: Bool = false
+        probe: Bool = false,
+        title: String? = nil
     ) {
         self.id = id
         self.pid = pid
@@ -126,11 +130,12 @@ public struct RecordingSession: Codable, Equatable, Sendable {
         endReason = nil
         self.audioFileName = audioFileName
         self.probe = probe
+        self.title = title
     }
 
     private enum CodingKeys: String, CodingKey {
         case version, id, pid, state, startedAt, sourceApps, tapMode, globalTapFallback, micDeviceName, outputDeviceName
-        case channels, sampleRate, sampleFormat, pauses, languageMarkers, endReason, audioFileName, probe
+        case channels, sampleRate, sampleFormat, pauses, languageMarkers, endReason, audioFileName, probe, title
     }
 
     public init(from decoder: Decoder) throws {
@@ -153,6 +158,7 @@ public struct RecordingSession: Codable, Equatable, Sendable {
         endReason = try c.decodeIfPresent(String.self, forKey: .endReason)
         audioFileName = try c.decodeIfPresent(String.self, forKey: .audioFileName) ?? "audio.caf"
         probe = try c.decodeIfPresent(Bool.self, forKey: .probe) ?? false
+        title = try c.decodeIfPresent(String.self, forKey: .title)
     }
 
     // MARK: - Storage

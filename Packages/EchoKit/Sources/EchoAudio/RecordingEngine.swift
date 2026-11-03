@@ -176,14 +176,17 @@ public final class RecordingEngine: @unchecked Sendable {
     /// Writes `session.json` before any IO, then starts the tap, the mic (silence if unavailable) and the writer.
     /// Returns the session folder. Throws if the disk is nearly full or the tap cannot start; the folder is then removed.
     /// `micDeviceUID` nil (or a device that is gone) records the default input.
-    /// `probe` marks the session as recorded by the DEBUG `--capture-probe` harness.
+    /// `probe` marks the session as recorded by the DEBUG `--capture-probe` harness. `title` (e.g. the calendar
+    /// event's) goes into the first `session.json`, trimmed; blank or nil leaves the default title.
     @discardableResult
     public func start(
         target: CaptureTarget, language: String, micDeviceUID: String? = nil,
-        root: URL = RecordingSession.conversationsRoot, probe: Bool = false
+        root: URL = RecordingSession.conversationsRoot, probe: Bool = false, title: String? = nil
     ) throws -> URL {
         try onQueue {
-            try startLocked(target: target, language: language, micDeviceUID: micDeviceUID, root: root, probe: probe)
+            try startLocked(
+                target: target, language: language, micDeviceUID: micDeviceUID, root: root, probe: probe,
+                title: Self.normalizedTitle(title))
         }
     }
 
@@ -222,6 +225,21 @@ public final class RecordingEngine: @unchecked Sendable {
         }
     }
 
+    /// Sets the recording's title in `session.json`, trimmed; blank or nil goes back to the default title. No-op when idle.
+    public func setTitle(_ title: String?) {
+        let title = Self.normalizedTitle(title)
+        queue.async { [self] in
+            guard state != .idle, var session else { return }
+            session.title = title
+            save(session)
+        }
+    }
+
+    private static func normalizedTitle(_ title: String?) -> String? {
+        guard let trimmed = title?.trimmingCharacters(in: .whitespacesAndNewlines), !trimmed.isEmpty else { return nil }
+        return trimmed
+    }
+
     /// The language of the last marker ("auto" or BCP-47), or nil when idle. Lock-only.
     public func currentLanguage() -> String? {
         shared.withLock { $0.language }
@@ -249,7 +267,9 @@ public final class RecordingEngine: @unchecked Sendable {
         return try queue.sync(execute: body)
     }
 
-    private func startLocked(target: CaptureTarget, language: String, micDeviceUID: String?, root: URL, probe: Bool) throws -> URL {
+    private func startLocked(
+        target: CaptureTarget, language: String, micDeviceUID: String?, root: URL, probe: Bool, title: String?
+    ) throws -> URL {
         guard state == .idle else { throw RecordingEngineError.alreadyRecording }
         try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
         let available = Self.availableCapacity(at: root)
@@ -269,7 +289,8 @@ public final class RecordingEngine: @unchecked Sendable {
             micDeviceName: Self.inputDeviceName(uid: micDeviceUID),
             outputDeviceName: Self.defaultDeviceName(kAudioHardwarePropertyDefaultOutputDevice),
             languageMarkers: [.init(fileTime: 0, language: language)],
-            probe: probe
+            probe: probe,
+            title: title
         )
         let folder = session.folder(in: root)
         try session.write(to: folder)

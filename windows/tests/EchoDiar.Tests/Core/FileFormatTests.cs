@@ -62,6 +62,7 @@ public sealed class FileFormatTests : IDisposable
 
         Assert.Equal(ConversationStatus.Unknown, conversation.Status);
         Assert.Equal(SessionState.Unknown, session.State);
+        Assert.Null(session.Title);
         Assert.Equal("unknown", JsonNode.Parse(SwiftJson.Serialize(conversation))!["status"]!.GetValue<string>());
         Assert.Equal("unknown", JsonNode.Parse(SwiftJson.Serialize(session))!["state"]!.GetValue<string>());
     }
@@ -344,7 +345,7 @@ public sealed class FileFormatTests : IDisposable
         MicDeviceName = "Microphone (Realtek)", OutputDeviceName = "Speakers (Realtek)",
         Pauses = [new RecordingSession.PauseInterval { FileTime = 12.5, Start = At.AddSeconds(-30), End = At }],
         LanguageMarkers = [new RecordingSession.LanguageMarker { FileTime = 0, Language = "vi" }],
-        EndReason = "user", AudioFileName = "audio.caf", Probe = true,
+        EndReason = "user", AudioFileName = "audio.caf", Probe = true, Title = Vietnamese,
     };
 
     private static ChatLog FullChat() => new()

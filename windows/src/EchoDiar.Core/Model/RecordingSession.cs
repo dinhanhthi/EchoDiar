@@ -100,6 +100,11 @@ public sealed record RecordingSession
     [JsonPropertyName("audioFileName")] public string AudioFileName { get; set; } = "audio.caf";
     /// <summary>Recorded by the DEBUG <c>--capture-probe</c> harness.</summary>
     [JsonPropertyName("probe")] public bool Probe { get; set; }
+    /// <summary>
+    /// The recording's title, typed while recording or from its calendar event; null = the default title. The
+    /// conversation built from this session takes it as a custom title.
+    /// </summary>
+    [JsonPropertyName("title")] public string? Title { get; set; }
 
     /// <summary><c>&lt;yyyy-MM-dd_HHmmss&gt;-&lt;id8&gt;</c>: <see cref="StartedAt"/> in local time, then the first 8 characters of <see cref="Id"/>, lowercased.</summary>
     [JsonIgnore]
