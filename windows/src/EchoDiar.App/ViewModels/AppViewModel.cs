@@ -45,6 +45,9 @@ public sealed partial class AppViewModel : ObservableObject
     /// <summary>15 Hz: the elapsed time and level meters while recording.</summary>
     private static readonly TimeSpan PollInterval = TimeSpan.FromMilliseconds(67);
 
+    /// <summary>How long a title edit waits for the next keystroke before it is saved.</summary>
+    private static readonly TimeSpan TitleSaveDelay = TimeSpan.FromMilliseconds(300);
+
     /// <summary>How long <see cref="Shutdown"/> waits for a start under way and the stop that finishes the audio.</summary>
     private const uint ShutdownWaitMilliseconds = 10_000;
 
@@ -84,6 +87,13 @@ public sealed partial class AppViewModel : ObservableObject
     private double _systemLevel;
     private bool _isStarting;
     private string? _recordingError;
+    private string? _recordingTitle;
+
+    /// <summary>Saves <see cref="RecordingTitle"/> to <c>session.json</c> 300 ms after the last edit.</summary>
+    private DispatcherQueueTimer? _titleSaveTimer;
+
+    /// <summary>The last title write; each next one, and the stop, runs after it.</summary>
+    private Task _titleWrite = Task.CompletedTask;
     private IReadOnlyDictionary<Guid, JobProgress> _transcriptionProgress = new Dictionary<Guid, JobProgress>();
     private IReadOnlyDictionary<Guid, string> _transcriptionErrors = new Dictionary<Guid, string>();
     private IReadOnlyDictionary<string, double> _downloads = new Dictionary<string, double>();
@@ -193,6 +203,16 @@ public sealed partial class AppViewModel : ObservableObject
     {
         get => _recordingError;
         private set => SetProperty(ref _recordingError, value);
+    }
+
+    /// <summary>
+    /// The current recording's title, trimmed: the calendar event's at start, then what the user types (written to
+    /// <c>session.json</c>); null while blank (the default title) and when not recording (macOS <c>recordingTitle</c>).
+    /// </summary>
+    public string? RecordingTitle
+    {
+        get => _recordingTitle;
+        private set => SetProperty(ref _recordingTitle, value);
     }
 
     /// <summary>Queued and running jobs by conversation id, and "needs model" results.</summary>
@@ -363,6 +383,9 @@ public sealed partial class AppViewModel : ObservableObject
         // An update check under way is cancelled (an install goes on: Windows quits the app for it).
         Updater.Dispose();
         _pollTimer.Stop();
+        // A title edit still waiting for its delay is written now, and waited for before the stop.
+        FlushRecordingTitle();
+        var titleWrite = _titleWrite;
         // A run under way asks before each deletion, and is told every conversation is busy now.
         _retention?.Stop();
         foreach (var token in _downloadTokens.Values) token.Cancel();
@@ -385,6 +408,7 @@ public sealed partial class AppViewModel : ObservableObject
             {
                 // A failed start left nothing running.
             }
+            titleWrite.Wait(); // Never faults: each write catches its own error.
             _services.Engine.Stop();
         });
         var handle = ((IAsyncResult)Task.WhenAll(stop, settingsWrite)).AsyncWaitHandle.SafeWaitHandle;
@@ -593,8 +617,8 @@ public sealed partial class AppViewModel : ObservableObject
 
     /// <summary>
     /// Records <paramref name="app"/>'s audio (null: all system audio) and the mic, after launch recovery.
-    /// <paramref name="calendarEvent"/>: the calendar event recorded, which names the recording at its end and, with "Stop
-    /// when the event ends", prompts a stop after its end. The recording page shows at once ("Starting…" until it runs). A
+    /// <paramref name="calendarEvent"/>: the calendar event recorded, whose title is the recording's from the first
+    /// <c>session.json</c> and which, with "Stop when the event ends", prompts a stop after its end. The recording page shows at once ("Starting…" until it runs). A
     /// start from EchoDiar's own windows, shortcuts or tray brings the main window forward on it; without
     /// <paramref name="bringForward"/> (the pill's Record and Join, automatic starts) it is only selected in a shown window,
     /// so the meeting app keeps the focus (macOS <c>startRecording</c>).
@@ -612,6 +636,9 @@ public sealed partial class AppViewModel : ObservableObject
         }
         IsStarting = true;
         RecordingError = null;
+        // Before the page shows, so the recording page and card show it from their first frame.
+        var eventTitle = TrimmedTitle(calendarEvent?.Title);
+        RecordingTitle = eventTitle;
         if (bringForward)
         {
             ShowRecording();
@@ -637,7 +664,7 @@ public sealed partial class AppViewModel : ObservableObject
             {
                 if (_closing) return null;
                 target = Resolved(app);
-                var folder = _services.Engine.Start(target, language, micEndpointId, root);
+                var folder = _services.Engine.Start(target, language, micEndpointId, root, eventTitle);
                 if (!_closing) return folder;
                 // The window closed while the devices opened: nothing else would stop this recording.
                 _services.Engine.Stop();
@@ -651,6 +678,8 @@ public sealed partial class AppViewModel : ObservableObject
             _pollTimer.Start();
             BeginEndWatch(target);
             CalendarRecordingStarted(calendarEvent);
+            // Edited while the devices opened, when the engine had no session to write it to.
+            if (RecordingTitle != eventTitle) QueueTitleWrite();
         }
         catch (Exception e)
         {
@@ -659,6 +688,7 @@ public sealed partial class AppViewModel : ObservableObject
             RecordingSourceName = null;
             RecordingSourceRootPid = null;
             AutoStartedAppName = null;
+            RecordingTitle = null;
             RecordingError = e is RecordingDiskFullException
                 ? Loc.T("There is not enough free disk space to record.")
                 : $"{Loc.T("The recording could not start.")} ({e.Message})";
@@ -707,8 +737,68 @@ public sealed partial class AppViewModel : ObservableObject
         }
     }
 
-    /// <summary>Stops the recording; the end snapshot runs the steps after it.</summary>
-    public Task StopRecordingAsync() => Task.Run(() => _services.Engine.Stop());
+    /// <summary>Stops the recording after the title edits still waiting for their delay; the end snapshot runs the steps after it.</summary>
+    public Task StopRecordingAsync()
+    {
+        FlushRecordingTitle();
+        var titleWrite = _titleWrite;
+        return Task.Run(async () =>
+        {
+            await titleWrite;
+            _services.Engine.Stop();
+        });
+    }
+
+    /// <summary>
+    /// Renames the current recording at once (the page and the card) and in its <c>session.json</c> 300 ms after the
+    /// last edit, off the UI thread; blank goes back to the recorded calendar event's title, or the default one. Ignored
+    /// when not recording (macOS <c>setRecordingTitle</c>).
+    /// </summary>
+    public void SetRecordingTitle(string? title)
+    {
+        if (_closing || (!IsRecording && !IsStarting)) return;
+        var trimmed = TrimmedTitle(title);
+        if (trimmed == RecordingTitle) return;
+        RecordingTitle = trimmed;
+        // A title hides the calendar suggestion; clearing it looks for one again.
+        UpdateCalendarSuggestion();
+        if (_titleSaveTimer is null)
+        {
+            _titleSaveTimer = _dispatcher.CreateTimer();
+            _titleSaveTimer.Interval = TitleSaveDelay;
+            _titleSaveTimer.IsRepeating = false;
+            _titleSaveTimer.Tick += (_, _) => QueueTitleWrite();
+        }
+        _titleSaveTimer.Stop();
+        _titleSaveTimer.Start();
+    }
+
+    /// <summary>Writes a title edit still waiting for its delay now (the recording stops).</summary>
+    private void FlushRecordingTitle()
+    {
+        if (_titleSaveTimer is { IsRunning: true }) QueueTitleWrite();
+    }
+
+    /// <summary>Writes the current title to the engine off the UI thread, after the writes queued before.</summary>
+    private void QueueTitleWrite()
+    {
+        _titleSaveTimer?.Stop();
+        var title = RecordingTitle ?? _recordingEvent?.Title;
+        _titleWrite = _titleWrite.ContinueWith(_ =>
+        {
+            try
+            {
+                _services.Engine.SetTitle(title);
+            }
+            catch (Exception e)
+            {
+                Debug.WriteLine($"EchoDiar: could not save the recording title: {e}");
+            }
+        }, TaskScheduler.Default);
+    }
+
+    /// <summary><paramref name="title"/> without surrounding whitespace; null when blank.</summary>
+    private static string? TrimmedTitle(string? title) => string.IsNullOrWhiteSpace(title) ? null : title.Trim();
 
     /// <summary>Reloads the apps for the target picker, off the UI thread.</summary>
     public async Task RefreshRecordTargetsAsync()
@@ -766,9 +856,14 @@ public sealed partial class AppViewModel : ObservableObject
         StopPolling();
         RecordingSourceName = null;
         RecordingSourceRootPid = null;
+        // An edit still waiting is dropped: the engine has no session to write it to now.
+        _titleSaveTimer?.Stop();
+        RecordingTitle = null;
+        CalendarSuggestion = null;
+        _dismissedSuggestionIds.Clear();
         if (snapshot.EndReason is not { } reason) return;
         EndEndWatch();
-        var calendarEvent = TakeRecordingEvent();
+        TakeRecordingEvent();
         // The next recording starts with the remembered or default language again.
         if (_languageOverride is not null)
         {
@@ -779,16 +874,15 @@ public sealed partial class AppViewModel : ObservableObject
         var folder = _activeFolder;
         _activeFolder = null;
         var transcriber = TakeRecordingTranscriber();
-        if (folder is not null) _ = FinishRecordingAsync(folder, transcriber, calendarEvent?.Title);
+        if (folder is not null) _ = FinishRecordingAsync(folder, transcriber);
         else if (transcriber is not null) CancelRecordingTranscriber(transcriber);
     }
 
     /// <summary>
-    /// Lists the recording, names it <paramref name="title"/> (its calendar event's) when given, opens it when the
-    /// recording page is showing, then compresses and transcribes it with what the live transcriber transcribed, which
-    /// drains meanwhile.
+    /// Lists the recording (its title, if any, comes from <c>session.json</c>), opens it when the recording page is
+    /// showing, then compresses and transcribes it with what the live transcriber transcribed, which drains meanwhile.
     /// </summary>
-    private async Task FinishRecordingAsync(string folder, RecordingTranscriber? transcriber, string? title = null)
+    private async Task FinishRecordingAsync(string folder, RecordingTranscriber? transcriber)
     {
         var prior = transcriber is null ? null : FinishRecordingTranscriberAsync(transcriber);
         if (_closing) return;
@@ -797,11 +891,6 @@ public sealed partial class AppViewModel : ObservableObject
             var list = await _services.Library.RefreshAsync();
             var session = await Task.Run(() => ReadSession(folder));
             if (_closing) return;
-            if (title is not null && session is not null && list.Any(c => c.Id == session.Id))
-            {
-                await ApplyEventTitleAsync(session.Id, title);
-                if (_closing) return;
-            }
             if (Route.Kind == RouteKind.Recording)
             {
                 DetailTab = DetailTab.Transcript;

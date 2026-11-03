@@ -2723,7 +2723,7 @@ extension AppModel {
     func dismissCalendarSuggestion() {
         guard let event = calendarSuggestion else { return }
         dismissedSuggestionIDs.insert(event.id)
-        calendarSuggestion = nil
+        updateCalendarSuggestion() // The next overlapping event, if any, shows at once.
     }
 
     /// Stops the timer and the feeds, and drops the end prompt. Safe to call repeatedly.

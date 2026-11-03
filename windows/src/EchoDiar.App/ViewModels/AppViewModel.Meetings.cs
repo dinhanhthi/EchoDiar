@@ -495,6 +495,10 @@ public sealed partial class AppViewModel
     {
         try
         {
+            // A title edit still waiting for its delay is written first (small file writes, off this thread).
+            FlushRecordingTitle();
+            // A native wait, as in Shutdown: a managed wait on this STA thread would run queued XAML work.
+            WaitForSingleObject(((IAsyncResult)_titleWrite).AsyncWaitHandle.SafeWaitHandle, 1_000);
             _services.Engine.Stop();
         }
         catch (Exception e)

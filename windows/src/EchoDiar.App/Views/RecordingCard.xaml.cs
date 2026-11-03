@@ -2,19 +2,21 @@ using System.ComponentModel;
 using System.Diagnostics;
 using EchoDiar.App.ViewModels;
 using EchoDiar.Core.Audio;
+using Microsoft.UI.Dispatching;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Automation;
 using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Controls.Primitives;
 using Microsoft.UI.Xaml.Input;
 using Microsoft.UI.Xaml.Media;
+using VirtualKey = Windows.System.VirtualKey;
 
 namespace EchoDiar.App.Views;
 
 /// <summary>
-/// The recording's card at the top of the library (macOS RecordingViews.swift RecordingCard), while recording: Stop,
-/// Pause or Resume, Mute or Unmute and the language in its row. The mini meters move at 15 Hz while the window is
-/// shown.
+/// The recording's card at the top of the library (macOS RecordingViews.swift RecordingCard), while recording: its
+/// title (renamed in place on double-click), Stop, Pause or Resume, Mute or Unmute and the language in its row. The
+/// mini meters move at 15 Hz while the window is shown.
 /// </summary>
 public sealed partial class RecordingCard : UserControl
 {
@@ -29,6 +31,10 @@ public sealed partial class RecordingCard : UserControl
     private bool _selected;
     private bool? _shownPaused;
     private bool? _shownMuted;
+    private bool _editing;
+
+    /// <summary>The title's tooltip as last set: one set again while shown closes under the pointer (Update runs at 15 Hz).</summary>
+    private string? _titleTip;
 
     public RecordingCard(AppViewModel model)
     {
@@ -43,6 +49,10 @@ public sealed partial class RecordingCard : UserControl
         MuteItem.Click += (_, _) => _model.ToggleMicMute();
         ButtonRow.Children.Add(new LanguagePicker(model, shortLabel: true));
         Tapped += OnTapped;
+        StateText.DoubleTapped += OnTitleDoubleTapped;
+        TitleBox.KeyDown += OnTitleBoxKeyDown;
+        // Clicking elsewhere cancels, like Esc; only Enter saves (ConversationCard, macOS RecordingCard).
+        TitleBox.LostFocus += (_, _) => EndEditing();
         Loaded += (_, _) =>
         {
             _model.PropertyChanged += OnModelChanged;
@@ -52,6 +62,7 @@ public sealed partial class RecordingCard : UserControl
         {
             _model.PropertyChanged -= OnModelChanged;
             _ticker.Run(false);
+            EndEditing();
         };
     }
 
@@ -74,6 +85,7 @@ public sealed partial class RecordingCard : UserControl
             case nameof(AppViewModel.RecordingSnapshot):
             case nameof(AppViewModel.IsStarting):
             case nameof(AppViewModel.RecordingSourceName):
+            case nameof(AppViewModel.RecordingTitle):
                 Update();
                 break;
         }
@@ -86,7 +98,13 @@ public sealed partial class RecordingCard : UserControl
         var paused = snapshot.State == RecordingEngine.State.Paused;
         RecordingDot.Visibility = paused ? Visibility.Collapsed : Visibility.Visible;
         PausedDot.Visibility = paused ? Visibility.Visible : Visibility.Collapsed;
-        SetText(StateText, Loc.T(paused ? "Paused" : "Recording…"));
+        var title = _model.RecordingTitle;
+        SetText(StateText, title ?? Loc.T(paused ? "Paused" : "Recording…"));
+        if (title != _titleTip)
+        {
+            _titleTip = title;
+            ToolTipService.SetToolTip(StateText, title);
+        }
         SetText(ElapsedText, ConversationText.Clock(recording ? snapshot.Elapsed : 0));
         SetText(SourceText, _model.RecordingSourceName ?? Loc.T("All system audio"));
         MiniMeters.Visibility = paused ? Visibility.Collapsed : Visibility.Visible;
@@ -127,14 +145,65 @@ public sealed partial class RecordingCard : UserControl
         SystemFill.Width = MiniMeterWidth * (live ? _model.SystemLevel : 0);
     }
 
-    /// <summary>A click outside the buttons opens the recording page.</summary>
+    /// <summary>
+    /// A click outside the buttons and the title field opens the recording page at once, also on the title, whose double
+    /// click then renames the recording; not while the title is edited.
+    /// </summary>
     private void OnTapped(object sender, TappedRoutedEventArgs e)
     {
         for (var element = e.OriginalSource as DependencyObject; element is not null && element != this; element = VisualTreeHelper.GetParent(element))
         {
-            if (element is ButtonBase) return;
+            if (element is ButtonBase or TextBox) return;
         }
-        _model.ShowRecording();
+        if (!_editing) _model.ShowRecording();
+    }
+
+    private void OnTitleDoubleTapped(object sender, DoubleTappedRoutedEventArgs e)
+    {
+        e.Handled = true;
+        BeginEditing();
+    }
+
+    private void BeginEditing()
+    {
+        if (_editing) return;
+        _editing = true;
+        TitleBox.Text = _model.RecordingTitle ?? "";
+        StateText.Visibility = Visibility.Collapsed;
+        TitleBox.Visibility = Visibility.Visible;
+        // Once the field is laid out, so it can take the focus.
+        DispatcherQueue.TryEnqueue(DispatcherQueuePriority.Low, () =>
+        {
+            if (!_editing) return;
+            TitleBox.Focus(FocusState.Programmatic);
+            TitleBox.SelectAll();
+        });
+    }
+
+    private void EndEditing()
+    {
+        if (!_editing) return;
+        _editing = false;
+        TitleBox.Visibility = Visibility.Collapsed;
+        StateText.Visibility = Visibility.Visible;
+    }
+
+    /// <summary>Enter saves the title (blank goes back to the default), Esc cancels.</summary>
+    private void OnTitleBoxKeyDown(object sender, KeyRoutedEventArgs e)
+    {
+        switch (e.Key)
+        {
+            case VirtualKey.Enter:
+                e.Handled = true;
+                var draft = TitleBox.Text;
+                EndEditing();
+                _model.SetRecordingTitle(draft);
+                break;
+            case VirtualKey.Escape:
+                e.Handled = true;
+                EndEditing();
+                break;
+        }
     }
 
     /// <summary>Only an actual change reaches the text: the elapsed time is set at 15 Hz but changes once a second.</summary>

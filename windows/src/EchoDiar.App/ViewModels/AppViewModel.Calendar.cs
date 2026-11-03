@@ -44,8 +44,11 @@ public sealed partial class AppViewModel
     private bool _calendarSyncing;
     private bool _calendarSyncAgain;
 
-    /// <summary>The event the current recording was started for: its end prompts a stop, its title names it.</summary>
+    /// <summary>The event the current recording was started for or linked to: its end prompts a stop, its title is the recording's default.</summary>
     private CalendarEvent? _recordingEvent;
+
+    /// <summary>Occurrence ids of the calendar suggestions dismissed during the current recording.</summary>
+    private readonly HashSet<string> _dismissedSuggestionIds = new(StringComparer.Ordinal);
 
     private CalendarAccess _calendarAccess = CalendarAccess.NotDetermined;
     private IReadOnlyList<CalendarInfo> _calendars = [];
@@ -53,6 +56,7 @@ public sealed partial class AppViewModel
     private CalendarEvent? _activeCalendarEvent;
     private CalendarPrompt? _pendingCalendarPrompt;
     private CalendarEvent? _calendarWaitEvent;
+    private CalendarEvent? _calendarSuggestion;
 
     /// <summary>Calendar access as last read.</summary>
     public CalendarAccess CalendarAccess
@@ -114,6 +118,16 @@ public sealed partial class AppViewModel
     {
         get => _calendarWaitEvent;
         private set => SetProperty(ref _calendarWaitEvent, value);
+    }
+
+    /// <summary>
+    /// A calendar event the current recording, started without one and still untitled, likely belongs to: the recording
+    /// page offers to rename the recording after it (macOS <c>calendarSuggestion</c>).
+    /// </summary>
+    public CalendarEvent? CalendarSuggestion
+    {
+        get => _calendarSuggestion;
+        private set => SetProperty(ref _calendarSuggestion, value);
     }
 
     /// <summary>
@@ -364,6 +378,8 @@ public sealed partial class AppViewModel
         {
             CalendarWaitEvent = null;
         }
+        // An event that began, ended, moved or was deleted since changes the recording's suggestion.
+        UpdateCalendarSuggestion();
         HandleCalendar(_calendarScheduler.Evaluate(now));
         ArmCalendarTimer(now);
     }
@@ -466,7 +482,7 @@ public sealed partial class AppViewModel
     /// <summary>
     /// A recording started and its end watch is armed (after <see cref="BeginEndWatch"/>): any recording handles the
     /// calendar event (no prompt, no later start from its wait); <paramref name="event"/> (the event it records, or
-    /// null) names it at the end and feeds its end to the end monitor.
+    /// null) is the title a blank one goes back to and feeds its end to the end monitor.
     /// </summary>
     private void CalendarRecordingStarted(CalendarEvent? @event)
     {
@@ -475,9 +491,10 @@ public sealed partial class AppViewModel
         CalendarWaitEvent = null;
         _recordingEvent = @event;
         FeedEventEnd();
+        UpdateCalendarSuggestion();
     }
 
-    /// <summary>The recording ended: the event it recorded, whose title names it; cleared.</summary>
+    /// <summary>The recording ended: the event it recorded; cleared.</summary>
     private CalendarEvent? TakeRecordingEvent()
     {
         var @event = _recordingEvent;
@@ -495,19 +512,43 @@ public sealed partial class AppViewModel
     }
 
     /// <summary>
-    /// Names the finished recording after its event (macOS <c>finishRecording</c>'s <c>title</c>), before its jobs, which
-    /// keep the title. The store cleaned the title (control and bidi characters removed, at most 200 characters).
+    /// While a recording without a calendar event or a title runs (its end watch is armed): the listed event in progress
+    /// or starting within 5 min, closest to its start and not dismissed; null otherwise (macOS
+    /// <c>updateCalendarSuggestion</c>).
     /// </summary>
-    private async Task ApplyEventTitleAsync(Guid id, string title)
+    private void UpdateCalendarSuggestion()
     {
-        try
+        if (_endWatch is not { } watch || _recordingEvent is not null || RecordingTitle is not null)
         {
-            await _services.Library.RenameAsync(id, title);
+            CalendarSuggestion = null;
+            return;
         }
-        catch (Exception e)
-        {
-            Debug.WriteLine($"EchoDiar: could not rename conversation {id}: {e.GetType().Name}");
-        }
+        CalendarSuggestion = _calendarScheduler.RecordingMatch(
+            watch.Monitor.StartedAt, DateTimeOffset.Now, excluding: _dismissedSuggestionIds);
+    }
+
+    /// <summary>
+    /// Links the suggested event to the recording, as the calendar prompt's Record does (its end prompts a stop with
+    /// "Stop when the event ends"), and names the recording after it (macOS <c>acceptCalendarSuggestion</c>).
+    /// </summary>
+    public void AcceptCalendarSuggestion()
+    {
+        if (_closing || CalendarSuggestion is not { } @event || _endWatch is null) return;
+        _recordingEvent = @event;
+        FeedEventEnd();
+        SetRecordingTitle(@event.Title);
+        CalendarSuggestion = null;
+    }
+
+    /// <summary>
+    /// "Not now": the event is not suggested again for this recording; the next overlapping one, if any, shows at once
+    /// (as on macOS).
+    /// </summary>
+    public void DismissCalendarSuggestion()
+    {
+        if (_closing || CalendarSuggestion is not { } @event) return;
+        _dismissedSuggestionIds.Add(@event.Id);
+        UpdateCalendarSuggestion();
     }
 
     private static async Task LaunchMeetingLinkAsync(Uri url)

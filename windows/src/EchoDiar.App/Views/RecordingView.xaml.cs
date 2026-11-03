@@ -12,7 +12,8 @@ namespace EchoDiar.App.Views;
 
 /// <summary>
 /// The recording page (macOS RecordingViews.swift RecordingDetailView, RecordingHeader, ChannelMeters and
-/// RecordingWave), opened from the recording's card: the live transcript, or the wave and why there is none. The
+/// RecordingWave), opened from the recording's card: the title, the calendar suggestion, then the live transcript, or
+/// the wave and why there is none. The
 /// meters and the wave move at 15 Hz while the window is shown and the recording is not paused; the wave stands still
 /// when Windows animations are off (Reduce Motion).
 /// </summary>
@@ -47,10 +48,16 @@ public sealed partial class RecordingView : UserControl
         AutomationProperties.SetName(MicMeter, Loc.T("Mic level"));
         AutomationProperties.SetName(SystemMeter, Loc.T("System audio level"));
         OpenSettingsLink.Click += (_, _) => OpenReasonSettings();
+        // Each change renames the recording; the model keeps it trimmed, so the box is not bound to it.
+        TitleBox.TextChanged += (_, _) => _model.SetRecordingTitle(TitleBox.Text);
+        AcceptSuggestionButton.Click += (_, _) => _model.AcceptCalendarSuggestion();
+        DismissSuggestionButton.Click += (_, _) => _model.DismissCalendarSuggestion();
         Loaded += (_, _) =>
         {
             _model.PropertyChanged += OnModelChanged;
             Update();
+            UpdateTitle();
+            UpdateSuggestion();
             UpdateReason();
             UpdateLive();
         };
@@ -76,7 +83,32 @@ public sealed partial class RecordingView : UserControl
             case nameof(AppViewModel.RecordingCaptions):
                 UpdateLive();
                 break;
+            case nameof(AppViewModel.RecordingTitle):
+                UpdateTitle();
+                break;
+            case nameof(AppViewModel.CalendarSuggestion):
+                UpdateSuggestion();
+                break;
         }
+    }
+
+    /// <summary>
+    /// A title set elsewhere (the card, the calendar suggestion, the event at start) replaces the text unless only
+    /// surrounding whitespace differs, so typing keeps its caret and trailing spaces (macOS <c>titleField</c>).
+    /// </summary>
+    private void UpdateTitle()
+    {
+        var title = _model.RecordingTitle ?? "";
+        if (TitleBox.Text.Trim() == title) return;
+        TitleBox.Text = title;
+        TitleBox.SelectionStart = title.Length;
+    }
+
+    /// <summary>"Rename to "…"?" while the model suggests a calendar event.</summary>
+    private void UpdateSuggestion()
+    {
+        if (_model.CalendarSuggestion is { } @event) SuggestionBar.Message = Loc.Format("Rename to \"%@\"?", @event.Title);
+        SuggestionBar.IsOpen = _model.CalendarSuggestion is not null;
     }
 
     private void Update()
