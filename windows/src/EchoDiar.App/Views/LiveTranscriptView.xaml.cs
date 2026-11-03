@@ -51,8 +51,21 @@ public sealed partial class LiveTranscriptView : UserControl
     /// <summary>One line's paragraph and the runs whose colors follow the theme.</summary>
     private sealed record CaptionBlock(Paragraph Paragraph, Run Name, Run Text, RecordingTranscriber.Speaker Speaker);
 
-    /// <summary>A place in the text: a paragraph's index in its blocks and a <see cref="TextPointer.Offset"/> in it.</summary>
-    private readonly record struct TextSpot(int Paragraph, int Offset);
+    /// <summary>
+    /// A place in the text: a paragraph's index in its blocks, its run (the name, or the ": text" one when
+    /// <c>InText</c>) and a character index in that run. Run-relative: inside one run a
+    /// <see cref="TextPointer.Offset"/> step is one character, while a paragraph-relative offset also counts the runs'
+    /// element edges, which a pointer round trip does not keep reliably.
+    /// </summary>
+    private readonly record struct TextSpot(int Paragraph, bool InText, int Offset);
+
+    /// <summary>
+    /// The selection this view last set and the selection's offsets the text reported right after. While the text still
+    /// reports those, the user has not changed the selection: the next update keeps these spots instead of reading the
+    /// selection back from pointers, so a small error of one read-back cannot add up over the updates.
+    /// </summary>
+    private (TextSpot Start, TextSpot End)? _keptSelection;
+    private (int Start, int End) _keptOffsets;
 
     public LiveTranscriptView(AppViewModel model)
     {
@@ -143,6 +156,7 @@ public sealed partial class LiveTranscriptView : UserControl
 
         // Before any edit: a pointer into a removed paragraph means nothing afterwards.
         var selection = SavedSelection();
+        _keptSelection = null;
         var shownBefore = _shown.Count;
         var blocks = CaptionText.Blocks;
         for (var i = 0; i < dropped; i++) blocks.RemoveAt(0);
@@ -170,6 +184,8 @@ public sealed partial class LiveTranscriptView : UserControl
             // A line's paragraph moves up by the dropped ones; an unchanged tentative one also down by the added lines.
             // Replaced tentative text keeps its place, like macOS's plain offsets: it most likely became the new lines.
             int Moved(int index) => index < shownBefore || tentativeChanged ? index - dropped : index - dropped + added.Count;
+            // Laid out first: the text has taken in its new blocks before its selection is set.
+            CaptionText.UpdateLayout();
             RestoreSelection(saved.Start with { Paragraph = Moved(saved.Start.Paragraph) },
                 saved.End with { Paragraph = Moved(saved.End.Paragraph) });
         }
@@ -190,6 +206,7 @@ public sealed partial class LiveTranscriptView : UserControl
 
     private void ClearText()
     {
+        _keptSelection = null;
         _shown.Clear();
         _tentative = [];
         _tentativeBlocks.Clear();
@@ -219,31 +236,54 @@ public sealed partial class LiveTranscriptView : UserControl
 
     // Selection
 
-    /// <summary>The selection's ends, first one first; null without a selection.</summary>
+    /// <summary>
+    /// The selection's ends, first one first (the kept spots while the user has not changed it); null without a
+    /// selection.
+    /// </summary>
     private (TextSpot Start, TextSpot End)? SavedSelection()
     {
         if (CaptionText.SelectedText.Length == 0 || CaptionText.Blocks.Count == 0) return null;
         if (CaptionText.SelectionStart is not { } from || CaptionText.SelectionEnd is not { } to) return null;
+        if (_keptSelection is { } kept && SelectionOffsets() == _keptOffsets) return kept;
         TextSpot start = Spot(from), end = Spot(to);
         return Before(end, start) ? (end, start) : (start, end);
     }
 
-    private static bool Before(TextSpot a, TextSpot b) => a.Paragraph < b.Paragraph || (a.Paragraph == b.Paragraph && a.Offset < b.Offset);
+    private static bool Before(TextSpot a, TextSpot b) =>
+        (a.Paragraph, a.InText ? 1 : 0, a.Offset).CompareTo((b.Paragraph, b.InText ? 1 : 0, b.Offset)) < 0;
 
-    /// <summary><paramref name="pointer"/> as the last paragraph starting at or before it and the offset into that one.</summary>
+    /// <summary>The selection's <see cref="TextPointer.Offset"/>s, smaller one first; null without its ends.</summary>
+    private (int Start, int End)? SelectionOffsets()
+    {
+        if (CaptionText.SelectionStart is not { } from || CaptionText.SelectionEnd is not { } to) return null;
+        return (Math.Min(from.Offset, to.Offset), Math.Max(from.Offset, to.Offset));
+    }
+
+    /// <summary>The paragraph <paramref name="index"/> of the text: the lines' ones, then the tentative ones.</summary>
+    private CaptionBlock BlockAt(int index) => index < _shown.Count ? _shown[index].Block : _tentativeBlocks[index - _shown.Count];
+
+    /// <summary>
+    /// <paramref name="pointer"/> as the last paragraph starting at or before it, the run it is in (an edge between
+    /// the runs counts as the name's end) and the characters before it in that run.
+    /// </summary>
     private TextSpot Spot(TextPointer pointer)
     {
         var blocks = CaptionText.Blocks;
         var offset = pointer.Offset;
         var index = 0;
         while (index + 1 < blocks.Count && blocks[index + 1].ContentStart.Offset <= offset) index++;
-        return new TextSpot(index, Math.Max(0, offset - blocks[index].ContentStart.Offset));
+        var block = BlockAt(index);
+        var textStart = block.Text.ContentStart.Offset;
+        if (offset >= textStart) return new TextSpot(index, true, Math.Clamp(offset - textStart, 0, block.Text.Text.Length));
+        return new TextSpot(index, false, Math.Clamp(offset - block.Name.ContentStart.Offset, 0, block.Name.Text.Length));
     }
 
     /// <summary>
     /// Selects from <paramref name="start"/> to <paramref name="end"/> (paragraph indices in the edited text) unless the
-    /// text kept that selection itself. An end before the first paragraph (dropped with its line) clamps to the text's
-    /// start; a selection all in dropped lines is cleared; past the last paragraph clamps to the text's end.
+    /// text kept that selection itself, and keeps the spots it selected for the next update. A start before the first
+    /// paragraph (dropped with its line) clamps to the text's start; a selection all in dropped lines is cleared; past
+    /// the last paragraph clamps to the text's end, and an offset to its run's text (a replaced tentative line may be
+    /// shorter). Kept unclamped, a later update could move them onto text the user never selected.
     /// </summary>
     private void RestoreSelection(TextSpot start, TextSpot end)
     {
@@ -252,26 +292,38 @@ public sealed partial class LiveTranscriptView : UserControl
             if (CaptionText.SelectedText.Length > 0) CaptionText.Select(CaptionText.ContentStart, CaptionText.ContentStart);
             return;
         }
-        if (start.Paragraph < 0) start = new TextSpot(0, 0);
+        if (start.Paragraph < 0) start = new TextSpot(0, false, 0);
+        start = Clamped(start);
+        end = Clamped(end);
         TextPointer from = Pointer(start), to = Pointer(end);
-        if (CaptionText.SelectionStart is { } shownStart && CaptionText.SelectionEnd is { } shownEnd)
-        {
-            int a = shownStart.Offset, b = shownEnd.Offset;
-            if (Math.Min(a, b) == from.Offset && Math.Max(a, b) == to.Offset) return;
-        }
-        CaptionText.Select(from, to);
+        if (SelectionOffsets() != (from.Offset, to.Offset)) CaptionText.Select(from, to);
+        _keptSelection = (start, end);
+        _keptOffsets = SelectionOffsets() ?? (from.Offset, to.Offset);
     }
 
-    /// <summary>The text position at <paramref name="spot"/>, clamped to its paragraph and to the text's end.</summary>
+    /// <summary>
+    /// <paramref name="spot"/> in the text: past the last paragraph the text's end, its offset at most its run's text.
+    /// </summary>
+    private TextSpot Clamped(TextSpot spot)
+    {
+        var count = CaptionText.Blocks.Count;
+        if (spot.Paragraph >= count) return new TextSpot(count - 1, true, BlockAt(count - 1).Text.Text.Length);
+        var block = BlockAt(spot.Paragraph);
+        var run = spot.InText ? block.Text : block.Name;
+        return spot with { Offset = Math.Clamp(spot.Offset, 0, run.Text.Length) };
+    }
+
+    /// <summary>
+    /// The text position at <paramref name="spot"/>, a <see cref="Clamped"/> one: in its run. Only moves inside one
+    /// run, where every unit is a character.
+    /// </summary>
     private TextPointer Pointer(TextSpot spot)
     {
-        var blocks = CaptionText.Blocks;
-        if (spot.Paragraph >= blocks.Count) return blocks[^1].ContentEnd;
-        var block = blocks[spot.Paragraph];
-        var contentStart = block.ContentStart;
-        if (spot.Offset <= 0) return contentStart;
-        if (spot.Offset >= block.ContentEnd.Offset - contentStart.Offset) return block.ContentEnd;
-        return contentStart.GetPositionAtOffset(spot.Offset, LogicalDirection.Forward) ?? block.ContentEnd;
+        var block = BlockAt(spot.Paragraph);
+        var run = spot.InText ? block.Text : block.Name;
+        if (spot.Offset <= 0) return run.ContentStart;
+        if (spot.Offset >= run.Text.Length) return run.ContentEnd;
+        return run.ContentStart.GetPositionAtOffset(spot.Offset, LogicalDirection.Forward) ?? run.ContentEnd;
     }
 
     /// <summary>

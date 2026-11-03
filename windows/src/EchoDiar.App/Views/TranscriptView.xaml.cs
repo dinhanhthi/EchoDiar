@@ -44,6 +44,9 @@ public sealed partial class TranscriptView : UserControl
     /// <summary>Space kept above a segment the text scrolls to.</summary>
     private const double ScrollMargin = 8;
 
+    /// <summary>How far the play head's fill reaches past its paragraph's text (macOS <c>fillPadding</c>).</summary>
+    private static readonly Size FillPadding = new(10, 6);
+
     /// <summary>Between segments, about the old rows' spacing.</summary>
     private static readonly Thickness SegmentMargin = new(0, 0, 0, 14);
 
@@ -73,7 +76,7 @@ public sealed partial class TranscriptView : UserControl
     private int? _highlighted;
     private int? _speakingIndex;
     private bool _wasPlaying;
-    private bool _iconPending;
+    private bool _marksPending;
 
     /// <summary>A citation's segment to scroll to once its paragraph is in the text.</summary>
     private Guid? _pendingSegment;
@@ -104,12 +107,15 @@ public sealed partial class TranscriptView : UserControl
         InitializeComponent();
         FollowUserScrolling();
         SegmentText.PreviewKeyDown += OnTextPreviewKeyDown;
-        SegmentText.ContextRequested += OnTextContextRequested;
-        // A new width wraps the text again: the speaker icon moves with its name. The first layout (the tab or the
-        // text has just shown) lets a waiting citation scroll.
+        // Also when the text already handled it: RichTextBlock's own menu (Copy, Select All, removed in the XAML) may
+        // take the request before handlers added with +=.
+        SegmentText.AddHandler(ContextRequestedEvent,
+            new TypedEventHandler<UIElement, ContextRequestedEventArgs>(OnTextContextRequested), handledEventsToo: true);
+        // A new width wraps the text again: the fill and the speaker icon move with their paragraph. The first layout
+        // (the tab or the text has just shown) lets a waiting citation scroll.
         SegmentText.SizeChanged += (_, _) =>
         {
-            PlaceSpeakingIconLater();
+            PlaceMarksLater();
             if (_pendingSegment is not null) DispatcherQueue.TryEnqueue(DispatcherQueuePriority.Low, ShowPendingSegment);
         };
         // After the theme walk, once the swatches hold the new theme's brushes.
@@ -279,8 +285,7 @@ public sealed partial class TranscriptView : UserControl
         }
         _document = document;
         _segments = segments;
-        SetHighlight(_highlighted);
-        PlaceSpeakingIconLater();
+        PlaceMarksLater();
     }
 
     /// <summary>
@@ -394,7 +399,7 @@ public sealed partial class TranscriptView : UserControl
         if (speaking != _speakingIndex)
         {
             _speakingIndex = speaking;
-            PlaceSpeakingIconLater();
+            PlaceMarksLater();
         }
 
         if (playback.IsPlaying && !_wasPlaying) _following = true;
@@ -403,33 +408,52 @@ public sealed partial class TranscriptView : UserControl
     }
 
     /// <summary>
-    /// The play head's fill on paragraph <paramref name="index"/> (none for null), set again as a new highlighter: a
-    /// changed range of a shown one may not redraw. The range is the paragraph's <see cref="TextPointer.Offset"/>s,
-    /// assuming TextHighlighter ranges count positions as TextPointer offsets do (element edges included); should the
-    /// fill land on the wrong text, they count plain characters, and the range is the entry's
-    /// <c>HeaderRange.Start</c> to <c>BodyRange.End</c> of <see cref="_document"/> instead.
+    /// The play head's fill on paragraph <paramref name="index"/> (none for null), placed once the text is laid out;
+    /// none goes at once, so a rebuilt text never shows the old one.
     /// </summary>
     private void SetHighlight(int? index)
     {
-        SegmentText.TextHighlighters.Clear();
         _highlighted = index;
-        if (index is not { } shown || shown >= _blocks.Count) return;
-        var paragraph = _blocks[shown].Paragraph;
-        int start = paragraph.ContentStart.Offset, end = paragraph.ContentEnd.Offset;
-        var highlighter = new TextHighlighter { Background = HighlightSwatch.Background };
-        highlighter.Ranges.Add(new TextRange { StartIndex = start, Length = end - start });
-        SegmentText.TextHighlighters.Add(highlighter);
+        if (index is null) ActiveFill.Visibility = Visibility.Collapsed;
+        PlaceMarksLater();
     }
 
-    /// <summary>The speaker icon after the playing segment's name once the text is laid out, once per turn.</summary>
-    private void PlaceSpeakingIconLater()
+    /// <summary>The fill and the speaker icon on their paragraphs once the text is laid out, once per turn.</summary>
+    private void PlaceMarksLater()
     {
-        if (_iconPending) return;
-        _iconPending = DispatcherQueue.TryEnqueue(DispatcherQueuePriority.Low, () =>
+        if (_marksPending) return;
+        _marksPending = DispatcherQueue.TryEnqueue(DispatcherQueuePriority.Low, () =>
         {
-            _iconPending = false;
-            if (_model is { IsClosing: false }) PlaceSpeakingIcon();
+            _marksPending = false;
+            if (_model is not { IsClosing: false }) return;
+            PlaceFill();
+            PlaceSpeakingIcon();
         });
+    }
+
+    /// <summary>
+    /// The play head's fill behind paragraph <see cref="_highlighted"/> (macOS SegmentFragment's fill): the text's
+    /// width and its lines' height, plus <see cref="FillPadding"/> on each side; hidden without one or a layout. A
+    /// rounded border on a canvas under the text, placed from the paragraph's character rects like the speaker icon.
+    /// Not a TextHighlighter: its ranges count the text's characters, not the <see cref="TextPointer.Offset"/>s a
+    /// paragraph gives (those also count element edges, several per paragraph), and it recolors the text.
+    /// </summary>
+    private void PlaceFill()
+    {
+        var paragraph = _highlighted is { } index && index < _blocks.Count ? _blocks[index].Paragraph : null;
+        var top = paragraph?.ContentStart.GetCharacterRect(LogicalDirection.Forward) ?? Rect.Empty;
+        var bottom = paragraph?.ContentEnd.GetCharacterRect(LogicalDirection.Backward) ?? Rect.Empty;
+        if (top.IsEmpty || bottom.IsEmpty)
+        {
+            ActiveFill.Visibility = Visibility.Collapsed;
+            return;
+        }
+        // The canvas lies under the text, at its origin.
+        Canvas.SetLeft(ActiveFill, -FillPadding.Width);
+        Canvas.SetTop(ActiveFill, top.Top - FillPadding.Height);
+        ActiveFill.Width = SegmentText.ActualWidth + 2 * FillPadding.Width;
+        ActiveFill.Height = Math.Max(0, bottom.Bottom - top.Top) + 2 * FillPadding.Height;
+        ActiveFill.Visibility = Visibility.Visible;
     }
 
     /// <summary>The speaker icon in the speaker's color, after the name of <see cref="_speakingIndex"/>; hidden without one.</summary>
@@ -540,13 +564,15 @@ public sealed partial class TranscriptView : UserControl
     {
         args.Handled = true;
         var hasPoint = args.TryGetPosition(SegmentText, out var point);
-        var pointer = hasPoint ? SegmentText.GetPositionFromPoint(point) : SegmentText.SelectionStart;
-        var entry = pointer is not null && _document is { } document ? document.SegmentAt(PlainOffset(pointer)) : null;
+        var segment = hasPoint
+            ? SegmentAt(point.Y)
+            : SegmentText.SelectionStart is { } start && _document is { } document
+                ? document.SegmentAt(PlainOffset(start))?.Index
+                : null;
         _textMenu.Items.Clear();
-        if (entry is not null)
+        if (segment is { } index)
         {
             var play = new MenuFlyoutItem { Text = Loc.T("Play from here"), IsEnabled = _playback is { IsReady: true } };
-            var index = entry.Index;
             play.Click += (_, _) => Play(index);
             _textMenu.Items.Add(play);
             _textMenu.Items.Add(new MenuFlyoutSeparator());
@@ -561,6 +587,26 @@ public sealed partial class TranscriptView : UserControl
         selectAll.Click += (_, _) => SegmentText.SelectAll();
         _textMenu.Items.Add(selectAll);
         _textMenu.ShowAt(SegmentText, hasPoint ? new FlyoutShowOptions { Position = point } : new FlyoutShowOptions());
+    }
+
+    /// <summary>
+    /// The paragraph at <paramref name="y"/> in the text's coordinates: the last one whose first line starts at or
+    /// above it (the space under a paragraph is its own, above the first is the first's); null without a layout. From
+    /// the paragraphs' character rects, like the fill.
+    /// </summary>
+    private int? SegmentAt(double y)
+    {
+        if (_blocks.Count == 0) return null;
+        int low = 0, high = _blocks.Count;
+        while (low < high)
+        {
+            var mid = (low + high) / 2;
+            var top = _blocks[mid].Paragraph.ContentStart.GetCharacterRect(LogicalDirection.Forward);
+            if (top.IsEmpty) return null;
+            if (top.Top <= y) low = mid + 1;
+            else high = mid;
+        }
+        return Math.Max(0, low - 1);
     }
 
     /// <summary>The selection as <see cref="TranscriptDocument.CopyText"/> gives it; null without a selection.</summary>
@@ -618,7 +664,10 @@ public sealed partial class TranscriptView : UserControl
     /// </summary>
     private Brush SpeakerBrush(int colorIndex) => ((TextBlock)Swatches.Children[colorIndex + 1]).Foreground;
 
-    /// <summary>Light, Dark or contrast changed: the text's brushes from the swatches again (XAML styles follow by themselves).</summary>
+    /// <summary>
+    /// Light, Dark or contrast changed: the text's brushes from the swatches again (XAML styles and the fill follow by
+    /// themselves).
+    /// </summary>
     private void ApplyColors()
     {
         if (_model?.IsClosing == true) return;
@@ -628,8 +677,7 @@ public sealed partial class TranscriptView : UserControl
             block.TimeLink.Foreground = secondary;
             block.NameLink.Foreground = SpeakerBrush(block.ColorIndex);
         }
-        SetHighlight(_highlighted);
-        PlaceSpeakingIconLater();
+        PlaceMarksLater();
     }
 
     /// <summary>The speaker's color as a caption style (SpeakerMe, Speaker0…7 in the resources).</summary>

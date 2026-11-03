@@ -82,8 +82,9 @@
                 <!--
                     The segments as one selectable text (macOS TranscriptTextView), built in code: per segment the start
                     and the speaker (both play from the segment's start), then the text. A drag selects across segments;
-                    Ctrl+C copies "Name [mm:ss]: text" lines. The segment under the play head has a fill, and a speaker
-                    icon after its name while it plays.
+                    Ctrl+C copies "Name [mm:ss]: text" lines. The segment under the play head has a fill (placed in
+                    code behind its paragraph, macOS SegmentFragment's row fill), and a speaker icon after its name
+                    while it plays. No built-in context menu: the code shows its own, with Play from here.
                 -->
                 <ScrollViewer
                     x:Name="SegmentScroller"
@@ -93,8 +94,17 @@
                     VerticalScrollBarVisibility="Auto"
                     Visibility="Collapsed">
                     <Grid Padding="18,14,18,4">
+                        <Canvas IsHitTestVisible="False">
+                            <Border
+                                x:Name="ActiveFill"
+                                Background="{ThemeResource TextFillColorPrimaryBrush}"
+                                CornerRadius="{StaticResource ControlCornerRadius}"
+                                Opacity="0.12"
+                                Visibility="Collapsed" />
+                        </Canvas>
                         <RichTextBlock
                             x:Name="SegmentText"
+                            ContextFlyout="{x:Null}"
                             IsTextSelectionEnabled="True"
                             SelectionFlyout="{x:Null}"
                             TextWrapping="Wrap" />
@@ -343,7 +353,7 @@
 
         <!--
             The theme's brushes for the text built in code (TranscriptView.SpeakerBrush): the speakers' colors (me, then
-            0 to 7), the start's color and the play head's fill. Elements in the tree, so they follow Light, Dark and
+            0 to 7) and the start's color. Elements in the tree, so they follow Light, Dark and
             contrast themes like the styles do.
         -->
         <StackPanel x:Name="Swatches" Visibility="Collapsed">
@@ -357,7 +367,6 @@
             <TextBlock Style="{StaticResource Speaker6}" />
             <TextBlock Style="{StaticResource Speaker7}" />
             <TextBlock x:Name="SecondarySwatch" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
-            <Border x:Name="HighlightSwatch" Background="{ThemeResource SubtleFillColorSecondaryBrush}" />
         </StackPanel>
     </Grid>
 </UserControl>
