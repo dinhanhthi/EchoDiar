@@ -74,6 +74,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSMe
         if !loginLaunch && !ProcessInfo.processInfo.arguments.contains("--background") {
             showMainWindow()
         }
+        // Before `start`: the end prompt's notification buttons reach the model through it.
+        model.endPromptNotifier.install(model: model)
         model.start()
         if !measuring { updater.start() }
     }

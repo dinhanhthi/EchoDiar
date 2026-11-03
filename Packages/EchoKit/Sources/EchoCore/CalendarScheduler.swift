@@ -162,6 +162,24 @@ public struct CalendarScheduler: Sendable {
         events.last { $0.start <= now && now < $0.end }
     }
 
+    /// The eligible event a recording started at `startedAt` likely belongs to, whatever the mode or skip state: one in
+    /// progress at `now` or starting within `lead` after it, not in `excluding` (occurrence ids the user dismissed).
+    /// Several → the start closest to `startedAt`; ties → the later start, then the lower id.
+    public func recordingMatch(
+        startedAt: Date, now: Date, lead: TimeInterval = 300, excluding: Set<String> = []
+    ) -> CalendarEvent? {
+        let horizon = now.addingTimeInterval(lead)
+        return events
+            .filter { !excluding.contains($0.id) && $0.start <= horizon && now < $0.end }
+            .min { a, b in
+                let distanceA = abs(a.start.timeIntervalSince(startedAt))
+                let distanceB = abs(b.start.timeIntervalSince(startedAt))
+                if distanceA != distanceB { return distanceA < distanceB }
+                if a.start != b.start { return a.start > b.start }
+                return a.id < b.id
+            }
+    }
+
     /// Eligible events not yet over, by start, whatever the mode or skip state.
     public func upcoming(after now: Date, limit: Int) -> [CalendarEvent] {
         Array(events.filter { $0.end > now }.prefix(limit))

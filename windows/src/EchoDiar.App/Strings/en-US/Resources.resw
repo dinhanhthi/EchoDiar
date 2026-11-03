@@ -106,6 +106,10 @@
     <value>Add a model id</value>
     <comment>Add a model id</comment>
   </data>
+  <data name="AddATitle" xml:space="preserve">
+    <value>Add a title</value>
+    <comment>Add a title</comment>
+  </data>
   <data name="AddEndpoint" xml:space="preserve">
     <value>Add Endpoint</value>
     <comment>Add Endpoint</comment>
@@ -1966,6 +1970,14 @@
     <value>Nothing to download. Rougher ranking than the models above.</value>
     <comment>Nothing to download. Rougher ranking than the models above.</comment>
   </data>
+  <data name="NotificationsAreOffForEchoDiarInSystemSettings" xml:space="preserve">
+    <value>Notifications are off for EchoDiar in System Settings.</value>
+    <comment>Notifications are off for EchoDiar in System Settings.</comment>
+  </data>
+  <data name="NotifyWhenAMeetingSeemsToEnd" xml:space="preserve">
+    <value>Notify when a meeting seems to end</value>
+    <comment>Notify when a meeting seems to end</comment>
+  </data>
   <data name="NumberOfOtherSpeakers" xml:space="preserve">
     <value>Number of other speakers</value>
     <comment>Number of other speakers</comment>
@@ -2061,6 +2073,10 @@
   <data name="OpenMicrophoneSettings" xml:space="preserve">
     <value>Open Microphone Settings</value>
     <comment>Open Microphone Settings</comment>
+  </data>
+  <data name="OpenNotificationSettings" xml:space="preserve">
+    <value>Open Notification Settings</value>
+    <comment>Open Notification Settings</comment>
   </data>
   <data name="OpenPrivacySettings" xml:space="preserve">
     <value>Open Privacy Settings</value>
@@ -2453,6 +2469,10 @@
   <data name="RenameThisSpeaker" xml:space="preserve">
     <value>Rename this speaker</value>
     <comment>Rename this speaker</comment>
+  </data>
+  <data name="RenameTo" xml:space="preserve">
+    <value>Rename to "{0}"?</value>
+    <comment>Rename to "%@"?</comment>
   </data>
   <data name="Repeat" xml:space="preserve">
     <value>Repeat</value>
@@ -3613,6 +3633,10 @@
   <data name="WhileARecordingStaysPausedThisLongTheModelThatTranscribesItI" xml:space="preserve">
     <value>While a recording stays paused this long, the model that transcribes it is freed; it loads again when you resume. Other models are freed as soon as their job ends.</value>
     <comment>While a recording stays paused this long, the model that transcribes it is freed; it loads again when you resume. Other models are freed as soon as their job ends.</comment>
+  </data>
+  <data name="WhileEchoDiarIsInTheBackgroundANotificationAsksTooWithStopNo" xml:space="preserve">
+    <value>While EchoDiar is in the background, a notification asks too, with Stop now and Keep recording.</value>
+    <comment>While EchoDiar is in the background, a notification asks too, with Stop now and Keep recording.</comment>
   </data>
   <data name="WhisperTranscription" xml:space="preserve">
     <value>Whisper transcription</value>

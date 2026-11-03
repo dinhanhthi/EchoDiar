@@ -10,6 +10,7 @@ import EventKit
 import Foundation
 import Observation
 import os
+import UserNotifications
 
 /// App-wide state shared by the main window (Settings included) and the menu bar item.
 /// Coordinates recording: engine → stop → compress → transcribe → library refresh.
@@ -110,8 +111,12 @@ final class AppModel {
     var pendingTranscriptTime: Double?
     /// The meeting app whose mic use was detected last (menu "Detected: Zoom"); nil once its mic is off.
     private(set) var detectedMeeting: DetectedMeeting?
-    /// What the floating pill asks; nil = no question.
-    private(set) var pillPrompt: PillPrompt?
+    /// What the floating pill asks; nil = no question. The end prompt also posts an OS notification, removed with it.
+    private(set) var pillPrompt: PillPrompt? {
+        didSet { pillPromptChanged(from: oldValue) }
+    }
+    /// Whether EchoDiar may post notifications, for the end prompt's notification and its setting.
+    private(set) var notificationStatus: UNAuthorizationStatus = .notDetermined
     /// Eligible calendar events not over yet (next 7 days), by start; empty without calendar access.
     private(set) var upcomingEvents: [CalendarEvent] = []
     private(set) var calendarAuthorized = false
@@ -121,6 +126,12 @@ final class AppModel {
     private(set) var calendars: [CalendarStore.CalendarInfo] = []
     /// The app being recorded (`.app` targets), for the end prompt and the window anchor.
     private(set) var sourceApp: SourceApp?
+    /// The current recording's title, trimmed: the calendar event's at start, then what the user types (written to
+    /// `session.json` as it changes); nil while blank (the default title).
+    private(set) var recordingTitle: String?
+    /// A calendar event the current recording, started without one and still untitled, likely belongs to: the
+    /// recording page offers to rename the recording after it.
+    private(set) var calendarSuggestion: CalendarEvent?
     /// The app whose detection ("Always") started the recording, or the calendar event's title for a calendar start:
     /// the pill shows "Recording <name>" for its first 10 s even when the indicator is hidden.
     private(set) var autoStartedAppName: String?
@@ -299,14 +310,19 @@ final class AppModel {
     /// Bundle IDs of the meeting apps whose mic is on, per the detector (every known app, ignored ones too).
     @ObservationIgnored private var meetingMics: Set<String> = []
     @ObservationIgnored private var autoStartNoticeTask: Task<Void, Never>?
+    /// Installed by the AppDelegate at launch.
+    @ObservationIgnored let endPromptNotifier = EndPromptNotifier()
     @ObservationIgnored private let calendarStore = CalendarStore()
     @ObservationIgnored private var scheduler = CalendarScheduler()
     /// One-shot: fires at the next event start or end (30 min at most) to sync the calendar again.
     @ObservationIgnored private var calendarTimer: Timer?
     /// "Wait for the call": the event in progress whose first detected meeting app starts a recording.
     @ObservationIgnored private var calendarWaitEvent: CalendarEvent?
-    /// The calendar event the current recording was started for: its end prompts a stop, its title names it.
+    /// The calendar event the current recording was started for or linked to: its end prompts a stop, its title is
+    /// the recording's default.
     @ObservationIgnored private var recordingEvent: CalendarEvent?
+    /// Occurrence ids of the calendar suggestions dismissed during the current recording.
+    @ObservationIgnored private var dismissedSuggestionIDs: Set<String> = []
     /// Created on the normal launch path only (not for the DEBUG harnesses).
     @ObservationIgnored private var hotKey: GlobalHotKey?
     @ObservationIgnored private var pauseHotKey: GlobalHotKey?
@@ -369,6 +385,7 @@ final class AppModel {
         syncHotKey()
         observeTranscriptions()
         startMeetingServices()
+        refreshNotificationStatus()
         Task {
             // Subscribed before the first refresh, whose emit would otherwise be missed.
             let changes = await library.changes()
@@ -407,13 +424,17 @@ final class AppModel {
         if isRecording { stopRecording() } else { startRecording(target: selectedTarget) }
     }
 
-    /// Waits for launch recovery, then starts the engine off the main thread. `event`: the calendar event recorded.
+    /// Waits for launch recovery, then starts the engine off the main thread. `event`: the calendar event recorded,
+    /// whose title is the recording's from the first `session.json`.
     /// The recording page shows at once ("Starting…" until it runs). A start from EchoDiar's own windows, shortcuts or
     /// menus brings the main window forward on it; without `bringForward` (the pill's Record and Join, automatic
     /// starts) it is only selected in an open window, so the meeting app keeps the focus.
     func startRecording(target: CaptureTarget, event: CalendarEvent? = nil, bringForward: Bool = true) {
         guard !isRecording, !isStarting else { return }
         isStarting = true
+        // Before the engine starts, so the recording page and card show it from their first frame.
+        recordingTitle = Self.trimmedTitle(event?.title)
+        if settings.endPromptNotification { requestNotificationAccess() }
         if bringForward {
             route = .recording
             (NSApp.delegate as? AppDelegate)?.showMainWindow()
@@ -433,9 +454,11 @@ final class AppModel {
             }
             do {
                 let (folder, resolved) = try await Task.detached(priority: .userInitiated) {
-                    [engine, uid = settings.micDeviceUID] in
+                    [engine, uid = settings.micDeviceUID, title = event?.title] in
                     let resolved = Self.resolved(target)
-                    return (try engine.start(target: resolved, language: language, micDeviceUID: uid), resolved)
+                    return (
+                        try engine.start(target: resolved, language: language, micDeviceUID: uid, title: title),
+                        resolved)
                 }.value
                 activeFolder = folder
                 recordingEvent = event
@@ -449,12 +472,30 @@ final class AppModel {
                 NSLog("EchoDiar: could not start recording: \(error)")
                 autoStartedAppName = nil
                 recordingEvent = nil
+                recordingTitle = nil
                 recordingError = Self.captureFailureMessage(error, action: .start)
                 // The recording page opened before the start; nothing to show there now.
                 if route == .recording { route = .list }
             }
             isStarting = false
         }
+    }
+
+    /// Renames the current recording at once (the page and the card) and in its `session.json` (on the engine's
+    /// queue); blank goes back to the linked calendar event's title, or the default one. A title hides the calendar
+    /// suggestion; clearing it looks for one again. Ignored once the recording has ended.
+    func setRecordingTitle(_ title: String) {
+        let trimmed = Self.trimmedTitle(title)
+        guard isRecording || isStarting, trimmed != recordingTitle else { return }
+        recordingTitle = trimmed
+        engine.setTitle(trimmed ?? recordingEvent?.title)
+        updateCalendarSuggestion()
+    }
+
+    /// `title` without surrounding whitespace; nil when blank.
+    private static func trimmedTitle(_ title: String?) -> String? {
+        guard let trimmed = title?.trimmingCharacters(in: .whitespacesAndNewlines), !trimmed.isEmpty else { return nil }
+        return trimmed
     }
 
     /// Connects the recording's transcriber to the engine's sink and publishes its updates to `recordingCaptions`
@@ -632,8 +673,10 @@ final class AppModel {
                     if let message = Self.stopMessage(reason) { recordingError = message }
                     let folder = activeFolder
                     activeFolder = nil
-                    let title = recordingEvent?.title
                     recordingEvent = nil
+                    recordingTitle = nil
+                    calendarSuggestion = nil
+                    dismissedSuggestionIDs = []
                     // Bookkeeping only: the writer copied the sink at start and flushed its last frames before `.idle`.
                     engine.liveSink = nil
                     let transcriber = recordingTranscriber
@@ -645,9 +688,9 @@ final class AppModel {
                             defer { self.compressionJobs -= 1 }
                             // Unloads its model before the job may load one, so two never sit side by side.
                             let prior = await transcriber.finish()
-                            if let folder { await self.finishRecording(folder, prior: prior, title: title) }
+                            if let folder { await self.finishRecording(folder, prior: prior) }
                         } else if let folder {
-                            await self.finishRecording(folder, title: title)
+                            await self.finishRecording(folder)
                         }
                         // Unless a new recording's transcriber publishes them meanwhile.
                         if self.recordingTranscriber == nil { self.recordingCaptions = nil }
@@ -763,10 +806,9 @@ final class AppModel {
     /// after transcription") or is compressed.
     /// Otherwise it is compressed first, then queued as `compress(_:)` does (a cloud confirmation may hold it), and
     /// waited for. `prior` (what the recording transcriber transcribed) goes to the job either way. `milestone` sees
-    /// each step end. `title` (a calendar event's) renames the conversation once the library lists it, before the
-    /// jobs' read-modify-writes of `conversation.json`, which keep it.
+    /// each step end.
     func finishRecording(
-        _ folder: URL, prior: PriorTranscription? = nil, title: String? = nil,
+        _ folder: URL, prior: PriorTranscription? = nil,
         milestone: (@MainActor (FinishMilestone) -> Void)? = nil
     ) async {
         let id = (try? RecordingSession.read(from: folder))?.id
@@ -775,13 +817,6 @@ final class AppModel {
         // Before the transcription, so the indicator never drops to idle between the two steps.
         compressionJobs += 1
         await library.refresh()
-        if let id, let title {
-            do {
-                try await library.rename(id: id, title: title)
-            } catch {
-                NSLog("EchoDiar: could not rename conversation \(id): \(error)")
-            }
-        }
         if transcribesFirst(folder, prior: prior),
            let job = submitTranscription(
                folder: folder, deleteAudioAfter: false, processNow: needsNoModel(prior), prior: prior) {
@@ -1452,6 +1487,8 @@ final class AppModel {
             || updated.globalHotKeyEnabled != settings.globalHotKeyEnabled
             || updated.globalPauseHotKey != settings.globalPauseHotKey
             || updated.globalPauseHotKeyEnabled != settings.globalPauseHotKeyEnabled
+        let notificationTurnedOn = updated.endPromptNotification && !settings.endPromptNotification
+        let notificationTurnedOff = !updated.endPromptNotification && settings.endPromptNotification
         let ragChanged = updated.ragEnabled != settings.ragEnabled
             || updated.embeddingModelID != settings.embeddingModelID
             || updated.embeddingAPIModel != settings.embeddingAPIModel
@@ -1466,6 +1503,8 @@ final class AppModel {
         if calendarChanged { syncCalendar() }
         if retentionChanged { syncRetention() }
         if hotKeyChanged { syncHotKey() }
+        if notificationTurnedOn { requestNotificationAccess() }
+        if notificationTurnedOff { endPromptNotifier.dismiss() }
         // A pass still running would keep embedding with the old choice.
         if ragChanged { syncLibraryIndex(restart: true) }
     }
@@ -2389,6 +2428,53 @@ extension AppModel {
         stopRecording()
     }
 
+    /// The end prompt's question, on the pill and in its notification.
+    func endPromptQuestion(for reason: MeetingEndMonitor.Reason) -> String {
+        let app = sourceApp?.name
+        switch reason {
+        case .sourceExited:
+            if let app { return String(localized: "\(app) quit — stop recording?") }
+            return String(localized: "The app quit — stop recording?")
+        case .sourceInactive:
+            if let app { return String(localized: "\(app) stopped using audio — stop recording?") }
+            return String(localized: "The app stopped using audio — stop recording?")
+        case .callEnded: return String(localized: "The call seems to be over — stop recording?")
+        case .silence:
+            return String(
+                localized: "No sound for \(settings.endMonitor.effectiveSilenceMinutes) min — stop recording?")
+        case .screenLocked: return String(localized: "Screen locked — stop recording?")
+        case .inputRouteLost: return String(localized: "Microphone disconnected — stop recording?")
+        case .eventEnded: return String(localized: "The meeting has ended — stop recording?")
+        case .systemSleep, .diskFull, .maxDuration: return String(localized: "Stop recording?")
+        }
+    }
+
+    /// One hook for every path that sets or clears the prompt: the end prompt's notification follows it.
+    private func pillPromptChanged(from old: PillPrompt?) {
+        if case .meetingEnded(let reason, let deadline)? = pillPrompt {
+            if old != pillPrompt { endPromptNotifier.show(question: endPromptQuestion(for: reason), deadline: deadline) }
+        } else if case .meetingEnded? = old {
+            endPromptNotifier.dismiss()
+        }
+    }
+
+    /// Asks for notification access (alert and sound) once, while it is not determined yet.
+    func requestNotificationAccess() {
+        guard notificationStatus == .notDetermined else { return }
+        UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .sound]) { [weak self] _, error in
+            if let error { NSLog("EchoDiar: notification access request failed: \(error)") }
+            Task { @MainActor in self?.refreshNotificationStatus() }
+        }
+    }
+
+    /// Reads the notification access again: at launch, after a request, and back from System Settings.
+    func refreshNotificationStatus() {
+        UNUserNotificationCenter.current().getNotificationSettings { [weak self] settings in
+            let status = settings.authorizationStatus
+            Task { @MainActor in self?.notificationStatus = status }
+        }
+    }
+
     /// The pill, sleep/lock/quit events and meeting detection; on the normal launch path only.
     private func startMeetingServices() {
         pill = FloatingPillController(model: self)
@@ -2439,6 +2525,8 @@ extension AppModel {
             from: now, to: now + 7 * 86_400, ownCalendarID: settings.calendar.ownCalendarID)
         scheduler.update(events, configuration: settings.calendar)
         upcomingEvents = scheduler.upcoming(after: now, limit: 50)
+        // An event that began, ended, moved or was deleted since changes the recording's suggestion.
+        updateCalendarSuggestion()
         // Ended, deleted, moved or skipped since: drop its prompt and wait (and the wait in another mode).
         func isActive(_ event: CalendarEvent) -> Bool {
             upcomingEvents.contains { $0.id == event.id && $0.start <= now }
@@ -2597,12 +2685,45 @@ extension AppModel {
         let sourceGone = sourceApp != nil && watch.livePIDs.isEmpty
         endWatch = watch
         syncMeetingMic()
-        if let event = recordingEvent, settings.calendar.stopAtEventEnd {
-            let delay = TimeInterval(settings.calendar.effectiveStopAfterEndMinutes) * 60
-            recordEnd(.scheduledEnd(event.end.addingTimeInterval(delay)))
-        }
+        feedEventEnd()
         if let autoStarted { showAutoStartNotice(autoStarted) }
         if sourceGone { recordEnd(.sourceExited) }
+        updateCalendarSuggestion()
+    }
+
+    /// With "Stop at event end": the recording's calendar event ends (plus the delay) for the end monitor.
+    private func feedEventEnd() {
+        guard let event = recordingEvent, settings.calendar.stopAtEventEnd else { return }
+        let delay = TimeInterval(settings.calendar.effectiveStopAfterEndMinutes) * 60
+        recordEnd(.scheduledEnd(event.end.addingTimeInterval(delay)))
+    }
+
+    /// While a recording without a calendar event or a title runs (its end watch is armed): the listed event in
+    /// progress or starting within 5 min, closest to its start and not dismissed; nil otherwise.
+    private func updateCalendarSuggestion() {
+        guard let startedAt = endWatch?.monitor.startedAt, recordingEvent == nil, recordingTitle == nil else {
+            calendarSuggestion = nil
+            return
+        }
+        calendarSuggestion = scheduler.recordingMatch(
+            startedAt: startedAt, now: Date(), excluding: dismissedSuggestionIDs)
+    }
+
+    /// Links the suggested event to the recording, as the Calendar page's Record does (its end prompts a stop with
+    /// "Stop at event end"), and names the recording after it.
+    func acceptCalendarSuggestion() {
+        guard let event = calendarSuggestion, endWatch != nil else { return }
+        recordingEvent = event
+        feedEventEnd()
+        setRecordingTitle(event.title)
+        calendarSuggestion = nil
+    }
+
+    /// "Not now": the event is not suggested again for this recording.
+    func dismissCalendarSuggestion() {
+        guard let event = calendarSuggestion else { return }
+        dismissedSuggestionIDs.insert(event.id)
+        calendarSuggestion = nil
     }
 
     /// Stops the timer and the feeds, and drops the end prompt. Safe to call repeatedly.

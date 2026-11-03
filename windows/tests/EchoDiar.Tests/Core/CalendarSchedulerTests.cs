@@ -18,8 +18,8 @@ public sealed class CalendarSchedulerTests
 
     private static CalendarEvent Event(
         string id, bool link = true, bool isAllDay = false, bool declined = false, string calendarID = "work",
-        bool confirmed = true) =>
-        new(id, id, Start, At(3_600), isAllDay, calendarID, link ? Zoom : null, declined, Canceled: false, confirmed);
+        bool confirmed = true, double from = 0, double to = 3_600) =>
+        new(id, id, At(from), At(to), isAllDay, calendarID, link ? Zoom : null, declined, Canceled: false, confirmed);
 
     private static List<string> Ids(IEnumerable<CalendarEvent> events) => events.Select(e => e.Id).ToList();
 
@@ -96,6 +96,26 @@ public sealed class CalendarSchedulerTests
         Assert.Null(scheduler.ActiveEvent(At(3_600)));
         Assert.Equal(["later"], Ids(scheduler.Upcoming(At(3_600), 10)));
         Assert.Null(scheduler.NextChange(At(9_000)));
+    }
+
+    // "a" [0, 3600) and "b" [1800, 5400) overlap; "c" starts at 7200.
+    [Theory]
+    [InlineData(2_000, 1_900, null, "b")] // Overlap: the start closest to the recording start wins.
+    [InlineData(2_000, 100, null, "a")]
+    [InlineData(2_000, 900, null, "b")] // Same distance: the later start wins.
+    [InlineData(2_000, 1_900, "b", "a")] // A dismissed event is skipped.
+    [InlineData(6_960, 6_960, null, "c")] // Starts within 5 minutes.
+    [InlineData(6_000, 6_000, null, null)] // Nothing in progress, the next start is 20 minutes away.
+    [InlineData(6_960, 6_960, "c", null)]
+    public void RecordingMatchPicksTheEventClosestToTheRecordingStart(
+        double now, double startedAt, string? dismissed, string? expected)
+    {
+        var scheduler = new CalendarScheduler();
+        scheduler.Update(
+            [Event("a", from: 0, to: 3_600), Event("b", from: 1_800, to: 5_400), Event("c", from: 7_200, to: 9_000)],
+            new Configuration());
+        var excluding = dismissed is null ? null : new HashSet<string>(StringComparer.Ordinal) { dismissed };
+        Assert.Equal(expected, scheduler.RecordingMatch(At(startedAt), At(now), excluding: excluding)?.Id);
     }
 
     // Trust rule (plan Q3, macOS c28c628): an invite the user has not answered never starts silently, and "no

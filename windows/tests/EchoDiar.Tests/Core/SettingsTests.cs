@@ -220,7 +220,7 @@ public sealed class SettingsTests : IDisposable
           "hidePillWhenAppActive": false, "showPillInScreenCaptures": false, "attachPillToWindow": false,
           "pillSize": "medium",
           "endMonitor": {"sourceInactiveSeconds": 25, "callEndedSeconds": 60, "silenceMinutes": 10, "maxDurationMinutes": 240},
-          "routeChangeBehavior": "ask",
+          "endPromptNotification": true, "routeChangeBehavior": "ask",
           "calendar": {"mode": "ask", "ignoredCalendarIDs": [], "allTimedEvents": false, "stopAtEventEnd": true,
                        "stopAfterEndMinutes": 10, "skippedEvents": {}},
           "autoTranscribe": true, "transcribeWhileRecording": true, "diarization": false,

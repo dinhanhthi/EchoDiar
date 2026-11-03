@@ -106,6 +106,10 @@
     <value>Thêm ID mô hình</value>
     <comment>Add a model id</comment>
   </data>
+  <data name="AddATitle" xml:space="preserve">
+    <value>Thêm tiêu đề</value>
+    <comment>Add a title</comment>
+  </data>
   <data name="AddEndpoint" xml:space="preserve">
     <value>Thêm endpoint</value>
     <comment>Add Endpoint</comment>
@@ -1866,6 +1870,14 @@
     <value>Không cần tải về. Xếp hạng kém chính xác hơn các mô hình ở trên.</value>
     <comment>Nothing to download. Rougher ranking than the models above.</comment>
   </data>
+  <data name="NotificationsAreOffForEchoDiarInSystemSettings" xml:space="preserve">
+    <value>Thông báo của EchoDiar đang tắt trong Cài đặt hệ thống.</value>
+    <comment>Notifications are off for EchoDiar in System Settings.</comment>
+  </data>
+  <data name="NotifyWhenAMeetingSeemsToEnd" xml:space="preserve">
+    <value>Thông báo khi cuộc họp có vẻ đã kết thúc</value>
+    <comment>Notify when a meeting seems to end</comment>
+  </data>
   <data name="NumberOfOtherSpeakers" xml:space="preserve">
     <value>Số người nói khác</value>
     <comment>Number of other speakers</comment>
@@ -1961,6 +1973,10 @@
   <data name="OpenMicrophoneSettings" xml:space="preserve">
     <value>Mở cài đặt Micrô</value>
     <comment>Open Microphone Settings</comment>
+  </data>
+  <data name="OpenNotificationSettings" xml:space="preserve">
+    <value>Mở cài đặt Thông báo</value>
+    <comment>Open Notification Settings</comment>
   </data>
   <data name="OpenPrivacySettings" xml:space="preserve">
     <value>Mở cài đặt Quyền riêng tư</value>
@@ -2353,6 +2369,10 @@
   <data name="RenameThisSpeaker" xml:space="preserve">
     <value>Đổi tên người nói này</value>
     <comment>Rename this speaker</comment>
+  </data>
+  <data name="RenameTo" xml:space="preserve">
+    <value>Đổi tên thành "{0}"?</value>
+    <comment>Rename to "%@"?</comment>
   </data>
   <data name="Repeat" xml:space="preserve">
     <value>Lặp lại</value>
@@ -3473,6 +3493,10 @@
   <data name="WhileARecordingStaysPausedThisLongTheModelThatTranscribesItI" xml:space="preserve">
     <value>Khi bản ghi âm tạm dừng lâu như vậy, mô hình đang chép lời bản ghi âm đó sẽ được giải phóng; mô hình sẽ tải lại khi bạn tiếp tục. Các mô hình khác được giải phóng ngay khi xong việc.</value>
     <comment>While a recording stays paused this long, the model that transcribes it is freed; it loads again when you resume. Other models are freed as soon as their job ends.</comment>
+  </data>
+  <data name="WhileEchoDiarIsInTheBackgroundANotificationAsksTooWithStopNo" xml:space="preserve">
+    <value>Khi EchoDiar chạy nền, một thông báo cũng hỏi, kèm nút Dừng ngay và Tiếp tục ghi âm.</value>
+    <comment>While EchoDiar is in the background, a notification asks too, with Stop now and Keep recording.</comment>
   </data>
   <data name="WhisperTranscription" xml:space="preserve">
     <value>Chép lời Whisper</value>

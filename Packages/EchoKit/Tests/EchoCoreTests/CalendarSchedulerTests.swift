@@ -10,10 +10,11 @@ struct CalendarSchedulerTests {
     private func at(_ seconds: TimeInterval) -> Date { start.addingTimeInterval(seconds) }
 
     private func event(
-        _ id: String, link: Bool = true, isAllDay: Bool = false, declined: Bool = false, calendarID: String = "work"
+        _ id: String, link: Bool = true, isAllDay: Bool = false, declined: Bool = false, calendarID: String = "work",
+        from: TimeInterval = 0, to: TimeInterval = 3_600
     ) -> CalendarEvent {
         CalendarEvent(
-            id: id, title: id, start: start, end: at(3_600), isAllDay: isAllDay, calendarID: calendarID,
+            id: id, title: id, start: at(from), end: at(to), isAllDay: isAllDay, calendarID: calendarID,
             link: link ? zoom : nil, declined: declined, canceled: false, confirmed: true)
     }
 
@@ -65,6 +66,29 @@ struct CalendarSchedulerTests {
         var scheduler = CalendarScheduler()
         scheduler.update(events, configuration: .init())
         #expect(scheduler.evaluate(now: at(301)) == .start(events[0], late: true))
+    }
+
+    /// "a" [0, 3600) and "b" [1800, 5400) overlap; "c" starts at 7200. Arguments: now, recording start, a dismissed
+    /// id, the expected match.
+    @Test(arguments: [
+        (2_000.0, 1_900.0, nil, "b"),  // Overlap: the start closest to the recording start wins.
+        (2_000.0, 100.0, nil, "a"),
+        (2_000.0, 900.0, nil, "b"),  // Same distance: the later start wins.
+        (2_000.0, 1_900.0, "b", "a"),  // A dismissed event is skipped.
+        (6_960.0, 6_960.0, nil, "c"),  // Starts within 5 minutes.
+        (6_000.0, 6_000.0, nil, nil),  // Nothing in progress, the next start is 20 minutes away.
+        (6_960.0, 6_960.0, "c", nil),
+    ] as [(TimeInterval, TimeInterval, String?, String?)])
+    func recordingMatchPicksTheEventClosestToTheRecordingStart(
+        now: TimeInterval, startedAt: TimeInterval, dismissed: String?, expected: String?
+    ) {
+        var scheduler = CalendarScheduler()
+        scheduler.update(
+            [event("a", from: 0, to: 3_600), event("b", from: 1_800, to: 5_400), event("c", from: 7_200, to: 9_000)],
+            configuration: .init())
+        let match = scheduler.recordingMatch(
+            startedAt: at(startedAt), now: at(now), excluding: dismissed.map { [$0] } ?? [])
+        #expect(match?.id == expected)
     }
 
     @Test func unknownModeAndOutOfRangeMinutesDecodeSafely() throws {

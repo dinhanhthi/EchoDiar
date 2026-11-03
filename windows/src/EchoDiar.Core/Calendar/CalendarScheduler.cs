@@ -86,6 +86,8 @@ public sealed class CalendarScheduler
 
     /// <summary>Beyond this after the start, a trigger counts as late.</summary>
     private static readonly TimeSpan LateThreshold = TimeSpan.FromSeconds(300);
+    /// <summary>How far ahead <see cref="RecordingMatch"/> looks for an event about to start.</summary>
+    private static readonly TimeSpan DefaultMatchLead = TimeSpan.FromSeconds(300);
 
     private List<CalendarEvent> _events = [];
     private Mode _mode = Mode.Ask;
@@ -149,6 +151,24 @@ public sealed class CalendarScheduler
 
     /// <summary>The eligible event in progress at <paramref name="now"/> (the latest started), whatever the mode.</summary>
     public CalendarEvent? ActiveEvent(DateTimeOffset now) => _events.LastOrDefault(e => e.Start <= now && now < e.End);
+
+    /// <summary>
+    /// The eligible event a recording started at <paramref name="startedAt"/> likely belongs to, whatever the mode or
+    /// skip state: one in progress at <paramref name="now"/> or starting within <paramref name="lead"/> (default 5
+    /// minutes) after it, not in <paramref name="excluding"/> (occurrence ids the user dismissed). Several: the start
+    /// closest to <paramref name="startedAt"/>; ties: the later start, then the lower id. Null when none.
+    /// </summary>
+    public CalendarEvent? RecordingMatch(
+        DateTimeOffset startedAt, DateTimeOffset now, TimeSpan? lead = null, IReadOnlySet<string>? excluding = null)
+    {
+        var horizon = now + (lead ?? DefaultMatchLead);
+        return _events
+            .Where(e => excluding?.Contains(e.Id) != true && e.Start <= horizon && now < e.End)
+            .OrderBy(e => (e.Start - startedAt).Duration())
+            .ThenByDescending(e => e.Start)
+            .ThenBy(e => e.Id, StringComparer.Ordinal)
+            .FirstOrDefault();
+    }
 
     /// <summary>Eligible events not yet over, by start, whatever the mode or skip state.</summary>
     public IReadOnlyList<CalendarEvent> Upcoming(DateTimeOffset now, int limit) =>

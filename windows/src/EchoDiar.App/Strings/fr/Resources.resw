@@ -106,6 +106,10 @@
     <value>Ajouter un identifiant de modèle</value>
     <comment>Add a model id</comment>
   </data>
+  <data name="AddATitle" xml:space="preserve">
+    <value>Ajouter un titre</value>
+    <comment>Add a title</comment>
+  </data>
   <data name="AddEndpoint" xml:space="preserve">
     <value>Ajouter un point de terminaison</value>
     <comment>Add Endpoint</comment>
@@ -1958,6 +1962,14 @@
     <value>Rien à télécharger. Classement plus approximatif que les modèles ci-dessus.</value>
     <comment>Nothing to download. Rougher ranking than the models above.</comment>
   </data>
+  <data name="NotificationsAreOffForEchoDiarInSystemSettings" xml:space="preserve">
+    <value>Les notifications d’EchoDiar sont désactivées dans Réglages Système.</value>
+    <comment>Notifications are off for EchoDiar in System Settings.</comment>
+  </data>
+  <data name="NotifyWhenAMeetingSeemsToEnd" xml:space="preserve">
+    <value>Avertir quand une réunion semble terminée</value>
+    <comment>Notify when a meeting seems to end</comment>
+  </data>
   <data name="NumberOfOtherSpeakers" xml:space="preserve">
     <value>Nombre d’autres intervenants</value>
     <comment>Number of other speakers</comment>
@@ -2053,6 +2065,10 @@
   <data name="OpenMicrophoneSettings" xml:space="preserve">
     <value>Ouvrir les réglages du microphone</value>
     <comment>Open Microphone Settings</comment>
+  </data>
+  <data name="OpenNotificationSettings" xml:space="preserve">
+    <value>Ouvrir les réglages des notifications</value>
+    <comment>Open Notification Settings</comment>
   </data>
   <data name="OpenPrivacySettings" xml:space="preserve">
     <value>Ouvrir les réglages de confidentialité</value>
@@ -2445,6 +2461,10 @@
   <data name="RenameThisSpeaker" xml:space="preserve">
     <value>Renommer cet intervenant</value>
     <comment>Rename this speaker</comment>
+  </data>
+  <data name="RenameTo" xml:space="preserve">
+    <value>Renommer en "{0}" ?</value>
+    <comment>Rename to "%@"?</comment>
   </data>
   <data name="Repeat" xml:space="preserve">
     <value>Récurrence</value>
@@ -3593,6 +3613,10 @@
   <data name="WhileARecordingStaysPausedThisLongTheModelThatTranscribesItI" xml:space="preserve">
     <value>Quand un enregistrement reste en pause aussi longtemps, le modèle qui le transcrit est libéré ; il se recharge quand vous reprenez. Les autres modèles sont libérés dès que leur tâche se termine.</value>
     <comment>While a recording stays paused this long, the model that transcribes it is freed; it loads again when you resume. Other models are freed as soon as their job ends.</comment>
+  </data>
+  <data name="WhileEchoDiarIsInTheBackgroundANotificationAsksTooWithStopNo" xml:space="preserve">
+    <value>Quand EchoDiar est en arrière-plan, une notification pose aussi la question, avec Arrêter maintenant et Continuer l’enregistrement.</value>
+    <comment>While EchoDiar is in the background, a notification asks too, with Stop now and Keep recording.</comment>
   </data>
   <data name="WhisperTranscription" xml:space="preserve">
     <value>Transcription Whisper</value>

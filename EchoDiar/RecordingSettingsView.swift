@@ -5,6 +5,7 @@ import EchoCore
 import EchoTranscribe
 import EventKit
 import SwiftUI
+import UserNotifications
 
 /// The Recording tab, one inner tab per section: the microphone, meeting detection and per-app behavior with the
 /// floating pill's anchor, calendar events, auto-stop, and what happens after a recording stops.
@@ -47,6 +48,7 @@ struct RecordingSettingsView: View {
             // Back from System Settings.
             accessibilityTrusted = WindowAnchor.isTrusted
             model.refreshCalendarAccess()
+            model.refreshNotificationStatus()
         }
     }
 
@@ -210,7 +212,7 @@ struct RecordingSettingsView: View {
             set: { value in model.updateSettings { $0.calendar.allTimedEvents = !value } })
     }
 
-    private var autoStopSection: some View {
+    @ViewBuilder private var autoStopSection: some View {
         Section {
             NumberRow(
                 title: "Stop when the app is quiet for", unit: "s",
@@ -231,6 +233,18 @@ struct RecordingSettingsView: View {
         } header: {
             SectionHeader(
                 description: "The indicator asks before stopping, with a 15 s countdown. Reaching the length limit stops at once.")
+        }
+        Section {
+            Toggle(isOn: model.setting(\.endPromptNotification)) {
+                Text("Notify when a meeting seems to end")
+                Text("While EchoDiar is in the background, a notification asks too, with Stop now and Keep recording.")
+            }
+            if model.notificationStatus == .denied {
+                LabeledContent("Notifications are off for EchoDiar in System Settings.") {
+                    Button("Open Notification Settings") { PrivacySettings.openNotifications() }
+                }
+                .foregroundStyle(.secondary)
+            }
         }
     }
 

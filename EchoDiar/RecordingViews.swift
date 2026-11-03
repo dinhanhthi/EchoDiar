@@ -3,12 +3,16 @@ import EchoAudio
 import EchoCore
 import SwiftUI
 
-/// The recording in the sidebar, above the first day: the recorded app's icon, "Recording…" (or "Paused"), the elapsed
-/// clock and mini meters, then a bottom row with Stop, Pause or Resume, Mute or Unmute and the language; selected adds
-/// the accent fill and stroke of `ConversationCard`. A click opens the recording page.
+/// The recording in the sidebar, above the first day: the recorded app's icon, its title (else "Recording…" or
+/// "Paused"; double-click to rename), the elapsed clock and mini meters, then a bottom row with Stop, Pause or Resume,
+/// Mute or Unmute and the language; selected adds the accent fill and stroke of `ConversationCard`. A click opens the
+/// recording page.
 struct RecordingCard: View {
     let model: AppModel
     var selected = false
+    @State private var editing = false
+    @State private var draft = ""
+    @FocusState private var titleFocused: Bool
 
     var body: some View {
         let paused = model.snapshot.state == .paused
@@ -20,9 +24,7 @@ struct RecordingCard: View {
                     Circle()
                         .fill(paused ? Color.orange : Color.red)
                         .frame(width: 8, height: 8)
-                    Text(paused ? "Paused" : "Recording…")
-                        .font(.headline)
-                        .lineLimit(1)
+                    title(paused: paused)
                     Spacer(minLength: 0)
                 }
                 HStack(spacing: 8) {
@@ -64,9 +66,9 @@ struct RecordingCard: View {
         .overlay {
             if selected { Self.shape.strokeBorder(Color.accentColor, lineWidth: 1.5).allowsHitTesting(false) }
         }
-        // Buttons and the menu take their own clicks.
+        // Buttons and the menu take their own clicks; the title's double click is handled before this.
         .contentShape(Rectangle())
-        .onTapGesture { model.route = .recording }
+        .onTapGesture(perform: open)
         // Stop, Pause and Mute also from the context menu, as the conversation cards' actions.
         .contextMenu {
             Button("Stop", action: model.stopRecording)
@@ -78,6 +80,50 @@ struct RecordingCard: View {
 
     /// The `GlassCard` shape, for the selection.
     private static let shape = RoundedRectangle(cornerRadius: 20, style: .continuous)
+
+    /// The recording's title, else its state; a field while renamed in place, as `ConversationCard`'s title: Return
+    /// saves, Esc and a click elsewhere cancel.
+    @ViewBuilder private func title(paused: Bool) -> some View {
+        if editing {
+            TextField("Add a title", text: $draft)
+                .textFieldStyle(.plain)
+                .font(.headline)
+                .focused($titleFocused)
+                .onAppear { titleFocused = true }
+                .onSubmit {
+                    editing = false
+                    model.setRecordingTitle(draft)
+                }
+                .onExitCommand { editing = false }
+                .onChange(of: titleFocused) { _, focused in if !focused { editing = false } }
+        } else {
+            Group {
+                if let title = model.recordingTitle {
+                    Text(title).help(title)
+                } else {
+                    Text(paused ? "Paused" : "Recording…")
+                }
+            }
+            .font(.headline)
+            .lineLimit(1)
+            .truncationMode(.tail)
+            // Side by side, so the first click opens the recording page at once instead of waiting out the double
+            // click, which then renames it.
+            .onTapGesture(perform: open)
+            .simultaneousGesture(TapGesture(count: 2).onEnded(beginEditing))
+        }
+    }
+
+    /// Not while the title is being edited: clicks in its field must not leave it.
+    private func open() {
+        guard !editing else { return }
+        model.route = .recording
+    }
+
+    private func beginEditing() {
+        draft = model.recordingTitle ?? ""
+        editing = true
+    }
 
     private func rowButton(_ title: LocalizedStringKey, systemImage: String,
                            action: @escaping () -> Void) -> some View {
@@ -117,7 +163,8 @@ struct RecordingCard: View {
     }
 }
 
-/// The recording in the library page's detail: the header, then the live transcript, or the wave and why there is none
+/// The recording in the library page's detail: the header, the calendar suggestion if any, then the live transcript,
+/// or the wave and why there is none
 /// (the conditions of `AppModel.startRecordingTranscriber`, read from the settings), with the Settings page that
 /// changes it.
 struct RecordingDetailView: View {
@@ -126,6 +173,7 @@ struct RecordingDetailView: View {
     var body: some View {
         VStack(spacing: 12) {
             RecordingHeader(model: model)
+            if let event = model.calendarSuggestion { suggestionRow(event) }
             if let captions = model.recordingCaptions {
                 LiveTranscriptView(snapshot: captions)
             } else {
@@ -143,6 +191,28 @@ struct RecordingDetailView: View {
         }
         .padding(12)
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+    }
+
+    /// Offers the calendar event the recording likely belongs to: "Rename" links it and takes its title, "Not now"
+    /// stops suggesting it for this recording.
+    private func suggestionRow(_ event: CalendarEvent) -> some View {
+        HStack(spacing: 10) {
+            Image(systemName: "calendar")
+                .foregroundStyle(.secondary)
+            Text("Rename to \"\(event.title)\"?")
+                .lineLimit(1)
+                .truncationMode(.tail)
+                .help(event.title)
+            Spacer(minLength: 8)
+            Button("Not now", action: model.dismissCalendarSuggestion)
+            Button("Rename", action: model.acceptCalendarSuggestion)
+                .buttonStyle(.borderedProminent)
+        }
+        .buttonBorderShape(.capsule)
+        .controlSize(.small)
+        .padding(.horizontal, 14)
+        .padding(.vertical, 8)
+        .modifier(GlassCard(cornerRadius: 14))
     }
 
     private var noCaptionsReason: LocalizedStringKey {
@@ -220,30 +290,22 @@ struct RecordingWave: View {
     }
 }
 
-/// Elapsed time, two-channel level meter and capture warnings while a recording is open.
+/// The recording's title (edited in place, saved as it changes), elapsed time, two-channel level meter and capture
+/// warnings while a recording is open.
 struct RecordingHeader: View {
     let model: AppModel
+    /// What the title field shows; `model.recordingTitle` is its trimmed value.
+    @State private var titleDraft = ""
+    @FocusState private var titleFocused: Bool
     /// The window is visible: only then the clock and the meter update.
     private var live: Bool { model.mainWindowVisible }
 
     var body: some View {
         let paused = model.snapshot.state == .paused
         VStack(alignment: .leading, spacing: 8) {
-            HStack(spacing: 10) {
-                Image(systemName: paused ? "pause.circle.fill" : "record.circle.fill")
-                    .foregroundStyle(paused ? .orange : .red)
-                if live {
-                    TimelineView(.periodic(from: .now, by: 1)) { _ in elapsedText }
-                } else {
-                    elapsedText
-                }
-                Text(paused ? "Paused" : "Recording")
-                    .foregroundStyle(.secondary)
-                Spacer(minLength: 8)
-                if live && !paused {
-                    ChannelMeters(feed: model.levels)
-                }
-                languageMenu
+            VStack(alignment: .leading, spacing: 10) {
+                titleField
+                statusRow(paused: paused)
             }
             .padding(.horizontal, 14)
             .padding(.vertical, 10)
@@ -257,6 +319,50 @@ struct RecordingHeader: View {
             if model.snapshot.silentTapSuspected {
                 SilentTapBanner { PrivacySettings.openSystemAudioRecording() }
             }
+        }
+    }
+
+    /// An input on the card: each change renames the recording; Esc leaves the field. A title set elsewhere (the
+    /// card, the calendar suggestion) replaces the text unless only surrounding whitespace differs.
+    private var titleField: some View {
+        TextField("Add a title", text: $titleDraft)
+            .textFieldStyle(.plain)
+            .font(.title3.weight(.semibold))
+            .focused($titleFocused)
+            .onSubmit { model.setRecordingTitle(titleDraft) }
+            .onExitCommand { titleFocused = false }
+            .onChange(of: titleDraft) { _, draft in model.setRecordingTitle(draft) }
+            .onChange(of: model.recordingTitle, initial: true) { _, title in
+                if titleDraft.trimmingCharacters(in: .whitespacesAndNewlines) != (title ?? "") {
+                    titleDraft = title ?? ""
+                }
+            }
+            .padding(.horizontal, 10)
+            .padding(.vertical, 6)
+            .background(RoundedRectangle(cornerRadius: 8, style: .continuous).fill(Palette.inputSurface))
+            .overlay(
+                RoundedRectangle(cornerRadius: 8, style: .continuous)
+                    .strokeBorder(Palette.surfaceBorder, lineWidth: 1)
+                    .allowsHitTesting(false))
+    }
+
+    /// The state icon, elapsed clock and state, the meters and the language.
+    private func statusRow(paused: Bool) -> some View {
+        HStack(spacing: 10) {
+            Image(systemName: paused ? "pause.circle.fill" : "record.circle.fill")
+                .foregroundStyle(paused ? .orange : .red)
+            if live {
+                TimelineView(.periodic(from: .now, by: 1)) { _ in elapsedText }
+            } else {
+                elapsedText
+            }
+            Text(paused ? "Paused" : "Recording")
+                .foregroundStyle(.secondary)
+            Spacer(minLength: 8)
+            if live && !paused {
+                ChannelMeters(feed: model.levels)
+            }
+            languageMenu
         }
     }
 

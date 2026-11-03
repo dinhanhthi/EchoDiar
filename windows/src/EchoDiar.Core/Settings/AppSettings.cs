@@ -80,6 +80,8 @@ public sealed record AppSettings : IJsonOnDeserialized
     [JsonPropertyName("pillWindowOffset")] public PillPosition? PillWindowOffset { get; set; }
     [JsonPropertyName("pillSize")] public PillSize PillSize { get; set; } = PillSize.Medium;
     [JsonPropertyName("endMonitor")] public MeetingEndMonitorConfiguration EndMonitor { get; set; } = new();
+    /// <summary>Post an OS notification with "Stop now" / "Keep recording" when the meeting-ended prompt shows.</summary>
+    [JsonPropertyName("endPromptNotification")] public bool EndPromptNotification { get; set; } = true;
     [JsonPropertyName("routeChangeBehavior")] public RouteChangeBehavior RouteChangeBehavior { get; set; } = RouteChangeBehavior.Ask;
     /// <summary>Calendar auto-record: trigger mode, watched calendars, event-end stop and skipped occurrences.</summary>
     [JsonPropertyName("calendar")] public CalendarScheduler.Configuration Calendar { get; set; } = new();

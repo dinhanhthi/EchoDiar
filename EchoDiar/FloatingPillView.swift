@@ -196,7 +196,7 @@ struct FloatingPillView: View {
         HStack(spacing: 10) {
             PillLogo(size: 32)
             VStack(alignment: .leading, spacing: 8) {
-                Text(question(for: reason))
+                Text(model.endPromptQuestion(for: reason))
                     .font(.callout.weight(.semibold))
                 TimelineView(.periodic(from: .now, by: 1)) { context in
                     let left = max(0, Int(deadline.timeIntervalSince(context.date).rounded(.up)))
@@ -214,26 +214,6 @@ struct FloatingPillView: View {
             }
         }
         .padding(.vertical, 10)
-    }
-
-    private func question(for reason: MeetingEndMonitor.Reason) -> String {
-        let app = model.sourceApp?.name
-        switch reason {
-        case .sourceExited:
-            if let app { return String(localized: "\(app) quit — stop recording?") }
-            return String(localized: "The app quit — stop recording?")
-        case .sourceInactive:
-            if let app { return String(localized: "\(app) stopped using audio — stop recording?") }
-            return String(localized: "The app stopped using audio — stop recording?")
-        case .callEnded: return String(localized: "The call seems to be over — stop recording?")
-        case .silence:
-            return String(
-                localized: "No sound for \(model.settings.endMonitor.effectiveSilenceMinutes) min — stop recording?")
-        case .screenLocked: return String(localized: "Screen locked — stop recording?")
-        case .inputRouteLost: return String(localized: "Microphone disconnected — stop recording?")
-        case .eventEnded: return String(localized: "The meeting has ended — stop recording?")
-        case .systemSleep, .diskFull, .maxDuration: return String(localized: "Stop recording?")
-        }
     }
 }
 

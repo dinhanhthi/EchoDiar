@@ -61,6 +61,13 @@ enum PrivacySettings {
     static func openAccessibility() { open(anchor: "Privacy_Accessibility") }
     static func openCalendars() { open(anchor: "Privacy_Calendars") }
 
+    /// System Settings › Notifications (not a Privacy & Security pane).
+    static func openNotifications() {
+        if let url = URL(string: "x-apple.systempreferences:com.apple.Notifications-Settings.extension") {
+            NSWorkspace.shared.open(url)
+        }
+    }
+
     private static func open(anchor: String) {
         let pane = "x-apple.systempreferences:com.apple.settings.PrivacySecurity.extension"
         if let url = URL(string: "\(pane)?\(anchor)"), NSWorkspace.shared.open(url) { return }
