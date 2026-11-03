@@ -58,6 +58,10 @@
   <resheader name="writer">
     <value>System.Resources.ResXResourceWriter, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
   </resheader>
+  <data name="ACatchUpIsBeingWritten" xml:space="preserve">
+    <value>Đang viết một bản tóm tắt nhanh.</value>
+    <comment>A catch-up is being written.</comment>
+  </data>
   <data name="ACloudProviderReceivesTheTranscriptsAndSummariesToIndexAndEa" xml:space="preserve">
     <value>Một nhà cung cấp đám mây nhận các bản chép lời và bản tóm tắt để lập chỉ mục, cùng mỗi câu hỏi.</value>
     <comment>A cloud provider receives the transcripts and summaries to index, and each question.</comment>
@@ -362,6 +366,14 @@
     <value>Tự động = ngôn ngữ của bản chép lời đối với bản tóm tắt, của câu hỏi đối với câu trả lời.</value>
     <comment>Auto = the transcript's language for summaries, the question's for answers.</comment>
   </data>
+  <data name="Automatic" xml:space="preserve">
+    <value>Tự động</value>
+    <comment>Automatic</comment>
+  </data>
+  <data name="Automatic_2" xml:space="preserve">
+    <value>Tự động ({0})</value>
+    <comment>Automatic (%@)</comment>
+  </data>
   <data name="Available" xml:space="preserve">
     <value>Khả dụng</value>
     <comment>Available</comment>
@@ -441,6 +453,34 @@
   <data name="CannotBeRecordedOnItsOwnAllSystemAudioWillBeRecorded" xml:space="preserve">
     <value>Không thể ghi riêng {0}: toàn bộ âm thanh hệ thống sẽ được ghi lại.</value>
     <comment>%@ cannot be recorded on its own: all system audio will be recorded.</comment>
+  </data>
+  <data name="CatchUp" xml:space="preserve">
+    <value>Tóm tắt nhanh</value>
+    <comment>Catch up</comment>
+  </data>
+  <data name="CatchUpAt" xml:space="preserve">
+    <value>Tóm tắt nhanh lúc {0}</value>
+    <comment>Catch-up at %@</comment>
+  </data>
+  <data name="CatchUpModel" xml:space="preserve">
+    <value>Mô hình tóm tắt nhanh</value>
+    <comment>Catch-up model</comment>
+  </data>
+  <data name="CatchUpNeedsAnAIProviderOutsideTheAppACloudAPIALocalServerOr" xml:space="preserve">
+    <value>Tóm tắt nhanh cần một nhà cung cấp AI bên ngoài ứng dụng: API đám mây, máy chủ cục bộ hoặc công cụ dòng lệnh. Hãy thêm một nhà cung cấp trong Cài đặt › AI.</value>
+    <comment>Catch up needs an AI provider outside the app: a cloud API, a local server or a command-line tool. Add one in Settings › AI.</comment>
+  </data>
+  <data name="CatchUpProvider" xml:space="preserve">
+    <value>Nhà cung cấp tóm tắt nhanh</value>
+    <comment>Catch-up provider</comment>
+  </data>
+  <data name="CatchUp_2" xml:space="preserve">
+    <value>Tóm tắt nhanh</value>
+    <comment>Catch-up</comment>
+  </data>
+  <data name="CatchUps" xml:space="preserve">
+    <value>Các bản tóm tắt nhanh</value>
+    <comment>Catch-ups</comment>
   </data>
   <data name="Change" xml:space="preserve">
     <value>Thay đổi</value>
@@ -558,6 +598,10 @@
     <value>Thu gọn</value>
     <comment>Collapse</comment>
   </data>
+  <data name="Collapsed" xml:space="preserve">
+    <value>Đã thu gọn</value>
+    <comment>Collapsed</comment>
+  </data>
   <data name="Compressing" xml:space="preserve">
     <value>Đang nén…</value>
     <comment>Compressing…</comment>
@@ -613,6 +657,10 @@
   <data name="CopyTheAnswer" xml:space="preserve">
     <value>Sao chép câu trả lời</value>
     <comment>Copy the answer</comment>
+  </data>
+  <data name="CopyTheCatchUp" xml:space="preserve">
+    <value>Sao chép bản tóm tắt nhanh</value>
+    <comment>Copy the catch-up</comment>
   </data>
   <data name="CopyTheTranscriptAndTheQuestionAsAPromptForAnyChatApp" xml:space="preserve">
     <value>Sao chép bản chép lời và câu hỏi thành lời nhắc cho bất kỳ ứng dụng trò chuyện nào</value>
@@ -1058,6 +1106,10 @@
     <value>Mở rộng</value>
     <comment>Expand</comment>
   </data>
+  <data name="Expanded" xml:space="preserve">
+    <value>Đã mở rộng</value>
+    <comment>Expanded</comment>
+  </data>
   <data name="ExtraHeaders" xml:space="preserve">
     <value>Header bổ sung</value>
     <comment>Extra headers</comment>
@@ -1189,6 +1241,10 @@
   <data name="Ignore" xml:space="preserve">
     <value>Bỏ qua</value>
     <comment>Ignore</comment>
+  </data>
+  <data name="InAppModelsAreNotOfferedTheLiveTranscriptHoldsTheModelDuring" xml:space="preserve">
+    <value>Không dùng các mô hình trong ứng dụng: chép lời trực tiếp chiếm giữ mô hình trong suốt lúc ghi âm.</value>
+    <comment>In-app models are not offered: the live transcript holds the model during a recording.</comment>
   </data>
   <data name="InEchoDiar" xml:space="preserve">
     <value>Trong EchoDiar</value>
@@ -1866,6 +1922,14 @@
     <value>Hiện không có gì khớp.</value>
     <comment>Nothing matches now.</comment>
   </data>
+  <data name="NothingNewSinceTheLastCatchUp" xml:space="preserve">
+    <value>Không có gì mới kể từ bản tóm tắt nhanh trước</value>
+    <comment>Nothing new since the last catch-up</comment>
+  </data>
+  <data name="NothingToCatchUpOnYet" xml:space="preserve">
+    <value>Chưa có gì để tóm tắt.</value>
+    <comment>Nothing to catch up on yet.</comment>
+  </data>
   <data name="NothingToDownloadRougherRankingThanTheModelsAbove" xml:space="preserve">
     <value>Không cần tải về. Xếp hạng kém chính xác hơn các mô hình ở trên.</value>
     <comment>Nothing to download. Rougher ranking than the models above.</comment>
@@ -1893,6 +1957,10 @@
   <data name="Off" xml:space="preserve">
     <value>Tắt</value>
     <comment>Off</comment>
+  </data>
+  <data name="OffEachCatchUpAddsWhatWasSaidSinceThePreviousOneOnEachOneRea" xml:space="preserve">
+    <value>Tắt: mỗi bản tóm tắt nhanh chỉ thêm những gì được nói kể từ bản trước. Bật: mỗi bản đọc lại toàn bộ bản ghi âm.</value>
+    <comment>Off: each catch-up adds what was said since the previous one. On: each one reads the whole recording again.</comment>
   </data>
   <data name="OffersToRecordWhenAMeetingAppStartsUsingTheMicrophone" xml:space="preserve">
     <value>Đề nghị ghi âm khi một ứng dụng họp bắt đầu dùng micrô.</value>
@@ -2194,6 +2262,10 @@
     <value>Trong hàng đợi</value>
     <comment>Queued</comment>
   </data>
+  <data name="QuickSummariesOfTheMeetingSoFarAskedForWhileRecording" xml:space="preserve">
+    <value>Tóm tắt nhanh cuộc họp đến thời điểm hiện tại, yêu cầu trong khi ghi âm.</value>
+    <comment>Quick summaries of the meeting so far, asked for while recording.</comment>
+  </data>
   <data name="Quit" xml:space="preserve">
     <value>Thoát</value>
     <comment>Quit</comment>
@@ -2221,6 +2293,10 @@
   <data name="ReSummarize" xml:space="preserve">
     <value>Tóm tắt lại</value>
     <comment>Re-summarize</comment>
+  </data>
+  <data name="ReSummarizeFromTheStartEachTime" xml:space="preserve">
+    <value>Tóm tắt lại từ đầu mỗi lần</value>
+    <comment>Re-summarize from the start each time</comment>
   </data>
   <data name="ReTranscribe" xml:space="preserve">
     <value>Chép lời lại</value>
@@ -2706,6 +2782,10 @@
     <value>Dừng câu trả lời</value>
     <comment>Stop the answer</comment>
   </data>
+  <data name="StopTheCatchUpAndKeepWhatIsWritten" xml:space="preserve">
+    <value>Dừng tóm tắt nhanh và giữ phần đã viết</value>
+    <comment>Stop the catch-up and keep what is written</comment>
+  </data>
   <data name="StopTheRecordingFirst" xml:space="preserve">
     <value>Hãy dừng ghi âm trước</value>
     <comment>Stop the recording first</comment>
@@ -2749,6 +2829,10 @@
   <data name="Summarize" xml:space="preserve">
     <value>Tóm tắt</value>
     <comment>Summarize</comment>
+  </data>
+  <data name="SummarizeTheMeetingSoFarMostlyItsLast5Minutes" xml:space="preserve">
+    <value>Tóm tắt cuộc họp đến lúc này, chủ yếu là 5 phút gần nhất</value>
+    <comment>Summarize the meeting so far, mostly its last 5 minutes</comment>
   </data>
   <data name="Summarizing" xml:space="preserve">
     <value>Đang tóm tắt</value>
@@ -3561,6 +3645,10 @@
   <data name="WouldDeleteNowLldConversations" xml:space="preserve">
     <value>Sẽ xoá ngay: {0} cuộc hội thoại</value>
     <comment>Would delete now: %lld conversations</comment>
+  </data>
+  <data name="WritingTheCatchUp" xml:space="preserve">
+    <value>Đang viết bản tóm tắt nhanh…</value>
+    <comment>Writing the catch-up…</comment>
   </data>
   <data name="WritingTheSummary" xml:space="preserve">
     <value>Đang viết bản tóm tắt…</value>

@@ -44,6 +44,12 @@ struct AIPanelView: View {
     @State private var hoveredEntry: UUID?
     /// The first `load` has returned; until then the tab shows `DetailLoadingPane`.
     @State private var loaded = false
+    /// The catch-ups written while it was recorded (its `catchups.json`), oldest first.
+    @State private var catchUps: [CatchUp] = []
+    /// The Catch-ups section under the summary is open.
+    @State private var showingCatchUps = false
+    /// The open state the user gave catch-up cards with a click; the others: the newest open, the older ones collapsed.
+    @State private var catchUpOpenStates: [UUID: Bool] = [:]
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     private static let chatEnd = "chatEnd"
@@ -94,6 +100,8 @@ struct AIPanelView: View {
                           jobsEnded: model.aiJobEnds[conversation.id] ?? 0)) { await load() }
         // Start fresh, Resume and a new title: the chat and the history only (`load()` resets the shown version).
         .task(id: HistoryKey(id: conversation.id, changes: model.chatHistoryChanges)) { await loadChat() }
+        // Again when a catch-up still writing at Stop saves its card.
+        .task(id: CatchUpKey(id: conversation.id, saved: model.recordingCatchUps.count)) { await loadCatchUps() }
         // A new conversation rebuilds the view (`MainView` gives it the conversation's id), which closes the panel too.
         .onChange(of: model.detailTab) { _, new in
             if new != .chat { showingHistory = false }
@@ -109,6 +117,11 @@ struct AIPanelView: View {
     private struct HistoryKey: Equatable {
         let id: UUID
         let changes: Int
+    }
+
+    private struct CatchUpKey: Equatable {
+        let id: UUID
+        let saved: Int
     }
 
     // MARK: - Chat
@@ -316,10 +329,11 @@ struct AIPanelView: View {
 
     // MARK: - Summary
 
-    /// The summary with the version menu pinned above it, or a note in the middle while there is none.
+    /// The summary with the version menu pinned above it, then the catch-ups if any; a note in the middle while there
+    /// are neither.
     private var summaryPane: some View {
         Group {
-            if summaryJob == nil && summaries.isEmpty {
+            if summaryJob == nil && summaries.isEmpty && catchUps.isEmpty {
                 Text(emptyNote ?? "No summary yet.")
                     .foregroundStyle(.secondary)
                     .multilineTextAlignment(.center)
@@ -347,6 +361,13 @@ struct AIPanelView: View {
                                 }
                             } else if let shown = shownSummary {
                                 MarkdownText(text: shown.text)
+                            } else {
+                                Text(emptyNote ?? "No summary yet.")
+                                    .foregroundStyle(.secondary)
+                            }
+                            if !catchUps.isEmpty {
+                                catchUpsSection
+                                    .padding(.top, 12)
                             }
                         }
                         .padding(.horizontal, 14)
@@ -399,6 +420,44 @@ struct AIPanelView: View {
          version.stopped ? String(localized: "Stopped") : nil]
             .compactMap { $0 }
             .joined(separator: " · ")
+    }
+
+    /// The catch-ups written while recording, read-only and collapsed until its header is clicked: newest first, the
+    /// newest open and the others collapsed, each opening or closing with a click on its header, each with Copy.
+    private var catchUpsSection: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Button {
+                withAnimation(reduceMotion ? nil : Motion.standard) { showingCatchUps.toggle() }
+            } label: {
+                HStack(spacing: 6) {
+                    Image(systemName: showingCatchUps ? "chevron.down" : "chevron.right")
+                        .font(.system(size: 10, weight: .bold))
+                        .frame(width: 12)
+                        .foregroundStyle(.secondary)
+                    Text("Catch-ups").font(.headline)
+                    Text(catchUps.count, format: .number)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                    Spacer(minLength: 0)
+                }
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .accessibilityValue(showingCatchUps ? Text("Expanded") : Text("Collapsed"))
+            if showingCatchUps {
+                let providers = model.aiProviders
+                ForEach(Array(catchUps.reversed().enumerated()), id: \.element.id) { index, catchUp in
+                    let open = catchUpOpenStates[catchUp.id] ?? (index == 0)
+                    CatchUpCardView(
+                        card: CatchUpCard(catchUp, providers: providers),
+                        open: open,
+                        toggle: {
+                            withAnimation(reduceMotion ? nil : Motion.standard) { catchUpOpenStates[catchUp.id] = !open }
+                        },
+                        stop: {})
+                }
+            }
+        }
     }
 
     /// Why nothing can run for this conversation.
@@ -570,8 +629,8 @@ struct AIPanelView: View {
     /// Where the data goes with the current provider: off this Mac, and how far a CLI agent is contained.
     @ViewBuilder private var dataNotes: some View {
         let provider = model.currentAIProvider
-        if let provider, provider.leavesMac {
-            Label("Data sent to \(provider.name) leaves this Mac.", systemImage: "info.circle")
+        if let note = provider?.leavesMacNote {
+            Label(note, systemImage: "info.circle")
         }
         if let note = containmentNote {
             Label(note, systemImage: "exclamationmark.shield")
@@ -579,7 +638,7 @@ struct AIPanelView: View {
     }
 
     private var containmentNote: String? {
-        model.currentAIProvider?.cliPreset.flatMap(CLIRunner.containmentNote(for:))
+        model.currentAIProvider?.containmentNote
     }
 
     private var hasDataNotes: Bool {
@@ -631,12 +690,14 @@ struct AIPanelView: View {
 
     private func load() async {
         let folder = conversation.folder
-        let (loaded, versions, messages) = await Task.detached(priority: .utility) {
+        // The catch-ups too, so the summary tab shows them with the summary, not a moment after it.
+        let (loaded, versions, messages, catchUpLog) = await Task.detached(priority: .utility) {
             (try? Transcript.read(from: folder), Conversation.readSummaryVersions(from: folder),
-             ChatLog.read(from: folder).messages)
+             ChatLog.read(from: folder).messages, try? CatchUpLog.load(from: folder))
         }.value
         guard !Task.isCancelled else { return }
         (transcript, summaries, summary, chat) = (loaded, versions, versions.last?.text, messages)
+        catchUps = catchUpLog?.catchUps ?? []
         shownVersion = nil
         self.loaded = true
     }
@@ -648,6 +709,14 @@ struct AIPanelView: View {
         }.value
         guard !Task.isCancelled else { return }
         (chat, chatTitle, archives) = (log.messages, log.title, entries)
+    }
+
+    /// The conversation's catch-ups; none when its `catchups.json` is missing or unreadable.
+    private func loadCatchUps() async {
+        let folder = conversation.folder
+        let log = await Task.detached(priority: .utility) { try? CatchUpLog.load(from: folder) }.value
+        guard !Task.isCancelled else { return }
+        catchUps = log?.catchUps ?? []
     }
 
     private func start(_ kind: AppModel.AIJob.Kind) {

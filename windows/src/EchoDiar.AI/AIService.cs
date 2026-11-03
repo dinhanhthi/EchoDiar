@@ -261,9 +261,10 @@ public sealed class AIService(ModelLoadGate gate)
                 (text, cut) = (interrupted.Text, true);
             }
             if (job.Token.IsCancellationRequested && !job.IsStopped) throw new OperationCanceledException(job.Token);
+            // Saved under the job's id, so the card shown while it streams keeps its state once saved (as on macOS).
             AppendCatchUp(folder, new CatchUp
             {
-                CreatedAt = asked, Elapsed = elapsed, ThroughLineID = plan.ThroughLineID, ThroughTime = plan.ThroughTime,
+                Id = job.Id, CreatedAt = asked, Elapsed = elapsed, ThroughLineID = plan.ThroughLineID, ThroughTime = plan.ThroughTime,
                 FullPass = plan.FullPass, Text = text, Provider = providerID, Model = model, Stopped = cut,
             });
         }, cancellationToken);

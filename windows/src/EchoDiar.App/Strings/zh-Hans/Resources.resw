@@ -58,6 +58,10 @@
   <resheader name="writer">
     <value>System.Resources.ResXResourceWriter, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
   </resheader>
+  <data name="ACatchUpIsBeingWritten" xml:space="preserve">
+    <value>正在撰写回顾。</value>
+    <comment>A catch-up is being written.</comment>
+  </data>
   <data name="ACloudProviderReceivesTheTranscriptsAndSummariesToIndexAndEa" xml:space="preserve">
     <value>云端提供商会收到要编入索引的转写文本和摘要，以及每个问题。</value>
     <comment>A cloud provider receives the transcripts and summaries to index, and each question.</comment>
@@ -362,6 +366,14 @@
     <value>自动 = 摘要使用转写文本的语言，回答使用问题的语言。</value>
     <comment>Auto = the transcript's language for summaries, the question's for answers.</comment>
   </data>
+  <data name="Automatic" xml:space="preserve">
+    <value>自动</value>
+    <comment>Automatic</comment>
+  </data>
+  <data name="Automatic_2" xml:space="preserve">
+    <value>自动（{0}）</value>
+    <comment>Automatic (%@)</comment>
+  </data>
   <data name="Available" xml:space="preserve">
     <value>可用</value>
     <comment>Available</comment>
@@ -441,6 +453,34 @@
   <data name="CannotBeRecordedOnItsOwnAllSystemAudioWillBeRecorded" xml:space="preserve">
     <value>无法单独录制 {0}：将录制全部系统音频。</value>
     <comment>%@ cannot be recorded on its own: all system audio will be recorded.</comment>
+  </data>
+  <data name="CatchUp" xml:space="preserve">
+    <value>快速回顾</value>
+    <comment>Catch up</comment>
+  </data>
+  <data name="CatchUpAt" xml:space="preserve">
+    <value>{0} 时的回顾</value>
+    <comment>Catch-up at %@</comment>
+  </data>
+  <data name="CatchUpModel" xml:space="preserve">
+    <value>回顾模型</value>
+    <comment>Catch-up model</comment>
+  </data>
+  <data name="CatchUpNeedsAnAIProviderOutsideTheAppACloudAPIALocalServerOr" xml:space="preserve">
+    <value>快速回顾需要应用之外的 AI 提供商：云端 API、本地服务器或命令行工具。请在“设置 › AI”中添加一个。</value>
+    <comment>Catch up needs an AI provider outside the app: a cloud API, a local server or a command-line tool. Add one in Settings › AI.</comment>
+  </data>
+  <data name="CatchUpProvider" xml:space="preserve">
+    <value>回顾提供商</value>
+    <comment>Catch-up provider</comment>
+  </data>
+  <data name="CatchUp_2" xml:space="preserve">
+    <value>回顾</value>
+    <comment>Catch-up</comment>
+  </data>
+  <data name="CatchUps" xml:space="preserve">
+    <value>回顾</value>
+    <comment>Catch-ups</comment>
   </data>
   <data name="Change" xml:space="preserve">
     <value>更改</value>
@@ -558,6 +598,10 @@
     <value>折叠</value>
     <comment>Collapse</comment>
   </data>
+  <data name="Collapsed" xml:space="preserve">
+    <value>已折叠</value>
+    <comment>Collapsed</comment>
+  </data>
   <data name="Compressing" xml:space="preserve">
     <value>正在压缩…</value>
     <comment>Compressing…</comment>
@@ -613,6 +657,10 @@
   <data name="CopyTheAnswer" xml:space="preserve">
     <value>拷贝回答</value>
     <comment>Copy the answer</comment>
+  </data>
+  <data name="CopyTheCatchUp" xml:space="preserve">
+    <value>拷贝回顾</value>
+    <comment>Copy the catch-up</comment>
   </data>
   <data name="CopyTheTranscriptAndTheQuestionAsAPromptForAnyChatApp" xml:space="preserve">
     <value>将转写文本和问题拷贝为提示词，用于任意聊天应用</value>
@@ -1058,6 +1106,10 @@
     <value>展开</value>
     <comment>Expand</comment>
   </data>
+  <data name="Expanded" xml:space="preserve">
+    <value>已展开</value>
+    <comment>Expanded</comment>
+  </data>
   <data name="ExtraHeaders" xml:space="preserve">
     <value>额外标头</value>
     <comment>Extra headers</comment>
@@ -1189,6 +1241,10 @@
   <data name="Ignore" xml:space="preserve">
     <value>忽略</value>
     <comment>Ignore</comment>
+  </data>
+  <data name="InAppModelsAreNotOfferedTheLiveTranscriptHoldsTheModelDuring" xml:space="preserve">
+    <value>不提供应用内模型：录音期间实时转写会占用模型。</value>
+    <comment>In-app models are not offered: the live transcript holds the model during a recording.</comment>
   </data>
   <data name="InEchoDiar" xml:space="preserve">
     <value>在 EchoDiar 中</value>
@@ -1866,6 +1922,14 @@
     <value>目前没有匹配项。</value>
     <comment>Nothing matches now.</comment>
   </data>
+  <data name="NothingNewSinceTheLastCatchUp" xml:space="preserve">
+    <value>自上次回顾以来没有新内容</value>
+    <comment>Nothing new since the last catch-up</comment>
+  </data>
+  <data name="NothingToCatchUpOnYet" xml:space="preserve">
+    <value>暂时还没有可回顾的内容。</value>
+    <comment>Nothing to catch up on yet.</comment>
+  </data>
   <data name="NothingToDownloadRougherRankingThanTheModelsAbove" xml:space="preserve">
     <value>无需下载。排序比上方的模型粗略。</value>
     <comment>Nothing to download. Rougher ranking than the models above.</comment>
@@ -1893,6 +1957,10 @@
   <data name="Off" xml:space="preserve">
     <value>关闭</value>
     <comment>Off</comment>
+  </data>
+  <data name="OffEachCatchUpAddsWhatWasSaidSinceThePreviousOneOnEachOneRea" xml:space="preserve">
+    <value>关闭：每次回顾只补充上次之后说的内容。打开：每次都重新读取整段录音。</value>
+    <comment>Off: each catch-up adds what was said since the previous one. On: each one reads the whole recording again.</comment>
   </data>
   <data name="OffersToRecordWhenAMeetingAppStartsUsingTheMicrophone" xml:space="preserve">
     <value>会议应用开始使用麦克风时提示录制。</value>
@@ -2194,6 +2262,10 @@
     <value>已排队</value>
     <comment>Queued</comment>
   </data>
+  <data name="QuickSummariesOfTheMeetingSoFarAskedForWhileRecording" xml:space="preserve">
+    <value>录音时随时生成的会议至今快速摘要。</value>
+    <comment>Quick summaries of the meeting so far, asked for while recording.</comment>
+  </data>
   <data name="Quit" xml:space="preserve">
     <value>退出</value>
     <comment>Quit</comment>
@@ -2221,6 +2293,10 @@
   <data name="ReSummarize" xml:space="preserve">
     <value>重新生成摘要</value>
     <comment>Re-summarize</comment>
+  </data>
+  <data name="ReSummarizeFromTheStartEachTime" xml:space="preserve">
+    <value>每次都从头重新生成摘要</value>
+    <comment>Re-summarize from the start each time</comment>
   </data>
   <data name="ReTranscribe" xml:space="preserve">
     <value>重新转写</value>
@@ -2706,6 +2782,10 @@
     <value>停止回答</value>
     <comment>Stop the answer</comment>
   </data>
+  <data name="StopTheCatchUpAndKeepWhatIsWritten" xml:space="preserve">
+    <value>停止回顾并保留已写出的内容</value>
+    <comment>Stop the catch-up and keep what is written</comment>
+  </data>
   <data name="StopTheRecordingFirst" xml:space="preserve">
     <value>请先停止录音</value>
     <comment>Stop the recording first</comment>
@@ -2749,6 +2829,10 @@
   <data name="Summarize" xml:space="preserve">
     <value>生成摘要</value>
     <comment>Summarize</comment>
+  </data>
+  <data name="SummarizeTheMeetingSoFarMostlyItsLast5Minutes" xml:space="preserve">
+    <value>总结会议至今的内容，重点是最近 5 分钟</value>
+    <comment>Summarize the meeting so far, mostly its last 5 minutes</comment>
   </data>
   <data name="Summarizing" xml:space="preserve">
     <value>正在生成摘要</value>
@@ -3561,6 +3645,10 @@
   <data name="WouldDeleteNowLldConversations" xml:space="preserve">
     <value>现在将删除：{0} 个对话</value>
     <comment>Would delete now: %lld conversations</comment>
+  </data>
+  <data name="WritingTheCatchUp" xml:space="preserve">
+    <value>正在撰写回顾…</value>
+    <comment>Writing the catch-up…</comment>
   </data>
   <data name="WritingTheSummary" xml:space="preserve">
     <value>正在撰写摘要…</value>

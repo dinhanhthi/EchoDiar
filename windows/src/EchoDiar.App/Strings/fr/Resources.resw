@@ -58,6 +58,10 @@
   <resheader name="writer">
     <value>System.Resources.ResXResourceWriter, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
   </resheader>
+  <data name="ACatchUpIsBeingWritten" xml:space="preserve">
+    <value>Un récapitulatif est en cours de rédaction.</value>
+    <comment>A catch-up is being written.</comment>
+  </data>
   <data name="ACloudProviderReceivesTheTranscriptsAndSummariesToIndexAndEa" xml:space="preserve">
     <value>Un fournisseur cloud reçoit les transcriptions et les résumés à indexer, ainsi que chaque question.</value>
     <comment>A cloud provider receives the transcripts and summaries to index, and each question.</comment>
@@ -386,6 +390,14 @@
     <value>Auto = la langue de la transcription pour les résumés, celle de la question pour les réponses.</value>
     <comment>Auto = the transcript's language for summaries, the question's for answers.</comment>
   </data>
+  <data name="Automatic" xml:space="preserve">
+    <value>Automatique</value>
+    <comment>Automatic</comment>
+  </data>
+  <data name="Automatic_2" xml:space="preserve">
+    <value>Automatique ({0})</value>
+    <comment>Automatic (%@)</comment>
+  </data>
   <data name="Available" xml:space="preserve">
     <value>Disponible</value>
     <comment>Available</comment>
@@ -465,6 +477,34 @@
   <data name="CannotBeRecordedOnItsOwnAllSystemAudioWillBeRecorded" xml:space="preserve">
     <value>{0} ne peut pas être enregistré seul : tout l’audio du système sera enregistré.</value>
     <comment>%@ cannot be recorded on its own: all system audio will be recorded.</comment>
+  </data>
+  <data name="CatchUp" xml:space="preserve">
+    <value>Récapituler</value>
+    <comment>Catch up</comment>
+  </data>
+  <data name="CatchUpAt" xml:space="preserve">
+    <value>Récapitulatif à {0}</value>
+    <comment>Catch-up at %@</comment>
+  </data>
+  <data name="CatchUpModel" xml:space="preserve">
+    <value>Modèle du récapitulatif</value>
+    <comment>Catch-up model</comment>
+  </data>
+  <data name="CatchUpNeedsAnAIProviderOutsideTheAppACloudAPIALocalServerOr" xml:space="preserve">
+    <value>Récapituler nécessite un fournisseur d’IA hors de l’app : une API cloud, un serveur local ou un outil en ligne de commande. Ajoutez-en un dans Réglages › IA.</value>
+    <comment>Catch up needs an AI provider outside the app: a cloud API, a local server or a command-line tool. Add one in Settings › AI.</comment>
+  </data>
+  <data name="CatchUpProvider" xml:space="preserve">
+    <value>Fournisseur du récapitulatif</value>
+    <comment>Catch-up provider</comment>
+  </data>
+  <data name="CatchUp_2" xml:space="preserve">
+    <value>Récapitulatif</value>
+    <comment>Catch-up</comment>
+  </data>
+  <data name="CatchUps" xml:space="preserve">
+    <value>Récapitulatifs</value>
+    <comment>Catch-ups</comment>
   </data>
   <data name="Change" xml:space="preserve">
     <value>Modifier</value>
@@ -582,6 +622,10 @@
     <value>Réduire</value>
     <comment>Collapse</comment>
   </data>
+  <data name="Collapsed" xml:space="preserve">
+    <value>Replié</value>
+    <comment>Collapsed</comment>
+  </data>
   <data name="Compressing" xml:space="preserve">
     <value>Compression…</value>
     <comment>Compressing…</comment>
@@ -637,6 +681,10 @@
   <data name="CopyTheAnswer" xml:space="preserve">
     <value>Copier la réponse</value>
     <comment>Copy the answer</comment>
+  </data>
+  <data name="CopyTheCatchUp" xml:space="preserve">
+    <value>Copier le récapitulatif</value>
+    <comment>Copy the catch-up</comment>
   </data>
   <data name="CopyTheTranscriptAndTheQuestionAsAPromptForAnyChatApp" xml:space="preserve">
     <value>Copier la transcription et la question comme prompt pour n’importe quelle app de discussion</value>
@@ -1106,6 +1154,10 @@
     <value>Développer</value>
     <comment>Expand</comment>
   </data>
+  <data name="Expanded" xml:space="preserve">
+    <value>Développé</value>
+    <comment>Expanded</comment>
+  </data>
   <data name="ExtraHeaders" xml:space="preserve">
     <value>En-têtes supplémentaires</value>
     <comment>Extra headers</comment>
@@ -1237,6 +1289,10 @@
   <data name="Ignore" xml:space="preserve">
     <value>Ignorer</value>
     <comment>Ignore</comment>
+  </data>
+  <data name="InAppModelsAreNotOfferedTheLiveTranscriptHoldsTheModelDuring" xml:space="preserve">
+    <value>Les modèles intégrés à l’app ne sont pas proposés : la transcription en direct occupe le modèle pendant un enregistrement.</value>
+    <comment>In-app models are not offered: the live transcript holds the model during a recording.</comment>
   </data>
   <data name="InEchoDiar" xml:space="preserve">
     <value>Dans EchoDiar</value>
@@ -1958,6 +2014,14 @@
     <value>Rien ne correspond pour l’instant.</value>
     <comment>Nothing matches now.</comment>
   </data>
+  <data name="NothingNewSinceTheLastCatchUp" xml:space="preserve">
+    <value>Rien de nouveau depuis le dernier récapitulatif</value>
+    <comment>Nothing new since the last catch-up</comment>
+  </data>
+  <data name="NothingToCatchUpOnYet" xml:space="preserve">
+    <value>Rien à récapituler pour l’instant.</value>
+    <comment>Nothing to catch up on yet.</comment>
+  </data>
   <data name="NothingToDownloadRougherRankingThanTheModelsAbove" xml:space="preserve">
     <value>Rien à télécharger. Classement plus approximatif que les modèles ci-dessus.</value>
     <comment>Nothing to download. Rougher ranking than the models above.</comment>
@@ -1985,6 +2049,10 @@
   <data name="Off" xml:space="preserve">
     <value>Désactivé</value>
     <comment>Off</comment>
+  </data>
+  <data name="OffEachCatchUpAddsWhatWasSaidSinceThePreviousOneOnEachOneRea" xml:space="preserve">
+    <value>Désactivé : chaque récapitulatif ajoute ce qui a été dit depuis le précédent. Activé : chacun relit tout l’enregistrement.</value>
+    <comment>Off: each catch-up adds what was said since the previous one. On: each one reads the whole recording again.</comment>
   </data>
   <data name="OffersToRecordWhenAMeetingAppStartsUsingTheMicrophone" xml:space="preserve">
     <value>Propose d’enregistrer quand une app de réunion commence à utiliser le microphone.</value>
@@ -2286,6 +2354,10 @@
     <value>En file d’attente</value>
     <comment>Queued</comment>
   </data>
+  <data name="QuickSummariesOfTheMeetingSoFarAskedForWhileRecording" xml:space="preserve">
+    <value>Résumés rapides de la réunion jusqu’ici, demandés pendant l’enregistrement.</value>
+    <comment>Quick summaries of the meeting so far, asked for while recording.</comment>
+  </data>
   <data name="Quit" xml:space="preserve">
     <value>Quitter</value>
     <comment>Quit</comment>
@@ -2313,6 +2385,10 @@
   <data name="ReSummarize" xml:space="preserve">
     <value>Résumer à nouveau</value>
     <comment>Re-summarize</comment>
+  </data>
+  <data name="ReSummarizeFromTheStartEachTime" xml:space="preserve">
+    <value>Résumer à nouveau depuis le début à chaque fois</value>
+    <comment>Re-summarize from the start each time</comment>
   </data>
   <data name="ReTranscribe" xml:space="preserve">
     <value>Retranscrire</value>
@@ -2798,6 +2874,10 @@
     <value>Arrêter la réponse</value>
     <comment>Stop the answer</comment>
   </data>
+  <data name="StopTheCatchUpAndKeepWhatIsWritten" xml:space="preserve">
+    <value>Arrêter le récapitulatif et garder ce qui est écrit</value>
+    <comment>Stop the catch-up and keep what is written</comment>
+  </data>
   <data name="StopTheRecordingFirst" xml:space="preserve">
     <value>Arrêtez d’abord l’enregistrement</value>
     <comment>Stop the recording first</comment>
@@ -2841,6 +2921,10 @@
   <data name="Summarize" xml:space="preserve">
     <value>Résumer</value>
     <comment>Summarize</comment>
+  </data>
+  <data name="SummarizeTheMeetingSoFarMostlyItsLast5Minutes" xml:space="preserve">
+    <value>Résumer la réunion jusqu’ici, surtout ses 5 dernières minutes</value>
+    <comment>Summarize the meeting so far, mostly its last 5 minutes</comment>
   </data>
   <data name="Summarizing" xml:space="preserve">
     <value>Résumé en cours</value>
@@ -3685,6 +3769,10 @@
   <data name="WouldDeleteNowLldConversations__One" xml:space="preserve">
     <value>Supprimerait maintenant : {0} conversation</value>
     <comment>Would delete now: %lld conversations</comment>
+  </data>
+  <data name="WritingTheCatchUp" xml:space="preserve">
+    <value>Rédaction du récapitulatif…</value>
+    <comment>Writing the catch-up…</comment>
   </data>
   <data name="WritingTheSummary" xml:space="preserve">
     <value>Rédaction du résumé…</value>

@@ -166,8 +166,9 @@ public actor AIService {
 
     /// Streams a catch-up while recording: `messages` (`PromptBuilder.catchUpMessages` of `plan`), then appends a
     /// `CatchUp` covering `plan` to `folder`'s `catchups.json`, also when stopped with some text (`stopped`).
-    /// `providerID` is saved with it and `elapsed` (seconds of recording when it was asked for) too. Fails at once
-    /// with an in-app model (`LocalLLMProvider`): the live transcriber holds the model gate for the whole recording.
+    /// `providerID` is saved with it and `elapsed` (seconds of recording when it was asked for) too; its id is `jobID`,
+    /// so the card shown while it streams keeps its state once saved. Fails at once with an in-app model
+    /// (`LocalLLMProvider`): the live transcriber holds the model gate for the whole recording.
     public nonisolated func catchUp(
         plan: CatchUpPlan, messages: [LLMMessage], provider: any LLMProvider, providerID: String, model: String,
         elapsed: TimeInterval, folder: URL, jobID: UUID = UUID()
@@ -189,8 +190,9 @@ public actor AIService {
             }
             if Task.isCancelled && !isStopped() { throw CancellationError() }
             try await appendCatchUp(CatchUp(
-                createdAt: asked, elapsed: elapsed, throughLineID: plan.throughLineID, throughTime: plan.throughTime,
-                fullPass: plan.fullPass, text: text, provider: providerID, model: model, stopped: cut), folder: folder)
+                id: jobID, createdAt: asked, elapsed: elapsed, throughLineID: plan.throughLineID,
+                throughTime: plan.throughTime, fullPass: plan.fullPass, text: text, provider: providerID, model: model,
+                stopped: cut), folder: folder)
         }
     }
 

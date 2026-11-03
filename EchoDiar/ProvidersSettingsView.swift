@@ -44,6 +44,7 @@ struct ProvidersSettingsView: View {
             case .onThisMac:
                 llmSection
                 chatSection
+                catchUpSection
                 localHosts
             case .cloudAPIs:
                 dataLeavesNotice
@@ -134,6 +135,100 @@ struct ProvidersSettingsView: View {
         } header: {
             SectionHeader(title: "Chat", description: "Earlier messages sent with each question.")
         }
+    }
+
+    // MARK: - Catch-up
+
+    /// Where "Catch up" runs while recording: a provider outside the app (as `AppModel.catchUpProvider` resolves it),
+    /// its model, and whether each catch-up reads the recording from the start.
+    private var catchUpSection: some View {
+        let external = catchUpProviders
+        let picked = external.first { $0.id == model.settings.catchUpProviderID }
+        return Section {
+            Picker("Catch-up provider", selection: catchUpProviderBinding(external)) {
+                if let automatic = automaticCatchUpProvider(external) {
+                    let label = String(localized: "Automatic (\(automatic.name))")
+                    Text(automatic.leavesMac ? String(localized: "\(label) (leaves this Mac)") : label).tag("")
+                } else {
+                    Text("Automatic").tag("")
+                }
+                ForEach(external) { provider in
+                    Text(provider.leavesMac ? String(localized: "\(provider.name) (leaves this Mac)") : provider.name)
+                        .tag(provider.id)
+                }
+            }
+            .disabled(external.isEmpty)
+            if let picked {
+                Picker("Catch-up model", selection: catchUpModelBinding) {
+                    Text("Automatic").tag("")
+                    ForEach(catchUpModels(picked), id: \.self) { id in Text(id).tag(id) }
+                }
+            }
+            // As the AI pane's data notes, for the provider a catch-up runs on.
+            if let note = model.catchUpProvider?.leavesMacNote {
+                Label(note, systemImage: "info.circle")
+                    .foregroundStyle(.secondary)
+            }
+            if let note = model.catchUpProvider?.containmentNote {
+                Label(note, systemImage: "exclamationmark.shield")
+                    .foregroundStyle(.secondary)
+            }
+            if external.isEmpty {
+                Text("Catch up needs an AI provider outside the app: a cloud API, a local server or a command-line tool. Add one in Settings › AI.")
+                    .foregroundStyle(.secondary)
+            }
+            Toggle(isOn: model.setting(\.catchUpFromStart)) {
+                Text("Re-summarize from the start each time")
+                Text("Off: each catch-up adds what was said since the previous one. On: each one reads the whole recording again.")
+            }
+            Label("In-app models are not offered: the live transcript holds the model during a recording.",
+                  systemImage: "info.circle")
+                .foregroundStyle(.secondary)
+        } header: {
+            SectionHeader(title: "Catch-up", description: "Quick summaries of the meeting so far, asked for while recording.")
+        }
+    }
+
+    /// The usable providers outside the app, as `AppModel.catchUpProvider` filters them.
+    private var catchUpProviders: [AppModel.AIProvider] {
+        model.aiProviders.filter { $0.kind != .inApp && $0.unavailableReason == nil }
+    }
+
+    /// What "Automatic" runs, as `AppModel.catchUpProvider` resolves it with no provider picked.
+    private func automaticCatchUpProvider(_ external: [AppModel.AIProvider]) -> AppModel.AIProvider? {
+        if let main = model.currentAIProvider, main.kind != .inApp { return main }
+        return external.first
+    }
+
+    /// The picked provider, "Automatic" when it is not usable now (as `catchUpProvider` then runs); picking one
+    /// clears the model picked for the previous one.
+    private func catchUpProviderBinding(_ external: [AppModel.AIProvider]) -> Binding<String> {
+        Binding(
+            get: {
+                let id = model.settings.catchUpProviderID
+                return external.contains { $0.id == id } ? id : ""
+            },
+            set: { id in
+                model.updateSettings {
+                    $0.catchUpProviderID = id
+                    $0.catchUpModel = ""
+                }
+            })
+    }
+
+    private var catchUpModelBinding: Binding<String> {
+        Binding(
+            get: { model.settings.catchUpModel.trimmingCharacters(in: .whitespacesAndNewlines) },
+            set: { id in model.updateSettings { $0.catchUpModel = id } })
+    }
+
+    /// `provider`'s models without a CLI's own default ("Automatic" covers it), then the saved pick when it is no
+    /// longer listed, so the picker shows what runs.
+    private func catchUpModels(_ provider: AppModel.AIProvider) -> [String] {
+        var ids = provider.models.filter { !$0.isEmpty }
+        let saved = model.settings.catchUpModel.trimmingCharacters(in: .whitespacesAndNewlines)
+        if !saved.isEmpty && !ids.contains(saved) { ids.append(saved) }
+        return ids
     }
 
     // MARK: - Local hosts

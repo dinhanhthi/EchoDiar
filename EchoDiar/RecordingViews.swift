@@ -163,8 +163,8 @@ struct RecordingCard: View {
     }
 }
 
-/// The recording in the library page's detail: the header, the calendar suggestion if any, then the live transcript,
-/// or the wave and why there is none
+/// The recording in the library page's detail: the header, the calendar suggestion if any, the catch-ups if any,
+/// then the live transcript, or the wave and why there is none
 /// (the conditions of `AppModel.startRecordingTranscriber`, read from the settings), with the Settings page that
 /// changes it.
 struct RecordingDetailView: View {
@@ -174,12 +174,13 @@ struct RecordingDetailView: View {
         VStack(spacing: 12) {
             RecordingHeader(model: model)
             if let event = model.calendarSuggestion { suggestionRow(event) }
+            CatchUpPanel(model: model)
             if let captions = model.recordingCaptions {
                 LiveTranscriptView(snapshot: captions)
             } else {
                 VStack(spacing: 16) {
                     RecordingWave(model: model)
-                    Text(noCaptionsReason)
+                    Text(Self.noCaptionsReason(settings: model.settings))
                         .font(.callout)
                         .foregroundStyle(.secondary)
                         .multilineTextAlignment(.center)
@@ -215,13 +216,14 @@ struct RecordingDetailView: View {
         .modifier(GlassCard(cornerRadius: 14))
     }
 
-    private var noCaptionsReason: LocalizedStringKey {
-        if !model.settings.autoTranscribe {
-            "Transcription is off. Turn on Transcribe automatically in Settings › Recording."
-        } else if !model.settings.transcribeWhileRecording {
-            "Transcribe while recording is off. Turn it on in Settings › Transcription."
+    /// Why the recording has no live transcript, from `settings`; also why "Catch up" cannot run.
+    static func noCaptionsReason(settings: AppSettings) -> String {
+        if !settings.autoTranscribe {
+            String(localized: "Transcription is off. Turn on Transcribe automatically in Settings › Recording.")
+        } else if !settings.transcribeWhileRecording {
+            String(localized: "Transcribe while recording is off. Turn it on in Settings › Transcription.")
         } else {
-            "This engine transcribes after Stop. WhisperKit and Parakeet models, and Apple Speech (macOS 26+), also show the transcript while recording."
+            String(localized: "This engine transcribes after Stop. WhisperKit and Parakeet models, and Apple Speech (macOS 26+), also show the transcript while recording.")
         }
     }
 
@@ -346,7 +348,7 @@ struct RecordingHeader: View {
                     .allowsHitTesting(false))
     }
 
-    /// The state icon, elapsed clock and state, the meters and the language.
+    /// The state icon, elapsed clock and state, the meters, "Catch up" and the language.
     private func statusRow(paused: Bool) -> some View {
         HStack(spacing: 10) {
             Image(systemName: paused ? "pause.circle.fill" : "record.circle.fill")
@@ -362,6 +364,7 @@ struct RecordingHeader: View {
             if live && !paused {
                 ChannelMeters(feed: model.levels)
             }
+            CatchUpButton(model: model)
             languageMenu
         }
     }

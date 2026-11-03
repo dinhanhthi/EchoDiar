@@ -132,6 +132,11 @@ final class AppModel {
     /// A calendar event the current recording, started without one and still untitled, likely belongs to: the
     /// recording page offers to rename the recording after it.
     private(set) var calendarSuggestion: CalendarEvent?
+    /// The current recording's catch-up being written (or the last one that failed); nil otherwise. Apart from
+    /// `aiJobs`, so the summary and a catch-up never stop each other.
+    private(set) var catchUpRun: CatchUpRun?
+    /// The current recording's saved catch-ups (its `catchups.json`), oldest first.
+    private(set) var recordingCatchUps: [CatchUp] = []
     /// The app whose detection ("Always") started the recording, or the calendar event's title for a calendar start:
     /// the pill shows "Recording <name>" for its first 10 s even when the indicator is hidden.
     private(set) var autoStartedAppName: String?
@@ -188,6 +193,27 @@ final class AppModel {
 
     typealias AIJobs = AIJobTable<AIJob>
 
+    /// A catch-up of the current recording (`startCatchUp`): its `AIService` job id, for `aiService.stop(_:)`.
+    struct CatchUpRun {
+        enum Status: Equatable { case starting, streaming, failed }
+        let jobID: UUID
+        /// Seconds of recording when it was asked for, for its card.
+        let elapsed: Double
+        /// The provider's name and the model it runs, for its card's header.
+        let providerName: String
+        let model: String
+        var status: Status = .starting
+        /// The text streamed so far (every 50 ms), Markdown.
+        var text = ""
+        /// What the job is doing before its text starts.
+        var statusLine: String?
+        var error: String?
+        /// Stop was asked for: the text streamed until then is saved, marked stopped.
+        var stopping = false
+
+        var isRunning: Bool { status != .failed }
+    }
+
     /// A provider the AI tab offers: an in-app model (LLM catalog entry id) or a configured `ProviderConfig`.
     struct AIProvider: Identifiable {
         enum Kind { case inApp, localHost, cloud, cli }
@@ -205,6 +231,12 @@ final class AppModel {
         var remoteHost = false
 
         var leavesMac: Bool { kind == .cloud || kind == .cli || remoteHost }
+
+        /// "Data sent to <name> leaves this Mac." when it does.
+        var leavesMacNote: String? { leavesMac ? String(localized: "Data sent to \(name) leaves this Mac.") : nil }
+
+        /// How far a CLI agent is contained (`CLIRunner.containmentNote`); nil for the others.
+        var containmentNote: String? { cliPreset.flatMap(CLIRunner.containmentNote(for:)) }
 
         /// Whether `baseURL`'s host is this Mac: localhost, 127.0.0.0/8 or ::1.
         static func isLoopback(baseURL: String) -> Bool {
@@ -297,6 +329,9 @@ final class AppModel {
     /// Streamed AI text not in `aiJobText` yet, and its scheduled flush, per job key (see `applyAIUpdate`).
     @ObservationIgnored private var pendingAIText: [UUID?: String] = [:]
     @ObservationIgnored private var aiTextFlush: [UUID?: Task<Void, Never>] = [:]
+    /// The catch-up text streamed since the last flush into `catchUpRun`, and that flush.
+    @ObservationIgnored private var pendingCatchUpText = ""
+    @ObservationIgnored private var catchUpFlush: Task<Void, Never>?
     /// Conversations `deleteConversation` is moving to the Trash: their AI job's error is not shown, and no new job
     /// starts for them.
     @ObservationIgnored private var deletingConversationIDs: Set<UUID> = []
@@ -434,6 +469,9 @@ final class AppModel {
         isStarting = true
         // Before the engine starts, so the recording page and card show it from their first frame.
         recordingTitle = Self.trimmedTitle(event?.title)
+        // A catch-up still writing for the previous recording finishes and saves in its folder, out of sight.
+        catchUpRun = nil
+        recordingCatchUps = []
         if settings.endPromptNotification { requestNotificationAccess() }
         if bringForward {
             route = .recording
@@ -1912,6 +1950,189 @@ extension AppModel {
         provider.kind == .inApp
             ? makeLocalProvider(entryID: provider.id)
             : try providerConfigs.first { $0.id == provider.id }.flatMap(makeProvider(for:))
+    }
+}
+
+// MARK: - Catch-up
+
+extension AppModel {
+    /// Where a catch-up runs: the "Catch-up provider" setting when it is a usable provider outside the app, else the
+    /// AI tab's provider when it is not in-app, else the first usable provider outside the app; nil when there is
+    /// none. Never an in-app model: the live transcriber holds the model gate for the whole recording.
+    var catchUpProvider: AIProvider? {
+        let external = aiProviders.filter { $0.kind != .inApp && $0.unavailableReason == nil }
+        if let picked = external.first(where: { $0.id == settings.catchUpProviderID }) { return picked }
+        if let main = currentAIProvider, main.kind != .inApp { return main }
+        return external.first
+    }
+
+    /// The "Catch-up model" setting when `provider` is the picked catch-up provider, else its AI tab model.
+    func catchUpModel(for provider: AIProvider) -> String {
+        let picked = settings.catchUpModel.trimmingCharacters(in: .whitespacesAndNewlines)
+        if !picked.isEmpty, provider.id == settings.catchUpProviderID { return picked }
+        return aiModel(for: provider)
+    }
+
+    /// Why "Catch up" cannot run now; nil when it can. "Nothing new" follows `CatchUpPlan.make`: no live line after
+    /// the newest catch-up that was not stopped.
+    var catchUpDisabledReason: String? {
+        guard let captions = recordingCaptions, recordingTranscriber != nil else {
+            return RecordingDetailView.noCaptionsReason(settings: settings)
+        }
+        if catchUpRun?.isRunning == true { return String(localized: "A catch-up is being written.") }
+        if catchUpProvider == nil {
+            return String(localized: "Catch up needs an AI provider outside the app: a cloud API, a local server or a command-line tool. Add one in Settings › AI.")
+        }
+        let base = recordingCatchUps.last { !$0.stopped }
+        if (captions.lines.last?.id ?? -1) <= (base?.throughLineID ?? -1) {
+            return recordingCatchUps.isEmpty
+                ? String(localized: "Nothing to catch up on yet.")
+                : String(localized: "Nothing new since the last catch-up")
+        }
+        return nil
+    }
+
+    /// Summarizes the current recording so far with `catchUpProvider`, streamed into `catchUpRun` (its card shows at
+    /// once), then appended to the recording's `catchups.json` and shown in `recordingCatchUps`. Incremental unless
+    /// "from the start" is on (`CatchUpPlan.make`), within the provider's context window. A run still going at Stop
+    /// finishes and saves in that recording's folder.
+    func startCatchUp() {
+        guard catchUpDisabledReason == nil, let provider = catchUpProvider, let transcriber = recordingTranscriber,
+              let folder = activeFolder else { return }
+        let jobID = UUID()
+        let elapsed = engine.currentSnapshot().elapsed
+        catchUpFlush?.cancel()
+        catchUpFlush = nil
+        pendingCatchUpText = ""
+        let model = catchUpModel(for: provider)
+        catchUpRun = CatchUpRun(jobID: jobID, elapsed: elapsed, providerName: provider.name, model: model)
+        let client: (any LLMProvider)?
+        do {
+            client = try llmClient(for: provider)
+        } catch {
+            return failCatchUp(jobID, "\(provider.name): \(error.localizedDescription)")
+        }
+        guard let client else {
+            return failCatchUp(jobID, String(localized: "\(provider.name) is not available."))
+        }
+        let title = recordingTitle ?? recordingEvent?.title ?? ""
+        let language = OutputLanguage.catchUp(setting: settings.summaryLanguage, recordingLanguage: recordingLanguage)
+        let fromStart = settings.catchUpFromStart
+        Task { [weak self, aiService] in
+            let lines = await transcriber.finalizedLines(after: nil).map {
+                CatchUpLine(id: $0.id, start: $0.start, speaker: $0.speaker == .me ? .me : .others, text: $0.text)
+            }
+            let files = await Task.detached(priority: .userInitiated) {
+                Result { (try CatchUpLog.load(from: folder), try RecordingSession.read(from: folder).startedAt) }
+            }.value
+            let context = await client.contextWindow(model: model)
+            guard let self, catchUpRun?.jobID == jobID else { return }
+            let (log, startedAt): (CatchUpLog, Date)
+            switch files {
+            case .success(let read): (log, startedAt) = read
+            case .failure(let error): return failCatchUp(jobID, error.localizedDescription)
+            }
+            // Stopped before anything was sent: nothing to save.
+            if catchUpRun?.stopping == true {
+                catchUpRun = nil
+                return
+            }
+            let maxCharacters = Self.catchUpCharacters(
+                contextWindow: context, lines: lines, title: title, startedAt: startedAt, elapsed: elapsed,
+                language: language)
+            guard let plan = CatchUpPlan.make(
+                lines: lines, log: log, fromStart: fromStart, maxCharacters: maxCharacters) else {
+                recordingCatchUps = log.catchUps
+                return failCatchUp(jobID, String(localized: "Nothing new since the last catch-up"))
+            }
+            let messages = PromptBuilder.catchUpMessages(
+                plan: plan, title: title, startedAt: startedAt, elapsed: elapsed, language: language)
+            let stream = aiService.catchUp(
+                plan: plan, messages: messages, provider: client, providerID: provider.id, model: model,
+                elapsed: elapsed, folder: folder, jobID: jobID)
+            do {
+                for try await update in stream { applyCatchUpUpdate(update, jobID: jobID) }
+            } catch {
+                return failCatchUp(jobID, error.localizedDescription)
+            }
+            await finishCatchUp(jobID, folder: folder)
+        }
+    }
+
+    /// Ends the running catch-up early: the text streamed until then is saved, marked stopped; nothing when no text
+    /// came yet. Only its own job: a summary keeps running.
+    func stopCatchUp() {
+        guard let run = catchUpRun, run.isRunning, !run.stopping else { return }
+        catchUpRun?.stopping = true
+        aiService.stop(run.jobID)
+    }
+
+    /// The characters of live lines that fit `contextWindow` beside the catch-up's instructions and header, as the
+    /// summaries count them (`TranscriptChunker`: UTF-8 bytes / 4 per token, 20% kept for the answer); characters
+    /// per byte of `lines`' text, so accented and CJK text count as many tokens as for a summary.
+    private static func catchUpCharacters(
+        contextWindow: Int, lines: [CatchUpLine], title: String, startedAt: Date, elapsed: Double,
+        language: OutputLanguage?
+    ) -> Int {
+        let empty = CatchUpPlan(
+            previous: nil, transcript: [], recent: [], omitted: true, fullPass: true, throughLineID: -1, throughTime: 0)
+        let instructions = PromptBuilder.catchUpMessages(
+            plan: empty, title: title, startedAt: startedAt, elapsed: elapsed, language: language
+        ).reduce(0) { $0 + TranscriptChunker.estimateTokens($1.content) }
+        let bytes = TranscriptChunker.budget(contextWindow: contextWindow, instructionTokens: instructions) * 4
+        let textBytes = lines.reduce(0) { $0 + $1.text.utf8.count }
+        guard textBytes > 0 else { return bytes }
+        let textCharacters = lines.reduce(0) { $0 + $1.text.count }
+        return Int(Double(bytes) * Double(textCharacters) / Double(textBytes))
+    }
+
+    /// Shows an update of catch-up `jobID` while it is `catchUpRun`: the first text at once, then at most every
+    /// 50 ms (`MarkdownText` lays the whole text out again at each change, as `applyAIUpdate` explains).
+    private func applyCatchUpUpdate(_ update: AIService.Update, jobID: UUID) {
+        guard catchUpRun?.jobID == jobID else { return }
+        switch update {
+        case .status(let line): catchUpRun?.statusLine = line
+        case .text(let text):
+            pendingCatchUpText += text
+            if catchUpRun?.status != .streaming {
+                catchUpRun?.status = .streaming
+                catchUpRun?.statusLine = nil
+                return flushCatchUpText()
+            }
+            guard catchUpFlush == nil else { return }
+            catchUpFlush = Task { [weak self] in
+                try? await Task.sleep(for: .milliseconds(50))
+                guard !Task.isCancelled else { return }
+                self?.flushCatchUpText()
+            }
+        }
+    }
+
+    private func flushCatchUpText() {
+        catchUpFlush?.cancel()
+        catchUpFlush = nil
+        guard !pendingCatchUpText.isEmpty else { return }
+        catchUpRun?.text += pendingCatchUpText
+        pendingCatchUpText = ""
+    }
+
+    /// Catch-up `jobID` ended (saved, or stopped before any text): `recordingCatchUps` from its `catchups.json`, read
+    /// off the main thread, replaces its card in the same update.
+    private func finishCatchUp(_ jobID: UUID, folder: URL) async {
+        guard catchUpRun?.jobID == jobID else { return }
+        flushCatchUpText()
+        let log = await Task.detached(priority: .userInitiated) { try? CatchUpLog.load(from: folder) }.value
+        guard catchUpRun?.jobID == jobID else { return }
+        if let log { recordingCatchUps = log.catchUps }
+        catchUpRun = nil
+    }
+
+    /// Catch-up `jobID` failed: its card keeps the text streamed so far and shows `message`; "Catch up" runs again.
+    private func failCatchUp(_ jobID: UUID, _ message: String) {
+        guard catchUpRun?.jobID == jobID else { return }
+        flushCatchUpText()
+        catchUpRun?.status = .failed
+        catchUpRun?.error = message
     }
 }
 
