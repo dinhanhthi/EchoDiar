@@ -256,7 +256,7 @@
 
                 <views:PlaybackBar x:Name="Player" />
 
-                <!-- Speaker chips, then Copy and Re-transcribe, then the note in place of playback once the audio is gone. -->
+                <!-- Speaker chips, then Copy, Re-transcribe and Summarize, then the note in place of playback once the audio is gone. -->
                 <Grid x:Name="ControlRow" ColumnSpacing="8">
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="*" />
@@ -321,6 +321,18 @@
                                 <MenuFlyout x:Name="RetranscribeMenu" Placement="TopEdgeAlignedRight" />
                             </DropDownButton.Flyout>
                         </DropDownButton>
+                        <!-- Opens the Summary tab, and starts a summary when there is none; a ring while it is written. -->
+                        <Button x:Name="SummarizeButton" Visibility="Collapsed">
+                            <StackPanel Orientation="Horizontal" Spacing="8">
+                                <ProgressRing
+                                    x:Name="SummarizingRing"
+                                    Width="16"
+                                    Height="16"
+                                    IsActive="False"
+                                    Visibility="Collapsed" />
+                                <TextBlock x:Name="SummarizeText" VerticalAlignment="Center" />
+                            </StackPanel>
+                        </Button>
                     </StackPanel>
 
                     <!-- In place of playback once the audio was moved to the Recycle Bin. -->

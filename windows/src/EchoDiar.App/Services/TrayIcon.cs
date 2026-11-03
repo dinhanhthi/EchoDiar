@@ -8,6 +8,7 @@ using EchoDiar.Platform.SystemServices;
 using EchoDiar.Transcribe;
 using Microsoft.UI.Dispatching;
 using Microsoft.UI.Xaml;
+using Windows.UI.ViewManagement;
 
 namespace EchoDiar.App.Services;
 
@@ -17,12 +18,15 @@ internal enum IndicatorState { Idle, Recording, Paused, Processing }
 /// <summary>
 /// The notification area icon and its menu (macOS StatusItemController.swift), on the Platform <see cref="NotifyIcon"/>.
 /// The menu is rebuilt each time it opens; a left click opens the main window (the Windows convention; macOS opens the
-/// menu). The icon follows the recording: the logo, with a red dot while recording or an orange pause badge while paused
-/// at its bottom-right (macOS), and the tooltip names the state. The window's session end (sign-out, shutdown) goes to
-/// <c>sessionEnding</c>, synchronously. UI thread only; menu picks run after the menu closed, posted to the dispatcher.
+/// menu). The icon follows the recording: the logo, with a red dot while recording, an orange pause badge while paused or
+/// an accent level badge while processing at its bottom-right (macOS), and the tooltip names the state. The window's
+/// session end (sign-out, shutdown) goes to <c>sessionEnding</c>, synchronously. UI thread only; menu picks run after
+/// the menu closed, posted to the dispatcher.
 /// </summary>
 internal sealed class TrayIcon : IDisposable
 {
+    private static readonly UISettings UISettings = new();
+
     private readonly AppViewModel _model;
     private readonly DispatcherQueue _dispatcher;
     private readonly Action _openMain;
@@ -107,8 +111,11 @@ internal sealed class TrayIcon : IDisposable
             case IndicatorState.Paused:
                 _icon.SetGlyph(NotifyIconGlyph.Pause, MainWindow.ThemeColor("SystemFillColorCaution", ElementTheme.Light));
                 break;
+            case IndicatorState.Processing:
+                // The system accent, read when processing starts; a static badge (macOS animates its waveform).
+                _icon.SetGlyph(NotifyIconGlyph.Processing, UISettings.GetColorValue(UIColorType.Accent));
+                break;
             default:
-                // macOS animates a waveform while processing; here the logo stays and the tooltip says it.
                 _icon.SetGlyph(NotifyIconGlyph.Logo);
                 break;
         }

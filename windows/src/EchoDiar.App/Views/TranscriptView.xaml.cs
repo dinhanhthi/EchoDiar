@@ -22,7 +22,7 @@ namespace EchoDiar.App.Views;
 /// The Transcript tab of the conversation page (macOS TranscriptView.swift) for a <see cref="TranscriptViewModel"/> and
 /// the page's <see cref="PlaybackController"/>: the segments (a click plays from one; the one under the play head is
 /// selected, and the list follows it while playing until the user scrolls), the version menu, the transcription's
-/// state, the speaker notes, playback, the speaker chips with their rename field, Copy and Re-transcribe.
+/// state, the speaker notes, playback, the speaker chips with their rename field, Copy, Re-transcribe and Summarize.
 /// </summary>
 public sealed partial class TranscriptView : UserControl
 {
@@ -73,6 +73,7 @@ public sealed partial class TranscriptView : UserControl
         RetryButton.Click += (_, _) => Transcribe(null);
         TranscribeButton.Click += (_, _) => Transcribe(null);
         CopyButton.Click += (_, _) => Copy();
+        SummarizeButton.Click += (_, _) => Summarize();
         RenameBox.KeyDown += OnRenameKeyDown;
         RenameFlyout.Opened += (_, _) =>
         {
@@ -134,6 +135,10 @@ public sealed partial class TranscriptView : UserControl
             case nameof(AppViewModel.InstalledModelIds):
                 Update();
                 break;
+            case nameof(AppViewModel.AIJob):
+            case nameof(AppViewModel.Conversations):
+                UpdateSummarize();
+                break;
         }
     }
 
@@ -191,6 +196,7 @@ public sealed partial class TranscriptView : UserControl
         }
         _speakingLine = null;
         CopyButton.IsEnabled = lines.Count > 0;
+        UpdateSummarize();
         UpdateContent();
         UpdateActive();
     }
@@ -412,7 +418,7 @@ public sealed partial class TranscriptView : UserControl
         NoticeDownloadButton.Visibility = Shown(download);
     }
 
-    /// <summary>Copy, Re-transcribe (or "Transcribing…" while a job runs), playback or the removed-audio note.</summary>
+    /// <summary>Copy, Re-transcribe (or "Transcribing…" while a job runs), Summarize, playback or the removed-audio note.</summary>
     private void UpdateActions()
     {
         if (_transcript is null) return;
@@ -424,6 +430,24 @@ public sealed partial class TranscriptView : UserControl
         SetTip(RetranscribeButton, Loc.T(hasAudio ? "Re-transcribe with another model or language" : "Audio has been removed"), ref _retranscribeTip);
         Player.Visibility = Shown(hasAudio);
         AudioRemovedNote.Visibility = Shown(!hasAudio && _transcript.Conversation is not null);
+        UpdateSummarize();
+    }
+
+    /// <summary>
+    /// With lines only (macOS <c>summaryButton</c>): "Summary" once there is one, else "Summarize"; disabled with a
+    /// ring and "Summarizing…" while this conversation's summary is written.
+    /// </summary>
+    private void UpdateSummarize()
+    {
+        if (_model is null || _transcript is null) return;
+        var summarizing = _model.AIJob is { Kind: AIJobKind.Summary } job && job.ConversationId == _transcript.ConversationId;
+        var text = Loc.T(summarizing ? "Summarizing…" : _transcript.Conversation?.HasSummary == true ? "Summary" : "Summarize");
+        SummarizeButton.Visibility = Shown(_lines.Count > 0);
+        SummarizeButton.IsEnabled = !summarizing;
+        SummarizingRing.Visibility = Shown(summarizing);
+        SummarizingRing.IsActive = summarizing;
+        SummarizeText.Text = text;
+        AutomationProperties.SetName(SummarizeButton, text);
     }
 
     // Menus
@@ -508,6 +532,21 @@ public sealed partial class TranscriptView : UserControl
     private void Transcribe(string? engineId)
     {
         if (_model is not null && _transcript is not null) _ = _model.TranscribeAsync(_transcript.ConversationId, engineId);
+    }
+
+    /// <summary>
+    /// The tab switches in the click's frame; without a summary one starts as the Summary tab's Summarize starts it,
+    /// when it could start there (a provider, no other job).
+    /// </summary>
+    private void Summarize()
+    {
+        if (_model is not { } model || _transcript is not { } pane) return;
+        model.DetailTab = DetailTab.Summary;
+        if (pane.Conversation is not { HasSummary: false } conversation || pane.Transcript is not { } transcript
+            || model.ProvidersModel.CurrentAIProvider is not { } provider
+            || model.AIJob is not null || model.ChatChanging || model.Updater.IsInstalling) return;
+        model.StartAIJob(AIJobKind.Summary, null, conversation, transcript, null, [], provider,
+            model.ProvidersModel.AIModelFor(provider));
     }
 
     /// <summary>One "Name [mm:ss]: text" line per segment of the shown version.</summary>

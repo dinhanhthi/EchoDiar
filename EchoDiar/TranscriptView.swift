@@ -145,7 +145,12 @@ struct TranscriptView: View {
             } else if shownTranscript?.notes.contains(Transcript.diarizationMissingNote) == true {
                 diarizationMissingNotice
             }
-            if conversation.hasAudio { PlaybackScrubber(playback: playback) }
+            if conversation.hasAudio {
+                HStack(spacing: 10) {
+                    PlaybackScrubber(playback: playback)
+                    PlaybackTime(playback: playback).fixedSize()
+                }
+            }
             // Up to three speaker chips, fewer when the row is short; "+N" lists the others.
             ViewThatFits(in: .horizontal) {
                 ForEach(chipCounts, id: \.self) { controlRow(chips: $0) }
@@ -220,8 +225,8 @@ struct TranscriptView: View {
 
     private static let maxSpeakerChips = 3
 
-    /// Copy (round) and Re-transcribe, in the accent color like Send; a spinner and "Transcribing…" in its place while a
-    /// job is queued or runs.
+    /// Copy (round), Re-transcribe and Summarize, in the accent color like Send; a spinner and "Transcribing…" in
+    /// Re-transcribe's place while a job is queued or runs.
     private var actions: some View {
         HStack(spacing: 6) {
             Button(action: copyTranscript) {
@@ -244,7 +249,39 @@ struct TranscriptView: View {
             } else {
                 retranscribeMenu
             }
+            if transcript?.segments.isEmpty == false { summaryButton }
         }
+    }
+
+    /// Opens the Summary tab, and starts a summary when there is none yet and the AI tab could start one; a spinner and
+    /// "Summarizing…" in its place while this conversation's summary is written.
+    @ViewBuilder
+    private var summaryButton: some View {
+        if let job = model.aiJob, job.conversationID == conversation.id, job.kind == .summary {
+            Button {} label: {
+                HStack(spacing: 8) {
+                    ProgressView().controlSize(.small)
+                    Text("Summarizing…")
+                }
+            }
+            .buttonStyle(BottomBarButtonStyle(prominent: true))
+            .allowsHitTesting(false)
+            .fixedSize()
+        } else {
+            Button(conversation.hasSummary ? "Summary" : "Summarize", action: summarize)
+                .buttonStyle(BottomBarButtonStyle(prominent: true))
+                .fixedSize()
+        }
+    }
+
+    /// The tab switches in the click's frame; the job starts as the Summary tab's Summarize button starts it, and
+    /// `startAIJob` does nothing while another job runs.
+    private func summarize() {
+        model.detailTab = .summary
+        guard !conversation.hasSummary, let transcript, let provider = model.currentAIProvider else { return }
+        model.startAIJob(
+            .summary, conversation: conversation, transcript: transcript, summary: nil, history: [],
+            provider: provider, model: model.aiModel(for: provider))
     }
 
     /// Installed batch ASR models and configured cloud engines; picking one transcribes the conversation again with
@@ -295,7 +332,6 @@ struct TranscriptView: View {
             .buttonStyle(BottomBarButtonStyle(horizontalPadding: 0))
             .disabled(!playback.isReady)
             .help(playback.isPlaying ? "Pause (Space)" : "Play (Space)")
-            PlaybackTime(playback: playback)
         }
         .fixedSize()
     }

@@ -4,12 +4,12 @@ name: Windows
 # tests on x64 and ARM64, and packages a signed sideload MSIX per architecture for the QA VM
 # (artifact EchoDiar-win-<arch>).
 # Signing uses the dev certificate in the WINDOWS_DEV_CERT_PFX / WINDOWS_DEV_CERT_PASSWORD secrets of the
-# windows-dev-signing environment, which only allows the branches above (and windows-v* tags); pull requests
-# do not use the environment and build an unsigned package.
+# windows-dev-signing environment, which must allow the plan/* branches (deployment-branch rule), main and
+# windows-v* tags; pull requests do not use the environment and build an unsigned package.
 
 on:
   push:
-    branches: [plan/2026-10-21-windows-port, plan/2026-10-25-windows-macos-parity, plan/2026-10-28-windows-public-release, plan/2026-10-28-windows-gui-install, plan/2026-10-29-windows-microsoft-store, main]
+    branches: ['plan/**', main]
     paths:
       - 'windows/**'
       - '.github/workflows/windows.yml'

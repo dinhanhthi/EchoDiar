@@ -62,8 +62,9 @@ final class StatusItemController: NSObject, NSMenuDelegate {
     private let updater: Updater
     private let statusItem: NSStatusItem
     private let menu = NSMenu()
-    private let symbolConfiguration = NSImage.SymbolConfiguration(pointSize: 15, weight: .regular)
-    /// Shown only while processing: `NSStatusBarButton` exposes no image view to run a symbol effect on.
+    private let symbolConfiguration = NSImage.SymbolConfiguration(pointSize: 8, weight: .semibold)
+    /// The processing badge, over the logo's knockout: `NSStatusBarButton` exposes no image view to run a symbol
+    /// effect on.
     private var effectView: NSImageView?
 
     init(onOpenMain: @escaping () -> Void, onOpenSettings: @escaping () -> Void,
@@ -73,7 +74,7 @@ final class StatusItemController: NSObject, NSMenuDelegate {
         self.onToggleRecording = onToggleRecording
         self.onAbout = onAbout
         self.updater = updater
-        // Fixed width, so the item keeps its size while the button's own image is cleared for processing.
+        // Fixed width, so the item keeps its size whatever the icon.
         statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.squareLength)
         super.init()
         menu.delegate = self
@@ -96,7 +97,7 @@ final class StatusItemController: NSObject, NSMenuDelegate {
             stopEffect()
             button.image = Self.pausedLogo
         case .processing:
-            button.image = nil
+            button.image = Self.processingLogo
             startEffect(in: button)
         }
     }
@@ -119,6 +120,12 @@ final class StatusItemController: NSObject, NSMenuDelegate {
         NSRect(x: 12, y: 2, width: 1, height: 4).fill()
         NSRect(x: 15, y: 2, width: 1, height: 4).fill()
     }
+
+    /// Where the processing badge sits on the 18 pt logo (bottom-right, image coordinates).
+    private static let processingBadge = NSRect(x: 8, y: -2, width: 11, height: 11)
+
+    /// The logo cut out at the bottom-right; `startEffect` lays the animated waveform over the hole.
+    private static let processingLogo = logoImage(knockout: processingBadge)
 
     /// An 18 pt image: the logo, cut out by `knockout` (so a badge reads against it), then `badge` on top. Whole-point
     /// rects keep the badge crisp at 1x and 2x.
@@ -151,11 +158,18 @@ final class StatusItemController: NSObject, NSMenuDelegate {
         return image
     }
 
-    /// The system drives the animation; no timer runs.
+    /// A small waveform over `processingLogo`'s knockout. The system drives the animation; no timer runs.
     private func startEffect(in button: NSStatusBarButton) {
         guard effectView == nil else { return }
-        let view = NSImageView(frame: button.bounds)
-        view.autoresizingMask = [.width, .height]
+        // The button centers its 18 pt image; the badge rect is in the image's bottom-left-origin coordinates.
+        let bounds = button.bounds
+        let origin = NSPoint(x: (bounds.midX - 9).rounded(.down), y: (bounds.midY - 9).rounded(.down))
+        let logo = NSRect(origin: origin, size: NSSize(width: 18, height: 18))
+        let badge = Self.processingBadge
+        let y = button.isFlipped ? logo.maxY - badge.maxY : logo.minY + badge.minY
+        let view = NSImageView(frame: NSRect(x: logo.minX + badge.minX, y: y, width: badge.width, height: badge.height))
+        // Flexible margins keep it on the centered logo if the button resizes.
+        view.autoresizingMask = [.minXMargin, .maxXMargin, .minYMargin, .maxYMargin]
         view.imageScaling = .scaleNone
         view.image = symbol("waveform", tint: nil)
         view.setAccessibilityElement(false)

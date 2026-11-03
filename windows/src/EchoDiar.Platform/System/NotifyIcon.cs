@@ -30,6 +30,9 @@ public enum NotifyIconGlyph
 
     /// <summary>The logo with a dot holding two white bars at the bottom-right (macOS pausedLogo).</summary>
     Pause,
+
+    /// <summary>The logo with a dot holding three white level bars at the bottom-right (macOS processingLogo, not animated).</summary>
+    Processing,
 }
 
 /// <summary>
@@ -150,7 +153,8 @@ public sealed class NotifyIcon : IDisposable
     /// <summary>
     /// <paramref name="logo"/> with the badge of <paramref name="glyph"/> at the bottom-right (macOS logoImage): a disc
     /// of <paramref name="fill"/> about 45% of the icon, flush with the corner, white pause bars for
-    /// <see cref="NotifyIconGlyph.Pause"/>, and a ring around it cleared from the logo so it reads on any taskbar.
+    /// <see cref="NotifyIconGlyph.Pause"/> or three white level bars (30%, 60% and 45% of the disc high) for
+    /// <see cref="NotifyIconGlyph.Processing"/>, and a ring around it cleared from the logo so it reads on any taskbar.
     /// Pixels are <paramref name="size"/> square, row by row from the top, as 0xAARRGGBB with straight alpha (a 32 bpp
     /// DIB's B, G, R, A bytes); an empty <paramref name="logo"/> is transparent. Logo pixels away from the badge are kept.
     /// </summary>
@@ -171,6 +175,9 @@ public sealed class NotifyIcon : IDisposable
         var barHeight = Snap(diameter / 2.0, diameter);
         var barLeft = origin + (diameter - 2 * barWidth - gap) / 2;
         var barTop = origin + (diameter - barHeight) / 2;
+        // Processing: three bars one bar width apart, each snapped so it centres in the badge (an audio level).
+        var levelLeft = origin + (diameter - 5 * barWidth) / 2;
+        int[] levelHeights = [Snap(diameter * 0.3, diameter), Snap(diameter * 0.6, diameter), Snap(diameter * 0.45, diameter)];
         for (var y = Math.Max(0, (int)(center - knockout - 1)); y < size; y++)
         {
             for (var x = Math.Max(0, (int)(center - knockout - 1)); x < size; x++)
@@ -182,8 +189,13 @@ public sealed class NotifyIcon : IDisposable
                 var under = pixels[y * size + x];
                 var underAlpha = (under >> 24) / 255.0 * (1 - cleared);
                 var badgeAlpha = Math.Clamp(radius - distance + 0.5, 0, 1) * fill.A / 255.0;
-                var bar = glyph == NotifyIconGlyph.Pause && y >= barTop && y < barTop + barHeight
-                    && (x >= barLeft && x < barLeft + barWidth || x >= barLeft + barWidth + gap && x < barLeft + 2 * barWidth + gap);
+                var bar = glyph switch
+                {
+                    NotifyIconGlyph.Pause => y >= barTop && y < barTop + barHeight
+                        && (x >= barLeft && x < barLeft + barWidth || x >= barLeft + barWidth + gap && x < barLeft + 2 * barWidth + gap),
+                    NotifyIconGlyph.Processing => IsLevelBar(x - levelLeft, y - origin, barWidth, diameter, levelHeights),
+                    _ => false,
+                };
                 double r = bar ? 255 : fill.R, g = bar ? 255 : fill.G, b = bar ? 255 : fill.B;
                 // The badge over what is left of the logo, in straight alpha.
                 var alpha = badgeAlpha + underAlpha * (1 - badgeAlpha);
@@ -199,6 +211,19 @@ public sealed class NotifyIcon : IDisposable
             }
         }
         return pixels;
+    }
+
+    /// <summary>
+    /// Whether (<paramref name="x"/>, <paramref name="y"/>), from the left of the first bar and the badge's top, is on one
+    /// of the level bars: <paramref name="width"/> wide, a width apart, each centred in <paramref name="diameter"/> rows.
+    /// </summary>
+    private static bool IsLevelBar(int x, int y, int width, int diameter, int[] heights)
+    {
+        if (x < 0 || x % (2 * width) >= width) return false;
+        var index = x / (2 * width);
+        if (index >= heights.Length) return false;
+        var top = (diameter - heights[index]) / 2;
+        return y >= top && y < top + heights[index];
     }
 
     /// <summary>The whole number nearest <paramref name="target"/> (at least 1) that centres in <paramref name="span"/> pixels: same parity.</summary>
