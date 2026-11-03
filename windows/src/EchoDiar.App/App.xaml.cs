@@ -8,6 +8,7 @@ using Microsoft.UI.Dispatching;
 using Microsoft.UI.Windowing;
 using Microsoft.UI.Xaml;
 using Microsoft.Windows.AppLifecycle;
+using Microsoft.Windows.AppNotifications;
 
 namespace EchoDiar.App;
 
@@ -75,6 +76,7 @@ public partial class App : Application
         if (CalendarProbe.TryRun(Environment.GetCommandLineArgs(), Exit)) return;
         if (CalendarSeed.TryRun(Environment.GetCommandLineArgs(), Exit)) return;
 #endif
+        RegisterNotifications();
         // Single instance: a second launch activates the running app's window, then exits.
         StartupTrace.Write("begin FindOrRegisterForKey");
         var main = AppInstance.FindOrRegisterForKey("main");
@@ -89,15 +91,17 @@ public partial class App : Application
             {
                 Debug.WriteLine($"EchoDiar: could not redirect the activation: {e}");
             }
+            UnregisterNotifications();
             Exit();
             return;
         }
 
-        // Launch at login (Settings › General): only the tray icon, as macOS starts in the menu bar.
+        // Launch at login (Settings › General): only the tray icon, as macOS starts in the menu bar. A launch by a
+        // notification click (ExtendedActivationKind.AppNotification, after the app quit) starts as a normal launch.
         var atLogin = AppInstance.GetCurrent().GetActivatedEventArgs().Kind == ExtendedActivationKind.StartupTask;
         var dispatcher = DispatcherQueue.GetForCurrentThread();
         _dispatcher = dispatcher;
-        AppInstance.GetCurrent().Activated += (_, _) => dispatcher.TryEnqueue(ShowWindow);
+        AppInstance.GetCurrent().Activated += (_, e) => dispatcher.TryEnqueue(() => OnRedirectedActivation(e));
         StartupTrace.Write("begin AppServices");
         _services = new AppServices(Paths);
         StartupTrace.Write("end AppServices");
@@ -190,6 +194,62 @@ public partial class App : Application
             Debug.WriteLine($"EchoDiar: launch failed: {e}");
             StartupTrace.Write($"StartAsync failed: {e.GetType().Name} {e.Message}");
         }
+    }
+
+    /// <summary>
+    /// The end prompt's notification clicks (EndPromptNotifier) reach this process: subscribed before
+    /// <c>Register</c>, so a click while the app runs comes through <c>NotificationInvoked</c> instead of a new process, and
+    /// before the first <c>GetActivatedEventArgs</c>. Fails in an unpackaged dev run: no notification then.
+    /// </summary>
+    private void RegisterNotifications()
+    {
+        try
+        {
+            AppNotificationManager.Default.NotificationInvoked += OnNotificationInvoked;
+            AppNotificationManager.Default.Register();
+        }
+        catch (Exception e)
+        {
+            Debug.WriteLine($"EchoDiar: could not register for notifications: {e}");
+            StartupTrace.Write($"notification registration failed: {e.GetType().Name} {e.Message}");
+        }
+    }
+
+    private static void UnregisterNotifications()
+    {
+        try
+        {
+            AppNotificationManager.Default.Unregister();
+        }
+        catch (Exception e)
+        {
+            Debug.WriteLine($"EchoDiar: could not unregister from notifications: {e}");
+        }
+    }
+
+    /// <summary>
+    /// A notification click, on a background thread. One that launched the app (after it quit) comes through
+    /// <c>GetActivatedEventArgs</c> and is left alone; one reaching this handler before the model exists is dropped: the
+    /// app just starts, no recording is touched.
+    /// </summary>
+    private void OnNotificationInvoked(AppNotificationManager sender, AppNotificationActivatedEventArgs args)
+    {
+        var activation = EndPromptNotifier.ParseAction(args.Arguments);
+        _dispatcher?.TryEnqueue(() => _model?.HandleEndPromptResponse(activation));
+    }
+
+    /// <summary>
+    /// A second launch redirected here: a notification click acts as in <see cref="OnNotificationInvoked"/> (its own
+    /// response shows the window, or not); any other shows the window.
+    /// </summary>
+    private void OnRedirectedActivation(AppActivationArguments args)
+    {
+        if (args.Kind == ExtendedActivationKind.AppNotification && args.Data is AppNotificationActivatedEventArgs notification)
+        {
+            _model?.HandleEndPromptResponse(EndPromptNotifier.ParseAction(notification.Arguments));
+            return;
+        }
+        ShowWindow();
     }
 
     /// <summary>A redirected launch, the tray icon and its menu: brings the window back (shown if hidden, restored if minimized).</summary>
@@ -362,8 +422,11 @@ public partial class App : Application
     {
         if (_shutDown) return;
         _shutDown = true;
+        var stopped = _model?.Shutdown() ?? true;
+        // After the model's shutdown, which queues the end prompt's removal (best effort: the toast also expires).
+        UnregisterNotifications();
         // A stop that did not end in time still holds the engine: disposing it would block on it.
-        if (_model is { } model && !model.Shutdown()) return;
+        if (!stopped) return;
         _services?.Dispose();
     }
 

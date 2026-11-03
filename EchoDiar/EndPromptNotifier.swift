@@ -9,6 +9,8 @@ final class EndPromptNotifier: NSObject, UNUserNotificationCenterDelegate {
     private nonisolated static let identifier = "endPrompt"
     private nonisolated static let stopAction = "stopNow"
     private nonisolated static let keepAction = "keepRecording"
+    /// The prompt's deadline, in userInfo: a leftover notification's buttons never act on a later prompt.
+    private nonisolated static let deadlineKey = "endPromptDeadline"
 
     weak var model: AppModel?
 
@@ -35,6 +37,7 @@ final class EndPromptNotifier: NSObject, UNUserNotificationCenterDelegate {
         let left = max(0, Int(deadline.timeIntervalSinceNow.rounded(.up)))
         content.body = String(localized: "Stopping in \(left) s")
         content.categoryIdentifier = Self.category
+        content.userInfo = [Self.deadlineKey: Self.token(deadline)]
         // No sound: a chime would land in the recording (speakers into the mic, or the global tap).
         let request = UNNotificationRequest(identifier: Self.identifier, content: content, trigger: nil)
         UNUserNotificationCenter.current().add(request) { error in
@@ -53,17 +56,24 @@ final class EndPromptNotifier: NSObject, UNUserNotificationCenterDelegate {
         _ center: UNUserNotificationCenter, didReceive response: UNNotificationResponse
     ) async {
         guard response.notification.request.identifier == Self.identifier else { return }
-        await handle(response.actionIdentifier)
+        let token = response.notification.request.content.userInfo[Self.deadlineKey] as? String
+        await handle(response.actionIdentifier, token: token)
     }
 
-    private func handle(_ action: String) {
+    /// The prompt's deadline as a string (unix ms), the same on both sides whatever the transport keeps of a Date.
+    private nonisolated static func token(_ deadline: Date) -> String {
+        String(Int64((deadline.timeIntervalSince1970 * 1000).rounded()))
+    }
+
+    private func handle(_ action: String, token: String?) {
         guard let model else { return }
         switch action {
         case Self.keepAction:
+            // A notification left over from an earlier prompt never keeps or stops the recording.
+            guard case .meetingEnded(_, let deadline)? = model.pillPrompt, Self.token(deadline) == token else { return }
             model.keepRecording()
         case Self.stopAction:
-            // A notification left over from an earlier prompt never stops the recording.
-            guard case .meetingEnded? = model.pillPrompt else { return }
+            guard case .meetingEnded(_, let deadline)? = model.pillPrompt, Self.token(deadline) == token else { return }
             model.stopFromEndPrompt()
         case UNNotificationDefaultActionIdentifier:
             if model.isRecording { model.route = .recording }

@@ -1,3 +1,4 @@
+using EchoDiar.App.Services;
 using EchoDiar.Core;
 using EchoDiar.Core.Settings;
 using EchoDiar.Platform.Audio;
@@ -36,14 +37,17 @@ public sealed partial class AppViewModel
 
     /// <summary>
     /// What the pill asks (meeting detected, calendar event, meeting ended); null = no question. A prompt shows the pill
-    /// whatever the settings.
+    /// whatever the settings. The end prompt also shows a Windows notification, removed with it.
     /// </summary>
     public PillPrompt? PillPrompt
     {
         get => _pillPrompt;
         private set
         {
-            if (SetProperty(ref _pillPrompt, value)) OnPropertyChanged(nameof(PillAppRootPid));
+            var old = _pillPrompt;
+            if (!SetProperty(ref _pillPrompt, value)) return;
+            OnPropertyChanged(nameof(PillAppRootPid));
+            PillPromptChanged(old);
         }
     }
 
@@ -57,6 +61,63 @@ public sealed partial class AppViewModel
         PillPrompt.CalendarEvent => _detectedMeeting?.RootPid,
         _ => RecordingSourceRootPid,
     };
+
+    /// <summary>The Windows notification beside the "meeting ended" prompt while EchoDiar is not in front.</summary>
+    internal EndPromptNotifier EndPromptNotifier { get; }
+
+    /// <summary>
+    /// A click on the end prompt's notification, on the UI thread (macOS EndPromptNotifier <c>handle</c>): its buttons act
+    /// like the pill's, only while the prompt it was shown for is still the pill's; the toast itself shows the main window,
+    /// on the recording page while recording.
+    /// </summary>
+    internal void HandleEndPromptResponse(EndPromptNotifier.Activation activation)
+    {
+        if (_closing) return;
+        // A notification left over from an earlier prompt never stops or keeps the recording.
+        var current = PillPrompt is PillPrompt.MeetingEnded ended && EndPromptNotifier.IsFor(activation, ended.Deadline);
+        switch (activation.Response)
+        {
+            case EndPromptNotifier.Response.Stop:
+                if (current) StopFromEndPrompt();
+                break;
+            case EndPromptNotifier.Response.Keep:
+                if (current) KeepRecording();
+                break;
+            case EndPromptNotifier.Response.Open:
+                if (IsRecording) ShowRecording();
+                MainWindowRequested?.Invoke();
+                break;
+        }
+    }
+
+    /// <summary>The end prompt's question, on the pill and in its notification (macOS <c>endPromptQuestion(for:)</c>).</summary>
+    public string EndPromptQuestion(MeetingEndMonitor.Reason reason)
+    {
+        var app = RecordingSourceName ?? Loc.T("The app");
+        return reason switch
+        {
+            MeetingEndMonitor.Reason.SourceExited => Loc.Format("%@ quit — stop recording?", app),
+            MeetingEndMonitor.Reason.SourceInactive => Loc.Format("%@ stopped using audio — stop recording?", app),
+            MeetingEndMonitor.Reason.CallEnded => Loc.T("The call seems to be over — stop recording?"),
+            MeetingEndMonitor.Reason.Silence => Loc.Format(
+                "No sound for %lld min — stop recording?",
+                Math.Clamp(Settings.EndMonitor.SilenceMinutes, MeetingEndMonitorConfiguration.SilenceRange.Min, MeetingEndMonitorConfiguration.SilenceRange.Max)),
+            MeetingEndMonitor.Reason.ScreenLocked => Loc.T("Screen locked — stop recording?"),
+            MeetingEndMonitor.Reason.InputRouteLost => Loc.T("Microphone disconnected — stop recording?"),
+            MeetingEndMonitor.Reason.EventEnded => Loc.T("The meeting has ended — stop recording?"),
+            _ => Loc.T("Stop recording?"),
+        };
+    }
+
+    /// <summary>
+    /// One hook for every path that sets or clears the prompt (macOS <c>pillPromptChanged</c>): the end prompt's
+    /// notification follows it. A new end prompt replaces the shown toast (same tag), so it is not removed first.
+    /// </summary>
+    private void PillPromptChanged(PillPrompt? old)
+    {
+        if (PillPrompt is PillPrompt.MeetingEnded ended) EndPromptNotifier.Show(EndPromptQuestion(ended.Reason), ended.Deadline);
+        else if (old is PillPrompt.MeetingEnded) EndPromptNotifier.Dismiss();
+    }
 
     /// <summary>
     /// <see cref="PendingCalendarPrompt"/> changed: a calendar prompt replaces what the pill asks (a detection prompt, an

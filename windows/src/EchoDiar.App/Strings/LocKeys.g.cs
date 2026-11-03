@@ -466,6 +466,7 @@ public static partial class Loc
         "Nothing matches now.",
         "Nothing to download. Rougher ranking than the models above.",
         "Notifications are off for EchoDiar in System Settings.",
+        "Notifications are off for EchoDiar in Windows Settings › System › Notifications.",
         "Notify when a meeting seems to end",
         "Number of other speakers",
         "OK",

@@ -2311,6 +2311,36 @@
         }
       }
     },
+    "Notifications are off for EchoDiar in Windows Settings › System › Notifications." : {
+      "comment" : "Windows only: Views/Settings/RecordingSettingsPage.xaml.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Las notificaciones de EchoDiar están desactivadas en Configuración de Windows › Sistema › Notificaciones."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Les notifications d’EchoDiar sont désactivées dans Paramètres Windows › Système › Notifications."
+          }
+        },
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Thông báo của EchoDiar đang tắt trong Cài đặt Windows › Hệ thống › Thông báo."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "EchoDiar 的通知已在“Windows 设置 › 系统 › 通知”中关闭。"
+          }
+        }
+      }
+    },
     "On this PC" : {
       "comment" : "Windows only: Views/AIMenus.cs, Views/Settings/RAGSettingsPage.xaml.",
       "extractionState" : "manual",

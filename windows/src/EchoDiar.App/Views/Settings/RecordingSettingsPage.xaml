@@ -6,7 +6,7 @@
       (rows made in code).
     - Calendar: calendar access while it is not granted, what a meeting starting does, the launch at login hint, the
       watched calendars (rows made in code), meeting-link-only events, and stopping at the event's end.
-    - Auto-stop: the end monitor's thresholds, each clamped to its range.
+    - Auto-stop: the end monitor's thresholds, each clamped to its range, and the end prompt's notification.
     - After recording: transcribe automatically, tell speakers apart and the number of other speakers (also in
       Transcription › Diarization model, as on macOS), and waiting while energy saver is on.
     The floating indicator's other options stay in General, as on macOS. Each searchable element's Tag is its search
@@ -244,6 +244,22 @@
                             SpinButtonPlacementMode="Inline" />
                         <TextBlock Style="{StaticResource UnitStyle}" Text="{local:T Text='min'}" />
                     </StackPanel>
+                </controls:SettingsCard>
+
+                <controls:SettingsCard
+                    Margin="0,24,0,0"
+                    Description="{local:T Text='While EchoDiar is in the background, a notification asks too, with Stop now and Keep recording.'}"
+                    Header="{local:T Text='Notify when a meeting seems to end'}"
+                    Tag="Notify when a meeting seems to end">
+                    <ToggleSwitch x:Name="EndPromptNotificationToggle" AutomationProperties.Name="{local:T Text='Notify when a meeting seems to end'}" />
+                </controls:SettingsCard>
+
+                <!-- Shown while notifications are off for EchoDiar (EndPromptNotifier.NotificationsOff). -->
+                <controls:SettingsCard
+                    x:Name="NotificationsOffCard"
+                    Description="{local:T Text='Notifications are off for EchoDiar in Windows Settings › System › Notifications.'}"
+                    Visibility="Collapsed">
+                    <Button x:Name="NotificationSettingsButton" Content="{local:T Text='Open Notification Settings'}" />
                 </controls:SettingsCard>
             </StackPanel>
 

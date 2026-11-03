@@ -1966,6 +1966,10 @@
     <value>Las notificaciones de EchoDiar están desactivadas en Ajustes del Sistema.</value>
     <comment>Notifications are off for EchoDiar in System Settings.</comment>
   </data>
+  <data name="NotificationsAreOffForEchoDiarInWindowsSettingsSystemNotific" xml:space="preserve">
+    <value>Las notificaciones de EchoDiar están desactivadas en Configuración de Windows › Sistema › Notificaciones.</value>
+    <comment>Notifications are off for EchoDiar in Windows Settings › System › Notifications.</comment>
+  </data>
   <data name="NotifyWhenAMeetingSeemsToEnd" xml:space="preserve">
     <value>Avisar cuando parezca que una reunión ha terminado</value>
     <comment>Notify when a meeting seems to end</comment>

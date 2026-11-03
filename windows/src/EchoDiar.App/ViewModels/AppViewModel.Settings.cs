@@ -90,8 +90,8 @@ public sealed partial class AppViewModel
     /// <summary>
     /// Applies <paramref name="settings"/> at once (the screens and the next recording read them) and saves them 300 ms
     /// after the last change, through the same ordered writes as every other settings change. Turning auto-delete on or
-    /// off starts or stops its schedule at once, a changed global shortcut is registered at once, and a changed embedder
-    /// restarts the library index (macOS
+    /// off starts or stops its schedule at once, a changed global shortcut is registered at once, a changed embedder
+    /// restarts the library index, and turning the end prompt's notification off removes a shown one (macOS
     /// <c>updateSettings</c>).
     /// </summary>
     internal void ApplySettings(AppSettings settings)
@@ -100,10 +100,12 @@ public sealed partial class AppViewModel
         var retentionChanged = settings.AutoDeleteEnabled != Settings.AutoDeleteEnabled;
         var hotKeysChanged = HotKeysChanged(Settings, settings);
         var ragChanged = RagChanged(Settings, settings);
+        var notificationTurnedOff = !settings.EndPromptNotification && Settings.EndPromptNotification;
         Settings = settings;
         if (retentionChanged) SyncRetention();
         if (hotKeysChanged) SyncHotKeys();
         if (ragChanged) SyncLibraryIndex(restart: true);
+        if (notificationTurnedOff) EndPromptNotifier.Dismiss();
         if (_settingsSaveTimer is null)
         {
             _settingsSaveTimer = _dispatcher.CreateTimer();

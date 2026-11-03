@@ -1974,6 +1974,10 @@
     <value>Notifications are off for EchoDiar in System Settings.</value>
     <comment>Notifications are off for EchoDiar in System Settings.</comment>
   </data>
+  <data name="NotificationsAreOffForEchoDiarInWindowsSettingsSystemNotific" xml:space="preserve">
+    <value>Notifications are off for EchoDiar in Windows Settings › System › Notifications.</value>
+    <comment>Notifications are off for EchoDiar in Windows Settings › System › Notifications.</comment>
+  </data>
   <data name="NotifyWhenAMeetingSeemsToEnd" xml:space="preserve">
     <value>Notify when a meeting seems to end</value>
     <comment>Notify when a meeting seems to end</comment>

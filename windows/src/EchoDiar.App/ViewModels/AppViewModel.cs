@@ -110,6 +110,7 @@ public sealed partial class AppViewModel : ObservableObject
         _pollTimer.Tick += (_, _) => PollRecording();
         Updater = new Updater(dispatcher);
         Updater.PropertyChanged += OnUpdaterChanged;
+        EndPromptNotifier = new EndPromptNotifier(() => Settings.EndPromptNotification);
     }
 
     // State

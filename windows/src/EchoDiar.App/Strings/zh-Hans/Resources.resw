@@ -1874,6 +1874,10 @@
     <value>EchoDiar 的通知已在“系统设置”中关闭。</value>
     <comment>Notifications are off for EchoDiar in System Settings.</comment>
   </data>
+  <data name="NotificationsAreOffForEchoDiarInWindowsSettingsSystemNotific" xml:space="preserve">
+    <value>EchoDiar 的通知已在“Windows 设置 › 系统 › 通知”中关闭。</value>
+    <comment>Notifications are off for EchoDiar in Windows Settings › System › Notifications.</comment>
+  </data>
   <data name="NotifyWhenAMeetingSeemsToEnd" xml:space="preserve">
     <value>会议似乎结束时发送通知</value>
     <comment>Notify when a meeting seems to end</comment>

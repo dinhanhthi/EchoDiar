@@ -80,6 +80,15 @@ public static class PillWindowStyle
     /// <summary>The foreground window; 0 when none.</summary>
     public static nint ForegroundWindow() => PInvoke.GetForegroundWindow();
 
+    /// <summary>The foreground window's process id; 0 when there is no foreground window.</summary>
+    public static int ForegroundProcessId()
+    {
+        var window = PInvoke.GetForegroundWindow();
+        if (window.IsNull) return 0;
+        PInvoke.GetWindowThreadProcessId(window, out var pid);
+        return pid <= int.MaxValue ? (int)pid : 0;
+    }
+
     /// <summary>
     /// <paramref name="window"/> is the pill or one of the windows it owns (its flyouts' popups); a press on the pill
     /// can still make it the foreground window, as WS_EX_NOACTIVATE does not hold for every activation.

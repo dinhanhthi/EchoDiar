@@ -298,7 +298,7 @@ public sealed partial class FloatingPillWindow : Window
                 _countdownTimer.Stop();
                 break;
             case PillPrompt.MeetingEnded ended:
-                RecordingCard.SetText(PromptText, Question(ended.Reason));
+                RecordingCard.SetText(PromptText, _model.EndPromptQuestion(ended.Reason));
                 CountdownText.Visibility = Visibility.Visible;
                 RecordPromptButton.Visibility = NotNowButton.Visibility = AlwaysButton.Visibility = Visibility.Collapsed;
                 JoinButton.Visibility = Visibility.Collapsed;
@@ -322,25 +322,6 @@ public sealed partial class FloatingPillWindow : Window
         }
         var left = Math.Max(0, (int)Math.Ceiling((ended.Deadline - DateTimeOffset.Now).TotalSeconds));
         RecordingCard.SetText(CountdownText, Loc.Format("Stopping in %lld s", left));
-    }
-
-    /// <summary>The end prompt's question (macOS <c>question(for:)</c>).</summary>
-    private string Question(MeetingEndMonitor.Reason reason)
-    {
-        var app = _model.RecordingSourceName ?? Loc.T("The app");
-        return reason switch
-        {
-            MeetingEndMonitor.Reason.SourceExited => Loc.Format("%@ quit — stop recording?", app),
-            MeetingEndMonitor.Reason.SourceInactive => Loc.Format("%@ stopped using audio — stop recording?", app),
-            MeetingEndMonitor.Reason.CallEnded => Loc.T("The call seems to be over — stop recording?"),
-            MeetingEndMonitor.Reason.Silence => Loc.Format(
-                "No sound for %lld min — stop recording?",
-                Math.Clamp(_model.Settings.EndMonitor.SilenceMinutes, MeetingEndMonitorConfiguration.SilenceRange.Min, MeetingEndMonitorConfiguration.SilenceRange.Max)),
-            MeetingEndMonitor.Reason.ScreenLocked => Loc.T("Screen locked — stop recording?"),
-            MeetingEndMonitor.Reason.InputRouteLost => Loc.T("Microphone disconnected — stop recording?"),
-            MeetingEndMonitor.Reason.EventEnded => Loc.T("The meeting has ended — stop recording?"),
-            _ => Loc.T("Stop recording?"),
-        };
     }
 
     /// <summary>The louder channel's peak (macOS PillMeter), from the levels the model reads at 15 Hz.</summary>

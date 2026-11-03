@@ -54,6 +54,7 @@ public sealed partial class RecordingSettingsPage : UserControl
         new("Stop when the call seems over for", ["auto-stop", "call ended", "hang up"], AutoStopTab),
         new("Stop after silence of", ["auto-stop", "quiet", "silent"], AutoStopTab),
         new("Stop after a recording length of", ["auto-stop", "maximum duration", "time limit"], AutoStopTab),
+        new("Notify when a meeting seems to end", ["auto-stop", "notification", "alert", "banner", "meeting end"], AutoStopTab),
         new("Transcribe automatically", ["auto transcribe", "after stop"], AfterRecordingTab),
         new("Tell speakers apart", ["diarization", "speakers", "who spoke"], AfterRecordingTab),
         new("Number of other speakers", ["speaker count", "diarization", "people"], AfterRecordingTab),
@@ -153,6 +154,10 @@ public sealed partial class RecordingSettingsPage : UserControl
         // The inverse of allTimedEvents (macOS meetingLinkOnly).
         LinkOnlyToggle.Toggled += (_, _) => Set(() => UpdateCalendar(c => c with { AllTimedEvents = !LinkOnlyToggle.IsOn }));
         StopAtEventEndToggle.Toggled += (_, _) => Set(() => UpdateCalendar(c => c with { StopAtEventEnd = StopAtEventEndToggle.IsOn }));
+        EndPromptNotificationToggle.Toggled += (_, _) =>
+            Set(() => _settings.Update(s => s with { EndPromptNotification = EndPromptNotificationToggle.IsOn }));
+        NotificationSettingsButton.Click += (_, _) =>
+            _ = Windows.System.Launcher.LaunchUriAsync(new Uri("ms-settings:notifications"));
         AutoTranscribeToggle.Toggled += (_, _) => Set(() => _settings.AutoTranscribe = AutoTranscribeToggle.IsOn);
         DiarizationToggle.Toggled += (_, _) => Set(() => _settings.Diarization = DiarizationToggle.IsOn);
         SpeakerCountCombo.SelectionChanged += (_, _) =>
@@ -194,6 +199,8 @@ public sealed partial class RecordingSettingsPage : UserControl
             case nameof(AppViewModel.SettingsSubTab):
                 ShowTab();
                 if (Tab == MicrophoneTab) _ = ListMicrophonesAsync();
+                // Turned on or off in Windows Settings since the page showed.
+                if (Tab == AutoStopTab) RefreshNotificationsOff();
                 break;
             case nameof(AppViewModel.CalendarAccess):
                 Refresh();
@@ -266,6 +273,8 @@ public sealed partial class RecordingSettingsPage : UserControl
             CallEndedBox.Value = Clamped(endMonitor.CallEndedSeconds, MeetingEndMonitorConfiguration.CallEndedRange);
             SilenceBox.Value = Clamped(endMonitor.SilenceMinutes, MeetingEndMonitorConfiguration.SilenceRange);
             MaxDurationBox.Value = Clamped(endMonitor.MaxDurationMinutes, MeetingEndMonitorConfiguration.MaxDurationRange);
+            EndPromptNotificationToggle.IsOn = settings.EndPromptNotification;
+            RefreshNotificationsOff();
 
             AutoTranscribeToggle.IsOn = settings.AutoTranscribe;
             DiarizationToggle.IsOn = settings.Diarization;
@@ -472,4 +481,8 @@ public sealed partial class RecordingSettingsPage : UserControl
     }
 
     private static int Clamped(int value, (int Min, int Max) range) => Math.Clamp(value, range.Min, range.Max);
+
+    /// <summary>The note and its Windows Settings button while notifications are off for EchoDiar (macOS: denied).</summary>
+    private void RefreshNotificationsOff() =>
+        NotificationsOffCard.Visibility = EndPromptNotifier.NotificationsOff() ? Visibility.Visible : Visibility.Collapsed;
 }

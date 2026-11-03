@@ -4,9 +4,11 @@
   xmlns:uap="http://schemas.microsoft.com/appx/manifest/uap/windows10"
   xmlns:uap5="http://schemas.microsoft.com/appx/manifest/uap/windows10/5"
   xmlns:rescap="http://schemas.microsoft.com/appx/manifest/foundation/windows10/restrictedcapabilities"
+  xmlns:desktop="http://schemas.microsoft.com/appx/manifest/desktop/windows10"
   xmlns:desktop6="http://schemas.microsoft.com/appx/manifest/desktop/windows10/6"
+  xmlns:com="http://schemas.microsoft.com/appx/manifest/com/windows10"
   xmlns:systemai="http://schemas.microsoft.com/appx/manifest/systemai/windows10"
-  IgnorableNamespaces="uap uap5 rescap desktop6 systemai">
+  IgnorableNamespaces="uap uap5 rescap desktop desktop6 com systemai">
 
   <!-- Version = MARKETING_VERSION of project.yml + ".0" (scripts/bump-version.sh: macOS and Windows share one
        version). CI patches it: 0.0.<run number>.0 in CI builds, X.Y.Z.0 from the release tag. -->
@@ -80,6 +82,18 @@
             Enabled="false"
             DisplayName="EchoDiar" />
         </uap5:Extension>
+        <!-- Notification clicks (the end prompt's Stop now / Keep recording, App RegisterNotifications): Windows App SDK
+             AppNotificationManager activates the app through this COM server; the same CLSID in both entries. -->
+        <com:Extension Category="windows.comServer">
+          <com:ComServer>
+            <com:ExeServer Executable="EchoDiar.App.exe" Arguments="----AppNotificationActivated:" DisplayName="EchoDiar">
+              <com:Class Id="6656F0EB-4750-4DFE-AB6E-B1E287EF9BA0" />
+            </com:ExeServer>
+          </com:ComServer>
+        </com:Extension>
+        <desktop:Extension Category="windows.toastNotificationActivation">
+          <desktop:ToastNotificationActivation ToastActivatorCLSID="6656F0EB-4750-4DFE-AB6E-B1E287EF9BA0" />
+        </desktop:Extension>
       </Extensions>
     </Application>
   </Applications>
