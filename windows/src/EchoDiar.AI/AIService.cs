@@ -29,13 +29,13 @@ public readonly record struct AIUpdate(AIUpdateKind Kind, string Value)
 /// <see cref="Stop()"/> ends every job early, <see cref="Stop(Guid)"/> the one with that id (each entry point's
 /// <c>jobId</c>; a new one when null), and saves the answer streamed until then (a summary marked stopped); nothing
 /// when no text was streamed yet. <see cref="CancelAsync"/> ends a job saving nothing, even after a stop, and waits for
-/// it. A title job names an archived chat and saves nothing. In-app models
-/// (<see cref="ILocalLLMProvider"/>) run the whole job inside <see cref="ModelLoadGate"/> (owner LLM), loaded once and
-/// unloaded before the gate is released.
+/// it. A title job names an archived chat and saves nothing. A catch-up appends to the recording's
+/// <c>catchups.json</c> and never runs on an in-app model. In-app models (<see cref="ILocalLLMProvider"/>) run the
+/// whole job inside <see cref="ModelLoadGate"/> (owner LLM), loaded once and unloaded before the gate is released.
 /// </summary>
 /// <remarks>
-/// The Swift actor's only isolated member is the <c>chat.json</c> append; here a lock serializes it, so two answers
-/// finishing together cannot drop each other's messages. The running jobs (Swift <c>Jobs</c>, two mutexes) are a list
+/// The Swift actor's only isolated members are the <c>chat.json</c> and <c>catchups.json</c> appends; here a lock
+/// serializes each, so two jobs finishing together cannot drop each other's entries. The running jobs (Swift <c>Jobs</c>, two mutexes) are a list
 /// under a second lock that <see cref="Stop"/> snapshots. Each job runs on the thread pool and passes its updates
 /// through a channel; leaving the enumeration cancels the job and waits for it, so nothing is written after that.
 /// </remarks>
@@ -103,6 +103,7 @@ public sealed class AIService(ModelLoadGate gate)
     private readonly Lock _jobsLock = new();
     private readonly List<Job> _jobs = [];
     private readonly Lock _chatLock = new();
+    private readonly Lock _catchUpLock = new();
 
     /// <summary>Ends every running job, saving what each has streamed; their enumerations then finish without an error.</summary>
     public void Stop()
@@ -232,6 +233,51 @@ public sealed class AIService(ModelLoadGate gate)
     }
 
     /// <summary>
+    /// Streams a catch-up while recording: <paramref name="messages"/> (<see cref="PromptBuilder.CatchUpMessages"/> of
+    /// <paramref name="plan"/>), then appends a <see cref="CatchUp"/> covering <paramref name="plan"/> to
+    /// <paramref name="folder"/>'s <c>catchups.json</c>, also when stopped with some text (<c>Stopped</c>).
+    /// <paramref name="providerID"/> is saved with it and <paramref name="elapsed"/> (seconds of recording when it was
+    /// asked for) too. Fails at once with an in-app model (<see cref="ILocalLLMProvider"/>), before entering the job: the
+    /// live transcriber holds the model gate for the whole recording. Named with <c>Async</c> because a
+    /// <c>CatchUp</c> member would hide the <see cref="CatchUp"/> type here.
+    /// </summary>
+    public IAsyncEnumerable<AIUpdate> CatchUpAsync(
+        CatchUpPlan plan, IReadOnlyList<LLMMessage> messages, ILLMProvider provider, string providerID, string model,
+        double elapsed, string folder, CancellationToken cancellationToken = default, Guid? jobId = null)
+    {
+        if (provider is ILocalLLMProvider) return Failing(LLMException.Provider("A catch-up needs a provider outside the app."));
+        var asked = DateTimeOffset.UtcNow;
+        return RunAsync(jobId, provider, model, async (backend, yield, job) =>
+        {
+            var context = await provider.ContextWindowAsync(model, job.Token);
+            string text;
+            var cut = false;
+            try
+            {
+                text = await AnswerAsync(messages, backend, model, context, yield, job.Token);
+            }
+            catch (Interrupted interrupted) when (job.IsStopped && interrupted.Text.Length > 0)
+            {
+                (text, cut) = (interrupted.Text, true);
+            }
+            if (job.Token.IsCancellationRequested && !job.IsStopped) throw new OperationCanceledException(job.Token);
+            AppendCatchUp(folder, new CatchUp
+            {
+                CreatedAt = asked, Elapsed = elapsed, ThroughLineID = plan.ThroughLineID, ThroughTime = plan.ThroughTime,
+                FullPass = plan.FullPass, Text = text, Provider = providerID, Model = model, Stopped = cut,
+            });
+        }, cancellationToken);
+    }
+
+    /// <summary>An enumeration that throws <paramref name="error"/> on its first read.</summary>
+    private static async IAsyncEnumerable<AIUpdate> Failing(Exception error)
+    {
+        await Task.CompletedTask;
+        ExceptionDispatchInfo.Throw(error);
+        yield break;
+    }
+
+    /// <summary>
     /// A short title for <paramref name="chat"/>, from its questions: one text update with the whole cleaned title (none
     /// when the model gave nothing usable), no text streamed before it; an in-app model's job sends its status lines
     /// first.
@@ -276,6 +322,17 @@ public sealed class AIService(ModelLoadGate gate)
             var log = ChatLog.Read(folder);
             log.Messages.AddRange(messages);
             log.Write(folder);
+        }
+    }
+
+    /// <summary>Serialized so two catch-ups finishing together cannot drop each other; an unreadable file is not replaced.</summary>
+    private void AppendCatchUp(string folder, CatchUp catchUp)
+    {
+        lock (_catchUpLock)
+        {
+            var log = CatchUpLog.Load(folder);
+            log.Append(catchUp);
+            log.Save(folder);
         }
     }
 

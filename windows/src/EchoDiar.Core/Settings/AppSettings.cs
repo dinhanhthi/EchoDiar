@@ -57,6 +57,13 @@ public sealed record AppSettings : IJsonOnDeserialized
     [JsonPropertyName("defaultAIProviderID")] public string? DefaultAIProviderID { get; set; }
     /// <summary>Model for <see cref="DefaultAIProviderID"/>; null = that config's default model.</summary>
     [JsonPropertyName("defaultAIModel")] public string? DefaultAIModel { get; set; }
+    /// <summary>Catch-up provider while recording: a provider config id outside the app (never an in-app model); empty =
+    /// automatic (the AI tab provider when it is not in-app, else the first configured one).</summary>
+    [JsonPropertyName("catchUpProviderID")] public string CatchUpProviderID { get; set; } = "";
+    /// <summary>Model for the catch-up provider; empty = automatic (that provider's model).</summary>
+    [JsonPropertyName("catchUpModel")] public string CatchUpModel { get; set; } = "";
+    /// <summary>Each catch-up summarizes the recording from the start, instead of building on the previous one.</summary>
+    [JsonPropertyName("catchUpFromStart")] public bool CatchUpFromStart { get; set; }
     [JsonPropertyName("summaryLanguage")] public string SummaryLanguage { get; set; } = "auto";
     /// <summary>Earlier chat messages sent with each question; 0 = the whole chat.</summary>
     [JsonPropertyName("chatContextMessages")] public int ChatContextMessages { get; set; } = 10;

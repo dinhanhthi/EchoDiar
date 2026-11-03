@@ -40,6 +40,13 @@ public struct AppSettings: Codable, Equatable, Sendable {
     public var defaultAIProviderID: String?
     /// Model for `defaultAIProviderID`; nil = that config's `defaultModel`.
     public var defaultAIModel: String?
+    /// Catch-up provider while recording: a `ProviderConfig` id outside the app (never an in-app model); empty =
+    /// automatic (the AI tab provider when it is not in-app, else the first configured one).
+    public var catchUpProviderID: String
+    /// Model for the catch-up provider; empty = automatic (that provider's model).
+    public var catchUpModel: String
+    /// Each catch-up summarizes the recording from the start, instead of building on the previous one.
+    public var catchUpFromStart: Bool
     /// Summary language: "auto" (the transcript's dominant language), "en", "fr", "vi" or another BCP-47 code.
     public var summaryLanguage: String
     /// Earlier chat messages sent with each question; 0 = the whole chat.
@@ -126,6 +133,9 @@ public struct AppSettings: Codable, Equatable, Sendable {
         cloudSTTConfirmed: [String] = [],
         defaultAIProviderID: String? = nil,
         defaultAIModel: String? = nil,
+        catchUpProviderID: String = "",
+        catchUpModel: String = "",
+        catchUpFromStart: Bool = false,
         summaryLanguage: String = "auto",
         chatContextMessages: Int = 10,
         ragEnabled: Bool = false,
@@ -177,6 +187,9 @@ public struct AppSettings: Codable, Equatable, Sendable {
         self.cloudSTTConfirmed = cloudSTTConfirmed
         self.defaultAIProviderID = defaultAIProviderID
         self.defaultAIModel = defaultAIModel
+        self.catchUpProviderID = catchUpProviderID
+        self.catchUpModel = catchUpModel
+        self.catchUpFromStart = catchUpFromStart
         self.summaryLanguage = summaryLanguage
         self.chatContextMessages = chatContextMessages
         self.ragEnabled = ragEnabled
@@ -227,6 +240,7 @@ public struct AppSettings: Codable, Equatable, Sendable {
         case playbackChannels, onboardingCompleted, modelIdleMinutes
         case defaultASRModelID, defaultDiarizerModelID, providers
         case cloudSTTConfirmed, defaultAIProviderID, defaultAIModel, summaryLanguage, chatContextMessages
+        case catchUpProviderID, catchUpModel, catchUpFromStart
         case ragEnabled, embeddingModelID, embeddingAPIModel, cloudEmbeddingConfirmed
         case micDeviceUID, meetingDetection, perAppBehavior, pillPositions, showPill, hidePillWhenAppActive
         case showPillInScreenCaptures, attachPillToWindow, pillWindowOffset, pillSize, endMonitor, routeChangeBehavior
@@ -257,6 +271,9 @@ public struct AppSettings: Codable, Equatable, Sendable {
         cloudSTTConfirmed = try container.decodeIfPresent([String].self, forKey: .cloudSTTConfirmed) ?? []
         defaultAIProviderID = try container.decodeIfPresent(String.self, forKey: .defaultAIProviderID)
         defaultAIModel = try container.decodeIfPresent(String.self, forKey: .defaultAIModel)
+        catchUpProviderID = try container.decodeIfPresent(String.self, forKey: .catchUpProviderID) ?? ""
+        catchUpModel = try container.decodeIfPresent(String.self, forKey: .catchUpModel) ?? ""
+        catchUpFromStart = try container.decodeIfPresent(Bool.self, forKey: .catchUpFromStart) ?? false
         summaryLanguage = try container.decodeIfPresent(String.self, forKey: .summaryLanguage) ?? "auto"
         chatContextMessages = try container.decodeIfPresent(Int.self, forKey: .chatContextMessages) ?? 10
         ragEnabled = try container.decodeIfPresent(Bool.self, forKey: .ragEnabled) ?? false

@@ -8,7 +8,8 @@ namespace EchoDiar.Tests.AI;
 // Guards the summary job: map-reduce sends status lines and streams only the final reduce, the result is saved as a
 // version, a cancelled job saves nothing (also after a stop, and CancelAsync waits for it), a stopped job saves what it
 // streamed, and an in-app model is unloaded before the gate is released. Also guards how many earlier chat messages a
-// question sends, the library question's sources and references, and the clickable citations. AIServiceTests.swift +
+// question sends, the library question's sources and references, the clickable citations, and the catch-up job
+// (appended to catchups.json, never on an in-app model). AIServiceTests.swift +
 // AIStorageTests.swift (citations).
 public sealed class AIServiceTests : IDisposable
 {
@@ -526,6 +527,65 @@ public sealed class AIServiceTests : IDisposable
         Assert.StartsWith("Reading part 1 of", only.Value);
         Assert.Empty(Conversation.ReadSummaryVersions(conversation.Folder));
         Assert.False(Conversation.Read(conversation.Folder).HasSummary);
+    }
+
+    [Fact]
+    public async Task CatchUpsAppendACompletedThenAStoppedEntry()
+    {
+        var folder = NewFolderPath();
+        Directory.CreateDirectory(folder);
+        var service = new AIService(new ModelLoadGate());
+        LLMMessage[] messages = [new(LLMRole.User, "Catch me up.")];
+        var provider = new FakeProvider("So far: the roadmap.", context: 128_000);
+        var first = new CatchUpPlan(null, [], [], Omitted: false, FullPass: true, ThroughLineID: 7, ThroughTime: 42.5);
+        var second = new CatchUpPlan(
+            "So far: the roadmap.", [], [], Omitted: false, FullPass: false, ThroughLineID: 12, ThroughTime: 95);
+
+        await Collect(service.CatchUpAsync(
+            first, messages, provider, providerID: "cfg-1", model: "fake", elapsed: 60, folder, Ct));
+        await foreach (var update in service.CatchUpAsync(
+            second, messages, new StallingProvider("## Budget"), providerID: "cfg-2", model: "slow", elapsed: 120,
+            folder, Ct))
+        {
+            if (update.Kind == AIUpdateKind.Text) service.Stop();
+        }
+
+        Assert.Equal(messages, provider.LastReceived!);
+        var catchUps = CatchUpLog.Load(folder).CatchUps;
+        Assert.Equal([false, true], catchUps.Select(c => c.Stopped));
+        Assert.Equal(["So far: the roadmap.", "## Budget"], catchUps.Select(c => c.Text));
+        Assert.Equal([7, 12], catchUps.Select(c => c.ThroughLineID));
+        Assert.Equal([42.5, 95], catchUps.Select(c => c.ThroughTime));
+        Assert.Equal([true, false], catchUps.Select(c => c.FullPass));
+        Assert.Equal(["cfg-1", "cfg-2"], catchUps.Select(c => c.Provider));
+        Assert.Equal(["fake", "slow"], catchUps.Select(c => c.Model));
+        Assert.Equal([60.0, 120.0], catchUps.Select(c => c.Elapsed));
+    }
+
+    [Fact]
+    public async Task CatchUpOnAnInAppModelFailsWithoutWaitingForTheGate()
+    {
+        var gate = new ModelLoadGate();
+        var service = new AIService(gate);
+        var plan = new CatchUpPlan(null, [], [], Omitted: false, FullPass: true, ThroughLineID: 7, ThroughTime: 42);
+        // Held by the live transcriber for the whole recording: a job waiting for it would send its waiting status.
+        using var lease = await gate.AcquireAsync(ModelLoadGate.Owner.LiveTranscript, Ct);
+
+        var updates = new List<AIUpdate>();
+        var error = await Assert.ThrowsAsync<LLMException>(async () =>
+        {
+            await foreach (var update in service.CatchUpAsync(
+                plan, [new(LLMRole.User, "Catch me up.")], new FakeLocalProvider(), providerID: "local", model: "local",
+                elapsed: 60, NewFolderPath(), Ct))
+            {
+                updates.Add(update);
+                break;
+            }
+        });
+
+        Assert.Empty(updates);
+        Assert.Equal(LLMErrorKind.Provider, error.Kind);
+        Assert.Equal("A catch-up needs a provider outside the app.", error.Message);
     }
 
     [Fact]

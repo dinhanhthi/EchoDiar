@@ -48,6 +48,8 @@ public actor RecordingTranscriber {
         public let id: Int
         public let speaker: Speaker
         public let text: String
+        /// Seconds of file time (recording time, pauses excluded) where its chunk or Apple Speech result starts.
+        public let start: TimeInterval
     }
 
     /// The text of a chunk still open, decoded so far; its line replaces it once the chunk closes.
@@ -136,6 +138,8 @@ public actor RecordingTranscriber {
     private var snapshot = Snapshot(state: .loading)
     private var published: Snapshot?
     private var nextLineID = 0
+    /// Every line shown, oldest first, also those the snapshot dropped (`maxLines`): the catch-up's input.
+    private var finalized: [Line] = []
     private var decoder: Task<Void, Never>?
     private var finished = false
     /// What `finish()` left; nil before it, or when the model never loaded or `cancel()` ran.
@@ -494,11 +498,7 @@ public actor RecordingTranscriber {
             othersPending || buffer.withLock { $0.othersFinal(during: span) }
         })
         snapshot.tentative = Self.tentative(snapshot.tentative, setting: speaker, text: nil, startSample: 0)
-        if let text {
-            snapshot.lines.append(Line(id: nextLineID, speaker: speaker, text: text))
-            nextLineID += 1
-            snapshot.lines.removeFirst(max(0, snapshot.lines.count - Self.maxLines))
-        }
+        if let text { addLine(speaker, text, start: segment.start) }
         publishRunning()
     }
 
@@ -506,12 +506,24 @@ public actor RecordingTranscriber {
     /// tentative text of that chunk, in one publish.
     private func add(_ speaker: Speaker, _ text: String?, startSample: Int) {
         snapshot.tentative = Self.tentative(snapshot.tentative, clearing: speaker, startSample: startSample)
-        if let text {
-            snapshot.lines.append(Line(id: nextLineID, speaker: speaker, text: text))
-            nextLineID += 1
-            snapshot.lines.removeFirst(max(0, snapshot.lines.count - Self.maxLines))
-        }
+        if let text { addLine(speaker, text, start: Double(startSample) / Double(Self.sampleRate)) }
         publishRunning()
+    }
+
+    /// Adds a line with the next id to the snapshot (the newest `maxLines`) and to `finalized` (all of them).
+    private func addLine(_ speaker: Speaker, _ text: String, start: TimeInterval) {
+        let line = Line(id: nextLineID, speaker: speaker, text: text, start: start)
+        nextLineID += 1
+        finalized.append(line)
+        snapshot.lines.append(line)
+        snapshot.lines.removeFirst(max(0, snapshot.lines.count - Self.maxLines))
+    }
+
+    /// The lines shown after the line `id` (all of them for nil), oldest first, none dropped; ids increase by one and
+    /// are never reused. Kept after `finish()` and `cancel()`.
+    public func finalizedLines(after id: Int?) -> [Line] {
+        guard let id else { return finalized }
+        return finalized.filter { $0.id > id }
     }
 
     private func setTentative(_ speaker: Speaker, _ text: String?, startSample: Int) {

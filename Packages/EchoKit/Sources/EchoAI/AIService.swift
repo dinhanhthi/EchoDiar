@@ -7,9 +7,10 @@ import Synchronization
 /// `chat.json` messages) and saves nothing when cancelled or failed. `stop(_:)` ends a job early (`stop()` every job)
 /// and saves the answer streamed until then (a summary marked stopped); nothing when no text was streamed yet.
 /// `cancel(_:)` ends a job saving nothing, even after a stop, and waits for it. A
-/// job's `jobID` must be unique among the running jobs. A title job names an archived chat and saves nothing. In-app
-/// models (`LocalLLMProvider`: Foundation Models, MLX) run the whole job inside `ModelLoadGate` (owner `.llm`), loaded
-/// once and unloaded before the gate is released.
+/// job's `jobID` must be unique among the running jobs. A title job names an archived chat and saves nothing. A
+/// catch-up appends to the recording's `catchups.json` and never runs on an in-app model. In-app models
+/// (`LocalLLMProvider`: Foundation Models, MLX) run the whole job inside `ModelLoadGate` (owner `.llm`), loaded once
+/// and unloaded before the gate is released.
 public actor AIService {
     public enum Update: Equatable, Sendable {
         /// What a long job is doing ("Reading part 2 of 5…"), before the answer starts.
@@ -163,6 +164,36 @@ public actor AIService {
         }
     }
 
+    /// Streams a catch-up while recording: `messages` (`PromptBuilder.catchUpMessages` of `plan`), then appends a
+    /// `CatchUp` covering `plan` to `folder`'s `catchups.json`, also when stopped with some text (`stopped`).
+    /// `providerID` is saved with it and `elapsed` (seconds of recording when it was asked for) too. Fails at once
+    /// with an in-app model (`LocalLLMProvider`): the live transcriber holds the model gate for the whole recording.
+    public nonisolated func catchUp(
+        plan: CatchUpPlan, messages: [LLMMessage], provider: any LLMProvider, providerID: String, model: String,
+        elapsed: TimeInterval, folder: URL, jobID: UUID = UUID()
+    ) -> AsyncThrowingStream<Update, Error> {
+        guard !(provider is any LocalLLMProvider) else {
+            return AsyncThrowingStream {
+                $0.finish(throwing: LLMError.provider("A catch-up needs a provider outside the app."))
+            }
+        }
+        let asked = Date()
+        return job(id: jobID, provider: provider, model: model) { [self] backend, yield, isStopped in
+            let context = await provider.contextWindow(model: model)
+            let text: String
+            var cut = false
+            do {
+                text = try await Self.answer(messages, backend: backend, model: model, context: context, yield: yield)
+            } catch let interrupted as Interrupted where isStopped() && !interrupted.text.isEmpty {
+                (text, cut) = (interrupted.text, true)
+            }
+            if Task.isCancelled && !isStopped() { throw CancellationError() }
+            try await appendCatchUp(CatchUp(
+                createdAt: asked, elapsed: elapsed, throughLineID: plan.throughLineID, throughTime: plan.throughTime,
+                fullPass: plan.fullPass, text: text, provider: providerID, model: model, stopped: cut), folder: folder)
+        }
+    }
+
     /// The last `limit` messages of `history` (0 or less = all of them), starting with a question: some APIs reject a
     /// conversation whose first turn is an answer.
     private static func turns(_ history: [ChatLog.Message], limit: Int) -> [LLMMessage] {
@@ -209,6 +240,13 @@ public actor AIService {
         var log = ChatLog.read(from: folder)
         log.messages += messages
         try log.write(to: folder)
+    }
+
+    /// Serialized here so two catch-ups finishing together cannot drop each other; an unreadable file is not replaced.
+    private func appendCatchUp(_ catchUp: CatchUp, folder: URL) throws {
+        var log = try CatchUpLog.load(from: folder)
+        log.append(catchUp)
+        try log.save(to: folder)
     }
 
     /// Runs `work` as job `id` in a task that the stream's end cancels, and `stop()` or `stop(id)` too (`work`'s

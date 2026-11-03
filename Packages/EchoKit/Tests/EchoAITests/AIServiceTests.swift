@@ -7,7 +7,7 @@ import Testing
 /// Guards the summary job: map-reduce sends status lines and streams only the final reduce, the result is saved as a
 /// version, a cancelled job saves nothing (also after a stop, and `cancel` waits for it), a stopped job saves what it
 /// streamed (stopping one job leaves the others running), and an in-app model is unloaded before the gate is released. Also guards how many earlier chat messages a
-/// question sends.
+/// question sends, and the catch-up job (appended to `catchups.json`, never on an in-app model).
 struct AIServiceTests {
     /// Answers every request with `reply`, in two pieces, and reports a small context to force map-reduce.
     final class FakeProvider: LLMProvider {
@@ -410,6 +410,70 @@ struct AIServiceTests {
         #expect(status.hasPrefix("Reading part 1 of"))
         #expect(Conversation.readSummaryVersions(from: conversation.folder).isEmpty)
         #expect(try !Conversation.read(from: conversation.folder).hasSummary)
+    }
+
+    @Test
+    func catchUpsAppendACompletedThenAStoppedEntry() async throws {
+        let folder = FileManager.default.temporaryDirectory.appendingPathComponent("AIServiceTests-\(UUID().uuidString)")
+        try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: folder) }
+        let service = AIService(gate: ModelLoadGate())
+        let messages = [LLMMessage(role: .user, content: "Catch me up.")]
+        let provider = FakeProvider(reply: "So far: the roadmap.", context: 128_000)
+        let first = CatchUpPlan(
+            previous: nil, transcript: [], recent: [], omitted: false, fullPass: true, throughLineID: 7,
+            throughTime: 42.5)
+        let second = CatchUpPlan(
+            previous: "So far: the roadmap.", transcript: [], recent: [], omitted: false, fullPass: false,
+            throughLineID: 12, throughTime: 95)
+
+        for try await _ in service.catchUp(
+            plan: first, messages: messages, provider: provider, providerID: "cfg-1", model: "fake", elapsed: 60,
+            folder: folder) {}
+        for try await update in service.catchUp(
+            plan: second, messages: messages, provider: StallingProvider(piece: "## Budget"), providerID: "cfg-2",
+            model: "slow", elapsed: 120, folder: folder) {
+            if case .text = update { service.stop() }
+        }
+
+        #expect(provider.received.withLock { $0 } == [messages])
+        let catchUps = try CatchUpLog.load(from: folder).catchUps
+        #expect(catchUps.map(\.stopped) == [false, true])
+        #expect(catchUps.map(\.text) == ["So far: the roadmap.", "## Budget"])
+        #expect(catchUps.map(\.throughLineID) == [7, 12])
+        #expect(catchUps.map(\.throughTime) == [42.5, 95])
+        #expect(catchUps.map(\.fullPass) == [true, false])
+        #expect(catchUps.map(\.provider) == ["cfg-1", "cfg-2"])
+        #expect(catchUps.map(\.model) == ["fake", "slow"])
+        #expect(catchUps.map(\.elapsed) == [60, 120])
+    }
+
+    @Test
+    func catchUpOnAnInAppModelFailsWithoutWaitingForTheGate() async throws {
+        let gate = ModelLoadGate()
+        let service = AIService(gate: gate)
+        let plan = CatchUpPlan(
+            previous: nil, transcript: [], recent: [], omitted: false, fullPass: true, throughLineID: 7, throughTime: 42)
+        let folder = FileManager.default.temporaryDirectory.appendingPathComponent("AIServiceTests-\(UUID().uuidString)")
+
+        // Held by the live transcriber for the whole recording: a job waiting for it would send its waiting status.
+        let (updates, message) = try await gate.withExclusiveModel(owner: .liveTranscript) {
+            var updates: [AIService.Update] = []
+            do {
+                for try await update in service.catchUp(
+                    plan: plan, messages: [LLMMessage(role: .user, content: "Catch me up.")],
+                    provider: FakeLocalProvider(), providerID: "local", model: "local", elapsed: 60, folder: folder) {
+                    updates.append(update)
+                    break
+                }
+                return (updates, nil as String?)
+            } catch let error as LLMError {
+                return (updates, error.errorDescription)
+            }
+        }
+
+        #expect(updates.isEmpty)
+        #expect(message == "A catch-up needs a provider outside the app.")
     }
 
     @Test

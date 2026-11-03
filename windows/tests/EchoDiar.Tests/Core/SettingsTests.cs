@@ -214,6 +214,7 @@ public sealed class SettingsTests : IDisposable
           "compressionBitrateKbps": 64, "keepUncompressedAudio": false, "rememberRecordingLanguage": false,
           "playbackChannels": "mixed",
           "onboardingCompleted": false, "modelIdleMinutes": 2, "providers": [], "cloudSTTConfirmed": [],
+          "catchUpProviderID": "", "catchUpModel": "", "catchUpFromStart": false,
           "summaryLanguage": "auto", "chatContextMessages": 10, "ragEnabled": false,
           "embeddingModelID": "gguf-qwen3-embedding-0.6b", "embeddingAPIModel": "", "cloudEmbeddingConfirmed": [],
           "meetingDetection": true, "perAppBehavior": {}, "pillPositions": {}, "showPill": true,

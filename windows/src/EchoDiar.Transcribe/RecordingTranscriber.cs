@@ -44,7 +44,8 @@ public sealed class RecordingTranscriber : IAsyncDisposable
     public enum Speaker { Me, Others }
 
     /// <summary>One decoded chunk's text (<see cref="LineText"/>), not one per Whisper segment.</summary>
-    public sealed record Line(int Id, Speaker Speaker, string Text);
+    /// <param name="Start">Seconds of file time (recording time, pauses excluded) where its chunk starts.</param>
+    public sealed record Line(int Id, Speaker Speaker, string Text, double Start = 0);
 
     /// <param name="Lines">Oldest first, at most <see cref="MaxLines"/>; a new array whenever a line is added.</param>
     /// <param name="PendingSeconds">Seconds of speech waiting to be decoded, both channels summed.</param>
@@ -129,6 +130,8 @@ public sealed class RecordingTranscriber : IAsyncDisposable
     private TranscriberState _state = TranscriberState.Loading;
     private string? _error;
     private Line[] _lines = [];
+    /// <summary>Every line shown, oldest first, also those the snapshot dropped (<see cref="MaxLines"/>): the catch-up's input.</summary>
+    private readonly List<Line> _finalized = [];
     private Tentative[] _tentative = [];
     private int _nextLineID;
     private Snapshot? _published;
@@ -468,7 +471,8 @@ public sealed class RecordingTranscriber : IAsyncDisposable
 
     /// <summary>
     /// The final of the chunk starting at <paramref name="startSample"/> (Swift <c>add</c>): its line (none when
-    /// <paramref name="text"/> is null) replaces the speaker's tentative text of that chunk, in one publish.
+    /// <paramref name="text"/> is null) replaces the speaker's tentative text of that chunk, in one publish, and goes to
+    /// the snapshot (the newest <see cref="MaxLines"/>) and the finalized log (all of them).
     /// </summary>
     private void AddLine(Speaker speaker, string? text, long startSample)
     {
@@ -477,11 +481,23 @@ public sealed class RecordingTranscriber : IAsyncDisposable
             _tentative = WithoutTentative(_tentative, speaker, startSample);
             if (text is not null)
             {
-                var lines = new List<Line>(_lines) { new(_nextLineID++, speaker, text) };
+                var line = new Line(_nextLineID++, speaker, text, (double)startSample / SampleRate);
+                _finalized.Add(line);
+                var lines = new List<Line>(_lines) { line };
                 _lines = [.. lines.Skip(Math.Max(0, lines.Count - MaxLines))];
             }
         }
         PublishRunning();
+    }
+
+    /// <summary>
+    /// The lines shown after the line <paramref name="afterId"/> (all of them for null), oldest first, none dropped
+    /// (Swift <c>finalizedLines(after:)</c>); ids increase by one and are never reused. Kept after
+    /// <see cref="FinishAsync"/> and <see cref="Cancel"/>.
+    /// </summary>
+    public IReadOnlyList<Line> FinalizedLines(int? afterId)
+    {
+        lock (_lock) return afterId is { } id ? [.. _finalized.Where(l => l.Id > id)] : [.. _finalized];
     }
 
     private void SetTentative(Speaker speaker, string? text, long startSample)
