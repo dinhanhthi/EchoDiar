@@ -235,12 +235,12 @@ extension AppModel {
 // MARK: - Library chat
 
 extension AppModel {
-    /// Asks `question` across the library as the AI job (`conversationID` nil) with the current AI provider and model:
-    /// searches the index, then streams the answer, saved with its references in `globalChatFolder`'s `chat.json`.
-    /// The job is set before the search so indexing yields. With no source found the question is still asked: the
-    /// prompt has the model say the sources hold no answer.
+    /// Asks `question` across the library as the AI job of the nil key, beside the conversations' jobs, with the current
+    /// AI provider and model: searches the index, then streams the answer, saved with its references in
+    /// `globalChatFolder`'s `chat.json`. The job is set before the search so indexing yields. With no source found the
+    /// question is still asked: the prompt has the model say the sources hold no answer.
     func askLibrary(_ question: String) {
-        guard aiJob == nil, settings.ragEnabled, let provider = currentAIProvider else { return }
+        guard aiJobs.entry(for: nil) == nil, settings.ragEnabled, let provider = currentAIProvider else { return }
         let model = aiModel(for: provider).trimmingCharacters(in: .whitespacesAndNewlines)
         aiError = nil
         let client: (any LLMProvider)?
@@ -254,29 +254,31 @@ extension AppModel {
             aiError = (nil, String(localized: "\(provider.name) is not available."))
             return
         }
+        let jobID = UUID()
         let task = Task { [weak self] in
-            let stream = await self?.libraryAnswer(question, client: client, providerID: provider.id, model: model)
+            let stream = await self?.libraryAnswer(
+                question, client: client, providerID: provider.id, model: model, jobID: jobID)
             if let stream {
                 do {
-                    for try await update in stream { self?.applyAIUpdate(update) }
+                    for try await update in stream { self?.applyAIUpdate(update, key: nil) }
                 } catch where !Task.isCancelled {
                     self?.aiError = (nil, error.localizedDescription)
                 } catch {}
             }
             guard let self else { return }
-            flushAIText()
-            aiJob = nil
-            aiJobsEnded += 1
+            endAIJob(key: nil)
             syncLibraryIndex()
         }
-        aiJob = AIJob(
-            conversationID: nil, kind: .question(question),
-            status: String(localized: "Searching your conversations…"), task: task)
+        aiJobs.start(
+            key: nil, kind: .libraryQuestion, usesInAppModel: provider.kind == .inApp,
+            payload: AIJob(kind: .question(question), jobID: jobID, task: task))
+        aiJobStatus[nil] = String(localized: "Searching your conversations…")
     }
 
-    /// The search and the answer stream of `askLibrary`; nil when the job was stopped during the search.
+    /// The search and the answer stream (as `AIService` job `jobID`) of `askLibrary`; nil when the job was stopped
+    /// during the search.
     private func libraryAnswer(
-        _ question: String, client: any LLMProvider, providerID: String, model: String
+        _ question: String, client: any LLMProvider, providerID: String, model: String, jobID: UUID
     ) async -> AsyncThrowingStream<AIService.Update, Error>? {
         let vector = await queryVector(question)
         let context = await client.contextWindow(model: model)
@@ -295,10 +297,11 @@ extension AppModel {
         let (sources, references) = librarySources(
             hits, budget: TranscriptChunker.budget(contextWindow: context, instructionTokens: promptTokens))
         guard !Task.isCancelled else { return nil }
-        aiJob?.status = nil
+        aiJobStatus[nil] = nil
         return aiService.askLibrary(
             question: question, sources: sources, references: references, history: history, historyLimit: limit,
-            provider: client, providerID: providerID, model: model, language: settings.summaryLanguage, folder: folder)
+            provider: client, providerID: providerID, model: model, language: settings.summaryLanguage, folder: folder,
+            jobID: jobID)
     }
 
     /// The question's embedding; nil (BM25 only) without a usable embedder, while the API embedder's destination is

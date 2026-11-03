@@ -259,7 +259,7 @@ struct TranscriptView: View {
     /// "Summarizing…" in its place while this conversation's summary is written.
     @ViewBuilder
     private var summaryButton: some View {
-        if let job = model.aiJob, job.conversationID == conversation.id, job.kind == .summary {
+        if model.aiJobs.entry(for: conversation.id)?.kind == .summary {
             Button {} label: {
                 HStack(spacing: 8) {
                     ProgressView().controlSize(.small)
@@ -277,7 +277,7 @@ struct TranscriptView: View {
     }
 
     /// The tab switches in the click's frame; the job starts as the Summary tab's Summarize button starts it, and
-    /// `startAIJob` does nothing while another job runs.
+    /// `startAIJob` does nothing while this conversation has a job (other conversations' jobs do not block it).
     private func summarize() {
         model.detailTab = .summary
         guard !conversation.hasSummary, let transcript, let provider = model.currentAIProvider else { return }

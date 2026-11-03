@@ -91,7 +91,7 @@ struct AIPanelView: View {
             questionFocused = true
         }
         .task(id: LoadKey(id: conversation.id, hasTranscript: conversation.hasTranscript,
-                          jobsEnded: model.aiJobsEnded)) { await load() }
+                          jobsEnded: model.aiJobEnds[conversation.id] ?? 0)) { await load() }
         // Start fresh, Resume and a new title: the chat and the history only (`load()` resets the shown version).
         .task(id: HistoryKey(id: conversation.id, changes: model.chatHistoryChanges)) { await loadChat() }
         // A new conversation rebuilds the view (`MainView` gives it the conversation's id), which closes the panel too.
@@ -143,17 +143,17 @@ struct AIPanelView: View {
                     ForEach(Array(chat.enumerated()), id: \.offset) { _, message in
                         messageView(message.role, text: message.text, model: message.model)
                     }
-                    if let job = questionJob, case .question(let asked) = job.kind {
+                    if let job = questionJob, case .question(let asked) = job.payload.kind {
                         messageView(.user, text: asked, model: nil)
-                        if job.text.isEmpty {
+                        if let text = jobText {
+                            messageView(.assistant, text: text, model: currentModel, isStreaming: true)
+                        } else {
                             HStack(spacing: 6) {
                                 ProgressView().controlSize(.small)
-                                if let status = job.status {
+                                if let status = jobStatus {
                                     Text(status).foregroundStyle(.secondary)
                                 }
                             }
-                        } else {
-                            messageView(.assistant, text: job.text, model: currentModel, isStreaming: true)
                         }
                     }
                     Color.clear.frame(height: 1).id(Self.chatEnd)
@@ -163,7 +163,9 @@ struct AIPanelView: View {
             }
             .onAppear { proxy.scrollTo(Self.chatEnd, anchor: .bottom) }
             .onChange(of: chat.count) { _, _ in proxy.scrollTo(Self.chatEnd, anchor: .bottom) }
-            .onChange(of: questionJob?.text.count) { _, _ in proxy.scrollTo(Self.chatEnd, anchor: .bottom) }
+            .onChange(of: questionJob == nil ? nil : jobText?.count) { _, _ in
+                proxy.scrollTo(Self.chatEnd, anchor: .bottom)
+            }
         }
     }
 
@@ -332,16 +334,16 @@ struct AIPanelView: View {
                     }
                     ScrollView {
                         VStack(alignment: .leading, spacing: 8) {
-                            if let job = summaryJob {
+                            if summaryJob != nil {
                                 // Until the first text: a remote provider sends no status before it.
-                                if job.text.isEmpty {
+                                if let text = jobText {
+                                    MarkdownText(text: text)
+                                } else {
                                     HStack(spacing: 6) {
                                         ProgressView().controlSize(.small)
-                                        Text(job.status ?? String(localized: "Writing the summary…"))
+                                        Text(jobStatus ?? String(localized: "Writing the summary…"))
                                             .foregroundStyle(.secondary)
                                     }
-                                } else {
-                                    MarkdownText(text: job.text)
                                 }
                             } else if let shown = shownSummary {
                                 MarkdownText(text: shown.text)
@@ -446,7 +448,7 @@ struct AIPanelView: View {
                     Spacer(minLength: 0)
                     copyButton
                     if summaryJob != nil {
-                        Button(action: model.stopAIJob) {
+                        Button { model.stopAIJob(conversation.id) } label: {
                             Label("Summarizing", systemImage: "stop.fill")
                         }
                         .buttonStyle(BottomBarButtonStyle(prominent: true))
@@ -493,7 +495,7 @@ struct AIPanelView: View {
                     .fill(Palette.inputSurface))
             copyButton
             if questionJob != nil {
-                Button(action: model.stopAIJob) {
+                Button { model.stopAIJob(conversation.id) } label: {
                     Label("Stop", systemImage: "stop.fill").labelStyle(.iconOnly)
                 }
                 .buttonStyle(BottomBarButtonStyle(prominent: true, horizontalPadding: 0))
@@ -516,32 +518,24 @@ struct AIPanelView: View {
         .disabled(chat.isEmpty || questionJob != nil)
     }
 
-    /// A job of another conversation or of the other tab: it blocks Ask and Generate until it ends, so it says what
-    /// runs and can be stopped from here.
+    /// This conversation's job of the other tab: it blocks Ask and Summarize until it ends, so it says what runs and
+    /// can be stopped from here. Other conversations' jobs run beside this one's.
     @ViewBuilder private var busyElsewhere: some View {
-        if let job = model.aiJob, (model.detailTab == .chat ? questionJob : summaryJob) == nil {
+        if let job = model.aiJobs.entry(for: conversation.id),
+           (model.detailTab == .chat ? questionJob : summaryJob) == nil {
             HStack(spacing: 6) {
                 ProgressView().controlSize(.small)
-                busyText(job)
+                (job.kind == .summary ? Text("Summarizing \(conversation.title)…")
+                    : Text("Answering about \(conversation.title)…"))
                     .lineLimit(1)
                     .truncationMode(.middle)
                 Spacer(minLength: 0)
-                Button("Stop", action: model.stopAIJob)
+                Button("Stop") { model.stopAIJob(conversation.id) }
                     .modifier(CapsuleButton())
             }
             .font(.caption)
             .foregroundStyle(.secondary)
         }
-    }
-
-    /// What `job` does, in a whole sentence; a conversation no longer in the library is "another conversation".
-    private func busyText(_ job: AppModel.AIJob) -> Text {
-        guard let id = job.conversationID else { return Text("Answering a question about your conversations…") }
-        if let title = model.conversations.first(where: { $0.id == id })?.title {
-            return job.kind == .summary ? Text("Summarizing \(title)…") : Text("Answering about \(title)…")
-        }
-        return job.kind == .summary ? Text("Summarizing another conversation…")
-            : Text("Answering about another conversation…")
     }
 
     /// The "i": where the data goes with the current provider, in a popover; only when there is something to say.
@@ -610,18 +604,29 @@ struct AIPanelView: View {
         model.currentAIProvider.map(model.aiModel(for:))
     }
 
-    private var summaryJob: AppModel.AIJob? {
-        guard let job = model.aiJob, job.conversationID == conversation.id, job.kind == .summary else { return nil }
+    private var summaryJob: AppModel.AIJobs.Entry? {
+        guard let job = model.aiJobs.entry(for: conversation.id), job.kind == .summary else { return nil }
         return job
     }
 
-    private var questionJob: AppModel.AIJob? {
-        guard let job = model.aiJob, job.conversationID == conversation.id, job.kind != .summary else { return nil }
+    private var questionJob: AppModel.AIJobs.Entry? {
+        guard let job = model.aiJobs.entry(for: conversation.id), job.kind != .summary else { return nil }
         return job
     }
 
+    /// The answer streamed so far by this conversation's job; nil before its first text.
+    private var jobText: String? {
+        model.aiJobText[conversation.id]
+    }
+
+    /// What this conversation's job does before its first text: "Queued" behind another in-app job, else its status.
+    private var jobStatus: String? {
+        model.aiJobs.isQueued(conversation.id) ? String(localized: "Queued") : model.aiJobStatus[conversation.id]
+    }
+
+    /// As `startAIJob`'s guard: one job per conversation; other conversations' jobs do not block it.
     private var canRun: Bool {
-        model.aiJob == nil && transcript != nil && model.currentAIProvider != nil
+        model.aiJobs.entry(for: conversation.id) == nil && transcript != nil && model.currentAIProvider != nil
     }
 
     private func load() async {

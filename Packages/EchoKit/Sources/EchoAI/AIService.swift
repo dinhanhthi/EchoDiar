@@ -5,7 +5,8 @@ import Synchronization
 /// Summaries and questions about one conversation (docs/research/llm-providers.md F). Each job streams its answer,
 /// saves it in the conversation folder when it completes (a new summary version + `hasSummary`, or two more
 /// `chat.json` messages) and saves nothing when cancelled or failed. `stop(_:)` ends a job early (`stop()` every job)
-/// and saves the answer streamed until then (a summary marked stopped); nothing when no text was streamed yet. A
+/// and saves the answer streamed until then (a summary marked stopped); nothing when no text was streamed yet.
+/// `cancel(_:)` ends a job saving nothing, even after a stop, and waits for it. A
 /// job's `jobID` must be unique among the running jobs. A title job names an archived chat and saves nothing. In-app
 /// models (`LocalLLMProvider`: Foundation Models, MLX) run the whole job inside `ModelLoadGate` (owner `.llm`), loaded
 /// once and unloaded before the gate is released.
@@ -60,6 +61,19 @@ public actor AIService {
             return task
         }
         task?.cancel()
+    }
+
+    /// Cancels the running job `jobID` without saving anything, also after `stop(_:)`, and returns once its task has
+    /// ended (a write it had already started is then done); at once when it is not running.
+    public nonisolated func cancel(_ jobID: UUID) async {
+        // Out of `running` too, so a `stop(_:)` meanwhile cannot mark it stopped again.
+        let task = jobs.running.withLock { running -> Task<Void, Never>? in
+            guard let task = running.removeValue(forKey: jobID) else { return nil }
+            jobs.stopped.withLock { _ = $0.remove(jobID) }
+            return task
+        }
+        task?.cancel()
+        await task?.value
     }
 
     /// Streams a new summary: one pass when the transcript fits, else map over the chunks and reduce the notes until

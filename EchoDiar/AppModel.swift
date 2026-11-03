@@ -88,12 +88,20 @@ final class AppModel {
     private(set) var recordingCaptions: RecordingTranscriber.Snapshot?
     /// Apple Speech locales reserved by EchoDiar (BCP-47), read with the installed models.
     private(set) var appleSpeechReservedLocales: [String] = []
-    /// The running summary or question; one at a time. Also set by the library chat (LibraryChatModel.swift).
-    var aiJob: AIJob?
+    /// The running summaries and questions, at most one per conversation id; the library chat (LibraryChatModel.swift)
+    /// is the nil key. Cards observe it, so the streamed text and status live in `aiJobText` and `aiJobStatus`.
+    var aiJobs = AIJobs()
+    /// The answer streamed so far by the job of each key; read only by the answer views (it changes every 50 ms).
+    private(set) var aiJobText: [UUID?: String] = [:]
+    /// What a long job of each key is doing before its text starts; read only by the answer views.
+    var aiJobStatus: [UUID?: String] = [:]
     /// Why the last AI job, or chat archive or resume, of a conversation (nil: the library chat) failed.
     var aiError: (conversationID: UUID?, message: String)?
-    /// Bumped when an AI job ends, so the AI tab reloads `summary.md` and `chat.json`.
+    /// Bumped when an AI job ends, so search reloads.
     var aiJobsEnded = 0
+    /// Bumped per key (nil: the library chat) when its AI job ends, so its AI tab or chat reloads `summary.md` and
+    /// `chat.json`, and other keys' views keep their state.
+    private(set) var aiJobEnds: [UUID?: Int] = [:]
     /// Bumped when a conversation's chat or archived chats change outside a question job, so the AI tab reloads them.
     private(set) var chatHistoryChanges = 0
     /// Bumped per conversation when a speaker is renamed in `transcript.json`, so search rereads that document.
@@ -158,17 +166,16 @@ final class AppModel {
         let language: String?
     }
 
+    /// What `aiJobs` keeps of a running job, beside its key, kind and status.
     struct AIJob {
         enum Kind: Equatable { case summary, question(String) }
-        /// nil for a question across the library.
-        let conversationID: UUID?
         let kind: Kind
-        /// What a long summary is doing before its text starts.
-        var status: String?
-        /// The answer so far.
-        var text = ""
-        var task: Task<Void, Never>?
+        /// Its `AIService` job id, for `aiService.stop(_:)`.
+        let jobID: UUID
+        let task: Task<Void, Never>
     }
+
+    typealias AIJobs = AIJobTable<AIJob>
 
     /// A provider the AI tab offers: an in-app model (LLM catalog entry id) or a configured `ProviderConfig`.
     struct AIProvider: Identifiable {
@@ -232,12 +239,15 @@ final class AppModel {
     var micMuted: Bool { snapshot.micMuted }
 
     /// Library indexing waits while any of these runs, so it never competes with them for the model gate or the CPU.
-    var indexingPaused: Bool { isRecording || compressionJobs > 0 || transcriptionJobs > 0 || aiJob != nil }
+    var indexingPaused: Bool { isRecording || compressionJobs > 0 || transcriptionJobs > 0 || !aiJobs.isEmpty }
 
-    /// The recording transcriber holds the model gate for a whole recording (and its drain after Stop) and a
-    /// transcription job until it ends: a library question then skips an in-app embedder (keyword search only)
-    /// instead of waiting for the gate.
-    var modelGateBusy: Bool { isRecording || recordingCaptions != nil || transcriptionJobs > 0 }
+    /// The recording transcriber holds the model gate for a whole recording (and its drain after Stop), a
+    /// transcription job and a conversation's in-app AI job until they end: a library question then skips an in-app
+    /// embedder (keyword search only) instead of waiting for the gate. Its own job takes the gate after the search.
+    var modelGateBusy: Bool {
+        isRecording || recordingCaptions != nil || transcriptionJobs > 0
+            || aiJobs.busyIDs.contains { aiJobs.entry(for: $0)?.usesInAppModel == true }
+    }
 
     /// Its `currentLevels()` has a single consumer: `levels`.
     @ObservationIgnored let engine: RecordingEngine
@@ -273,9 +283,11 @@ final class AppModel {
     @ObservationIgnored private var languageCache: [String: [String]] = [:]
     /// The current recording's transcriber, from its start until the `.idle` snapshot; one per recording.
     @ObservationIgnored private var recordingTranscriber: RecordingTranscriber?
-    /// Streamed AI text not in `aiJob.text` yet, and its scheduled flush (see `applyAIUpdate`).
-    @ObservationIgnored private var pendingAIText = ""
-    @ObservationIgnored private var aiTextFlush: Task<Void, Never>?
+    /// Streamed AI text not in `aiJobText` yet, and its scheduled flush, per job key (see `applyAIUpdate`).
+    @ObservationIgnored private var pendingAIText: [UUID?: String] = [:]
+    @ObservationIgnored private var aiTextFlush: [UUID?: Task<Void, Never>] = [:]
+    /// Conversations `deleteConversation` is moving to the Trash: their AI job's error is not shown.
+    @ObservationIgnored private var deletingConversationIDs: Set<UUID> = []
     @ObservationIgnored private var savedKeys: [String: Bool] = [:]
     @ObservationIgnored private let meetingDetector = MeetingDetector()
     @ObservationIgnored private let systemEvents = SystemEventsMonitor()
@@ -1183,7 +1195,9 @@ final class AppModel {
         downloads[id]?.task.cancel()
     }
 
+    /// Does nothing while an in-app AI job runs or waits: it may be using the model.
     func deleteModel(_ id: String) {
+        guard !aiJobs.hasInAppJob else { return }
         Task {
             do {
                 try await Task.detached(priority: .utility) { [modelStore] in try modelStore.delete(id) }.value
@@ -1283,16 +1297,27 @@ final class AppModel {
         }
     }
 
-    /// Moves the conversation to the Trash, cancelling its AI job first so it does not write into the trashed folder.
+    /// Moves the conversation to the Trash once its AI job, cancelled first without saving (also after a Stop), has
+    /// ended: a summary or chat written after the trash would recreate the folder.
     func deleteConversation(_ id: UUID) {
         if route == .conversation(id) { route = .list }
-        if aiJob?.conversationID == id { aiJob?.task?.cancel() }
+        let job = aiJobs.entry(for: id)?.payload
+        // Its stream now finishes with an error, which must not show as the AI error.
+        deletingConversationIDs.insert(id)
         Task {
+            if let job {
+                // Before the app task: its cancellation would end the job while still marked stopped, which saves.
+                await aiService.cancel(job.jobID)
+                job.task.cancel()
+                // Its `library.reload(id:)` too, so it does not list the conversation again after the trash.
+                await job.task.value
+            }
             do {
                 try await library.delete(id: id)
             } catch {
                 NSLog("EchoDiar: could not delete conversation \(id): \(error)")
             }
+            deletingConversationIDs.remove(id)
         }
     }
 
@@ -1325,9 +1350,8 @@ final class AppModel {
     /// Conversations with a queued or running transcription, a pending cloud confirmation, an AI job, or still in
     /// `finishRecording`.
     private var busyConversationIDs: Set<UUID> {
-        var ids = Set(transcriptionProgress.keys).union(pendingCloudRuns.map(\.conversationID)).union(finishingIDs)
-        if let id = aiJob?.conversationID { ids.insert(id) }
-        return ids
+        let ids = Set(transcriptionProgress.keys).union(pendingCloudRuns.map(\.conversationID)).union(finishingIDs)
+        return ids.union(aiJobs.busyIDs)
     }
 
     /// Auto-delete on: schedules the daily run and runs it once now (launch, or when turned on). Off: stops it.
@@ -1386,6 +1410,7 @@ final class AppModel {
 
     /// Storage tab: removes every downloaded model.
     func deleteAllModels() {
+        guard !aiJobs.hasInAppJob else { return }
         for id in deletableModelIDs { deleteModel(id) }
     }
 
@@ -1663,13 +1688,15 @@ extension AppModel {
         route = .conversation(conversationID)
     }
 
-    /// Starts a summary or a question with `provider` and `model` (saved as the AI tab default). `summary` and
-    /// `history` are the conversation's saved summary and chat, sent with a question.
+    /// Starts a summary or a question with `provider` and `model` (saved as the AI tab default), beside the jobs of
+    /// the other conversations; does nothing while the conversation has a job. `summary` and `history` are the
+    /// conversation's saved summary and chat, sent with a question.
     func startAIJob(
         _ kind: AIJob.Kind, conversation: Conversation, transcript: Transcript, summary: String?,
         history: [ChatLog.Message], provider: AIProvider, model: String
     ) {
-        guard aiJob == nil else { return }
+        // Before the stream: building it starts the job.
+        guard aiJobs.entry(for: conversation.id) == nil else { return }
         let model = model.trimmingCharacters(in: .whitespacesAndNewlines)
         updateSettings {
             $0.defaultAIProviderID = provider.id
@@ -1687,67 +1714,83 @@ extension AppModel {
             aiError = (conversation.id, String(localized: "\(provider.name) is not available."))
             return
         }
+        let key: UUID? = conversation.id
+        let jobID = UUID()
         let stream = switch kind {
         case .summary:
             aiService.summarize(
                 conversation: conversation, transcript: transcript, provider: client, providerID: provider.id,
-                model: model, language: settings.summaryLanguage)
+                model: model, language: settings.summaryLanguage, jobID: jobID)
         case .question(let question):
             aiService.ask(
                 question: question, conversation: conversation, transcript: transcript, summary: summary,
                 history: history, historyLimit: settings.chatContextMessages, provider: client,
-                providerID: provider.id, model: model, language: settings.summaryLanguage)
+                providerID: provider.id, model: model, language: settings.summaryLanguage, jobID: jobID)
         }
         let task = Task { [weak self] in
             do {
-                for try await update in stream { self?.applyAIUpdate(update) }
-            } catch where !Task.isCancelled {
+                for try await update in stream { self?.applyAIUpdate(update, key: key) }
+            } catch where !Task.isCancelled && self?.deletingConversationIDs.contains(conversation.id) != true {
                 self?.aiError = (conversation.id, error.localizedDescription)
             } catch {}
             guard let self else { return }
-            flushAIText()
-            aiJob = nil
-            aiJobsEnded += 1
+            endAIJob(key: key)
             syncLibraryIndex()
             await library.reload(id: conversation.id)
         }
-        aiJob = AIJob(conversationID: conversation.id, kind: kind, task: task)
+        aiJobs.start(
+            key: key, kind: kind == .summary ? .summary : .question, usesInAppModel: provider.kind == .inApp,
+            payload: AIJob(kind: kind, jobID: jobID, task: task))
     }
 
-    /// Shows an update of the running job's stream. Text reaches `aiJob.text` at once when it is the first, then at
-    /// most every 50 ms: the answer view lays out its whole Markdown again at each change, which per token costs
+    /// Removes the job of `key` with its streamed text (flushed first) and status, and bumps `aiJobsEnded` and
+    /// `aiJobEnds[key]`.
+    func endAIJob(key: UUID?) {
+        flushAIText(key: key)
+        aiJobs.finish(key: key)
+        aiJobText[key] = nil
+        aiJobStatus[key] = nil
+        aiJobsEnded += 1
+        aiJobEnds[key, default: 0] += 1
+    }
+
+    /// Shows an update of the stream of the job of `key`. Text reaches `aiJobText` at once when it is the first, then
+    /// at most every 50 ms: the answer view lays out its whole Markdown again at each change, which per token costs
     /// time quadratic in the answer's length.
-    func applyAIUpdate(_ update: AIService.Update) {
+    func applyAIUpdate(_ update: AIService.Update, key: UUID?) {
         switch update {
-        case .status(let status): aiJob?.status = status
+        case .status(let status): aiJobStatus[key] = status
         case .text(let text):
-            if aiJob?.status != nil { aiJob?.status = nil }
-            pendingAIText += text
-            if aiJob?.text.isEmpty == true { return flushAIText() }
-            guard aiTextFlush == nil else { return }
-            aiTextFlush = Task { [weak self] in
+            if aiJobStatus[key] != nil { aiJobStatus[key] = nil }
+            pendingAIText[key, default: ""] += text
+            if aiJobText[key, default: ""].isEmpty {
+                if aiJobs.entry(for: key)?.status == .running { aiJobs.markStreaming(key: key) }
+                return flushAIText(key: key)
+            }
+            guard aiTextFlush[key] == nil else { return }
+            aiTextFlush[key] = Task { [weak self] in
                 try? await Task.sleep(for: .milliseconds(50))
-                // Cancelled by an earlier flush: the next job's scheduled flush is not this one's to clear.
+                // Cancelled by an earlier flush: the key's next scheduled flush is not this one's to clear.
                 guard !Task.isCancelled else { return }
-                self?.flushAIText()
+                self?.flushAIText(key: key)
             }
         }
     }
 
-    /// Moves the batched text into `aiJob`; called by the scheduled flush and when the stream ends.
-    func flushAIText() {
-        aiTextFlush?.cancel()
-        aiTextFlush = nil
-        guard !pendingAIText.isEmpty else { return }
-        aiJob?.text += pendingAIText
-        pendingAIText = ""
+    /// Moves the batched text of `key` into `aiJobText`; called by the scheduled flush and when the stream ends.
+    func flushAIText(key: UUID?) {
+        aiTextFlush.removeValue(forKey: key)?.cancel()
+        guard let text = pendingAIText.removeValue(forKey: key), !text.isEmpty else { return }
+        aiJobText[key, default: ""] += text
     }
 
-    /// Ends the job early; the answer or summary streamed until then is saved, then the job ends as usual. A library
-    /// question still looking for its sources (nothing streamed yet) is cancelled.
-    func stopAIJob() {
-        if let job = aiJob, job.conversationID == nil, job.text.isEmpty { job.task?.cancel() }
-        aiService.stop()
+    /// Ends the job of `key` (nil: the library chat) early, the others keep running; the answer or summary streamed
+    /// until then is saved, then the job ends as usual. A library question still looking for its sources (nothing
+    /// streamed yet) is cancelled.
+    func stopAIJob(_ key: UUID?) {
+        guard let job = aiJobs.entry(for: key) else { return }
+        if key == nil, aiJobText[nil, default: ""].isEmpty { job.payload.task.cancel() }
+        aiService.stop(job.payload.jobID)
     }
 
     /// Archives the conversation's chat so the next question starts without history; then asks the AI provider for
@@ -1782,7 +1825,7 @@ extension AppModel {
     /// Runs `change` on the chat in `folder` of conversation `id` (nil: the library chat) unless a question runs for
     /// it (its answer is appended to `chat.json`); a failure shows as its AI error.
     func changeChat(of id: UUID?, in folder: URL, _ change: () throws -> ChatArchive.Archived?) {
-        if let job = aiJob, job.conversationID == id, job.kind != .summary { return }
+        if let job = aiJobs.entry(for: id), job.kind != .summary { return }
         let archived: ChatArchive.Archived?
         do {
             archived = try change()
@@ -1795,7 +1838,7 @@ extension AppModel {
         if let archived, archived.needsTitle { requestTitle(for: archived.entry, in: folder) }
     }
 
-    /// Names the archived chat `entry` with the current AI provider and model, outside `aiJob`. Without a provider,
+    /// Names the archived chat `entry` with the current AI provider and model, outside `aiJobs`. Without a provider,
     /// when another one gave any of the chat's answers, with an in-app model, or on error its fallback title (the first
     /// question) stays.
     private func requestTitle(for entry: ChatArchive.Entry, in folder: URL) {

@@ -5,8 +5,8 @@ import Synchronization
 import Testing
 
 /// Guards the summary job: map-reduce sends status lines and streams only the final reduce, the result is saved as a
-/// version, a cancelled job saves nothing, a stopped job saves what it streamed (stopping one job leaves the others
-/// running), and an in-app model is unloaded before the gate is released. Also guards how many earlier chat messages a
+/// version, a cancelled job saves nothing (also after a stop, and `cancel` waits for it), a stopped job saves what it
+/// streamed (stopping one job leaves the others running), and an in-app model is unloaded before the gate is released. Also guards how many earlier chat messages a
 /// question sends.
 struct AIServiceTests {
     /// Answers every request with `reply`, in two pieces, and reports a small context to force map-reduce.
@@ -76,16 +76,25 @@ struct AIServiceTests {
     }
 
     /// An in-app model whose generation sends one piece, then waits until cancelled and returns normally (as MLX
-    /// does); its unload takes a moment.
+    /// does), `linger` after the cancellation; its unload takes a moment.
     final class FakeLocalProvider: LocalLLMProvider {
         let unloaded = Mutex(false)
+        let linger: Duration
+
+        init(linger: Duration = .zero) {
+            self.linger = linger
+        }
 
         struct Generator: LocalLLMGenerator {
+            let linger: Duration
+
             func generate(
                 messages: [LLMMessage], maxTokens: Int, onText: @escaping @Sendable (String) -> Void
             ) async throws -> String {
                 onText("Partial")
                 while !Task.isCancelled { try? await Task.sleep(for: .milliseconds(10)) }
+                // Not cut short by the cancellation.
+                await Task.detached { [linger] in try? await Task.sleep(for: linger) }.value
                 return "Partial answer"
             }
         }
@@ -94,7 +103,7 @@ struct AIServiceTests {
             model: String, _ body: @Sendable (any LocalLLMGenerator) async throws -> T
         ) async throws -> T {
             do {
-                let result = try await body(Generator())
+                let result = try await body(Generator(linger: linger))
                 await unload()
                 return result
             } catch {
@@ -340,6 +349,28 @@ struct AIServiceTests {
         let completed = Conversation.readSummaryVersions(from: second.folder)
         #expect(completed.map(\.text) == ["## Actions ship on Friday"])
         #expect(completed.map(\.stopped) == [false])
+    }
+
+    @Test
+    func cancelAfterStopSavesNothingAndWaitsForTheJob() async throws {
+        let conversation = try makeConversation()
+        defer { try? FileManager.default.removeItem(at: conversation.folder) }
+        let service = AIService(gate: ModelLoadGate())
+        // Still generating when `cancel` comes, so the stop alone would save its text.
+        let provider = FakeLocalProvider(linger: .milliseconds(100))
+        let id = UUID()
+        var job = service.summarize(
+            conversation: conversation, transcript: transcript(turns: 3), provider: provider, providerID: "local",
+            model: "local", language: "en", jobID: id).makeAsyncIterator()
+        while let update = try await job.next() { if case .text = update { break } }
+
+        service.stop(id)
+        await service.cancel(id)
+
+        // Unloaded after the job's body: `cancel` returned once the job had ended.
+        #expect(provider.unloaded.withLock { $0 })
+        #expect(Conversation.readSummaryVersions(from: conversation.folder).isEmpty)
+        #expect(try !Conversation.read(from: conversation.folder).hasSummary)
     }
 
     @Test

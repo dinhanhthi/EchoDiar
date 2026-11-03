@@ -62,7 +62,7 @@ struct GlobalChatView: View {
             if !Task.isCancelled { questionFocused = true }
         }
         // An answer saved, Start fresh, Resume and a new title.
-        .task(id: LoadKey(jobsEnded: model.aiJobsEnded, changes: model.chatHistoryChanges)) { await loadChat() }
+        .task(id: LoadKey(jobsEnded: model.aiJobEnds[nil] ?? 0, changes: model.chatHistoryChanges)) { await loadChat() }
     }
 
     private struct LoadKey: Equatable {
@@ -142,19 +142,19 @@ struct GlobalChatView: View {
                         messageView(message.role, text: message.text, model: message.model,
                                     references: message.references ?? [])
                     }
-                    if let job = libraryJob, case .question(let asked) = job.kind {
+                    if let job = libraryJob, case .question(let asked) = job.payload.kind {
                         messageView(.user, text: asked, model: nil, references: [])
-                        if job.text.isEmpty {
+                        if let text = model.aiJobText[nil] {
+                            // The sources are saved with the answer: its citations link once it is saved.
+                            messageView(.assistant, text: text, model: currentModel, references: [],
+                                        isStreaming: true)
+                        } else {
                             HStack(spacing: 6) {
                                 ProgressView().controlSize(.small)
-                                if let status = job.status {
+                                if let status = jobStatus {
                                     Text(status).foregroundStyle(.secondary)
                                 }
                             }
-                        } else {
-                            // The sources are saved with the answer: its citations link once it is saved.
-                            messageView(.assistant, text: job.text, model: currentModel, references: [],
-                                        isStreaming: true)
                         }
                     }
                     Color.clear.frame(height: 1).id(Self.chatEnd)
@@ -164,7 +164,7 @@ struct GlobalChatView: View {
             }
             .onAppear { proxy.scrollTo(Self.chatEnd, anchor: .bottom) }
             .onChange(of: chat.count) { _, _ in proxy.scrollTo(Self.chatEnd, anchor: .bottom) }
-            .onChange(of: libraryJob?.text.count) { _, _ in proxy.scrollTo(Self.chatEnd, anchor: .bottom) }
+            .onChange(of: model.aiJobText[nil]?.count) { _, _ in proxy.scrollTo(Self.chatEnd, anchor: .bottom) }
         }
     }
 
@@ -367,11 +367,10 @@ struct GlobalChatView: View {
 
     // MARK: - Bottom bar
 
-    /// A job of a conversation and the index's progress, the menus, "Start a fresh chat" and History (one row), the
-    /// question with Send, then the missing-model warning.
+    /// The index's progress, the menus, "Start a fresh chat" and History (one row), the question with Send, then the
+    /// missing-model warning.
     private var bottomBar: some View {
         VStack(alignment: .leading, spacing: 8) {
-            busyElsewhere
             indexingLine
             // One row at any width: only the model menu shrinks (its name truncates), the rest keep their size.
             HStack(spacing: 8) {
@@ -430,7 +429,7 @@ struct GlobalChatView: View {
                 .background(RoundedRectangle(cornerRadius: Self.inputHeight / 2, style: .continuous)
                     .fill(Palette.inputSurface))
             if libraryJob != nil {
-                Button(action: model.stopAIJob) {
+                Button { model.stopAIJob(nil) } label: {
                     Label("Stop", systemImage: "stop.fill").labelStyle(.iconOnly)
                 }
                 .buttonStyle(BottomBarButtonStyle(prominent: true, horizontalPadding: 0))
@@ -451,32 +450,6 @@ struct GlobalChatView: View {
         .buttonStyle(BottomBarButtonStyle(height: Self.chatMenuHeight, horizontalPadding: 0))
         .help("Start a fresh chat")
         .disabled(chat.isEmpty || libraryJob != nil)
-    }
-
-    /// A job of a conversation: it blocks asking until it ends, so it says what runs and can be stopped from here.
-    @ViewBuilder private var busyElsewhere: some View {
-        if let job = model.aiJob, let id = job.conversationID {
-            HStack(spacing: 6) {
-                ProgressView().controlSize(.small)
-                busyText(job, conversationID: id)
-                    .lineLimit(1)
-                    .truncationMode(.middle)
-                Spacer(minLength: 0)
-                Button("Stop", action: model.stopAIJob)
-                    .modifier(CapsuleButton())
-            }
-            .font(.caption)
-            .foregroundStyle(.secondary)
-        }
-    }
-
-    /// What `job` does, in a whole sentence; a conversation no longer in the library is "another conversation".
-    private func busyText(_ job: AppModel.AIJob, conversationID id: UUID) -> Text {
-        if let title = model.conversations.first(where: { $0.id == id })?.title {
-            return job.kind == .summary ? Text("Summarizing \(title)…") : Text("Answering about \(title)…")
-        }
-        return job.kind == .summary ? Text("Summarizing another conversation…")
-            : Text("Answering about another conversation…")
     }
 
     /// While the index is built or still empty: how far it is, or why it waits. Asking stays allowed (the answer uses
@@ -525,15 +498,19 @@ struct GlobalChatView: View {
         model.currentAIProvider.map(model.aiModel(for:))
     }
 
-    /// The library question running now.
-    private var libraryJob: AppModel.AIJob? {
-        guard let job = model.aiJob, job.conversationID == nil, job.kind != .summary else { return nil }
-        return job
+    /// The library question running now (the nil key).
+    private var libraryJob: AppModel.AIJobs.Entry? {
+        model.aiJobs.entry(for: nil)
     }
 
-    /// As `askLibrary`'s guard: one AI job at a time.
+    /// What the library question does before its first text: "Queued" behind another in-app job, else its status.
+    private var jobStatus: String? {
+        model.aiJobs.isQueued(nil) ? String(localized: "Queued") : model.aiJobStatus[nil]
+    }
+
+    /// As `askLibrary`'s guard: one library question at a time; the conversations' jobs do not block it.
     private var canAsk: Bool {
-        model.aiJob == nil && model.settings.ragEnabled && model.currentAIProvider != nil
+        model.aiJobs.entry(for: nil) == nil && model.settings.ragEnabled && model.currentAIProvider != nil
     }
 
     private func loadChat() async {

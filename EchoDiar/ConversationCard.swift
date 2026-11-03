@@ -17,10 +17,22 @@ struct ConversationCard: View {
     @State private var editing = false
     @State private var draft = ""
     @FocusState private var titleFocused: Bool
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var body: some View {
+        let activity = CardActivity(conversation: conversation, model: model)
         HStack(spacing: 12) {
             AppIcon(bundleID: conversation.sourceBundleID)
+                // An overlay, so the badge never moves the row; display only, the card takes the click.
+                .overlay(alignment: .bottomTrailing) {
+                    if let activity {
+                        ActivityBadge(
+                            activity: activity,
+                            blinks: activity != .queued && !reduceMotion && model.mainWindowVisible)
+                            .offset(x: 4, y: 4)
+                            .allowsHitTesting(false)
+                    }
+                }
             VStack(alignment: .leading, spacing: 4) {
                 title
                 details
@@ -28,6 +40,7 @@ struct ConversationCard: View {
                 // The status has its own row under the title and details, from the same leading edge; often empty.
                 HStack(spacing: 12) {
                     TranscriptionStatus(conversation: conversation, model: model)
+                    if let job = CardActivity.aiJob(conversation.id, model) { AIJobLabel(activity: job) }
                     Spacer(minLength: 0)
                 }
             }
@@ -237,6 +250,14 @@ struct TranscriptionStatus: View {
         model.transcriptionProgress[conversation.id] == nil && conversation.status == .transcriptionFailed
     }
 
+    /// Still in the Stop sequence (`finishRecording`) with no job yet, and an automatic transcription about to run:
+    /// not compressing (the badge says so), nor a failed recording (never transcribed), nor transcribed already.
+    static func isAboutToTranscribe(_ conversation: Conversation, _ model: AppModel) -> Bool {
+        model.transcriptionProgress[conversation.id] == nil && model.isTranscribing(conversation.id)
+            && model.settings.autoTranscribe && conversation.status != .compressing && conversation.status != .failed
+            && !conversation.hasTranscript
+    }
+
     /// Progress first: a queued job's conversation is still `ready`. A `transcribing` status without a job was
     /// left by a quit or crash, so it offers Transcribe again. A failed recording (`failed`) offers nothing.
     var body: some View {
@@ -274,6 +295,16 @@ struct TranscriptionStatus: View {
                 .help(conversation.hasAudio ? "Retry with another engine" : "Audio has been removed")
             }
             .fixedSize()
+        } else if Self.isAboutToTranscribe(conversation, model) {
+            // Still in the Stop sequence (`finishRecording`) before its job reports progress.
+            HStack(spacing: 6) {
+                ProgressView().controlSize(.mini)
+                Text("Transcribing…")
+            }
+            .lineLimit(1)
+            .fixedSize()
+            .font(.caption)
+            .foregroundStyle(.secondary)
         } else if conversation.status == .ready || conversation.status == .transcribing, !conversation.hasTranscript {
             Button("Transcribe") { model.transcribe(conversation.id) }
                 .buttonStyle(RowTextButtonStyle())
@@ -397,6 +428,101 @@ struct StatusBadge: View {
             .padding(.horizontal, 6)
             .padding(.vertical, 2)
             .background(color.opacity(0.18), in: Capsule())
+    }
+}
+
+/// What a card shows it is busy with, most important first: a transcription (queued, running or in the Stop
+/// sequence), then its AI job: "Queued" behind another in-app job, else a summary or a question. Read from
+/// `aiJobs` only, never `aiJobText`, so streamed text does not redraw the cards.
+private enum CardActivity {
+    case transcribing, summarizing, answering, queued
+
+    @MainActor init?(conversation: Conversation, model: AppModel) {
+        let id = conversation.id
+        if let step = model.transcriptionProgress[id]?.step, step != .needsModel {
+            self = .transcribing
+        } else if TranscriptionStatus.isAboutToTranscribe(conversation, model) {
+            self = .transcribing
+        } else if let job = Self.aiJob(id, model) {
+            self = job
+        } else {
+            return nil
+        }
+    }
+
+    /// The conversation's summary or question job; nil without one.
+    @MainActor static func aiJob(_ id: UUID, _ model: AppModel) -> CardActivity? {
+        guard let entry = model.aiJobs.entry(for: id) else { return nil }
+        if model.aiJobs.isQueued(id) { return .queued }
+        switch entry.kind {
+        case .summary: return .summarizing
+        case .question: return .answering
+        case .libraryQuestion, .title: return nil
+        }
+    }
+
+    var text: String {
+        switch self {
+        case .transcribing: String(localized: "Transcribing…")
+        case .summarizing: String(localized: "Summarizing…")
+        case .answering: String(localized: "Answering…")
+        case .queued: String(localized: "Queued")
+        }
+    }
+
+    var symbol: String {
+        switch self {
+        case .transcribing: "waveform"
+        case .summarizing: "sparkles"
+        case .answering: "ellipsis.bubble"
+        case .queued: "clock"
+        }
+    }
+
+    var color: Color {
+        switch self {
+        case .transcribing: .blue
+        case .summarizing: .purple
+        case .answering: .teal
+        case .queued: .gray
+        }
+    }
+}
+
+/// The card's activity on the app icon's corner: a 14 pt tinted circle like `StatusBadge`'s capsule, on the card's
+/// surface so the icon does not show through. Its symbol blinks in 1 s steps (`RecordingBlink`), never a continuous
+/// animation over the glass.
+private struct ActivityBadge: View {
+    let activity: CardActivity
+    let blinks: Bool
+
+    var body: some View {
+        Image(systemName: activity.symbol)
+            .font(.system(size: 8, weight: .semibold))
+            .foregroundStyle(activity.color)
+            .modifier(RecordingBlink(isActive: blinks))
+            .frame(width: 14, height: 14)
+            .background(Circle().fill(activity.color.opacity(0.18)))
+            .background(Circle().fill(Palette.surface))
+            .accessibilityElement()
+            .accessibilityLabel(activity.text)
+    }
+}
+
+/// The AI job's state in the card's status row, beside the transcription's: a mini spinner and "Summarizing…",
+/// "Answering…" or "Queued".
+private struct AIJobLabel: View {
+    let activity: CardActivity
+
+    var body: some View {
+        HStack(spacing: 6) {
+            ProgressView().controlSize(.mini)
+            Text(activity.text)
+        }
+        .lineLimit(1)
+        .fixedSize()
+        .font(.caption)
+        .foregroundStyle(.secondary)
     }
 }
 

@@ -109,7 +109,7 @@ struct StorageSettingsView: View {
                 usageRow("Transcripts and AI", usage.transcriptsAndAI, color: .green, delete: .transcriptsAndAI,
                          disabled: transcriptCandidates.isEmpty)
                 usageRow("Models", usage.models, color: .orange, delete: .models,
-                         disabled: model.deletableModelIDs.isEmpty || model.isRecording || model.aiJob != nil
+                         disabled: model.deletableModelIDs.isEmpty || model.isRecording || model.aiJobs.hasInAppJob
                             || model.transcriptionProgress.keys.contains(where: model.isTranscribing))
                 LabeledContent("Total") {
                     HStack(spacing: 10) {

@@ -295,9 +295,9 @@ struct ModelRow: View {
             Button("Delete") { model.deleteModel(entry.id) }
                 .controlSize(.small)
                 // The recording's transcriber loads its model again after a long pause: deleting it meanwhile
-                // would end it.
+                // would end it. An in-app AI job, running or queued, may be using it too.
                 .disabled(model.transcriptionProgress.keys.contains(where: model.isTranscribing)
-                          || model.recordingCaptions != nil)
+                          || model.recordingCaptions != nil || model.aiJobs.hasInAppJob)
         } else {
             Button("Download") { model.downloadModel(entry.id) }
                 .controlSize(.small)
