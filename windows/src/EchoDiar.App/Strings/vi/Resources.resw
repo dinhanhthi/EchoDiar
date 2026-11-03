@@ -2734,6 +2734,10 @@
     <value>Đang tóm tắt {0}…</value>
     <comment>Summarizing %@…</comment>
   </data>
+  <data name="Summarizing_3" xml:space="preserve">
+    <value>Đang tóm tắt…</value>
+    <comment>Summarizing…</comment>
+  </data>
   <data name="Summary" xml:space="preserve">
     <value>Bản tóm tắt</value>
     <comment>Summary</comment>

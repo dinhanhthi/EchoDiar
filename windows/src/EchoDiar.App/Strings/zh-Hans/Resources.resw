@@ -2734,6 +2734,10 @@
     <value>正在为“{0}”生成摘要…</value>
     <comment>Summarizing %@…</comment>
   </data>
+  <data name="Summarizing_3" xml:space="preserve">
+    <value>正在生成摘要…</value>
+    <comment>Summarizing…</comment>
+  </data>
   <data name="Summary" xml:space="preserve">
     <value>摘要</value>
     <comment>Summary</comment>

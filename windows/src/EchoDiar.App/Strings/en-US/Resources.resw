@@ -2846,6 +2846,10 @@
     <value>Summarizing {0}…</value>
     <comment>Summarizing %@…</comment>
   </data>
+  <data name="Summarizing_3" xml:space="preserve">
+    <value>Summarizing…</value>
+    <comment>Summarizing…</comment>
+  </data>
   <data name="Summary" xml:space="preserve">
     <value>Summary</value>
     <comment>Summary</comment>

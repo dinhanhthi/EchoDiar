@@ -1,4 +1,3 @@
-using System.Collections.ObjectModel;
 using System.ComponentModel;
 using System.Globalization;
 using EchoDiar.App.ViewModels;
@@ -6,10 +5,12 @@ using EchoDiar.Core.Model;
 using EchoDiar.Core.Models;
 using EchoDiar.Transcribe;
 using Microsoft.UI.Dispatching;
+using Microsoft.UI.Text;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Automation;
 using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Controls.Primitives;
+using Microsoft.UI.Xaml.Documents;
 using Microsoft.UI.Xaml.Input;
 using Microsoft.UI.Xaml.Media;
 using Windows.ApplicationModel.DataTransfer;
@@ -20,30 +21,65 @@ namespace EchoDiar.App.Views;
 
 /// <summary>
 /// The Transcript tab of the conversation page (macOS TranscriptView.swift) for a <see cref="TranscriptViewModel"/> and
-/// the page's <see cref="PlaybackController"/>: the segments (a click plays from one; the one under the play head is
-/// selected, and the list follows it while playing until the user scrolls), the version menu, the transcription's
-/// state, the speaker notes, playback, the speaker chips with their rename field, Copy, Re-transcribe and Summarize.
+/// the page's <see cref="PlaybackController"/>: the segments as one selectable text (macOS TranscriptTextView; a click
+/// on a start or a name plays from the segment; the one under the play head has a fill, and the text follows it while
+/// playing until the user scrolls), the version menu, the transcription's state, the speaker notes, playback, the
+/// speaker chips with their rename field, Copy, Re-transcribe and Summarize.
 /// </summary>
 public sealed partial class TranscriptView : UserControl
 {
     /// <summary>Up to three speaker chips; "+N" lists the others.</summary>
     private const int MaxSpeakerChips = 3;
 
+    /// <summary>Segments added to the text per dispatcher turn, so a long transcript never blocks the UI thread for long.</summary>
+    private const int BatchSize = 200;
+
+    /// <summary>The start and the name: CaptionTextBlockStyle's size.</summary>
+    private const double CaptionFontSize = 12;
+
+    /// <summary>Between the start and the dot, and the dot before the name: <see cref="TranscriptDocument"/>'s "  ● ".</summary>
+    private const string SpacerText = "  ";
+    private const string DotText = "● ";
+
+    /// <summary>Space kept above a segment the text scrolls to.</summary>
+    private const double ScrollMargin = 8;
+
+    /// <summary>Between segments, about the old rows' spacing.</summary>
+    private static readonly Thickness SegmentMargin = new(0, 0, 0, 14);
+
     private AppViewModel? _model;
     private TranscriptViewModel? _transcript;
     private PlaybackController? _playback;
-    private ObservableCollection<TranscriptLineItem> _lines = [];
-    private ScrollViewer? _scroller;
 
     /// <summary>
-    /// The list follows the play head: set by Play and by a click on a segment, cleared when the user scrolls
-    /// (macOS SegmentList <c>following</c>).
+    /// The shown version as one text (null without a transcript), its segments in the same order, and each segment's
+    /// index by id. <see cref="_blocks"/> holds the paragraphs added so far, one per entry, in order.
+    /// </summary>
+    private TranscriptDocument? _document;
+    private IReadOnlyList<Transcript.Segment> _segments = [];
+    private Dictionary<Guid, int> _indexById = new();
+    private readonly List<SegmentBlock> _blocks = [];
+
+    /// <summary>Bumped at every rebuild and at <see cref="Detach"/>, so the batches of an older build stop.</summary>
+    private int _buildGeneration;
+
+    /// <summary>
+    /// The text follows the play head: set by Play and by a click on a start or a name, cleared when the user scrolls
+    /// or a citation shows (macOS TranscriptTextView <c>following</c>).
     /// </summary>
     private bool _following;
 
-    /// <summary>The segment shown as playing (its speaker icon), and whether playback was on at the last update.</summary>
-    private TranscriptLineItem? _speakingLine;
+    /// <summary>The segment with the play head's fill, the one with the speaker icon, and whether playback was on at the last update.</summary>
+    private int? _highlighted;
+    private int? _speakingIndex;
     private bool _wasPlaying;
+    private bool _iconPending;
+
+    /// <summary>A citation's segment to scroll to once its paragraph is in the text.</summary>
+    private Guid? _pendingSegment;
+
+    /// <summary>The text's context menu: Play from here, Copy, Select All.</summary>
+    private readonly MenuFlyout _textMenu = new();
 
     /// <summary>The speaker whose rename field is open.</summary>
     private SpeakerChip? _renaming;
@@ -58,15 +94,26 @@ public sealed partial class TranscriptView : UserControl
     private string? _retryTip;
     private string? _transcribeTip;
 
+    /// <summary>One segment's paragraph and the inlines that change: names on a rename, colors on a theme change.</summary>
+    private sealed record SegmentBlock(
+        Paragraph Paragraph, Hyperlink TimeLink, Run Time, Run Spacer, Hyperlink NameLink, Run Dot, Run Name, Run Body,
+        int ColorIndex);
+
     public TranscriptView()
     {
         InitializeComponent();
-        LineList.ItemsSource = _lines;
-        LineList.ItemClick += OnLineClick;
-        LineList.ContainerContentChanging += OnContainerContentChanging;
-        LineList.Loaded += (_, _) => FollowUserScrolling();
-        // Loaded while collapsed (the page's loading pane) comes before the template: its first layout finds the scroller.
-        LineList.SizeChanged += (_, _) => FollowUserScrolling();
+        FollowUserScrolling();
+        SegmentText.PreviewKeyDown += OnTextPreviewKeyDown;
+        SegmentText.ContextRequested += OnTextContextRequested;
+        // A new width wraps the text again: the speaker icon moves with its name. The first layout (the tab or the
+        // text has just shown) lets a waiting citation scroll.
+        SegmentText.SizeChanged += (_, _) =>
+        {
+            PlaceSpeakingIconLater();
+            if (_pendingSegment is not null) DispatcherQueue.TryEnqueue(DispatcherQueuePriority.Low, ShowPendingSegment);
+        };
+        // After the theme walk, once the swatches hold the new theme's brushes.
+        ActualThemeChanged += (_, _) => DispatcherQueue.TryEnqueue(ApplyColors);
         VersionMenu.Opening += (_, _) => BuildVersionMenu();
         RetranscribeMenu.Opening += (_, _) => BuildRetranscribeMenu();
         RetryMenu.Opening += (_, _) => BuildRetryMenu();
@@ -101,15 +148,15 @@ public sealed partial class TranscriptView : UserControl
     }
 
     /// <summary>
-    /// A clicked AI citation (macOS <c>scrollTarget</c>): scrolls to the segment <paramref name="id"/>, once the list is laid
-    /// out (its tab has just shown).
+    /// A clicked AI citation (macOS <c>scrollTarget</c>): scrolls the segment <paramref name="id"/> to the middle once
+    /// its paragraph is in the text and laid out (its tab has just shown), and stops following the play head.
     /// </summary>
     internal void ShowSegment(Guid id) => DispatcherQueue.TryEnqueue(DispatcherQueuePriority.Low, () =>
     {
-        if (_model is { IsClosing: false } && _lines.FirstOrDefault(l => l.Id == id) is { } line)
-        {
-            LineList.ScrollIntoView(line, ScrollIntoViewAlignment.Leading);
-        }
+        if (_model is not { IsClosing: false }) return;
+        _following = false;
+        _pendingSegment = id;
+        ShowPendingSegment();
     });
 
     /// <summary>Stops following the models; call when the page goes.</summary>
@@ -121,6 +168,9 @@ public sealed partial class TranscriptView : UserControl
         Player.Detach();
         RenameFlyout.Hide();
         MoreSpeakersFlyout.Hide();
+        _textMenu.Hide();
+        // A build still adding paragraphs stops; the next Attach builds the text again.
+        _buildGeneration++;
         _model = null;
         _transcript = null;
         _playback = null;
@@ -174,77 +224,288 @@ public sealed partial class TranscriptView : UserControl
 
     // Segments
 
+    /// <summary>The shown version has segments: Copy and Summarize show for it, the card shows the text (or a ring while it is built).</summary>
+    private bool HasSegments => _document is { Entries.Count: > 0 };
+
     /// <summary>
-    /// The shown version's lines. The same segments (a speaker renamed) are replaced in place, so the list keeps its
-    /// scroll position; other segments (another version, a new transcript) start from the top.
+    /// The shown version's text (macOS TranscriptTextView <c>apply</c>). The same segments with other names (a speaker
+    /// renamed) change the names in place, so the text keeps its scroll position; other segments (another version, a
+    /// new transcript) build the text again from the top.
     /// </summary>
     private void UpdateLines()
     {
         if (_transcript is null) return;
-        var lines = _transcript.Lines;
-        if (lines.Count == _lines.Count && lines.Count > 0 && lines.Select(l => l.Id).SequenceEqual(_lines.Select(l => l.Id)))
+        var shown = _transcript.ShownTranscript;
+        IReadOnlyList<Transcript.Segment> segments = shown?.Segments ?? [];
+        var document = shown is { } transcript ? new TranscriptDocument(segments, s => transcript.DisplayName(s.Speaker)) : null;
+        if (document is not null && _document is { } old && _blocks.Count == old.Entries.Count && OnlyNamesDiffer(old, _segments, document, segments))
         {
-            for (var i = 0; i < lines.Count; i++)
-            {
-                if (!Equals(_lines[i], lines[i])) _lines[i] = lines[i];
-            }
+            Rename(old, document, segments);
         }
         else
         {
-            _lines = [.. lines];
-            LineList.ItemsSource = _lines;
+            Rebuild(document, segments);
         }
-        _speakingLine = null;
-        CopyButton.IsEnabled = lines.Count > 0;
+        CopyButton.IsEnabled = HasSegments;
         UpdateSummarize();
         UpdateContent();
         UpdateActive();
     }
 
+    /// <summary>Same segments (ids, starts, speakers and texts), all of them in the text: only names may differ.</summary>
+    private static bool OnlyNamesDiffer(
+        TranscriptDocument old, IReadOnlyList<Transcript.Segment> oldSegments,
+        TranscriptDocument document, IReadOnlyList<Transcript.Segment> segments)
+    {
+        if (old.Entries.Count != document.Entries.Count || oldSegments.Count != segments.Count) return false;
+        for (var i = 0; i < segments.Count; i++)
+        {
+            TranscriptDocument.Entry before = old.Entries[i], after = document.Entries[i];
+            if (before.Id != after.Id || before.Time != after.Time || oldSegments[i].Speaker != segments[i].Speaker
+                || !Body(old, before).SequenceEqual(Body(document, after))) return false;
+        }
+        return true;
+    }
+
+    private static ReadOnlySpan<char> Body(TranscriptDocument document, TranscriptDocument.Entry entry) =>
+        document.Text.AsSpan(entry.BodyRange.Start, entry.BodyRange.Length);
+
+    /// <summary>The renamed speakers' names in place; the fill and the speaker icon move with the text.</summary>
+    private void Rename(TranscriptDocument old, TranscriptDocument document, IReadOnlyList<Transcript.Segment> segments)
+    {
+        for (var i = 0; i < _blocks.Count; i++)
+        {
+            if (old.Entries[i].Name != document.Entries[i].Name) _blocks[i].Name.Text = document.Entries[i].Name;
+        }
+        _document = document;
+        _segments = segments;
+        SetHighlight(_highlighted);
+        PlaceSpeakingIconLater();
+    }
+
     /// <summary>
-    /// Selects the segment under the play head; the list scrolls to it while following, only once it is out of
-    /// view. Play starts following (macOS SegmentList).
+    /// Empties the text and adds <paramref name="document"/>'s paragraphs in batches at low priority (the ring shows
+    /// until the first is in), scrolled to the top.
+    /// </summary>
+    private void Rebuild(TranscriptDocument? document, IReadOnlyList<Transcript.Segment> segments)
+    {
+        var generation = ++_buildGeneration;
+        SetHighlight(null);
+        _speakingIndex = null;
+        SpeakingIcon.Visibility = Visibility.Collapsed;
+        SegmentText.Blocks.Clear();
+        _blocks.Clear();
+        _document = document;
+        _segments = segments;
+        _indexById = new();
+        foreach (var entry in document?.Entries ?? []) _indexById.TryAdd(entry.Id, entry.Index);
+        SegmentScroller.ChangeView(null, 0, null, true);
+        if (HasSegments) DispatcherQueue.TryEnqueue(DispatcherQueuePriority.Low, () => AddBatch(generation, 0));
+    }
+
+    /// <summary>The next <see cref="BatchSize"/> paragraphs from <paramref name="from"/>, then the next batch on a later turn.</summary>
+    private void AddBatch(int generation, int from)
+    {
+        if (generation != _buildGeneration || _model is not { IsClosing: false } || _document is not { } document) return;
+        var to = Math.Min(from + BatchSize, document.Entries.Count);
+        var tip = Loc.T("Play from here");
+        for (var i = from; i < to; i++)
+        {
+            var block = NewBlock(document, i, tip);
+            _blocks.Add(block);
+            SegmentText.Blocks.Add(block.Paragraph);
+        }
+        if (from == 0) UpdateContent();
+        // The play head's segment and a citation's may be in this batch.
+        UpdateActive();
+        ShowPendingSegment();
+        if (to < document.Entries.Count) DispatcherQueue.TryEnqueue(DispatcherQueuePriority.Low, () => AddBatch(generation, to));
+    }
+
+    /// <summary>
+    /// The segment's paragraph: its start (secondary, tabular digits) and its dot and name (semibold, in the speaker's
+    /// color), both links that play from the segment's start (<paramref name="tip"/> on the start), then the text on
+    /// the next line.
+    /// </summary>
+    private SegmentBlock NewBlock(TranscriptDocument document, int index, string tip)
+    {
+        var entry = document.Entries[index];
+        var colorIndex = TranscriptViewModel.ColorIndex(_segments[index].Speaker);
+        var time = new Run { Text = entry.Time };
+        Typography.SetNumeralAlignment(time, FontNumeralAlignment.Tabular);
+        var timeLink = PlayLink(index, SecondarySwatch.Foreground);
+        timeLink.Inlines.Add(time);
+        ToolTipService.SetToolTip(timeLink, tip);
+        var spacer = new Run { Text = SpacerText, FontSize = CaptionFontSize };
+        var dot = new Run { Text = DotText };
+        var name = new Run { Text = entry.Name };
+        var nameLink = PlayLink(index, SpeakerBrush(colorIndex));
+        nameLink.FontWeight = FontWeights.SemiBold;
+        nameLink.Inlines.Add(dot);
+        nameLink.Inlines.Add(name);
+        var body = new Run { Text = Body(document, entry).ToString() };
+        var paragraph = new Paragraph { Margin = SegmentMargin };
+        paragraph.Inlines.Add(timeLink);
+        paragraph.Inlines.Add(spacer);
+        paragraph.Inlines.Add(nameLink);
+        paragraph.Inlines.Add(new LineBreak());
+        paragraph.Inlines.Add(body);
+        return new SegmentBlock(paragraph, timeLink, time, spacer, nameLink, dot, name, body, colorIndex);
+    }
+
+    /// <summary>
+    /// A caption-size link without underline that plays from segment <paramref name="index"/>; not a tab stop, so Tab
+    /// leaves the text at once instead of visiting two links per segment.
+    /// </summary>
+    private Hyperlink PlayLink(int index, Brush foreground)
+    {
+        var link = new Hyperlink
+        {
+            Foreground = foreground,
+            FontSize = CaptionFontSize,
+            UnderlineStyle = UnderlineStyle.None,
+            IsTabStop = false,
+        };
+        link.Click += (_, _) => Play(index);
+        return link;
+    }
+
+    /// <summary>Plays from the segment's start and follows it (the old row click); nothing without audio.</summary>
+    private void Play(int index)
+    {
+        if (index >= _segments.Count || _playback is not { IsReady: true } playback) return;
+        _following = true;
+        playback.SeekTo(_segments[index]);
+    }
+
+    /// <summary>
+    /// The fill on the segment under the play head, the speaker icon after its name while it plays; the text scrolls to
+    /// it while following, only once it is out of view. Play starts following (macOS TranscriptTextView).
     /// </summary>
     private void UpdateActive()
     {
         if (_playback is not { } playback) return;
-        var id = playback.ActiveSegmentId;
-        var active = id is null ? null : _lines.FirstOrDefault(l => l.Id == id);
-        if (!Equals(LineList.SelectedItem, active)) LineList.SelectedItem = active;
+        int? active = playback.ActiveSegmentId is { } id && _indexById.TryGetValue(id, out var index) && index < _blocks.Count
+            ? index
+            : null;
+        if (active != _highlighted) SetHighlight(active);
 
         var speaking = playback.IsPlaying ? active : null;
-        if (!Equals(speaking, _speakingLine))
+        if (speaking != _speakingIndex)
         {
-            if (_speakingLine is not null) SetSpeaking(_speakingLine, false);
-            if (speaking is not null) SetSpeaking(speaking, true);
-            _speakingLine = speaking;
+            _speakingIndex = speaking;
+            PlaceSpeakingIconLater();
         }
 
         if (playback.IsPlaying && !_wasPlaying) _following = true;
         _wasPlaying = playback.IsPlaying;
-        if (_following && playback.IsPlaying && active is not null) ScrollIntoViewIfOutside(active);
+        if (_following && playback.IsPlaying && active is { } line) ScrollIntoViewIfOutside(line);
     }
 
-    private void ScrollIntoViewIfOutside(TranscriptLineItem line)
+    /// <summary>
+    /// The play head's fill on paragraph <paramref name="index"/> (none for null), set again as a new highlighter: a
+    /// changed range of a shown one may not redraw. The range is the paragraph's <see cref="TextPointer.Offset"/>s,
+    /// assuming TextHighlighter ranges count positions as TextPointer offsets do (element edges included); should the
+    /// fill land on the wrong text, they count plain characters, and the range is the entry's
+    /// <c>HeaderRange.Start</c> to <c>BodyRange.End</c> of <see cref="_document"/> instead.
+    /// </summary>
+    private void SetHighlight(int? index)
     {
-        if (LineList.ContainerFromItem(line) is FrameworkElement container && _scroller is not null && container.ActualHeight > 0)
-        {
-            var bounds = container.TransformToVisual(_scroller).TransformBounds(new Rect(0, 0, container.ActualWidth, container.ActualHeight));
-            if (bounds.Top >= 0 && bounds.Bottom <= _scroller.ViewportHeight) return;
-        }
-        LineList.ScrollIntoView(line, ScrollIntoViewAlignment.Leading);
+        SegmentText.TextHighlighters.Clear();
+        _highlighted = index;
+        if (index is not { } shown || shown >= _blocks.Count) return;
+        var paragraph = _blocks[shown].Paragraph;
+        int start = paragraph.ContentStart.Offset, end = paragraph.ContentEnd.Offset;
+        var highlighter = new TextHighlighter { Background = HighlightSwatch.Background };
+        highlighter.Ranges.Add(new TextRange { StartIndex = start, Length = end - start });
+        SegmentText.TextHighlighters.Add(highlighter);
     }
 
-    /// <summary>The user's own scrolling (wheel, touch, scroll bar, keys) stops following the play head.</summary>
+    /// <summary>The speaker icon after the playing segment's name once the text is laid out, once per turn.</summary>
+    private void PlaceSpeakingIconLater()
+    {
+        if (_iconPending) return;
+        _iconPending = DispatcherQueue.TryEnqueue(DispatcherQueuePriority.Low, () =>
+        {
+            _iconPending = false;
+            if (_model is { IsClosing: false }) PlaceSpeakingIcon();
+        });
+    }
+
+    /// <summary>The speaker icon in the speaker's color, after the name of <see cref="_speakingIndex"/>; hidden without one.</summary>
+    private void PlaceSpeakingIcon()
+    {
+        var block = _speakingIndex is { } index && index < _blocks.Count ? _blocks[index] : null;
+        var rect = block?.Name.ContentEnd.GetCharacterRect(LogicalDirection.Backward) ?? Rect.Empty;
+        if (block is null || rect.IsEmpty)
+        {
+            SpeakingIcon.Visibility = Visibility.Collapsed;
+            return;
+        }
+        // The canvas lies over the text, at its origin.
+        Canvas.SetLeft(SpeakingIcon, rect.Right + 6);
+        Canvas.SetTop(SpeakingIcon, rect.Top + (rect.Height - SpeakingIcon.FontSize) / 2);
+        SpeakingIcon.Foreground = SpeakerBrush(block.ColorIndex);
+        SpeakingIcon.Visibility = Visibility.Visible;
+    }
+
+    /// <summary>The segment's top and bottom in the viewport, once the text is laid out; null without a layout.</summary>
+    private (double Top, double Bottom)? SegmentBounds(int index)
+    {
+        SegmentScroller.UpdateLayout();
+        var paragraph = _blocks[index].Paragraph;
+        var top = paragraph.ContentStart.GetCharacterRect(LogicalDirection.Forward);
+        var bottom = paragraph.ContentEnd.GetCharacterRect(LogicalDirection.Backward);
+        if (top.IsEmpty || bottom.IsEmpty) return null;
+        var transform = SegmentText.TransformToVisual(SegmentScroller);
+        return (transform.TransformPoint(new Point(0, top.Top)).Y, transform.TransformPoint(new Point(0, bottom.Bottom)).Y);
+    }
+
+    /// <summary>
+    /// Scrolls the segment to the top of the view when it is not fully in view (the old list's Leading), without
+    /// animation like the old ScrollIntoView: an animated ChangeView may raise DirectManipulationStarted, which would
+    /// stop following.
+    /// </summary>
+    private void ScrollIntoViewIfOutside(int index)
+    {
+        if (SegmentBounds(index) is not { } bounds) return;
+        if (bounds.Top >= 0 && bounds.Bottom <= SegmentScroller.ViewportHeight) return;
+        SegmentScroller.ChangeView(null, Math.Max(0, SegmentScroller.VerticalOffset + bounds.Top - ScrollMargin), null, true);
+    }
+
+    /// <summary>
+    /// A citation's segment in the middle of the view (its top when taller than the view), once it is in the text and
+    /// laid out; dropped when the shown version does not have it.
+    /// </summary>
+    private void ShowPendingSegment()
+    {
+        if (_pendingSegment is not { } id || _model is not { IsClosing: false }) return;
+        if (!_indexById.TryGetValue(id, out var index))
+        {
+            _pendingSegment = null;
+            return;
+        }
+        if (index >= _blocks.Count || SegmentBounds(index) is not { } bounds) return;
+        _pendingSegment = null;
+        var height = bounds.Bottom - bounds.Top;
+        var viewport = SegmentScroller.ViewportHeight;
+        var above = height > viewport ? ScrollMargin : (viewport - height) / 2;
+        SegmentScroller.ChangeView(null, Math.Max(0, SegmentScroller.VerticalOffset + bounds.Top - above), null, true);
+    }
+
+    /// <summary>
+    /// The user's own scrolling (wheel, touch, scroll bar, keys) stops following the play head; a press in the text
+    /// (a selection, a link) does not.
+    /// </summary>
     private void FollowUserScrolling()
     {
-        if (_scroller is not null) return;
-        _scroller = FindChild<ScrollViewer>(LineList);
-        if (_scroller is null) return;
-        _scroller.AddHandler(PointerWheelChangedEvent, new PointerEventHandler((_, _) => _following = false), handledEventsToo: true);
-        _scroller.AddHandler(PointerPressedEvent, new PointerEventHandler((_, _) => _following = false), handledEventsToo: true);
-        _scroller.AddHandler(KeyDownEvent, new KeyEventHandler(OnListKeyDown), handledEventsToo: true);
-        _scroller.DirectManipulationStarted += (_, _) => _following = false;
+        SegmentScroller.AddHandler(PointerWheelChangedEvent, new PointerEventHandler((_, _) => _following = false), handledEventsToo: true);
+        SegmentScroller.AddHandler(PointerPressedEvent, new PointerEventHandler((_, e) =>
+        {
+            if (!ReferenceEquals(e.OriginalSource, SegmentText)) _following = false;
+        }), handledEventsToo: true);
+        SegmentScroller.AddHandler(KeyDownEvent, new KeyEventHandler(OnListKeyDown), handledEventsToo: true);
+        SegmentScroller.DirectManipulationStarted += (_, _) => _following = false;
     }
 
     private void OnListKeyDown(object sender, KeyRoutedEventArgs e)
@@ -255,39 +516,120 @@ public sealed partial class TranscriptView : UserControl
         }
     }
 
-    /// <summary>Plays from the segment's start and follows it; without audio the selection stays on the play head.</summary>
-    private void OnLineClick(object sender, ItemClickEventArgs e)
+    // Selection
+
+    /// <summary>
+    /// Ctrl+C (and Ctrl+Insert) with a selection copies it as "Name [mm:ss]: text" lines, before the text's own copy of
+    /// the plain text. Not with Shift or Alt: Ctrl+Shift+C is the window's Copy as prompt.
+    /// </summary>
+    private void OnTextPreviewKeyDown(object sender, KeyRoutedEventArgs e)
     {
-        if (e.ClickedItem is TranscriptLineItem line && _playback is { IsReady: true } playback)
+        if (e.Key is not (VirtualKey.C or VirtualKey.Insert) || !ConversationListView.IsKeyDown(VirtualKey.Control)
+            || ConversationListView.IsKeyDown(VirtualKey.Shift) || ConversationListView.IsKeyDown(VirtualKey.Menu)) return;
+        if (SelectionCopyText() is not { } text) return;
+        e.Handled = true;
+        // After the key's own handling, so a copy the text still makes cannot replace this one.
+        DispatcherQueue.TryEnqueue(() => SetClipboard(text));
+    }
+
+    /// <summary>
+    /// The text's menu (macOS: the standard menu with Play from here first): Play from here for the segment under the
+    /// pointer (under the selection's start from the keyboard), Copy and Select All.
+    /// </summary>
+    private void OnTextContextRequested(UIElement sender, ContextRequestedEventArgs args)
+    {
+        args.Handled = true;
+        var hasPoint = args.TryGetPosition(SegmentText, out var point);
+        var pointer = hasPoint ? SegmentText.GetPositionFromPoint(point) : SegmentText.SelectionStart;
+        var entry = pointer is not null && _document is { } document ? document.SegmentAt(PlainOffset(pointer)) : null;
+        _textMenu.Items.Clear();
+        if (entry is not null)
         {
-            _following = true;
-            playback.SeekTo(line.Segment);
+            var play = new MenuFlyoutItem { Text = Loc.T("Play from here"), IsEnabled = _playback is { IsReady: true } };
+            var index = entry.Index;
+            play.Click += (_, _) => Play(index);
+            _textMenu.Items.Add(play);
+            _textMenu.Items.Add(new MenuFlyoutSeparator());
         }
-        // The click also selected the row; the selection shows the play head only.
-        DispatcherQueue.TryEnqueue(UpdateActive);
+        var copy = new MenuFlyoutItem { Text = Loc.T("Copy"), IsEnabled = SegmentText.SelectedText.Length > 0 };
+        copy.Click += (_, _) =>
+        {
+            if (SelectionCopyText() is { } text) SetClipboard(text);
+        };
+        _textMenu.Items.Add(copy);
+        var selectAll = new MenuFlyoutItem { Text = Loc.T("Select All") };
+        selectAll.Click += (_, _) => SegmentText.SelectAll();
+        _textMenu.Items.Add(selectAll);
+        _textMenu.ShowAt(SegmentText, hasPoint ? new FlyoutShowOptions { Position = point } : new FlyoutShowOptions());
     }
 
-    /// <summary>A row is shown for an item: its speaker's color and whether it plays.</summary>
-    private void OnContainerContentChanging(ListViewBase sender, ContainerContentChangingEventArgs args)
+    /// <summary>The selection as <see cref="TranscriptDocument.CopyText"/> gives it; null without a selection.</summary>
+    private string? SelectionCopyText()
     {
-        if (args.InRecycleQueue || args.Item is not TranscriptLineItem line) return;
-        if (args.ItemContainer.ContentTemplateRoot is not FrameworkElement root) return;
-        var name = root.FindName("NameText") as TextBlock;
-        if (name is not null) name.Style = SpeakerStyle(line.ColorIndex);
-        if (root.FindName("SpeakingIcon") is FontIcon icon) ShowSpeaking(icon, name, Equals(line, _speakingLine));
+        if (_document is not { } document || _blocks.Count == 0 || SegmentText.SelectedText.Length == 0) return null;
+        if (SegmentText.SelectionStart is not { } from || SegmentText.SelectionEnd is not { } to) return null;
+        int start = PlainOffset(from), end = PlainOffset(to);
+        if (end < start) (start, end) = (end, start);
+        return end > start ? document.CopyText(new TranscriptDocument.TextRange(start, end - start)) : null;
     }
 
-    private void SetSpeaking(TranscriptLineItem line, bool speaking)
+    /// <summary>
+    /// <paramref name="pointer"/> as an index into <see cref="_document"/>'s text. A pointer's offset also counts
+    /// element edges, so it is read relative to the run it is in (each run is a known piece of the document); a pointer
+    /// between runs (an element edge, the line break) counts as the end of the run before it.
+    /// </summary>
+    private int PlainOffset(TextPointer pointer)
     {
-        if (LineList.ContainerFromItem(line) is not ListViewItem { ContentTemplateRoot: FrameworkElement root }) return;
-        if (root.FindName("SpeakingIcon") is FontIcon icon) ShowSpeaking(icon, root.FindName("NameText") as TextBlock, speaking);
+        if (_document is not { } document || _blocks.Count == 0) return 0;
+        var offset = pointer.Offset;
+        // The last paragraph starting at or before the pointer.
+        int low = 0, high = _blocks.Count;
+        while (low < high)
+        {
+            var mid = (low + high) / 2;
+            if (_blocks[mid].Paragraph.ContentStart.Offset <= offset) low = mid + 1;
+            else high = mid;
+        }
+        if (low == 0) return 0;
+        var block = _blocks[low - 1];
+        var entry = document.Entries[low - 1];
+        // Last run first: the first one starting at or before the pointer holds it.
+        (Run Run, int Start)[] runs =
+        [
+            (block.Body, entry.BodyRange.Start),
+            (block.Name, entry.NameRange.Start),
+            (block.Dot, entry.NameRange.Start - DotText.Length),
+            (block.Spacer, entry.TimeRange.End),
+            (block.Time, entry.TimeRange.Start),
+        ];
+        foreach (var (run, start) in runs)
+        {
+            var runStart = run.ContentStart.Offset;
+            if (offset >= runStart) return start + Math.Clamp(offset - runStart, 0, run.Text.Length);
+        }
+        return entry.HeaderRange.Start;
     }
 
-    /// <summary>The speaker icon under the start, in the speaker's color, while the segment plays.</summary>
-    private static void ShowSpeaking(FontIcon icon, TextBlock? name, bool speaking)
+    // Colors
+
+    /// <summary>
+    /// The speaker's color (-1 is me, see <see cref="TranscriptViewModel.ColorIndex"/>) from the SpeakerMe and
+    /// Speaker0…7 swatches, in the current theme.
+    /// </summary>
+    private Brush SpeakerBrush(int colorIndex) => ((TextBlock)Swatches.Children[colorIndex + 1]).Foreground;
+
+    /// <summary>Light, Dark or contrast changed: the text's brushes from the swatches again (XAML styles follow by themselves).</summary>
+    private void ApplyColors()
     {
-        icon.Visibility = speaking ? Visibility.Visible : Visibility.Collapsed;
-        if (speaking && name is not null) icon.Foreground = name.Foreground;
+        if (_model?.IsClosing == true) return;
+        var secondary = SecondarySwatch.Foreground;
+        foreach (var block in _blocks)
+        {
+            block.TimeLink.Foreground = secondary;
+            block.NameLink.Foreground = SpeakerBrush(block.ColorIndex);
+        }
+        SetHighlight(_highlighted);
+        PlaceSpeakingIconLater();
     }
 
     /// <summary>The speaker's color as a caption style (SpeakerMe, Speaker0…7 in the resources).</summary>
@@ -314,13 +656,13 @@ public sealed partial class TranscriptView : UserControl
         UpdateActions();
     }
 
-    /// <summary>The lines, a ring while reading, or why there are none.</summary>
+    /// <summary>The text once its first paragraphs are in, a ring while reading or building it, or why there are none.</summary>
     private void UpdateContent()
     {
         if (_transcript is null) return;
-        var hasLines = _lines.Count > 0;
-        var loading = !hasLines && _transcript.IsLoading;
-        LineList.Visibility = Shown(hasLines);
+        var hasLines = _blocks.Count > 0;
+        var loading = !hasLines && (HasSegments || _transcript.IsLoading);
+        SegmentScroller.Visibility = Shown(hasLines);
         LoadingRing.Visibility = Shown(loading);
         LoadingRing.IsActive = loading;
         EmptyPanel.Visibility = Shown(!hasLines && !loading);
@@ -442,7 +784,7 @@ public sealed partial class TranscriptView : UserControl
         if (_model is null || _transcript is null) return;
         var summarizing = _model.AIJob is { Kind: AIJobKind.Summary } job && job.ConversationId == _transcript.ConversationId;
         var text = Loc.T(summarizing ? "Summarizing…" : _transcript.Conversation?.HasSummary == true ? "Summary" : "Summarize");
-        SummarizeButton.Visibility = Shown(_lines.Count > 0);
+        SummarizeButton.Visibility = Shown(HasSegments);
         SummarizeButton.IsEnabled = !summarizing;
         SummarizingRing.Visibility = Shown(summarizing);
         SummarizingRing.IsActive = summarizing;
@@ -552,9 +894,13 @@ public sealed partial class TranscriptView : UserControl
     /// <summary>One "Name [mm:ss]: text" line per segment of the shown version.</summary>
     private void Copy()
     {
-        if (_transcript is null) return;
+        if (_transcript is not null) SetClipboard(_transcript.TranscriptText());
+    }
+
+    private static void SetClipboard(string text)
+    {
         var package = new DataPackage();
-        package.SetText(_transcript.TranscriptText());
+        package.SetText(text);
         try
         {
             Clipboard.SetContent(package);
@@ -666,16 +1012,5 @@ public sealed partial class TranscriptView : UserControl
         if (text == shown) return;
         shown = text;
         ToolTipService.SetToolTip(element, text);
-    }
-
-    private static T? FindChild<T>(DependencyObject parent) where T : DependencyObject
-    {
-        for (var i = 0; i < VisualTreeHelper.GetChildrenCount(parent); i++)
-        {
-            var child = VisualTreeHelper.GetChild(parent, i);
-            if (child is T match) return match;
-            if (FindChild<T>(child) is { } found) return found;
-        }
-        return null;
     }
 }

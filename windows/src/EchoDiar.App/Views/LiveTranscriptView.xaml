@@ -1,8 +1,9 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!--
     Live captions on the recording page, under its header (macOS LiveTranscriptView.swift, setting "Transcribe while
-    recording"): the transcriber's state, then the newest lines and the open chunks' greyed tentative text, scrolled to
-    the bottom as they arrive unless the user scrolled up, filling the page. The lines are built in code.
+    recording"): the transcriber's state, then the newest lines and the open chunks' greyed tentative text as one
+    selectable text, scrolled to the bottom as they arrive unless the user scrolled up, filling the page. The lines are
+    built in code.
 -->
 <UserControl
     x:Class="EchoDiar.App.Views.LiveTranscriptView"
@@ -10,21 +11,17 @@
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
 
     <UserControl.Resources>
-        <!-- The transcript's colors (TranscriptView SpeakerMe and Speaker0): me in the accent color, the others in caution. -->
-        <Style x:Key="LiveSpeakerBase" BasedOn="{StaticResource BodyStrongTextBlockStyle}" TargetType="TextBlock">
-            <Setter Property="TextWrapping" Value="NoWrap" />
-        </Style>
-        <Style x:Key="LiveSpeakerMe" BasedOn="{StaticResource LiveSpeakerBase}" TargetType="TextBlock">
+        <!--
+            The transcript's colors (TranscriptView SpeakerMe and Speaker0): me in the accent color, the others in caution;
+            the tentative text in the secondary color. Runs take no style: the code reads these from the swatches below.
+        -->
+        <Style x:Key="LiveSpeakerMe" TargetType="TextBlock">
             <Setter Property="Foreground" Value="{ThemeResource AccentTextFillColorPrimaryBrush}" />
         </Style>
-        <Style x:Key="LiveSpeakerOthers" BasedOn="{StaticResource LiveSpeakerBase}" TargetType="TextBlock">
+        <Style x:Key="LiveSpeakerOthers" TargetType="TextBlock">
             <Setter Property="Foreground" Value="{ThemeResource SystemFillColorCautionBrush}" />
         </Style>
-        <Style x:Key="LiveLineText" BasedOn="{StaticResource BodyTextBlockStyle}" TargetType="TextBlock">
-            <Setter Property="TextWrapping" Value="Wrap" />
-            <Setter Property="IsTextSelectionEnabled" Value="True" />
-        </Style>
-        <Style x:Key="LiveTentativeText" BasedOn="{StaticResource LiveLineText}" TargetType="TextBlock">
+        <Style x:Key="LiveTentativeText" TargetType="TextBlock">
             <Setter Property="Foreground" Value="{ThemeResource TextFillColorSecondaryBrush}" />
         </Style>
 
@@ -85,12 +82,24 @@
                 HorizontalScrollMode="Disabled"
                 VerticalScrollBarVisibility="Auto"
                 Visibility="Collapsed">
-                <!-- Right padding keeps the text clear of the scroll bar. -->
-                <StackPanel Padding="0,0,16,0" Spacing="6">
-                    <StackPanel x:Name="LinesPanel" Spacing="6" />
-                    <StackPanel x:Name="TentativePanel" Spacing="6" />
-                </StackPanel>
+                <!--
+                    One paragraph per line ("Name: text"), then the tentative ones: a drag selects across lines and Ctrl+C
+                    copies plain text. Right padding keeps the text clear of the scroll bar.
+                -->
+                <RichTextBlock
+                    x:Name="CaptionText"
+                    Padding="0,0,16,0"
+                    IsTextSelectionEnabled="True"
+                    SelectionFlyout="{x:Null}"
+                    TextWrapping="Wrap" />
             </ScrollViewer>
+
+            <!-- The brushes of the styles above, in the current theme, for the text's runs. -->
+            <StackPanel Visibility="Collapsed">
+                <TextBlock x:Name="MeSwatch" Style="{StaticResource LiveSpeakerMe}" />
+                <TextBlock x:Name="OthersSwatch" Style="{StaticResource LiveSpeakerOthers}" />
+                <TextBlock x:Name="TentativeSwatch" Style="{StaticResource LiveTentativeText}" />
+            </StackPanel>
         </Grid>
     </Border>
 </UserControl>

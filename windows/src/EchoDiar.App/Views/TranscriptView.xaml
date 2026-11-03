@@ -9,8 +9,7 @@
     xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
     xmlns:local="using:EchoDiar.App"
-    xmlns:views="using:EchoDiar.App.Views"
-    xmlns:vm="using:EchoDiar.App.ViewModels">
+    xmlns:views="using:EchoDiar.App.Views">
 
     <UserControl.Resources>
         <!--
@@ -81,52 +80,35 @@
                 </DropDownButton>
 
                 <!--
-                    One row per segment: the start (and a speaker icon while it plays), the speaker, the text. A click
-                    plays from the segment's start; the segment under the play head is the selected row.
+                    The segments as one selectable text (macOS TranscriptTextView), built in code: per segment the start
+                    and the speaker (both play from the segment's start), then the text. A drag selects across segments;
+                    Ctrl+C copies "Name [mm:ss]: text" lines. The segment under the play head has a fill, and a speaker
+                    icon after its name while it plays.
                 -->
-                <ListView
-                    x:Name="LineList"
+                <ScrollViewer
+                    x:Name="SegmentScroller"
                     Grid.Row="1"
-                    Padding="4,10"
-                    IsItemClickEnabled="True"
-                    SelectionMode="Single"
-                    SingleSelectionFollowsFocus="False">
-                    <ListView.ItemTemplate>
-                        <DataTemplate x:DataType="vm:TranscriptLineItem">
-                            <Grid Padding="0,6" ColumnSpacing="10">
-                                <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="Auto" />
-                                    <ColumnDefinition Width="*" />
-                                </Grid.ColumnDefinitions>
-                                <StackPanel Spacing="4">
-                                    <TextBlock
-                                        Style="{StaticResource CaptionTextBlockStyle}"
-                                        Foreground="{ThemeResource TextFillColorSecondaryBrush}"
-                                        Text="{x:Bind Time}"
-                                        TextWrapping="NoWrap"
-                                        ToolTipService.ToolTip="{local:T Text='Play from here'}" />
-                                    <FontIcon
-                                        x:Name="SpeakingIcon"
-                                        HorizontalAlignment="Left"
-                                        AutomationProperties.AccessibilityView="Raw"
-                                        FontFamily="{ThemeResource SymbolThemeFontFamily}"
-                                        FontSize="12"
-                                        Glyph="&#xE767;"
-                                        Visibility="Collapsed" />
-                                </StackPanel>
-                                <StackPanel Grid.Column="1" Spacing="2">
-                                    <TextBlock x:Name="NameText" Style="{StaticResource SpeakerNameBase}">
-                                        <Run Text="&#x25CF; " /><Run Text="{x:Bind Name}" />
-                                    </TextBlock>
-                                    <TextBlock
-                                        Style="{StaticResource BodyTextBlockStyle}"
-                                        Text="{x:Bind Text}"
-                                        TextWrapping="Wrap" />
-                                </StackPanel>
-                            </Grid>
-                        </DataTemplate>
-                    </ListView.ItemTemplate>
-                </ListView>
+                    HorizontalScrollBarVisibility="Disabled"
+                    HorizontalScrollMode="Disabled"
+                    VerticalScrollBarVisibility="Auto"
+                    Visibility="Collapsed">
+                    <Grid Padding="18,14,18,4">
+                        <RichTextBlock
+                            x:Name="SegmentText"
+                            IsTextSelectionEnabled="True"
+                            SelectionFlyout="{x:Null}"
+                            TextWrapping="Wrap" />
+                        <Canvas IsHitTestVisible="False">
+                            <FontIcon
+                                x:Name="SpeakingIcon"
+                                AutomationProperties.AccessibilityView="Raw"
+                                FontFamily="{ThemeResource SymbolThemeFontFamily}"
+                                FontSize="12"
+                                Glyph="&#xE767;"
+                                Visibility="Collapsed" />
+                        </Canvas>
+                    </Grid>
+                </ScrollViewer>
 
                 <ProgressRing
                     x:Name="LoadingRing"
@@ -358,5 +340,24 @@
                 </Grid>
             </StackPanel>
         </Border>
+
+        <!--
+            The theme's brushes for the text built in code (TranscriptView.SpeakerBrush): the speakers' colors (me, then
+            0 to 7), the start's color and the play head's fill. Elements in the tree, so they follow Light, Dark and
+            contrast themes like the styles do.
+        -->
+        <StackPanel x:Name="Swatches" Visibility="Collapsed">
+            <TextBlock Style="{StaticResource SpeakerMe}" />
+            <TextBlock Style="{StaticResource Speaker0}" />
+            <TextBlock Style="{StaticResource Speaker1}" />
+            <TextBlock Style="{StaticResource Speaker2}" />
+            <TextBlock Style="{StaticResource Speaker3}" />
+            <TextBlock Style="{StaticResource Speaker4}" />
+            <TextBlock Style="{StaticResource Speaker5}" />
+            <TextBlock Style="{StaticResource Speaker6}" />
+            <TextBlock Style="{StaticResource Speaker7}" />
+            <TextBlock x:Name="SecondarySwatch" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+            <Border x:Name="HighlightSwatch" Background="{ThemeResource SubtleFillColorSecondaryBrush}" />
+        </StackPanel>
     </Grid>
 </UserControl>
