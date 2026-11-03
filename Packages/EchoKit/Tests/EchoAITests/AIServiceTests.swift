@@ -5,8 +5,9 @@ import Synchronization
 import Testing
 
 /// Guards the summary job: map-reduce sends status lines and streams only the final reduce, the result is saved as a
-/// version, a cancelled job saves nothing, a stopped job saves what it streamed, and an in-app model is unloaded
-/// before the gate is released. Also guards how many earlier chat messages a question sends.
+/// version, a cancelled job saves nothing, a stopped job saves what it streamed (stopping one job leaves the others
+/// running), and an in-app model is unloaded before the gate is released. Also guards how many earlier chat messages a
+/// question sends.
 struct AIServiceTests {
     /// Answers every request with `reply`, in two pieces, and reports a small context to force map-reduce.
     final class FakeProvider: LLMProvider {
@@ -35,22 +36,35 @@ struct AIServiceTests {
         func contextWindow(model: String) async -> Int { context }
     }
 
-    /// Sends `piece` (when not empty), then waits until cancelled, as a slow answer does.
+    /// Sends `piece` (when not empty), then waits until cancelled, as a slow answer does; or until `release()`, then
+    /// sends `rest` and finishes.
     final class StallingProvider: LLMProvider {
         let piece: String
+        let rest: String
         let context: Int
+        let released = Mutex(false)
 
-        init(piece: String, context: Int = 128_000) {
+        init(piece: String, rest: String = "", context: Int = 128_000) {
             self.piece = piece
+            self.rest = rest
             self.context = context
         }
 
+        func release() { released.withLock { $0 = true } }
+
         func stream(messages: [LLMMessage], model: String, maxTokens: Int) -> AsyncThrowingStream<String, Error> {
-            let piece = piece
-            return AsyncThrowingStream { continuation in
+            let (piece, rest) = (piece, rest)
+            return AsyncThrowingStream { [self] continuation in
                 let task = Task {
                     if !piece.isEmpty { continuation.yield(piece) }
-                    while !Task.isCancelled { try? await Task.sleep(for: .milliseconds(10)) }
+                    while !Task.isCancelled {
+                        if released.withLock({ $0 }) {
+                            continuation.yield(rest)
+                            continuation.finish()
+                            return
+                        }
+                        try? await Task.sleep(for: .milliseconds(10))
+                    }
                     continuation.finish(throwing: CancellationError())
                 }
                 continuation.onTermination = { _ in task.cancel() }
@@ -293,6 +307,39 @@ struct AIServiceTests {
         #expect(versions.map(\.text) == ["## Decisions"])
         #expect(versions.map(\.stopped) == [true])
         #expect(Conversation.readSummary(from: conversation.folder) == "## Decisions")
+    }
+
+    @Test
+    func stoppingOneSummaryLeavesTheOtherRunning() async throws {
+        let (first, second) = (try makeConversation(), try makeConversation())
+        defer {
+            try? FileManager.default.removeItem(at: first.folder)
+            try? FileManager.default.removeItem(at: second.folder)
+        }
+        let service = AIService(gate: ModelLoadGate())
+        let slow = StallingProvider(piece: "## Actions", rest: " ship on Friday")
+        let (id1, id2) = (UUID(), UUID())
+        var job1 = service.summarize(
+            conversation: first, transcript: transcript(turns: 3), provider: StallingProvider(piece: "## Decisions"),
+            providerID: "fake", model: "fake", language: "en", jobID: id1).makeAsyncIterator()
+        var job2 = service.summarize(
+            conversation: second, transcript: transcript(turns: 3), provider: slow, providerID: "fake", model: "fake",
+            language: "en", jobID: id2).makeAsyncIterator()
+        // Both jobs have streamed their first piece and are waiting.
+        while let update = try await job1.next() { if case .text = update { break } }
+        while let update = try await job2.next() { if case .text = update { break } }
+
+        service.stop(id1)
+        while try await job1.next() != nil {}
+        slow.release()
+        while try await job2.next() != nil {}
+
+        let stopped = Conversation.readSummaryVersions(from: first.folder)
+        #expect(stopped.map(\.text) == ["## Decisions"])
+        #expect(stopped.map(\.stopped) == [true])
+        let completed = Conversation.readSummaryVersions(from: second.folder)
+        #expect(completed.map(\.text) == ["## Actions ship on Friday"])
+        #expect(completed.map(\.stopped) == [false])
     }
 
     @Test

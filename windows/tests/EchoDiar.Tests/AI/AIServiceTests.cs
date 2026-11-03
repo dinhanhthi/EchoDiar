@@ -59,6 +59,24 @@ public sealed class AIServiceTests : IDisposable
         public ValueTask<int> ContextWindowAsync(string model, CancellationToken cancellationToken = default) => new(context);
     }
 
+    /// <summary>Sends the first half of <c>reply</c>, then the second once <c>release</c> completes (unless cancelled).</summary>
+    private sealed class HeldProvider(string reply, Task release) : ILLMProvider
+    {
+        public async IAsyncEnumerable<string> StreamAsync(
+            IReadOnlyList<LLMMessage> messages, string model, int maxTokens,
+            [EnumeratorCancellation] CancellationToken cancellationToken = default)
+        {
+            yield return reply[..(reply.Length / 2)];
+            await release.WaitAsync(cancellationToken);
+            yield return reply[(reply.Length / 2)..];
+        }
+
+        public Task<IReadOnlyList<string>> ListModelsAsync(CancellationToken cancellationToken = default) =>
+            Task.FromResult<IReadOnlyList<string>>(["fake"]);
+
+        public ValueTask<int> ContextWindowAsync(string model, CancellationToken cancellationToken = default) => new(128_000);
+    }
+
     /// <summary>Sends 64K-character pieces without end.</summary>
     private sealed class FloodingProvider : ILLMProvider
     {
@@ -404,6 +422,42 @@ public sealed class AIServiceTests : IDisposable
         Assert.Equal(["## Decisions"], versions.Select(v => v.Text));
         Assert.Equal([true], versions.Select(v => v.Stopped));
         Assert.Equal("## Decisions", Conversation.ReadSummary(conversation.Folder));
+    }
+
+    // Stop(jobId) ends only that job: two summaries stream at once, the stopped one saves its partial text as stopped
+    // and the other completes in full.
+    [Fact]
+    public async Task StoppingOneJobLeavesTheOtherRunning()
+    {
+        var first = MakeConversation();
+        var second = MakeConversation();
+        var service = new AIService(new ModelLoadGate());
+        var firstId = Guid.NewGuid();
+        var release = new TaskCompletionSource();
+        const string reply = "## Decisions\nShip on Friday.";
+
+        await using var other = service.Summarize(
+            second, MakeTranscript(3), new HeldProvider(reply, release.Task), providerID: "fake", model: "fake",
+            language: "en", cancellationToken: Ct).GetAsyncEnumerator(Ct);
+        // The second job is streaming before the first one is stopped.
+        do Assert.True(await other.MoveNextAsync());
+        while (other.Current.Kind != AIUpdateKind.Text);
+
+        await foreach (var update in service.Summarize(
+            first, MakeTranscript(3), new StallingProvider("## Notes"), providerID: "fake", model: "fake",
+            language: "en", cancellationToken: Ct, jobId: firstId))
+        {
+            if (update.Kind == AIUpdateKind.Text) service.Stop(firstId);
+        }
+        release.SetResult();
+        while (await other.MoveNextAsync()) { }
+
+        var stopped = Conversation.ReadSummaryVersions(first.Folder);
+        Assert.Equal(["## Notes"], stopped.Select(v => v.Text));
+        Assert.Equal([true], stopped.Select(v => v.Stopped));
+        var completed = Conversation.ReadSummaryVersions(second.Folder);
+        Assert.Equal([reply], completed.Select(v => v.Text));
+        Assert.Equal([false], completed.Select(v => v.Stopped));
     }
 
     [Fact]

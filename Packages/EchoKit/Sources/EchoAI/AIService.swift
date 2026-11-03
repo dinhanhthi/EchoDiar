@@ -4,10 +4,11 @@ import Synchronization
 
 /// Summaries and questions about one conversation (docs/research/llm-providers.md F). Each job streams its answer,
 /// saves it in the conversation folder when it completes (a new summary version + `hasSummary`, or two more
-/// `chat.json` messages) and saves nothing when cancelled or failed. `stop()` ends a job early and saves the answer
-/// streamed until then (a summary marked stopped); nothing when no text was streamed yet. A title job names an
-/// archived chat and saves nothing. In-app models
-/// (`LocalLLMProvider`: Foundation Models, MLX) run the whole job inside `ModelLoadGate` (owner `.llm`), loaded once and unloaded before the gate is released.
+/// `chat.json` messages) and saves nothing when cancelled or failed. `stop(_:)` ends a job early (`stop()` every job)
+/// and saves the answer streamed until then (a summary marked stopped); nothing when no text was streamed yet. A
+/// job's `jobID` must be unique among the running jobs. A title job names an archived chat and saves nothing. In-app
+/// models (`LocalLLMProvider`: Foundation Models, MLX) run the whole job inside `ModelLoadGate` (owner `.llm`), loaded
+/// once and unloaded before the gate is released.
 public actor AIService {
     public enum Update: Equatable, Sendable {
         /// What a long job is doing ("Reading part 2 of 5…"), before the answer starts.
@@ -30,7 +31,7 @@ public actor AIService {
         let text: String
     }
 
-    /// The tasks of the running jobs, and those `stop()` ended.
+    /// The tasks of the running jobs by job id, and those `stop()` or `stop(_:)` ended.
     final class Jobs: Sendable {
         let running = Mutex<[UUID: Task<Void, Never>]>([:])
         let stopped = Mutex<Set<UUID>>([])
@@ -50,14 +51,25 @@ public actor AIService {
         for task in tasks.values { task.cancel() }
     }
 
+    /// Ends the running job `jobID` as `stop()` does, the others keep running; nothing when it is not running.
+    public nonisolated func stop(_ jobID: UUID) {
+        // Marked under the running lock: a job that ends meanwhile cannot leave its id in `stopped`.
+        let task = jobs.running.withLock { running -> Task<Void, Never>? in
+            guard let task = running[jobID] else { return nil }
+            jobs.stopped.withLock { _ = $0.insert(jobID) }
+            return task
+        }
+        task?.cancel()
+    }
+
     /// Streams a new summary: one pass when the transcript fits, else map over the chunks and reduce the notes until
     /// one group is left; only the last reduce is streamed. `language` is the summary-language setting.
     /// `providerID` is saved with the summary.
     public nonisolated func summarize(
         conversation: Conversation, transcript: Transcript, provider: any LLMProvider, providerID: String,
-        model: String, language: String
+        model: String, language: String, jobID: UUID = UUID()
     ) -> AsyncThrowingStream<Update, Error> {
-        job(provider: provider, model: model) { backend, yield, isStopped in
+        job(id: jobID, provider: provider, model: model) { backend, yield, isStopped in
             let summary: String
             var cut = false
             do {
@@ -79,10 +91,10 @@ public actor AIService {
     public nonisolated func ask(
         question: String, conversation: Conversation, transcript: Transcript, summary: String?,
         history: [ChatLog.Message], historyLimit: Int, provider: any LLMProvider, providerID: String, model: String,
-        language: String
+        language: String, jobID: UUID = UUID()
     ) -> AsyncThrowingStream<Update, Error> {
         let asked = Date()
-        return job(provider: provider, model: model) { [self] backend, yield, isStopped in
+        return job(id: jobID, provider: provider, model: model) { [self] backend, yield, isStopped in
             let turns = Self.turns(history, limit: historyLimit)
             let language = Self.answerLanguage(setting: language, provider: provider)
             let context = await provider.contextWindow(model: model)
@@ -112,10 +124,10 @@ public actor AIService {
     public nonisolated func askLibrary(
         question: String, sources: [PromptBuilder.LibrarySource], references: [ChatLog.Reference],
         history: [ChatLog.Message], historyLimit: Int, provider: any LLMProvider, providerID: String, model: String,
-        language: String, folder: URL
+        language: String, folder: URL, jobID: UUID = UUID()
     ) -> AsyncThrowingStream<Update, Error> {
         let asked = Date()
-        return job(provider: provider, model: model) { [self] backend, yield, isStopped in
+        return job(id: jobID, provider: provider, model: model) { [self] backend, yield, isStopped in
             let messages = PromptBuilder.libraryQuestionMessages(
                 question: question, sources: sources, history: Self.turns(history, limit: historyLimit),
                 language: Self.answerLanguage(setting: language, provider: provider))
@@ -159,9 +171,9 @@ public actor AIService {
     /// A short title for `chat`, from its questions: one `.text` update with the whole cleaned title (none when the
     /// model gave nothing usable), no text streamed before it; an in-app model's job sends its status lines first.
     public nonisolated func title(
-        chat: [ChatLog.Message], provider: any LLMProvider, model: String
+        chat: [ChatLog.Message], provider: any LLMProvider, model: String, jobID: UUID = UUID()
     ) -> AsyncThrowingStream<Update, Error> {
-        job(provider: provider, model: model) { backend, yield, _ in
+        job(id: jobID, provider: provider, model: model) { backend, yield, _ in
             let context = await provider.contextWindow(model: model)
             let answer = try await Self.answer(
                 PromptBuilder.titleMessages(chat: chat), backend: backend, model: model, context: context)
@@ -185,15 +197,15 @@ public actor AIService {
         try log.write(to: folder)
     }
 
-    /// Runs `work` in a task that the stream's end cancels, and `stop()` too (`work`'s `isStopped` then says so and
-    /// the stream finishes without an error). An in-app model is loaded inside the gate for the whole job and
-    /// unloaded before the gate is released, also on error and cancellation.
+    /// Runs `work` as job `id` in a task that the stream's end cancels, and `stop()` or `stop(id)` too (`work`'s
+    /// `isStopped` then says so and the stream finishes without an error). An in-app model is loaded inside the gate
+    /// for the whole job and unloaded before the gate is released, also on error and cancellation.
     private nonisolated func job(
-        provider: any LLMProvider, model: String,
+        id: UUID, provider: any LLMProvider, model: String,
         _ work: @escaping @Sendable (Backend, @escaping @Sendable (Update) -> Void, @escaping @Sendable () -> Bool)
             async throws -> Void
     ) -> AsyncThrowingStream<Update, Error> {
-        let (gate, jobs, id) = (gate, jobs, UUID())
+        let (gate, jobs) = (gate, jobs)
         let isStopped: @Sendable () -> Bool = { jobs.stopped.withLock { $0.contains(id) } }
         return AsyncThrowingStream { continuation in
             // Registered under the lock: the task's own removal waits for it, also when the job ends at once.

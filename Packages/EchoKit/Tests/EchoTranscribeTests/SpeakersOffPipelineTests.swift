@@ -41,6 +41,74 @@ struct SpeakersOffPipelineTests {
         #expect(abs(conversation.duration - 2) <= 0.01)
     }
 
+    /// Cloud jobs run in parallel: a second cloud job finishes while the first one's upload is still blocked.
+    @Test func cloudJobsRunInParallel() async throws {
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString, isDirectory: true)
+        defer { try? FileManager.default.removeItem(at: root) }
+        let first = try Self.makeRecording(in: root)
+        let second = try Self.makeRecording(in: root)
+        let pipeline = TranscriptionPipeline(
+            modelStore: ModelStore(root: root.appendingPathComponent("Models")), gate: ModelLoadGate(),
+            deferWhenConstrained: false)
+        let blocking = BlockingTranscriber()
+
+        let firstJob = Task {
+            try await pipeline.transcribe(
+                first, cloud: CloudEngine(engineID: "cloud:fake", name: "Fake", model: "", transcriber: blocking))
+        }
+        for await _ in blocking.entered { break }
+        let secondJob = Task {
+            try await pipeline.transcribe(
+                second, cloud: CloudEngine(engineID: "cloud:fake", name: "Fake", model: "", transcriber: FakeTranscriber()))
+        }
+        let secondFinished = await withTaskGroup(of: Bool.self) { group in
+            group.addTask { (try? await secondJob.value) != nil }
+            group.addTask {
+                try? await Task.sleep(for: .seconds(10))
+                return false
+            }
+            let finished = await group.next() ?? false
+            // Unblocks the first job, so a serial pipeline's second job can drain too.
+            blocking.release()
+            group.cancelAll()
+            return finished
+        }
+
+        #expect(secondFinished)
+        _ = try await firstJob.value
+    }
+
+    /// A stopped recording folder under `root` with a 2 s stereo audio file, as a speakers-off job.
+    private static func makeRecording(in root: URL) throws -> TranscriptionJob {
+        let session = RecordingSession(state: .stopped, audioFileName: "audio.caf")
+        let folder = session.folder(in: root)
+        try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+        try session.write(to: folder)
+        try writeStereo(seconds: 2, to: folder.appendingPathComponent(session.audioFileName))
+        return TranscriptionJob(conversationID: session.id, folder: folder, processNow: true, diarize: false)
+    }
+
+    /// Signals `entered` when called, then returns one segment once `release()` is called.
+    private final class BlockingTranscriber: CloudTranscriber {
+        let entered: AsyncStream<Void>
+        private let enteredContinuation: AsyncStream<Void>.Continuation
+        private let released: AsyncStream<Void>
+        private let releasedContinuation: AsyncStream<Void>.Continuation
+
+        init() {
+            (entered, enteredContinuation) = AsyncStream.makeStream()
+            (released, releasedContinuation) = AsyncStream.makeStream()
+        }
+
+        func release() { releasedContinuation.finish() }
+
+        func transcribe(file: URL, language: String?, diarize: Bool) async throws -> [CloudSegment] {
+            enteredContinuation.yield()
+            for await _ in released {}
+            return [CloudSegment(start: 0, end: 0.8, text: "hello there")]
+        }
+    }
+
     /// Returns two segments with distinct provider speaker labels, whatever `diarize` asks; records `diarize`.
     private final class FakeTranscriber: CloudTranscriber {
         private let flags = Mutex<[Bool]>([])

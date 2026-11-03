@@ -26,7 +26,8 @@ public readonly record struct AIUpdate(AIUpdateKind Kind, string Value)
 /// Summaries and questions about one conversation (Swift <c>AIService</c>). Each job streams its answer, saves it in
 /// the conversation folder when it completes (a new summary version + <c>hasSummary</c>, or two more <c>chat.json</c>
 /// messages) and saves nothing when cancelled (the caller's token, or leaving the enumeration early) or failed.
-/// <see cref="Stop"/> ends a job early and saves the answer streamed until then (a summary marked stopped); nothing
+/// <see cref="Stop()"/> ends every job early, <see cref="Stop(Guid)"/> the one with that id (each entry point's
+/// <c>jobId</c>; a new one when null), and saves the answer streamed until then (a summary marked stopped); nothing
 /// when no text was streamed yet. A title job names an archived chat and saves nothing. In-app models
 /// (<see cref="ILocalLLMProvider"/>) run the whole job inside <see cref="ModelLoadGate"/> (owner LLM), loaded once and
 /// unloaded before the gate is released.
@@ -51,11 +52,12 @@ public sealed class AIService(ModelLoadGate gate)
         public string Text { get; } = text;
     }
 
-    /// <summary>A running job: its cancellation, and whether <see cref="Stop"/> ended it.</summary>
-    private sealed class Job(CancellationTokenSource cancel)
+    /// <summary>A running job: its id, its cancellation, and whether <see cref="Stop()"/> ended it.</summary>
+    private sealed class Job(Guid id, CancellationTokenSource cancel)
     {
         private volatile bool _stopped;
 
+        public Guid Id { get; } = id;
         public CancellationToken Token { get; } = cancel.Token;
         public bool IsStopped => _stopped;
 
@@ -88,14 +90,25 @@ public sealed class AIService(ModelLoadGate gate)
     }
 
     /// <summary>
+    /// Ends the running job <paramref name="jobId"/> as <see cref="Stop()"/> does, leaving the others running; nothing
+    /// when no such job is running.
+    /// </summary>
+    public void Stop(Guid jobId)
+    {
+        Job[] running;
+        lock (_jobsLock) running = [.. _jobs.Where(job => job.Id == jobId)];
+        foreach (var job in running) job.Stop();
+    }
+
+    /// <summary>
     /// Streams a new summary: one pass when the transcript fits, else map over the chunks and reduce the notes until one
     /// group is left; only the last reduce is streamed. <paramref name="language"/> is the summary-language setting.
     /// <paramref name="providerID"/> is saved with the summary.
     /// </summary>
     public IAsyncEnumerable<AIUpdate> Summarize(
         Conversation conversation, Transcript transcript, ILLMProvider provider, string providerID, string model,
-        string language, CancellationToken cancellationToken = default) =>
-        RunAsync(provider, model, async (backend, yield, job) =>
+        string language, CancellationToken cancellationToken = default, Guid? jobId = null) =>
+        RunAsync(jobId, provider, model, async (backend, yield, job) =>
         {
             string summary;
             var cut = false;
@@ -121,10 +134,10 @@ public sealed class AIService(ModelLoadGate gate)
     public IAsyncEnumerable<AIUpdate> Ask(
         string question, Conversation conversation, Transcript transcript, string? summary,
         IReadOnlyList<ChatLog.Message> history, int historyLimit, ILLMProvider provider, string providerID, string model,
-        string language, CancellationToken cancellationToken = default)
+        string language, CancellationToken cancellationToken = default, Guid? jobId = null)
     {
         var asked = DateTimeOffset.UtcNow;
-        return RunAsync(provider, model, async (backend, yield, job) =>
+        return RunAsync(jobId, provider, model, async (backend, yield, job) =>
         {
             var turns = Turns(history, historyLimit);
             var answerLanguage = OutputLanguage.Answer(language);
@@ -155,10 +168,10 @@ public sealed class AIService(ModelLoadGate gate)
     public IAsyncEnumerable<AIUpdate> AskLibrary(
         string question, IReadOnlyList<PromptBuilder.LibrarySource> sources, IReadOnlyList<ChatLog.Reference> references,
         IReadOnlyList<ChatLog.Message> history, int historyLimit, ILLMProvider provider, string providerID, string model,
-        string language, string folder, CancellationToken cancellationToken = default)
+        string language, string folder, CancellationToken cancellationToken = default, Guid? jobId = null)
     {
         var asked = DateTimeOffset.UtcNow;
-        return RunAsync(provider, model, async (backend, yield, job) =>
+        return RunAsync(jobId, provider, model, async (backend, yield, job) =>
         {
             var messages = PromptBuilder.LibraryQuestionMessages(
                 question, sources, Turns(history, historyLimit), OutputLanguage.Answer(language));
@@ -184,8 +197,8 @@ public sealed class AIService(ModelLoadGate gate)
     /// </summary>
     public IAsyncEnumerable<AIUpdate> Title(
         IReadOnlyList<ChatLog.Message> chat, ILLMProvider provider, string model,
-        CancellationToken cancellationToken = default) =>
-        RunAsync(provider, model, async (backend, yield, job) =>
+        CancellationToken cancellationToken = default, Guid? jobId = null) =>
+        RunAsync(jobId, provider, model, async (backend, yield, job) =>
         {
             var context = await provider.ContextWindowAsync(model, job.Token);
             var answer = await AnswerAsync(PromptBuilder.TitleMessages(chat), backend, model, context, null, job.Token);
@@ -252,11 +265,12 @@ public sealed class AIService(ModelLoadGate gate)
     /// cancellation. The enumeration ends only once the job has ended, after its file writes.
     /// </summary>
     private async IAsyncEnumerable<AIUpdate> RunAsync(
-        ILLMProvider provider, string model, Work work, [EnumeratorCancellation] CancellationToken cancellationToken)
+        Guid? jobId, ILLMProvider provider, string model, Work work,
+        [EnumeratorCancellation] CancellationToken cancellationToken)
     {
         var updates = Channel.CreateUnbounded<AIUpdate>(new UnboundedChannelOptions { SingleReader = true });
         using var cancel = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
-        var job = new Job(cancel);
+        var job = new Job(jobId ?? Guid.NewGuid(), cancel);
         lock (_jobsLock) _jobs.Add(job);
         var task = Task.Run(() => RunJobAsync(job, provider, model, work, updates.Writer), CancellationToken.None);
         Exception? failure;

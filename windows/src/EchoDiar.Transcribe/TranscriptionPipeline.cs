@@ -8,16 +8,17 @@ using EchoDiar.Core.Models;
 namespace EchoDiar.Transcribe;
 
 /// <summary>
-/// Batch transcription of recording folders, one job at a time (Swift <c>TranscriptionPipeline</c>): extract each
+/// Batch transcription of recording folders, one local job at a time (Swift <c>TranscriptionPipeline</c>): extract each
 /// channel to 16 kHz mono, skip silent channels, ASR mic, ASR system, diarize system, merge, write
 /// <c>transcript.json</c>. Models are loaded inside each step and unloaded before the next, while the job holds the
 /// <see cref="ModelLoadGate"/> (it waits while a recording transcriber holds it). A job with a usable
 /// <see cref="TranscriptionJob.Prior"/> keeps its segments and transcribes only its gaps, taking the gate only for gap
 /// fill or diarization. While <paramref name="deferral"/> says so, a job waits before it takes a model (macOS
 /// <c>waitWhileConstrained</c>), unless <see cref="TranscriptionJob.ProcessNow"/> or <see cref="ProcessNow"/>.
-/// A job with a <see cref="CloudEngine"/> sends each channel to its API instead (no ASR model, so no gate); a cloud
-/// diarizer labels the system channel first, the local diarizer after its failure. The app resolves both, keys
-/// included, and asks the one-time confirmation before it submits the job.
+/// A job with a <see cref="CloudEngine"/> sends each channel to its API instead (no ASR model, so no gate) and skips
+/// the queue: cloud jobs run at once, beside each other and a local job (the deferral wait and the gate around a local
+/// diarization still apply). A cloud diarizer labels the system channel first, the local diarizer after its failure.
+/// The app resolves both, keys included, and asks the one-time confirmation before it submits the job.
 /// </summary>
 /// <remarks>
 /// The macOS thermal deferral has no Windows API; energy saver stands in for Low Power Mode.
@@ -65,13 +66,14 @@ public sealed class TranscriptionPipeline(
     /// <summary>Every job's progress; raised on the job's thread.</summary>
     public event Action<JobProgress>? Progress;
 
-    /// <summary>Runs after every job queued before it; returns the <c>transcript.json</c> path.</summary>
+    /// <summary>Runs after every local job queued before it; returns the <c>transcript.json</c> path.</summary>
     public Task<string> TranscribeAsync(TranscriptionJob job, CancellationToken cancellationToken = default) =>
         TranscribeAsync(job, null, null, cancellationToken);
 
     /// <summary>
-    /// Runs after every job queued before it; returns the <c>transcript.json</c> path. <paramref name="cloud"/>: the
-    /// job's cloud engine, which replaces <see cref="TranscriptionJob.EngineID"/>'s resolution.
+    /// Runs after every local job queued before it, or at once with <paramref name="cloud"/>; returns the
+    /// <c>transcript.json</c> path. <paramref name="cloud"/>: the job's cloud engine, which replaces
+    /// <see cref="TranscriptionJob.EngineID"/>'s resolution.
     /// <paramref name="cloudDiarizer"/>: labels the system channel's speakers when the ASR does not (its text is
     /// dropped); unused when <see cref="TranscriptionJob.Diarize"/> is false. Both are resolved by the app, whose
     /// one-time confirmation of their destination comes first: the pipeline uploads to whatever it is given.
@@ -80,14 +82,16 @@ public sealed class TranscriptionPipeline(
         TranscriptionJob job, CloudEngine? cloud, CloudEngine? cloudDiarizer, CancellationToken cancellationToken = default)
     {
         Emit(job, JobStep.Queued, 0);
-        await _queue.WaitAsync(cancellationToken).ConfigureAwait(false);
+        // Only local jobs queue: a cloud job loads no ASR model (a local diarization takes the gate on its own).
+        var queued = cloud is null;
+        if (queued) await _queue.WaitAsync(cancellationToken).ConfigureAwait(false);
         try
         {
             return await RunAsync(job, cloud, job.Diarize ? cloudDiarizer : null, cancellationToken).ConfigureAwait(false);
         }
         finally
         {
-            _queue.Release();
+            if (queued) _queue.Release();
         }
     }
 

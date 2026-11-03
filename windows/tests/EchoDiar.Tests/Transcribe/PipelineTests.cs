@@ -234,6 +234,35 @@ public sealed class PipelineTests : IDisposable
         Assert.False(File.Exists(Path.Combine(folder, Transcript.FileName)));
     }
 
+    // Cloud jobs skip the one-at-a-time queue: a second cloud job finishes while the first is still uploading.
+    [Fact]
+    public async Task CloudJobsRunInParallel()
+    {
+        var token = TestContext.Current.CancellationToken;
+        var (firstSession, firstFolder) = MakeRecording(1, toneOnMic: false);
+        var (secondSession, secondFolder) = MakeRecording(1, toneOnMic: false);
+        var pipeline = new TranscriptionPipeline(
+            new Dictionary<ModelRuntime, TranscriptionPipeline.EngineFactory>(), null, _ => false,
+            e => Path.Combine(_root, "Models", e.Id), new ModelLoadGate(), exporter: new FakeExporter());
+        var release = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var blocked = new FakeCloud { Hold = release.Task };
+
+        var first = pipeline.TranscribeAsync(
+            new TranscriptionJob { ConversationID = firstSession.Id, Folder = firstFolder, ProcessNow = true, Diarize = false },
+            new CloudEngine("cloud:deepgram", "Deepgram", "nova-3", blocked), null, token);
+        await blocked.Entered.Task.WaitAsync(TimeSpan.FromSeconds(10), token);
+        var second = pipeline.TranscribeAsync(
+            new TranscriptionJob { ConversationID = secondSession.Id, Folder = secondFolder, ProcessNow = true, Diarize = false },
+            new CloudEngine("cloud:deepgram", "Deepgram", "nova-3", new FakeCloud()), null, token);
+
+        await second.WaitAsync(TimeSpan.FromSeconds(10), token);
+        Assert.False(first.IsCompleted);
+        release.SetResult();
+        await first.WaitAsync(TimeSpan.FromSeconds(10), token);
+        Assert.True(File.Exists(Path.Combine(firstFolder, Transcript.FileName)));
+        Assert.True(File.Exists(Path.Combine(secondFolder, Transcript.FileName)));
+    }
+
     // The cloud diarizer runs first and its turns label the system channel; the local diarizer then never runs.
     // When it fails or labels no speaker, the local diarizer runs and the transcript notes the cloud failure.
     [Theory]
@@ -322,7 +351,8 @@ public sealed class PipelineTests : IDisposable
 
     /// <summary>
     /// Answers every upload with two segments, labeled A and B when speakers are asked for (unless
-    /// <see cref="Labels"/> is false), or throws <see cref="Error"/>; records each request's diarize flag.
+    /// <see cref="Labels"/> is false), or throws <see cref="Error"/>; records each request's diarize flag. With
+    /// <see cref="Hold"/>, each upload signals <see cref="Entered"/> and waits for it first.
     /// </summary>
     private sealed class FakeCloud : ICloudTranscriber
     {
@@ -332,21 +362,27 @@ public sealed class PipelineTests : IDisposable
 
         public bool Labels { get; init; } = true;
 
+        public Task? Hold { get; init; }
+
+        public TaskCompletionSource Entered { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
+
         public List<bool> Diarize { get; } = [];
 
-        public Task<IReadOnlyList<CloudSegment>> TranscribeAsync(
+        public async Task<IReadOnlyList<CloudSegment>> TranscribeAsync(
             string file, double duration, string? language, bool diarize, CancellationToken cancellationToken = default)
         {
             lock (Diarize) Diarize.Add(diarize);
+            Entered.TrySetResult();
+            if (Hold is { } hold) await hold.WaitAsync(cancellationToken).ConfigureAwait(false);
             if (Error is { } error) throw error;
             // Words differ per upload, so the merger never takes the mic's for bleed of the system's.
             var words = Interlocked.Increment(ref _calls) % 2 == 1 ? ("alpha bravo", "charlie delta") : ("echo foxtrot", "golf hotel");
             var labels = diarize && Labels;
-            return Task.FromResult<IReadOnlyList<CloudSegment>>(
+            return
             [
                 new CloudSegment(0, 0.8, words.Item1, labels ? "A" : null),
                 new CloudSegment(1, 1.8, words.Item2, labels ? "B" : null),
-            ]);
+            ];
         }
     }
 

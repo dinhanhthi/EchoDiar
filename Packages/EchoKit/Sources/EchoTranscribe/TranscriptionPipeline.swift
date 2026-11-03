@@ -5,12 +5,13 @@ import EchoAI
 import EchoCore
 import Foundation
 
-/// Batch transcription of recording folders, one job at a time: extract each channel to 16 kHz mono, skip silent
-/// channels, ASR mic, ASR system, diarize system (the cloud diarizer when given, else or after its failure the
-/// local one), merge, write `transcript.json`. Models are loaded inside each step and unloaded before the next,
-/// while the job holds the `ModelLoadGate` (it waits while a recording transcriber holds it). A job with a usable `prior` keeps
-/// its segments and transcribes only its gaps, taking the gate only for gap fill or diarization. Never touches
-/// EchoAudio: `AppModel` runs compression first.
+/// Batch transcription of recording folders: extract each channel to 16 kHz mono, skip silent channels, ASR mic,
+/// ASR system, diarize system (the cloud diarizer when given, else or after its failure the local one), merge, write
+/// `transcript.json`. Local jobs run one at a time; a cloud job starts at once, in parallel with any other job.
+/// Models are loaded inside each step and unloaded before the next, while the job holds the `ModelLoadGate` (it waits
+/// while a recording transcriber holds it); a cloud job takes it only for a local diarization. A job with a usable
+/// `prior` keeps its segments and transcribes only its gaps, taking the gate only for gap fill or diarization. Never
+/// touches EchoAudio: `AppModel` runs compression first.
 public actor TranscriptionPipeline {
     public typealias EngineFactory = @Sendable (_ entry: ModelEntry, _ folder: URL) -> any TranscriptionEngine
 
@@ -77,20 +78,21 @@ public actor TranscriptionPipeline {
         }
     }
 
-    /// Runs after every job queued before it; returns the `transcript.json` URL. `cloud`: the job's cloud engine
-    /// (resolved by the app from settings and the Keychain), which replaces `job.engineID`'s resolution.
+    /// Returns the `transcript.json` URL. A local job runs after every local job queued before it; a cloud job
+    /// starts at once. `cloud`: the job's cloud engine (resolved by the app from settings and the Keychain), which
+    /// replaces `job.engineID`'s resolution.
     /// `cloudDiarizer`: labels the system channel's speakers when the ASR does not (its text is dropped); unused
     /// when `job.diarize` is false.
     public func transcribe(
         _ job: TranscriptionJob, cloud: CloudEngine? = nil, cloudDiarizer: CloudEngine? = nil
     ) async throws -> URL {
         emit(job, .queued, 0)
-        let previous = tail
+        let previous = cloud == nil ? tail : nil
         let task = Task(priority: .utility) {
             await previous?.value
             return try await self.run(job, cloud: cloud, cloudDiarizer: cloudDiarizer)
         }
-        tail = Task { _ = await task.result }
+        if cloud == nil { tail = Task { _ = await task.result } }
         return try await task.value
     }
 
