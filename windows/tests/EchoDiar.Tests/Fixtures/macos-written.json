@@ -1,4 +1,21 @@
 {
+  "catchups.json" : {
+    "catchUps" : [
+      {
+        "createdAt" : "2026-10-21T09:30:15Z",
+        "elapsed" : 1234.5,
+        "fullPass" : true,
+        "id" : "5B0E3C1A-7D2F-4E8B-9A61-2C4D6E8F0A1B",
+        "model" : "gpt-5-mini",
+        "provider" : "openai",
+        "stopped" : true,
+        "text" : "## Now\n- Xin chào, cuộc họp",
+        "throughLineID" : 87,
+        "throughTime" : 1220
+      }
+    ],
+    "version" : 1
+  },
   "chat.json" : {
     "messages" : [
       {

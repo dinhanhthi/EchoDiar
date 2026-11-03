@@ -10,6 +10,7 @@ struct CrossPlatformFixturesTests {
     private static let vietnamese = "Xin chào, cuộc họp"
     private static let conversationID = UUID(uuidString: "6F1C2A9E-3B4D-4E5F-8A7B-1C2D3E4F5A6B")!
     private static let chatID = UUID(uuidString: "0A1B2C3D-4E5F-4061-8273-94A5B6C7D8E9")!
+    private static let catchUpID = UUID(uuidString: "5B0E3C1A-7D2F-4E8B-9A61-2C4D6E8F0A1B")!
     /// 2026-10-21T09:30:15.25Z: fractional, and exact as a double (and in .NET ticks).
     private static let at = Date(timeIntervalSinceReferenceDate: 814_267_815.25)
     /// The same instant as ISO 8601 stores it, truncated to whole seconds.
@@ -54,6 +55,12 @@ struct CrossPlatformFixturesTests {
         files[Conversation.summaryIndexFileName] = try SummaryIndex(summaries: [
             SummaryVersion(
                 number: 1, createdAt: Self.at, provider: "anthropic", model: "claude-sonnet-5-5", stopped: true, text: ""),
+        ]).encoded()
+        files[CatchUpLog.fileName] = try CatchUpLog(catchUps: [
+            CatchUp(
+                id: Self.catchUpID, createdAt: Self.at, elapsed: 1234.5, throughLineID: 87, throughTime: 1220,
+                fullPass: true, text: "## Now\n- " + Self.vietnamese, provider: "openai", model: "gpt-5-mini",
+                stopped: true),
         ]).encoded()
 
         // Spliced as text, not re-serialized, so the bytes stay the encoders' own.
@@ -161,6 +168,13 @@ struct CrossPlatformFixturesTests {
         #expect(summaries.map(\.number) == [1])
         #expect(summaries.first?.stopped == true)
         Self.expectDate(try #require(summaries.first?.createdAt), Self.atSeconds)
+
+        let catchUps = try CatchUpLog.decode(entry(CatchUpLog.fileName)).catchUps
+        #expect(catchUps.map(\.id) == [Self.catchUpID])
+        #expect(catchUps.first?.throughLineID == 87)
+        #expect(catchUps.first?.text == "## Now\n- " + Self.vietnamese)
+        #expect(catchUps.first?.stopped == true)
+        Self.expectDate(try #require(catchUps.first?.createdAt), Self.atSeconds)
     }
 
     private static func expectDate(

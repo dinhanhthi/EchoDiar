@@ -116,8 +116,8 @@ public sealed class LibraryStore(string root, IFileTrash trash)
     });
 
     /// <summary>
-    /// Moves the transcript and its kept versions, summary and its versions, chat and archived chats to the Recycle
-    /// Bin; the conversation is ready to transcribe again. Without audio nothing would be left, so the whole
+    /// Moves the transcript and its kept versions, summary and its versions, chat, archived chats and catch-ups to the
+    /// Recycle Bin; the conversation is ready to transcribe again. Without audio nothing would be left, so the whole
     /// conversation goes instead.
     /// </summary>
     public Task DeleteTranscriptsAndAIAsync(Guid id) => Run(() =>
@@ -130,7 +130,7 @@ public sealed class LibraryStore(string root, IFileTrash trash)
             return;
         }
         string[] names = [Transcript.FileName, Transcript.VersionsFolderName, Conversation.SummaryFileName,
-            Conversation.SummariesFolderName, ChatLog.FileName, ChatArchive.FolderName];
+            Conversation.SummariesFolderName, ChatLog.FileName, ChatArchive.FolderName, CatchUpLog.FileName];
         foreach (var name in names)
         {
             var path = Path.Combine(current.Folder, name);

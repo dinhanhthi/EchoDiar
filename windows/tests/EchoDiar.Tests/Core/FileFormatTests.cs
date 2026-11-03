@@ -19,6 +19,7 @@ public sealed class FileFormatTests : IDisposable
     private static readonly DateTimeOffset At = new DateTimeOffset(2026, 10, 21, 9, 30, 15, TimeSpan.Zero).AddMilliseconds(250);
     private static readonly Guid ConversationId = Guid.Parse("6F1C2A9E-3B4D-4E5F-8A7B-1C2D3E4F5A6B");
     private static readonly Guid ChatId = Guid.Parse("0A1B2C3D-4E5F-4061-8273-94A5B6C7D8E9");
+    private static readonly Guid CatchUpId = Guid.Parse("5B0E3C1A-7D2F-4E8B-9A61-2C4D6E8F0A1B");
 
     private readonly string _dir = Path.Combine(Path.GetTempPath(), "EchoDiarTests-" + Guid.NewGuid().ToString("N"));
 
@@ -35,6 +36,7 @@ public sealed class FileFormatTests : IDisposable
         AssertRoundTrips(FullChat());
         AssertRoundTrips(FullChatIndex());
         AssertRoundTrips(FullSummaryIndex());
+        AssertRoundTrips(FullCatchUpLog());
 
         // Sparse: null optionals must be omitted, not written as null.
         AssertRoundTrips(new Conversation { Id = ConversationId, CreatedAt = At, Status = ConversationStatus.Ready });
@@ -50,6 +52,7 @@ public sealed class FileFormatTests : IDisposable
         });
         AssertRoundTrips(new ChatLog { Messages = [new ChatLog.Message { Role = ChatRole.User, Text = "Hi" }] });
         AssertRoundTrips(new SummaryIndex { Summaries = [new SummaryVersion { Number = 1 }] });
+        AssertRoundTrips(new CatchUpLog { CatchUps = [new CatchUp { Elapsed = 1 }] });
     }
 
     [Fact]
@@ -87,6 +90,7 @@ public sealed class FileFormatTests : IDisposable
                  {
                      json[ChatLog.FileName]!["messages"]![0]!["timestamp"], json[ChatArchive.IndexFileName]!["chats"]![0]!["archivedAt"],
                      json[Conversation.SummaryIndexFileName]!["summaries"]![0]!["createdAt"],
+                     json[CatchUpLog.FileName]!["catchUps"]![0]!["createdAt"],
                  })
         {
             Assert.Matches(iso, isoDate!.GetValue<string>());
@@ -159,6 +163,32 @@ public sealed class FileFormatTests : IDisposable
         }
     }
 
+    // catchups.json: a malformed entry is skipped, not fatal; a file that is not a catch-up log throws, so an append
+    // never overwrites it (CatchUpLogTests.swift).
+    [Fact]
+    public void CatchUpLoadSkipsMalformedEntriesAndThrowsOnAnUnreadableFile()
+    {
+        var path = Path.Combine(_dir, CatchUpLog.FileName);
+        Assert.Empty(CatchUpLog.Load(_dir).CatchUps);
+
+        File.WriteAllText(path, """
+            {"version": 1, "catchUps": [
+              {"elapsed": 1, "text": 5},
+              {"elapsed": 2, "createdAt": "yesterday"},
+              {"elapsed": 3, "throughLineID": 7, "text": "## Now"},
+              5
+            ]}
+            """);
+        var catchUps = CatchUpLog.Load(_dir).CatchUps;
+        Assert.Equal([3.0], catchUps.Select(c => c.Elapsed));
+        Assert.Equal("## Now", catchUps[0].Text);
+
+        File.WriteAllText(path, "not json");
+        Assert.ThrowsAny<JsonException>(() => CatchUpLog.Load(_dir));
+        File.WriteAllText(path, """{"catchUps": 5}""");
+        Assert.ThrowsAny<JsonException>(() => CatchUpLog.Load(_dir));
+    }
+
     [Fact]
     public void ResumeRestoresTheArchivedChatAndArchivesTheOpenOne()
     {
@@ -228,6 +258,7 @@ public sealed class FileFormatTests : IDisposable
                 ChatLog.FileName => ChatLog.Decode(bytes).Encoded(),
                 ChatArchive.IndexFileName => SwiftJson.Serialize(SwiftJson.Deserialize<ChatArchive.Index>(bytes)),
                 Conversation.SummaryIndexFileName => SwiftJson.Serialize(SwiftJson.Deserialize<SummaryIndex>(bytes)),
+                CatchUpLog.FileName => CatchUpLog.Decode(bytes).Encoded(),
                 _ => throw new InvalidDataException($"Unexpected file kind {name}"),
             };
 
@@ -307,6 +338,7 @@ public sealed class FileFormatTests : IDisposable
         [ChatLog.FileName] = FullChat(),
         [ChatArchive.IndexFileName] = FullChatIndex(),
         [Conversation.SummaryIndexFileName] = FullSummaryIndex(),
+        [CatchUpLog.FileName] = FullCatchUpLog(),
     };
 
     private static Conversation FullConversation() => new()
@@ -371,6 +403,18 @@ public sealed class FileFormatTests : IDisposable
     private static SummaryIndex FullSummaryIndex() => new()
     {
         Summaries = [new SummaryVersion { Number = 1, CreatedAt = At, Provider = "anthropic", Model = "claude-sonnet-5-5", Stopped = true }],
+    };
+
+    private static CatchUpLog FullCatchUpLog() => new()
+    {
+        CatchUps =
+        [
+            new CatchUp
+            {
+                Id = CatchUpId, CreatedAt = At, Elapsed = 1234.5, ThroughLineID = 87, ThroughTime = 1220, FullPass = true,
+                Text = "## Now\n- " + Vietnamese, Provider = "openai", Model = "gpt-5-mini", Stopped = true,
+            },
+        ],
     };
 
     private static Transcript TranscriptOf(string text, string engineID) => new()
