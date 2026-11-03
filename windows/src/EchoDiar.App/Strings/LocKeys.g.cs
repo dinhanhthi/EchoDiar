@@ -90,6 +90,7 @@ public static partial class Loc
         "Answering a question about your conversations…",
         "Answering about %@…",
         "Answering about another conversation…",
+        "Answering…",
         "Answers questions about all your transcribed conversations, citing the conversation and the moment. The index stays on this Mac unless you pick an API embedder.",
         "Answers questions about all your transcribed conversations, citing the conversation and the moment. The index stays on this PC unless you pick an API embedder.",
         "App language",

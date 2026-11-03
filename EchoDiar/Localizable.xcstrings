@@ -2257,6 +2257,7 @@
       }
     },
     "Answering a question about your conversations…" : {
+      "extractionState" : "stale",
       "localizations" : {
         "es" : {
           "stringUnit" : {
@@ -2315,6 +2316,7 @@
       }
     },
     "Answering about another conversation…" : {
+      "extractionState" : "stale",
       "localizations" : {
         "es" : {
           "stringUnit" : {
@@ -2338,6 +2340,34 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "正在回答关于另一个对话的问题…"
+          }
+        }
+      }
+    },
+    "Answering…" : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Respondiendo…"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Réponse en cours…"
+          }
+        },
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Đang trả lời…"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "正在回答…"
           }
         }
       }
@@ -17430,6 +17460,7 @@
       }
     },
     "Summarizing another conversation…" : {
+      "extractionState" : "stale",
       "localizations" : {
         "es" : {
           "stringUnit" : {

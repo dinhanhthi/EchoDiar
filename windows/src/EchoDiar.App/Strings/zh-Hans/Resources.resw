@@ -186,6 +186,10 @@
     <value>另一个对话</value>
     <comment>another conversation</comment>
   </data>
+  <data name="Answering" xml:space="preserve">
+    <value>正在回答…</value>
+    <comment>Answering…</comment>
+  </data>
   <data name="AnsweringAQuestionAboutYourConversations" xml:space="preserve">
     <value>正在回答关于你的对话的问题…</value>
     <comment>Answering a question about your conversations…</comment>

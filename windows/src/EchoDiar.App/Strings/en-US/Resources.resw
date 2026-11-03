@@ -210,6 +210,10 @@
     <value>another conversation</value>
     <comment>another conversation</comment>
   </data>
+  <data name="Answering" xml:space="preserve">
+    <value>Answering…</value>
+    <comment>Answering…</comment>
+  </data>
   <data name="AnsweringAQuestionAboutYourConversations" xml:space="preserve">
     <value>Answering a question about your conversations…</value>
     <comment>Answering a question about your conversations…</comment>

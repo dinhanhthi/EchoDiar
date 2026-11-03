@@ -186,6 +186,10 @@
     <value>một cuộc hội thoại khác</value>
     <comment>another conversation</comment>
   </data>
+  <data name="Answering" xml:space="preserve">
+    <value>Đang trả lời…</value>
+    <comment>Answering…</comment>
+  </data>
   <data name="AnsweringAQuestionAboutYourConversations" xml:space="preserve">
     <value>Đang trả lời câu hỏi về các cuộc hội thoại của bạn…</value>
     <comment>Answering a question about your conversations…</comment>
