@@ -17,11 +17,11 @@ namespace EchoDiar.App.Views;
 /// <summary>
 /// The Summary or Chat tab of the open conversation (macOS AIPanelView.swift, with its AIModelMenu, AILanguageMenu,
 /// AISetupHints and WebLinkConfirmation). The state is <see cref="AIPanelViewModel"/>; the jobs run in
-/// <see cref="AppViewModel"/>, so one goes on when the page changes and another conversation shows it as busy, with
-/// Stop. Answers are Markdown rendered by <see cref="MarkdownView"/> (at most every 120 ms while streaming, as the model
-/// batches the text, and once more when saved); <c>[mm:ss]</c> citations call the seek action
-/// <see cref="ConversationView"/> passes, web links open once their destination is confirmed. Attach when the page shows,
-/// Detach when it goes.
+/// <see cref="AppViewModel"/>, one per conversation, so one goes on when the page changes and the conversation's other
+/// tab shows it as busy, with Stop. Answers are Markdown rendered by <see cref="MarkdownView"/> (at most every 120 ms
+/// while streaming, as the model batches the text, and once more when saved); <c>[mm:ss]</c> citations call the seek
+/// action <see cref="ConversationView"/> passes, web links open once their destination is confirmed. Attach when the
+/// page shows, Detach when it goes.
 /// </summary>
 public sealed partial class AIPanelView : UserControl
 {
@@ -103,6 +103,7 @@ public sealed partial class AIPanelView : UserControl
         _panel = new AIPanelViewModel(model, id);
         _panel.Changed += Update;
         _model.PropertyChanged += OnModelChanged;
+        _model.AIJobTextChanged += OnJobTextChanged;
         _panel.Attach();
         _tab = model.DetailTab == DetailTab.Chat ? DetailTab.Chat : DetailTab.Summary;
         UpdateTab();
@@ -113,7 +114,11 @@ public sealed partial class AIPanelView : UserControl
     {
         _toastTimer.Stop();
         _focusTimer.Stop();
-        if (_model is not null) _model.PropertyChanged -= OnModelChanged;
+        if (_model is not null)
+        {
+            _model.PropertyChanged -= OnModelChanged;
+            _model.AIJobTextChanged -= OnJobTextChanged;
+        }
         if (_panel is not null)
         {
             _panel.Changed -= Update;
@@ -138,6 +143,14 @@ public sealed partial class AIPanelView : UserControl
         _tab = model.DetailTab;
         UpdateTab();
         Update();
+    }
+
+    /// <summary>The streamed text or status of a job changed: this conversation's only redraws its answer.</summary>
+    private void OnJobTextChanged(Guid? key)
+    {
+        if (_model is not { IsClosing: false } || _panel is null || key != _panel.ConversationId) return;
+        UpdateSummary();
+        UpdateChat();
     }
 
     /// <summary>
@@ -216,7 +229,7 @@ public sealed partial class AIPanelView : UserControl
         // Until the first text: a remote provider sends no status before it.
         var waiting = job is { Text.Length: 0 };
         SummaryStatusPanel.Visibility = Shown(waiting);
-        SummaryStatusText.Text = job?.Status ?? Loc.T("Writing the summary…");
+        SummaryStatusText.Text = _panel.JobStatus ?? Loc.T("Writing the summary…");
         var text = job is not null ? job.Text : shown?.Text ?? "";
         SummaryText.Visibility = Shown(!waiting);
         if (text != _summaryRendered)
@@ -281,11 +294,15 @@ public sealed partial class AIPanelView : UserControl
         if (job is not null) UpdateStream(job);
     }
 
-    /// <summary>A spinner with the status until the first text, then the answer so far with the model's badge.</summary>
+    /// <summary>
+    /// A spinner with the status ("Queued" behind another in-app job) until the first text, then the answer so far with
+    /// the model's badge.
+    /// </summary>
     private void UpdateStream(AIJob job)
     {
         if (_streamSlot is null) return;
-        var key = job.Text.Length == 0 ? "\u0001" + job.Status : job.Text;
+        var jobStatus = _panel?.JobStatus;
+        var key = job.Text.Length == 0 ? "\u0001" + jobStatus : job.Text;
         if (key == _streamRendered) return;
         _streamRendered = key;
         _streamSlot.Children.Clear();
@@ -293,7 +310,7 @@ public sealed partial class AIPanelView : UserControl
         {
             var row = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 6 };
             row.Children.Add(new ProgressRing { Width = 16, Height = 16, MinWidth = 0, MinHeight = 0, IsActive = true });
-            if (job.Status is { } status)
+            if (jobStatus is { } status)
             {
                 row.Children.Add(new TextBlock
                 {
@@ -522,11 +539,12 @@ public sealed partial class AIPanelView : UserControl
         WindowsAIHint.Text = windowsAI ?? "";
         WindowsAIHint.Visibility = Shown(current is null && windowsAI is not null);
 
+        // This conversation's job of the other tab; other conversations' jobs run beside this one's.
         if (_panel.BusyElsewhere(_tab) is { } job)
         {
-            var conversationTitle = _model.Conversations.FirstOrDefault(c => c.Id == job.ConversationId)?.Title ?? Loc.T("another conversation");
-            BusyText.Text = job.ConversationId is null ? Loc.T("Answering a question about your conversations…")
-                : job.Kind == AIJobKind.Summary ? Loc.Format("Summarizing %@…", conversationTitle)
+            var conversationTitle = _panel.Conversation?.Title ?? "";
+            BusyText.Text = job.Kind == AIJobKind.Summary
+                ? Loc.Format("Summarizing %@…", conversationTitle)
                 : Loc.Format("Answering about %@…", conversationTitle);
             ToolTipService.SetToolTip(BusyText, BusyText.Text);
             BusyRow.Visibility = Visibility.Visible;

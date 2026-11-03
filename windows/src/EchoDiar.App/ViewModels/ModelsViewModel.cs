@@ -12,8 +12,8 @@ namespace EchoDiar.App.ViewModels;
 /// <summary>
 /// What a model's row on Settings › Transcription shows and offers now (macOS ModelsSettingsView.swift
 /// <c>ModelRow</c>): the Default badge, Set default (installed, not the default; off when it cannot transcribe the
-/// default language), the download's fraction with Cancel, Installed with Delete (off while a transcription or the
-/// recording's transcriber runs), or Download (off when it cannot transcribe the default language).
+/// default language), the download's fraction with Cancel, Installed with Delete (off while a transcription, the
+/// recording's transcriber or an in-app AI job runs), or Download (off when it cannot transcribe the default language).
 /// </summary>
 public sealed record ModelRowState(
     bool IsDefault,
@@ -92,8 +92,10 @@ public sealed partial class ModelsViewModel : ObservableObject
         double? download = _app.Downloads.TryGetValue(entry.Id, out var fraction) ? fraction : null;
         var isDefault = entry.Kind == ModelKind.Asr ? DefaultASRModelID == entry.Id : DefaultDiarizerModelID == entry.Id;
         var unsupported = UnsupportedNote(entry);
-        // The recording's transcriber loads its model again after a long pause: deleting it meanwhile would end it.
-        var busy = _app.TranscriptionProgress.Keys.Any(_app.IsTranscribing) || _app.RecordingCaptions is not null;
+        // The recording's transcriber loads its model again after a long pause: deleting it meanwhile would end it. An
+        // in-app AI job, running or queued, may be using it too.
+        var busy = _app.TranscriptionProgress.Keys.Any(_app.IsTranscribing) || _app.RecordingCaptions is not null
+            || _app.AIJobs.HasInAppJob;
         return new ModelRowState(
             isDefault,
             installed,
@@ -270,6 +272,7 @@ public sealed partial class ModelsViewModel : ObservableObject
             case nameof(AppViewModel.DownloadErrors):
             case nameof(AppViewModel.TranscriptionProgress):
             case nameof(AppViewModel.RecordingCaptions):
+            case nameof(AppViewModel.AIJobs):
                 StatesChanged?.Invoke();
                 break;
         }

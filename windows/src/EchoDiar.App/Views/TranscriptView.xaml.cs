@@ -191,7 +191,7 @@ public sealed partial class TranscriptView : UserControl
             case nameof(AppViewModel.InstalledModelIds):
                 Update();
                 break;
-            case nameof(AppViewModel.AIJob):
+            case nameof(AppViewModel.AIJobs):
             case nameof(AppViewModel.Conversations):
                 UpdateSummarize();
                 break;
@@ -830,7 +830,7 @@ public sealed partial class TranscriptView : UserControl
     private void UpdateSummarize()
     {
         if (_model is null || _transcript is null) return;
-        var summarizing = _model.AIJob is { Kind: AIJobKind.Summary } job && job.ConversationId == _transcript.ConversationId;
+        var summarizing = _model.AIJobs.EntryFor(_transcript.ConversationId)?.Payload.Kind == AIJobKind.Summary;
         var text = Loc.T(summarizing ? "Summarizing…" : _transcript.Conversation?.HasSummary == true ? "Summary" : "Summarize");
         SummarizeButton.Visibility = Shown(HasSegments);
         SummarizeButton.IsEnabled = !summarizing;
@@ -926,7 +926,8 @@ public sealed partial class TranscriptView : UserControl
 
     /// <summary>
     /// The tab switches in the click's frame; without a summary one starts as the Summary tab's Summarize starts it,
-    /// when it could start there (a provider, no other job).
+    /// when it could start there (a provider, no other job of this conversation; other conversations' jobs do not block
+    /// it).
     /// </summary>
     private void Summarize()
     {
@@ -934,7 +935,7 @@ public sealed partial class TranscriptView : UserControl
         model.DetailTab = DetailTab.Summary;
         if (pane.Conversation is not { HasSummary: false } conversation || pane.Transcript is not { } transcript
             || model.ProvidersModel.CurrentAIProvider is not { } provider
-            || model.AIJob is not null || model.ChatChanging || model.Updater.IsInstalling) return;
+            || model.AIJobs.EntryFor(conversation.Id) is not null || model.ChatChanging || model.Updater.IsInstalling) return;
         model.StartAIJob(AIJobKind.Summary, null, conversation, transcript, null, [], provider,
             model.ProvidersModel.AIModelFor(provider));
     }

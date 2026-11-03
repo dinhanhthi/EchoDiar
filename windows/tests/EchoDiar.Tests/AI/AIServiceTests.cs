@@ -6,9 +6,10 @@ using EchoDiar.Core.Models;
 namespace EchoDiar.Tests.AI;
 
 // Guards the summary job: map-reduce sends status lines and streams only the final reduce, the result is saved as a
-// version, a cancelled job saves nothing, a stopped job saves what it streamed, and an in-app model is unloaded before
-// the gate is released. Also guards how many earlier chat messages a question sends, the library question's sources
-// and references, and the clickable citations. AIServiceTests.swift + AIStorageTests.swift (citations).
+// version, a cancelled job saves nothing (also after a stop, and CancelAsync waits for it), a stopped job saves what it
+// streamed, and an in-app model is unloaded before the gate is released. Also guards how many earlier chat messages a
+// question sends, the library question's sources and references, and the clickable citations. AIServiceTests.swift +
+// AIStorageTests.swift (citations).
 public sealed class AIServiceTests : IDisposable
 {
     /// <summary>Answers every request with <c>reply</c>, in two pieces, and reports a small context to force map-reduce.</summary>
@@ -100,16 +101,16 @@ public sealed class AIServiceTests : IDisposable
     }
 
     /// <summary>
-    /// An in-app model whose generation sends one piece, then waits until cancelled and returns normally; its unload
-    /// takes a moment.
+    /// An in-app model whose generation sends one piece, then waits until cancelled and returns normally,
+    /// <paramref name="linger"/> after the cancellation; its unload takes a moment.
     /// </summary>
-    private sealed class FakeLocalProvider : ILocalLLMProvider
+    private sealed class FakeLocalProvider(TimeSpan linger = default) : ILocalLLMProvider
     {
         private volatile bool _unloaded;
 
         public bool Unloaded => _unloaded;
 
-        private sealed class Generator : ILocalLLMGenerator
+        private sealed class Generator(TimeSpan linger) : ILocalLLMGenerator
         {
             public async Task<string> GenerateAsync(
                 IReadOnlyList<LLMMessage> messages, int maxTokens, Action<string> onText,
@@ -117,6 +118,8 @@ public sealed class AIServiceTests : IDisposable
             {
                 onText("Partial");
                 while (!cancellationToken.IsCancellationRequested) await Task.Delay(10, CancellationToken.None);
+                // Not cut short by the cancellation.
+                await Task.Delay(linger, CancellationToken.None);
                 return "Partial answer";
             }
         }
@@ -126,7 +129,7 @@ public sealed class AIServiceTests : IDisposable
         {
             try
             {
-                return await body(new Generator());
+                return await body(new Generator(linger));
             }
             finally
             {
@@ -458,6 +461,32 @@ public sealed class AIServiceTests : IDisposable
         var completed = Conversation.ReadSummaryVersions(second.Folder);
         Assert.Equal([reply], completed.Select(v => v.Text));
         Assert.Equal([false], completed.Select(v => v.Stopped));
+    }
+
+    // CancelAsync(jobId) ends a job saving nothing, also after Stop(jobId) (a conversation being deleted), and returns
+    // once the job has ended.
+    [Fact]
+    public async Task CancelAfterStopSavesNothingAndWaitsForTheJob()
+    {
+        var conversation = MakeConversation();
+        var service = new AIService(new ModelLoadGate());
+        // Still generating when CancelAsync comes, so the stop alone would save its text.
+        var provider = new FakeLocalProvider(linger: TimeSpan.FromMilliseconds(100));
+        var id = Guid.NewGuid();
+
+        await using var job = service.Summarize(
+            conversation, MakeTranscript(3), provider, providerID: "local", model: "local", language: "en",
+            cancellationToken: Ct, jobId: id).GetAsyncEnumerator(Ct);
+        do Assert.True(await job.MoveNextAsync());
+        while (job.Current.Kind != AIUpdateKind.Text);
+
+        service.Stop(id);
+        await service.CancelAsync(id);
+
+        // Unloaded after the job's body: CancelAsync returned once the job had ended.
+        Assert.True(provider.Unloaded);
+        Assert.Empty(Conversation.ReadSummaryVersions(conversation.Folder));
+        Assert.False(Conversation.Read(conversation.Folder).HasSummary);
     }
 
     [Fact]

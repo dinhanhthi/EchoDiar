@@ -217,7 +217,7 @@ public sealed partial class TitleBarToolbar : UserControl
             case nameof(AppViewModel.DetailTab):
                 UpdateTabs();
                 break;
-            case nameof(AppViewModel.AIJob):
+            case nameof(AppViewModel.AIJobs):
                 UpdateUpdateButton();
                 break;
             case nameof(AppViewModel.SettingsSection):

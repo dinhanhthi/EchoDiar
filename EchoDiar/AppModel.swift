@@ -286,7 +286,8 @@ final class AppModel {
     /// Streamed AI text not in `aiJobText` yet, and its scheduled flush, per job key (see `applyAIUpdate`).
     @ObservationIgnored private var pendingAIText: [UUID?: String] = [:]
     @ObservationIgnored private var aiTextFlush: [UUID?: Task<Void, Never>] = [:]
-    /// Conversations `deleteConversation` is moving to the Trash: their AI job's error is not shown.
+    /// Conversations `deleteConversation` is moving to the Trash: their AI job's error is not shown, and no new job
+    /// starts for them.
     @ObservationIgnored private var deletingConversationIDs: Set<UUID> = []
     @ObservationIgnored private var savedKeys: [String: Bool] = [:]
     @ObservationIgnored private let meetingDetector = MeetingDetector()
@@ -1689,14 +1690,17 @@ extension AppModel {
     }
 
     /// Starts a summary or a question with `provider` and `model` (saved as the AI tab default), beside the jobs of
-    /// the other conversations; does nothing while the conversation has a job. `summary` and `history` are the
-    /// conversation's saved summary and chat, sent with a question.
+    /// the other conversations; does nothing while the conversation has a job or is being deleted. `summary` and
+    /// `history` are the conversation's saved summary and chat, sent with a question.
     func startAIJob(
         _ kind: AIJob.Kind, conversation: Conversation, transcript: Transcript, summary: String?,
         history: [ChatLog.Message], provider: AIProvider, model: String
     ) {
-        // Before the stream: building it starts the job.
-        guard aiJobs.entry(for: conversation.id) == nil else { return }
+        // Before the stream: building it starts the job. Not for a conversation being deleted: its answer would
+        // recreate the folder going to the Trash.
+        guard aiJobs.entry(for: conversation.id) == nil, !deletingConversationIDs.contains(conversation.id) else {
+            return
+        }
         let model = model.trimmingCharacters(in: .whitespacesAndNewlines)
         updateSettings {
             $0.defaultAIProviderID = provider.id
@@ -1823,9 +1827,11 @@ extension AppModel {
     }
 
     /// Runs `change` on the chat in `folder` of conversation `id` (nil: the library chat) unless a question runs for
-    /// it (its answer is appended to `chat.json`); a failure shows as its AI error.
+    /// it (its answer is appended to `chat.json`) or it is being deleted; a failure shows as its AI error.
     func changeChat(of id: UUID?, in folder: URL, _ change: () throws -> ChatArchive.Archived?) {
         if let job = aiJobs.entry(for: id), job.kind != .summary { return }
+        // Its chats would recreate the folder going to the Trash.
+        if let id, deletingConversationIDs.contains(id) { return }
         let archived: ChatArchive.Archived?
         do {
             archived = try change()

@@ -106,14 +106,16 @@ public sealed partial class AppViewModel
     /// <c>indexingPaused</c>): a recording, a compression or a recording's last steps, a transcription, an AI job.
     /// </summary>
     private bool IndexingPaused =>
-        IsRecording || _finishing.Count > 0 || TranscriptionProgress.Keys.Any(IsTranscribing) || AIJob is not null;
+        IsRecording || _finishing.Count > 0 || TranscriptionProgress.Keys.Any(IsTranscribing) || !AIJobs.IsEmpty;
 
     /// <summary>
-    /// The recording transcriber holds the model gate for a whole recording, a transcription until it ends: a library
-    /// question then skips an in-app embedder (keyword search only) instead of waiting for the gate (macOS
-    /// <c>modelGateBusy</c>).
+    /// The recording transcriber holds the model gate for a whole recording, a transcription and a conversation's in-app
+    /// AI job until they end: a library question then skips an in-app embedder (keyword search only) instead of waiting
+    /// for the gate (macOS <c>modelGateBusy</c>). Its own job takes the gate after the search.
     /// </summary>
-    private bool ModelGateBusy => IsRecording || RecordingCaptions is not null || TranscriptionProgress.Keys.Any(IsTranscribing);
+    private bool ModelGateBusy =>
+        IsRecording || RecordingCaptions is not null || TranscriptionProgress.Keys.Any(IsTranscribing)
+        || AIJobs.BusyIds.Any(id => AIJobs.EntryFor(id) is { UsesInAppModel: true });
 
     // Index
 
@@ -469,15 +471,16 @@ public sealed partial class AppViewModel
     // Library chat
 
     /// <summary>
-    /// Asks <paramref name="question"/> across the library as the AI job (no conversation) with the current AI provider
-    /// and model (macOS <c>askLibrary</c>): searches the index, then streams the answer, saved with its references in
-    /// <see cref="GlobalChatFolder"/>'s <c>chat.json</c>. The job is set before the search so indexing yields. With no
-    /// source found the question is still asked: the prompt has the model say the sources hold no answer.
+    /// Asks <paramref name="question"/> across the library as the AI job of the null key, beside the conversations' jobs,
+    /// with the current AI provider and model (macOS <c>askLibrary</c>): searches the index, then streams the answer,
+    /// saved with its references in <see cref="GlobalChatFolder"/>'s <c>chat.json</c>. The job is set before the search
+    /// so indexing yields. With no source found the question is still asked: the prompt has the model say the sources
+    /// hold no answer.
     /// </summary>
     public void AskLibrary(string question)
     {
         question = question.Trim();
-        if (_closing || AIJob is not null || ChatChanging || question.Length == 0 || !Settings.RagEnabled
+        if (_closing || AIJobs.EntryFor(null) is not null || ChatChanging || question.Length == 0 || !Settings.RagEnabled
             || ProvidersModel.CurrentAIProvider is not { } provider) return;
         if (Updater.IsInstalling)
         {
@@ -487,21 +490,19 @@ public sealed partial class AppViewModel
         }
         var model = ProvidersModel.AIModelFor(provider).Trim();
         AIError = null;
-        _aiStopRequested = false;
-        _aiPendingText.Clear();
-        var cancel = new CancellationTokenSource();
-        _aiCancel = cancel;
-        AIJob = new AIJob(null, AIJobKind.Question, question, Loc.T("Searching your conversations…"),
-            UsesLocalModel: provider.Kind == AIProviderKind.InApp);
+        var job = new AIJob(AIJobKind.Question, question) { Status = Loc.T("Searching your conversations…") };
+        // In the table before the job's task starts: its first steps look it up there.
+        AddAIJob(null, AIJobTable.Kind.LibraryQuestion, provider.Kind == AIProviderKind.InApp, job);
         // Read on the UI thread: the settings and the provider configs belong to it.
         var config = provider.Kind == AIProviderKind.InApp ? null : ProvidersModel.Config(provider.Id);
-        _aiTask = RunLibraryJobAsync(question, provider, config, model, Settings, ProvidersModel.ProviderConfigs, cancel);
+        job.Work = RunLibraryJobAsync(question, provider, config, model, Settings, ProvidersModel.ProviderConfigs, job);
     }
 
     private async Task RunLibraryJobAsync(
         string question, AIProviderInfo provider, ProviderConfig? config, string model, AppSettings settings,
-        IReadOnlyList<ProviderConfig> configs, CancellationTokenSource cancel)
+        IReadOnlyList<ProviderConfig> configs, AIJob job)
     {
+        var cancel = job.Cancel;
         try
         {
             if (await MakeJobClientAsync(provider, config, null, cancel.Token) is not { } client) return;
@@ -518,10 +519,14 @@ public sealed partial class AppViewModel
             var budget = TranscriptChunker.Budget(context, LibraryChat.PromptTokens(question, history, limit));
             var (sources, references) = LibraryChat.Sources(hits, Conversations, budget);
             if (token.IsCancellationRequested || _closing) return;
-            if (AIJob is { } job) AIJob = job with { Status = null };
-            await StreamAIJobAsync(_services.AI.AskLibrary(
+            if (job.Status is not null)
+            {
+                job.Status = null;
+                AIJobTextChanged?.Invoke(null);
+            }
+            await StreamAIJobAsync(null, job, _services.AI.AskLibrary(
                 question, sources, references, history, limit, client, provider.Id, model, settings.SummaryLanguage, folder,
-                token), token);
+                token, job.JobId), token);
         }
         catch (OperationCanceledException) when (cancel.IsCancellationRequested)
         {
@@ -534,14 +539,8 @@ public sealed partial class AppViewModel
         }
         finally
         {
-            if (ReferenceEquals(_aiCancel, cancel)) _aiCancel = null;
             cancel.Dispose();
-            if (!_closing)
-            {
-                FlushAIText();
-                AIJob = null;
-                AIJobsEnded++;
-            }
+            if (!_closing) EndAIJob(null, job);
         }
         SyncLibraryIndex();
     }

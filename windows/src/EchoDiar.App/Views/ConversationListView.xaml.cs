@@ -97,6 +97,10 @@ public sealed partial class ConversationListView : UserControl
             case nameof(AppViewModel.TranscriptionErrors):
                 UpdateRows();
                 break;
+            case nameof(AppViewModel.AIJobs):
+                // A job's start, first text and end: only the cards' activity changes, never the rows.
+                UpdateCards();
+                break;
             case nameof(AppViewModel.RecordingSnapshot):
                 // At 15 Hz while recording: only the start and the end change the list.
                 if (_model.IsRecording != _listedWhileRecording) UpdateRows();

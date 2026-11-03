@@ -550,21 +550,28 @@ public sealed partial class AppViewModel : ObservableObject
     public event Action<Guid>? ReleasingAudio;
 
     /// <summary>
-    /// Moves the conversation to the Recycle Bin; its page goes back to the list first, and its AI job is cancelled first
-    /// so it does not write into the moved folder.
+    /// Moves the conversation to the Recycle Bin; its page goes back to the list first, and once its AI job, cancelled
+    /// first without saving (also after a Stop), has ended: a summary or chat written after the move would recreate the
+    /// folder (macOS <c>deleteConversation</c>).
     /// </summary>
     public async Task DeleteConversationAsync(Guid id)
     {
         ReleasingAudio?.Invoke(id);
         if (Route.ConversationId == id) Route = Route.List;
-        await CancelAIJobAsync(id);
+        // Its AI job's stream now ends with an error, which must not show as the AI error.
+        var added = _deletingConversationIds.Add(id);
         try
         {
+            await CancelAIJobAsync(id);
             await _services.Library.DeleteAsync(id);
         }
         catch (Exception e)
         {
             Debug.WriteLine($"EchoDiar: could not delete conversation {id}: {e}");
+        }
+        finally
+        {
+            if (added) _deletingConversationIds.Remove(id);
         }
     }
 

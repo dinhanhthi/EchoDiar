@@ -8,15 +8,16 @@ namespace EchoDiar.App.ViewModels;
 /// <summary>
 /// The Summary and Chat tabs of one conversation (macOS AIPanelView.swift state): its transcript, kept summaries (the
 /// version shown), open chat with its title and archived chats, read off the UI thread when the conversation gets a
-/// transcript, when an AI job ends and when the chat history changes; the job of this conversation; and the actions,
-/// which go through <see cref="AppViewModel"/>. A job that just ended stays shown until the files it wrote are read, so
-/// the answer does not flash back to the earlier state. On the UI thread.
+/// transcript, when this conversation's AI job ends and when the chat history changes; the job of this conversation
+/// (other conversations' jobs run beside it); and the actions, which go through <see cref="AppViewModel"/>. A job that
+/// just ended stays shown until the files it wrote are read, so the answer does not flash back to the earlier state. Its
+/// streamed text is not raised here: the view follows <see cref="AppViewModel.AIJobTextChanged"/>. On the UI thread.
 /// </summary>
 public sealed class AIPanelViewModel
 {
     private readonly AppViewModel _model;
 
-    private (bool Listed, bool HasTranscript, int JobsEnded)? _loadedFor;
+    private (bool Listed, bool HasTranscript, int JobEnds)? _loadedFor;
     private (bool Listed, int Changes)? _chatLoadedFor;
     private int _loadGeneration;
     private int _chatGeneration;
@@ -63,8 +64,8 @@ public sealed class AIPanelViewModel
 
     public Conversation? Conversation => _model.Conversations.FirstOrDefault(c => c.Id == ConversationId);
 
-    /// <summary>The running job of this conversation; null when none runs or another conversation's runs.</summary>
-    public AIJob? RunningJob => _model.AIJob is { } job && job.ConversationId == ConversationId ? job : null;
+    /// <summary>The running job of this conversation; null when it has none.</summary>
+    public AIJob? RunningJob => _model.AIJobs.EntryFor(ConversationId)?.Payload;
 
     /// <summary>The summary being written (shown while it runs and until it is read back).</summary>
     public AIJob? SummaryJob => ShownJob is { Kind: AIJobKind.Summary } job ? job : null;
@@ -74,13 +75,19 @@ public sealed class AIPanelViewModel
 
     private AIJob? ShownJob => RunningJob ?? _endedJob;
 
-    /// <summary>A job of another conversation, or of the other tab, which blocks this one's (macOS <c>busyElsewhere</c>).</summary>
+    /// <summary>
+    /// This conversation's job of the other tab, which blocks this one's (macOS <c>busyElsewhere</c>); other
+    /// conversations' jobs run beside it.
+    /// </summary>
     public AIJob? BusyElsewhere(DetailTab tab) =>
-        _model.AIJob is { } job && (tab == DetailTab.Chat ? RunningQuestion : RunningSummary) is null ? job : null;
+        (tab == DetailTab.Chat ? RunningQuestion : RunningSummary) is null ? RunningJob : null;
 
     public AIJob? RunningSummary => RunningJob is { Kind: AIJobKind.Summary } job ? job : null;
 
     public AIJob? RunningQuestion => RunningJob is { Kind: AIJobKind.Question } job ? job : null;
+
+    /// <summary>What this conversation's job does before its first text: "Queued" behind another in-app job, else its status.</summary>
+    public string? JobStatus => _model.AIJobStatus(ConversationId);
 
     /// <summary>The summary shown: the picked version, else the newest.</summary>
     public SummaryVersion? ShownSummary => Summaries.LastOrDefault(v => v.Number == ShownVersion) ?? Summaries.LastOrDefault();
@@ -88,8 +95,11 @@ public sealed class AIPanelViewModel
     /// <summary>Why nothing can run for this conversation.</summary>
     public string? EmptyNote => Conversation is { HasTranscript: true } ? null : Loc.T("This conversation has no transcript yet.");
 
-    /// <summary>A summary or a question can start now (macOS <c>canRun</c>).</summary>
-    public bool CanRun => _model.AIJob is null && !_model.ChatChanging && Transcript is not null && Providers.CurrentAIProvider is not null
+    /// <summary>
+    /// A summary or a question can start now (macOS <c>canRun</c>, as <see cref="AppViewModel.StartAIJob"/>'s guard): one
+    /// job per conversation; other conversations' jobs do not block it.
+    /// </summary>
+    public bool CanRun => RunningJob is null && !_model.ChatChanging && Transcript is not null && Providers.CurrentAIProvider is not null
         && !_model.Updater.IsInstalling;
 
     /// <summary>Why this conversation's last job or chat change failed; null when none did.</summary>
@@ -166,7 +176,7 @@ public sealed class AIPanelViewModel
     {
         switch (e.PropertyName)
         {
-            case nameof(AppViewModel.AIJob):
+            case nameof(AppViewModel.AIJobs):
                 var job = RunningJob;
                 // This conversation's job ended: shown until LoadAsync reads what it saved.
                 if (_job is { } ended && job is null && ended.Text.Length > 0) _endedJob = ended;
@@ -174,7 +184,7 @@ public sealed class AIPanelViewModel
                 Changed?.Invoke();
                 break;
             case nameof(AppViewModel.Conversations):
-            case nameof(AppViewModel.AIJobsEnded):
+            case nameof(AppViewModel.AIJobEnds):
             case nameof(AppViewModel.ChatHistoryChanges):
                 Refresh();
                 break;
@@ -190,7 +200,8 @@ public sealed class AIPanelViewModel
     private void Refresh()
     {
         var conversation = Conversation;
-        var key = (conversation is not null, conversation?.HasTranscript ?? false, _model.AIJobsEnded);
+        // This conversation's job ends only: another one's would reset the summary version picked here.
+        var key = (conversation is not null, conversation?.HasTranscript ?? false, _model.AIJobEnds(ConversationId));
         if (_loadedFor != key)
         {
             _loadedFor = key;
@@ -275,7 +286,7 @@ public sealed class AIPanelViewModel
             Providers.AIModelFor(provider));
     }
 
-    public void Stop() => _model.StopAIJob();
+    public void Stop() => _model.StopAIJob(ConversationId);
 
     public void StartFreshChat()
     {

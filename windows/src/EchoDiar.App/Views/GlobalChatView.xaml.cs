@@ -17,9 +17,9 @@ namespace EchoDiar.App.Views;
 /// answer with its numbered sources under it. <c>[n mm:ss]</c> / <c>[n]</c> citations and the sources open the
 /// conversation at that moment or its summary, the chat staying beside it (<see cref="AppViewModel.OpenReference"/>).
 /// Laid out like the AI panel's Chat tab. The state is <see cref="LibraryChatViewModel"/>; the question runs in
-/// <see cref="AppViewModel"/>, so it goes on when the chat closes. Answers are Markdown rendered by
-/// <see cref="MarkdownView"/> with their saved references only (never null, so a bare <c>[mm:ss]</c> stays plain text);
-/// web links open once their destination is confirmed. Attached while it is in the window.
+/// <see cref="AppViewModel"/> beside the conversations' jobs, so it goes on when the chat closes. Answers are Markdown
+/// rendered by <see cref="MarkdownView"/> with their saved references only (never null, so a bare <c>[mm:ss]</c> stays
+/// plain text); web links open once their destination is confirmed. Attached while it is in the window.
 /// </summary>
 public sealed partial class GlobalChatView : UserControl
 {
@@ -58,7 +58,6 @@ public sealed partial class GlobalChatView : UserControl
         LanguageMenu.Opening += (_, _) => BuildLanguageMenu();
         TurnOnButton.Click += (_, _) => OpenRagSettings();
         IndexingSettingsButton.Click += (_, _) => OpenRagSettings();
-        BusyStopButton.Click += (_, _) => _chat?.Stop();
         AskStopButton.Click += (_, _) => _chat?.Stop();
         SendButton.Click += (_, _) => Ask();
         FreshChatButton.Click += (_, _) => _chat?.StartFreshChat();
@@ -78,6 +77,7 @@ public sealed partial class GlobalChatView : UserControl
         if (_chat is not null) return;
         _chat = new LibraryChatViewModel(_model);
         _chat.Changed += Update;
+        _model.AIJobTextChanged += OnJobTextChanged;
         _chat.Attach();
         Update();
         // Opening the chat puts the cursor in the question.
@@ -91,6 +91,7 @@ public sealed partial class GlobalChatView : UserControl
         if (_chat is not null)
         {
             _chat.Changed -= Update;
+            _model.AIJobTextChanged -= OnJobTextChanged;
             _chat.Detach();
         }
         _chat = null;
@@ -98,6 +99,12 @@ public sealed partial class GlobalChatView : UserControl
         _streamRendered = null;
         _historyKey = null;
         _streamSlot = null;
+    }
+
+    /// <summary>The streamed text or status of a job changed: the library question's only redraws its answer.</summary>
+    private void OnJobTextChanged(Guid? key)
+    {
+        if (key is null && !_model.IsClosing && _chat is { RagEnabled: true }) UpdateChat();
     }
 
     /// <summary>Everything from the state: RAG off or on, the messages, the history, the error, the bottom bar.</summary>
@@ -162,11 +169,15 @@ public sealed partial class GlobalChatView : UserControl
         .SelectMany(m => m.References ?? [])
         .Select(r => chat.Conversation(r.ConversationID) is { } c ? $"{c.Id}\u0002{c.Title}\u0002{c.CreatedAt.ToUnixTimeSeconds()}" : "-"));
 
-    /// <summary>A spinner with the status until the first text, then the answer so far with the model's badge.</summary>
+    /// <summary>
+    /// A spinner with the status ("Queued" behind another in-app job) until the first text, then the answer so far with
+    /// the model's badge.
+    /// </summary>
     private void UpdateStream(AIJob job)
     {
         if (_streamSlot is null) return;
-        var key = job.Text.Length == 0 ? "\u0001" + job.Status : job.Text;
+        var jobStatus = _chat?.JobStatus;
+        var key = job.Text.Length == 0 ? "\u0001" + jobStatus : job.Text;
         if (key == _streamRendered) return;
         _streamRendered = key;
         _streamSlot.Children.Clear();
@@ -174,7 +185,7 @@ public sealed partial class GlobalChatView : UserControl
         {
             var row = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 6 };
             row.Children.Add(new ProgressRing { Width = 16, Height = 16, MinWidth = 0, MinHeight = 0, IsActive = true });
-            if (job.Status is { } status)
+            if (jobStatus is { } status)
             {
                 row.Children.Add(new TextBlock
                 {
@@ -454,7 +465,7 @@ public sealed partial class GlobalChatView : UserControl
 
     // Bottom bar
 
-    /// <summary>A job of a conversation, the index's progress, the model and language labels and the setup hints.</summary>
+    /// <summary>The index's progress, the model and language labels and the setup hints.</summary>
     private void UpdateBottomBar()
     {
         if (_chat is null) return;
@@ -469,20 +480,6 @@ public sealed partial class GlobalChatView : UserControl
         WindowsAIHint.Text = windowsAI ?? "";
         WindowsAIHint.Visibility = Shown(current is null && windowsAI is not null);
 
-        // It blocks asking until it ends, so it says what runs and can be stopped from here.
-        if (_chat.BusyElsewhere is { } job)
-        {
-            var conversationTitle = _model.Conversations.FirstOrDefault(c => c.Id == job.ConversationId)?.Title ?? Loc.T("another conversation");
-            BusyText.Text = job.Kind == AIJobKind.Summary
-                ? Loc.Format("Summarizing %@…", conversationTitle)
-                : Loc.Format("Answering about %@…", conversationTitle);
-            ToolTipService.SetToolTip(BusyText, BusyText.Text);
-            BusyRow.Visibility = Visibility.Visible;
-        }
-        else
-        {
-            BusyRow.Visibility = Visibility.Collapsed;
-        }
         UpdateIndexingLine(_chat.Status);
     }
 

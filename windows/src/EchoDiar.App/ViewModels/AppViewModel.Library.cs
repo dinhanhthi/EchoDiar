@@ -224,12 +224,12 @@ public sealed partial class AppViewModel
     /// <summary>
     /// macOS <c>busyConversationIDs</c>: a transcription queued, running or waiting for a model, or still between its
     /// recording's end (or the launch scan) and its last step (compressing). Recording and compressing conversations are
-    /// not transcribed, so auto-delete never picks them. A transcription waiting for its cloud confirmation, and an AI
-    /// job's conversation, too.
+    /// not transcribed, so auto-delete never picks them. A transcription waiting for its cloud confirmation, and the
+    /// conversations with an AI job (<see cref="AIJobs"/>), too.
     /// </summary>
     private bool IsBusy(Guid id) =>
         _finishing.Contains(id) || TranscriptionProgress.ContainsKey(id) || PendingCloudRuns.Any(r => r.ConversationId == id)
-        || AIJob?.ConversationId == id;
+        || AIJobs.BusyIds.Contains(id);
 
     /// <summary>
     /// Auto-delete on: schedules the daily run and runs it once now (launch, or when turned on). Off: stops it (macOS
@@ -348,12 +348,13 @@ public sealed partial class AppViewModel
     }
 
     /// <summary>
-    /// A model may be loaded: a transcription, the recording's transcriber, an AI job of an in-app model or an in-app
-    /// embedder runs (a cloud, CLI or local-host job holds no model file). Model files are not deleted meanwhile: llama.cpp
-    /// maps a GGUF file while loaded, which Windows then refuses to move or delete.
+    /// A model may be loaded: a transcription, the recording's transcriber, an AI job of an in-app model (running or
+    /// queued, the library chat's too) or an in-app embedder runs (a cloud, CLI or local-host job holds no model file).
+    /// Model files are not deleted meanwhile: llama.cpp maps a GGUF file while loaded, which Windows then refuses to move
+    /// or delete.
     /// </summary>
     public bool ModelsInUse =>
-        TranscriptionProgress.Keys.Any(IsTranscribing) || RecordingCaptions is not null || AIJob is { UsesLocalModel: true }
+        TranscriptionProgress.Keys.Any(IsTranscribing) || RecordingCaptions is not null || AIJobs.HasInAppJob
         || IsEmbedderLoaded;
 
     /// <summary>The downloaded models (not one still downloading), which "Delete all" removes.</summary>
@@ -362,10 +363,12 @@ public sealed partial class AppViewModel
 
     /// <summary>
     /// Removes every downloaded model (macOS <c>deleteAllModels</c>). A default model removed is no longer the default,
-    /// or every new recording would stop at "Needs model".
+    /// or every new recording would stop at "Needs model". Does nothing while an in-app AI job runs or waits: it may be
+    /// using one.
     /// </summary>
     public async Task DeleteAllModelsAsync()
     {
+        if (AIJobs.HasInAppJob) return;
         foreach (var entry in DeletableModels)
         {
             await DeleteModelFilesAsync(entry);
@@ -376,10 +379,12 @@ public sealed partial class AppViewModel
 
     /// <summary>
     /// Removes one downloaded model (macOS <c>deleteModel</c>, Settings › Transcription's Delete); a model still
-    /// downloading is left alone. A default model removed is no longer the default.
+    /// downloading is left alone. A default model removed is no longer the default. Does nothing while an in-app AI job
+    /// runs or waits: it may be using the model.
     /// </summary>
     public async Task DeleteModelAsync(string id)
     {
+        if (AIJobs.HasInAppJob) return;
         if (ModelCatalog.Entry(id) is not { Repo: not null } entry || Downloads.ContainsKey(id)) return;
         await DeleteModelFilesAsync(entry);
         if (_closing) return;

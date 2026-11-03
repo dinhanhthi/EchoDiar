@@ -5,14 +5,15 @@ namespace EchoDiar.App.ViewModels;
 
 /// <summary>
 /// The chat across the library (macOS GlobalChatView.swift state): its open chat with its title and archived chats in
-/// <see cref="AppViewModel.GlobalChatFolder"/>, read off the UI thread when a job ends and when the chat history changes;
-/// the library question running; the index's progress; and the actions, which go through <see cref="AppViewModel"/>. A
-/// question that just ended stays shown until the files it wrote are read, so the answer does not flash away. On the UI
-/// thread.
+/// <see cref="AppViewModel.GlobalChatFolder"/>, read off the UI thread when its question ends and when the chat history
+/// changes; the library question running (the null key of <see cref="AppViewModel.AIJobs"/>, beside the conversations'
+/// jobs); the index's progress; and the actions, which go through <see cref="AppViewModel"/>. A question that just ended
+/// stays shown until the files it wrote are read, so the answer does not flash away. Its streamed text is not raised
+/// here: the view follows <see cref="AppViewModel.AIJobTextChanged"/>. On the UI thread.
 /// </summary>
 public sealed class LibraryChatViewModel(AppViewModel model)
 {
-    private (int JobsEnded, int Changes)? _loadedFor;
+    private (int JobEnds, int Changes)? _loadedFor;
     private int _generation;
     private bool _attached;
 
@@ -39,17 +40,20 @@ public sealed class LibraryChatViewModel(AppViewModel model)
 
     public RAGStatus Status => model.RAGStatus;
 
-    /// <summary>The library question running now (macOS <c>libraryJob</c>).</summary>
-    public AIJob? RunningJob => model.AIJob is { ConversationId: null, Kind: AIJobKind.Question } job ? job : null;
+    /// <summary>The library question running now (macOS <c>libraryJob</c>, the null key).</summary>
+    public AIJob? RunningJob => model.AIJobs.EntryFor(null)?.Payload;
 
     /// <summary>The question being answered, shown while it runs and until it is read back.</summary>
     public AIJob? ShownJob => RunningJob ?? _endedJob;
 
-    /// <summary>A job of a conversation: it blocks asking until it ends (macOS <c>busyElsewhere</c>).</summary>
-    public AIJob? BusyElsewhere => model.AIJob is { ConversationId: not null } job ? job : null;
+    /// <summary>What the library question does before its first text: "Queued" behind another in-app job, else its status.</summary>
+    public string? JobStatus => model.AIJobStatus(null);
 
-    /// <summary>As <see cref="AppViewModel.AskLibrary"/>'s guard: one AI job at a time (macOS <c>canAsk</c>).</summary>
-    public bool CanAsk => model.AIJob is null && !model.ChatChanging && RagEnabled && Providers.CurrentAIProvider is not null
+    /// <summary>
+    /// As <see cref="AppViewModel.AskLibrary"/>'s guard: one library question at a time; the conversations' jobs do not
+    /// block it (macOS <c>canAsk</c>).
+    /// </summary>
+    public bool CanAsk => RunningJob is null && !model.ChatChanging && RagEnabled && Providers.CurrentAIProvider is not null
         && !model.Updater.IsInstalling;
 
     /// <summary>Why the last library question or library chat change failed; null when none did.</summary>
@@ -97,14 +101,14 @@ public sealed class LibraryChatViewModel(AppViewModel model)
     {
         switch (e.PropertyName)
         {
-            case nameof(AppViewModel.AIJob):
+            case nameof(AppViewModel.AIJobs):
                 var job = RunningJob;
                 // The library question ended: shown until LoadAsync reads what it saved.
                 if (_job is { } ended && job is null && ended.Text.Length > 0) _endedJob = ended;
                 _job = job;
                 Changed?.Invoke();
                 break;
-            case nameof(AppViewModel.AIJobsEnded):
+            case nameof(AppViewModel.AIJobEnds):
             case nameof(AppViewModel.ChatHistoryChanges):
                 Refresh();
                 break;
@@ -121,7 +125,7 @@ public sealed class LibraryChatViewModel(AppViewModel model)
     /// <summary>Reads the chat again when an answer was saved or the history changed (macOS <c>LoadKey</c>).</summary>
     private void Refresh()
     {
-        var key = (model.AIJobsEnded, model.ChatHistoryChanges);
+        var key = (model.AIJobEnds(null), model.ChatHistoryChanges);
         if (_loadedFor != key)
         {
             _loadedFor = key;
@@ -155,7 +159,7 @@ public sealed class LibraryChatViewModel(AppViewModel model)
         return true;
     }
 
-    public void Stop() => model.StopAIJob();
+    public void Stop() => model.StopAIJob(null);
 
     public void StartFreshChat() => model.StartFreshLibraryChat();
 

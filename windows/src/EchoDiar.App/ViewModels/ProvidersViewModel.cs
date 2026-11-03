@@ -111,7 +111,7 @@ public sealed partial class ProvidersViewModel : ObservableObject
             case nameof(AppViewModel.DownloadErrors):
             case nameof(AppViewModel.TranscriptionProgress):
             case nameof(AppViewModel.RecordingCaptions):
-            case nameof(AppViewModel.AIJob):
+            case nameof(AppViewModel.AIJobs):
             case nameof(AppViewModel.IsEmbedderLoaded):
                 LocalModelStatesChanged?.Invoke();
                 break;

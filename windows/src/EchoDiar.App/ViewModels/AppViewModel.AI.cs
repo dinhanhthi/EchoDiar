@@ -8,55 +8,82 @@ using Microsoft.UI.Dispatching;
 
 namespace EchoDiar.App.ViewModels;
 
-/// <summary>What an AI job of one conversation does (macOS <c>AppModel.AIJob.Kind</c>).</summary>
+/// <summary>What an AI job of one conversation does (macOS AppModel's <c>AIJob.Kind</c>).</summary>
 public enum AIJobKind { Summary, Question }
 
 /// <summary>
-/// The running summary or question (macOS <c>AppModel.AIJob</c>): its conversation (null for a question across the
-/// library, Phase 27), what it does (<see cref="Question"/> is the question asked), what a long summary does before its
-/// text starts, and the answer so far; <see cref="UsesLocalModel"/> when an in-app model runs it (one that loads model
-/// files). Replaced at each update, so a change is a new instance.
+/// What <see cref="AppViewModel.AIJobs"/> keeps of a running summary or question, beside its key, kind and status (macOS
+/// AppModel's <c>AIJob</c> with its <c>aiJobText</c> and <c>aiJobStatus</c>): what it does (<see cref="Question"/> is the
+/// question asked), its <see cref="AIService"/> job id, what a long job does before its text starts and the answer so
+/// far (changed in place: <see cref="AppViewModel.AIJobTextChanged"/> says when), and the app's handles on it. On the UI
+/// thread.
 /// </summary>
-public sealed record AIJob(
-    Guid? ConversationId, AIJobKind Kind, string? Question, string? Status = null, string Text = "", bool UsesLocalModel = false);
+public sealed class AIJob(AIJobKind kind, string? question)
+{
+    public AIJobKind Kind { get; } = kind;
+
+    public string? Question { get; } = question;
+
+    /// <summary>Its job id, for <see cref="AIService.Stop(Guid)"/> and <see cref="AIService.CancelAsync"/>.</summary>
+    public Guid JobId { get; } = Guid.NewGuid();
+
+    /// <summary>What it does before its first text; null once the text starts.</summary>
+    public string? Status { get; internal set; }
+
+    /// <summary>The answer streamed so far; kept once the job ends, so its view shows it until the saved answer is read.</summary>
+    public string Text { get; internal set; } = "";
+
+    /// <summary>Its cancellation: a deleted conversation's job, a library question stopped during its search.</summary>
+    internal CancellationTokenSource Cancel { get; } = new();
+
+    /// <summary>The job, from its start to its last update and its conversation's reload.</summary>
+    internal Task Work { get; set; } = Task.CompletedTask;
+
+    /// <summary>Stop was asked before its stream started: it is stopped as soon as it is registered.</summary>
+    internal bool StopRequested { get; set; }
+
+    /// <summary>Streamed text not in <see cref="Text"/> yet, and its scheduled flush (macOS <c>pendingAIText</c>).</summary>
+    internal StringBuilder PendingText { get; } = new();
+
+    internal DispatcherQueueTimer? FlushTimer { get; set; }
+}
 
 /// <summary>Why the last AI job, or chat archive or resume, of a conversation (null: the library chat) failed.</summary>
 public sealed record AIErrorInfo(Guid? ConversationId, string Message);
 
 /// <summary>
 /// The AI state of the app (macOS AppModel's AI tab): the providers model Settings › AI and the AI pickers share, the
-/// running summary or question (one at a time; started off the UI thread, its updates applied on it), its error per
-/// conversation, the chat history changes (archive, resume, delete, titles) and the cards' AI and Summary buttons.
+/// running summaries and questions (one per conversation, the library chat beside them; started off the UI thread, their
+/// updates applied on it), the error per conversation, the chat history changes (archive, resume, delete, titles) and
+/// the cards' AI and Summary buttons.
 /// </summary>
 public sealed partial class AppViewModel
 {
-    /// <summary>Streamed text reaches <see cref="AIJob"/> at most this often: each change renders the whole Markdown again.</summary>
+    /// <summary>Streamed text reaches <see cref="AIJob.Text"/> at most this often: each change renders the whole Markdown again.</summary>
     private static readonly TimeSpan AITextFlushInterval = TimeSpan.FromMilliseconds(120);
 
-    /// <summary>A deleted conversation's job is waited for at most this long before its folder goes to the Recycle Bin.</summary>
+    /// <summary>
+    /// A deleted conversation's job (its client and its conversation's reload) is waited for at most this long, once its
+    /// write has ended, before its folder goes to the Recycle Bin.
+    /// </summary>
     private static readonly TimeSpan AICancelWait = TimeSpan.FromSeconds(5);
 
     private ProvidersViewModel? _providersModel;
-    private AIJob? _aiJob;
     private AIErrorInfo? _aiError;
-    private int _aiJobsEnded;
     private int _chatHistoryChanges;
     private bool _chatChanging;
 
-    /// <summary>The running job's cancellation: a deleted conversation's job saves nothing.</summary>
-    private CancellationTokenSource? _aiCancel;
+    /// <summary>How many jobs of each conversation, and of the library chat, have ended (<see cref="AIJobEnds"/>).</summary>
+    private readonly Dictionary<Guid, int> _aiJobEnds = [];
+    private int _libraryJobEnds;
 
-    /// <summary>The running job, from its start to its last update.</summary>
-    private Task _aiTask = Task.CompletedTask;
+    /// <summary>
+    /// Conversations <see cref="DeleteConversationAsync"/> moves to the Recycle Bin: their AI job's error is not shown,
+    /// and no new job starts for them.
+    /// </summary>
+    private readonly HashSet<Guid> _deletingConversationIds = [];
 
-    /// <summary>Stop was asked before the job's stream started: it is stopped as soon as it is registered.</summary>
-    private volatile bool _aiStopRequested;
-
-    /// <summary>Streamed text not in <see cref="AIJob"/> yet, and its scheduled flush (macOS <c>pendingAIText</c>).</summary>
-    private readonly StringBuilder _aiPendingText = new();
-    private DispatcherQueueTimer? _aiFlushTimer;
-
-    /// <summary>Cancelled at Shutdown: the chat titles asked outside <see cref="AIJob"/>.</summary>
+    /// <summary>Cancelled at Shutdown: the chat titles asked outside <see cref="AIJobs"/>.</summary>
     private readonly CancellationTokenSource _aiLifetime = new();
 
     /// <summary>One change of a conversation's archived chats at a time, titles included (they rewrite <c>chats.json</c>).</summary>
@@ -65,12 +92,19 @@ public sealed partial class AppViewModel
     /// <summary>What Settings › AI binds to, and the AI pickers' providers; one for the app's lifetime.</summary>
     public ProvidersViewModel ProvidersModel => _providersModel ??= new ProvidersViewModel(this, _services);
 
-    /// <summary>The running summary or question; one at a time (macOS <c>aiJob</c>).</summary>
-    public AIJob? AIJob
-    {
-        get => _aiJob;
-        private set => SetProperty(ref _aiJob, value);
-    }
+    /// <summary>
+    /// The running summaries and questions, at most one per conversation id; the library chat (AppViewModel.RAG.cs) is the
+    /// null key (macOS <c>aiJobs</c>). Raised when a job starts, gets its first text or ends: cards follow it, so a job's
+    /// streamed text and status are raised by <see cref="AIJobTextChanged"/> instead. On the UI thread only (the table is
+    /// not thread-safe).
+    /// </summary>
+    public AIJobTable<AIJob> AIJobs { get; } = new();
+
+    /// <summary>
+    /// Raised on the UI thread when the text or the status of the job of a key (null: the library chat) changed; for the
+    /// answer views only, as it comes every 120 ms while a job streams.
+    /// </summary>
+    public event Action<Guid?>? AIJobTextChanged;
 
     /// <summary>Why the last AI job or chat change failed, with its conversation (macOS <c>aiError</c>).</summary>
     public AIErrorInfo? AIError
@@ -79,12 +113,16 @@ public sealed partial class AppViewModel
         private set => SetProperty(ref _aiError, value);
     }
 
-    /// <summary>Bumped when an AI job ends, so the AI tab reads the summaries and the chat again.</summary>
-    public int AIJobsEnded
-    {
-        get => _aiJobsEnded;
-        private set => SetProperty(ref _aiJobsEnded, value);
-    }
+    /// <summary>
+    /// How many AI jobs of <paramref name="key"/> (null: the library chat) have ended, raised as <c>AIJobEnds</c> (macOS
+    /// <c>aiJobEnds</c>): its AI tab or chat reads the summaries and the chat again, while other keys' views keep their
+    /// state (a summary version picked stays shown).
+    /// </summary>
+    public int AIJobEnds(Guid? key) => key is { } id ? _aiJobEnds.GetValueOrDefault(id) : _libraryJobEnds;
+
+    /// <summary>What the job of <paramref name="key"/> does before its first text: "Queued" behind another in-app job, else its status.</summary>
+    public string? AIJobStatus(Guid? key) =>
+        AIJobs.IsQueued(key) ? Loc.T("Queued") : AIJobs.EntryFor(key)?.Payload.Status;
 
     /// <summary>Bumped when a chat or the archived chats change outside a question job, so the AI tab reads them again.</summary>
     public int ChatHistoryChanges
@@ -119,7 +157,9 @@ public sealed partial class AppViewModel
 
     /// <summary>
     /// Starts a summary or the question <paramref name="question"/> about <paramref name="conversation"/> with
-    /// <paramref name="provider"/> and <paramref name="model"/>, saved as the AI tab's default (macOS <c>startAIJob</c>).
+    /// <paramref name="provider"/> and <paramref name="model"/>, saved as the AI tab's default (macOS <c>startAIJob</c>),
+    /// beside the jobs of the other conversations; does nothing while the conversation has a job or is being deleted
+    /// (its answer would recreate the folder going to the Recycle Bin).
     /// <paramref name="summary"/> and <paramref name="history"/> are the saved summary and chat, sent with a question.
     /// The client is made off the UI thread; the job's updates come back on it.
     /// </summary>
@@ -127,7 +167,9 @@ public sealed partial class AppViewModel
         AIJobKind kind, string? question, Conversation conversation, Transcript transcript, string? summary,
         IReadOnlyList<ChatLog.Message> history, AIProviderInfo provider, string model)
     {
-        if (_closing || AIJob is not null || kind == AIJobKind.Question && (ChatChanging || string.IsNullOrWhiteSpace(question))) return;
+        if (_closing || AIJobs.EntryFor(conversation.Id) is not null
+            || _deletingConversationIds.Contains(conversation.Id)
+            || kind == AIJobKind.Question && (ChatChanging || string.IsNullOrWhiteSpace(question))) return;
         if (Updater.IsInstalling)
         {
             // Windows closes the app once the update is downloaded: the answer would be cut off.
@@ -137,32 +179,33 @@ public sealed partial class AppViewModel
         model = model.Trim();
         ProvidersModel.SetAIModel(model, provider);
         AIError = null;
-        _aiStopRequested = false;
-        _aiPendingText.Clear();
-        var cancel = new CancellationTokenSource();
-        _aiCancel = cancel;
-        AIJob = new AIJob(conversation.Id, kind, question, UsesLocalModel: provider.Kind == AIProviderKind.InApp);
+        var job = new AIJob(kind, question);
+        // In the table before the job's task starts: its first steps look it up there.
+        AddAIJob(conversation.Id, kind == AIJobKind.Summary ? AIJobTable.Kind.Summary : AIJobTable.Kind.Question,
+            provider.Kind == AIProviderKind.InApp, job);
         // Read on the UI thread: the settings and the provider configs belong to it.
         var config = provider.Kind == AIProviderKind.InApp ? null : ProvidersModel.Config(provider.Id);
         var settings = Settings;
-        _aiTask = RunAIJobAsync(kind, question, conversation, transcript, summary, history, provider, config, model,
-            settings.SummaryLanguage, settings.ChatContextMessages, cancel);
+        job.Work = RunAIJobAsync(kind, question, conversation, transcript, summary, history, provider, config, model,
+            settings.SummaryLanguage, settings.ChatContextMessages, job);
     }
 
     private async Task RunAIJobAsync(
         AIJobKind kind, string? question, Conversation conversation, Transcript transcript, string? summary,
         IReadOnlyList<ChatLog.Message> history, AIProviderInfo provider, ProviderConfig? config, string model,
-        string language, int historyLimit, CancellationTokenSource cancel)
+        string language, int historyLimit, AIJob job)
     {
         var id = conversation.Id;
+        var cancel = job.Cancel;
         try
         {
             if (await MakeJobClientAsync(provider, config, id, cancel.Token) is not { } client) return;
             var stream = kind == AIJobKind.Summary
-                ? _services.AI.Summarize(conversation, transcript, client, provider.Id, model, language, cancel.Token)
+                ? _services.AI.Summarize(conversation, transcript, client, provider.Id, model, language, cancel.Token,
+                    job.JobId)
                 : _services.AI.Ask(question!, conversation, transcript, summary, history, historyLimit, client, provider.Id,
-                    model, language, cancel.Token);
-            await StreamAIJobAsync(stream, cancel.Token);
+                    model, language, cancel.Token, job.JobId);
+            await StreamAIJobAsync(id, job, stream, cancel.Token);
         }
         catch (OperationCanceledException) when (cancel.IsCancellationRequested)
         {
@@ -171,22 +214,40 @@ public sealed partial class AppViewModel
         catch (Exception e)
         {
             Debug.WriteLine($"EchoDiar: the AI job of {id} failed: {e.GetType().Name}");
-            if (!_closing) AIError = new AIErrorInfo(id, e.Message);
+            // A conversation being deleted: its job was cancelled before the app's token, which its stream reports.
+            if (!_closing && !_deletingConversationIds.Contains(id)) AIError = new AIErrorInfo(id, e.Message);
         }
         finally
         {
-            if (ReferenceEquals(_aiCancel, cancel)) _aiCancel = null;
             cancel.Dispose();
-            if (!_closing)
-            {
-                FlushAIText();
-                AIJob = null;
-                AIJobsEnded++;
-            }
+            if (!_closing) EndAIJob(id, job);
         }
         if (_closing) return;
         // A new summary sets hasSummary: the card shows its Summary button.
         await ReloadAsync(id);
+    }
+
+    /// <summary>Puts <paramref name="job"/> in <see cref="AIJobs"/> on <paramref name="key"/>, free (the callers' guard).</summary>
+    private void AddAIJob(Guid? key, AIJobTable.Kind kind, bool usesInAppModel, AIJob job)
+    {
+        AIJobs.Start(key, kind, usesInAppModel, job);
+        OnPropertyChanged(nameof(AIJobs));
+    }
+
+    /// <summary>
+    /// Removes the job of <paramref name="key"/> from <see cref="AIJobs"/>, its text flushed first (and kept in
+    /// <paramref name="job"/>), and bumps the key's <see cref="AIJobEnds"/> (macOS
+    /// <c>endAIJob</c>).
+    /// </summary>
+    private void EndAIJob(Guid? key, AIJob job)
+    {
+        FlushAIText(key, job);
+        if (!ReferenceEquals(AIJobs.EntryFor(key)?.Payload, job)) return;
+        AIJobs.Finish(key);
+        OnPropertyChanged(nameof(AIJobs));
+        if (key is { } id) _aiJobEnds[id] = _aiJobEnds.GetValueOrDefault(id) + 1;
+        else _libraryJobEnds++;
+        OnPropertyChanged(nameof(AIJobEnds));
     }
 
     /// <summary>
@@ -219,16 +280,17 @@ public sealed partial class AppViewModel
         return client;
     }
 
-    /// <summary>Applies the job's updates on the UI thread until its stream ends.</summary>
-    private async Task StreamAIJobAsync(IAsyncEnumerable<AIUpdate> stream, CancellationToken cancellationToken)
+    /// <summary>Applies the updates of <paramref name="job"/> (of <paramref name="key"/>) on the UI thread until its stream ends.</summary>
+    private async Task StreamAIJobAsync(
+        Guid? key, AIJob job, IAsyncEnumerable<AIUpdate> stream, CancellationToken cancellationToken)
     {
         await using var updates = stream.GetAsyncEnumerator(cancellationToken);
         // The first MoveNextAsync registers the job, so Stop sees it from here; a Stop asked before stops it now.
         var next = updates.MoveNextAsync();
-        if (_aiStopRequested) _services.AI.Stop();
+        if (job.StopRequested) _services.AI.Stop(job.JobId);
         while (await next)
         {
-            ApplyAIUpdate(updates.Current);
+            ApplyAIUpdate(key, job, updates.Current);
             next = updates.MoveNextAsync();
         }
     }
@@ -245,94 +307,115 @@ public sealed partial class AppViewModel
     }
 
     /// <summary>
-    /// Shows an update of the running job (macOS <c>applyAIUpdate</c>): a status at once; text at once when it is the
-    /// first, then at most every 120 ms, as the answer view renders its whole Markdown again at each change.
+    /// Shows an update of <paramref name="job"/>, the job of <paramref name="key"/> (macOS <c>applyAIUpdate</c>): a status
+    /// at once; text at once when it is the first (the job is then streaming), then at most every 120 ms, as the answer
+    /// view renders its whole Markdown again at each change.
     /// </summary>
-    private void ApplyAIUpdate(AIUpdate update)
+    private void ApplyAIUpdate(Guid? key, AIJob job, AIUpdate update)
     {
-        if (_closing || AIJob is not { } job) return;
+        if (_closing || AIJobs.EntryFor(key) is not { } entry || !ReferenceEquals(entry.Payload, job)) return;
         if (update.Kind == AIUpdateKind.Status)
         {
             // The AI project's fixed statuses have catalog keys; "Reading part 2 of 5…" stays English, as on macOS.
-            AIJob = job with { Status = Loc.T(update.Value) };
+            job.Status = Loc.T(update.Value);
+            AIJobTextChanged?.Invoke(key);
             return;
         }
-        _aiPendingText.Append(update.Value);
+        job.PendingText.Append(update.Value);
         if (job.Text.Length == 0)
         {
-            FlushAIText();
+            if (entry.Status == AIJobTable.Status.Running)
+            {
+                AIJobs.MarkStreaming(key);
+                OnPropertyChanged(nameof(AIJobs));
+            }
+            FlushAIText(key, job);
             return;
         }
-        if (_aiFlushTimer is null)
+        if (job.FlushTimer is null)
         {
-            _aiFlushTimer = _dispatcher.CreateTimer();
-            _aiFlushTimer.Interval = AITextFlushInterval;
-            _aiFlushTimer.IsRepeating = false;
-            _aiFlushTimer.Tick += (_, _) => FlushAIText();
+            var timer = _dispatcher.CreateTimer();
+            timer.Interval = AITextFlushInterval;
+            timer.IsRepeating = false;
+            timer.Tick += (_, _) => FlushAIText(key, job);
+            job.FlushTimer = timer;
         }
-        if (!_aiFlushTimer.IsRunning) _aiFlushTimer.Start();
-    }
-
-    /// <summary>Moves the batched text into <see cref="AIJob"/>; by the scheduled flush and when the stream ends.</summary>
-    private void FlushAIText()
-    {
-        _aiFlushTimer?.Stop();
-        if (_aiPendingText.Length == 0 || AIJob is not { } job) return;
-        AIJob = job with { Status = null, Text = job.Text + _aiPendingText };
-        _aiPendingText.Clear();
+        if (!job.FlushTimer.IsRunning) job.FlushTimer.Start();
     }
 
     /// <summary>
-    /// Ends the job early: the answer or summary streamed until then is saved (a summary marked stopped), then it ends as
-    /// usual (macOS <c>stopAIJob</c>). Nothing is saved when nothing was streamed yet; a library question without text
-    /// yet (still searching) is cancelled outright.
+    /// Moves the batched text of <paramref name="job"/> into its <see cref="AIJob.Text"/>; by the scheduled flush and when
+    /// the stream ends.
     /// </summary>
-    public void StopAIJob()
+    private void FlushAIText(Guid? key, AIJob job)
     {
-        if (AIJob is not { } job) return;
-        if (job is { ConversationId: null, Text.Length: 0 })
+        job.FlushTimer?.Stop();
+        if (job.PendingText.Length == 0) return;
+        job.Status = null;
+        job.Text += job.PendingText.ToString();
+        job.PendingText.Clear();
+        if (!_closing) AIJobTextChanged?.Invoke(key);
+    }
+
+    /// <summary>
+    /// Ends the job of <paramref name="key"/> (null: the library chat) early, the others keep running: the answer or
+    /// summary streamed until then is saved (a summary marked stopped), then it ends as usual (macOS <c>stopAIJob</c>).
+    /// Nothing is saved when nothing was streamed yet; a library question without text yet (still searching) is
+    /// cancelled outright.
+    /// </summary>
+    public void StopAIJob(Guid? key)
+    {
+        if (AIJobs.EntryFor(key)?.Payload is not { } job) return;
+        if (key is null && job.Text.Length == 0)
         {
             try
             {
-                _aiCancel?.Cancel();
+                job.Cancel.Cancel();
             }
             catch (ObjectDisposedException)
             {
                 // The job ended meanwhile.
             }
         }
-        _aiStopRequested = true;
-        _services.AI.Stop();
+        job.StopRequested = true;
+        _services.AI.Stop(job.JobId);
     }
 
     /// <summary>
-    /// Cancels the job of conversation <paramref name="id"/> (nothing is saved) and waits for it, at most 5 s, so nothing
-    /// writes into its folder once it goes to the Recycle Bin (macOS <c>deleteConversation</c>).
+    /// Cancels the job of conversation <paramref name="id"/> without saving, also after a Stop, so nothing writes into its
+    /// folder once it goes to the Recycle Bin (macOS <c>deleteConversation</c>): waits, without a limit, for the summary
+    /// or chat write it had already started (none starts once it is cancelled), then at most 5 s for the rest of the job
+    /// (its client and its conversation's reload), so a slow reload does not hold the delete but rarely lists the
+    /// conversation again.
     /// </summary>
     private async Task CancelAIJobAsync(Guid id)
     {
-        if (AIJob?.ConversationId != id) return;
+        if (AIJobs.EntryFor(id)?.Payload is not { } job) return;
+        // Before the app's token: cancelling that one would end the job while still marked stopped, which saves.
+        await _services.AI.CancelAsync(job.JobId);
         try
         {
-            _aiCancel?.Cancel();
+            job.Cancel.Cancel();
         }
         catch (ObjectDisposedException)
         {
             // The job ended meanwhile.
         }
-        var job = _aiTask;
-        await Task.WhenAny(job, Task.Delay(AICancelWait));
+        await Task.WhenAny(job.Work, Task.Delay(AICancelWait));
     }
 
     /// <summary>
-    /// Quit: the running job stops and keeps what it streamed, a title being asked is cancelled; nothing is waited for
+    /// Quit: the running jobs stop and keep what they streamed, a title being asked is cancelled; nothing is waited for
     /// (a CLI child dies with the app's job object, an HTTP request with the process).
     /// </summary>
     private void ShutdownAI()
     {
-        _aiFlushTimer?.Stop();
+        foreach (var key in AIJobs.BusyIds.Select(id => (Guid?)id).Append(null))
+        {
+            AIJobs.EntryFor(key)?.Payload.FlushTimer?.Stop();
+        }
         _aiLifetime.Cancel();
-        if (_aiJob is not null) _services.AI.Stop();
+        if (!AIJobs.IsEmpty) _services.AI.Stop();
     }
 
     // Chat history
@@ -367,11 +450,13 @@ public sealed partial class AppViewModel
     /// <summary>
     /// Runs <paramref name="change"/> on the chat in <paramref name="folder"/> of conversation <paramref name="id"/> (null:
     /// the library chat, Phase 27) off the UI thread, unless a question runs for it (its answer is appended to
-    /// <c>chat.json</c>); a failure shows as its AI error (macOS <c>changeChat</c>). No question starts meanwhile.
+    /// <c>chat.json</c>) or the conversation is being deleted (its chats would recreate the folder going to the Recycle
+    /// Bin); a failure shows as its AI error (macOS <c>changeChat</c>). No question starts meanwhile.
     /// </summary>
     internal async Task ChangeChatAsync(Guid? id, string folder, Func<string, ChatArchive.Archived?> change)
     {
-        if (_closing || ChatChanging || AIJob is { Kind: AIJobKind.Question } job && job.ConversationId == id) return;
+        if (_closing || ChatChanging || AIJobs.EntryFor(id) is { Kind: not AIJobTable.Kind.Summary }
+            || id is { } conversationId && _deletingConversationIds.Contains(conversationId)) return;
         ChatChanging = true;
         ChatArchive.Archived? archived = null;
         try
@@ -402,7 +487,7 @@ public sealed partial class AppViewModel
     }
 
     /// <summary>
-    /// Names the archived chat <paramref name="entry"/> with the current provider and model, outside <see cref="AIJob"/>
+    /// Names the archived chat <paramref name="entry"/> with the current provider and model, outside <see cref="AIJobs"/>
     /// (macOS <c>requestTitle</c>). Only with the provider that gave every answer of the chat, so its questions reach no
     /// provider that never saw them, and never with an in-app model, whose gate a hidden job would hold. Without one, or
     /// on error, its fallback title (the first question) stays.

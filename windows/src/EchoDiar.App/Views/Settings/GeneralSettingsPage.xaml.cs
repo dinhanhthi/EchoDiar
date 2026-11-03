@@ -94,7 +94,7 @@ public sealed partial class GeneralSettingsPage : UserControl
     private void OnModelChanged(object? sender, PropertyChangedEventArgs e)
     {
         if (e.PropertyName is nameof(AppViewModel.RecordingSnapshot) or nameof(AppViewModel.IsStarting)
-            or nameof(AppViewModel.TranscriptionProgress) or nameof(AppViewModel.Conversations) or nameof(AppViewModel.AIJob))
+            or nameof(AppViewModel.TranscriptionProgress) or nameof(AppViewModel.Conversations) or nameof(AppViewModel.AIJobs))
         {
             RefreshRelaunch();
         }

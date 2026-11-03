@@ -28,7 +28,8 @@ public readonly record struct AIUpdate(AIUpdateKind Kind, string Value)
 /// messages) and saves nothing when cancelled (the caller's token, or leaving the enumeration early) or failed.
 /// <see cref="Stop()"/> ends every job early, <see cref="Stop(Guid)"/> the one with that id (each entry point's
 /// <c>jobId</c>; a new one when null), and saves the answer streamed until then (a summary marked stopped); nothing
-/// when no text was streamed yet. A title job names an archived chat and saves nothing. In-app models
+/// when no text was streamed yet. <see cref="CancelAsync"/> ends a job saving nothing, even after a stop, and waits for
+/// it. A title job names an archived chat and saves nothing. In-app models
 /// (<see cref="ILocalLLMProvider"/>) run the whole job inside <see cref="ModelLoadGate"/> (owner LLM), loaded once and
 /// unloaded before the gate is released.
 /// </summary>
@@ -52,18 +53,40 @@ public sealed class AIService(ModelLoadGate gate)
         public string Text { get; } = text;
     }
 
-    /// <summary>A running job: its id, its cancellation, and whether <see cref="Stop()"/> ended it.</summary>
+    /// <summary>
+    /// A running job: its id, its cancellation, whether <see cref="Stop()"/> ended it (never once
+    /// <see cref="CancelAsync"/> did), and its end.
+    /// </summary>
     private sealed class Job(Guid id, CancellationTokenSource cancel)
     {
         private volatile bool _stopped;
+        private volatile bool _cancelled;
+        private readonly TaskCompletionSource _ended = new(TaskCreationOptions.RunContinuationsAsynchronously);
 
         public Guid Id { get; } = id;
         public CancellationToken Token { get; } = cancel.Token;
-        public bool IsStopped => _stopped;
+        public bool IsStopped => _stopped && !_cancelled;
+
+        /// <summary>Completes once the job has ended, after its file writes.</summary>
+        public Task Ended => _ended.Task;
 
         public void Stop()
         {
             _stopped = true;
+            CancelToken();
+        }
+
+        /// <summary>Ends the job saving nothing, also after <see cref="Stop()"/>.</summary>
+        public void Cancel()
+        {
+            _cancelled = true;
+            CancelToken();
+        }
+
+        public void End() => _ended.TrySetResult();
+
+        private void CancelToken()
+        {
             try
             {
                 cancel.Cancel();
@@ -98,6 +121,24 @@ public sealed class AIService(ModelLoadGate gate)
         Job[] running;
         lock (_jobsLock) running = [.. _jobs.Where(job => job.Id == jobId)];
         foreach (var job in running) job.Stop();
+    }
+
+    /// <summary>
+    /// Cancels the running job <paramref name="jobId"/> without saving anything, also after <see cref="Stop(Guid)"/>, and
+    /// returns once it has ended (a write it had already started is then done); at once when it is not running.
+    /// </summary>
+    public async Task CancelAsync(Guid jobId)
+    {
+        Job? job;
+        lock (_jobsLock)
+        {
+            job = _jobs.Find(j => j.Id == jobId);
+            // Out of the running jobs too, so a Stop meanwhile cannot reach it.
+            if (job is not null) _jobs.Remove(job);
+        }
+        if (job is null) return;
+        job.Cancel();
+        await job.Ended;
     }
 
     /// <summary>
@@ -329,6 +370,7 @@ public sealed class AIService(ModelLoadGate gate)
         {
             lock (_jobsLock) _jobs.Remove(job);
             updates.TryComplete();
+            job.End();
         }
     }
 

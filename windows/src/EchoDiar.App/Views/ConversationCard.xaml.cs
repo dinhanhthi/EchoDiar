@@ -1,4 +1,5 @@
 using System.Globalization;
+using EchoDiar.AI;
 using EchoDiar.App.ViewModels;
 using EchoDiar.Core.Model;
 using EchoDiar.Transcribe;
@@ -35,6 +36,7 @@ public sealed partial class ConversationCard : UserControl
     private string? _stepTip;
     private string? _retryTip;
     private string? _transcribeTip;
+    private string? _badgeTip;
 
     internal ConversationCard(AppViewModel model, ConversationListView list, Conversation conversation)
     {
@@ -85,6 +87,7 @@ public sealed partial class ConversationCard : UserControl
         SetTip(TitleText, conversation.Title, ref _titleTip);
         UpdateDetails(conversation);
         UpdateStatus(conversation);
+        UpdateBadge(conversation);
         // An empty row would only add space.
         ActionRow.Visibility = Shown(ProgressPanel.Visibility == Visibility.Visible
             || TranscribeNowButton.Visibility == Visibility.Visible
@@ -144,10 +147,14 @@ public sealed partial class ConversationCard : UserControl
         _model.TranscriptionProgress.TryGetValue(c.Id, out var progress);
         var running = progress is not null && progress.Step != JobStep.NeedsModel;
         var failed = progress is null && c.Status == ConversationStatus.TranscriptionFailed;
-        var transcribe = progress is null && !failed && !c.HasTranscript
+        // After the failure, as macOS: Retry stays.
+        var aboutToTranscribe = !failed && IsAboutToTranscribe(c);
+        var transcribe = progress is null && !failed && !aboutToTranscribe && !c.HasTranscript
             && c.Status is ConversationStatus.Ready or ConversationStatus.Transcribing;
+        // The transcription's state first; else the Stop sequence's "Transcribing…", else the AI job's.
+        Activity? waiting = running ? null : aboutToTranscribe ? Activity.Transcribing : AIJobActivity(c.Id);
 
-        ProgressPanel.Visibility = Shown(running);
+        ProgressPanel.Visibility = Shown(running || waiting is not null);
         TranscribeNowButton.Visibility = Shown(running && progress!.Step == JobStep.Deferred);
         NeedsModelBadge.Visibility = Shown(progress is not null && !running);
         RetryButton.Visibility = Shown(failed);
@@ -165,6 +172,14 @@ public sealed partial class ConversationCard : UserControl
                 ? StepTitle(progress.Step)
                 : progress.Fraction.ToString("P0", CultureInfo.CurrentCulture), ref _stepTip);
         }
+        else if (waiting is { } activity)
+        {
+            JobRing.IsIndeterminate = true;
+            JobRing.Value = 0;
+            var text = ActivityText(activity);
+            RecordingCard.SetText(StepText, text);
+            SetTip(ProgressPanel, text, ref _stepTip);
+        }
         if (failed)
         {
             var reason = _model.TranscriptionErrors.GetValueOrDefault(c.Id) ?? Loc.T("Transcription failed");
@@ -179,6 +194,64 @@ public sealed partial class ConversationCard : UserControl
             SetTip(TranscribeButton, Loc.T(c.HasAudio ? "Transcribe this conversation" : "Audio has been removed"), ref _transcribeTip);
         }
     }
+
+    /// <summary>
+    /// macOS CardActivity, most important first: a transcription (queued, running or in the Stop sequence), then the AI
+    /// job. Read from <see cref="AppViewModel.AIJobs"/> only, never the streamed text, so answers do not redraw the cards.
+    /// </summary>
+    private enum Activity { Transcribing, Summarizing, Answering, Queued }
+
+    /// <summary>The activity on the icon's corner, its text as tooltip and name; hidden without one.</summary>
+    private void UpdateBadge(Conversation c)
+    {
+        Activity? activity = _model.TranscriptionProgress.TryGetValue(c.Id, out var progress) && progress.Step != JobStep.NeedsModel
+            || IsAboutToTranscribe(c)
+            ? Activity.Transcribing
+            : AIJobActivity(c.Id);
+        ActivityBadge.Visibility = Shown(activity is not null);
+        if (activity is not { } shown) return;
+        ActivityGlyph.Glyph = shown switch
+        {
+            Activity.Transcribing => "\uE720",
+            Activity.Summarizing => "\uE945",
+            Activity.Answering => "\uE8BD",
+            _ => "\uE823",
+        };
+        var text = ActivityText(shown);
+        if (text == _badgeTip) return;
+        SetTip(ActivityBadge, text, ref _badgeTip);
+        AutomationProperties.SetName(ActivityBadge, text);
+        AutomationProperties.SetName(ActivityGlyph, text);
+    }
+
+    /// <summary>
+    /// macOS isAboutToTranscribe: still in the Stop sequence with no job yet, and an automatic transcription about to
+    /// run; not compressing (the badge says so), nor a failed recording (never transcribed), nor transcribed already.
+    /// </summary>
+    private bool IsAboutToTranscribe(Conversation c) =>
+        !_model.TranscriptionProgress.ContainsKey(c.Id) && _model.IsTranscribing(c.Id) && _model.Settings.AutoTranscribe
+        && c.Status is not (ConversationStatus.Compressing or ConversationStatus.Failed) && !c.HasTranscript;
+
+    /// <summary>The conversation's summary or question job: "Queued" behind another in-app job first; null without one.</summary>
+    private Activity? AIJobActivity(Guid id)
+    {
+        if (_model.AIJobs.EntryFor(id) is not { } entry) return null;
+        if (_model.AIJobs.IsQueued(id)) return Activity.Queued;
+        return entry.Kind switch
+        {
+            AIJobTable.Kind.Summary => Activity.Summarizing,
+            AIJobTable.Kind.Question => Activity.Answering,
+            _ => null,
+        };
+    }
+
+    private static string ActivityText(Activity activity) => activity switch
+    {
+        Activity.Transcribing => Loc.T("Transcribing…"),
+        Activity.Summarizing => Loc.T("Summarizing…"),
+        Activity.Answering => Loc.T("Answering…"),
+        _ => Loc.T("Queued"),
+    };
 
     internal static string StepTitle(JobStep step) => step switch
     {

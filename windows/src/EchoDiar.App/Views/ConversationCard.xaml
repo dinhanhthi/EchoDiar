@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!--
-    One conversation of the library (macOS ConversationCard.swift): the source icon, the title (double-click to rename),
+    One conversation of the library (macOS ConversationCard.swift): the source icon with its activity badge, the title (double-click to rename),
     the source app's name, the date, duration, size, status pill and "Audio has been removed" marker, the reason of a
     failed transcription, then a row with the transcription progress or its action. The actions are in the context
     menu and the detail. A Fluent card (card fill and stroke, overlay corners) in theme resources (Light and Dark), in
@@ -52,6 +52,26 @@
                     FontSize="18"
                     Foreground="{ThemeResource TextFillColorSecondaryBrush}"
                     Glyph="&#xE8D6;" />
+                <!--
+                    macOS ActivityBadge: what the card is busy with on the icon's corner, an overlay that never moves the
+                    row. Static (no blink); hit-testable only for its tooltip, the click still reaches the card.
+                -->
+                <Border
+                    x:Name="ActivityBadge"
+                    Width="16"
+                    Height="16"
+                    Margin="0,0,-4,-4"
+                    HorizontalAlignment="Right"
+                    VerticalAlignment="Bottom"
+                    Background="{ThemeResource AccentFillColorDefaultBrush}"
+                    CornerRadius="8"
+                    Visibility="Collapsed">
+                    <FontIcon
+                        x:Name="ActivityGlyph"
+                        FontFamily="{ThemeResource SymbolThemeFontFamily}"
+                        FontSize="10"
+                        Foreground="{ThemeResource TextOnAccentFillColorPrimaryBrush}" />
+                </Border>
             </Grid>
 
             <StackPanel Grid.Column="1" Spacing="4">

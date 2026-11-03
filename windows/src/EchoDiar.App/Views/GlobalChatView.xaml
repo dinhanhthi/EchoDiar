@@ -186,35 +186,9 @@
                 TextWrapping="Wrap"
                 Visibility="Collapsed" />
 
-            <!-- A job of a conversation, the index's progress, the menus, the question, the setup hints. -->
+            <!-- The index's progress, the menus, the question, the setup hints. -->
             <Border Grid.Row="2" Padding="14,10" Style="{StaticResource PaneStyle}">
                 <StackPanel Spacing="8">
-                    <Grid x:Name="BusyRow" ColumnSpacing="6" Visibility="Collapsed">
-                        <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="Auto" />
-                            <ColumnDefinition Width="*" />
-                            <ColumnDefinition Width="Auto" />
-                        </Grid.ColumnDefinitions>
-                        <ProgressRing
-                            Width="14"
-                            Height="14"
-                            MinWidth="0"
-                            MinHeight="0"
-                            IsActive="True" />
-                        <TextBlock
-                            x:Name="BusyText"
-                            Grid.Column="1"
-                            VerticalAlignment="Center"
-                            Style="{StaticResource CaptionStyle}"
-                            MaxLines="1"
-                            TextTrimming="CharacterEllipsis"
-                            TextWrapping="NoWrap" />
-                        <Button
-                            x:Name="BusyStopButton"
-                            Grid.Column="2"
-                            Content="{local:T Text='Stop'}" />
-                    </Grid>
-
                     <!-- While the index is built or still empty: how far it is, or why it waits. Asking stays allowed. -->
                     <Grid x:Name="IndexingRow" ColumnSpacing="6" Visibility="Collapsed">
                         <Grid.ColumnDefinitions>
