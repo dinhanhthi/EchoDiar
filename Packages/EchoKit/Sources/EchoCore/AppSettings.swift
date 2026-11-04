@@ -119,6 +119,12 @@ public struct AppSettings: Codable, Equatable, Sendable {
     /// `migratingProviderAvailability()` ran. A fresh install (the init's default) has nothing to migrate, so new
     /// users get automatic picks once they save a key; a file from an older build (key missing) decodes as false.
     public var providerAvailabilityMigrated: Bool
+    /// What the live transcript shows while recording when the default transcription engine is a cloud one.
+    public var cloudLiveSource: CloudLiveSource
+    /// Catalog id of the local model for `cloudLiveSource == .local` (display only); nil = the catalog default.
+    public var cloudLiveModelID: String?
+    /// With `cloudLiveSource == .realtime`, keep the realtime transcript as the final one instead of a cloud batch.
+    public var realtimeAsFinal: Bool
 
     public static let defaultEmbeddingModelID = "mlx-qwen3-embedding-0.6b"
 
@@ -177,7 +183,10 @@ public struct AppSettings: Codable, Equatable, Sendable {
         globalPauseHotKey: HotKey = .defaultPause,
         globalPauseHotKeyEnabled: Bool = true,
         autoExcludedProviderIDs: Set<String> = [],
-        providerAvailabilityMigrated: Bool = true
+        providerAvailabilityMigrated: Bool = true,
+        cloudLiveSource: CloudLiveSource = .off,
+        cloudLiveModelID: String? = nil,
+        realtimeAsFinal: Bool = false
     ) {
         self.launchAtLogin = launchAtLogin
         self.defaultLanguage = defaultLanguage
@@ -234,6 +243,9 @@ public struct AppSettings: Codable, Equatable, Sendable {
         self.globalPauseHotKeyEnabled = globalPauseHotKeyEnabled
         self.autoExcludedProviderIDs = autoExcludedProviderIDs
         self.providerAvailabilityMigrated = providerAvailabilityMigrated
+        self.cloudLiveSource = cloudLiveSource
+        self.cloudLiveModelID = cloudLiveModelID
+        self.realtimeAsFinal = realtimeAsFinal
     }
 
     public static let autoDeleteDaysRange = 1...3650
@@ -259,6 +271,7 @@ public struct AppSettings: Codable, Equatable, Sendable {
         case autoDeleteEnabled, autoDeleteAfterDays, autoDeleteMode, deleteAudioAfterTranscription
         case deleteWithoutConfirmation, globalHotKey, globalHotKeyEnabled, globalPauseHotKey, globalPauseHotKeyEnabled
         case autoExcludedProviderIDs, providerAvailabilityMigrated
+        case cloudLiveSource, cloudLiveModelID, realtimeAsFinal
     }
 
     public init(from decoder: Decoder) throws {
@@ -333,6 +346,9 @@ public struct AppSettings: Codable, Equatable, Sendable {
             Set<String>.self, forKey: .autoExcludedProviderIDs) ?? []
         providerAvailabilityMigrated = try container.decodeIfPresent(
             Bool.self, forKey: .providerAvailabilityMigrated) ?? false
+        cloudLiveSource = try container.decodeIfPresent(CloudLiveSource.self, forKey: .cloudLiveSource) ?? .off
+        cloudLiveModelID = try container.decodeIfPresent(String.self, forKey: .cloudLiveModelID)
+        realtimeAsFinal = try container.decodeIfPresent(Bool.self, forKey: .realtimeAsFinal) ?? false
     }
 
     /// One-time move to "key saved = available" for cloud providers (settings only, no Keychain read). Every cloud
@@ -394,6 +410,21 @@ public enum PlaybackChannels: String, Codable, Sendable {
     /// An unrecognized raw value (written by another build) falls back to `mixed`.
     public init(from decoder: Decoder) throws {
         self = PlaybackChannels(rawValue: try decoder.singleValueContainer().decode(String.self)) ?? .mixed
+    }
+}
+
+/// Where the live transcript comes from while recording with a cloud default transcription engine.
+public enum CloudLiveSource: String, Codable, Sendable {
+    /// No live transcript.
+    case off
+    /// A local model, display only; the cloud batch still writes the transcript.
+    case local
+    /// The default provider's realtime WebSocket.
+    case realtime
+
+    /// An unrecognized raw value (written by another build) falls back to `off`.
+    public init(from decoder: Decoder) throws {
+        self = CloudLiveSource(rawValue: try decoder.singleValueContainer().decode(String.self)) ?? .off
     }
 }
 

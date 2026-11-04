@@ -489,8 +489,8 @@ final class AppModel {
             // Before the engine starts: it reads the sink once at start, and the model loads meanwhile. Same
             // `language` as the engine's first marker, so the prior's engine is the one the Stop job resolves to.
             // A previous recording's captions, kept while its Stop sequence runs, are not this one's.
-            if let transcriber = startRecordingTranscriber(language: language) {
-                attach(transcriber)
+            if let (transcriber, placeholder) = startRecordingTranscriber(language: language) {
+                attach(transcriber, placeholder: placeholder)
             } else {
                 recordingCaptions = nil
             }
@@ -542,10 +542,11 @@ final class AppModel {
 
     /// Connects the recording's transcriber to the engine's sink and publishes its updates to `recordingCaptions`
     /// while it is `recordingTranscriber` (the Stop sequence clears it first, so a late snapshot is dropped).
-    private func attach(_ transcriber: RecordingTranscriber) {
+    /// `placeholder` is shown until its first snapshot.
+    private func attach(_ transcriber: RecordingTranscriber, placeholder: RecordingTranscriber.Snapshot) {
         engine.liveSink = { transcriber.append(interleaved: $0, frames: $1, channels: $2) }
         recordingTranscriber = transcriber
-        recordingCaptions = RecordingTranscriber.Snapshot(state: .loading)
+        recordingCaptions = placeholder
         Task { [weak self] in
             for await snapshot in transcriber.updates {
                 guard let self, recordingTranscriber === transcriber else { return }
@@ -555,26 +556,69 @@ final class AppModel {
     }
 
     /// A started transcriber for a recording in `language` ("auto" or a code; the language markers once the engine
-    /// runs), its model loading meanwhile; nil unless auto-transcribe and "Transcribe while recording" are on, the
-    /// default engines are local and the engine the Stop job resolves to (as `submitTranscription` does) is an
-    /// installed WhisperKit or Parakeet entry, or Apple Speech on macOS 26+ (its folder is the models root, unused).
+    /// runs), its model loading meanwhile, and the snapshot to show until its first one; nil unless auto-transcribe
+    /// and "Transcribe while recording" are on and either
+    /// - the default engines are local and the engine the Stop job resolves to (as `submitTranscription` does) is an
+    ///   installed WhisperKit or Parakeet entry, or Apple Speech on macOS 26+ (its folder is the models root, unused);
+    /// - or the default ASR is a cloud engine (confirmed or not: nothing leaves the Mac) with the live source "local
+    ///   model": `cloudLiveEntry`, display only (`finish()` returns nil at once, so the cloud batch writes the
+    ///   transcript with no prior). "Realtime" is not wired yet and shows nothing, like "off".
+    /// Settings are read here, so a change during a recording applies from the next one.
     /// The caller sets `engine.liveSink` to its `append` before `engine.start` (the writer reads the sink once), calls
     /// `flush()` after a pause and `finish()` after the `.idle` snapshot.
-    func startRecordingTranscriber(language: String) -> RecordingTranscriber? {
-        guard settings.autoTranscribe, settings.transcribeWhileRecording, autoEngine() == .local else { return nil }
+    func startRecordingTranscriber(
+        language: String
+    ) -> (transcriber: RecordingTranscriber, placeholder: RecordingTranscriber.Snapshot)? {
+        guard settings.autoTranscribe, settings.transcribeWhileRecording else { return nil }
         let isUsable = { [modelStore] (entry: ModelEntry) in TranscriptionPipeline.isUsable(entry, in: modelStore) }
-        let preferred = TranscriptionPipeline.preferredEngineID(
-            settings.defaultASRModelID, language: language, isUsable: isUsable)
-        guard let entry = TranscriptionPipeline.incrementalEntry(
-                  engineID: preferred, language: language, isUsable: isUsable),
+        let found: ModelEntry?
+        let displayOnly: Bool
+        if autoEngine() == .local {
+            let preferred = TranscriptionPipeline.preferredEngineID(
+                settings.defaultASRModelID, language: language, isUsable: isUsable)
+            found = TranscriptionPipeline.incrementalEntry(engineID: preferred, language: language, isUsable: isUsable)
+            displayOnly = false
+        } else if defaultASRIsCloud, settings.cloudLiveSource == .local {
+            found = cloudLiveEntry(language: language, isUsable: isUsable)
+            displayOnly = true
+        } else {
+            return nil
+        }
+        guard let entry = found,
               let folder = modelStore.folder(for: entry.id) ?? (entry.repo == nil ? modelStore.root : nil)
         else { return nil }
         let transcriber = RecordingTranscriber(
             entry: entry, folder: folder, gate: modelGate, idleRelease: .seconds(settings.modelIdleMinutes * 60),
-            deferWhenConstrained: settings.deferTranscriptionWhenConstrained
+            deferWhenConstrained: settings.deferTranscriptionWhenConstrained, displayOnly: displayOnly
         ) { [engine] in engine.currentLanguage() ?? language }
         Task { await transcriber.start() }
-        return transcriber
+        let appleSpeech = entry.runtime == .appleSpeech
+        let placeholder = RecordingTranscriber.Snapshot(
+            state: .loading, source: appleSpeech ? .appleSpeech : .chunks, displayOnly: displayOnly || appleSpeech)
+        return (transcriber, placeholder)
+    }
+
+    /// The default ASR is an available cloud engine: the Stop job uploads (after a confirmation when pending).
+    private var defaultASRIsCloud: Bool {
+        guard let providerID = CloudTranscription.providerID(engineID: settings.defaultASRModelID) else { return false }
+        return cloudEngineConfigs.contains { $0.id == providerID }
+    }
+
+    /// The local model of a display-only live transcript in cloud mode: the picked `cloudLiveModelID` (nil = the
+    /// catalog default) when `incrementalEntry` accepts it for `language`; else (uninstalled, a language fallback, or
+    /// a default that is no live model) the first live entry it accepts; nil when none is.
+    private func cloudLiveEntry(language: String, isUsable: (ModelEntry) -> Bool) -> ModelEntry? {
+        if let entry = TranscriptionPipeline.incrementalEntry(
+            engineID: settings.cloudLiveModelID, language: language, isUsable: isUsable) {
+            return entry
+        }
+        for candidate in TranscriptionPipeline.liveEntries(isUsable: isUsable) {
+            if let entry = TranscriptionPipeline.incrementalEntry(
+                engineID: candidate.id, language: language, isUsable: isUsable) {
+                return entry
+            }
+        }
+        return nil
     }
 
     func stopRecording() {
@@ -729,6 +773,7 @@ final class AppModel {
                             self.compressionJobs += 1
                             defer { self.compressionJobs -= 1 }
                             // Unloads its model before the job may load one, so two never sit side by side.
+                            // Display only (Apple Speech, local live in cloud mode): nil at once, no drain.
                             let prior = await transcriber.finish()
                             if let folder { await self.finishRecording(folder, prior: prior) }
                         } else if let folder {
@@ -2354,7 +2399,7 @@ extension AppModel {
         // The recording transcriber, as a recording in `language` starts it.
         var transcriber: RecordingTranscriber?
         if incremental == "on" {
-            guard let started = startRecordingTranscriber(language: language) else {
+            guard let started = startRecordingTranscriber(language: language)?.transcriber else {
                 fail("error: \(engine) does not transcribe while recording (not an installed WhisperKit or Parakeet "
                     + "model, or Apple Speech on macOS 26+, usable for \(language) without a fallback)")
             }

@@ -76,3 +76,110 @@ private struct STTResponse: Decodable {
     var duration: Double?
     var words: [Word]?
 }
+
+extension XAITranscriber {
+    /// Streaming `wss://api.x.ai/v1/stt?...` (settings in the query, no start message), `Authorization: Bearer`
+    /// handshake header, binary 16 kHz PCM frames. `transcript.created` starts: audio waits for it. A
+    /// `transcript.partial` with `is_final:false` is a partial; with `is_final:true` its words become finals
+    /// (integer speakers with `diarize`), except the words a `speech_final` repeats from the chunk finals before it:
+    /// only words that start after the last final word are new. `finalize` forces an utterance final; `audio.done`
+    /// ends (answered by `transcript.done`, then the close). No keep-alive documented.
+    public struct Realtime: RealtimeAdapter {
+        public static let models = ["grok-voice-transcribe-2.0"]
+        public static let endpoint = URL(string: "wss://api.x.ai/v1/stt")!
+
+        public let model: String
+        private let apiKey: String
+        private let language: String?
+        private let diarize: Bool
+        /// Start of the last word emitted as final; repeated words start at or before it.
+        private var lastFinalStart = -Double.infinity
+
+        public init(apiKey: String, model: String, language: String?, diarize: Bool) {
+            self.apiKey = apiKey
+            self.model = model
+            self.language = CloudTranscription.languageCode(language)
+            self.diarize = diarize
+        }
+
+        public var streamsSpeakers: Bool { diarize }
+        public var headers: [String: String] { ["Authorization": "Bearer \(apiKey)"] }
+
+        public func socketURL(sessionAnswer: Data?) throws -> URL {
+            var query = [
+                URLQueryItem(name: "model", value: model),
+                URLQueryItem(name: "sample_rate", value: String(sampleRate)),
+                URLQueryItem(name: "encoding", value: "pcm"),
+                URLQueryItem(name: "interim_results", value: "true"),
+            ]
+            if let language { query.append(URLQueryItem(name: "language", value: language)) }
+            if diarize { query.append(URLQueryItem(name: "diarize", value: "true")) }
+            return Self.endpoint.appending(queryItems: query)
+        }
+
+        public mutating func finalize(at streamSeconds: Double) -> [RealtimeMessage] {
+            [.text(#"{"type":"finalize"}"#)]
+        }
+
+        public mutating func closeMessages() -> [RealtimeMessage] {
+            [.text(#"{"type":"audio.done"}"#)]
+        }
+
+        public mutating func parse(_ message: RealtimeMessage) throws -> [RealtimeEvent] {
+            guard let live = try CloudRealtime.decode(LiveTranscript.self, from: message) else { return [] }
+            switch live.type {
+            case "transcript.created":
+                return [.started(expiresAt: nil)]
+            case "transcript.partial" where live.isFinal != true:
+                let text = live.text?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+                guard !text.isEmpty else { return [] }
+                let start = live.start ?? live.words?.first?.start
+                let end = start.flatMap { start in live.duration.map { start + $0 } } ?? live.words?.last?.end
+                return [.partial(text: text, start: start, end: end, speaker: live.words?.first?.speaker.map(String.init))]
+            case "transcript.partial":
+                return finals(live)
+            case "transcript.done":
+                return finals(live) + [.ended]
+            case "error":
+                return [.failed(kind: CloudRealtime.errorKind(live.type))]
+            default:
+                return []
+            }
+        }
+
+        /// The new words of a final (by start time) grouped into segments; a chunk final without words is its text
+        /// over `start...start+duration`.
+        private mutating func finals(_ live: LiveTranscript) -> [RealtimeEvent] {
+            let fresh = (live.words ?? []).filter { $0.start > lastFinalStart }
+            if let last = fresh.map(\.start).max() { lastFinalStart = last }
+            let words = fresh.map {
+                CloudTranscription.Word(start: $0.start, end: $0.end, text: $0.text, speaker: $0.speaker.map(String.init))
+            }
+            if !words.isEmpty {
+                return CloudTranscription.segments(from: words, separator: " ", language: nil).map { .final($0) }
+            }
+            let text = live.text?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+            guard live.type == "transcript.partial", live.speechFinal != true, live.words?.isEmpty ?? true, !text.isEmpty,
+                  let start = live.start, start > lastFinalStart else { return [] }
+            lastFinalStart = start
+            return [.final(CloudSegment(start: start, end: start + (live.duration ?? 0), text: text))]
+        }
+    }
+}
+
+private struct LiveTranscript: Decodable {
+    struct Word: Decodable {
+        var text: String
+        var start: Double
+        var end: Double
+        var speaker: Int?
+    }
+
+    var type: String?
+    var text: String?
+    var words: [Word]?
+    var isFinal: Bool?
+    var speechFinal: Bool?
+    var start: Double?
+    var duration: Double?
+}

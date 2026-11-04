@@ -112,3 +112,146 @@ private struct TranscriptionResponse: Decodable {
     var language: String?
     var segments: [Segment]?
 }
+
+extension OpenAICompatibleTranscriber {
+    /// OpenAI realtime transcription (the `openai` preset only): `wss://api.openai.com/v1/realtime?intent=transcription`,
+    /// `Authorization: Bearer` handshake header, a `session.update` start message (24 kHz `audio/pcm`, the model,
+    /// manual commits: `turn_detection` null), audio as base64 in `input_audio_buffer.append` JSON frames at
+    /// **24 kHz**. There are no word or segment times: `finalize(at:)` commits the audio since the last commit and
+    /// remembers that stretch of stream time; `committed` ties it to an `item_id`, and that item's `completed`
+    /// transcript is the final over the stretch (turns may complete out of order). Deltas accumulate per item into
+    /// partials without times. No speakers. `session.created` starts (its `expires_at` caps the session). No close
+    /// message: `closeMessages` commits the rest (by the audio framed) and `ended` follows the last pending
+    /// transcript; `isDrained` says so at once when nothing is left to commit or wait for.
+    public struct Realtime: RealtimeAdapter {
+        /// The default's `session.update` body is documented (`languages`, `delay`); the others get the generic
+        /// `language` field (not verified for them).
+        public static let models = ["gpt-live-transcribe", "gpt-transcribe", "gpt-realtime-whisper"]
+        public static let endpoint = URL(string: "wss://api.openai.com/v1/realtime")!
+        /// OpenAI refuses a commit of less than 100 ms of audio.
+        static let minimumCommit = 0.1
+
+        public let model: String
+        private let apiKey: String
+        private let language: String?
+        /// Stream seconds framed so far, and where the last commit ended.
+        private var framedSeconds = 0.0
+        private var committedThrough = 0.0
+        /// Commits not yet acknowledged, oldest first, then the acknowledged ones by item.
+        private var pendingSpans: [ClosedRange<Double>] = []
+        private var spans: [String: ClosedRange<Double>] = [:]
+        private var deltas: [String: String] = [:]
+        private var closing = false
+
+        public init(apiKey: String, model: String, language: String?, diarize: Bool) {
+            self.apiKey = apiKey
+            self.model = model
+            self.language = CloudTranscription.languageCode(language)
+        }
+
+        public var sampleRate: Int { 24_000 }
+        public var headers: [String: String] { ["Authorization": "Bearer \(apiKey)"] }
+
+        public func socketURL(sessionAnswer: Data?) throws -> URL {
+            Self.endpoint.appending(queryItems: [URLQueryItem(name: "intent", value: "transcription")])
+        }
+
+        /// `gpt-live-transcribe` takes `languages` and `delay`; another model gets the generic `language`.
+        public func startMessages() throws -> [RealtimeMessage] {
+            var transcription: [String: Any] = ["model": model]
+            if model == Self.models[0] {
+                transcription["delay"] = "low"
+                if let language { transcription["languages"] = [language] }
+            } else if let language {
+                transcription["language"] = language
+            }
+            let input: [String: Any] = [
+                "format": ["type": "audio/pcm", "rate": sampleRate],
+                "transcription": transcription,
+                "turn_detection": NSNull(),
+            ]
+            return [try CloudRealtime.json([
+                "type": "session.update",
+                "session": ["type": "transcription", "audio": ["input": input]],
+            ])]
+        }
+
+        public mutating func frame(_ pcm: Data) -> RealtimeMessage {
+            framedSeconds += Double(pcm.count / 2) / Double(sampleRate)
+            return .text(#"{"type":"input_audio_buffer.append","audio":"\#(pcm.base64EncodedString())"}"#)
+        }
+
+        /// Nothing when under 100 ms of audio came since the last commit (an empty commit is an error).
+        public mutating func finalize(at streamSeconds: Double) -> [RealtimeMessage] {
+            guard streamSeconds - committedThrough >= Self.minimumCommit else { return [] }
+            pendingSpans.append(committedThrough...streamSeconds)
+            committedThrough = streamSeconds
+            return [.text(#"{"type":"input_audio_buffer.commit"}"#)]
+        }
+
+        public mutating func closeMessages() -> [RealtimeMessage] {
+            closing = true
+            return finalize(at: framedSeconds)
+        }
+
+        /// Closing, and every commit has its transcript (or failed).
+        public var isDrained: Bool { closing && pendingSpans.isEmpty && spans.isEmpty }
+
+        public mutating func parse(_ message: RealtimeMessage) throws -> [RealtimeEvent] {
+            guard let live = try CloudRealtime.decode(LiveEvent.self, from: message) else { return [] }
+            switch live.type {
+            case "session.created":
+                return [.started(expiresAt: live.session?.expiresAt.map { Date(timeIntervalSince1970: $0) })]
+            case "input_audio_buffer.committed":
+                guard let item = live.itemId, !pendingSpans.isEmpty else { return [] }
+                spans[item] = pendingSpans.removeFirst()
+                return []
+            case "conversation.item.input_audio_transcription.delta":
+                guard let item = live.itemId, let delta = live.delta else { return [] }
+                let text = (deltas[item] ?? "") + delta
+                deltas[item] = text
+                let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
+                return trimmed.isEmpty ? [] : [.partial(text: trimmed, start: nil, end: nil, speaker: nil)]
+            case "conversation.item.input_audio_transcription.completed":
+                guard let item = live.itemId else { return [] }
+                deltas[item] = nil
+                var events: [RealtimeEvent] = []
+                let text = live.transcript?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+                if let span = spans.removeValue(forKey: item), !text.isEmpty {
+                    events.append(.final(CloudSegment(start: span.lowerBound, end: span.upperBound, text: text)))
+                }
+                return events + endedIfDone()
+            case "conversation.item.input_audio_transcription.failed":
+                if let item = live.itemId {
+                    deltas[item] = nil
+                    spans[item] = nil
+                }
+                return [.failed(kind: CloudRealtime.errorKind(live.error?.code ?? live.type))]
+            case "error":
+                return [.failed(kind: CloudRealtime.errorKind(live.error?.code ?? live.error?.type ?? live.type))]
+            default:
+                return []
+            }
+        }
+
+        /// `ended` once closing and every commit has its transcript.
+        private func endedIfDone() -> [RealtimeEvent] {
+            isDrained ? [.ended] : []
+        }
+    }
+}
+
+private struct LiveEvent: Decodable {
+    struct Session: Decodable { var expiresAt: Double? }
+    struct Failure: Decodable {
+        var type: String?
+        var code: String?
+    }
+
+    var type: String?
+    var session: Session?
+    var itemId: String?
+    var delta: String?
+    var transcript: String?
+    var error: Failure?
+}

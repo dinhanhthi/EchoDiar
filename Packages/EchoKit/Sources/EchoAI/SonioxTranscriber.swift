@@ -182,3 +182,118 @@ private struct TranscriptResponse: Decodable {
 
     var tokens: [Token]?
 }
+
+extension SonioxTranscriber {
+    /// Realtime `wss://stt-rt.soniox.com/transcribe-websocket`, `Authorization: Bearer` handshake header (the start
+    /// message's `api_key` is deprecated), a JSON start message (model, raw pcm_s16le 16 kHz mono, language hints,
+    /// speaker diarization, language identification, endpoint detection), binary audio frames. Each answer re-sends
+    /// the non-final tokens and adds new final ones once; tokens are sub-words with their own spacing, times in ms.
+    /// Final tokens are held until a segment is complete (a later segment began, or an `<end>` / `<fin>` marker or
+    /// the end of the stream), so a word is never split across finals; the partial is the held text plus the
+    /// non-final tokens. Speakers `1`, `2`, ... `finalize` flushes, an empty text frame ends (answered by
+    /// `finished`, then the close), `keepalive` every 10 s while no audio flows (Soniox closes after 20 s). No ready
+    /// message: the session accepts audio once connected.
+    public struct Realtime: RealtimeAdapter {
+        public static let models = ["stt-rt-v6"]
+        public static let endpoint = URL(string: "wss://stt-rt.soniox.com/transcribe-websocket")!
+
+        public let model: String
+        private let apiKey: String
+        private let language: String?
+        private let diarize: Bool
+        /// Final tokens not emitted yet, and the first language among them.
+        private var held: [CloudTranscription.Word] = []
+        private var heldLanguage: String?
+
+        public init(apiKey: String, model: String, language: String?, diarize: Bool) {
+            self.apiKey = apiKey
+            self.model = model
+            self.language = CloudTranscription.languageCode(language)
+            self.diarize = diarize
+        }
+
+        public var streamsSpeakers: Bool { diarize }
+        public var headers: [String: String] { ["Authorization": "Bearer \(apiKey)"] }
+        public var keepAlive: RealtimeKeepAlive? { RealtimeKeepAlive(message: .text(#"{"type":"keepalive"}"#), interval: .seconds(10)) }
+
+        public func socketURL(sessionAnswer: Data?) throws -> URL { Self.endpoint }
+
+        public func startMessages() throws -> [RealtimeMessage] {
+            var config: [String: Any] = [
+                "model": model, "audio_format": "pcm_s16le", "sample_rate": sampleRate, "num_channels": 1,
+                "enable_speaker_diarization": diarize, "enable_language_identification": true,
+                "enable_endpoint_detection": true,
+            ]
+            if let language { config["language_hints"] = [language] }
+            return [try CloudRealtime.json(config)]
+        }
+
+        public mutating func finalize(at streamSeconds: Double) -> [RealtimeMessage] {
+            [.text(#"{"type":"finalize"}"#)]
+        }
+
+        public mutating func closeMessages() -> [RealtimeMessage] {
+            [.text("")]
+        }
+
+        public mutating func parse(_ message: RealtimeMessage) throws -> [RealtimeEvent] {
+            guard let live = try CloudRealtime.decode(LiveResponse.self, from: message) else { return [] }
+            if live.errorCode != nil || live.errorType != nil {
+                return [.failed(kind: CloudRealtime.errorKind(live.errorType ?? live.errorCode.map(String.init)))]
+            }
+            var flush = live.finished == true
+            var pending: [LiveResponse.Token] = []
+            for token in live.tokens ?? [] {
+                if Self.markers.contains(token.text) {
+                    flush = flush || token.isFinal == true
+                } else if token.isFinal == true {
+                    let start = token.startMs.map { $0 / 1000 } ?? held.last?.end ?? 0
+                    held.append(.init(start: start, end: token.endMs.map { $0 / 1000 } ?? start, text: token.text, speaker: token.speaker))
+                    heldLanguage = heldLanguage ?? token.language
+                } else {
+                    pending.append(token)
+                }
+            }
+            var events = emitHeld(all: flush).map { RealtimeEvent.final($0) }
+            let text = (held.map(\.text) + pending.map(\.text)).joined().trimmingCharacters(in: .whitespacesAndNewlines)
+            if !text.isEmpty {
+                let start = held.first?.start ?? pending.first?.startMs.map { $0 / 1000 }
+                let end = pending.last?.endMs.map { $0 / 1000 } ?? held.last?.end
+                events.append(.partial(text: text, start: start, end: end, speaker: held.first?.speaker ?? pending.first?.speaker))
+            }
+            return live.finished == true ? events + [.ended] : events
+        }
+
+        /// The held tokens' complete segments (all of them with `all`); the last one stays held otherwise.
+        private mutating func emitHeld(all: Bool) -> [CloudSegment] {
+            var segments = CloudTranscription.segments(from: held, separator: "", language: heldLanguage)
+            if all || segments.isEmpty {
+                held = []
+                heldLanguage = nil
+                return segments
+            }
+            let last = segments.removeLast()
+            held = held.filter { $0.start >= last.start }
+            return segments
+        }
+
+        /// End-of-utterance (`<end>`, endpoint detection) and manual-finalize (`<fin>`) markers.
+        private static let markers: Set<String> = ["<end>", "<fin>"]
+    }
+}
+
+private struct LiveResponse: Decodable {
+    struct Token: Decodable {
+        var text: String
+        var startMs: Double?
+        var endMs: Double?
+        var isFinal: Bool?
+        var speaker: String?
+        var language: String?
+    }
+
+    var tokens: [Token]?
+    var finished: Bool?
+    var errorCode: Int?
+    var errorType: String?
+}

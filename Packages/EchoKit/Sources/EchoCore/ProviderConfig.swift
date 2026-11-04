@@ -41,6 +41,9 @@ public struct ProviderConfig: Codable, Equatable, Sendable, Identifiable {
     /// The provider's diarization model id, used when it is the default cloud diarizer; empty = the provider default.
     public var diarizationModel: String
     public var enabled: Bool
+    /// Realtime (WebSocket) model for the live transcript; empty = the provider default. Separate from
+    /// `transcriptionModel`, so a streaming-only batch check never applies to it.
+    public var realtimeModel: String
 
     public init(
         id: String,
@@ -54,7 +57,8 @@ public struct ProviderConfig: Codable, Equatable, Sendable, Identifiable {
         shownModels: [String] = [],
         transcriptionModel: String = "",
         diarizationModel: String = "",
-        enabled: Bool = false
+        enabled: Bool = false,
+        realtimeModel: String = ""
     ) {
         self.id = id
         self.kind = kind
@@ -68,6 +72,7 @@ public struct ProviderConfig: Codable, Equatable, Sendable, Identifiable {
         self.transcriptionModel = transcriptionModel
         self.diarizationModel = diarizationModel
         self.enabled = enabled
+        self.realtimeModel = realtimeModel
     }
 
     /// Tolerant: a missing, malformed or unknown (newer) value falls back to a default instead of failing, so one bad
@@ -88,6 +93,7 @@ public struct ProviderConfig: Codable, Equatable, Sendable, Identifiable {
         transcriptionModel = value(.transcriptionModel) ?? ""
         diarizationModel = value(.diarizationModel) ?? ""
         enabled = value(.enabled) ?? false
+        realtimeModel = value(.realtimeModel) ?? ""
     }
 
     /// A cloud API (every kind but `.local` servers and `.cli` tools): usable once its key is saved, whatever `enabled`

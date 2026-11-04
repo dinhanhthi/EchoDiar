@@ -553,6 +553,13 @@ public actor TranscriptionPipeline {
         return resolved.engineFallback == nil ? entry : nil
     }
 
+    /// The local models a recording transcriber can run, in catalog order, for the cloud live-transcript picker: the
+    /// usable WhisperKit and Parakeet entries, and Apple Speech on macOS 26+ (`transcribesLive`). Any language: the
+    /// picked id still goes through `incrementalEntry` at Start.
+    public static func liveEntries(isUsable: (ModelEntry) -> Bool) -> [ModelEntry] {
+        ModelCatalog.asr.filter { engines[$0.runtime] != nil && isUsable($0) && transcribesLive($0) }
+    }
+
     /// A batch ASR entry that also loads as a `TranscriptionSession`: WhisperKit or Parakeet.
     static func transcribesChunks(_ entry: ModelEntry) -> Bool {
         entry.kind == .asr && (entry.runtime == .whisperKit || entry.runtime == .fluidAudio)

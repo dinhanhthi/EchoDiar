@@ -179,3 +179,109 @@ private struct TranscriptResponse: Decodable {
 
     var results: [Item]?
 }
+
+extension SpeechmaticsTranscriber {
+    /// Realtime `wss://eu.rt.speechmatics.com/v2` (one fixed region), `Authorization: Bearer` handshake header, a
+    /// `StartRecognition` start message (raw pcm_s16le 16 kHz, the model, partials, `max_delay` 2 s, speaker
+    /// diarization with `standard`/`enhanced`), binary audio frames (`AddAudio`), each counted for `EndOfStream`'s
+    /// `last_seq_no`. `RecognitionStarted` starts; `AddPartialTranscript` is a partial, `AddTranscript` finals
+    /// (json-v2 results, read like the batch transcript: punctuation attached, speakers `S1`, `S2`, `UU` = none),
+    /// times in seconds from the stream start. `ForceEndOfUtterance` flushes; `EndOfStream` ends (answered by
+    /// `EndOfTranscript`). Realtime has no automatic language: Auto is refused (except the multilingual `melia`
+    /// models, sent `multi`). Keep-alive is WebSocket ping/pong (3 min idle close), not a message.
+    public struct Realtime: RealtimeAdapter {
+        public static let models = ["enhanced", "standard", "melia-1", "oak-1"]
+        public static let endpoint = URL(string: "wss://eu.rt.speechmatics.com/v2")!
+
+        public let model: String
+        private let apiKey: String
+        private let language: String?
+        private let diarize: Bool
+        /// `AddAudio` frames sent: Speechmatics numbers them from 1.
+        private var framesSent = 0
+
+        public init(apiKey: String, model: String, language: String?, diarize: Bool) {
+            self.apiKey = apiKey
+            self.model = model
+            self.language = CloudTranscription.languageCode(language)
+            self.diarize = diarize
+        }
+
+        /// Only `standard` and `enhanced` label speakers in realtime.
+        public var streamsSpeakers: Bool { diarize && ["standard", "enhanced"].contains(model) }
+        public var headers: [String: String] { ["Authorization": "Bearer \(apiKey)"] }
+
+        public func socketURL(sessionAnswer: Data?) throws -> URL { Self.endpoint }
+
+        public func startMessages() throws -> [RealtimeMessage] {
+            var config: [String: Any] = ["model": model, "enable_partials": true, "max_delay": 2]
+            if model.lowercased().hasPrefix("melia") {
+                config["language"] = "multi"
+                if let language { config["language_hints"] = [language] }
+            } else if let language {
+                config["language"] = language
+            } else {
+                throw LLMError.provider("Speechmatics live transcription needs a language: choose one instead of Auto.")
+            }
+            if streamsSpeakers { config["diarization"] = "speaker" }
+            return [try CloudRealtime.json([
+                "message": "StartRecognition",
+                "audio_format": ["type": "raw", "encoding": "pcm_s16le", "sample_rate": sampleRate],
+                "transcription_config": config,
+            ])]
+        }
+
+        public mutating func frame(_ pcm: Data) -> RealtimeMessage {
+            framesSent += 1
+            return .data(pcm)
+        }
+
+        public mutating func finalize(at streamSeconds: Double) -> [RealtimeMessage] {
+            [.text(#"{"message":"ForceEndOfUtterance"}"#)]
+        }
+
+        public mutating func closeMessages() -> [RealtimeMessage] {
+            [.text(#"{"message":"EndOfStream","last_seq_no":\#(framesSent)}"#)]
+        }
+
+        public mutating func parse(_ message: RealtimeMessage) throws -> [RealtimeEvent] {
+            guard let live = try CloudRealtime.decode(LiveMessage.self, from: message) else { return [] }
+            switch live.message {
+            case "RecognitionStarted":
+                return [.started(expiresAt: nil)]
+            case "AddPartialTranscript":
+                let text = live.metadata?.transcript?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+                guard !text.isEmpty else { return [] }
+                let speaker = live.results?.lazy.compactMap { $0.alternatives?.first?.speaker }.first { $0 != "UU" }
+                return [.partial(text: text, start: live.metadata?.startTime, end: live.metadata?.endTime, speaker: speaker)]
+            case "AddTranscript":
+                return try SpeechmaticsTranscriber.parse(CloudRealtime.payload(message)).map { .final($0) }
+            case "EndOfTranscript":
+                return [.ended]
+            case "Error":
+                return [.failed(kind: CloudRealtime.errorKind(live.type ?? live.message))]
+            default:
+                return []
+            }
+        }
+    }
+}
+
+private struct LiveMessage: Decodable {
+    /// `EndOfUtterance` (the answer to `ForceEndOfUtterance`) has metadata without a transcript.
+    struct Metadata: Decodable {
+        var transcript: String?
+        var startTime: Double?
+        var endTime: Double?
+    }
+
+    struct Result: Decodable {
+        struct Alternative: Decodable { var speaker: String? }
+        var alternatives: [Alternative]?
+    }
+
+    var message: String?
+    var type: String?
+    var metadata: Metadata?
+    var results: [Result]?
+}

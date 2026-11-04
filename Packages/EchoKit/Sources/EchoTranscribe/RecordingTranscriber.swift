@@ -32,11 +32,22 @@ import Synchronization
 /// lives in a system process. Apple live is display only: `finish()` returns nil and batch Apple Speech writes the
 /// transcript after Stop, because the forced finals that bring a line ~0.6 s after a phrase lose words (measured WER
 /// 11.6 % live against 0.8 % batch on the same recording).
+///
+/// `displayOnly` makes the chunk path display only too (a local live transcript while a cloud engine writes the
+/// transcript after Stop): `finish()` then cancels and returns nil at once, as for Apple Speech.
 public actor RecordingTranscriber {
     public enum State: Sendable, Equatable {
         /// `preparing`: Apple Speech is installing a language; its audio waits.
         case loading, preparing, listening, paused
         case failed(String)
+    }
+
+    /// What produces the live text.
+    public enum Source: Sendable, Equatable {
+        /// WhisperKit or Parakeet decoding speech chunks.
+        case chunks
+        /// Apple Speech streaming each channel (macOS 26+).
+        case appleSpeech
     }
 
     public enum Speaker: String, Sendable {
@@ -70,16 +81,22 @@ public actor RecordingTranscriber {
         /// Decoding is held back while the Mac is hot or in Low Power Mode (`deferWhenConstrained`); read at each
         /// publish, so within a tick.
         public var deferred: Bool
+        public var source: Source
+        /// `finish()` returns nil: the live text is not kept, a batch job writes the transcript after Stop (Apple
+        /// Speech always, the chunk path with `displayOnly`).
+        public var displayOnly: Bool
 
         public init(
             state: State, lines: [Line] = [], tentative: [Tentative] = [], pendingSeconds: Double = 0,
-            deferred: Bool = false
+            deferred: Bool = false, source: Source = .chunks, displayOnly: Bool = false
         ) {
             self.state = state
             self.lines = lines
             self.tentative = tentative
             self.pendingSeconds = pendingSeconds
             self.deferred = deferred
+            self.source = source
+            self.displayOnly = displayOnly
         }
     }
 
@@ -135,7 +152,9 @@ public actor RecordingTranscriber {
     private nonisolated let language: @Sendable () -> String?
     /// The Apple Speech streams; nil for WhisperKit and Parakeet.
     private nonisolated let live: Live?
-    private var snapshot = Snapshot(state: .loading)
+    /// `finish()` returns nil without draining: the `displayOnly` parameter, or Apple Speech.
+    private nonisolated let displayOnly: Bool
+    private var snapshot: Snapshot
     private var published: Snapshot?
     private var nextLineID = 0
     /// Every line shown, oldest first, also those the snapshot dropped (`maxLines`): the catch-up's input.
@@ -149,10 +168,11 @@ public actor RecordingTranscriber {
     /// `idleRelease` frees the model once no chunk came for that long (a paused recording) and loads it again for the
     /// next one; nil keeps it until `finish()`. `deferWhenConstrained` stops decoding while the Mac is hot or in Low
     /// Power Mode. Apple Speech ignores both. `language` gives the current marker language ("auto", a BCP-47 code, or
-    /// nil = detect; Apple Speech: the default language), read per block.
+    /// nil = detect; Apple Speech: the default language), read per block. `displayOnly` keeps nothing at Stop
+    /// (`finish()` returns nil at once); Apple Speech always is.
     public init(
         entry: ModelEntry, folder: URL, gate: ModelLoadGate, idleRelease: Duration? = nil,
-        deferWhenConstrained: Bool, language: @escaping @Sendable () -> String?
+        deferWhenConstrained: Bool, displayOnly: Bool = false, language: @escaping @Sendable () -> String?
     ) {
         self.entry = entry
         self.folder = folder
@@ -165,7 +185,11 @@ public actor RecordingTranscriber {
                               shortPauseFrames: Self.liveShortPauseFrames))
         (updates, updatesContinuation) = AsyncStream.makeStream(bufferingPolicy: .bufferingNewest(1))
         (wake, wakeContinuation) = AsyncStream.makeStream(bufferingPolicy: .bufferingNewest(1))
-        live = entry.runtime == .appleSpeech ? Live() : nil
+        let appleSpeech = entry.runtime == .appleSpeech
+        snapshot = Snapshot(state: .loading, source: appleSpeech ? .appleSpeech : .chunks,
+                            displayOnly: displayOnly || appleSpeech)
+        self.displayOnly = displayOnly || appleSpeech
+        live = appleSpeech ? Live() : nil
     }
 
     /// Waits for the model gate, loads the model at `.utility` QoS and starts decoding (Apple Speech: no gate, starts
@@ -219,11 +243,11 @@ public actor RecordingTranscriber {
 
     /// At Stop: decodes what is left (unless the Mac is constrained and `deferWhenConstrained`: then it stays a gap),
     /// unloads the model and returns what was transcribed; nil when no chunk was, or the model never loaded (the
-    /// pipeline then transcribes the whole recording). Apple Speech: see `finishLive`.
+    /// pipeline then transcribes the whole recording). Display only (Apple Speech or `displayOnly`): see `finishLive`.
     public func finish() async -> PriorTranscription? {
         guard !finished else { return nil }
         finished = true
-        if live != nil { return finishLive() }
+        if displayOnly { return finishLive() }
         guard buffer.withLock({ $0.loaded }) else {
             cancel()
             return nil
@@ -253,9 +277,9 @@ public actor RecordingTranscriber {
             duration: duration)
     }
 
-    /// Apple Speech at Stop: always nil (display only; batch Apple Speech writes the transcript). Cancels the runners
-    /// without waiting for them, so it returns at once even with a `finalize(through:)` in flight. `stats.transcribed`
-    /// counts the lines shown, once an analyzer started.
+    /// Display only at Stop: always nil (a batch job writes the transcript). Cancels the runners or the decode task
+    /// without waiting for them, so it returns at once even with a `finalize(through:)` or a chunk decode in flight.
+    /// `stats.transcribed` counts the lines shown, once an analyzer started or the model loaded.
     private func finishLive() -> PriorTranscription? {
         if buffer.withLock({ $0.loaded }) { stats = Stats(transcribed: nextLineID) }
         cancel()
