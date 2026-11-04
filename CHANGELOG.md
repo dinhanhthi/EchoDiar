@@ -7,6 +7,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.4.0] - 2026-11-03
+
+### Added
+
+- Catch up while recording: a "Catch up" button summarizes the meeting so far from the live captions, mostly the last 5 minutes by default, or from the start with a new setting. Each catch-up shows as a card during the recording and is saved with the conversation, then listed read-only under "Catch-ups" in the Summary tab. It only uses a provider outside the app, set in Settings > AI > Catch-up, and says when data leaves the computer.
+- Name a recording while it is recording, and edit the name at any time. The title is suggested from the calendar event that overlaps the recording.
+- A notification when the meeting seems to end, with "Stop now" and "Keep recording"; it can be turned off in the recording settings.
+- A summary, a chat and a transcription can run on different conversations at the same time, each with its own Stop button and activity badge in the sidebar. Cloud transcriptions also run in parallel.
+- Transcript text can be selected across several messages, and live captions can be copied.
+- The transcript bar shows the position and the total duration next to the media track, and has a Summarize button next to Re-transcribe.
+- The menu bar and tray icon keep the logo while transcribing and show a small badge at the bottom right.
+
+### Changed
+
+- Stopping a job now stops only that job, not every running job.
+
+### Fixed
+
+- The active transcript line, the "play from here" menu and live selection work correctly in the Windows transcript. (Windows)
+
 ## [1.3.0] - 2026-10-30
 
 ### Added
