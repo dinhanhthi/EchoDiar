@@ -149,17 +149,18 @@ struct RAGSettingsView: View {
                         Text(AppModel.AIProvider.isLoopback(baseURL: config.baseURL) ? "This Mac" : "Leaves this Mac")
                             .font(.caption)
                             .foregroundStyle(.secondary)
-                    } else {
+                    } else if config.kind == .local {
                         Button("Set Up…") {
                             // Local hosts have a row only once added (scanned or by URL).
-                            if config.kind != .local || model.settings.providers.contains(where: { $0.id == config.id }) {
+                            if model.settings.providers.contains(where: { $0.id == config.id }) {
                                 model.settingsExpandedProvider = config.id
                             }
-                            model.openSettings(tab: .providers, subTab: config.kind == .local ? "onThisMac" : "cloudAPIs")
+                            model.openSettings(tab: .providers, subTab: "onThisMac")
                         }
                         .controlSize(.small)
                         .help("Turn on \(config.displayName) in Settings › AI")
                     }
+                    if config.kind != .local { APIKeyStatus(config: config, model: model) }
                 }
             }
         } header: {

@@ -4,9 +4,9 @@ import EchoTranscribe
 import SwiftUI
 
 /// The Transcription tab, one inner tab per section: the default language with the transcribe-while-recording switch
-/// and deleting the audio after transcription, the transcription models (local by tier, then cloud: the configured
-/// engines and the speech-to-text APIs), and the diarization models (local by tier, then the cloud diarizers), with
-/// Download, Cancel, Delete and Set default. Rows that cannot transcribe the default language are disabled with a note.
+/// and deleting the audio after transcription, the transcription models (local by tier, then the cloud engines with
+/// their models), and the diarization models (local by tier, then the cloud diarizers), with Download, Cancel, Delete
+/// and Set default. Rows that cannot transcribe the default language are disabled with a note.
 struct ModelsSettingsView: View {
     let model: AppModel
 
@@ -22,27 +22,12 @@ struct ModelsSettingsView: View {
     ).filter { $0.kind == .asr || $0.kind == .diarization }
 
     var body: some View {
-        ScrollViewReader { proxy in
-            page
-                // A cloud row's Set Up: the speech-to-text API's row below (which expands itself) comes into view.
-                .onChange(of: model.settingsExpandedProvider, initial: true) { _, id in
-                    guard let id, tab == .transcriptionModels else { return }
-                    Task {
-                        await Task.yield()
-                        withAnimation { proxy.scrollTo(id, anchor: .top) }
-                    }
-                }
-        }
-    }
-
-    private var page: some View {
         VStack(spacing: 0) {
             Form {
                 switch tab {
                 case .general: generalSection
                 case .transcriptionModels:
                     intro("Transcription turns speech into text. The transcription model listens to the recording and writes what was said, with timestamps.")
-                    speechToTextSection
                     tierSections(.asr)
                     cloudSection(diarization: false)
                 case .diarizationModels:
@@ -113,24 +98,10 @@ struct ModelsSettingsView: View {
         }
     }
 
-    /// "Cloud": the model of the default cloud engine (its own box, as it follows the default), then every provider
-    /// that transcribes, with Set default once configured (enabled, with a key and a model) or Set Up. With
-    /// `diarization`, the default cloud diarizer's model and the providers that label speakers (configured: enabled,
-    /// with a key).
-    @ViewBuilder private func cloudSection(diarization: Bool) -> some View {
-        if let config = defaultCloudConfig(diarization: diarization) {
-            Section {
-                CloudModelField(config: config, model: model, diarization: diarization)
-            } header: {
-                cloudHeader(diarization: diarization)
-            }
-            cloudProviders(header: false, diarization: diarization)
-        } else {
-            cloudProviders(header: true, diarization: diarization)
-        }
-    }
-
-    private func cloudProviders(header: Bool, diarization: Bool) -> some View {
+    /// "Cloud": every provider that transcribes, with its model, its key status and Set default once configured
+    /// (available, with a model). With `diarization`, the providers that label speakers, with their diarization model
+    /// (configured: available).
+    private func cloudSection(diarization: Bool) -> some View {
         Section {
             Label(diarization
                   ? "Audio leaves this Mac: the cloud diarizer uploads the system channel to the provider."
@@ -146,7 +117,7 @@ struct ModelsSettingsView: View {
                                diarization: diarization)
             }
         } header: {
-            if header { cloudHeader(diarization: diarization) }
+            cloudHeader(diarization: diarization)
         }
     }
 
@@ -156,27 +127,6 @@ struct ModelsSettingsView: View {
             description: diarization
                 ? "Only the system channel is uploaded, as one extra transcription billed by the provider; only the speaker labels are kept. Not used when the transcription model already labels speakers. Prices are approximate list prices per audio hour."
                 : "Prices are approximate list prices per audio hour; the mic and system channels are sent and billed separately.")
-    }
-
-    /// The provider of the default transcription model (or, with `diarization`, of the default diarizer) when it is a
-    /// configured cloud engine.
-    private func defaultCloudConfig(diarization: Bool) -> ProviderConfig? {
-        let defaultID = diarization ? model.defaultDiarizerModelID : model.defaultASRModelID
-        guard let id = CloudTranscription.providerID(engineID: defaultID) else { return nil }
-        return (diarization ? model.cloudDiarizerConfigs : model.cloudEngineConfigs).first { $0.id == id }
-    }
-
-    /// The speech-to-text APIs' keys and models; the LLM APIs that transcribe too are set up in AI.
-    private var speechToTextSection: some View {
-        Section {
-            ForEach(model.providerConfigs.filter { $0.kind == .speechToText }) { config in
-                SpeechProviderRow(config: config, model: model)
-            }
-        } header: {
-            SectionHeader(
-                title: "Speech-to-text APIs",
-                description: "OpenAI, Groq, Mistral, Google Gemini and custom endpoints transcribe too, with their transcription model: set them up in Settings › AI.")
-        }
     }
 
     /// The offered idle times, plus a hand-edited one, so the picker never shows an empty selection.
@@ -404,8 +354,8 @@ struct ModelRow: View {
 private struct CloudEngineRow: View {
     let config: ProviderConfig
     let model: AppModel
-    /// Enabled, with a key and a model (a key alone with `diarization`): it can be the default. Else Set Up opens where
-    /// it is configured.
+    /// Available, with a model (available alone with `diarization`): it can be the default. Its key is saved in API
+    /// Keys, which "API key" opens.
     let configured: Bool
     /// A cloud diarizer (Diarization models): its diarization model, Default and Set default of the default diarizer.
     var diarization = false
@@ -438,14 +388,11 @@ private struct CloudEngineRow: View {
                     Badge(text: String(localized: "Default"), color: .accentColor, filled: true)
                 }
                 Spacer(minLength: 8)
-                if !configured {
-                    Button("Set Up…", action: setUp)
-                        .controlSize(.small)
-                        .help(setUpHelp)
-                } else if defaultID != engineID {
+                if configured && defaultID != engineID {
                     Button("Set default", action: setDefault)
                         .controlSize(.small)
                 }
+                APIKeyStatus(config: config, model: model)
             }
             HStack(spacing: 4) {
                 Badge(text: String(localized: "Cloud"))
@@ -462,35 +409,26 @@ private struct CloudEngineRow: View {
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
+            CloudModelField(config: config, model: model, diarization: diarization)
+            // A custom endpoint transcribes once its base URL (set in API Keys) and its model are set.
+            if config.preset == nil, config.baseURL.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                Text("Base URL not set")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .inputColumn()
+            }
         }
         .padding(.vertical, 2)
-    }
-
-    private var setUpHelp: LocalizedStringKey {
-        guard config.kind == .speechToText else { return "Turn on \(config.displayName) in Settings › AI" }
-        return diarization
-            ? "Add the key of \(config.displayName) in Transcription models"
-            : "Add the key of \(config.displayName) below"
     }
 
     private func setDefault() {
         if diarization { model.setDefaultDiarizer(engineID) } else { model.setDefaultASRModel(engineID) }
     }
-
-    /// Speech-to-text APIs are set up in their row on the Transcription models page (from Diarization models, that
-    /// page is opened first, so its scroll to the expanded row applies), the LLM APIs in Settings › AI.
-    private func setUp() {
-        if diarization && config.kind == .speechToText {
-            model.openSettings(tab: .transcription, subTab: "transcriptionModels")
-        }
-        model.settingsExpandedProvider = config.id
-        if config.kind != .speechToText { model.openSettings(tab: .providers, subTab: "cloudAPIs") }
-    }
 }
 
-/// The default cloud engine's transcription model: free text, a menu of the known models and, for the APIs that list
-/// their models, "Load models" (only the ones that transcribe). With `diarization`, the default cloud diarizer's
-/// diarization model: only models that label speakers are listed, and a note says when the typed one does not.
+/// A cloud engine's transcription model: free text, a menu of the known models and, for the APIs that list their
+/// models, "Load models" (only the ones that transcribe). With `diarization`, the cloud diarizer's diarization model:
+/// only models that label speakers are listed, and a note says when the typed one does not.
 private struct CloudModelField: View {
     let config: ProviderConfig
     let model: AppModel
@@ -510,17 +448,18 @@ private struct CloudModelField: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 4) {
             if config.preset == "assemblyai" {
-                LabeledContent("Model") {
+                FieldRow("Model") {
                     Text(diarization
                          ? "Picked by AssemblyAI (Universal, speaker labels)"
                          : "Picked by AssemblyAI for the language (Universal)")
                 }
             } else {
-                HStack(spacing: 8) {
+                FieldRow("Model") {
                     TextField("Model", text: Binding(
                         get: { diarization ? config.diarizationModel : config.transcriptionModel },
                         set: { value in setModel(value) }
                     ), prompt: Text(prompt))
+                    .labelsHidden()
                     let known = diarization
                         ? [CloudTranscription.defaultDiarizationModel(for: config)]
                         : Self.knownModels[config.preset ?? ""] ?? []
@@ -540,29 +479,24 @@ private struct CloudModelField: View {
                     }
                 }
                 if let error {
-                    Text(error).font(.caption).foregroundStyle(.red).lineLimit(2)
+                    Text(error).font(.caption).foregroundStyle(.red).lineLimit(2).inputColumn()
                 } else if loaded?.isEmpty == true {
                     Text(diarization
                          ? "No diarization models listed; type the model id."
                          : "No transcription models listed; type the model id.")
-                        .font(.caption).foregroundStyle(.secondary)
+                        .font(.caption).foregroundStyle(.secondary).inputColumn()
                 }
                 // A streaming-only diarization model falls back to this Mac's diarizer: the note below says so.
                 if !diarization, CloudTranscription.isStreamingOnly(CloudTranscription.model(for: config)) {
                     Text("This model only streams live audio and can't transcribe a recording. Pick another model.")
-                        .font(.caption).foregroundStyle(.red)
+                        .font(.caption).foregroundStyle(.red).inputColumn()
                 }
                 if diarization,
                    !CloudTranscription.diarizes(config, model: CloudTranscription.diarizationModel(for: config)) {
                     Text("This model does not label speakers; a model on this Mac is used instead.")
-                        .font(.caption).foregroundStyle(.orange)
+                        .font(.caption).foregroundStyle(.orange).inputColumn()
                 }
             }
-        }
-        // Loaded models belong to the provider they came from.
-        .onChange(of: config.id) {
-            loaded = nil
-            error = nil
         }
     }
 

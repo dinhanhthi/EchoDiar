@@ -82,6 +82,10 @@
     <value>API 密钥</value>
     <comment>API key</comment>
   </data>
+  <data name="APIKeys" xml:space="preserve">
+    <value>API 密钥</value>
+    <comment>API Keys</comment>
+  </data>
   <data name="About" xml:space="preserve">
     <value>关于</value>
     <comment>About</comment>
@@ -1414,6 +1418,10 @@
     <value>从现在起的语言</value>
     <comment>Language from now on</comment>
   </data>
+  <data name="LanguageModels" xml:space="preserve">
+    <value>语言模型</value>
+    <comment>Language models</comment>
+  </data>
   <data name="LanguageOfSummariesAndAnswers" xml:space="preserve">
     <value>摘要和回答的语言</value>
     <comment>Language of summaries and answers</comment>
@@ -2170,6 +2178,10 @@
     <value>在边栏中选择一个对话。</value>
     <comment>Pick a conversation in the sidebar.</comment>
   </data>
+  <data name="PickAProviderInSettingsRAG" xml:space="preserve">
+    <value>在“设置 › RAG”中选择提供商</value>
+    <comment>Pick a provider in Settings › RAG</comment>
+  </data>
   <data name="PickAnEmbeddingModelInSettingsRAG" xml:space="preserve">
     <value>在“设置 › RAG”中选择嵌入模型</value>
     <comment>Pick an embedding model in Settings › RAG</comment>
@@ -2525,6 +2537,10 @@
   <data name="SaveAKeyForInSettingsAI" xml:space="preserve">
     <value>在“设置 › AI”中存储 {0} 的密钥</value>
     <comment>Save a key for %@ in Settings › AI</comment>
+  </data>
+  <data name="SaveAKeyForInSettingsAPIKeys" xml:space="preserve">
+    <value>在“设置 › API 密钥”中存储 {0} 的密钥</value>
+    <comment>Save a key for %@ in Settings › API Keys</comment>
   </data>
   <data name="SaveChangesToARepeatingEvent" xml:space="preserve">
     <value>要存储对重复日程的更改吗？</value>

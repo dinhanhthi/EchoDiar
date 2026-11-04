@@ -82,6 +82,10 @@
     <value>Khoá API</value>
     <comment>API key</comment>
   </data>
+  <data name="APIKeys" xml:space="preserve">
+    <value>Khoá API</value>
+    <comment>API Keys</comment>
+  </data>
   <data name="About" xml:space="preserve">
     <value>Giới thiệu</value>
     <comment>About</comment>
@@ -1414,6 +1418,10 @@
     <value>Ngôn ngữ từ giờ trở đi</value>
     <comment>Language from now on</comment>
   </data>
+  <data name="LanguageModels" xml:space="preserve">
+    <value>Mô hình ngôn ngữ</value>
+    <comment>Language models</comment>
+  </data>
   <data name="LanguageOfSummariesAndAnswers" xml:space="preserve">
     <value>Ngôn ngữ của bản tóm tắt và câu trả lời</value>
     <comment>Language of summaries and answers</comment>
@@ -2170,6 +2178,10 @@
     <value>Hãy chọn một cuộc hội thoại trong thanh bên.</value>
     <comment>Pick a conversation in the sidebar.</comment>
   </data>
+  <data name="PickAProviderInSettingsRAG" xml:space="preserve">
+    <value>Hãy chọn một nhà cung cấp trong Cài đặt › RAG</value>
+    <comment>Pick a provider in Settings › RAG</comment>
+  </data>
   <data name="PickAnEmbeddingModelInSettingsRAG" xml:space="preserve">
     <value>Hãy chọn một mô hình nhúng trong Cài đặt › RAG</value>
     <comment>Pick an embedding model in Settings › RAG</comment>
@@ -2525,6 +2537,10 @@
   <data name="SaveAKeyForInSettingsAI" xml:space="preserve">
     <value>Lưu khoá cho {0} trong Cài đặt › AI</value>
     <comment>Save a key for %@ in Settings › AI</comment>
+  </data>
+  <data name="SaveAKeyForInSettingsAPIKeys" xml:space="preserve">
+    <value>Lưu khoá cho {0} trong Cài đặt › Khoá API</value>
+    <comment>Save a key for %@ in Settings › API Keys</comment>
   </data>
   <data name="SaveChangesToARepeatingEvent" xml:space="preserve">
     <value>Lưu thay đổi cho một sự kiện lặp lại?</value>

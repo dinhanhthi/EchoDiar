@@ -75,7 +75,8 @@ final class AppModel {
     /// The inner tab (its id in `SettingsTab.subTabs`) each Settings section shows; a section missing here shows its
     /// first.
     var settingsSubTabs: [SettingsTab: String] = [:]
-    /// A provider whose row Settings › AI opens and scrolls to (RAG's Set Up); its row clears it once expanded.
+    /// A provider whose row Settings › AI or API Keys opens and scrolls to (RAG's Set Up, `showAPIKey(for:)`); its row
+    /// clears it once expanded.
     var settingsExpandedProvider: String?
     /// Running model downloads, by catalog id.
     private(set) var downloads: [String: ModelDownload] = [:]
@@ -1513,6 +1514,12 @@ final class AppModel {
     func openSettings(tab: SettingsTab?, subTab: String?) {
         openSettings(tab: tab)
         if let subTab { settingsSubTabs[settingsTab] = subTab }
+    }
+
+    /// Settings › API Keys with provider `id`'s card expanded and scrolled to (a model card's "API key" button).
+    func showAPIKey(for id: String) {
+        openSettings(tab: .apiKeys)
+        settingsExpandedProvider = id
     }
 
     /// The inner tab `tab` shows: the one picked last, else its first; nil for a section without tabs.

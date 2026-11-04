@@ -4,7 +4,7 @@ import SwiftUI
 
 /// A sidebar section. Adding one: a case, its row in `label`, its view in `SettingsView.content`.
 enum SettingsTab: CaseIterable, Identifiable {
-    case general, recording, transcription, providers, rag, storage, shortcuts, about, acknowledgements
+    case general, recording, transcription, providers, apiKeys, rag, storage, shortcuts, about, acknowledgements
 
     var id: Self { self }
 
@@ -15,6 +15,7 @@ enum SettingsTab: CaseIterable, Identifiable {
         case .recording: return ("Recording", "record.circle")
         case .transcription: return ("Transcription", "waveform")
         case .providers: return ("AI", "sparkles")
+        case .apiKeys: return ("API Keys", "key")
         case .rag: return ("RAG", "sparkle.magnifyingglass")
         case .storage: return ("Storage", "internaldrive")
         case .shortcuts: return ("Shortcuts", "keyboard")
@@ -35,12 +36,12 @@ enum SettingsTab: CaseIterable, Identifiable {
             [.init(id: "general", title: "General"), .init(id: "transcriptionModels", title: "Transcription model"),
              .init(id: "diarizationModels", title: "Diarization model")]
         case .providers:
-            [.init(id: "onThisMac", title: "On this Mac"), .init(id: "cloudAPIs", title: "Cloud APIs"),
+            [.init(id: "onThisMac", title: "On this Mac"), .init(id: "cloud", title: "Cloud"),
              .init(id: "cli", title: "CLIs")]
         case .storage:
             [.init(id: "usage", title: "Usage"), .init(id: "audio", title: "Audio"),
              .init(id: "autoDelete", title: "Auto-delete")]
-        case .general, .rag, .shortcuts, .about, .acknowledgements:
+        case .general, .apiKeys, .rag, .shortcuts, .about, .acknowledgements:
             []
         }
     }
@@ -142,6 +143,7 @@ struct SettingsView: View {
         case .recording: RecordingSettingsView(model: model)
         case .transcription: ModelsSettingsView(model: model)
         case .providers: ProvidersSettingsView(model: model)
+        case .apiKeys: APIKeysSettingsView(model: model)
         case .rag: RAGSettingsView(model: model)
         case .storage: StorageSettingsView(model: model)
         case .shortcuts: ShortcutsSettingsView(model: model)

@@ -16,7 +16,7 @@ extension AppModel {
     }
 
     /// The embedder picked in Settings › RAG; nil (with `ragStatus.message` saying why) when its model is not
-    /// downloaded, or its provider is not enabled or misses a model or key.
+    /// downloaded, or its provider is not available or misses a model or key.
     func makeEmbedder() -> (any TextEmbedder)? {
         resolveEmbedder { ragStatus.message = $0 }
     }
@@ -27,7 +27,7 @@ extension AppModel {
         if id == "apple-nl" { return AppleTextEmbedder() }
         if id.hasPrefix(Self.apiEmbedderPrefix) {
             guard let config = embeddingProviderConfig else {
-                problem(String(localized: "Pick an enabled provider in Settings › RAG"))
+                problem(String(localized: "Pick a provider in Settings › RAG"))
                 return nil
             }
             let model = settings.embeddingAPIModel.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -38,7 +38,7 @@ extension AppModel {
             let apiKey = config.authStyle == .none ? nil : try? KeychainStore.apiKey(forProvider: config.id)
             // As `makeProvider(for:)`: sent without a key, a preset only answers HTTP 401.
             if config.preset != nil, config.authStyle != .none, apiKey?.isEmpty ?? true {
-                problem(String(localized: "Save a key for \(config.displayName) in Settings › AI"))
+                problem(String(localized: "Save a key for \(config.displayName) in Settings › API Keys"))
                 return nil
             }
             return APITextEmbedder(config: config, apiKey: apiKey, model: model)

@@ -82,6 +82,10 @@
     <value>Clave de API</value>
     <comment>API key</comment>
   </data>
+  <data name="APIKeys" xml:space="preserve">
+    <value>Claves de API</value>
+    <comment>API Keys</comment>
+  </data>
   <data name="About" xml:space="preserve">
     <value>Acerca de</value>
     <comment>About</comment>
@@ -1466,6 +1470,10 @@
     <value>Idioma a partir de ahora</value>
     <comment>Language from now on</comment>
   </data>
+  <data name="LanguageModels" xml:space="preserve">
+    <value>Modelos de lenguaje</value>
+    <comment>Language models</comment>
+  </data>
   <data name="LanguageOfSummariesAndAnswers" xml:space="preserve">
     <value>Idioma de los resúmenes y las respuestas</value>
     <comment>Language of summaries and answers</comment>
@@ -2262,6 +2270,10 @@
     <value>Elige una conversación en la barra lateral.</value>
     <comment>Pick a conversation in the sidebar.</comment>
   </data>
+  <data name="PickAProviderInSettingsRAG" xml:space="preserve">
+    <value>Elige un proveedor en Ajustes › RAG</value>
+    <comment>Pick a provider in Settings › RAG</comment>
+  </data>
   <data name="PickAnEmbeddingModelInSettingsRAG" xml:space="preserve">
     <value>Elige un modelo de embeddings en Ajustes › RAG</value>
     <comment>Pick an embedding model in Settings › RAG</comment>
@@ -2617,6 +2629,10 @@
   <data name="SaveAKeyForInSettingsAI" xml:space="preserve">
     <value>Guarda una clave para {0} en Ajustes › IA</value>
     <comment>Save a key for %@ in Settings › AI</comment>
+  </data>
+  <data name="SaveAKeyForInSettingsAPIKeys" xml:space="preserve">
+    <value>Guarda una clave para {0} en Ajustes › Claves de API</value>
+    <comment>Save a key for %@ in Settings › API Keys</comment>
   </data>
   <data name="SaveChangesToARepeatingEvent" xml:space="preserve">
     <value>¿Guardar los cambios de un evento que se repite?</value>
