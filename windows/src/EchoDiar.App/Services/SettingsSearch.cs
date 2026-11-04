@@ -44,13 +44,14 @@ public static class SettingsSearch
     public const string Recording = "recording";
     public const string Transcription = "transcription";
     public const string Providers = "providers";
+    public const string ApiKeys = "apiKeys";
     public const string Rag = "rag";
     public const string Storage = "storage";
     public const string Shortcuts = "shortcuts";
     public const string About = "about";
     public const string Acknowledgements = "acknowledgements";
 
-    /// <summary>Every section, in sidebar order (macOS: General, Recording, Transcription, AI, RAG, Storage, Shortcuts, About, Acknowledgements).</summary>
+    /// <summary>Every section, in sidebar order (macOS: General, Recording, Transcription, AI, API Keys, RAG, Storage, Shortcuts, About, Acknowledgements).</summary>
     public static IReadOnlyList<SettingsSection> Sections { get; } =
     [
         new(General, "General", "\uE713", [], GeneralSettingsPage.SearchEntries, model => new GeneralSettingsPage(model)),
@@ -63,6 +64,7 @@ public static class SettingsSearch
         new(
             Providers, "AI", "\uE99A", ProvidersSettingsPage.SubTabs, ProvidersSettingsPage.SearchEntries,
             model => new ProvidersSettingsPage(model)),
+        new(ApiKeys, "API Keys", "\uE8D7", [], ApiKeysSettingsPage.SearchEntries, model => new ApiKeysSettingsPage(model)),
         new(Rag, "RAG", "\uE773", [], RAGSettingsPage.SearchEntries, model => new RAGSettingsPage(model)),
         new(Storage, "Storage", "\uEDA2", StorageSettingsPage.SubTabs, StorageSettingsPage.SearchEntries, model => new StorageSettingsPage(model)),
         new(Shortcuts, "Shortcuts", "\uE765", [], ShortcutsSettingsPage.SearchEntries, model => new ShortcutsSettingsPage(model)),

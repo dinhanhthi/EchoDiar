@@ -122,14 +122,6 @@
     <value>Add Endpoint</value>
     <comment>Add Endpoint</comment>
   </data>
-  <data name="AddTheKeyOfBelow" xml:space="preserve">
-    <value>Add the key of {0} below</value>
-    <comment>Add the key of %@ below</comment>
-  </data>
-  <data name="AddTheKeyOfInTranscriptionModels" xml:space="preserve">
-    <value>Add the key of {0} in Transcription models</value>
-    <comment>Add the key of %@ in Transcription models</comment>
-  </data>
   <data name="Added" xml:space="preserve">
     <value>Added</value>
     <comment>Added</comment>
@@ -313,10 +305,6 @@
   <data name="AskToStop" xml:space="preserve">
     <value>Ask to stop</value>
     <comment>Ask to stop</comment>
-  </data>
-  <data name="AssemblyAIPicksItsModelForTheLanguageUniversal" xml:space="preserve">
-    <value>AssemblyAI picks its model for the language (Universal).</value>
-    <comment>AssemblyAI picks its model for the language (Universal).</comment>
   </data>
   <data name="AttachTheIndicatorToTheMeetingWindow" xml:space="preserve">
     <value>Attach the indicator to the meeting window</value>
@@ -1786,10 +1774,6 @@
     <value>Model id</value>
     <comment>Model id</comment>
   </data>
-  <data name="ModelIdEGWhisper1" xml:space="preserve">
-    <value>Model id, e.g. whisper-1</value>
-    <comment>Model id, e.g. whisper-1</comment>
-  </data>
   <data name="Models" xml:space="preserve">
     <value>Models</value>
     <comment>Models</comment>
@@ -2122,10 +2106,6 @@
     <value>Open</value>
     <comment>Open</comment>
   </data>
-  <data name="OpenAIGroqMistralGoogleGeminiAndCustomEndpointsTranscribeToo" xml:space="preserve">
-    <value>OpenAI, Groq, Mistral, Google Gemini and custom endpoints transcribe too, with their transcription model: set them up in Settings › AI.</value>
-    <comment>OpenAI, Groq, Mistral, Google Gemini and custom endpoints transcribe too, with their transcription model: set them up in Settings › AI.</comment>
-  </data>
   <data name="OpenCodeDeniesEveryToolButMCPServersInYourOpenCodeConfigStil" xml:space="preserve">
     <value>OpenCode denies every tool, but MCP servers in your OpenCode config still start (their tools are denied).</value>
     <comment>OpenCode denies every tool, but MCP servers in your OpenCode config still start (their tools are denied).</comment>
@@ -2285,10 +2265,6 @@
   <data name="PickAnEmbeddingModelInSettingsRAG" xml:space="preserve">
     <value>Pick an embedding model in Settings › RAG</value>
     <comment>Pick an embedding model in Settings › RAG</comment>
-  </data>
-  <data name="PickAnEnabledProviderInSettingsRAG" xml:space="preserve">
-    <value>Pick an enabled provider in Settings › RAG</value>
-    <comment>Pick an enabled provider in Settings › RAG</comment>
   </data>
   <data name="PickedByAssemblyAIForTheLanguageUniversal" xml:space="preserve">
     <value>Picked by AssemblyAI for the language (Universal)</value>
@@ -2645,10 +2621,6 @@
   <data name="SaveAKeyFirst" xml:space="preserve">
     <value>Save a key first.</value>
     <comment>Save a key first.</comment>
-  </data>
-  <data name="SaveAKeyForInSettingsAI" xml:space="preserve">
-    <value>Save a key for {0} in Settings › AI</value>
-    <comment>Save a key for %@ in Settings › AI</comment>
   </data>
   <data name="SaveAKeyForInSettingsAPIKeys" xml:space="preserve">
     <value>Save a key for {0} in Settings › API Keys</value>

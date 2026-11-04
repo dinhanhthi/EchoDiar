@@ -5,11 +5,12 @@
       GGUF models with Download, progress and Cancel, Installed and Delete; the default model and the language of
       summaries and answers), the chat context, the catch-up (its provider outside the app, its model, from the start
       or not), and the local hosts (a scan finds them, Foundry Local included; a host is added, or typed by URL).
-    - Cloud APIs: the API presets, then the custom OpenAI-compatible endpoints and Add Endpoint.
+    - Cloud: the models of the API presets, then of the custom OpenAI-compatible endpoints (their keys and endpoints
+      are set in Settings › API Keys).
     - CLIs: the subscription CLIs found on this PC.
-    The provider rows are made in code (ProvidersSettingsPage.*Row): an expander with the Enabled switch, and its fields
-    below. API keys go to Credential Manager only. Each searchable element's Tag is its search entry's title
-    (SearchEntries), so a search result can bring it into view.
+    The provider rows are made in code (ProvidersSettingsPage.*Row): an expander with the Enabled switch (local hosts
+    and CLIs) or the key status (cloud APIs), and its fields below. Each searchable element's Tag is its search entry's
+    title (SearchEntries), so a search result can bring it into view.
 -->
 <UserControl
     x:Class="EchoDiar.App.Views.ProvidersSettingsPage"
@@ -171,6 +172,8 @@
                         MaxWidth="420"
                         AutomationProperties.Name="{local:T Text='Catch-up model'}" />
                 </controls:SettingsCard>
+                <!-- A picked cloud API: its key status (header and content set in code). -->
+                <controls:SettingsCard x:Name="CatchUpKeyCard" Visibility="Collapsed" />
                 <!-- As the AI pane's data notes, for the provider a catch-up runs on. -->
                 <Grid
                     x:Name="CatchUpLeavesRow"
@@ -279,7 +282,7 @@
                 </controls:SettingsCard>
             </StackPanel>
 
-            <!-- Cloud APIs -->
+            <!-- Cloud -->
             <StackPanel
                 x:Name="CloudPanel"
                 Spacing="4"
@@ -298,14 +301,15 @@
 
                 <StackPanel x:Name="CloudPresetsList" Spacing="4" />
 
-                <StackPanel Style="{StaticResource SectionHeaderStyle}" Tag="Custom OpenAI-compatible endpoints">
+                <!-- Only when there is one (they are added in Settings › API Keys). -->
+                <StackPanel
+                    x:Name="CustomHeader"
+                    Style="{StaticResource SectionHeaderStyle}"
+                    Tag="Custom OpenAI-compatible endpoints"
+                    Visibility="Collapsed">
                     <TextBlock Style="{StaticResource BodyStrongTextBlockStyle}" Text="{local:T Text='Custom OpenAI-compatible endpoints'}" />
                 </StackPanel>
                 <StackPanel x:Name="CustomList" Spacing="4" />
-                <Button
-                    x:Name="AddEndpointButton"
-                    Margin="0,4,0,0"
-                    Content="{local:T Text='Add Endpoint'}" />
             </StackPanel>
 
             <!-- CLIs -->

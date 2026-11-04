@@ -501,7 +501,8 @@ public sealed partial class RAGSettingsPage : UserControl
 
     /// <summary>
     /// A provider that can embed (macOS <c>providersSection</c>'s row): picked or not (off while the provider is), its
-    /// name and host, then whether its data stays on this PC, or Set Up…, which opens where it is turned on.
+    /// name and host, then whether its data stays on this PC, or for a local host Set Up…, which opens where it is turned
+    /// on; a cloud API's key status ("API key" opens its card in Settings › API Keys).
     /// </summary>
     private sealed class ProviderRow
     {
@@ -510,6 +511,7 @@ public sealed partial class RAGSettingsPage : UserControl
         private readonly TextBlock _host;
         private readonly TextBlock _where;
         private readonly Button _setUp = new();
+        private readonly ApiKeyStatus _status;
         private ProviderConfig? _config;
 
         public ProviderRow(RAGSettingsPage page)
@@ -524,9 +526,11 @@ public sealed partial class RAGSettingsPage : UserControl
             _where.VerticalAlignment = VerticalAlignment.Center;
             _setUp.Content = Loc.T("Set Up…");
             _setUp.Click += (_, _) => SetUp();
+            _status = new ApiKeyStatus(page._model, (Style)page.Resources["SuccessIconStyle"]);
             var actions = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 8 };
             actions.Children.Add(_where);
             actions.Children.Add(_setUp);
+            actions.Children.Add(_status.Element);
             Card = new SettingsCard { Header = _radio, Description = _host, Content = actions };
         }
 
@@ -549,23 +553,25 @@ public sealed partial class RAGSettingsPage : UserControl
             var host = Host(config);
             _host.Text = host.Length == 0 ? Loc.T("Base URL not set") : host;
             _where.Text = Loc.T(ProviderInput.IsLoopback(config.BaseURL) ? "This PC" : "Leaves this PC");
+            var local = config.Kind == ProviderKind.Local;
             _where.Visibility = Show(available);
-            _setUp.Visibility = Show(!available);
+            _setUp.Visibility = Show(!available && local);
             AutomationProperties.SetName(_setUp, $"{Loc.T("Set Up…")}, {name}");
             ToolTipService.SetToolTip(_setUp, Loc.Format("Turn on %@ in Settings › AI", name));
+            _status.Element.Visibility = Show(!local);
+            if (!local) _status.Update(config);
         }
 
         /// <summary>
-        /// Opens Settings › AI where the provider is turned on, its row expanded: Cloud APIs, or On this PC for a local
-        /// host (which has a row only once added, by a scan or by URL).
+        /// Opens Settings › AI › On this PC where the local host is turned on, its row expanded (it has a row only once
+        /// added, by a scan or by URL).
         /// </summary>
         private void SetUp()
         {
             if (_config is not { } config) return;
-            var local = config.Kind == ProviderKind.Local;
-            if (!local || _page._providers.SavedLocalHosts.Any(h => ProvidersViewModel.SameId(h.Id, config.Id)))
+            if (_page._providers.SavedLocalHosts.Any(h => ProvidersViewModel.SameId(h.Id, config.Id)))
                 _page._model.SettingsExpandedProvider = config.Id;
-            _page._model.OpenSettings(SettingsSearch.Providers, local ? ProvidersSettingsPage.OnThisPCTab : ProvidersSettingsPage.CloudAPIsTab);
+            _page._model.OpenSettings(SettingsSearch.Providers, ProvidersSettingsPage.OnThisPCTab);
         }
     }
 }

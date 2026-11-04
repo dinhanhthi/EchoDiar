@@ -194,7 +194,7 @@ internal sealed class AppServices : IDisposable
         {
             var providerId = id[ModelCatalog.ApiEmbedderPrefix.Length..];
             if (EmbeddingConfig(settings, configs, HasStoredKey) is not { } config)
-                return (null, Loc.T("Pick an enabled provider in Settings › RAG"));
+                return (null, Loc.T("Pick a provider in Settings › RAG"));
             var model = settings.EmbeddingAPIModel.Trim();
             if (model.Length == 0)
                 return (null, Loc.Format("Enter the embedding model of %@ in Settings › RAG", config.DisplayName));
@@ -213,7 +213,7 @@ internal sealed class AppServices : IDisposable
             }
             // As MakeProvider: sent without a key, a preset only answers HTTP 401.
             if (config.Preset is not null && config.AuthStyle != AuthStyle.None && string.IsNullOrEmpty(apiKey))
-                return (null, Loc.Format("Save a key for %@ in Settings › AI", config.DisplayName));
+                return (null, Loc.Format("Save a key for %@ in Settings › API Keys", config.DisplayName));
             var copy = config with { ExtraHeaders = new(config.ExtraHeaders), ShownModels = [.. config.ShownModels] };
             return (new APITextEmbedder(copy, apiKey, model), null);
         }

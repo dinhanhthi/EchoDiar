@@ -2,7 +2,6 @@ using System.ComponentModel;
 using System.Globalization;
 using CommunityToolkit.WinUI.Controls;
 using EchoDiar.AI;
-using EchoDiar.AI.Cloud;
 using EchoDiar.App.Services;
 using EchoDiar.App.ViewModels;
 using EchoDiar.Core.Models;
@@ -16,11 +15,12 @@ using Windows.System;
 namespace EchoDiar.App.Views;
 
 /// <summary>
-/// Settings › AI (macOS ProvidersSettingsView.swift), the On this PC, Cloud APIs and CLIs inner tabs; the title bar
-/// picks the tab (<see cref="AppViewModel.SubTabOf"/>). Every change goes through <see cref="ProvidersViewModel"/> and
-/// is saved after the settings delay; API keys go to Credential Manager only and are never read back into the UI. The
-/// provider rows are made in code and updated in place, so typing in a field never rebuilds the row it is in; so are the
-/// GGUF model rows, whose state a download changes often. The local
+/// Settings › AI (macOS ProvidersSettingsView.swift), the On this PC, Cloud and CLIs inner tabs; the title bar picks the
+/// tab (<see cref="AppViewModel.SubTabOf"/>). Cloud holds the models of the cloud API presets and custom endpoints; their
+/// keys and endpoints are set in Settings › API Keys (<see cref="ApiKeysSettingsPage"/>). Every change goes through
+/// <see cref="ProvidersViewModel"/> and is saved after the settings delay. The provider rows are made in code and updated
+/// in place, so typing in a field never rebuilds the row it is in; so are the GGUF model rows, whose state a download
+/// changes often. The local
 /// hosts are scanned and the CLIs looked up once, when the page first shows (macOS: once per window), then on Scan or
 /// on a new path override.
 /// </summary>
@@ -28,14 +28,14 @@ public sealed partial class ProvidersSettingsPage : UserControl
 {
     // macOS ids (deep links and search entries stay the same); "On this PC" is the Windows title.
     public const string OnThisPCTab = "onThisMac";
-    public const string CloudAPIsTab = "cloudAPIs";
+    public const string CloudTab = "cloud";
     public const string CliTab = "cli";
 
     /// <summary>macOS <c>SettingsTab.providers.subTabs</c>.</summary>
     public static IReadOnlyList<SettingsSubTab> SubTabs { get; } =
     [
         new(OnThisPCTab, "On this PC"),
-        new(CloudAPIsTab, "Cloud APIs"),
+        new(CloudTab, "Cloud"),
         new(CliTab, "CLIs"),
     ];
 
@@ -52,28 +52,14 @@ public sealed partial class ProvidersSettingsPage : UserControl
         new("Re-summarize from the start each time", ["catch up", "incremental", "whole recording", "from start"], OnThisPCTab),
         new("Local hosts", ["scan", "custom URL", "server", .. PresetNames(ProviderKind.Local)], OnThisPCTab),
         new("Cloud APIs",
-            ["API key", "provider", "LLM", .. PresetNames(ProviderKind.OpenAICompatible), .. PresetNames(ProviderKind.Anthropic)],
-            CloudAPIsTab),
-        new("Custom OpenAI-compatible endpoints", ["add endpoint", "base URL", "API key", "headers"], CloudAPIsTab),
+            ["provider", "LLM", "model", .. PresetNames(ProviderKind.OpenAICompatible), .. PresetNames(ProviderKind.Anthropic)],
+            CloudTab),
+        new("Custom OpenAI-compatible endpoints", ["custom endpoint", "model"], CloudTab),
         new("CLIs", ["subscription", "command line", "terminal", .. PresetNames(ProviderKind.Cli)], CliTab),
     ];
 
     private static IEnumerable<string> PresetNames(ProviderKind kind) =>
         ProviderConfig.Presets().Where(p => p.Kind == kind).Select(p => p.DisplayName);
-
-    /// <summary>Where to get a preset's API key and look up its model ids (macOS <c>providerLinks</c>).</summary>
-    private static readonly Dictionary<string, (string Keys, string Models)> ProviderLinks = new()
-    {
-        ["openai"] = ("https://platform.openai.com/api-keys", "https://developers.openai.com/api/docs/models"),
-        ["anthropic"] = ("https://platform.claude.com/settings/keys", "https://platform.claude.com/docs/en/models/overview"),
-        ["xai"] = ("https://console.x.ai", "https://docs.x.ai/developers/models"),
-        ["gemini"] = ("https://aistudio.google.com/apikey", "https://ai.google.dev/gemini-api/docs/models"),
-        ["mistral"] = ("https://console.mistral.ai/api-keys", "https://docs.mistral.ai/models"),
-        ["azure"] = ("https://ai.azure.com", "https://learn.microsoft.com/azure/ai-foundry/openai/concepts/models"),
-        ["openrouter"] = ("https://openrouter.ai/settings/keys", "https://openrouter.ai/models"),
-        ["groq"] = ("https://console.groq.com/keys", "https://console.groq.com/docs/models"),
-        ["deepseek"] = ("https://platform.deepseek.com/api_keys", "https://api-docs.deepseek.com/quick_start/pricing"),
-    };
 
     /// <summary>The summary languages offered (macOS <c>AILanguageMenu</c>), plus a hand-edited one.</summary>
     private static readonly (string Code, string Name)[] Languages =
@@ -83,6 +69,9 @@ public sealed partial class ProvidersSettingsPage : UserControl
     private readonly ProvidersViewModel _providers;
 
     private readonly Dictionary<string, ApiRow> _apiRows = new(StringComparer.OrdinalIgnoreCase);
+    private readonly Dictionary<string, CloudRow> _cloudRows = new(StringComparer.OrdinalIgnoreCase);
+    /// <summary>A picked cloud catch-up provider's key status.</summary>
+    private readonly ApiKeyStatus _catchUpKeyStatus;
     private readonly Dictionary<CLIPreset, CliRow> _cliRows = [];
 
     /// <summary>One row per GGUF model, made once and updated in place.</summary>
@@ -110,6 +99,8 @@ public sealed partial class ProvidersSettingsPage : UserControl
         _providers = model.ProvidersModel;
         InitializeComponent();
         LanguageCard.Description = Loc.T("Auto = the transcript's language for summaries, the question's for answers.");
+        _catchUpKeyStatus = new ApiKeyStatus(model, (Style)Resources["SuccessIconStyle"]);
+        CatchUpKeyCard.Content = _catchUpKeyStatus.Element;
         foreach (var entry in ProvidersViewModel.LocalModelEntries) LocalModelsList.Children.Add(CreateModelRow(entry));
 
         WindowsAICheckButton.Click += (_, _) => _ = _providers.RefreshWindowsAIAsync();
@@ -154,7 +145,6 @@ public sealed partial class ProvidersSettingsPage : UserControl
             AddCustomLocal();
         };
         AddCustomButton.Click += (_, _) => AddCustomLocal();
-        AddEndpointButton.Click += (_, _) => _providers.AddEndpoint();
 
         Loaded += (_, _) =>
         {
@@ -186,6 +176,7 @@ public sealed partial class ProvidersSettingsPage : UserControl
             _providers.LocalModelStatesChanged -= UpdateModelRows;
             // macOS: a test or a model list stops when its row goes away.
             foreach (var row in _apiRows.Values) row.Cancel();
+            foreach (var row in _cloudRows.Values) row.Cancel();
             foreach (var row in _cliRows.Values) row.Cancel();
         };
     }
@@ -216,27 +207,33 @@ public sealed partial class ProvidersSettingsPage : UserControl
     {
         var tab = _model.SubTabOf(SettingsSearch.Providers);
         OnThisPCPanel.Visibility = Show(tab == OnThisPCTab);
-        CloudPanel.Visibility = Show(tab == CloudAPIsTab);
+        CloudPanel.Visibility = Show(tab == CloudTab);
         CliPanel.Visibility = Show(tab == CliTab);
         ExpandRequestedProvider(tab);
     }
 
     /// <summary>
-    /// A Set Up in Settings › Transcription or RAG (macOS <c>settingsExpandedProvider</c>): its API row on Cloud APIs, or
+    /// A Set Up in Settings › Transcription or RAG (macOS <c>settingsExpandedProvider</c>): its model row on Cloud, or
     /// its saved local host's row on On this PC, expands and comes into view, and the request is cleared.
     /// </summary>
     private void ExpandRequestedProvider(string? tab)
     {
-        if (Closing || tab is not (CloudAPIsTab or OnThisPCTab) || _model.SettingsExpandedProvider is not { } id
-            || !_apiRows.TryGetValue(id, out var row)) return;
+        // Only while this section shows: a page just left may still hear a request meant for API Keys.
+        if (Closing || _model.SettingsSection != SettingsSearch.Providers || _model.SettingsExpandedProvider is not { } id) return;
         // Only on the tab its row is on.
-        if ((tab == OnThisPCTab) != ReferenceEquals(row.Expander.Parent, LocalHostsList)) return;
+        SettingsExpander? expander = tab switch
+        {
+            OnThisPCTab => _apiRows.GetValueOrDefault(id)?.Expander,
+            CloudTab => _cloudRows.GetValueOrDefault(id)?.Expander,
+            _ => null,
+        };
+        if (expander is null) return;
         _model.SettingsExpandedProvider = null;
-        row.Expander.IsExpanded = true;
+        expander.IsExpanded = true;
         // After the panel's layout: a row of a tab just shown has no position yet.
         DispatcherQueue.TryEnqueue(() =>
         {
-            if (!Closing) row.Expander.StartBringIntoView(new BringIntoViewOptions { AnimationDesired = true, VerticalAlignmentRatio = 0 });
+            if (!Closing) expander.StartBringIntoView(new BringIntoViewOptions { AnimationDesired = true, VerticalAlignmentRatio = 0 });
         });
     }
 
@@ -485,7 +482,8 @@ public sealed partial class ProvidersSettingsPage : UserControl
     /// <summary>
     /// The Catch-up group (macOS <c>catchUpSection</c>): the provider a catch-up runs on, among the usable ones outside
     /// the app ("Automatic" names what it runs, <see cref="AppViewModel.AutomaticCatchUpProvider"/>); the model of a
-    /// picked one; the notes of the provider it runs on; why none can; from the start or not.
+    /// picked one, and the key status of a picked cloud API; the notes of the provider it runs on; why none can; from the
+    /// start or not.
     /// </summary>
     private void RefreshCatchUp()
     {
@@ -526,6 +524,13 @@ public sealed partial class ProvidersSettingsPage : UserControl
                 foreach (var model in models) CatchUpModelCombo.Items.Add(model.Length == 0 ? Loc.T("Automatic") : model);
             }
             CatchUpModelCombo.SelectedIndex = _catchUpModels.IndexOf(saved);
+        }
+        var pickedCloud = picked is { Kind: AIProviderKind.Cloud } ? _providers.Config(picked.Id) : null;
+        CatchUpKeyCard.Visibility = Show(pickedCloud is not null);
+        if (pickedCloud is not null)
+        {
+            CatchUpKeyCard.Header = picked!.Name;
+            _catchUpKeyStatus.Update(pickedCloud);
         }
 
         var runsOn = _model.CatchUpProvider;
@@ -614,16 +619,14 @@ public sealed partial class ProvidersSettingsPage : UserControl
         var configs = _providers.ProviderConfigs;
         var cloud = configs.Where(c => c.Preset is not null && c.Kind is ProviderKind.OpenAICompatible or ProviderKind.Anthropic).ToList();
         var custom = configs.Where(c => c.Preset is null && c.Kind == ProviderKind.OpenAICompatible).ToList();
-        var local = _providers.SavedLocalHosts;
-        var shown = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-        SyncList(CloudPresetsList, cloud, shown);
-        SyncList(CustomList, custom, shown);
-        SyncList(LocalHostsList, local, shown);
-        foreach (var id in _apiRows.Keys.Where(id => !shown.Contains(id)).ToList())
-        {
-            _apiRows[id].Cancel();
-            _apiRows.Remove(id);
-        }
+        var cloudShown = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        SyncList(CloudPresetsList, cloud, _cloudRows, id => new CloudRow(this, id), cloudShown);
+        SyncList(CustomList, custom, _cloudRows, id => new CloudRow(this, id), cloudShown);
+        CustomHeader.Visibility = Show(custom.Count > 0);
+        var localShown = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        SyncList(LocalHostsList, _providers.SavedLocalHosts, _apiRows, id => new ApiRow(this, id), localShown);
+        DropRows(_cloudRows, cloudShown);
+        DropRows(_apiRows, localShown);
 
         List<CliRow> cliRows = [];
         foreach (var config in configs.Where(c => c.Kind == ProviderKind.Cli))
@@ -640,23 +643,39 @@ public sealed partial class ProvidersSettingsPage : UserControl
         }
     }
 
-    private void SyncList(StackPanel list, IReadOnlyList<ProviderConfig> configs, HashSet<string> shown)
+    /// <summary>
+    /// <paramref name="list"/> shows a row per config, made once (<paramref name="create"/>) and kept in
+    /// <paramref name="rows"/>; each id is shown once, and added to <paramref name="shown"/>.
+    /// </summary>
+    private static void SyncList<TRow>(
+        StackPanel list, IReadOnlyList<ProviderConfig> configs, Dictionary<string, TRow> rows, Func<string, TRow> create,
+        HashSet<string> shown) where TRow : IProviderRow
     {
-        List<ApiRow> rows = [];
+        List<TRow> listed = [];
         foreach (var config in configs)
         {
             if (!shown.Add(config.Id)) continue;
-            if (!_apiRows.TryGetValue(config.Id, out var row)) _apiRows[config.Id] = row = new ApiRow(this, config.Id);
+            if (!rows.TryGetValue(config.Id, out var row)) rows[config.Id] = row = create(config.Id);
             row.Update(config);
-            rows.Add(row);
+            listed.Add(row);
         }
-        if (list.Children.SequenceEqual(rows.Select(r => (UIElement)r.Expander))) return;
+        if (list.Children.SequenceEqual(listed.Select(r => (UIElement)r.Expander))) return;
         list.Children.Clear();
-        foreach (var row in rows)
+        foreach (var row in listed)
         {
             // A row moved from another list (its kind changed) leaves that one first.
             if (row.Expander.Parent is Panel parent) parent.Children.Remove(row.Expander);
             list.Children.Add(row.Expander);
+        }
+    }
+
+    /// <summary>The rows of providers no longer listed stop their work and are dropped.</summary>
+    private static void DropRows<TRow>(Dictionary<string, TRow> rows, HashSet<string> shown) where TRow : IProviderRow
+    {
+        foreach (var id in rows.Keys.Where(id => !shown.Contains(id)).ToList())
+        {
+            rows[id].Cancel();
+            rows.Remove(id);
         }
     }
 
@@ -708,40 +727,61 @@ public sealed partial class ProvidersSettingsPage : UserControl
         return ProviderInput.SuggestsV1(config, error) ? $"{message} {Loc.T("Check that the base URL ends with /v1.")}" : message;
     }
 
-    /// <summary>
-    /// A cloud preset, local host or custom endpoint (macOS <c>APIProviderRow</c>): the Enabled switch (local hosts
-    /// only); expanded, its name and authentication (custom endpoints), extra headers (custom endpoints), API key, base
-    /// URL, model, the models shown in the AI pane's menu, the transcription model (the APIs that transcribe too), Test,
-    /// and Remove (local hosts and custom endpoints).
-    /// </summary>
-    private sealed class ApiRow
+    /// <summary>A provider row a list shows: its expander, updated in place, and its work stopped when it goes away.</summary>
+    private interface IProviderRow
     {
-        private static readonly AuthStyle[] AuthStyles = [AuthStyle.Bearer, AuthStyle.ApiKeyHeader, AuthStyle.XApiKey, AuthStyle.None];
+        SettingsExpander Expander { get; }
+        void Update(ProviderConfig config);
+        void Cancel();
+    }
 
+    /// <summary>
+    /// A cloud LLM preset or custom endpoint on the Cloud tab (macOS <c>CloudModelRow</c>): its key status ("API key"
+    /// opens its card in Settings › API Keys); expanded, its model and the models shown in the AI pane's menu. A missing
+    /// base URL (Azure, a custom endpoint) is said under its name.
+    /// </summary>
+    private sealed class CloudRow : IProviderRow
+    {
+        private readonly ApiKeyStatus _status;
+        private readonly ModelField _modelField;
+
+        public CloudRow(ProvidersSettingsPage page, string id)
+        {
+            _status = new ApiKeyStatus(page._model, (Style)page.Resources["SuccessIconStyle"]);
+            _modelField = new ModelField(page, id, id == "azure" ? "Deployment name" : "Model id",
+                ApiKeysSettingsPage.ProviderLinks.TryGetValue(id, out var links) ? links.Models : null);
+            Expander = new SettingsExpander { Content = _status.Element };
+            Expander.Items.Add(_modelField.ModelCard);
+            Expander.Items.Add(_modelField.ShownCard);
+        }
+
+        public SettingsExpander Expander { get; }
+
+        public void Update(ProviderConfig config)
+        {
+            Expander.Header = config.DisplayName.Length == 0 ? Loc.T("Untitled") : config.DisplayName;
+            if (config.BaseURL.Trim().Length == 0) Expander.Description = Loc.T("Base URL not set");
+            else if (config.Preset is null) Expander.Description = config.BaseURL;
+            else Expander.ClearValue(SettingsExpander.DescriptionProperty);
+            _status.Update(config);
+            _modelField.Update(config);
+        }
+
+        public void Cancel() => _modelField.Cancel();
+    }
+
+    /// <summary>
+    /// A saved local host (macOS <c>APIProviderRow</c>): the Enabled switch; expanded, its base URL, model, the models
+    /// shown in the AI pane's menu, Test and Remove.
+    /// </summary>
+    private sealed class ApiRow : IProviderRow
+    {
         private readonly ProvidersSettingsPage _page;
         private readonly string _id;
         private readonly ToggleSwitch _enabled = new();
-        private readonly SettingsCard _nameCard;
-        private readonly TextBox _nameBox = new() { MinWidth = 260 };
-        private readonly SettingsCard _authCard;
-        private readonly ComboBox _authCombo = new() { MinWidth = 180 };
-        private readonly SettingsCard _headersCard;
-        private readonly TextBox _headersBox = new() { MinWidth = 260, AcceptsReturn = true, TextWrapping = TextWrapping.NoWrap, PlaceholderText = "HTTP-Referer: https://example.com" };
-        private readonly TextBlock _headersRefused;
-        private readonly SettingsCard _keyCard;
-        private readonly PasswordBox _keyBox = new();
-        private readonly StackPanel _savedLabel = new() { Orientation = Orientation.Horizontal, Spacing = 4, Visibility = Visibility.Collapsed };
-        private readonly Button _removeKeyButton = new() { Visibility = Visibility.Collapsed };
-        private readonly HyperlinkButton? _getKeyLink;
-        private readonly TextBlock _keyError;
         private readonly TextBox _baseBox = new();
-        private readonly TextBlock _azureNote;
-        private readonly TextBlock _httpWarning;
         private readonly ModelField _modelField;
-        private readonly TranscriptionModelField _transcriptionField;
         private readonly TestField _test;
-        private readonly Button _removeButton = new() { Visibility = Visibility.Collapsed };
-        private ProviderConfig? _config;
 
         public ApiRow(ProvidersSettingsPage page, string id)
         {
@@ -750,134 +790,34 @@ public sealed partial class ProvidersSettingsPage : UserControl
             Expander = new SettingsExpander { Content = _enabled };
             _enabled.Toggled += (_, _) => Change(c => c.Enabled != _enabled.IsOn, c => c.Enabled = _enabled.IsOn);
 
-            _nameCard = Field("Name", _nameBox);
-            AutomationProperties.SetName(_nameBox, Loc.T("Name"));
-            _nameBox.TextChanged += (_, _) => Change(c => c.DisplayName != _nameBox.Text, c => c.DisplayName = _nameBox.Text);
-
-            foreach (var title in new[] { "Bearer token", "api-key header", "x-api-key header", "None" }) _authCombo.Items.Add(Loc.T(title));
-            AutomationProperties.SetName(_authCombo, Loc.T("Authentication"));
-            _authCard = Field("Authentication", _authCombo);
-            _authCombo.SelectionChanged += (_, _) =>
-            {
-                var index = _authCombo.SelectedIndex;
-                if (index < 0) return;
-                Change(c => c.AuthStyle != AuthStyles[index], c => c.AuthStyle = AuthStyles[index]);
-            };
-
-            // Windows addition: macOS has no field for them. Saved in settings.json, never a key.
-            _headersCard = Field("Extra headers", _headersBox);
-            // A line naming a key header is not saved; this says why it went away.
-            _headersRefused = page.Note("CautionNoteStyle");
-            _headersRefused.Visibility = Visibility.Collapsed;
-            var headerNotes = new StackPanel { Spacing = 2 };
-            headerNotes.Children.Add(page.Note("NoteStyle", Loc.T("One per line, Name: value. Saved in the settings file: put API keys in the API key field.")));
-            headerNotes.Children.Add(_headersRefused);
-            _headersCard.Description = headerNotes;
-            AutomationProperties.SetName(_headersBox, Loc.T("Extra headers"));
-            _headersBox.LostFocus += (_, _) =>
-            {
-                var headers = ProviderInput.ParseHeaders(_headersBox.Text, out var refused);
-                _headersRefused.Text = refused.Count == 0 ? "" : Loc.Format(
-                    "%@ not saved: put the key in the API key field, which keeps it in Credential Manager.", string.Join(", ", refused));
-                _headersRefused.Visibility = Show(refused.Count > 0);
-                Change(c => !SameHeaders(c.ExtraHeaders, headers), c => c.ExtraHeaders = headers);
-                // The refused lines leave the box even when nothing else changed.
-                if (refused.Count > 0) _headersBox.Text = HeadersText(headers);
-            };
-
-            // The key (macOS APIKeyField): saved on Enter, on leaving the field, by Save and by Test; only "Saved" shows.
-            AutomationProperties.SetName(_keyBox, Loc.T("API key"));
-            _keyBox.KeyDown += (_, e) =>
-            {
-                if (!IsEnter(e)) return;
-                e.Handled = true;
-                _ = SaveKeyAsync();
-            };
-            _keyBox.LostFocus += (_, _) => _ = SaveKeyAsync();
-            _keyBox.PasswordChanged += (_, _) =>
-            {
-                UpdateHttpWarning();
-                // Null only while the constructor runs.
-                _test?.UpdateSave();
-            };
-            _savedLabel.Children.Add(new FontIcon { Style = (Style)page.Resources["SuccessIconStyle"], Glyph = "" });
-            _savedLabel.Children.Add(page.Note("SuccessNoteStyle", Loc.T("Saved")));
-            _removeKeyButton.Content = Loc.T("Remove");
-            _removeKeyButton.Click += async (_, _) => ShowKeyError(await _page._providers.DeleteApiKeyAsync(_id));
-            if (ProviderLinks.TryGetValue(id, out var links)) _getKeyLink = Link("Get an API key", links.Keys);
-            var keyPanel = new FieldPanel { InputWidth = 260 };
-            keyPanel.Children.Add(_keyBox);
-            keyPanel.Children.Add(_savedLabel);
-            keyPanel.Children.Add(_removeKeyButton);
-            if (_getKeyLink is not null) keyPanel.Children.Add(_getKeyLink);
-            _keyError = page.Note("CriticalNoteStyle");
-            _keyError.Visibility = Visibility.Collapsed;
-            _keyCard = Field("API key", keyPanel);
-            _keyCard.Description = _keyError;
-
             AutomationProperties.SetName(_baseBox, Loc.T("Base URL"));
             _baseBox.TextChanged += (_, _) => Change(c => c.BaseURL != _baseBox.Text, c => c.BaseURL = _baseBox.Text);
-            _azureNote = page.Note("NoteStyle", Loc.T("Required: your resource's https://<resource>.openai.azure.com/openai/v1 URL."));
-            _httpWarning = page.Note("CautionNoteStyle");
-            var baseNotes = new StackPanel { Spacing = 2 };
-            baseNotes.Children.Add(_azureNote);
-            baseNotes.Children.Add(_httpWarning);
             var baseCard = Field("Base URL", new FieldPanel { InputWidth = 320, Children = { _baseBox } });
-            baseCard.Description = baseNotes;
 
-            _modelField = new ModelField(page, id, id == "azure" ? "Deployment name" : "Model id",
-                ProviderLinks.TryGetValue(id, out var modelLinks) ? modelLinks.Models : null);
-            _transcriptionField = new TranscriptionModelField(page._providers, id, () => page._syncing || page.Closing);
+            _modelField = new ModelField(page, id, "Model id", null);
 
-            _removeButton.Content = Loc.T("Remove");
-            _removeButton.Click += (_, _) => _ = _page._providers.RemoveProviderAsync(_id);
-            _test = new TestField(page, id, "Test", PendingKeyAsync, () => HasPendingKey, _removeButton);
+            var remove = new Button { Content = Loc.T("Remove") };
+            remove.Click += (_, _) => _ = _page._providers.RemoveProviderAsync(_id);
+            _test = new TestField(page, id, "Test", remove);
 
-            Expander.Items.Add(_nameCard);
-            Expander.Items.Add(_authCard);
-            Expander.Items.Add(_headersCard);
-            Expander.Items.Add(_keyCard);
             Expander.Items.Add(baseCard);
             Expander.Items.Add(_modelField.ModelCard);
             Expander.Items.Add(_modelField.ShownCard);
-            Expander.Items.Add(_transcriptionField.Card);
             Expander.Items.Add(_test.Card);
         }
 
         public SettingsExpander Expander { get; }
 
-        private bool IsCustom => _config is { Preset: null };
-
         /// <summary>Shows <paramref name="config"/>; fields the user is editing already show their own text.</summary>
         public void Update(ProviderConfig config)
         {
-            _config = config;
             var name = config.DisplayName.Length == 0 ? Loc.T("Untitled") : config.DisplayName;
             Expander.Header = name;
-            if (config.Kind == ProviderKind.Local || IsCustom && config.BaseURL.Length > 0) Expander.Description = config.BaseURL;
-            else Expander.ClearValue(SettingsExpander.DescriptionProperty);
+            Expander.Description = config.BaseURL;
             AutomationProperties.SetName(_enabled, name);
             _enabled.IsOn = config.Enabled;
-            // A cloud API is available once its key is saved (or, without auth, its base URL set): no switch.
-            _enabled.Visibility = Show(!config.IsCloud);
-            var customApi = IsCustom && config.Kind == ProviderKind.OpenAICompatible;
-            _nameCard.Visibility = _authCard.Visibility = _headersCard.Visibility = Show(customApi);
-            SetText(_nameBox, config.DisplayName);
-            _authCombo.SelectedIndex = Array.IndexOf(AuthStyles, config.AuthStyle);
-            // Saved on leaving the field: a half-typed line must not be replaced while the user types it.
-            if (_headersBox.FocusState == FocusState.Unfocused
-                && !SameHeaders(ProviderInput.ParseHeaders(_headersBox.Text, out _), config.ExtraHeaders))
-                _headersBox.Text = HeadersText(config.ExtraHeaders);
-            _keyCard.Visibility = Show(config.AuthStyle != AuthStyle.None);
             SetText(_baseBox, config.BaseURL);
-            _baseBox.PlaceholderText = config.Id == "azure" ? "https://<resource>.openai.azure.com/openai/v1" : "";
-            _azureNote.Visibility = Show(config.Id == "azure");
-            UpdateKey();
             _modelField.Update(config);
-            _transcriptionField.Card.Visibility = Show(CloudTranscription.Supports(config));
-            _transcriptionField.Update(config);
-            _removeButton.Visibility = Show(config.Kind == ProviderKind.Local || IsCustom);
-            _test.Update(config);
         }
 
         public void Cancel()
@@ -892,60 +832,6 @@ public sealed partial class ProvidersSettingsPage : UserControl
             if (_page._syncing || _page.Closing || _page._providers.Config(_id) is not { } config || !differs(config)) return;
             _page._providers.UpdateProvider(_id, change);
         }
-
-        private void UpdateKey()
-        {
-            var saved = _page._providers.HasApiKey(_id);
-            _savedLabel.Visibility = _removeKeyButton.Visibility = Show(saved);
-            if (_getKeyLink is not null) _getKeyLink.Visibility = Show(!saved);
-            _keyBox.PlaceholderText = Loc.T(saved ? "Enter a new key to replace it" : "Paste the key, then Save");
-            UpdateHttpWarning();
-        }
-
-        /// <summary>The key would go unencrypted to another machine (Phase 22 security review): say so under the URL.</summary>
-        private void UpdateHttpWarning()
-        {
-            if (_config is not { } config) return;
-            var sendsKey = _page._providers.HasApiKey(_id) || _keyBox.Password.Length > 0;
-            var clear = ProviderInput.SendsKeyInClear(config, sendsKey);
-            _httpWarning.Visibility = Show(clear);
-            if (clear && Uri.TryCreate(config.BaseURL.Trim(), UriKind.Absolute, out var url))
-            {
-                _httpWarning.Text = Loc.Format("The API key is sent unencrypted over http to %@. Use https, or a host on this PC.", url.Host);
-            }
-        }
-
-        /// <summary>Saves the typed key (nothing when blank) and clears the field; false, with the error shown, when refused.</summary>
-        private async Task<bool> SaveKeyAsync()
-        {
-            var text = _keyBox.Password;
-            if (string.IsNullOrWhiteSpace(text)) return true;
-            var error = await _page._providers.SaveApiKeyAsync(_id, text);
-            if (_page.Closing) return false;
-            if (error is null && _keyBox.Password == text) _keyBox.Password = "";
-            ShowKeyError(error);
-            return error is null;
-        }
-
-        /// <summary>Save, and Test before it runs: a key typed without Enter is the one tested (macOS <c>TestButton.run</c>).</summary>
-        private Task<bool> PendingKeyAsync() =>
-            _config is { AuthStyle: not AuthStyle.None } ? SaveKeyAsync() : Task.FromResult(true);
-
-        private void ShowKeyError(string? error)
-        {
-            if (_page.Closing) return;
-            _keyError.Text = error ?? "";
-            _keyError.Visibility = Show(error is not null);
-        }
-
-        /// <summary>Whether a key is typed and not saved yet (Save is on then).</summary>
-        private bool HasPendingKey => !string.IsNullOrWhiteSpace(_keyBox.Password);
-
-        private static bool SameHeaders(IReadOnlyDictionary<string, string> a, IReadOnlyDictionary<string, string> b) =>
-            a.Count == b.Count && a.All(pair => b.TryGetValue(pair.Key, out var value) && value == pair.Value);
-
-        private static string HeadersText(Dictionary<string, string> headers) =>
-            string.Join("\r", headers.OrderBy(h => h.Key, StringComparer.Ordinal).Select(h => $"{h.Key}: {h.Value}"));
     }
 
     /// <summary>
@@ -1000,7 +886,7 @@ public sealed partial class ProvidersSettingsPage : UserControl
                 CLIPreset.Claude => "sonnet, opus or haiku (empty = default)",
                 _ => "Empty = the CLI's default",
             }, null);
-            _test = new TestField(page, _id, "Test (uses your subscription)", null, null, null, CLIRunner.ContainmentNote(preset));
+            _test = new TestField(page, _id, "Test (uses your subscription)", null, CLIRunner.ContainmentNote(preset));
 
             Expander.Items.Add(pathCard);
             Expander.Items.Add(_modelField.ModelCard);
@@ -1017,7 +903,6 @@ public sealed partial class ProvidersSettingsPage : UserControl
             _enabled.IsOn = config.Enabled;
             SetText(_pathBox, config.BaseURL);
             _modelField.Update(config);
-            _test.Update(config);
             _test.Enabled = _found;
         }
 
@@ -1265,42 +1150,28 @@ public sealed partial class ProvidersSettingsPage : UserControl
     }
 
     /// <summary>
-    /// Test, which shows OK beside it or a short error below (macOS <c>TestButton</c>); Cancel while it runs. With a key
-    /// field, Save writes the typed key and Test saves it first. A row's Remove and a CLI's containment note sit here too.
+    /// Test, which shows OK beside it or a short error below (macOS <c>TestButton</c>); Cancel while it runs. A local
+    /// host's Remove and a CLI's containment note sit here too.
     /// </summary>
     private sealed class TestField
     {
         private readonly ProvidersSettingsPage _page;
         private readonly string _id;
         private readonly string _title;
-        private readonly Func<Task<bool>>? _saveKey;
-        private readonly Func<bool>? _hasPendingKey;
         private readonly Button _testButton = new();
-        private readonly Button _saveButton = new() { Visibility = Visibility.Collapsed };
         private readonly ProgressRing _ring = SmallRing();
         private readonly TextBlock _ok;
         private readonly TextBlock _error;
         private CancellationTokenSource? _running;
         private bool _enabled = true;
-        private ProviderConfig? _config;
 
-        public TestField(
-            ProvidersSettingsPage page, string id, string title, Func<Task<bool>>? saveKey, Func<bool>? hasPendingKey, Button? remove,
-            string? note = null)
+        public TestField(ProvidersSettingsPage page, string id, string title, Button? remove, string? note = null)
         {
             _page = page;
             _id = id;
             _title = Loc.T(title);
-            _saveKey = saveKey;
-            _hasPendingKey = hasPendingKey;
             _testButton.Content = _title;
             _testButton.Click += (_, _) => _ = RunAsync();
-            _saveButton.Content = Loc.T("Save");
-            _saveButton.Click += async (_, _) =>
-            {
-                if (_saveKey is not null) await _saveKey();
-                UpdateSave();
-            };
             _ok = page.Note("SuccessNoteStyle", Loc.T("OK"));
             _ok.Visibility = Visibility.Collapsed;
             _error = page.Note("CriticalNoteStyle");
@@ -1309,7 +1180,6 @@ public sealed partial class ProvidersSettingsPage : UserControl
 
             var buttons = new FieldPanel();
             buttons.Children.Add(_testButton);
-            buttons.Children.Add(_saveButton);
             buttons.Children.Add(_ring);
             buttons.Children.Add(_ok);
             if (remove is not null) buttons.Children.Add(remove);
@@ -1333,16 +1203,6 @@ public sealed partial class ProvidersSettingsPage : UserControl
             }
         }
 
-        public void Update(ProviderConfig config)
-        {
-            _config = config;
-            _saveButton.Visibility = Show(_saveKey is not null && config.AuthStyle != AuthStyle.None);
-            UpdateSave();
-        }
-
-        /// <summary>Save is on while a key is typed and no test runs.</summary>
-        public void UpdateSave() => _saveButton.IsEnabled = _running is null && _hasPendingKey?.Invoke() == true;
-
         public void Cancel() => _running?.Cancel();
 
         private async Task RunAsync()
@@ -1353,8 +1213,6 @@ public sealed partial class ProvidersSettingsPage : UserControl
                 return;
             }
             _ok.Visibility = _error.Visibility = Visibility.Collapsed;
-            // A key pasted without Enter is tested, not the one already saved.
-            if (_saveKey is not null && !await _saveKey()) return;
             if (_page.Closing || _page._providers.Config(_id) is not { } config) return;
             using var cancellation = _running = new CancellationTokenSource();
             SetRunning(true);
@@ -1387,7 +1245,6 @@ public sealed partial class ProvidersSettingsPage : UserControl
             _testButton.IsEnabled = running || _enabled;
             _ring.IsActive = running;
             _ring.Visibility = Show(running);
-            UpdateSave();
         }
     }
 }

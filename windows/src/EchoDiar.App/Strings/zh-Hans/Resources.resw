@@ -122,14 +122,6 @@
     <value>添加端点</value>
     <comment>Add Endpoint</comment>
   </data>
-  <data name="AddTheKeyOfBelow" xml:space="preserve">
-    <value>在下方添加 {0} 的密钥</value>
-    <comment>Add the key of %@ below</comment>
-  </data>
-  <data name="AddTheKeyOfInTranscriptionModels" xml:space="preserve">
-    <value>在“转写模型”中添加 {0} 的密钥</value>
-    <comment>Add the key of %@ in Transcription models</comment>
-  </data>
   <data name="Added" xml:space="preserve">
     <value>已添加</value>
     <comment>Added</comment>
@@ -289,10 +281,6 @@
   <data name="AskToStop" xml:space="preserve">
     <value>询问是否停止</value>
     <comment>Ask to stop</comment>
-  </data>
-  <data name="AssemblyAIPicksItsModelForTheLanguageUniversal" xml:space="preserve">
-    <value>AssemblyAI 会根据语言选择模型（Universal）。</value>
-    <comment>AssemblyAI picks its model for the language (Universal).</comment>
   </data>
   <data name="AttachTheIndicatorToTheMeetingWindow" xml:space="preserve">
     <value>将指示器附着在会议窗口上</value>
@@ -1690,10 +1678,6 @@
     <value>模型 ID</value>
     <comment>Model id</comment>
   </data>
-  <data name="ModelIdEGWhisper1" xml:space="preserve">
-    <value>模型 ID，例如 whisper-1</value>
-    <comment>Model id, e.g. whisper-1</comment>
-  </data>
   <data name="Models" xml:space="preserve">
     <value>模型</value>
     <comment>Models</comment>
@@ -2022,10 +2006,6 @@
     <value>打开</value>
     <comment>Open</comment>
   </data>
-  <data name="OpenAIGroqMistralGoogleGeminiAndCustomEndpointsTranscribeToo" xml:space="preserve">
-    <value>OpenAI、Groq、Mistral、Google Gemini 和自定义端点也可以使用各自的转写模型进行转写：请在“设置 › AI”中进行设置。</value>
-    <comment>OpenAI, Groq, Mistral, Google Gemini and custom endpoints transcribe too, with their transcription model: set them up in Settings › AI.</comment>
-  </data>
   <data name="OpenCodeDeniesEveryToolButMCPServersInYourOpenCodeConfigStil" xml:space="preserve">
     <value>OpenCode 会拒绝所有工具，但你的 OpenCode 配置中的 MCP 服务器仍会启动（其工具会被拒绝）。</value>
     <comment>OpenCode denies every tool, but MCP servers in your OpenCode config still start (their tools are denied).</comment>
@@ -2185,10 +2165,6 @@
   <data name="PickAnEmbeddingModelInSettingsRAG" xml:space="preserve">
     <value>在“设置 › RAG”中选择嵌入模型</value>
     <comment>Pick an embedding model in Settings › RAG</comment>
-  </data>
-  <data name="PickAnEnabledProviderInSettingsRAG" xml:space="preserve">
-    <value>在“设置 › RAG”中选择已启用的提供商</value>
-    <comment>Pick an enabled provider in Settings › RAG</comment>
   </data>
   <data name="PickedByAssemblyAIForTheLanguageUniversal" xml:space="preserve">
     <value>由 AssemblyAI 根据语言选择（Universal）</value>
@@ -2533,10 +2509,6 @@
   <data name="SaveAKeyFirst" xml:space="preserve">
     <value>请先存储密钥。</value>
     <comment>Save a key first.</comment>
-  </data>
-  <data name="SaveAKeyForInSettingsAI" xml:space="preserve">
-    <value>在“设置 › AI”中存储 {0} 的密钥</value>
-    <comment>Save a key for %@ in Settings › AI</comment>
   </data>
   <data name="SaveAKeyForInSettingsAPIKeys" xml:space="preserve">
     <value>在“设置 › API 密钥”中存储 {0} 的密钥</value>

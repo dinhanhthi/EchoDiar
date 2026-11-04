@@ -10,7 +10,6 @@ using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Automation;
 using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Input;
-using Windows.System;
 
 namespace EchoDiar.App.Views;
 
@@ -19,9 +18,9 @@ namespace EchoDiar.App.Views;
 /// inner tabs; the title bar picks the tab (<see cref="AppViewModel.SubTabOf"/>). Every setting shows
 /// <see cref="SettingsViewModel"/> and changes it; the change is saved after its delay. The model rows show
 /// <see cref="ModelsViewModel"/>'s state, kept up to date in place (a download's progress changes them often). The cloud
-/// rows and the speech-to-text APIs (macOS <c>cloudSection</c>, <c>speechToTextSection</c>) show
-/// <see cref="ProvidersViewModel"/>'s configs and <see cref="AppViewModel.CloudEngineConfigs"/>, made once per provider
-/// and updated in place; API keys go to Credential Manager only and are never read back into the UI.
+/// rows (macOS <c>cloudSection</c>) show <see cref="ProvidersViewModel"/>'s configs with their model and key status, and
+/// <see cref="AppViewModel.CloudEngineConfigs"/>, made once per provider and updated in place; keys are saved in
+/// Settings › API Keys, which a row's "API key" button opens.
 /// </summary>
 public sealed partial class TranscriptionSettingsPage : UserControl
 {
@@ -47,7 +46,6 @@ public sealed partial class TranscriptionSettingsPage : UserControl
         new("Delete audio after transcription", ["remove audio", "Recycle Bin", "trash", "save space"], GeneralTab),
         new("Transcription models", ["download", "Whisper", "Parakeet", "fast", "balanced", "quality"], TranscriptionModelsTab),
         new("Cloud transcription engines", ["upload", "API", "default engine", .. SpeechToTextNames()], TranscriptionModelsTab),
-        new("Speech-to-text APIs", ["API key", "cloud transcription", .. SpeechToTextNames()], TranscriptionModelsTab),
         new("Diarization models", ["speaker model", "speakers", "pyannote", "download"], DiarizationModelsTab),
         new("Cloud diarization", ["OpenAI", "ElevenLabs", "Deepgram", "AssemblyAI", "Gemini", "speakers", "cloud"], DiarizationModelsTab),
         new("Tell speakers apart", ["diarization", "speakers", "who spoke"], DiarizationModelsTab),
@@ -65,9 +63,6 @@ public sealed partial class TranscriptionSettingsPage : UserControl
     private readonly ProvidersViewModel _providers;
     private readonly CloudSection _transcriptionCloud;
     private readonly CloudSection _diarizationCloud;
-
-    /// <summary>One row per speech-to-text API, made once and updated in place.</summary>
-    private readonly Dictionary<string, SpeechProviderRow> _speechRows = new(StringComparer.OrdinalIgnoreCase);
 
     /// <summary>One row per listed model, made once and updated in place.</summary>
     private readonly List<ModelRow> _rows = [];
@@ -90,10 +85,6 @@ public sealed partial class TranscriptionSettingsPage : UserControl
         InitializeComponent();
         _transcriptionCloud = new CloudSection(this, TranscriptionCloudList, diarization: false);
         _diarizationCloud = new CloudSection(this, DiarizationCloudList, diarization: true);
-        SpeechToTextList.Children.Add(SectionHeader(
-            "Speech-to-text APIs",
-            "OpenAI, Groq, Mistral, Google Gemini and custom endpoints transcribe too, with their transcription model: set them up in Settings › AI.",
-            "Speech-to-text APIs"));
         RememberLanguageCard.Description = Loc.T(
             "Uses the language picked in the Record menu for the next recordings instead of the default language. Languages changed during a recording don't count.");
         LiveCard.Description = Loc.T(LiveDescription);
@@ -147,10 +138,9 @@ public sealed partial class TranscriptionSettingsPage : UserControl
             _models.PropertyChanged -= OnModelsChanged;
             _models.StatesChanged -= UpdateRows;
             _providers.Changed -= RefreshCloud;
-            // macOS: a test or a model list stops when its row goes away.
+            // macOS: a model list stops when its row goes away.
             _transcriptionCloud.Cancel();
             _diarizationCloud.Cancel();
-            foreach (var row in _speechRows.Values) row.Cancel();
         };
     }
 
@@ -158,15 +148,7 @@ public sealed partial class TranscriptionSettingsPage : UserControl
 
     private void OnModelChanged(object? sender, PropertyChangedEventArgs e)
     {
-        switch (e.PropertyName)
-        {
-            case nameof(AppViewModel.SettingsSubTab):
-                ShowTab();
-                break;
-            case nameof(AppViewModel.SettingsExpandedProvider):
-                ExpandRequestedProvider();
-                break;
-        }
+        if (e.PropertyName == nameof(AppViewModel.SettingsSubTab)) ShowTab();
     }
 
     private void OnSettingsChanged(object? sender, PropertyChangedEventArgs e) => Refresh();
@@ -196,7 +178,6 @@ public sealed partial class TranscriptionSettingsPage : UserControl
         GeneralPanel.Visibility = tab == GeneralTab ? Visibility.Visible : Visibility.Collapsed;
         TranscriptionPanel.Visibility = tab == TranscriptionModelsTab ? Visibility.Visible : Visibility.Collapsed;
         DiarizationPanel.Visibility = tab == DiarizationModelsTab ? Visibility.Visible : Visibility.Collapsed;
-        ExpandRequestedProvider();
     }
 
     /// <summary>Every setting control shows the current settings.</summary>
@@ -400,8 +381,7 @@ public sealed partial class TranscriptionSettingsPage : UserControl
 
     private static Visibility Show(bool visible) => visible ? Visibility.Visible : Visibility.Collapsed;
 
-    // Cloud (macOS cloudSection, CloudEngineRow, CloudModelField) and the speech-to-text APIs (speechToTextSection,
-    // SpeechProviderRow)
+    // Cloud (macOS cloudSection, CloudEngineRow, CloudModelField)
 
     /// <summary>Below this width a field's card puts its input under its label, as the provider rows of Settings › AI.</summary>
     private const double FieldWrapWidth = 640;
@@ -413,54 +393,17 @@ public sealed partial class TranscriptionSettingsPage : UserControl
         ["elevenlabs"] = "~$0.22/h", ["deepgram"] = "~$0.26/h", ["assemblyai"] = "~$0.23/h",
     };
 
-    /// <summary>Where to get a speech-to-text API's key and look up its models (macOS <c>providerLinks</c>).</summary>
-    private static readonly Dictionary<string, (string Keys, string Models)> SpeechLinks = new()
-    {
-        ["elevenlabs"] = ("https://elevenlabs.io/app/developers/api-keys", "https://elevenlabs.io/docs/overview/models"),
-        ["deepgram"] = ("https://console.deepgram.com", "https://developers.deepgram.com/docs/models-languages-overview"),
-        ["assemblyai"] = ("https://www.assemblyai.com/dashboard/api-keys", "https://www.assemblyai.com/docs/getting-started/models"),
-    };
-
     private static IEnumerable<string> SpeechToTextNames() =>
         ProviderConfig.Presets().Where(p => p.Kind == ProviderKind.SpeechToText).Select(p => p.DisplayName);
 
     private bool Closing => _model.IsClosing;
 
-    /// <summary>Both cloud sections and the speech-to-text rows show the current configs, keys and defaults.</summary>
+    /// <summary>Both cloud sections show the current configs, keys and defaults.</summary>
     private void RefreshCloud()
     {
         if (Closing) return;
         _transcriptionCloud.Update();
         _diarizationCloud.Update();
-        List<UIElement> rows = [SpeechToTextList.Children[0]];
-        foreach (var config in _providers.ProviderConfigs.Where(c => c.Kind == ProviderKind.SpeechToText))
-        {
-            if (!_speechRows.TryGetValue(config.Id, out var row)) _speechRows[config.Id] = row = new SpeechProviderRow(this, config.Id);
-            row.Update(config);
-            rows.Add(row.Expander);
-        }
-        if (!SpeechToTextList.Children.SequenceEqual(rows))
-        {
-            SpeechToTextList.Children.Clear();
-            foreach (var row in rows) SpeechToTextList.Children.Add(row);
-        }
-    }
-
-    /// <summary>
-    /// A cloud row's Set Up on this page (macOS <c>settingsExpandedProvider</c>): the speech-to-text API's row expands and
-    /// comes into view once the Transcription model tab shows, and the request is cleared.
-    /// </summary>
-    private void ExpandRequestedProvider()
-    {
-        if (Closing || Tab != TranscriptionModelsTab || _model.SettingsExpandedProvider is not { } id
-            || !_speechRows.TryGetValue(id, out var row)) return;
-        _model.SettingsExpandedProvider = null;
-        row.Expander.IsExpanded = true;
-        // After the panel's layout: a row of a tab just shown has no position yet.
-        DispatcherQueue.TryEnqueue(() =>
-        {
-            if (!Closing) row.Expander.StartBringIntoView(new BringIntoViewOptions { AnimationDesired = true, VerticalAlignmentRatio = 0 });
-        });
     }
 
     /// <summary>A section title with its description (macOS <c>SectionHeader</c>); <paramref name="tag"/> is its search entry.</summary>
@@ -486,17 +429,15 @@ public sealed partial class TranscriptionSettingsPage : UserControl
     };
 
     /// <summary>
-    /// "Cloud" on one tab (macOS <c>cloudSection(diarization:)</c>): the header, the default cloud engine's model (its own
-    /// field, as it follows the default) when the default is a configured cloud engine, the "audio leaves this PC" note,
-    /// then every provider that transcribes (with <c>diarization</c>: that labels speakers), Set default once configured
-    /// or Set Up.
+    /// "Cloud" on one tab (macOS <c>cloudSection(diarization:)</c>): the header, the "audio leaves this PC" note, then
+    /// every provider that transcribes (with <c>diarization</c>: that labels speakers), each with its model, its key
+    /// status and Set default once configured.
     /// </summary>
     private sealed class CloudSection
     {
         private readonly TranscriptionSettingsPage _page;
         private readonly StackPanel _list;
         private readonly bool _diarization;
-        private readonly CloudModelField _modelField;
         private readonly UIElement _header;
         private readonly UIElement _caution;
         private readonly Dictionary<string, CloudEngineRow> _rows = new(StringComparer.OrdinalIgnoreCase);
@@ -512,7 +453,6 @@ public sealed partial class TranscriptionSettingsPage : UserControl
                     ? "Only the system channel is uploaded, as one extra transcription billed by the provider; only the speaker labels are kept. Not used when the transcription model already labels speakers. Prices are approximate list prices per audio hour."
                     : "Prices are approximate list prices per audio hour; the mic and system channels are sent and billed separately.",
                 diarization ? "Cloud diarization" : "Cloud transcription engines");
-            _modelField = new CloudModelField(page, diarization);
             var caution = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 6, Margin = new Thickness(1, 4, 0, 4) };
             caution.Children.Add(new FontIcon { Style = (Style)page.Resources["CautionIconStyle"], Glyph = "\uE753" });
             caution.Children.Add(new TextBlock
@@ -526,7 +466,10 @@ public sealed partial class TranscriptionSettingsPage : UserControl
             _caution = caution;
         }
 
-        public void Cancel() => _modelField.Cancel();
+        public void Cancel()
+        {
+            foreach (var row in _rows.Values) row.Cancel();
+        }
 
         public void Update()
         {
@@ -534,21 +477,15 @@ public sealed partial class TranscriptionSettingsPage : UserControl
             var configured = (_diarization ? app.CloudDiarizerConfigs : app.CloudEngineConfigs)
                 .Select(c => c.Id).ToHashSet(StringComparer.OrdinalIgnoreCase);
             var defaultId = _diarization ? _page._models.DefaultDiarizerModelID : _page._models.DefaultASRModelID;
-            var defaultConfig = CloudTranscription.ProviderId(defaultId) is { } providerId && configured.Contains(providerId)
-                ? _page._providers.Config(providerId)
-                : null;
-            _modelField.Update(defaultConfig);
 
-            List<UIElement> children = [_header];
-            if (defaultConfig is not null) children.Add(_modelField.Card);
-            children.Add(_caution);
+            List<UIElement> children = [_header, _caution];
             foreach (var config in _page._providers.ProviderConfigs.Where(c =>
                          CloudTranscription.Supports(c)
                          && (!_diarization || CloudTranscription.DiarizationPresets.Contains(c.Preset ?? ""))))
             {
                 if (!_rows.TryGetValue(config.Id, out var row)) _rows[config.Id] = row = new CloudEngineRow(_page, _diarization);
                 row.Update(config, configured.Contains(config.Id), defaultId);
-                children.Add(row.Card);
+                children.Add(row.Expander);
             }
             if (_list.Children.SequenceEqual(children)) return;
             _list.Children.Clear();
@@ -558,8 +495,9 @@ public sealed partial class TranscriptionSettingsPage : UserControl
 
     /// <summary>
     /// A cloud engine (macOS <c>CloudEngineRow</c>): its name with the model it runs once configured, the Default badge,
-    /// Cloud and its approximate price, Gemini's note; Set default once configured (enabled, with a key and a model; a key
-    /// alone with <c>diarization</c>), else Set Up, which opens where it is configured.
+    /// Cloud and its approximate price, Gemini's note, "Base URL not set" for a custom endpoint without one; Set default
+    /// once configured (available, with a model; available alone with <c>diarization</c>) and its key status ("API key"
+    /// opens its card in Settings › API Keys); expanded, its model.
     /// </summary>
     private sealed class CloudEngineRow
     {
@@ -572,9 +510,12 @@ public sealed partial class TranscriptionSettingsPage : UserControl
         private readonly Border _badge;
         private readonly TextBlock _details;
         private readonly TextBlock _geminiNote;
-        private readonly Button _setUp = new();
+        private readonly TextBlock _noBaseURL;
         private readonly Button _setDefault = new();
+        private readonly ApiKeyStatus _status;
+        private readonly CloudModelField _modelField;
         private ProviderConfig? _config;
+        private bool _warned;
 
         public CloudEngineRow(TranscriptionSettingsPage page, bool diarization)
         {
@@ -593,23 +534,29 @@ public sealed partial class TranscriptionSettingsPage : UserControl
             _geminiNote = page.Note(diarization
                 ? "LLM diarization — timestamps approximate, speakers can be mislabeled."
                 : "LLM transcription — timestamps approximate.", "NoteStyle");
+            // A custom endpoint transcribes once its base URL (set in API Keys) and its model are set.
+            _noBaseURL = page.Note("Base URL not set", "NoteStyle");
             var description = new StackPanel { Spacing = 2 };
             description.Children.Add(_details);
             description.Children.Add(_geminiNote);
-            _setUp.Content = Loc.T("Set Up…");
-            _setUp.Click += (_, _) => SetUp();
+            description.Children.Add(_noBaseURL);
             _setDefault.Content = Loc.T("Set default");
             _setDefault.Click += (_, _) =>
             {
                 if (_config is { } config) _page._models.SetDefault(CloudTranscription.EngineId(config.Id), _diarization);
             };
+            _status = new ApiKeyStatus(page._model, (Style)page.Resources["SuccessIconStyle"]);
             var actions = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 8 };
-            actions.Children.Add(_setUp);
             actions.Children.Add(_setDefault);
-            Card = new SettingsCard { Header = header, Description = description, Content = actions };
+            actions.Children.Add(_status.Element);
+            _modelField = new CloudModelField(page, diarization);
+            Expander = new SettingsExpander { Header = header, Description = description, Content = actions };
+            Expander.Items.Add(_modelField.Card);
         }
 
-        public SettingsCard Card { get; }
+        public SettingsExpander Expander { get; }
+
+        public void Cancel() => _modelField.Cancel();
 
         public void Update(ProviderConfig config, bool configured, string defaultId)
         {
@@ -620,15 +567,9 @@ public sealed partial class TranscriptionSettingsPage : UserControl
             ToolTipService.SetToolTip(_name, name);
             var isDefault = configured && ProvidersViewModel.SameId(defaultId, engineId);
             _badge.Visibility = Show(isDefault);
-            _setUp.Visibility = Show(!configured);
             _setDefault.Visibility = Show(configured && !isDefault);
-            AutomationProperties.SetName(_setUp, $"{Loc.T("Set Up…")}, {config.DisplayName}");
             AutomationProperties.SetName(_setDefault, $"{Loc.T("Set default")}, {config.DisplayName}");
-            ToolTipService.SetToolTip(_setUp, config.Kind != ProviderKind.SpeechToText
-                ? Loc.Format("Turn on %@ in Settings › AI", config.DisplayName)
-                : _diarization
-                    ? Loc.Format("Add the key of %@ in Transcription models", config.DisplayName)
-                    : Loc.Format("Add the key of %@ below", config.DisplayName));
+            _status.Update(config);
             List<string> details = [Loc.T("Cloud")];
             if (config.Preset is { } preset && Prices.TryGetValue(preset, out var price))
             {
@@ -636,6 +577,11 @@ public sealed partial class TranscriptionSettingsPage : UserControl
             }
             _details.Text = string.Join(" · ", details);
             _geminiNote.Visibility = Show(config.Preset == "gemini");
+            _noBaseURL.Visibility = Show(config.Preset is null && config.BaseURL.Trim().Length == 0);
+            _modelField.Update(config);
+            // Its model's warning shows without a click: the row opens when one appears (the user can close it again).
+            if (_modelField.Warns && !_warned) Expander.IsExpanded = true;
+            _warned = _modelField.Warns;
         }
 
         /// <summary>"Deepgram (nova-3)" with the model it runs; the provider name alone when it picks the model.</summary>
@@ -645,27 +591,13 @@ public sealed partial class TranscriptionSettingsPage : UserControl
             var model = CloudTranscription.DiarizationModel(config);
             return model.Length == 0 ? config.DisplayName : $"{config.DisplayName} ({model})";
         }
-
-        /// <summary>
-        /// Speech-to-text APIs are set up in their row on the Transcription model tab (from Diarization model, that tab is
-        /// opened first), the other APIs in Settings › AI › Cloud APIs.
-        /// </summary>
-        private void SetUp()
-        {
-            if (_config is not { } config) return;
-            var app = _page._model;
-            app.SettingsExpandedProvider = config.Id;
-            if (config.Kind != ProviderKind.SpeechToText) app.OpenSettings(SettingsSearch.Providers, ProvidersSettingsPage.CloudAPIsTab);
-            else if (_diarization) app.OpenSettings(SettingsSearch.Transcription, TranscriptionModelsTab);
-            else _page.ExpandRequestedProvider();
-        }
     }
 
     /// <summary>
-    /// The default cloud engine's transcription model (macOS <c>CloudModelField</c>): free text, a menu of the known
-    /// models and, for the APIs that list their models, Load models (only the ones that transcribe). With
-    /// <c>diarization</c>, the default cloud diarizer's diarization model: only models that label speakers are listed,
-    /// and a note says when the typed one does not. AssemblyAI picks its model.
+    /// A cloud engine's transcription model (macOS <c>CloudModelField</c>): free text, a menu of the known models and, for
+    /// the APIs that list their models, Load models (only the ones that transcribe). With <c>diarization</c>, the cloud
+    /// diarizer's diarization model: only models that label speakers are listed, and a note says when the typed one does
+    /// not. AssemblyAI picks its model.
     /// </summary>
     private sealed class CloudModelField
     {
@@ -731,19 +663,15 @@ public sealed partial class TranscriptionSettingsPage : UserControl
 
         public SettingsCard Card { get; }
 
+        /// <summary>The streaming-only or "does not label speakers" warning shows.</summary>
+        public bool Warns { get; private set; }
+
         public void Cancel() => _loading?.Cancel();
 
-        /// <summary>Shows the default engine's <paramref name="config"/> (null: none); loaded models belong to the provider they came from.</summary>
-        public void Update(ProviderConfig? config)
+        /// <summary>Shows its engine's <paramref name="config"/>; the text the user is typing stays as it is.</summary>
+        public void Update(ProviderConfig config)
         {
-            if (config is null || _config is null || !ProvidersViewModel.SameId(config.Id, _config.Id))
-            {
-                _loading?.Cancel();
-                _loaded = null;
-                _loadError = null;
-            }
             _config = config;
-            if (config is null) return;
             if (config.Preset == "assemblyai")
             {
                 _picked.Text = Loc.T(_diarization
@@ -751,6 +679,7 @@ public sealed partial class TranscriptionSettingsPage : UserControl
                     : "Picked by AssemblyAI for the language (Universal)");
                 Card.Content = _picked;
                 ((StackPanel)Card.Description).Visibility = Visibility.Collapsed;
+                Warns = false;
                 return;
             }
             Card.Content = _input;
@@ -785,6 +714,7 @@ public sealed partial class TranscriptionSettingsPage : UserControl
             // A streaming-only diarization model falls back to this PC's diarizer: _noSpeakers says so.
             _streamingOnly.Visibility = Show(!_diarization && CloudTranscription.IsStreamingOnly(CloudTranscription.Model(config)));
             _noSpeakers.Visibility = Show(_diarization && !CloudTranscription.Diarizes(config, CloudTranscription.DiarizationModel(config)));
+            Warns = _streamingOnly.Visibility == Visibility.Visible || _noSpeakers.Visibility == Visibility.Visible;
         }
 
         private void SetModel(string id)
@@ -829,7 +759,7 @@ public sealed partial class TranscriptionSettingsPage : UserControl
             _loadButton.IsEnabled = true;
             _ring.IsActive = false;
             _ring.Visibility = Visibility.Collapsed;
-            Update(_config);
+            if (_page._providers.Config(config.Id) is { } current) Update(current);
         }
 
         /// <summary>
@@ -841,184 +771,6 @@ public sealed partial class TranscriptionSettingsPage : UserControl
             id = id.ToLowerInvariant();
             if (preset == "gemini") return id.Contains("gemini", StringComparison.Ordinal);
             return new[] { "whisper", "transcribe", "voxtral", "scribe", "nova", "speech" }.Any(part => id.Contains(part, StringComparison.Ordinal));
-        }
-    }
-
-    /// <summary>
-    /// A speech-to-text API (macOS <c>SpeechProviderRow</c>), available once its key is saved; expanded, its API key
-    /// (Credential Manager only: saved on Enter, on leaving the field, by Save and by Test, then cleared; only "Saved"
-    /// shows), its transcription model (AssemblyAI picks its own), Browse models, and Test: a free request that needs a
-    /// valid key and uploads no audio.
-    /// </summary>
-    private sealed class SpeechProviderRow
-    {
-        private readonly TranscriptionSettingsPage _page;
-        private readonly string _id;
-        private readonly PasswordBox _keyBox = new();
-        private readonly StackPanel _savedLabel = new() { Orientation = Orientation.Horizontal, Spacing = 4, Visibility = Visibility.Collapsed };
-        private readonly Button _removeKeyButton = new() { Visibility = Visibility.Collapsed };
-        private readonly HyperlinkButton? _getKeyLink;
-        private readonly TextBlock _keyError;
-        private readonly SettingsCard _assemblyNote;
-        private readonly TranscriptionModelField _modelField;
-        private readonly Button _testButton = new();
-        private readonly Button _saveButton = new();
-        private readonly ProgressRing _ring = SmallRing();
-        private readonly TextBlock _ok;
-        private readonly TextBlock _testError;
-        private CancellationTokenSource? _testing;
-
-        public SpeechProviderRow(TranscriptionSettingsPage page, string id)
-        {
-            _page = page;
-            _id = id;
-            Expander = new SettingsExpander();
-
-            AutomationProperties.SetName(_keyBox, Loc.T("API key"));
-            _keyBox.KeyDown += (_, e) =>
-            {
-                if (e.Key != VirtualKey.Enter) return;
-                e.Handled = true;
-                _ = SaveKeyAsync();
-            };
-            _keyBox.LostFocus += (_, _) => _ = SaveKeyAsync();
-            _keyBox.PasswordChanged += (_, _) => UpdateSave();
-            _savedLabel.Children.Add(new FontIcon { Style = (Style)page.Resources["SuccessIconStyle"], Glyph = "\uE73E" });
-            _savedLabel.Children.Add(page.Note("Saved", "SuccessNoteStyle"));
-            _removeKeyButton.Content = Loc.T("Remove");
-            _removeKeyButton.Click += async (_, _) => ShowKeyError(await _page._providers.DeleteApiKeyAsync(_id));
-            var links = SpeechLinks.TryGetValue(id, out var found) ? found : ((string Keys, string Models)?)null;
-            if (links is { } keyLinks)
-            {
-                _getKeyLink = new HyperlinkButton { Content = Loc.T("Get an API key"), NavigateUri = new Uri(keyLinks.Keys), Padding = new Thickness(0) };
-            }
-            var keyPanel = new FieldPanel { InputWidth = 260 };
-            keyPanel.Children.Add(_keyBox);
-            keyPanel.Children.Add(_savedLabel);
-            keyPanel.Children.Add(_removeKeyButton);
-            if (_getKeyLink is not null) keyPanel.Children.Add(_getKeyLink);
-            _keyError = page.Note("", "CriticalNoteStyle");
-            _keyError.Visibility = Visibility.Collapsed;
-            var keyCard = Field("API key", keyPanel);
-            keyCard.Description = _keyError;
-
-            _assemblyNote = new SettingsCard { Header = page.Note("AssemblyAI picks its model for the language (Universal).", "NoteStyle") };
-            _modelField = new TranscriptionModelField(page._providers, id, () => page._syncing || page.Closing);
-
-            _testButton.Content = Loc.T("Test");
-            _testButton.Click += (_, _) => _ = TestAsync();
-            _saveButton.Content = Loc.T("Save");
-            _saveButton.Click += async (_, _) =>
-            {
-                await SaveKeyAsync();
-                UpdateSave();
-            };
-            _ok = page.Note("OK", "SuccessNoteStyle");
-            _ok.Visibility = Visibility.Collapsed;
-            _testError = page.Note("", "CriticalNoteStyle");
-            _testError.Visibility = Visibility.Collapsed;
-            _testError.MaxLines = 3;
-            var buttons = new FieldPanel();
-            buttons.Children.Add(_testButton);
-            buttons.Children.Add(_saveButton);
-            buttons.Children.Add(_ring);
-            buttons.Children.Add(_ok);
-
-            Expander.Items.Add(keyCard);
-            Expander.Items.Add(_assemblyNote);
-            Expander.Items.Add(_modelField.Card);
-            if (links is { } modelLinks)
-            {
-                Expander.Items.Add(new SettingsCard
-                {
-                    Header = new HyperlinkButton { Content = Loc.T("Browse models"), NavigateUri = new Uri(modelLinks.Models), Padding = new Thickness(0) },
-                });
-            }
-            Expander.Items.Add(new SettingsCard { Header = buttons, Description = _testError });
-        }
-
-        public SettingsExpander Expander { get; }
-
-        /// <summary>Shows <paramref name="config"/>; the key typed and the model being typed stay as they are.</summary>
-        public void Update(ProviderConfig config)
-        {
-            Expander.Header = config.DisplayName;
-            var assembly = config.Preset == "assemblyai";
-            _assemblyNote.Visibility = Show(assembly);
-            _modelField.Card.Visibility = Show(!assembly);
-            _modelField.Update(config);
-            var saved = _page._providers.HasApiKey(_id);
-            _savedLabel.Visibility = _removeKeyButton.Visibility = Show(saved);
-            if (_getKeyLink is not null) _getKeyLink.Visibility = Show(!saved);
-            _keyBox.PlaceholderText = Loc.T(saved ? "Enter a new key to replace it" : "Paste the key, then Save");
-            UpdateSave();
-        }
-
-        public void Cancel() => _testing?.Cancel();
-
-        /// <summary>Save is on while a key is typed and no test runs.</summary>
-        private void UpdateSave() => _saveButton.IsEnabled = _testing is null && !string.IsNullOrWhiteSpace(_keyBox.Password);
-
-        /// <summary>Saves the typed key (nothing when blank) and clears the field; false, with the error shown, when refused.</summary>
-        private async Task<bool> SaveKeyAsync()
-        {
-            var text = _keyBox.Password;
-            if (string.IsNullOrWhiteSpace(text)) return true;
-            var error = await _page._providers.SaveApiKeyAsync(_id, text);
-            if (_page.Closing) return false;
-            if (error is null && _keyBox.Password == text) _keyBox.Password = "";
-            ShowKeyError(error);
-            return error is null;
-        }
-
-        private void ShowKeyError(string? error)
-        {
-            if (_page.Closing) return;
-            _keyError.Text = error ?? "";
-            _keyError.Visibility = Show(error is not null);
-        }
-
-        /// <summary>Test: a key typed without Enter is saved first and is the one tested (macOS <c>TestButton.run</c>); Cancel while it runs.</summary>
-        private async Task TestAsync()
-        {
-            if (_testing is { } running)
-            {
-                running.Cancel();
-                return;
-            }
-            _ok.Visibility = _testError.Visibility = Visibility.Collapsed;
-            if (!await SaveKeyAsync() || _page.Closing || _page._providers.Config(_id) is not { } config) return;
-            using var cancellation = _testing = new CancellationTokenSource();
-            SetTesting(true);
-            string? error = null;
-            var ok = false;
-            try
-            {
-                await _page._providers.TestSpeechKeyAsync(config, cancellation.Token);
-                ok = true;
-            }
-            catch (Exception e) when (!cancellation.IsCancellationRequested)
-            {
-                error = ProvidersViewModel.ShortMessage(e);
-            }
-            catch (Exception)
-            {
-                // Cancelled: no result.
-            }
-            _testing = null;
-            if (_page.Closing) return;
-            SetTesting(false);
-            _ok.Visibility = Show(ok);
-            _testError.Text = error ?? "";
-            _testError.Visibility = Show(error is not null);
-        }
-
-        private void SetTesting(bool testing)
-        {
-            _testButton.Content = Loc.T(testing ? "Cancel" : "Test");
-            _ring.IsActive = testing;
-            _ring.Visibility = Show(testing);
-            UpdateSave();
         }
     }
 }
