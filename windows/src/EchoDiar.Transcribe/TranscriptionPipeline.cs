@@ -395,6 +395,15 @@ public sealed class TranscriptionPipeline(
         entry.Kind == ModelKind.Asr && entry.Runtime is ModelRuntime.WhisperNet or ModelRuntime.SherpaOnnx;
 
     /// <summary>
+    /// The local models a recording transcriber can run, in catalog order, for the cloud live-transcript picker (Swift
+    /// <c>liveEntries</c>): the usable Whisper and Parakeet entries (<see cref="TranscribesChunks"/>; no Apple Speech on
+    /// Windows). <paramref name="isUsable"/> includes "its runtime is registered". Any language: the picked id still
+    /// goes through the incremental-entry check at Start.
+    /// </summary>
+    public static IReadOnlyList<ModelEntry> LiveEntries(Func<ModelEntry, bool> isUsable) =>
+        [.. ModelCatalog.Asr.Where(e => isUsable(e) && TranscribesChunks(e))];
+
+    /// <summary>
     /// Extracts each channel (skipping silent ones), runs <paramref name="asr"/> on it, diarizes the system channel
     /// unless <paramref name="asr"/> returned speaker labels, merges and writes <c>transcript.json</c> (keeping the one
     /// it replaces). Diarization: <paramref name="cloudDiarizer"/> first (it never takes the gate); the local diarizer

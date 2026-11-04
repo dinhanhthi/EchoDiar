@@ -63,6 +63,11 @@ public sealed record ProviderConfig
     /// <summary>Diarization model id when this is the default cloud diarizer; empty = the provider default.</summary>
     public string DiarizationModel { get; set; } = "";
     public bool Enabled { get; set; }
+    /// <summary>
+    /// Realtime (WebSocket) model for the live transcript; empty = the provider default. Separate from
+    /// <see cref="TranscriptionModel"/>, so a streaming-only batch check never applies to it.
+    /// </summary>
+    public string RealtimeModel { get; set; } = "";
 
     /// <summary>
     /// A cloud API (every kind but <see cref="ProviderKind.Local"/> servers and <see cref="ProviderKind.Cli"/> tools,
@@ -176,6 +181,7 @@ public sealed class ProviderConfigConverter : JsonConverter<ProviderConfig>
             TranscriptionModel = Value(obj, "transcriptionModel", "", options),
             DiarizationModel = Value(obj, "diarizationModel", "", options),
             Enabled = Value(obj, "enabled", false, options),
+            RealtimeModel = Value(obj, "realtimeModel", "", options),
         };
     }
 
@@ -217,6 +223,7 @@ public sealed class ProviderConfigConverter : JsonConverter<ProviderConfig>
         writer.WriteString("transcriptionModel", value.TranscriptionModel);
         writer.WriteString("diarizationModel", value.DiarizationModel);
         writer.WriteBoolean("enabled", value.Enabled);
+        writer.WriteString("realtimeModel", value.RealtimeModel);
         writer.WriteEndObject();
     }
 }

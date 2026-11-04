@@ -133,6 +133,53 @@ public sealed class SettingsTests : IDisposable
     }
 
     [Fact]
+    public void OldFileReadsTheLiveTranscriptOff()
+    {
+        File.WriteAllText(_store.FilePath, """{"version":1,"providers":[{"id":"deepgram","kind":"deepgram"}]}""");
+
+        var loaded = _store.Load();
+        Assert.Equal(CloudLiveSource.Off, loaded.CloudLiveSource);
+        Assert.Null(loaded.CloudLiveModelID);
+        Assert.False(loaded.RealtimeAsFinal);
+        Assert.Equal("", Assert.Single(loaded.Providers).RealtimeModel);
+    }
+
+    [Fact]
+    public void UnknownCloudLiveSourceReadsOffAndKeepsTheOtherSettings()
+    {
+        File.WriteAllText(_store.FilePath,
+            """{"launchAtLogin":true,"cloudLiveSource":"telepathy","cloudLiveModelID":"m","realtimeAsFinal":true}""");
+
+        var loaded = _store.Load();
+        Assert.Equal(CloudLiveSource.Off, loaded.CloudLiveSource);
+        Assert.True(loaded.LaunchAtLogin);
+        Assert.Equal("m", loaded.CloudLiveModelID);
+        Assert.True(loaded.RealtimeAsFinal);
+    }
+
+    [Theory]
+    [InlineData(CloudLiveSource.Local, "local")]
+    [InlineData(CloudLiveSource.Realtime, "realtime")]
+    public void LiveTranscriptSettingsRoundTrip(CloudLiveSource source, string raw)
+    {
+        var provider = Config("deepgram", enabled: false);
+        provider.RealtimeModel = "nova-3";
+        _store.Save(new AppSettings
+        {
+            CloudLiveSource = source, CloudLiveModelID = "parakeet", RealtimeAsFinal = true, Providers = [provider],
+        });
+
+        var written = JsonNode.Parse(File.ReadAllBytes(_store.FilePath))!.AsObject();
+        Assert.Equal(raw, written["cloudLiveSource"]!.GetValue<string>());
+        Assert.Equal("nova-3", written["providers"]![0]!["realtimeModel"]!.GetValue<string>());
+        var loaded = _store.Load();
+        Assert.Equal(source, loaded.CloudLiveSource);
+        Assert.Equal("parakeet", loaded.CloudLiveModelID);
+        Assert.True(loaded.RealtimeAsFinal);
+        Assert.Equal("nova-3", Assert.Single(loaded.Providers).RealtimeModel);
+    }
+
+    [Fact]
     public void CorruptFileIsMovedAsideAndDefaultsAreReturned()
     {
         var now = new DateTimeOffset(2026, 10, 22, 9, 30, 15, TimeSpan.Zero).AddMilliseconds(7);
@@ -175,13 +222,13 @@ public sealed class SettingsTests : IDisposable
         Assert.True(JsonNode.DeepEquals(JsonNode.Parse("""
             [
               {"id":"x","kind":"openAICompatible","displayName":"x","baseURL":"","authStyle":"none","extraHeaders":{},
-               "defaultModel":"","shownModels":[],"transcriptionModel":"","diarizationModel":"","enabled":false},
+               "defaultModel":"","shownModels":[],"transcriptionModel":"","diarizationModel":"","enabled":false,"realtimeModel":""},
               {"id":"future","kind":"openAICompatible","displayName":"future","baseURL":"https://h/v1","authStyle":"none",
                "extraHeaders":{},"defaultModel":"m","shownModels":[],"transcriptionModel":"","diarizationModel":"",
-               "enabled":false},
+               "enabled":false,"realtimeModel":""},
               {"id":"anthropic","kind":"anthropic","preset":"anthropic","displayName":"A","baseURL":"https://a",
                "authStyle":"xApiKey","extraHeaders":{"h":"v"},"defaultModel":"m","shownModels":[],
-               "transcriptionModel":"","diarizationModel":"","enabled":true}
+               "transcriptionModel":"","diarizationModel":"","enabled":true,"realtimeModel":""}
             ]
             """), JsonNode.Parse(Json(settings))!["providers"]));
     }
@@ -344,7 +391,8 @@ public sealed class SettingsTests : IDisposable
           "autoDeleteMode": "audioOnly", "deleteAudioAfterTranscription": false, "deleteWithoutConfirmation": false,
           "globalHotKeyWindows": {"virtualKey": 82, "modifiers": 3}, "globalHotKeyEnabled": true,
           "globalPauseHotKeyWindows": {"virtualKey": 80, "modifiers": 3}, "globalPauseHotKeyEnabled": true,
-          "autoExcludedProviderIDs": [], "providerAvailabilityMigrated": false
+          "autoExcludedProviderIDs": [], "providerAvailabilityMigrated": false,
+          "cloudLiveSource": "off", "realtimeAsFinal": false
         }
         """;
 }

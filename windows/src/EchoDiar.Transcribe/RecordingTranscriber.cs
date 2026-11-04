@@ -35,10 +35,21 @@ namespace EchoDiar.Transcribe;
 /// task. Thread-safe: <see cref="AppendInterleaved"/> runs on the writer's thread, the decode task on the thread pool,
 /// the rest on any thread.
 /// </para>
+/// <para>
+/// <c>displayOnly</c> (Swift <c>displayOnly</c>): a local live transcript while a cloud engine writes the transcript
+/// after Stop. <see cref="FinishAsync"/> then cancels and returns null at once, without draining.
+/// </para>
 /// </remarks>
 public sealed class RecordingTranscriber : IAsyncDisposable
 {
     public enum TranscriberState { Loading, Listening, Paused, Failed }
+
+    /// <summary>What produces the live text (Swift <c>Source</c>; no Apple Speech on Windows, a cloud realtime source comes later).</summary>
+    public enum TranscriberSource
+    {
+        /// <summary>Whisper or Parakeet decoding speech chunks.</summary>
+        Chunks,
+    }
 
     /// <summary>Who spoke a line: <c>ToString()</c> is the macOS label ("Me", "Others").</summary>
     public enum Speaker { Me, Others }
@@ -57,6 +68,14 @@ public sealed class RecordingTranscriber : IAsyncDisposable
         /// <see cref="Lines"/> (Swift <c>tentative</c>); a new array whenever it changes.
         /// </summary>
         public IReadOnlyList<Tentative> Tentative { get; init; } = [];
+
+        public TranscriberSource Source { get; init; } = TranscriberSource.Chunks;
+
+        /// <summary>
+        /// <see cref="FinishAsync"/> returns null: the live text is not kept, a batch job writes the transcript after
+        /// Stop (Swift <c>displayOnly</c>).
+        /// </summary>
+        public bool DisplayOnly { get; init; }
     }
 
     /// <summary>The text of a chunk still open, decoded so far; its line replaces it once the chunk closes (Swift <c>Tentative</c>).</summary>
@@ -119,6 +138,8 @@ public sealed class RecordingTranscriber : IAsyncDisposable
     private readonly ModelLoadGate _gate;
     private readonly TimeSpan? _idleRelease;
     private readonly Func<string?> _language;
+    /// <summary><see cref="FinishAsync"/> returns null without draining.</summary>
+    private readonly bool _displayOnly;
     /// <summary>Filled by <see cref="AppendInterleaved"/> on the writer's thread, emptied by the decode task; locked on itself.</summary>
     private readonly Buffer _buffer;
     /// <summary>At most one pending wake-up: a chunk is waiting, the recording resumed, or the tick is due.</summary>
@@ -146,16 +167,18 @@ public sealed class RecordingTranscriber : IAsyncDisposable
     /// chunk came for that long (a paused recording) and loads it again for the next one; null keeps it until
     /// <see cref="FinishAsync"/>. <paramref name="language"/> gives the current marker language ("auto", a BCP-47
     /// code, or null = detect); it is called for every block on the writer's thread, so it must be cheap and thread-safe.
+    /// <paramref name="displayOnly"/> keeps nothing at Stop (<see cref="FinishAsync"/> returns null at once).
     /// </summary>
     public RecordingTranscriber(
         ModelEntry entry, ISessionTranscriptionEngine engine, ModelLoadGate gate, TimeSpan? idleRelease,
-        Func<string?> language)
+        Func<string?> language, bool displayOnly = false)
     {
         _entry = entry;
         _engine = engine;
         _gate = gate;
         _idleRelease = idleRelease;
         _language = language;
+        _displayOnly = displayOnly;
         _buffer = new Buffer(
             Math.Min(entry.WindowSeconds ?? TranscriptionPipeline.DefaultWindowSeconds, LiveMaxChunkSeconds),
             shortPauseMinSeconds: LiveShortPauseMinSeconds, shortPauseFrames: LiveShortPauseFrames);
@@ -205,7 +228,9 @@ public sealed class RecordingTranscriber : IAsyncDisposable
 
     /// <summary>
     /// At Stop: decodes what is left, unloads the model (releasing the gate) and returns what was transcribed; null
-    /// when no chunk was, or the model never loaded (the pipeline then transcribes the whole recording).
+    /// when no chunk was, or the model never loaded (the pipeline then transcribes the whole recording). Display only:
+    /// cancels without waiting for a decode in flight and returns null at once; <see cref="Stats"/> then counts the
+    /// lines shown as transcribed, once the model loaded.
     /// </summary>
     public async Task<PriorTranscription?> FinishAsync()
     {
@@ -218,6 +243,12 @@ public sealed class RecordingTranscriber : IAsyncDisposable
         }
         bool loaded;
         lock (_buffer) loaded = _buffer.Loaded;
+        if (_displayOnly)
+        {
+            if (loaded) lock (_lock) Stats = new ChunkStats(_nextLineID, 0, 0, 0, 0);
+            Cancel();
+            return null;
+        }
         if (!loaded)
         {
             Cancel();
@@ -447,6 +478,8 @@ public sealed class RecordingTranscriber : IAsyncDisposable
         var snapshot = new Snapshot(_state, _lines, pending, _state == TranscriberState.Failed ? _error : null)
         {
             Tentative = _tentative,
+            Source = TranscriberSource.Chunks,
+            DisplayOnly = _displayOnly,
         };
         if (snapshot == _published) return;
         _published = snapshot;

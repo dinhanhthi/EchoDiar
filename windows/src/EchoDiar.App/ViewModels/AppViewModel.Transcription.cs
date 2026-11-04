@@ -68,20 +68,33 @@ public sealed partial class AppViewModel
     /// <summary>
     /// Before the engine starts (it reads the sink once at start; the model loads meanwhile): a transcriber for a
     /// recording in <paramref name="language"/>, connected to the engine's live sink, when auto-transcribe and
-    /// "Transcribe while recording" are on and the engine the Stop job resolves to is an installed Whisper or Parakeet
-    /// entry. Otherwise the sink is cleared, and a previous recording's captions are not this one's.
+    /// "Transcribe while recording" are on and either
+    /// <list type="bullet">
+    /// <item>the default engines are local and the engine the Stop job resolves to is an installed Whisper or Parakeet
+    /// entry;</item>
+    /// <item>or the default ASR is a cloud engine (confirmed or not: nothing leaves the PC) with the live source "local
+    /// model": <see cref="CloudLiveEntry"/>, display only (its finish returns null at once, so the cloud batch writes
+    /// the transcript with no prior). "Realtime" is not wired yet and shows nothing, like "off".</item>
+    /// </list>
+    /// Otherwise the sink is cleared, and a previous recording's captions are not this one's. Settings are read here, so
+    /// a change during a recording applies from the next one.
     /// </summary>
     private async Task AttachRecordingTranscriberAsync(string language)
     {
         var settings = Settings;
         RecordingTranscriber? transcriber = null;
-        // macOS: a cloud default engine, or a destination still to confirm, transcribes after Stop only.
-        if (settings.AutoTranscribe && settings.TranscribeWhileRecording && AutoEngine() == AutoEngineKind.Local)
+        // On the UI thread (the provider configs live here). A local ASR whose cloud diarizer waits for its
+        // confirmation transcribes after Stop only, as on macOS.
+        bool? displayOnly = !settings.AutoTranscribe || !settings.TranscribeWhileRecording ? null
+            : AutoEngine() == AutoEngineKind.Local ? false
+            : DefaultASRIsCloud && settings.CloudLiveSource == CloudLiveSource.Local ? true
+            : null;
+        if (displayOnly is { } display)
         {
             try
             {
                 // Reads the installed models: off the UI thread.
-                transcriber = await Task.Run(() => CreateRecordingTranscriber(language, settings));
+                transcriber = await Task.Run(() => CreateRecordingTranscriber(language, settings, display));
             }
             catch (Exception e)
             {
@@ -98,7 +111,11 @@ public sealed partial class AppViewModel
         _recordingTranscriber = transcriber;
         _liveTranscribers.Add(transcriber);
         _services.Engine.LiveSink = transcriber.AppendInterleaved;
-        RecordingCaptions = new RecordingTranscriber.Snapshot(RecordingTranscriber.TranscriberState.Loading, [], 0);
+        RecordingCaptions = new RecordingTranscriber.Snapshot(RecordingTranscriber.TranscriberState.Loading, [], 0)
+        {
+            Source = RecordingTranscriber.TranscriberSource.Chunks,
+            DisplayOnly = displayOnly == true,
+        };
         // Raised inside the transcriber's lock on its threads: only queued here. A late one (after Stop) is dropped.
         transcriber.Updated += snapshot => Post(() =>
         {
@@ -179,14 +196,16 @@ public sealed partial class AppViewModel
 
     /// <summary>
     /// The transcriber for a recording in <paramref name="language"/>: the <see cref="IncrementalEntry"/> of the engine
-    /// the Stop job picks, loaded as a session when its marker vouches for its files (<see cref="ModelStore.MarkedFolder"/>);
-    /// idle release after "Unload models after" minutes. An install without a valid marker is not hashed here, which
+    /// the Stop job picks (<paramref name="displayOnly"/>: the <see cref="CloudLiveEntry"/>), loaded as a session when its
+    /// marker vouches for its files (<see cref="ModelStore.MarkedFolder"/>); idle release after "Unload models after"
+    /// minutes. An install without a valid marker is not hashed here, which
     /// would hold Record up to a whole model's read: the recording starts without live captions, the model is verified
     /// in the background, and the Stop job still checks it (<see cref="ModelStore.VerifiedFolder"/>).
     /// </summary>
-    private RecordingTranscriber? CreateRecordingTranscriber(string language, AppSettings settings)
+    private RecordingTranscriber? CreateRecordingTranscriber(string language, AppSettings settings, bool displayOnly)
     {
-        if (IncrementalEntry(PreferredEngine(language), language) is not { } entry) return null;
+        var found = displayOnly ? CloudLiveEntry(language, settings) : IncrementalEntry(PreferredEngine(language), language);
+        if (found is not { } entry) return null;
         if (_services.Models.MarkedFolder(entry) is not { } folder)
         {
             _ = Task.Run(() => _services.Models.VerifiedFolder(entry)).ContinueWith(
@@ -196,8 +215,35 @@ public sealed partial class AppViewModel
         }
         if (_services.Engines[entry.Runtime](entry, folder) is not ISessionTranscriptionEngine engine) return null;
         return new RecordingTranscriber(
-            entry, engine, _services.Gate, TimeSpan.FromMinutes(settings.ModelIdleMinutes), () => _liveLanguage);
+            entry, engine, _services.Gate, TimeSpan.FromMinutes(settings.ModelIdleMinutes), () => _liveLanguage,
+            displayOnly);
     }
+
+    /// <summary>The default ASR is an available cloud engine: the Stop job uploads (after a confirmation when pending).</summary>
+    private bool DefaultASRIsCloud =>
+        CloudTranscription.ProviderId(Settings.DefaultASRModelID) is { } id
+        && CloudEngineConfigs.Any(c => ProvidersViewModel.SameId(c.Id, id));
+
+    /// <summary>
+    /// The local model of a display-only live transcript in cloud mode (macOS <c>cloudLiveEntry</c>): the picked
+    /// <see cref="AppSettings.CloudLiveModelID"/> (null = the catalog default) when <see cref="IncrementalEntry"/>
+    /// accepts it for <paramref name="language"/>; else (uninstalled, a language fallback, or a default that is no live
+    /// model) the first <see cref="TranscriptionPipeline.LiveEntries"/> entry it accepts; null when none is.
+    /// </summary>
+    private ModelEntry? CloudLiveEntry(string language, AppSettings settings)
+    {
+        var picked = string.IsNullOrEmpty(settings.CloudLiveModelID) ? null : settings.CloudLiveModelID;
+        if (IncrementalEntry(picked, language) is { } entry) return entry;
+        foreach (var candidate in TranscriptionPipeline.LiveEntries(IsUsableLocally))
+        {
+            if (IncrementalEntry(candidate.Id, language) is { } accepted) return accepted;
+        }
+        return null;
+    }
+
+    /// <summary>A registered runtime and installed.</summary>
+    private bool IsUsableLocally(ModelEntry entry) =>
+        _services.Engines.ContainsKey(entry.Runtime) && _services.Models.IsInstalled(entry);
 
     /// <summary>
     /// The entry a recording transcriber runs so that the pipeline keeps its segments at Stop (Swift
@@ -207,16 +253,15 @@ public sealed partial class AppViewModel
     /// </summary>
     private ModelEntry? IncrementalEntry(string? engineId, string language)
     {
-        bool IsUsable(ModelEntry entry) => _services.Engines.ContainsKey(entry.Runtime) && _services.Models.IsInstalled(entry);
         var selected = engineId is null
-            ? TranscriptionPipeline.DefaultEngine(language, IsUsable)
-            : ModelCatalog.Entry(engineId) is { Kind: ModelKind.Asr } entry && IsUsable(entry) ? entry : null;
+            ? TranscriptionPipeline.DefaultEngine(language, IsUsableLocally)
+            : ModelCatalog.Entry(engineId) is { Kind: ModelKind.Asr } entry && IsUsableLocally(entry) ? entry : null;
         if (selected is null || !TranscriptionPipeline.TranscribesChunks(selected)) return null;
         var markers = LanguageRange.Ranges([new RecordingSession.LanguageMarker { FileTime = 0, Language = language }])
             .Select(r => r.Language).OfType<string>().Select(WhisperLanguages.Primary).ToList();
         var (_, engineFallback) = TranscriptionPipeline.LanguageFallback(
             selected, TranscriptionPipeline.SupportedLanguages(selected), markers, language,
-            id => ModelCatalog.Entry(id) is { } candidate && IsUsable(candidate));
+            id => ModelCatalog.Entry(id) is { } candidate && IsUsableLocally(candidate));
         return engineFallback is null ? selected : null;
     }
 
@@ -397,7 +442,8 @@ public sealed partial class AppViewModel
     /// <summary>
     /// Side-effect free (reads <c>cloudSTTConfirmed</c>, never queues a confirmation; macOS <c>autoEngine</c>): mirrors
     /// <see cref="PlanCloud"/> with the default engines. A pending confirmation compresses a stopped recording first
-    /// rather than holding its CAF behind the dialog, and a cloud default runs no live transcriber.
+    /// rather than holding its CAF behind the dialog, and a cloud default runs no live transcriber that the job keeps
+    /// (only a display-only one, <see cref="AppSettings.CloudLiveSource"/> "local model").
     /// </summary>
     private AutoEngineKind AutoEngine()
     {

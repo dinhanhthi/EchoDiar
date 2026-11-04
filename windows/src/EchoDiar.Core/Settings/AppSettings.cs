@@ -123,6 +123,12 @@ public sealed record AppSettings : IJsonOnDeserializing, IJsonOnDeserialized
     /// so new users get automatic picks once they save a key; a file from an older build (key missing) reads as false.
     /// </summary>
     [JsonPropertyName("providerAvailabilityMigrated")] public bool ProviderAvailabilityMigrated { get; set; } = true;
+    /// <summary>What the live transcript shows while recording when the default transcription engine is a cloud one.</summary>
+    [JsonPropertyName("cloudLiveSource")] public CloudLiveSource CloudLiveSource { get; set; } = CloudLiveSource.Off;
+    /// <summary>Catalog id of the local model for <see cref="CloudLiveSource.Local"/> (display only); null = the catalog default.</summary>
+    [JsonPropertyName("cloudLiveModelID")] public string? CloudLiveModelID { get; set; }
+    /// <summary>With <see cref="CloudLiveSource.Realtime"/>, keep the realtime transcript as the final one instead of a cloud batch.</summary>
+    [JsonPropertyName("realtimeAsFinal")] public bool RealtimeAsFinal { get; set; }
 
     /// <summary>Keys not modeled here, written back as read.</summary>
     [JsonExtensionData] public Dictionary<string, JsonElement> Extra { get; set; } = [];
@@ -290,6 +296,23 @@ public enum RouteChangeBehavior { Ask, Continue, Stop }
 public enum PlaybackChannels { Mixed, Split }
 
 public sealed class PlaybackChannelsConverter() : TolerantEnumConverter<PlaybackChannels>(PlaybackChannels.Mixed);
+
+/// <summary>
+/// Where the live transcript comes from while recording with a cloud default transcription engine. An unknown value
+/// reads as <see cref="Off"/>.
+/// </summary>
+[JsonConverter(typeof(CloudLiveSourceConverter))]
+public enum CloudLiveSource
+{
+    /// <summary>No live transcript.</summary>
+    Off,
+    /// <summary>A local model, display only; the cloud batch still writes the transcript.</summary>
+    Local,
+    /// <summary>The default provider's realtime WebSocket.</summary>
+    Realtime,
+}
+
+public sealed class CloudLiveSourceConverter() : TolerantEnumConverter<CloudLiveSource>(CloudLiveSource.Off);
 
 /// <summary>What auto-delete moves to the trash. An unknown value reads as the less destructive <see cref="AudioOnly"/>.</summary>
 [JsonConverter(typeof(RetentionModeConverter))]
