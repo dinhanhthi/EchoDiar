@@ -845,16 +845,15 @@ public sealed partial class TranscriptionSettingsPage : UserControl
     }
 
     /// <summary>
-    /// A speech-to-text API (macOS <c>SpeechProviderRow</c>): the Enabled switch; expanded, its API key (Credential
-    /// Manager only: saved on Enter, on leaving the field, by Save and by Test, then cleared; only "Saved" shows), its
-    /// transcription model (AssemblyAI picks its own), Browse models, and Test: a free request that needs a valid key and
-    /// uploads no audio.
+    /// A speech-to-text API (macOS <c>SpeechProviderRow</c>), available once its key is saved; expanded, its API key
+    /// (Credential Manager only: saved on Enter, on leaving the field, by Save and by Test, then cleared; only "Saved"
+    /// shows), its transcription model (AssemblyAI picks its own), Browse models, and Test: a free request that needs a
+    /// valid key and uploads no audio.
     /// </summary>
     private sealed class SpeechProviderRow
     {
         private readonly TranscriptionSettingsPage _page;
         private readonly string _id;
-        private readonly ToggleSwitch _enabled = new();
         private readonly PasswordBox _keyBox = new();
         private readonly StackPanel _savedLabel = new() { Orientation = Orientation.Horizontal, Spacing = 4, Visibility = Visibility.Collapsed };
         private readonly Button _removeKeyButton = new() { Visibility = Visibility.Collapsed };
@@ -873,12 +872,7 @@ public sealed partial class TranscriptionSettingsPage : UserControl
         {
             _page = page;
             _id = id;
-            Expander = new SettingsExpander { Content = _enabled };
-            _enabled.Toggled += (_, _) =>
-            {
-                if (_page._syncing || _page.Closing || _page._providers.Config(_id) is not { } config || config.Enabled == _enabled.IsOn) return;
-                _page._providers.UpdateProvider(_id, c => c.Enabled = _enabled.IsOn);
-            };
+            Expander = new SettingsExpander();
 
             AutomationProperties.SetName(_keyBox, Loc.T("API key"));
             _keyBox.KeyDown += (_, e) =>
@@ -949,8 +943,6 @@ public sealed partial class TranscriptionSettingsPage : UserControl
         public void Update(ProviderConfig config)
         {
             Expander.Header = config.DisplayName;
-            AutomationProperties.SetName(_enabled, config.DisplayName);
-            _enabled.IsOn = config.Enabled;
             var assembly = config.Preset == "assemblyai";
             _assemblyNote.Visibility = Show(assembly);
             _modelField.Card.Visibility = Show(!assembly);

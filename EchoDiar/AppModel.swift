@@ -383,6 +383,8 @@ final class AppModel {
     /// `--measure`, `--transcribe`, `--download-model` and `--delete-model`.
     func start() {
         settings = store.load()
+        // Before any launch-time automatic path (library indexing, retried transcriptions) reads the providers.
+        updateSettings { $0 = $0.migratingProviderAvailability() }
         recovery = (NSApp.delegate as? AppDelegate)?.recovery
         observeSnapshots()
         terminateObserver = NotificationCenter.default.addObserver(
@@ -1166,23 +1168,24 @@ final class AppModel {
         }
     }
 
-    /// Enabled cloud transcription providers with a model, a base URL (custom endpoints) and a saved key.
+    /// Available cloud transcription providers with a model, a base URL (custom endpoints) and a saved key.
     var cloudEngineConfigs: [ProviderConfig] {
         _ = keychainVersion
         return providerConfigs.filter { config in
-            config.enabled && CloudTranscription.isComplete(config)
-                && (!CloudTranscription.needsKey(config) || (try? KeychainStore.hasAPIKey(forProvider: config.id)) == true)
+            config.isAvailable(hasKey: hasSavedKey(config.id)) && CloudTranscription.isComplete(config)
+                && (!CloudTranscription.needsKey(config) || hasSavedKey(config.id))
         }
     }
 
-    /// Enabled providers that can be the default cloud diarizer, with a valid destination and a saved key. Their
+    /// Available providers that can be the default cloud diarizer, with a valid destination and a saved key. Their
     /// diarization model is not checked (Settings' model field would vanish mid-typing): `submitTranscription` does.
     var cloudDiarizerConfigs: [ProviderConfig] {
         _ = keychainVersion
         return providerConfigs.filter { config in
-            config.enabled && CloudTranscription.diarizationPresets.contains(config.preset ?? "")
+            config.isAvailable(hasKey: hasSavedKey(config.id))
+                && CloudTranscription.diarizationPresets.contains(config.preset ?? "")
                 && CloudTranscription.supports(config) && CloudTranscription.destination(for: config) != nil
-                && (!CloudTranscription.needsKey(config) || (try? KeychainStore.hasAPIKey(forProvider: config.id)) == true)
+                && (!CloudTranscription.needsKey(config) || hasSavedKey(config.id))
         }
     }
 
@@ -1191,6 +1194,13 @@ final class AppModel {
         keychainVersion += 1
         // A running pass would keep sending with the old key.
         if settings.embeddingModelID.hasPrefix(Self.apiEmbedderPrefix) { syncLibraryIndex(restart: true) }
+    }
+
+    /// Saves a key for provider `id` (already cleaned by the caller) and lets automatic picks use the provider again.
+    func saveAPIKey(_ key: String, for id: String) throws {
+        try KeychainStore.setAPIKey(key, forProvider: id)
+        keychainChanged()
+        updateSettings { $0.autoExcludedProviderIDs.remove(id) }
     }
 
     /// Whether provider `id` has a key in the Keychain; cached until `keychainChanged()`, since the AI tab asks on
@@ -1514,6 +1524,23 @@ final class AppModel {
     func updateSettings(_ change: (inout AppSettings) -> Void) {
         var updated = settings
         change(&updated)
+        // An explicit pick of an auto-excluded provider lets automatic picks use it again.
+        if !updated.autoExcludedProviderIDs.isEmpty {
+            var picked: [String?] = []
+            if updated.defaultASRModelID != settings.defaultASRModelID {
+                picked.append(CloudTranscription.providerID(engineID: updated.defaultASRModelID))
+            }
+            if updated.defaultDiarizerModelID != settings.defaultDiarizerModelID {
+                picked.append(CloudTranscription.providerID(engineID: updated.defaultDiarizerModelID))
+            }
+            if updated.defaultAIProviderID != settings.defaultAIProviderID { picked.append(updated.defaultAIProviderID) }
+            if updated.catchUpProviderID != settings.catchUpProviderID { picked.append(updated.catchUpProviderID) }
+            if updated.embeddingModelID != settings.embeddingModelID,
+               updated.embeddingModelID.hasPrefix(Self.apiEmbedderPrefix) {
+                picked.append(String(updated.embeddingModelID.dropFirst(Self.apiEmbedderPrefix.count)))
+            }
+            for case let id? in picked where !id.isEmpty { updated.autoExcludedProviderIDs.remove(id) }
+        }
         guard updated != settings else { return }
         let detectionChanged = updated.meetingDetection != settings.meetingDetection
         let calendarChanged = updated.calendar.mode != settings.calendar.mode
@@ -1690,7 +1717,7 @@ final class AppModel {
 // MARK: - AI tab
 
 extension AppModel {
-    /// Apple Foundation Models (with its unavailable reason), installed MLX models, then the enabled providers with
+    /// Apple Foundation Models (with its unavailable reason), installed MLX models, then the available providers with
     /// what they need (base URL, saved key).
     var aiProviders: [AIProvider] {
         _ = keychainVersion
@@ -1705,7 +1732,8 @@ extension AppModel {
                     id: entry.id, name: entry.displayName, kind: .inApp, defaultModel: entry.id, models: [entry.id]))
             }
         }
-        for config in providerConfigs where config.enabled && config.kind != .speechToText {
+        for config in providerConfigs
+        where config.isAvailable(hasKey: hasSavedKey(config.id)) && config.kind != .speechToText {
             let kind: AIProvider.Kind
             switch config.kind {
             case .cli: kind = .cli
@@ -1740,10 +1768,11 @@ extension AppModel {
         return String(localized: "Apple Foundation Models need macOS 26.")
     }
 
-    /// The default provider when it can run, else the first one that can.
+    /// The default provider when it can run, else the first one that can and is not in `autoExcludedProviderIDs`.
     var currentAIProvider: AIProvider? {
         let usable = aiProviders.filter { $0.unavailableReason == nil }
-        return usable.first { $0.id == settings.defaultAIProviderID } ?? usable.first
+        return usable.first { $0.id == settings.defaultAIProviderID }
+            ?? usable.first { !settings.autoExcludedProviderIDs.contains($0.id) }
     }
 
     /// The saved model for the default provider, else the provider's own.
@@ -1963,8 +1992,17 @@ extension AppModel {
     var catchUpProvider: AIProvider? {
         let external = aiProviders.filter { $0.kind != .inApp && $0.unavailableReason == nil }
         if let picked = external.first(where: { $0.id == settings.catchUpProviderID }) { return picked }
+        return automaticCatchUpProvider
+    }
+
+    /// What `catchUpProvider` runs with no usable provider picked: the AI tab's provider when it is not in-app, else
+    /// the first usable provider outside the app not in `autoExcludedProviderIDs`. `currentAIProvider` is never an
+    /// excluded one by accident: the migration clears `defaultAIProviderID` for those, and picking one un-excludes it.
+    var automaticCatchUpProvider: AIProvider? {
         if let main = currentAIProvider, main.kind != .inApp { return main }
-        return external.first
+        return aiProviders.first {
+            $0.kind != .inApp && $0.unavailableReason == nil && !settings.autoExcludedProviderIDs.contains($0.id)
+        }
     }
 
     /// The "Catch-up model" setting when `provider` is the picked catch-up provider, else its AI tab model.

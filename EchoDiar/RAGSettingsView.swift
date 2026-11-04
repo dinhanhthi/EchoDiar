@@ -3,7 +3,7 @@ import EchoCore
 import SwiftUI
 
 /// The RAG tab: the opt-in switch of the library chat, the index's status with Rebuild, then the embedder of the index
-/// (the catalog's MLX models with their downloads, Apple's built-in one, or an enabled OpenAI-compatible or local-host
+/// (the catalog's MLX models with their downloads, Apple's built-in one, or an available OpenAI-compatible or local-host
 /// provider with its model). Picking a cloud embedder asks once per provider and destination
 /// (`AppSettings.cloudEmbeddingConfirmed`).
 struct RAGSettingsView: View {
@@ -135,8 +135,9 @@ struct RAGSettingsView: View {
         Section {
             ForEach(embeddingConfigs) { config in
                 HStack(alignment: .firstTextBaseline, spacing: 8) {
+                    let available = isAvailable(config)
                     radio(AppModel.apiEmbedderPrefix + config.id, name: config.displayName) { selectAPI(config) }
-                        .disabled(!config.enabled)
+                        .disabled(!available)
                     VStack(alignment: .leading, spacing: 2) {
                         Text(config.displayName)
                         Text(Self.host(config).isEmpty ? String(localized: "Base URL not set") : Self.host(config))
@@ -144,7 +145,7 @@ struct RAGSettingsView: View {
                             .foregroundStyle(.secondary)
                     }
                     Spacer(minLength: 8)
-                    if config.enabled {
+                    if available {
                         Text(AppModel.AIProvider.isLoopback(baseURL: config.baseURL) ? "This Mac" : "Leaves this Mac")
                             .font(.caption)
                             .foregroundStyle(.secondary)
@@ -255,12 +256,18 @@ struct RAGSettingsView: View {
         }
     }
 
-    /// The enabled OpenAI-compatible and local-host providers (Ollama included), as `makeEmbedder()` accepts them.
+    /// The available OpenAI-compatible and local-host providers (Ollama included), as `makeEmbedder()` accepts them.
     private var apiConfigs: [ProviderConfig] {
-        model.providerConfigs.filter { $0.enabled && ($0.kind == .openAICompatible || $0.kind == .local) }
+        model.providerConfigs.filter { isAvailable($0) && ($0.kind == .openAICompatible || $0.kind == .local) }
     }
 
-    /// The config of the API embedder in use, when its provider is still enabled.
+    /// A cloud API once its key is saved, a local host when enabled (`ProviderConfig.isAvailable(hasKey:)`).
+    private func isAvailable(_ config: ProviderConfig) -> Bool {
+        _ = model.keychainVersion
+        return config.isAvailable(hasKey: model.hasSavedKey(config.id))
+    }
+
+    /// The config of the API embedder in use, when its provider is still available.
     private var currentAPIConfig: ProviderConfig? {
         let id = model.settings.embeddingModelID
         guard id.hasPrefix(AppModel.apiEmbedderPrefix) else { return nil }

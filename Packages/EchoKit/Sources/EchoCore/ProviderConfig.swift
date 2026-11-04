@@ -89,6 +89,20 @@ public struct ProviderConfig: Codable, Equatable, Sendable, Identifiable {
         enabled = value(.enabled) ?? false
     }
 
+    /// A cloud API (every kind but `.local` servers and `.cli` tools): usable once its key is saved, whatever `enabled`
+    /// says; local servers and CLIs keep the `enabled` toggle.
+    public var isCloud: Bool { kind != .local && kind != .cli }
+
+    /// Whether the provider can be used: a cloud API when `hasKey` (its Keychain key is saved), or for a custom
+    /// OpenAI-compatible endpoint without auth when its base URL is set; a local server or CLI when `enabled`.
+    public func isAvailable(hasKey: Bool) -> Bool {
+        guard isCloud else { return enabled }
+        if kind == .openAICompatible && preset == nil && authStyle == .none {
+            return !baseURL.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+        }
+        return hasKey
+    }
+
     /// A new custom OpenAI-compatible endpoint with its own UUID id.
     public static func custom(displayName: String = "Custom", baseURL: String = "") -> ProviderConfig {
         ProviderConfig(

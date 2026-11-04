@@ -54,13 +54,14 @@ extension AppModel {
         return MLXEmbedder(entryID: id, folder: folder)
     }
 
-    /// The enabled OpenAI-compatible or local-host config (Ollama included) of an `"api:<provider id>"` embedder.
+    /// The available OpenAI-compatible or local-host config (Ollama included) of an `"api:<provider id>"` embedder.
     private var embeddingProviderConfig: ProviderConfig? {
         let id = settings.embeddingModelID
         guard id.hasPrefix(Self.apiEmbedderPrefix) else { return nil }
         let providerID = String(id.dropFirst(Self.apiEmbedderPrefix.count))
         return providerConfigs.first {
-            $0.id == providerID && $0.enabled && ($0.kind == .openAICompatible || $0.kind == .local)
+            $0.id == providerID && $0.isAvailable(hasKey: hasSavedKey($0.id))
+                && ($0.kind == .openAICompatible || $0.kind == .local)
         }
     }
 

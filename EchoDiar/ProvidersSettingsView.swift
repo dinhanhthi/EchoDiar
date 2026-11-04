@@ -146,7 +146,7 @@ struct ProvidersSettingsView: View {
         let picked = external.first { $0.id == model.settings.catchUpProviderID }
         return Section {
             Picker("Catch-up provider", selection: catchUpProviderBinding(external)) {
-                if let automatic = automaticCatchUpProvider(external) {
+                if let automatic = model.automaticCatchUpProvider {
                     let label = String(localized: "Automatic (\(automatic.name))")
                     Text(automatic.leavesMac ? String(localized: "\(label) (leaves this Mac)") : label).tag("")
                 } else {
@@ -192,12 +192,6 @@ struct ProvidersSettingsView: View {
     /// The usable providers outside the app, as `AppModel.catchUpProvider` filters them.
     private var catchUpProviders: [AppModel.AIProvider] {
         model.aiProviders.filter { $0.kind != .inApp && $0.unavailableReason == nil }
-    }
-
-    /// What "Automatic" runs, as `AppModel.catchUpProvider` resolves it with no provider picked.
-    private func automaticCatchUpProvider(_ external: [AppModel.AIProvider]) -> AppModel.AIProvider? {
-        if let main = model.currentAIProvider, main.kind != .inApp { return main }
-        return external.first
     }
 
     /// The picked provider, "Automatic" when it is not usable now (as `catchUpProvider` then runs); picking one
@@ -333,7 +327,8 @@ private enum CLIStatus: Equatable {
 
 // MARK: - Rows
 
-/// A cloud preset, local host or custom endpoint: enable toggle; expanded, its key, base URL, model and Test.
+/// A cloud preset, local host or custom endpoint: enable toggle (local hosts only); expanded, its key, base URL, model
+/// and Test.
 private struct APIProviderRow: View {
     let config: ProviderConfig
     let model: AppModel
@@ -402,12 +397,26 @@ private struct APIProviderRow: View {
             .padding(.bottom, 4)
             .padding(.leading, disclosureIndent)
         } label: {
-            Toggle(isOn: binding(\.enabled)) {
-                Text(config.displayName.isEmpty ? String(localized: "Untitled") : config.displayName)
-                if config.kind == .local || (isCustom && !config.baseURL.isEmpty) { Text(config.baseURL) }
+            // A cloud API is available once its key is saved (or, without auth, its base URL set): no toggle.
+            if config.isCloud {
+                VStack(alignment: .leading, spacing: 2) {
+                    title
+                    if isCustom && !config.baseURL.isEmpty {
+                        Text(config.baseURL).font(.caption).foregroundStyle(.secondary)
+                    }
+                }
+            } else {
+                Toggle(isOn: binding(\.enabled)) {
+                    title
+                    Text(config.baseURL)
+                }
             }
         }
         .disclosureGroupStyle(TitleChevronDisclosureStyle())
+    }
+
+    private var title: Text {
+        Text(config.displayName.isEmpty ? String(localized: "Untitled") : config.displayName)
     }
 
     private func binding<Value>(_ keyPath: WritableKeyPath<ProviderConfig, Value>) -> Binding<Value> {
@@ -416,8 +425,8 @@ private struct APIProviderRow: View {
     }
 }
 
-/// A speech-to-text API (Transcription's models tab): enable toggle; expanded, its key, transcription model and a key
-/// check.
+/// A speech-to-text API (Transcription's models tab), available once its key is saved; expanded, its key, transcription
+/// model and a key check.
 struct SpeechProviderRow: View {
     let config: ProviderConfig
     let model: AppModel
@@ -469,10 +478,8 @@ struct SpeechProviderRow: View {
             .padding(.bottom, 4)
             .padding(.leading, disclosureIndent)
         } label: {
-            Toggle(isOn: Binding(get: { config.enabled },
-                                 set: { value in model.updateProvider(id: config.id) { $0.enabled = value } })) {
-                Text(config.displayName)
-            }
+            // Available once its key is saved: no toggle.
+            Text(config.displayName)
         }
         .disclosureGroupStyle(TitleChevronDisclosureStyle())
     }
@@ -945,15 +952,14 @@ private struct TestButton: View {
     }
 }
 
-/// Writes a typed API key to the Keychain and clears the field; does nothing when it is blank. Spaces and line breaks
-/// are dropped anywhere: a key copied across a wrapped line has one inside, and URLSession then silently drops the
-/// whole auth header (the provider answers "header is required").
+/// Writes a typed API key to the Keychain (`AppModel.saveAPIKey`) and clears the field; does nothing when it is blank.
+/// Spaces and line breaks are dropped anywhere: a key copied across a wrapped line has one inside, and URLSession then
+/// silently drops the whole auth header (the provider answers "header is required").
 @MainActor private func saveAPIKey(_ key: Binding<String>, providerID: String, model: AppModel) throws {
     let cleaned = key.wrappedValue.filter { !$0.isWhitespace }
     guard !cleaned.isEmpty else { return }
-    try KeychainStore.setAPIKey(cleaned, forProvider: providerID)
+    try model.saveAPIKey(cleaned, for: providerID)
     key.wrappedValue = ""
-    model.keychainChanged()
 }
 
 /// The first line of an error, at most 160 characters.

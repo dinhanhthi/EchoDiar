@@ -2,6 +2,7 @@ using System.Text.Json;
 using System.Text.Json.Serialization;
 using EchoDiar.Core.Calendar;
 using EchoDiar.Core.Json;
+using EchoDiar.Core.Models;
 
 namespace EchoDiar.Core.Settings;
 
@@ -11,7 +12,7 @@ namespace EchoDiar.Core.Settings;
 /// read (as in Swift). Keys this type does not model (the macOS-only Carbon <c>globalHotKey</c> and
 /// <c>globalPauseHotKey</c>, keys of newer builds) are kept in <see cref="Extra"/> and written back unchanged.
 /// </summary>
-public sealed record AppSettings : IJsonOnDeserialized
+public sealed record AppSettings : IJsonOnDeserializing, IJsonOnDeserialized
 {
     /// <summary>
     /// The Windows catalog's default embedder (macOS: <c>mlx-qwen3-embedding-0.6b</c>). Only a missing key gets it:
@@ -110,12 +111,63 @@ public sealed record AppSettings : IJsonOnDeserialized
     /// <summary>Windows-only pause/resume shortcut.</summary>
     [JsonPropertyName("globalPauseHotKeyWindows")] public WindowsHotKey GlobalPauseHotKeyWindows { get; set; } = WindowsHotKey.DefaultPause;
     [JsonPropertyName("globalPauseHotKeyEnabled")] public bool GlobalPauseHotKeyEnabled { get; set; } = true;
+    /// <summary>
+    /// Cloud provider ids that automatic picks (first usable AI provider, automatic catch-up, ...) skip; an explicit pick
+    /// or a saved key removes the id. Filled by <see cref="MigratingProviderAvailability"/>. Compared case-insensitively,
+    /// as Credential Manager names keys; never changed in place (a new set each time, so a change is seen).
+    /// </summary>
+    [JsonPropertyName("autoExcludedProviderIDs")]
+    public HashSet<string> AutoExcludedProviderIDs { get; set; } = new(StringComparer.OrdinalIgnoreCase);
+    /// <summary>
+    /// <see cref="MigratingProviderAvailability"/> ran. A fresh install (<c>new AppSettings()</c>) has nothing to migrate,
+    /// so new users get automatic picks once they save a key; a file from an older build (key missing) reads as false.
+    /// </summary>
+    [JsonPropertyName("providerAvailabilityMigrated")] public bool ProviderAvailabilityMigrated { get; set; } = true;
 
     /// <summary>Keys not modeled here, written back as read.</summary>
     [JsonExtensionData] public Dictionary<string, JsonElement> Extra { get; set; } = [];
 
+    // Before the keys are read: a file without the key has the migration to run (Swift's decodeIfPresent ?? false).
+    void IJsonOnDeserializing.OnDeserializing() => ProviderAvailabilityMigrated = false;
+
+    /// <summary>
+    /// One-time move to "key saved = available" for cloud providers (macOS <c>migratingProviderAvailability()</c>;
+    /// settings only, no credential read). Every cloud provider whose effective config (the saved one, else its preset)
+    /// is not enabled loses its references, which fell back to local while it was off and would otherwise switch to the
+    /// cloud silently, and joins <see cref="AutoExcludedProviderIDs"/>. Unchanged (this same value) once
+    /// <see cref="ProviderAvailabilityMigrated"/>.
+    /// </summary>
+    public AppSettings MigratingProviderAvailability()
+    {
+        if (ProviderAvailabilityMigrated) return this;
+        var saved = new Dictionary<string, ProviderConfig>(StringComparer.OrdinalIgnoreCase);
+        foreach (var config in Providers) saved.TryAdd(config.Id, config);
+        var presets = ProviderConfig.Presets();
+        var ids = presets.Select(p => p.Id).Concat(Providers.Select(p => p.Id)).Distinct(StringComparer.OrdinalIgnoreCase);
+        var settings = this with { AutoExcludedProviderIDs = new(AutoExcludedProviderIDs, StringComparer.OrdinalIgnoreCase) };
+        foreach (var id in ids)
+        {
+            var config = saved.GetValueOrDefault(id) ?? presets.FirstOrDefault(p => Same(p.Id, id));
+            if (config is null || !config.IsCloud || config.Enabled) continue;
+            // The "cleared" values are each field's default, as when the reference is invalid. "cloud:" is
+            // CloudTranscription.EnginePrefix (EchoDiar.AI).
+            if (Same(DefaultASRModelID, "cloud:" + id)) settings.DefaultASRModelID = null;
+            if (Same(DefaultDiarizerModelID, "cloud:" + id)) settings.DefaultDiarizerModelID = null;
+            if (Same(DefaultAIProviderID, id)) settings.DefaultAIProviderID = null;
+            if (Same(CatchUpProviderID, id)) settings.CatchUpProviderID = "";
+            if (Same(EmbeddingModelID, ModelCatalog.ApiEmbedderPrefix + id)) settings.EmbeddingModelID = DefaultEmbeddingModelID;
+            settings.AutoExcludedProviderIDs.Add(id);
+        }
+        settings.ProviderAvailabilityMigrated = true;
+        return settings;
+    }
+
+    private static bool Same(string? a, string b) => string.Equals(a, b, StringComparison.OrdinalIgnoreCase);
+
     void IJsonOnDeserialized.OnDeserialized()
     {
+        // Read with the default comparer.
+        AutoExcludedProviderIDs = new(AutoExcludedProviderIDs, StringComparer.OrdinalIgnoreCase);
         ModelIdleMinutes = Clamp(ModelIdleMinutes, ModelIdleMinutesRange);
         AutoDeleteAfterDays = Clamp(AutoDeleteAfterDays, AutoDeleteDaysRange);
         if (SpeakerCountHint is { } hint) SpeakerCountHint = Clamp(hint, SpeakerCountHintRange);

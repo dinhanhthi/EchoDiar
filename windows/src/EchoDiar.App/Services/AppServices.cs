@@ -180,7 +180,7 @@ internal sealed class AppServices : IDisposable
 
     /// <summary>
     /// The embedder picked by <paramref name="settings"/>' <c>embeddingModelID</c> (macOS <c>AppModel.resolveEmbedder</c>):
-    /// <c>api:&lt;provider id&gt;</c> is the enabled OpenAI-compatible or local-host config of <paramref name="configs"/>
+    /// <c>api:&lt;provider id&gt;</c> is the available OpenAI-compatible or local-host config of <paramref name="configs"/>
     /// with <c>embeddingAPIModel</c> and its saved key; anything else is an embedding catalog entry (a macOS MLX id maps to
     /// its GGUF entry), downloaded and checked against its catalog SHA-256 (<see cref="ModelStore.VerifiedFolder"/>), run
     /// with llama.cpp. Null with why when there is none. An in-app embedder loads nothing here: its caller holds
@@ -193,7 +193,7 @@ internal sealed class AppServices : IDisposable
         if (id.StartsWith(ModelCatalog.ApiEmbedderPrefix, StringComparison.Ordinal))
         {
             var providerId = id[ModelCatalog.ApiEmbedderPrefix.Length..];
-            if (EmbeddingConfig(settings, configs) is not { } config)
+            if (EmbeddingConfig(settings, configs, HasStoredKey) is not { } config)
                 return (null, Loc.T("Pick an enabled provider in Settings › RAG"));
             var model = settings.EmbeddingAPIModel.Trim();
             if (model.Length == 0)
@@ -228,16 +228,32 @@ internal sealed class AppServices : IDisposable
     }
 
     /// <summary>
-    /// The enabled OpenAI-compatible or local-host config (Ollama included) of an <c>api:&lt;provider id&gt;</c> embedder
+    /// The available OpenAI-compatible or local-host config (Ollama included) of an <c>api:&lt;provider id&gt;</c> embedder
     /// (macOS <c>embeddingProviderConfig</c>); null for an in-app embedder. Ids compare as Credential Manager names keys.
+    /// <paramref name="hasKey"/>: whether a provider id has a saved key (<see cref="ProviderConfig.IsAvailable"/>).
     /// </summary>
-    public static ProviderConfig? EmbeddingConfig(AppSettings settings, IReadOnlyList<ProviderConfig> configs)
+    public static ProviderConfig? EmbeddingConfig(
+        AppSettings settings, IReadOnlyList<ProviderConfig> configs, Func<string, bool> hasKey)
     {
         var id = settings.EmbeddingModelID;
         if (!id.StartsWith(ModelCatalog.ApiEmbedderPrefix, StringComparison.Ordinal)) return null;
         var providerId = id[ModelCatalog.ApiEmbedderPrefix.Length..];
         return configs.FirstOrDefault(c => string.Equals(c.Id, providerId, StringComparison.OrdinalIgnoreCase)
-            && c.Enabled && c.Kind is ProviderKind.OpenAICompatible or ProviderKind.Local);
+            && (c.Kind is ProviderKind.OpenAICompatible or ProviderKind.Local) && c.IsAvailable(hasKey(c.Id)));
+    }
+
+    /// <summary>Whether Credential Manager has a key for <paramref name="id"/>; false when unreadable. Off the UI thread.</summary>
+    private bool HasStoredKey(string id)
+    {
+        try
+        {
+            return Secrets.ApiKey(id) is not null;
+        }
+        catch (Exception e)
+        {
+            Debug.WriteLine($"EchoDiar: could not read the key of {id}: {e.GetType().Name}");
+            return false;
+        }
     }
 
     /// <summary>

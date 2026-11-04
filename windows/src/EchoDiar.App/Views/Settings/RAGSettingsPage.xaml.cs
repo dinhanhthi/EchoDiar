@@ -249,8 +249,9 @@ public sealed partial class RAGSettingsPage : UserControl
         }),
     ];
 
-    /// <summary>The config of the API embedder in use, when its provider is still enabled (macOS <c>currentAPIConfig</c>).</summary>
-    private ProviderConfig? CurrentAPIConfig => AppServices.EmbeddingConfig(Settings, _providers.ProviderConfigs);
+    /// <summary>The config of the API embedder in use, when its provider is still available (macOS <c>currentAPIConfig</c>).</summary>
+    private ProviderConfig? CurrentAPIConfig =>
+        AppServices.EmbeddingConfig(Settings, _providers.ProviderConfigs, _providers.HasApiKey);
 
     private void UpdateProviderRows()
     {
@@ -541,13 +542,15 @@ public sealed partial class RAGSettingsPage : UserControl
                 AutomationProperties.SetName(_radio, Loc.Format("Use %@", name));
                 ToolTipService.SetToolTip(_radio, Loc.Format("Use %@", name));
             }
-            _radio.IsEnabled = config.Enabled;
+            // A cloud API once its key is saved, a local host when enabled (macOS isAvailable(hasKey:)).
+            var available = config.IsAvailable(_page._providers.HasApiKey(config.Id));
+            _radio.IsEnabled = available;
             if (_radio.IsChecked != selected) _radio.IsChecked = selected;
             var host = Host(config);
             _host.Text = host.Length == 0 ? Loc.T("Base URL not set") : host;
             _where.Text = Loc.T(ProviderInput.IsLoopback(config.BaseURL) ? "This PC" : "Leaves this PC");
-            _where.Visibility = Show(config.Enabled);
-            _setUp.Visibility = Show(!config.Enabled);
+            _where.Visibility = Show(available);
+            _setUp.Visibility = Show(!available);
             AutomationProperties.SetName(_setUp, $"{Loc.T("Set Up…")}, {name}");
             ToolTipService.SetToolTip(_setUp, Loc.Format("Turn on %@ in Settings › AI", name));
         }

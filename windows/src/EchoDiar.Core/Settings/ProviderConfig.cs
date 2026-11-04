@@ -61,6 +61,26 @@ public sealed record ProviderConfig
     public string DiarizationModel { get; set; } = "";
     public bool Enabled { get; set; }
 
+    /// <summary>
+    /// A cloud API (every kind but <see cref="ProviderKind.Local"/> servers and <see cref="ProviderKind.Cli"/> tools,
+    /// macOS <c>isCloud</c>): usable once its key is saved, whatever <see cref="Enabled"/> says; local servers and CLIs
+    /// keep the toggle.
+    /// </summary>
+    public bool IsCloud => Kind is not (ProviderKind.Local or ProviderKind.Cli);
+
+    /// <summary>
+    /// Whether the provider can be used (macOS <c>isAvailable(hasKey:)</c>): a cloud API when <paramref name="hasKey"/>
+    /// (its key is saved), or for a custom OpenAI-compatible endpoint without auth when its base URL is set; a local
+    /// server or CLI when <see cref="Enabled"/>.
+    /// </summary>
+    public bool IsAvailable(bool hasKey)
+    {
+        if (!IsCloud) return Enabled;
+        if (Kind == ProviderKind.OpenAICompatible && Preset is null && AuthStyle == AuthStyle.None)
+            return BaseURL.Trim().Length > 0;
+        return hasKey;
+    }
+
     /// <summary>A new custom OpenAI-compatible endpoint with its own UUID id.</summary>
     public static ProviderConfig Custom(string displayName = "Custom", string baseURL = "") => new()
     {

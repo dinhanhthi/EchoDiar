@@ -249,22 +249,26 @@ public sealed partial class AppViewModel
     }
 
     /// <summary>
-    /// Enabled cloud transcription providers with a model, a valid destination and a saved key (macOS
+    /// Available cloud transcription providers with a model, a valid destination and a saved key (macOS
     /// <c>cloudEngineConfigs</c>); the key presence is the one <see cref="ProvidersViewModel"/> last read off the UI
     /// thread. <see cref="OnPropertyChanged(string)"/> is raised with this name when the configs or the keys change.
     /// </summary>
     public IReadOnlyList<ProviderConfig> CloudEngineConfigs =>
-        [.. ProvidersModel.ProviderConfigs.Where(c => c.Enabled && CloudTranscription.IsComplete(c) && HasKeyIfNeeded(c))];
+    [
+        .. ProvidersModel.ProviderConfigs.Where(c =>
+            c.IsAvailable(ProvidersModel.HasApiKey(c.Id)) && CloudTranscription.IsComplete(c) && HasKeyIfNeeded(c)),
+    ];
 
     /// <summary>
-    /// Enabled providers that can be the default cloud diarizer, with a valid destination and a saved key (macOS
+    /// Available providers that can be the default cloud diarizer, with a valid destination and a saved key (macOS
     /// <c>cloudDiarizerConfigs</c>). Their diarization model is not checked here (Settings' model field would vanish
     /// mid-typing): <see cref="DefaultCloudDiarizer"/> does.
     /// </summary>
     public IReadOnlyList<ProviderConfig> CloudDiarizerConfigs =>
     [
         .. ProvidersModel.ProviderConfigs.Where(c =>
-            c.Enabled && CloudTranscription.DiarizationPresets.Contains(c.Preset ?? "") && CloudTranscription.Supports(c)
+            c.IsAvailable(ProvidersModel.HasApiKey(c.Id)) && CloudTranscription.DiarizationPresets.Contains(c.Preset ?? "")
+            && CloudTranscription.Supports(c)
             && CloudTranscription.Destination(c) is not null && HasKeyIfNeeded(c)),
     ];
 

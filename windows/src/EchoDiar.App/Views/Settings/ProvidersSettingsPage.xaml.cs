@@ -484,14 +484,14 @@ public sealed partial class ProvidersSettingsPage : UserControl
 
     /// <summary>
     /// The Catch-up group (macOS <c>catchUpSection</c>): the provider a catch-up runs on, among the usable ones outside
-    /// the app ("Automatic" names what it runs, as <see cref="AppViewModel.CatchUpProvider"/> resolves it); the model of a
+    /// the app ("Automatic" names what it runs, <see cref="AppViewModel.AutomaticCatchUpProvider"/>); the model of a
     /// picked one; the notes of the provider it runs on; why none can; from the start or not.
     /// </summary>
     private void RefreshCatchUp()
     {
         var external = CatchUpProviders();
         List<string> ids = [""];
-        List<string> titles = [AutomaticCatchUpProvider(external) is { } automatic
+        List<string> titles = [_model.AutomaticCatchUpProvider is { } automatic
             ? WithLeavesPC(Loc.Format("Automatic (%@)", automatic.Name), automatic)
             : Loc.T("Automatic")];
         foreach (var provider in external)
@@ -540,10 +540,6 @@ public sealed partial class ProvidersSettingsPage : UserControl
     /// <summary>The usable providers outside the app, as <see cref="AppViewModel.CatchUpProvider"/> filters them.</summary>
     private List<AIProviderInfo> CatchUpProviders() =>
         [.. _providers.AIProviders.Where(p => p.Kind != AIProviderKind.InApp && p.UnavailableReason is null)];
-
-    /// <summary>What "Automatic" runs, as <see cref="AppViewModel.CatchUpProvider"/> resolves it with no provider picked.</summary>
-    private AIProviderInfo? AutomaticCatchUpProvider(List<AIProviderInfo> external) =>
-        _providers.CurrentAIProvider is { Kind: not AIProviderKind.InApp } main ? main : external.FirstOrDefault();
 
     /// <summary>The picked provider, "" (Automatic) when it is not usable now, as a catch-up then runs on Automatic's.</summary>
     private string ShownCatchUpProviderId(List<AIProviderInfo> external)
@@ -713,10 +709,10 @@ public sealed partial class ProvidersSettingsPage : UserControl
     }
 
     /// <summary>
-    /// A cloud preset, local host or custom endpoint (macOS <c>APIProviderRow</c>): the Enabled switch; expanded, its
-    /// name and authentication (custom endpoints), extra headers (custom endpoints), API key, base URL, model, the
-    /// models shown in the AI pane's menu, the transcription model (the APIs that transcribe too), Test, and Remove
-    /// (local hosts and custom endpoints).
+    /// A cloud preset, local host or custom endpoint (macOS <c>APIProviderRow</c>): the Enabled switch (local hosts
+    /// only); expanded, its name and authentication (custom endpoints), extra headers (custom endpoints), API key, base
+    /// URL, model, the models shown in the AI pane's menu, the transcription model (the APIs that transcribe too), Test,
+    /// and Remove (local hosts and custom endpoints).
     /// </summary>
     private sealed class ApiRow
     {
@@ -862,6 +858,8 @@ public sealed partial class ProvidersSettingsPage : UserControl
             else Expander.ClearValue(SettingsExpander.DescriptionProperty);
             AutomationProperties.SetName(_enabled, name);
             _enabled.IsOn = config.Enabled;
+            // A cloud API is available once its key is saved (or, without auth, its base URL set): no switch.
+            _enabled.Visibility = Show(!config.IsCloud);
             var customApi = IsCustom && config.Kind == ProviderKind.OpenAICompatible;
             _nameCard.Visibility = _authCard.Visibility = _headersCard.Visibility = Show(customApi);
             SetText(_nameBox, config.DisplayName);

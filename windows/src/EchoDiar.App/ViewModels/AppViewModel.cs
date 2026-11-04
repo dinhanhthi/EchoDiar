@@ -355,6 +355,9 @@ public sealed partial class AppViewModel : ObservableObject
             StartupTrace.Write("end settings load");
             return settings;
         });
+        // Before any launch-time automatic path (library indexing, retried transcriptions) reads the providers; saved
+        // through the usual delayed write.
+        ApplySettings(Settings.MigratingProviderAvailability());
         OnPropertyChanged(nameof(NeedsDiarizer));
         StartupTrace.Write("settings applied");
         await Task.Run(Recover);
