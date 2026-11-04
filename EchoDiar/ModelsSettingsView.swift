@@ -42,9 +42,9 @@ struct ModelsSettingsView: View {
                 case .general: generalSection
                 case .transcriptionModels:
                     intro("Transcription turns speech into text. The transcription model listens to the recording and writes what was said, with timestamps.")
+                    speechToTextSection
                     tierSections(.asr)
                     cloudSection(diarization: false)
-                    speechToTextSection
                 case .diarizationModels:
                     Section {
                         SpeakerSeparationToggle(model: model)

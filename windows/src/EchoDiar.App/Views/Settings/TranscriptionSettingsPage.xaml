@@ -144,12 +144,14 @@
                         Tag="Transcription models"
                         Text="{local:T Text='Transcription turns speech into text. The transcription model listens to the recording and writes what was said, with timestamps.'}" />
 
+                    <!-- First, as macOS speechToTextSection. -->
+                    <StackPanel x:Name="SpeechToTextList" Spacing="4" />
+
                     <!-- A header per tier, then its rows (made in code). -->
                     <StackPanel x:Name="TranscriptionList" Spacing="4" />
 
-                    <!-- After the local tiers: macOS cloudSection(diarization: false), then speechToTextSection. -->
+                    <!-- After the local tiers: macOS cloudSection(diarization: false). -->
                     <StackPanel x:Name="TranscriptionCloudList" Spacing="4" />
-                    <StackPanel x:Name="SpeechToTextList" Spacing="4" />
                 </StackPanel>
 
                 <!-- Diarization model -->
