@@ -429,10 +429,15 @@ public actor TranscriptionPipeline {
     }
 
     /// One channel through a cloud API, from the compressed source (not the 16 kHz extract); errors other than a
-    /// cancellation become `TranscriptionError.cloud` with a short reason.
+    /// cancellation become `TranscriptionError.cloud` with a short reason. A streaming-only model fails before any
+    /// upload (the file endpoints refuse it).
     private static func cloudSegments(
         _ cloud: CloudEngine, source: ChannelSource, language: String?, diarize: Bool
     ) async throws -> [RawSegment] {
+        guard !CloudTranscription.isStreamingOnly(cloud.model) else {
+            throw TranscriptionError.cloud(
+                provider: cloud.name, reason: "\(cloud.model) only streams live audio; pick another model in Settings")
+        }
         do {
             let segments = try await CloudTranscription.transcribe(
                 source: source.url, channel: source.channel, with: cloud.transcriber, language: language, diarize: diarize)

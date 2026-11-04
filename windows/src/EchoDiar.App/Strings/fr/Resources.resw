@@ -3314,6 +3314,10 @@
     <value>Ce modèle n’attribue pas les intervenants ; un modèle sur ce PC est utilisé à la place.</value>
     <comment>This model does not label speakers; a model on this PC is used instead.</comment>
   </data>
+  <data name="ThisModelOnlyStreamsLiveAudioAndCanTTranscribeARecordingPick" xml:space="preserve">
+    <value>Ce modèle ne fait que diffuser l’audio en direct et ne peut pas transcrire un enregistrement. Choisissez un autre modèle.</value>
+    <comment>This model only streams live audio and can't transcribe a recording. Pick another model.</comment>
+  </data>
   <data name="ThisPC" xml:space="preserve">
     <value>Ce PC</value>
     <comment>This PC</comment>

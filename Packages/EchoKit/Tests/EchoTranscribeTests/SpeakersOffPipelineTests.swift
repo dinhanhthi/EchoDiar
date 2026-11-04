@@ -78,6 +78,27 @@ struct SpeakersOffPipelineTests {
         _ = try await firstJob.value
     }
 
+    /// A streaming-only model (`scribe_v2_realtime`) fails the job before any upload, with a reason that names it.
+    @Test func streamingOnlyCloudModelFailsBeforeUpload() async throws {
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString, isDirectory: true)
+        defer { try? FileManager.default.removeItem(at: root) }
+        let job = try Self.makeRecording(in: root)
+        let pipeline = TranscriptionPipeline(
+            modelStore: ModelStore(root: root.appendingPathComponent("Models")), gate: ModelLoadGate(),
+            deferWhenConstrained: false)
+        let asr = FakeTranscriber()
+
+        let error = await #expect(throws: TranscriptionError.self) {
+            try await pipeline.transcribe(
+                job, cloud: CloudEngine(
+                    engineID: "cloud:elevenlabs", name: "ElevenLabs", model: "scribe_v2_realtime", transcriber: asr))
+        }
+
+        #expect(error?.errorDescription?.hasPrefix("ElevenLabs: scribe_v2_realtime") == true)
+        #expect(asr.diarizeFlags.isEmpty)
+        #expect(try Conversation.read(from: job.folder).status == .transcriptionFailed)
+    }
+
     /// A stopped recording folder under `root` with a 2 s stereo audio file, as a speakers-off job.
     private static func makeRecording(in root: URL) throws -> TranscriptionJob {
         let session = RecordingSession(state: .stopped, audioFileName: "audio.caf")

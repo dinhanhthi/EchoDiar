@@ -507,11 +507,17 @@ public sealed class TranscriptionPipeline(
 
     /// <summary>
     /// One channel through a cloud API, from its source (the compressed audio, not the 16 kHz extract); errors other
-    /// than a cancellation become <see cref="TranscriptionErrorKind.Cloud"/> with a short, key-free reason.
+    /// than a cancellation become <see cref="TranscriptionErrorKind.Cloud"/> with a short, key-free reason. A
+    /// streaming-only model fails before any upload (the file endpoints refuse it).
     /// </summary>
     private async Task<IReadOnlyList<RawSegment>> CloudSegmentsAsync(
         CloudEngine cloud, ChannelSource source, string? language, bool diarize, CancellationToken cancellationToken)
     {
+        if (CloudTranscription.IsStreamingOnly(cloud.Model))
+        {
+            throw new TranscriptionException(
+                TranscriptionErrorKind.Cloud, $"{cloud.Name}: {cloud.Model} only streams live audio; pick another model in Settings");
+        }
         List<CloudSegment> segments;
         try
         {

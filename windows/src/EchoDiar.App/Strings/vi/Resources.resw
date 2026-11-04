@@ -3198,6 +3198,10 @@
     <value>Mô hình này không gắn nhãn người nói; một mô hình trên máy tính này sẽ được dùng thay thế.</value>
     <comment>This model does not label speakers; a model on this PC is used instead.</comment>
   </data>
+  <data name="ThisModelOnlyStreamsLiveAudioAndCanTTranscribeARecordingPick" xml:space="preserve">
+    <value>Mô hình này chỉ nhận âm thanh trực tiếp (streaming), không thể chép lời một bản ghi âm. Hãy chọn mô hình khác.</value>
+    <comment>This model only streams live audio and can't transcribe a recording. Pick another model.</comment>
+  </data>
   <data name="ThisPC" xml:space="preserve">
     <value>Máy tính này</value>
     <comment>This PC</comment>

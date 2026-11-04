@@ -688,6 +688,7 @@ public sealed partial class TranscriptionSettingsPage : UserControl
         private readonly TextBlock _error;
         private readonly TextBlock _empty;
         private readonly TextBlock _noSpeakers;
+        private readonly TextBlock _streamingOnly;
         private readonly FieldPanel _input;
         private ProviderConfig? _config;
         private List<string>? _loaded;
@@ -717,8 +718,11 @@ public sealed partial class TranscriptionSettingsPage : UserControl
                 Style = (Style)page.Resources["CautionNoteStyle"],
                 Text = Loc.T("This model does not label speakers; a model on this PC is used instead."),
             };
+            _streamingOnly = page.Note(
+                "This model only streams live audio and can't transcribe a recording. Pick another model.", "CriticalNoteStyle");
             var notes = new StackPanel { Spacing = 2 };
             notes.Children.Add(_error);
+            notes.Children.Add(_streamingOnly);
             notes.Children.Add(_empty);
             notes.Children.Add(_noSpeakers);
             Card = Field("Model", _input);
@@ -778,6 +782,8 @@ public sealed partial class TranscriptionSettingsPage : UserControl
             _error.Text = _loadError ?? "";
             _error.Visibility = Show(_loadError is not null);
             _empty.Visibility = Show(_loadError is null && _loaded is { Count: 0 });
+            // A streaming-only diarization model falls back to this PC's diarizer: _noSpeakers says so.
+            _streamingOnly.Visibility = Show(!_diarization && CloudTranscription.IsStreamingOnly(CloudTranscription.Model(config)));
             _noSpeakers.Visibility = Show(_diarization && !CloudTranscription.Diarizes(config, CloudTranscription.DiarizationModel(config)));
         }
 
@@ -803,7 +809,7 @@ public sealed partial class TranscriptionSettingsPage : UserControl
             try
             {
                 var all = await _page._providers.ListModelsAsync(config, cancellation.Token);
-                _loaded = [.. all.Where(id => Transcribes(id, config.Preset) && (!_diarization || CloudTranscription.Diarizes(config, id)))
+                _loaded = [.. all.Where(id => Transcribes(id, config.Preset) && !CloudTranscription.IsStreamingOnly(id) && (!_diarization || CloudTranscription.Diarizes(config, id)))
                     .Order(StringComparer.Ordinal)];
                 _loadError = null;
             }

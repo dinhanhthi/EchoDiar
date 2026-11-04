@@ -3314,6 +3314,10 @@
     <value>Este modelo no etiqueta a los hablantes; en su lugar se usa un modelo de este PC.</value>
     <comment>This model does not label speakers; a model on this PC is used instead.</comment>
   </data>
+  <data name="ThisModelOnlyStreamsLiveAudioAndCanTTranscribeARecordingPick" xml:space="preserve">
+    <value>Este modelo solo transmite audio en directo y no puede transcribir una grabación. Elige otro modelo.</value>
+    <comment>This model only streams live audio and can't transcribe a recording. Pick another model.</comment>
+  </data>
   <data name="ThisPC" xml:space="preserve">
     <value>Este PC</value>
     <comment>This PC</comment>

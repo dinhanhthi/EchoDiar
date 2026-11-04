@@ -447,6 +447,17 @@ struct CloudTranscriptionRequestTests {
         #expect(!CloudTranscription.diarizes(openai, model: "gpt-4o-transcribe"))
         #expect(CloudTranscription.diarizes(openai, model: CloudTranscription.defaultDiarizationModel(for: openai)))
         #expect(!CloudTranscription.diarizes(try preset("groq"), model: "whisper-large-v3-turbo"))
+        #expect(CloudTranscription.diarizes(try preset("elevenlabs"), model: "scribe_v2"))
+        #expect(!CloudTranscription.diarizes(try preset("elevenlabs"), model: "scribe_v2_realtime"))
+    }
+
+    /// Realtime models only stream over a WebSocket: the file endpoints refuse them (ElevenLabs: HTTP 400).
+    @Test func realtimeModelsAreStreamingOnly() {
+        #expect(CloudTranscription.isStreamingOnly("scribe_v2_realtime"))
+        #expect(CloudTranscription.isStreamingOnly(" Scribe_V2_Realtime "))
+        #expect(!CloudTranscription.isStreamingOnly("scribe_v2"))
+        #expect(!CloudTranscription.isStreamingOnly("gpt-4o-transcribe"))
+        #expect(!CloudTranscription.isStreamingOnly(""))
     }
 
     // MARK: - Helpers

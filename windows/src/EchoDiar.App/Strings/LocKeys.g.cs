@@ -787,6 +787,7 @@ public static partial class Loc
         "This event can't be edited here.",
         "This model does not label speakers; a model on this Mac is used instead.",
         "This model does not label speakers; a model on this PC is used instead.",
+        "This model only streams live audio and can't transcribe a recording. Pick another model.",
         "Title",
         "Today",
         "Tokenizers and model downloads",

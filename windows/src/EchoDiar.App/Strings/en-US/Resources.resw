@@ -3334,6 +3334,10 @@
     <value>This model does not label speakers; a model on this PC is used instead.</value>
     <comment>This model does not label speakers; a model on this PC is used instead.</comment>
   </data>
+  <data name="ThisModelOnlyStreamsLiveAudioAndCanTTranscribeARecordingPick" xml:space="preserve">
+    <value>This model only streams live audio and can't transcribe a recording. Pick another model.</value>
+    <comment>This model only streams live audio and can't transcribe a recording. Pick another model.</comment>
+  </data>
   <data name="ThisPC" xml:space="preserve">
     <value>This PC</value>
     <comment>This PC</comment>

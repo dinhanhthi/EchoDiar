@@ -547,6 +547,11 @@ private struct CloudModelField: View {
                          : "No transcription models listed; type the model id.")
                         .font(.caption).foregroundStyle(.secondary)
                 }
+                // A streaming-only diarization model falls back to this Mac's diarizer: the note below says so.
+                if !diarization, CloudTranscription.isStreamingOnly(CloudTranscription.model(for: config)) {
+                    Text("This model only streams live audio and can't transcribe a recording. Pick another model.")
+                        .font(.caption).foregroundStyle(.red)
+                }
                 if diarization,
                    !CloudTranscription.diarizes(config, model: CloudTranscription.diarizationModel(for: config)) {
                     Text("This model does not label speakers; a model on this Mac is used instead.")
@@ -582,7 +587,7 @@ private struct CloudModelField: View {
         do {
             let all = try await model.makeProvider(for: config)?.listModels() ?? []
             loaded = all.filter { id in
-                Self.transcribes(id, preset: config.preset)
+                Self.transcribes(id, preset: config.preset) && !CloudTranscription.isStreamingOnly(id)
                     && (!diarization || CloudTranscription.diarizes(config, model: id))
             }.sorted()
             error = nil

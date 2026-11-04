@@ -694,6 +694,19 @@ public sealed class CloudTranscriptionRequestTests : IDisposable
         Assert.False(CloudTranscription.Diarizes(openai, "gpt-4o-transcribe"));
         Assert.True(CloudTranscription.Diarizes(openai, CloudTranscription.DefaultDiarizationModel(openai)));
         Assert.False(CloudTranscription.Diarizes(Preset("groq"), "whisper-large-v3-turbo"));
+        Assert.True(CloudTranscription.Diarizes(Preset("elevenlabs"), "scribe_v2"));
+        Assert.False(CloudTranscription.Diarizes(Preset("elevenlabs"), "scribe_v2_realtime"));
+    }
+
+    // Realtime models only stream over a WebSocket: the file endpoints refuse them (ElevenLabs: HTTP 400).
+    [Fact]
+    public void RealtimeModelsAreStreamingOnly()
+    {
+        Assert.True(CloudTranscription.IsStreamingOnly("scribe_v2_realtime"));
+        Assert.True(CloudTranscription.IsStreamingOnly(" Scribe_V2_Realtime "));
+        Assert.False(CloudTranscription.IsStreamingOnly("scribe_v2"));
+        Assert.False(CloudTranscription.IsStreamingOnly("gpt-4o-transcribe"));
+        Assert.False(CloudTranscription.IsStreamingOnly(""));
     }
 
     // Helpers.

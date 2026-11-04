@@ -299,6 +299,8 @@ extension CloudTranscription {
     /// Whether `model` of `config` returns speaker labels (a non-diarizing model would still bill a transcription).
     public static func diarizes(_ config: ProviderConfig, model: String) -> Bool {
         let model = model.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        // The file endpoints refuse it: the local diarizer runs instead.
+        if isStreamingOnly(model) { return false }
         switch config.preset {
         case "openai": return model.hasSuffix("-diarize")
         case "elevenlabs": return model.hasPrefix("scribe")
@@ -307,6 +309,12 @@ extension CloudTranscription {
         case "assemblyai": return true
         default: return false
         }
+    }
+
+    /// Whether `model` only streams live audio (`scribe_v2_realtime`): the file endpoints EchoDiar sends recordings to
+    /// refuse it (ElevenLabs: HTTP 400), so Settings warns before a recording fails.
+    public static func isStreamingOnly(_ model: String) -> Bool {
+        model.lowercased().contains("realtime")
     }
 
     /// The model used when `diarizationModel` is empty; "" when AssemblyAI picks it or the preset cannot diarize.

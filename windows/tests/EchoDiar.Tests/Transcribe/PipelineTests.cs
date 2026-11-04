@@ -234,6 +234,27 @@ public sealed class PipelineTests : IDisposable
         Assert.False(File.Exists(Path.Combine(folder, Transcript.FileName)));
     }
 
+    // A streaming-only model (scribe_v2_realtime) fails the job before any upload, with a reason that names it.
+    [Fact]
+    public async Task AStreamingOnlyCloudModelFailsBeforeUpload()
+    {
+        var (session, folder) = MakeRecording(1, toneOnMic: false);
+        var pipeline = new TranscriptionPipeline(
+            new Dictionary<ModelRuntime, TranscriptionPipeline.EngineFactory>(), null, _ => false,
+            e => Path.Combine(_root, "Models", e.Id), new ModelLoadGate(), exporter: new FakeExporter());
+        var cloud = new FakeCloud();
+        var job = new TranscriptionJob { ConversationID = session.Id, Folder = folder, ProcessNow = true, Diarize = false };
+
+        var error = await Assert.ThrowsAsync<TranscriptionException>(() => pipeline.TranscribeAsync(
+            job, new CloudEngine("cloud:elevenlabs", "ElevenLabs", "scribe_v2_realtime", cloud), null,
+            TestContext.Current.CancellationToken));
+
+        Assert.Equal(TranscriptionErrorKind.Cloud, error.Kind);
+        Assert.StartsWith("ElevenLabs: scribe_v2_realtime", error.Message, StringComparison.Ordinal);
+        Assert.Empty(cloud.Diarize);
+        Assert.Equal(ConversationStatus.TranscriptionFailed, Conversation.Read(folder).Status);
+    }
+
     // Cloud jobs skip the one-at-a-time queue: a second cloud job finishes while the first is still uploading.
     [Fact]
     public async Task CloudJobsRunInParallel()

@@ -334,6 +334,8 @@ public static partial class CloudTranscription
     public static bool Diarizes(ProviderConfig config, string model)
     {
         model = model.Trim().ToLowerInvariant();
+        // The file endpoints refuse it: the local diarizer runs instead.
+        if (IsStreamingOnly(model)) return false;
         return config.Preset switch
         {
             "openai" => model.EndsWith("-diarize", StringComparison.Ordinal),
@@ -344,6 +346,12 @@ public static partial class CloudTranscription
             _ => false,
         };
     }
+
+    /// <summary>
+    /// Whether <paramref name="model"/> only streams live audio (<c>scribe_v2_realtime</c>): the file endpoints EchoDiar
+    /// sends recordings to refuse it (ElevenLabs: HTTP 400), so Settings warns before a recording fails.
+    /// </summary>
+    public static bool IsStreamingOnly(string model) => model.Contains("realtime", StringComparison.OrdinalIgnoreCase);
 
     /// <summary>
     /// The speaker turns of a cloud diarizer's segments (their text is not kept): labels numbered 0, 1, ... by first

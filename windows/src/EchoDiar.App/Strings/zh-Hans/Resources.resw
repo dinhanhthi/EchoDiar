@@ -3198,6 +3198,10 @@
     <value>此模型不会标注说话人；将改用这台电脑上的模型。</value>
     <comment>This model does not label speakers; a model on this PC is used instead.</comment>
   </data>
+  <data name="ThisModelOnlyStreamsLiveAudioAndCanTTranscribeARecordingPick" xml:space="preserve">
+    <value>此模型只能处理实时音频流，无法转写录音。请选择其他模型。</value>
+    <comment>This model only streams live audio and can't transcribe a recording. Pick another model.</comment>
+  </data>
   <data name="ThisPC" xml:space="preserve">
     <value>这台电脑</value>
     <comment>This PC</comment>
