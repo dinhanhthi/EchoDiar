@@ -57,6 +57,9 @@ public sealed partial class ApiKeysSettingsPage : UserControl
             ["elevenlabs"] = ("https://elevenlabs.io/app/developers/api-keys", "https://elevenlabs.io/docs/overview/models"),
             ["deepgram"] = ("https://console.deepgram.com", "https://developers.deepgram.com/docs/models-languages-overview"),
             ["assemblyai"] = ("https://www.assemblyai.com/dashboard/api-keys", "https://www.assemblyai.com/docs/getting-started/models"),
+            ["speechmatics"] = ("https://portal.speechmatics.com/settings/api-keys/", "https://docs.speechmatics.com/speech-to-text/models"),
+            ["soniox"] = ("https://console.soniox.com/org/projects/api/keys/", "https://docs.soniox.com/stt/models"),
+            ["gladia"] = ("https://app.gladia.io/apikeys", "https://docs.gladia.io/chapters/introduction/models"),
         };
 
     /// <summary>

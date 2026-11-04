@@ -9,7 +9,10 @@ namespace EchoDiar.Core.Settings;
 public enum ProviderKind
 {
     OpenAICompatible, Anthropic, Cli, Local,
-    /// <summary>A speech-to-text-only API (ElevenLabs, Deepgram, AssemblyAI): <c>baseURL</c> and <c>authStyle</c> are unused.</summary>
+    /// <summary>
+    /// A speech-to-text-only API (ElevenLabs, Deepgram, AssemblyAI, Speechmatics, Soniox, Gladia): <c>baseURL</c> and
+    /// <c>authStyle</c> are unused.
+    /// </summary>
     SpeechToText,
 }
 
@@ -118,10 +121,14 @@ public sealed record ProviderConfig
         Other("codex-cli", "Codex", ProviderKind.Cli),
         Other("opencode-cli", "OpenCode", ProviderKind.Cli),
         Other("gemini-cli", "Gemini CLI", ProviderKind.Cli),
-        // Speech to text only (OpenAI, Groq, Mistral, Gemini and custom endpoints transcribe through the configs above).
+        // Speech to text only (OpenAI, xAI, Groq, Mistral, Gemini and custom endpoints transcribe through the configs
+        // above).
         Other("elevenlabs", "ElevenLabs", ProviderKind.SpeechToText),
         Other("deepgram", "Deepgram", ProviderKind.SpeechToText),
         Other("assemblyai", "AssemblyAI", ProviderKind.SpeechToText),
+        Other("speechmatics", "Speechmatics", ProviderKind.SpeechToText),
+        Other("soniox", "Soniox", ProviderKind.SpeechToText),
+        Other("gladia", "Gladia", ProviderKind.SpeechToText),
     ];
 
     private static ProviderConfig Cloud(string id, string name, string baseURL, string model, AuthStyle auth = AuthStyle.Bearer) => new()

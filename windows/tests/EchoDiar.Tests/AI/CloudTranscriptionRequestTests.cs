@@ -215,6 +215,201 @@ public sealed class CloudTranscriptionRequestTests : IDisposable
         ExpectKeyNotInUrl(upload);
     }
 
+    // xAI.
+
+    [Fact]
+    public async Task XAISystemChannelDiarizesWithLanguageAndSendsTheFileLast()
+    {
+        using var request = XAITranscriber.MakeRequest(Key, XAITranscriber.DefaultModel, Audio(), "vi-VN", diarize: true);
+
+        Assert.Equal(HttpMethod.Post, request.Method);
+        Assert.Equal("https://api.x.ai/v1/stt", request.RequestUri!.AbsoluteUri);
+        Assert.Equal($"Bearer {Key}", Header(request, "Authorization"));
+        var fields = await FormFields(request);
+        Assert.Equal("grok-voice-transcribe-2.0", fields["model"]);
+        Assert.Equal("vi", fields["language"]);
+        Assert.Equal("true", fields["diarize"]);
+        Assert.Equal(AudioText, fields["file"]);
+        // xAI may ignore the fields sent after `file`.
+        Assert.Equal("file", (await FormFieldNames(request)).Last());
+        ExpectKeyNotInUrl(request);
+
+        using var micRequest = XAITranscriber.MakeRequest(Key, XAITranscriber.DefaultModel, Audio(), "auto", diarize: false);
+        var mic = await FormFields(micRequest);
+        Assert.False(mic.ContainsKey("diarize"));
+        Assert.False(mic.ContainsKey("language"));
+    }
+
+    // Speechmatics.
+
+    [Fact]
+    public async Task SpeechmaticsJobSendsTheConfigBeforeTheAudioThenPolls()
+    {
+        using var request = SpeechmaticsTranscriber.MakeJobRequest(Key, SpeechmaticsTranscriber.DefaultModel, Audio(), "vi", diarize: true);
+
+        Assert.Equal(HttpMethod.Post, request.Method);
+        Assert.Equal("https://eu1.asr.api.speechmatics.com/v2/jobs", request.RequestUri!.AbsoluteUri);
+        Assert.Equal($"Bearer {Key}", Header(request, "Authorization"));
+        Assert.Equal(["config", "data_file"], await FormFieldNames(request));
+        var fields = await FormFields(request);
+        Assert.Equal(AudioText, fields["data_file"]);
+        ExpectJson(
+            new JsonObject
+            {
+                ["type"] = "transcription",
+                ["transcription_config"] = new JsonObject { ["language"] = "vi", ["model"] = "enhanced", ["diarization"] = "speaker" },
+            },
+            fields["config"]);
+        ExpectKeyNotInUrl(request);
+
+        // The mic channel on Auto: detection, no diarization; the multilingual `melia` models take `multi` + hints.
+        using var micRequest = SpeechmaticsTranscriber.MakeJobRequest(Key, SpeechmaticsTranscriber.DefaultModel, Audio(), "auto", diarize: false);
+        ExpectJson(
+            new JsonObject
+            {
+                ["type"] = "transcription", ["transcription_config"] = new JsonObject { ["language"] = "auto", ["model"] = "enhanced" },
+            },
+            (await FormFields(micRequest))["config"]);
+        using var meliaRequest = SpeechmaticsTranscriber.MakeJobRequest(Key, "melia-1", Audio(), "vi", diarize: false);
+        ExpectJson(
+            new JsonObject
+            {
+                ["type"] = "transcription",
+                ["transcription_config"] = new JsonObject
+                {
+                    ["language"] = "multi", ["model"] = "melia-1", ["language_hints"] = new JsonArray("vi"),
+                },
+            },
+            (await FormFields(meliaRequest))["config"]);
+
+        using var poll = SpeechmaticsTranscriber.MakePollRequest(Key, "job-1");
+        Assert.Equal(HttpMethod.Get, poll.Method);
+        Assert.Equal("https://eu1.asr.api.speechmatics.com/v2/jobs/job-1", poll.RequestUri!.AbsoluteUri);
+        using var transcript = SpeechmaticsTranscriber.MakeTranscriptRequest(Key, "job-1");
+        Assert.Equal(HttpMethod.Get, transcript.Method);
+        Assert.Equal("https://eu1.asr.api.speechmatics.com/v2/jobs/job-1/transcript?format=json-v2", transcript.RequestUri!.AbsoluteUri);
+        foreach (var get in new[] { poll, transcript })
+        {
+            Assert.Equal($"Bearer {Key}", Header(get, "Authorization"));
+            ExpectKeyNotInUrl(get);
+        }
+    }
+
+    // Soniox.
+
+    [Fact]
+    public async Task SonioxUploadsThenCreatesAJobPollsAndDeletesBoth()
+    {
+        using var upload = SonioxTranscriber.MakeUploadRequest(Key, Audio());
+        Assert.Equal(HttpMethod.Post, upload.Method);
+        Assert.Equal("https://api.soniox.com/v1/files", upload.RequestUri!.AbsoluteUri);
+        Assert.Equal(AudioText, (await FormFields(upload))["file"]);
+
+        using var system = SonioxTranscriber.MakeTranscriptionRequest(Key, SonioxTranscriber.DefaultModel, "file-1", "vi-VN", diarize: true);
+        Assert.Equal(HttpMethod.Post, system.Method);
+        Assert.Equal("https://api.soniox.com/v1/transcriptions", system.RequestUri!.AbsoluteUri);
+        Assert.True(JsonNode.DeepEquals(
+            new JsonObject
+            {
+                ["model"] = "stt-async-v6", ["file_id"] = "file-1", ["language_hints"] = new JsonArray("vi"),
+                ["enable_speaker_diarization"] = true,
+            },
+            await Json(system)));
+        using var mic = SonioxTranscriber.MakeTranscriptionRequest(Key, SonioxTranscriber.DefaultModel, "file-1", "auto", diarize: false);
+        Assert.True(JsonNode.DeepEquals(
+            new JsonObject { ["model"] = "stt-async-v6", ["file_id"] = "file-1", ["enable_speaker_diarization"] = false },
+            await Json(mic)));
+
+        (HttpRequestMessage Request, HttpMethod Method, string Url)[] others =
+        [
+            (SonioxTranscriber.MakePollRequest(Key, "t-1"), HttpMethod.Get, "https://api.soniox.com/v1/transcriptions/t-1"),
+            (SonioxTranscriber.MakeTranscriptRequest(Key, "t-1"), HttpMethod.Get, "https://api.soniox.com/v1/transcriptions/t-1/transcript"),
+            (SonioxTranscriber.MakeDeleteTranscriptionRequest(Key, "t-1"), HttpMethod.Delete, "https://api.soniox.com/v1/transcriptions/t-1"),
+            (SonioxTranscriber.MakeDeleteFileRequest(Key, "file-1"), HttpMethod.Delete, "https://api.soniox.com/v1/files/file-1"),
+        ];
+        foreach (var (request, method, url) in others)
+        {
+            Assert.Equal(method, request.Method);
+            Assert.Equal(url, request.RequestUri!.AbsoluteUri);
+        }
+        foreach (var request in new[] { upload, system, mic }.Concat(others.Select(o => o.Request)))
+        {
+            Assert.Equal($"Bearer {Key}", Header(request, "Authorization"));
+            ExpectKeyNotInUrl(request);
+        }
+        foreach (var (request, _, _) in others) request.Dispose();
+    }
+
+    // Gladia.
+
+    [Fact]
+    public async Task GladiaUploadsThenCreatesAJobAndPollsWithTheGladiaKeyHeader()
+    {
+        using var upload = GladiaTranscriber.MakeUploadRequest(Key, Audio());
+        Assert.Equal(HttpMethod.Post, upload.Method);
+        Assert.Equal("https://api.gladia.io/v2/upload", upload.RequestUri!.AbsoluteUri);
+        Assert.Equal(AudioText, (await FormFields(upload))["audio"]);
+
+        using var system = GladiaTranscriber.MakeJobRequest(
+            Key, GladiaTranscriber.DefaultModel, "https://api.gladia.io/file/abc", "fr-FR", diarize: true);
+        Assert.Equal(HttpMethod.Post, system.Method);
+        Assert.Equal("https://api.gladia.io/v2/pre-recorded", system.RequestUri!.AbsoluteUri);
+        Assert.True(JsonNode.DeepEquals(
+            new JsonObject
+            {
+                ["audio_url"] = "https://api.gladia.io/file/abc", ["model"] = "solaria-1", ["diarization"] = true,
+                ["language_config"] = new JsonObject { ["languages"] = new JsonArray("fr"), ["code_switching"] = false },
+            },
+            await Json(system)));
+        using var mic = GladiaTranscriber.MakeJobRequest(
+            Key, GladiaTranscriber.DefaultModel, "https://api.gladia.io/file/abc", null, diarize: false);
+        Assert.True(JsonNode.DeepEquals(
+            new JsonObject
+            {
+                ["audio_url"] = "https://api.gladia.io/file/abc", ["model"] = "solaria-1", ["diarization"] = false,
+                ["language_config"] = new JsonObject { ["languages"] = new JsonArray(), ["code_switching"] = false },
+            },
+            await Json(mic)));
+
+        using var poll = GladiaTranscriber.MakePollRequest(Key, "job-1");
+        Assert.Equal(HttpMethod.Get, poll.Method);
+        Assert.Equal("https://api.gladia.io/v2/pre-recorded/job-1", poll.RequestUri!.AbsoluteUri);
+        foreach (var request in new[] { upload, system, mic, poll })
+        {
+            Assert.Equal(Key, Header(request, "x-gladia-key"));
+            Assert.Null(Header(request, "Authorization"));
+            ExpectKeyNotInUrl(request);
+        }
+    }
+
+    // A job or file id from the API that is not plain could reach another path with the key, whichever new provider.
+    public static TheoryData<string, string> NonPlainIds()
+    {
+        var data = new TheoryData<string, string>();
+        foreach (var builder in new[] { "speechmatics poll", "speechmatics transcript", "soniox poll", "soniox transcript",
+                     "soniox delete transcription", "soniox delete file", "gladia poll" })
+        foreach (var id in new[] { "", "../v1/account", "job?limit=1", "a/b" })
+            data.Add(builder, id);
+        return data;
+    }
+
+    [Theory]
+    [MemberData(nameof(NonPlainIds))]
+    public void NewProvidersRefuseANonPlainId(string builder, string id)
+    {
+        Func<HttpRequestMessage> make = builder switch
+        {
+            "speechmatics poll" => () => SpeechmaticsTranscriber.MakePollRequest(Key, id),
+            "speechmatics transcript" => () => SpeechmaticsTranscriber.MakeTranscriptRequest(Key, id),
+            "soniox poll" => () => SonioxTranscriber.MakePollRequest(Key, id),
+            "soniox transcript" => () => SonioxTranscriber.MakeTranscriptRequest(Key, id),
+            "soniox delete transcription" => () => SonioxTranscriber.MakeDeleteTranscriptionRequest(Key, id),
+            "soniox delete file" => () => SonioxTranscriber.MakeDeleteFileRequest(Key, id),
+            _ => () => GladiaTranscriber.MakePollRequest(Key, id),
+        };
+        Assert.Equal(LLMErrorKind.Provider, Assert.Throws<LLMException>(() => make()).Kind);
+    }
+
     // Split.
 
     [Fact]
@@ -425,6 +620,133 @@ public sealed class CloudTranscriptionRequestTests : IDisposable
         Assert.Throws<LLMException>(() => AssemblyAITranscriber.ParseTranscript(Bytes("""{"id":"job-1","status":"error","error":"Bad audio"}""")));
     }
 
+    // The next four bodies are the recorded responses of stt-protocols.md part A (plan 2026-11-04-cloud-live-transcript),
+    // with the additions noted per test.
+
+    // The docs' sample with "speaker" on each word (what diarize=true adds) and a second speaker's word.
+    [Fact]
+    public void XAIWordsWithIntegerSpeakersGroupIntoSegments()
+    {
+        const string body = """
+            {
+              "text": "The balance is $167,983.15. Thanks.",
+              "language": "en",
+              "duration": 3.45,
+              "words": [
+                { "text": "The", "start": 0.24, "end": 0.48, "speaker": 0 },
+                { "text": "balance", "start": 0.48, "end": 0.96, "speaker": 0 },
+                { "text": "is", "start": 0.96, "end": 1.12, "speaker": 0 },
+                { "text": "$167,983.15.", "start": 1.12, "end": 3.20, "speaker": 0 },
+                { "text": "Thanks.", "start": 3.25, "end": 3.45, "speaker": 1 }
+              ]
+            }
+            """;
+        Assert.Equal(
+            [
+                new(0.24, 3.20, "The balance is $167,983.15.", "0", "en"),
+                new(3.25, 3.45, "Thanks.", "1", "en"),
+            ],
+            XAITranscriber.Parse(Bytes(body)));
+    }
+
+    // The docs' sample ("world" takes the "." that attaches to it), plus a word of an unknown (UU) speaker.
+    [Fact]
+    public void SpeechmaticsAttachesPunctuationAndDropsTheUnknownSpeaker()
+    {
+        const string body = """
+            {
+              "format": "2.7",
+              "job": { "created_at": "2018-01-09T12:29:01.853047Z", "data_name": "recording.mp3", "duration": 244, "id": "a1b2c3d4e5" },
+              "metadata": { "created_at": "2018-01-09T12:31:46.918860Z", "type": "transcription", "transcription_config": { "language": "en", "diarization": "speaker" } },
+              "results": [
+                { "start_time": 0.55, "end_time": 1.2, "type": "word", "alternatives": [ { "confidence": 0.95, "content": "Hello", "language": "en", "speaker": "S1" } ] },
+                { "start_time": 1.45, "end_time": 1.8, "type": "word", "alternatives": [ { "confidence": 0.76, "content": "world", "language": "en", "speaker": "S1" } ] },
+                { "start_time": 1.8, "end_time": 1.8, "type": "punctuation", "attaches_to": "previous", "alternatives": [ { "confidence": 1.0, "content": ".", "language": "en", "speaker": "S1" } ] },
+                { "start_time": 3.0, "end_time": 3.4, "type": "word", "alternatives": [ { "confidence": 0.6, "content": "Yes", "language": "en", "speaker": "UU" } ] }
+              ]
+            }
+            """;
+        Assert.Equal(
+            [new(0.55, 1.8, "Hello world.", "S1", "en"), new CloudSegment(3.0, 3.4, "Yes", Language: "en")],
+            SpeechmaticsTranscriber.Parse(Bytes(body)));
+        Assert.False(SpeechmaticsTranscriber.ParseJobStatus(Bytes("""{"job":{"id":"a1","status":"running"}}""")));
+        Assert.True(SpeechmaticsTranscriber.ParseJobStatus(Bytes("""{"job":{"id":"a1","status":"done"}}""")));
+        Assert.Throws<LLMException>(() => SpeechmaticsTranscriber.ParseJobStatus(Bytes("""{"job":{"id":"a1","status":"rejected"}}""")));
+    }
+
+    // The docs' sample (sub-word tokens in ms, joined without spaces), then the same with speakers and a second word that
+    // carries its own leading space.
+    [Fact]
+    public void SonioxTokensJoinIntoWordsWithMillisecondsAsSeconds()
+    {
+        const string body = """
+            {
+              "id": "19b6d61d-02db-4c25-bc71-b4094dc310c8",
+              "text": "Hello",
+              "tokens": [
+                {"confidence": 0.95, "end_ms": 90, "start_ms": 10, "text": "Hel"},
+                {"confidence": 0.98, "end_ms": 160, "start_ms": 110, "text": "lo"}
+              ]
+            }
+            """;
+        Assert.Equal([new CloudSegment(0.01, 0.16, "Hello")], SonioxTranscriber.Parse(Bytes(body)));
+
+        const string diarized = """
+            {"id": "t-1", "text": "Hello there", "tokens": [
+              {"confidence": 0.95, "end_ms": 90, "start_ms": 10, "text": "Hel", "speaker": "1", "language": "en"},
+              {"confidence": 0.98, "end_ms": 160, "start_ms": 110, "text": "lo", "speaker": "1", "language": "en"},
+              {"confidence": 0.9, "end_ms": 2500, "start_ms": 2000, "text": " there", "speaker": "2", "language": "en"}]}
+            """;
+        Assert.Equal(
+            [new(0.01, 0.16, "Hello", "1", "en"), new(2.0, 2.5, "there", "2", "en")],
+            SonioxTranscriber.Parse(Bytes(diarized)));
+
+        const string queued = """{"id": "73d4357d-cad2-4338-a60d-ec6f2044f721", "status": "queued", "model": "stt-async-preview", "file_id": null, "audio_duration_ms": 0, "error_message": null}""";
+        Assert.Equal(("73d4357d-cad2-4338-a60d-ec6f2044f721", false), SonioxTranscriber.ParseStatus(Bytes(queued)));
+        Assert.Throws<LLMException>(() => SonioxTranscriber.ParseStatus(Bytes("""{"id":"t-1","status":"error","error_message":"Bad audio"}""")));
+    }
+
+    // The docs' sample: each utterance is one segment with its integer speaker.
+    [Fact]
+    public void GladiaUtterancesBecomeSegments()
+    {
+        const string body = """
+            {
+            	"id": "0777a4fc-0b7e-40fb-9d37-690bdd83c9c6",
+            	"request_id": "G-0777a4fc",
+            	"status": "done",
+            	"created_at": "2024-01-03T11:11:03.872Z",
+            	"completed_at": "2024-01-03T11:11:14.962Z",
+            	"result": {
+            		"metadata": { "audio_duration": 20.555465, "number_of_channels": 1, "transcription_time": 11.09, "billing_time": 20.555465 },
+            		"transcription": {
+            			"languages": ["en"],
+            			"full_transcript": "Split infinity in a time when less is more, ...",
+            			"utterances": [
+            				{
+            					"text": "Split infinity in a time when less is more,",
+            					"language": "en",
+            					"start": 0.21001999999999998,
+            					"end": 4.71123,
+            					"channel": 0,
+            					"speaker": 0,
+            					"words": [
+            						{ "word": "Split", "start": 0.21001999999999998, "end": 0.69015, "confidence": 1 },
+            						{ "word": " infinity", "start": 0.91021, "end": 1.55038, "confidence": 0.95 }
+            					]
+            				}
+            			]
+            		}
+            	}
+            }
+            """;
+        Assert.Equal(
+            [new CloudSegment(0.21001999999999998, 4.71123, "Split infinity in a time when less is more,", "0", "en")],
+            GladiaTranscriber.ParseJob(Bytes(body))!);
+        Assert.Null(GladiaTranscriber.ParseJob(Bytes("""{"id":"job-1","status":"processing"}""")));
+        Assert.Throws<LLMException>(() => GladiaTranscriber.ParseJob(Bytes("""{"id":"job-1","status":"error"}""")));
+    }
+
     // Settings Test and failure reasons.
 
     [Fact]
@@ -435,6 +757,10 @@ public sealed class CloudTranscriptionRequestTests : IDisposable
             (ElevenLabsTranscriber.MakeKeyCheckRequest(Key), "xi-api-key", Key),
             (DeepgramTranscriber.MakeKeyCheckRequest(Key), "Authorization", $"Token {Key}"),
             (AssemblyAITranscriber.MakeKeyCheckRequest(Key), "Authorization", Key),
+            (XAITranscriber.MakeKeyCheckRequest(Key), "Authorization", $"Bearer {Key}"),
+            (SpeechmaticsTranscriber.MakeKeyCheckRequest(Key), "Authorization", $"Bearer {Key}"),
+            (SonioxTranscriber.MakeKeyCheckRequest(Key), "Authorization", $"Bearer {Key}"),
+            (GladiaTranscriber.MakeKeyCheckRequest(Key), "x-gladia-key", Key),
         ];
         foreach (var (request, header, value) in checks)
         {
@@ -445,6 +771,39 @@ public sealed class CloudTranscriptionRequestTests : IDisposable
             Assert.Equal(TimeSpan.FromSeconds(15), Timeout(request));
             ExpectKeyNotInUrl(request);
         }
+    }
+
+    // The new providers' Test is a free listing (no audio) on the transcription origin.
+    [Fact]
+    public void NewProviderKeyChecksAreFreeListings()
+    {
+        using var xai = XAITranscriber.MakeKeyCheckRequest(Key);
+        Assert.Equal("https://api.x.ai/v1/api-key", xai.RequestUri!.AbsoluteUri);
+        using var speechmatics = SpeechmaticsTranscriber.MakeKeyCheckRequest(Key);
+        Assert.Equal("https://eu1.asr.api.speechmatics.com/v2/jobs?limit=1", speechmatics.RequestUri!.AbsoluteUri);
+        using var soniox = SonioxTranscriber.MakeKeyCheckRequest(Key);
+        Assert.Equal("https://api.soniox.com/v1/files?limit=1", soniox.RequestUri!.AbsoluteUri);
+        using var gladia = GladiaTranscriber.MakeKeyCheckRequest(Key);
+        Assert.Equal("https://api.gladia.io/v2/pre-recorded?limit=1", gladia.RequestUri!.AbsoluteUri);
+        Assert.Null(Header(gladia, "Authorization"));
+    }
+
+    // Settings' Test reaches each new provider's listing with its key header.
+    [Theory]
+    [InlineData("xai", "https://api.x.ai/v1/api-key", "Authorization", $"Bearer {Key}")]
+    [InlineData("speechmatics", "https://eu1.asr.api.speechmatics.com/v2/jobs?limit=1", "Authorization", $"Bearer {Key}")]
+    [InlineData("soniox", "https://api.soniox.com/v1/files?limit=1", "Authorization", $"Bearer {Key}")]
+    [InlineData("gladia", "https://api.gladia.io/v2/pre-recorded?limit=1", "x-gladia-key", Key)]
+    public async Task NewProviderKeyChecksSendOneRequest(string preset, string url, string header, string value)
+    {
+        var handler = new FakeHandler(_ => Respond(200, "{}"));
+
+        await CloudTranscription.CheckKeyAsync(Preset(preset), Key, handler, TestContext.Current.CancellationToken);
+
+        var request = Assert.Single(handler.Requests);
+        Assert.Equal(HttpMethod.Get, request.Method);
+        Assert.Equal(url, request.RequestUri!.AbsoluteUri);
+        Assert.Equal(value, Header(request, header));
     }
 
     [Fact]
@@ -486,6 +845,8 @@ public sealed class CloudTranscriptionRequestTests : IDisposable
         Assert.Contains("[redacted]", reason2);
         using var bearer = OpenAICompatibleTranscriber.MakeRequest(Preset("openai"), Key, "whisper-1", Audio(), null, diarize: false);
         Assert.Equal("key [redacted]", ProviderHttp.Redacted($"key {Key}", bearer));
+        using var gladia = GladiaTranscriber.MakePollRequest(Key, "j");
+        Assert.Equal("key [redacted]", ProviderHttp.Redacted($"key {Key}", gladia));
     }
 
     // A key echoed back in an error body never reaches the error text or the reason, whichever vendor and step.
@@ -495,6 +856,10 @@ public sealed class CloudTranscriptionRequestTests : IDisposable
     [InlineData("deepgram")]
     [InlineData("assemblyai")]
     [InlineData("gemini")]
+    [InlineData("xai")]
+    [InlineData("speechmatics")]
+    [InlineData("soniox")]
+    [InlineData("gladia")]
     public async Task KeysNeverReachTheErrorText(string preset)
     {
         var handler = new FakeHandler(_ => Respond(400, $$$"""{"error":{"message":"bad key {{{Key}}}"}}"""));
@@ -526,6 +891,24 @@ public sealed class CloudTranscriptionRequestTests : IDisposable
             ("Gemini upload + finalize", GeminiAudioTranscriber.MakeUploadRequest(uploadUrl, Audio()), true),
             ("Deepgram key check", DeepgramTranscriber.MakeKeyCheckRequest(Key), true),
             ("ElevenLabs key check", ElevenLabsTranscriber.MakeKeyCheckRequest(Key), true),
+            ("xAI key check", XAITranscriber.MakeKeyCheckRequest(Key), true),
+            ("Speechmatics poll", SpeechmaticsTranscriber.MakePollRequest(Key, "job"), true),
+            ("Speechmatics transcript", SpeechmaticsTranscriber.MakeTranscriptRequest(Key, "job"), true),
+            ("Speechmatics key check", SpeechmaticsTranscriber.MakeKeyCheckRequest(Key), true),
+            ("Soniox poll", SonioxTranscriber.MakePollRequest(Key, "t"), true),
+            ("Soniox transcript", SonioxTranscriber.MakeTranscriptRequest(Key, "t"), true),
+            ("Soniox key check", SonioxTranscriber.MakeKeyCheckRequest(Key), true),
+            ("Gladia upload", GladiaTranscriber.MakeUploadRequest(Key, Audio()), true),
+            ("Gladia poll", GladiaTranscriber.MakePollRequest(Key, "job"), true),
+            ("Gladia key check", GladiaTranscriber.MakeKeyCheckRequest(Key), true),
+            ("xAI stt", XAITranscriber.MakeRequest(Key, XAITranscriber.DefaultModel, Audio(), null, true), false),
+            ("Speechmatics create job", SpeechmaticsTranscriber.MakeJobRequest(Key, SpeechmaticsTranscriber.DefaultModel, Audio(), null, true), false),
+            // Sent once: a retry after a lost answer would leave a second stored file.
+            ("Soniox upload", SonioxTranscriber.MakeUploadRequest(Key, Audio()), false),
+            ("Soniox create transcription", SonioxTranscriber.MakeTranscriptionRequest(Key, SonioxTranscriber.DefaultModel, "f", null, true), false),
+            ("Soniox delete transcription", SonioxTranscriber.MakeDeleteTranscriptionRequest(Key, "t"), false),
+            ("Soniox delete file", SonioxTranscriber.MakeDeleteFileRequest(Key, "f"), false),
+            ("Gladia create job", GladiaTranscriber.MakeJobRequest(Key, GladiaTranscriber.DefaultModel, "https://api.gladia.io/file/x", null, true), false),
             ("AssemblyAI create transcript", AssemblyAITranscriber.MakeTranscriptRequest(Key, "https://cdn/x", null, true), false),
             ("Deepgram listen", DeepgramTranscriber.MakeRequest(Key, DeepgramTranscriber.DefaultModel, Audio(), null, true), false),
             ("ElevenLabs speech-to-text", ElevenLabsTranscriber.MakeRequest(Key, ElevenLabsTranscriber.DefaultModel, Audio(), null, true), false),
@@ -684,12 +1067,59 @@ public sealed class CloudTranscriptionRequestTests : IDisposable
             Assert.True(GeminiAudioTranscriber.MakeDeleteRequest(Key, name) is null, name);
     }
 
+    // A failed or cancelled Soniox job still deletes the transcription, then the file (Soniox would keep them 30 days).
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task SonioxDeletesTheTranscriptionAndTheFileOnFailureOrCancel(bool cancel)
+    {
+        using var cancellation = CancellationTokenSource.CreateLinkedTokenSource(TestContext.Current.CancellationToken);
+        var handler = new FakeHandler(request => (request.Method.Method, request.RequestUri!.AbsolutePath) switch
+        {
+            ("POST", "/v1/files") => Respond(200, """{"id":"file-1"}"""),
+            ("POST", "/v1/transcriptions") => Respond(200, """{"id":"t-1","status":"queued"}"""),
+            ("GET", "/v1/transcriptions/t-1") => cancel
+                ? CancelThenRespond(cancellation, """{"id":"t-1","status":"processing"}""")
+                : Respond(200, """{"id":"t-1","status":"error","error_message":"Bad audio"}"""),
+            ("DELETE", "/v1/transcriptions/t-1") or ("DELETE", "/v1/files/file-1") => Respond(200, "{}"),
+            _ => Respond(404, ""),
+        });
+        var transcriber = new SonioxTranscriber(Key, handler: handler) { PollInterval = TimeSpan.FromMilliseconds(1) };
+
+        var transcribe = transcriber.TranscribeAsync(Audio(), 2, null, diarize: true, cancellation.Token);
+        if (cancel)
+        {
+            await Assert.ThrowsAnyAsync<OperationCanceledException>(() => transcribe);
+        }
+        else
+        {
+            Assert.Equal("Bad audio", (await Assert.ThrowsAsync<LLMException>(() => transcribe)).Message);
+        }
+        await transcriber.Cleanup;
+
+        Assert.Equal(
+            ["POST /v1/files", "POST /v1/transcriptions", "GET /v1/transcriptions/t-1", "DELETE /v1/transcriptions/t-1",
+             "DELETE /v1/files/file-1"],
+            handler.Requests.Select(r => $"{r.Method} {r.RequestUri!.AbsolutePath}"));
+        Assert.All(handler.Requests, request => Assert.Equal($"Bearer {Key}", Header(request, "Authorization")));
+        Assert.All(handler.Requests, request => ExpectKeyNotInUrl(request));
+    }
+
     // Consent destination.
 
     [Fact]
     public void ConsentIsBoundToTheRequestOrigin()
     {
         Assert.Equal("deepgram@https://api.deepgram.com", CloudTranscription.Destination(Preset("deepgram"))?.ConsentKey);
+        Assert.Equal("speechmatics@https://eu1.asr.api.speechmatics.com", CloudTranscription.Destination(Preset("speechmatics"))?.ConsentKey);
+        Assert.Equal("soniox@https://api.soniox.com", CloudTranscription.Destination(Preset("soniox"))?.ConsentKey);
+        Assert.Equal("gladia@https://api.gladia.io", CloudTranscription.Destination(Preset("gladia"))?.ConsentKey);
+        // xAI transcribes on its fixed /v1/stt origin, whatever its LLM base URL says.
+        var xai = Preset("xai");
+        Assert.True(CloudTranscription.Supports(xai));
+        Assert.Equal("xai@https://api.x.ai", CloudTranscription.Destination(xai)?.ConsentKey);
+        xai.BaseURL = "https://evil.example/v1";
+        Assert.Equal("xai@https://api.x.ai", CloudTranscription.Destination(xai)?.ConsentKey);
         var gemini = Preset("gemini");
         gemini.BaseURL = "https://evil.example/v1";
         Assert.Equal("gemini@https://generativelanguage.googleapis.com", CloudTranscription.Destination(gemini)?.ConsentKey);
@@ -725,7 +1155,7 @@ public sealed class CloudTranscriptionRequestTests : IDisposable
         Assert.Equal("", CloudTranscription.Model(Preset("assemblyai")));
         Assert.True(CloudTranscription.IsComplete(Preset("assemblyai")));
         Assert.False(CloudTranscription.Supports(Preset("anthropic")));
-        Assert.False(CloudTranscription.Supports(Preset("xai")));
+        Assert.False(CloudTranscription.Supports(Preset("deepseek")));
         Assert.True(CloudTranscription.NeedsKey(Preset("deepgram")));
     }
 
@@ -771,6 +1201,28 @@ public sealed class CloudTranscriptionRequestTests : IDisposable
         Assert.False(CloudTranscription.Diarizes(Preset("groq"), "whisper-large-v3-turbo"));
         Assert.True(CloudTranscription.Diarizes(Preset("elevenlabs"), "scribe_v2"));
         Assert.False(CloudTranscription.Diarizes(Preset("elevenlabs"), "scribe_v2_realtime"));
+        foreach (var (id, model) in new[]
+                 {
+                     ("xai", "grok-voice-transcribe-2.0"), ("speechmatics", "enhanced"), ("soniox", "stt-async-v6"), ("gladia", "solaria-1"),
+                 })
+        {
+            var config = Preset(id);
+            Assert.True(CloudTranscription.DiarizationPresets.Contains(id), id);
+            Assert.Equal(model, CloudTranscription.DefaultModel(config));
+            Assert.Equal(model, CloudTranscription.DefaultDiarizationModel(config));
+            Assert.True(CloudTranscription.Diarizes(config, model), id);
+        }
+        Assert.True(CloudTranscription.Diarizes(Preset("speechmatics"), "standard"));
+        Assert.False(CloudTranscription.Diarizes(Preset("speechmatics"), "melia-1"));
+        Assert.False(CloudTranscription.Diarizes(Preset("soniox"), "stt-rt-v3"));
+        Assert.False(CloudTranscription.Diarizes(Preset("gladia"), "whisper-1"));
+
+        // Each new preset reaches its own client, with the model it was given.
+        Assert.Equal("grok-voice-transcribe-2.0", Assert.IsType<XAITranscriber>(CloudTranscription.MakeTranscriber(Preset("xai"), Key)).Model);
+        Assert.Equal("standard", Assert.IsType<SpeechmaticsTranscriber>(
+            CloudTranscription.MakeTranscriber(Preset("speechmatics"), Key, "standard")).Model);
+        Assert.Equal("stt-async-v6", Assert.IsType<SonioxTranscriber>(CloudTranscription.MakeTranscriber(Preset("soniox"), Key)).Model);
+        Assert.Equal("solaria-1", Assert.IsType<GladiaTranscriber>(CloudTranscription.MakeTranscriber(Preset("gladia"), Key)).Model);
     }
 
     // Realtime models only stream over a WebSocket: the file endpoints refuse them (ElevenLabs: HTTP 400).
@@ -824,10 +1276,37 @@ public sealed class CloudTranscriptionRequestTests : IDisposable
         return fields;
     }
 
+    /// <summary>The multipart part names in body order.</summary>
+    private static async Task<List<string>> FormFieldNames(HttpRequestMessage request)
+    {
+        var boundary = request.Content!.Headers.ContentType!.Parameters.Single(p => p.Name == "boundary").Value!.Trim('"');
+        var body = await request.Content.ReadAsStringAsync(TestContext.Current.CancellationToken);
+        var names = new List<string>();
+        foreach (var part in body.Split("--" + boundary))
+        {
+            var nameStart = part.IndexOf("name=", StringComparison.Ordinal);
+            if (nameStart < 0) continue;
+            var name = part[(nameStart + 5)..].TrimStart('"');
+            names.Add(name[..name.IndexOfAny(['"', ';', '\r'])]);
+        }
+        return names;
+    }
+
+    /// <summary>A JSON text (a multipart field) compared as JSON, so key order does not matter.</summary>
+    private static void ExpectJson(JsonNode expected, string actual) =>
+        Assert.True(JsonNode.DeepEquals(expected, JsonNode.Parse(actual)), actual);
+
     private static void ExpectKeyNotInUrl(HttpRequestMessage request) => Assert.DoesNotContain(Key, request.RequestUri!.OriginalString);
 
     private static HttpResponseMessage Respond(int status, string body) =>
         new((HttpStatusCode)status) { Content = new ByteArrayContent(Encoding.UTF8.GetBytes(body)) };
+
+    /// <summary>Cancels <paramref name="cancellation"/> (the caller's token) and still answers 200 with <paramref name="body"/>.</summary>
+    private static HttpResponseMessage CancelThenRespond(CancellationTokenSource cancellation, string body)
+    {
+        cancellation.Cancel();
+        return Respond(200, body);
+    }
 
     /// <summary>Answers every request with <c>respond</c> and records it with its body (read before answering).</summary>
     private sealed class FakeHandler(Func<HttpRequestMessage, HttpResponseMessage> respond) : HttpMessageHandler

@@ -346,7 +346,7 @@ internal static class ProviderHttp
     /// <summary>Every key in <paramref name="request"/>, longest first.</summary>
     private static List<string> Secrets(HttpRequestMessage request)
     {
-        string[] headers = ["Authorization", "x-goog-api-key", "xi-api-key", "api-key", "x-api-key"];
+        string[] headers = ["Authorization", "x-goog-api-key", "xi-api-key", "api-key", "x-api-key", "x-gladia-key"];
         var auth = headers
             .SelectMany(name => request.Headers.TryGetValues(name, out var values) ? values : [])
             .SelectMany(value =>
@@ -539,7 +539,7 @@ internal static class ProviderHttp
 
     /// <summary>
     /// Whether sending <paramref name="request"/> twice costs nothing: GETs (polls, key checks) and audio uploads
-    /// (AssemblyAI <c>/v2/upload</c>, Gemini Files API). Billed one-shot POSTs (transcription requests,
+    /// (AssemblyAI and Gladia <c>/v2/upload</c>, Gemini Files API). Billed one-shot POSTs (transcription requests,
     /// <c>generateContent</c>, AssemblyAI <c>/v2/transcript</c>) are sent once, since a retry after a lost answer could
     /// start a second paid job. Pure, for tests.
     /// </summary>

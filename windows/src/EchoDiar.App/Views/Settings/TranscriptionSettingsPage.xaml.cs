@@ -45,9 +45,11 @@ public sealed partial class TranscriptionSettingsPage : UserControl
         new("Free unused models after", ["memory", "RAM", "idle", "unload", "pause"], GeneralTab),
         new("Delete audio after transcription", ["remove audio", "Recycle Bin", "trash", "save space"], GeneralTab),
         new("Transcription models", ["download", "Whisper", "Parakeet", "fast", "balanced", "quality"], TranscriptionModelsTab),
-        new("Cloud transcription engines", ["upload", "API", "default engine", .. SpeechToTextNames()], TranscriptionModelsTab),
+        new("Cloud transcription engines", ["upload", "API", "default engine", "xAI", .. SpeechToTextNames()], TranscriptionModelsTab),
         new("Diarization models", ["speaker model", "speakers", "pyannote", "download"], DiarizationModelsTab),
-        new("Cloud diarization", ["OpenAI", "ElevenLabs", "Deepgram", "AssemblyAI", "Gemini", "speakers", "cloud"], DiarizationModelsTab),
+        new("Cloud diarization",
+            ["OpenAI", "ElevenLabs", "Deepgram", "AssemblyAI", "Gemini", "xAI", "Speechmatics", "Soniox", "Gladia", "speakers", "cloud"],
+            DiarizationModelsTab),
         new("Tell speakers apart", ["diarization", "speakers", "who spoke"], DiarizationModelsTab),
         new("Number of other speakers", ["speaker count", "diarization", "people"], DiarizationModelsTab),
     ];
@@ -386,11 +388,15 @@ public sealed partial class TranscriptionSettingsPage : UserControl
     /// <summary>Below this width a field's card puts its input under its label, as the provider rows of Settings › AI.</summary>
     private const double FieldWrapWidth = 640;
 
-    /// <summary>Approximate pay-as-you-go prices per audio hour (macOS <c>CloudEngineRow.prices</c>, 2026-10-18).</summary>
+    /// <summary>
+    /// Approximate pay-as-you-go prices per audio hour (macOS <c>CloudEngineRow.prices</c>, 2026-10-18; xAI, Speechmatics
+    /// Enhanced, Soniox and Gladia solaria-1 2026-11-04).
+    /// </summary>
     private static readonly Dictionary<string, string> Prices = new()
     {
         ["openai"] = "~$0.36/h", ["groq"] = "~$0.04/h", ["mistral"] = "~$0.18/h", ["gemini"] = "~$0.23/h",
         ["elevenlabs"] = "~$0.22/h", ["deepgram"] = "~$0.26/h", ["assemblyai"] = "~$0.23/h",
+        ["xai"] = "~$0.10/h", ["speechmatics"] = "~$0.38/h", ["soniox"] = "~$0.10/h", ["gladia"] = "~€0.27/h",
     };
 
     private static IEnumerable<string> SpeechToTextNames() =>
@@ -607,6 +613,10 @@ public sealed partial class TranscriptionSettingsPage : UserControl
             ["elevenlabs"] = [ElevenLabsTranscriber.DefaultModel],
             ["deepgram"] = [DeepgramTranscriber.DefaultModel],
             ["gemini"] = OpenAICompatibleTranscriber.PresetModels.TryGetValue("gemini", out var gemini) ? gemini : [GeminiAudioTranscriber.DefaultModel],
+            ["xai"] = [XAITranscriber.DefaultModel],
+            ["speechmatics"] = [SpeechmaticsTranscriber.DefaultModel, "standard", "melia-1"],
+            ["soniox"] = [SonioxTranscriber.DefaultModel],
+            ["gladia"] = [GladiaTranscriber.DefaultModel],
         };
 
         private readonly TranscriptionSettingsPage _page;
