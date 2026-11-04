@@ -37,6 +37,9 @@ public sealed class OpenAICompatibleTranscriber : ICloudTranscriber
     /// <summary>Mistral takes up to 3 h per request; OpenAI, Groq (free tier) and unknown endpoints get the 25 MB cap.</summary>
     public int? MaxUploadBytes => IsMistral(Config) ? null : CloudTranscription.CappedUploadBytes;
 
+    /// <summary>False for the <c>json</c> (text-only) models, whose answer is one segment over the file.</summary>
+    public bool ReturnsSegmentTimestamps => IsMistral(Config) || !ReturnsTextOnly(Model);
+
     public Task<IReadOnlyList<CloudSegment>> TranscribeAsync(
         string file, double duration, string? language, bool diarize, CancellationToken cancellationToken = default) =>
         ProviderHttp.SendAsync<IReadOnlyList<CloudSegment>>(
@@ -65,7 +68,7 @@ public sealed class OpenAICompatibleTranscriber : ICloudTranscriber
                 fields.Add(("response_format", "diarized_json"));
                 fields.Add(("chunking_strategy", "auto"));
             }
-            else if (model.StartsWith("gpt-", StringComparison.Ordinal))
+            else if (ReturnsTextOnly(model))
             {
                 fields.Add(("response_format", "json"));
             }
@@ -100,6 +103,10 @@ public sealed class OpenAICompatibleTranscriber : ICloudTranscriber
     }
 
     private static bool IsMistral(ProviderConfig config) => config.Preset == "mistral";
+
+    /// <summary>Off Mistral: a <c>gpt-*</c> model without <c>-diarize</c> is sent <c>response_format=json</c>, text with no timestamps.</summary>
+    private static bool ReturnsTextOnly(string model) =>
+        !model.EndsWith("-diarize", StringComparison.Ordinal) && model.StartsWith("gpt-", StringComparison.Ordinal);
 
     private sealed record TranscriptionResponse(string? Text = null, string? Language = null, List<TranscriptionResponse.Segment>? Segments = null)
     {

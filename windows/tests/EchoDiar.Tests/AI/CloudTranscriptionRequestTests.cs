@@ -67,6 +67,8 @@ public sealed class CloudTranscriptionRequestTests : IDisposable
         Assert.Equal(format, fields["response_format"]);
         Assert.Equal(format == "verbose_json" ? "segment" : null, fields.GetValueOrDefault("timestamp_granularities[]"));
         Assert.False(fields.ContainsKey("language"));
+        // A text-only (json) answer has no timestamps, so split uploads of it must not overlap.
+        Assert.Equal(format != "json", new OpenAICompatibleTranscriber(Preset(preset), model, Key).ReturnsSegmentTimestamps);
         ExpectKeyNotInUrl(request);
     }
 
@@ -228,12 +230,16 @@ public sealed class CloudTranscriptionRequestTests : IDisposable
         Assert.Equal(2_500.05, parts[0].End, 0.001);
         Assert.Equal(parts[0].End, parts[1].Start);
         Assert.Equal(3_600, parts[1].End);
-        Assert.All(parts, part => Assert.True((part.End - part.Start) * bytesPerSecond <= CloudTranscription.CappedUploadBytes));
+        // A later part's upload also carries the overlap before its cut.
+        const double overlap = SpeakerLabelReconciler.LabelOverlapSeconds;
+        Assert.All(parts, part => Assert.True(
+            (part.End - Math.Max(0, part.Start - overlap)) * bytesPerSecond <= CloudTranscription.CappedUploadBytes));
 
-        // No quiet slot (flat levels) still cuts at the limit; offsets move a part's segments to file time.
+        // No quiet slot (flat levels) still cuts at the limit (30 s shorter for later parts, the overlap); offsets move
+        // a part's segments to file time.
         var flat = CloudTranscription.PlanParts(7_000, bytesPerSecond, CloudTranscription.CappedUploadBytes, [], 0.1);
         Assert.Equal(3, flat.Count);
-        Assert.All(flat.Zip(new[] { 0.0, 2_880, 5_760 }), pair => Assert.Equal(pair.Second, pair.First.Start, 0.001));
+        Assert.All(flat.Zip(new[] { 0.0, 2_880, 5_730 }), pair => Assert.Equal(pair.Second, pair.First.Start, 0.001));
         var segment = new CloudSegment(1.5, 3, "bonjour", "A").Offset(parts[1].Start);
         Assert.Equal(parts[1].Start + 1.5, segment.Start, 0.0001);
         Assert.Equal(parts[1].Start + 3, segment.End, 0.0001);
@@ -244,27 +250,96 @@ public sealed class CloudTranscriptionRequestTests : IDisposable
         Assert.Equal([new TimeRange(0, 600)], small);
     }
 
-    // The whole upload preparation: an over-cap export is replaced by parts cut at the quietest slots, each part goes to
-    // the transcriber with its own length, its segments are clamped to it and moved by its start, and the private work
-    // folder is gone afterwards.
+    // The whole upload preparation: an over-cap export is replaced by parts cut at the quietest slots (a later part starts
+    // 30 s before its cut, so the second cut's search window misses slot 1500 and takes its first slot), each part goes to
+    // the transcriber with its own length, its segments are clamped to it and moved by its start, a later part drops the
+    // segments ending at or before its cut (so "hi" survives only in the first part), and the private work folder is gone
+    // afterwards.
     [Fact]
     public async Task TranscribeExportsSplitsAndOffsetsTheParts()
     {
-        var exporter = new FakeExporter(bytesPerSecond: 10, duration: 180, quietSlots: [700, 1_500]);
+        var exporter = new FakeExporter(bytesPerSecond: 10, duration: 181, quietSlots: [700, 1_500]);
         var transcriber = new FakeTranscriber(maxUploadBytes: 1_000);
 
         var segments = await CloudTranscription.TranscribeAsync(
             "/recordings/audio.caf", 1, transcriber, exporter, "fr", diarize: true, TestContext.Current.CancellationToken);
 
-        Assert.Equal([null, new TimeRange(0, 70.05), new TimeRange(70.05, 150.05), new TimeRange(150.05, 180)],
+        Assert.Equal(
+            [null, new TimeRange(0, 70.05), new TimeRange(40.05, 105.15), new TimeRange(75.15, 150.05), new TimeRange(120.05, 181)],
             exporter.Ranges.Select(range => range is { } r ? new TimeRange(Math.Round(r.Start, 6), Math.Round(r.End, 6)) : (TimeRange?)null));
         Assert.Equal(1, exporter.Channel);
-        Assert.Equal([70.05, 80, 29.95], transcriber.Durations.Select(d => Math.Round(d, 6)));
+        Assert.Equal([70.05, 65.1, 74.9, 60.95], transcriber.Durations.Select(d => Math.Round(d, 6)));
         Assert.All(transcriber.Calls, call => Assert.Equal(((string?)"fr", true), call));
         Assert.Equal(
-            [(1.0, 2.0, "hi"), (0.0, 70.05, "x"), (71.05, 72.05, "hi"), (70.05, 150.05, "x"), (151.05, 152.05, "hi"), (150.05, 180.0, "x")],
+            [(1.0, 2.0, "hi"), (0.0, 70.05, "x"), (40.05, 105.15, "x"), (75.15, 150.05, "x"), (120.05, 181.0, "x")],
             segments.Select(s => (Math.Round(s.Start, 6), Math.Round(s.End, 6), s.Text)));
         Assert.All(exporter.Files, file => Assert.False(Directory.Exists(Path.GetDirectoryName(file))));
+    }
+
+    // A text-only model answers each part with one segment over the whole part: the parts are contiguous (part 2 is exported
+    // from the cut), so each part's text is there once.
+    [Fact]
+    public async Task TextOnlyAnswersGetContiguousPartsWithoutRepeatedText()
+    {
+        var exporter = new FakeExporter(bytesPerSecond: 10, duration: 120, quietSlots: [700]);
+        var transcriber = new FakeTranscriber(
+            maxUploadBytes: 1_000, [[new(0, 1e9, "one")], [new(0, 1e9, "two")]], returnsSegmentTimestamps: false);
+
+        var segments = await CloudTranscription.TranscribeAsync(
+            "/recordings/audio.caf", 1, transcriber, exporter, null, diarize: true, TestContext.Current.CancellationToken);
+
+        Assert.Equal(
+            [null, new TimeRange(0, 70.05), new TimeRange(70.05, 120)],
+            exporter.Ranges.Select(range => range is { } r ? new TimeRange(Math.Round(r.Start, 6), Math.Round(r.End, 6)) : (TimeRange?)null));
+        Assert.Equal([70.05, 49.95], transcriber.Durations.Select(d => Math.Round(d, 6)));
+        Assert.Equal(
+            [(0.0, 70.05, "one"), (70.05, 120.0, "two")],
+            segments.Select(s => (Math.Round(s.Start, 6), Math.Round(s.End, 6), s.Text)));
+    }
+
+    // Speaker labels across split parts. Both run the real split of a 120 s channel cut at its quiet slot (70.05 s): part 2
+    // is sent from 40.05 s, so the overlap is 40.05..70.05; the fake answers in part time (part 2's 0 s is 40.05 s).
+
+    // Part 2 calls the voice part 1 called "A" "B" in the overlap: it stays "A" after the cut, one speaker.
+    [Fact]
+    public async Task SameVoiceInTheOverlapKeepsOneSpeakerAcrossParts()
+    {
+        var segments = await SplitTranscriptionAsync(
+            [new(10, 30, "one", "A"), new(45, 65, "two", "A")],
+            [new(5, 25, "two", "B"), new(40, 60, "three", "B")]);
+
+        Assert.Equal(["one", "two", "three"], segments.Select(s => s.Text));
+        Assert.Equal(["A", "A", "A"], segments.Select(s => s.Speaker));
+        Assert.Equal([10, 45, 80.05], segments.Select(s => Math.Round(s.Start, 6)));
+        Assert.Equal([0], CloudTranscription.Turns(segments).Select(t => t.SpeakerIndex).Distinct());
+    }
+
+    // Two people both called "A" in different parts, with nobody labelled in the overlap, stay two speakers.
+    [Fact]
+    public async Task SameLabelWithoutOverlapEvidenceStaysASeparateSpeaker()
+    {
+        var segments = await SplitTranscriptionAsync(
+            [new(10, 30, "first", "A"), new(50, 60, "um")],
+            [new(10, 20, "um"), new(40, 60, "second", "A")]);
+
+        Assert.Equal(["first", "um", "second"], segments.Select(s => s.Text));
+        Assert.Equal(["A", null, "p1:A"], segments.Select(s => s.Speaker));
+        Assert.Equal([10, 50, 80.05], segments.Select(s => Math.Round(s.Start, 6)));
+        Assert.Equal([0, 1], CloudTranscription.Turns(segments).Select(t => t.SpeakerIndex));
+    }
+
+    // Part 2's "three" (64.05..75.05) straddles the cut with its midpoint before it: part 2 heard it whole, so it is kept,
+    // and part 1's clipped piece of it (from 64.5 s) goes, so its words are there once.
+    [Fact]
+    public async Task SegmentStraddlingTheCutIsKeptOnceFromTheLaterPart()
+    {
+        var segments = await SplitTranscriptionAsync(
+            [new(10, 30, "one", "A"), new(45, 64, "two", "A"), new(64.5, 70.05, "thr", "A")],
+            [new(5, 24, "two", "B"), new(24, 35, "three", "B"), new(40, 60, "four", "B")]);
+
+        Assert.Equal(["one", "two", "three", "four"], segments.Select(s => s.Text));
+        Assert.Equal(["A", "A", "A", "A"], segments.Select(s => s.Speaker));
+        Assert.Equal([10, 45, 64.05, 80.05], segments.Select(s => Math.Round(s.Start, 6)));
     }
 
     // Parsing.
@@ -805,13 +880,35 @@ public sealed class CloudTranscriptionRequestTests : IDisposable
         }
     }
 
-    /// <summary>Answers each part with a word at 1-2 s and one far out of range ("x"), and records the calls.</summary>
-    private sealed class FakeTranscriber(int maxUploadBytes) : ICloudTranscriber
+    /// <summary>
+    /// <see cref="CloudTranscription.TranscribeAsync"/> of a 120 s channel quiet at slot 700, its cap 100 s, so it splits
+    /// once at 70.05 s; <paramref name="answers"/> are the fake's two answers.
+    /// </summary>
+    private static async Task<List<CloudSegment>> SplitTranscriptionAsync(params CloudSegment[][] answers)
+    {
+        var exporter = new FakeExporter(bytesPerSecond: 10, duration: 120, quietSlots: [700]);
+        var transcriber = new FakeTranscriber(maxUploadBytes: 1_000, answers);
+
+        var segments = await CloudTranscription.TranscribeAsync(
+            "/recordings/audio.caf", 1, transcriber, exporter, null, diarize: true, TestContext.Current.CancellationToken);
+
+        Assert.Equal([79.95], transcriber.Durations.Skip(1).Select(d => Math.Round(d, 6)));
+        return segments;
+    }
+
+    /// <summary>
+    /// Answers call N with <c>answers[N]</c> when given, else each part with a word at 1-2 s and one far out of range
+    /// ("x"), and records the calls.
+    /// </summary>
+    private sealed class FakeTranscriber(
+        int maxUploadBytes, CloudSegment[][]? answers = null, bool returnsSegmentTimestamps = true) : ICloudTranscriber
     {
         public List<double> Durations { get; } = [];
         public List<(string?, bool)> Calls { get; } = [];
 
         public int? MaxUploadBytes => maxUploadBytes;
+
+        public bool ReturnsSegmentTimestamps => returnsSegmentTimestamps;
 
         public Task<IReadOnlyList<CloudSegment>> TranscribeAsync(
             string file, double duration, string? language, bool diarize, CancellationToken cancellationToken = default)
@@ -819,6 +916,7 @@ public sealed class CloudTranscriptionRequestTests : IDisposable
             Assert.True(File.Exists(file));
             Durations.Add(duration);
             Calls.Add((language, diarize));
+            if (answers is not null) return Task.FromResult<IReadOnlyList<CloudSegment>>(answers[Calls.Count - 1]);
             return Task.FromResult<IReadOnlyList<CloudSegment>>([new(1, 2, "hi"), new(-5, 1e9, " x ")]);
         }
     }

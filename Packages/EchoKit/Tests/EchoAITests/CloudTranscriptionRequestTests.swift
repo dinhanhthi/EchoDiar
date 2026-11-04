@@ -1,11 +1,14 @@
 @testable import EchoAI
+import AVFoundation
 import EchoCore
 import Foundation
+import Synchronization
 import Testing
 
 /// Guards the cloud STT request contract (endpoint, auth header, parameters; diarization only for the system
 /// channel, language only when not Auto), that keys never go in URLs, the size-cap split, and one canned answer
-/// per vendor. No network: only the pure builders and parsers run, with a fake key.
+/// per vendor. No network: the pure builders and parsers run, with a fake key, plus the split path end to end with a
+/// fake transcriber.
 struct CloudTranscriptionRequestTests {
     private let key = "sk-test-fake-0000"
     private let audio = Data("fake-audio".utf8)
@@ -46,6 +49,9 @@ struct CloudTranscriptionRequestTests {
         #expect(fields["response_format"] == format)
         #expect(fields["timestamp_granularities[]"] == (format == "verbose_json" ? "segment" : nil))
         #expect(fields["language"] == nil)
+        // A text-only (`json`) answer has no timestamps, so split uploads of it must not overlap.
+        #expect(OpenAICompatibleTranscriber(config: try preset(id), model: model, apiKey: key).returnsSegmentTimestamps
+            == (format != "json"))
         expectKeyNotInURL(request)
     }
 
@@ -192,14 +198,19 @@ struct CloudTranscriptionRequestTests {
         #expect(abs(parts[0].upperBound - 2_500.05) < 0.001)
         #expect(parts[1].lowerBound == parts[0].upperBound)
         #expect(parts[1].upperBound == 3_600)
-        #expect(parts.allSatisfy { ($0.upperBound - $0.lowerBound) * bytesPerSecond <= Double(CloudTranscription.cappedUploadBytes) })
+        // A later part's upload also carries the overlap before its cut.
+        let overlap = SpeakerLabelReconciler.labelOverlapSeconds
+        #expect(parts.allSatisfy {
+            ($0.upperBound - max(0, $0.lowerBound - overlap)) * bytesPerSecond <= Double(CloudTranscription.cappedUploadBytes)
+        })
 
-        // No quiet slot (flat levels) still cuts at the limit; offsets move a part's segments to file time.
+        // No quiet slot (flat levels) still cuts at the limit (30 s shorter for later parts, the overlap); offsets move
+        // a part's segments to file time.
         let flat = CloudTranscription.planParts(
             duration: 7_000, bytesPerSecond: bytesPerSecond, maxBytes: CloudTranscription.cappedUploadBytes,
             levels: [], window: 0.1)
         #expect(flat.count == 3)
-        #expect(zip(flat.map(\.lowerBound), [0, 2_880, 5_760]).allSatisfy { abs($0 - $1) < 0.001 })
+        #expect(zip(flat.map(\.lowerBound), [0, 2_880, 5_730]).allSatisfy { abs($0 - $1) < 0.001 })
         let segment = CloudSegment(start: 1.5, end: 3, text: "bonjour", speaker: "A").offset(by: parts[1].lowerBound)
         #expect(abs(segment.start - (parts[1].lowerBound + 1.5)) < 0.000_1)
         #expect(abs(segment.end - (parts[1].lowerBound + 3)) < 0.000_1)
@@ -208,6 +219,132 @@ struct CloudTranscriptionRequestTests {
         let small = CloudTranscription.planParts(
             duration: 600, bytesPerSecond: bytesPerSecond, maxBytes: CloudTranscription.cappedUploadBytes, levels: [], window: 0.1)
         #expect(small == [0...600])
+    }
+
+    // MARK: - Speaker labels across split parts
+
+    // Both run the real split of a 120 s channel cut at its silence (70.05 s): part 2 is sent from 40.05 s, so the
+    // overlap is 40.05...70.05; the fake answers in part time (part 2's 0 s is 40.05 s).
+
+    /// Part 2 calls the voice part 1 called "A" "B" in the overlap: it stays "A" after the cut, one speaker.
+    @Test func sameVoiceInTheOverlapKeepsOneSpeakerAcrossParts() async throws {
+        let segments = try await splitTranscription(answers: [
+            [CloudSegment(start: 10, end: 30, text: "one", speaker: "A"),
+             CloudSegment(start: 45, end: 65, text: "two", speaker: "A")],
+            [CloudSegment(start: 5, end: 25, text: "two", speaker: "B"),
+             CloudSegment(start: 40, end: 60, text: "three", speaker: "B")],
+        ])
+
+        #expect(segments.map(\.text) == ["one", "two", "three"])
+        #expect(segments.map(\.speaker) == ["A", "A", "A"])
+        #expect(zip(segments.map(\.start), [10, 45, 80.05]).allSatisfy { abs($0 - $1) < 0.001 })
+        #expect(Set(CloudTranscription.turns(from: segments).map(\.speakerIndex)) == [0])
+    }
+
+    /// Two people both called "A" in different parts, with nobody labelled in the overlap, stay two speakers.
+    @Test func sameLabelWithoutOverlapEvidenceStaysASeparateSpeaker() async throws {
+        let segments = try await splitTranscription(answers: [
+            [CloudSegment(start: 10, end: 30, text: "first", speaker: "A"),
+             CloudSegment(start: 50, end: 60, text: "um")],
+            [CloudSegment(start: 10, end: 20, text: "um"),
+             CloudSegment(start: 40, end: 60, text: "second", speaker: "A")],
+        ])
+
+        #expect(segments.map(\.text) == ["first", "um", "second"])
+        #expect(segments.map(\.speaker) == ["A", nil, "p1:A"])
+        #expect(zip(segments.map(\.start), [10, 50, 80.05]).allSatisfy { abs($0 - $1) < 0.001 })
+        #expect(CloudTranscription.turns(from: segments).map(\.speakerIndex) == [0, 1])
+    }
+
+    /// Part 2's "three" (64.05...75.05) straddles the cut with its midpoint before it: part 2 heard it whole, so it is
+    /// kept, and part 1's clipped piece of it (from 64.5 s) goes, so its words are there once.
+    @Test func segmentStraddlingTheCutIsKeptOnceFromTheLaterPart() async throws {
+        let segments = try await splitTranscription(answers: [
+            [CloudSegment(start: 10, end: 30, text: "one", speaker: "A"),
+             CloudSegment(start: 45, end: 64, text: "two", speaker: "A"),
+             CloudSegment(start: 64.5, end: 70.05, text: "thr", speaker: "A")],
+            [CloudSegment(start: 5, end: 24, text: "two", speaker: "B"),
+             CloudSegment(start: 24, end: 35, text: "three", speaker: "B"),
+             CloudSegment(start: 40, end: 60, text: "four", speaker: "B")],
+        ])
+
+        #expect(segments.map(\.text) == ["one", "two", "three", "four"])
+        #expect(segments.map(\.speaker) == ["A", "A", "A", "A"])
+        #expect(zip(segments.map(\.start), [10, 45, 64.05, 80.05]).allSatisfy { abs($0 - $1) < 0.001 })
+    }
+
+    /// A text-only model answers each part with one segment over the whole part: the parts are contiguous (part 2 is
+    /// sent from the cut), so each part's text is there once.
+    @Test func textOnlyAnswersGetContiguousPartsWithoutRepeatedText() async throws {
+        let segments = try await splitTranscription(answers: [
+            [CloudSegment(start: 0, end: 1e9, text: "one")],
+            [CloudSegment(start: 0, end: 1e9, text: "two")],
+        ], returnsSegmentTimestamps: false)
+
+        #expect(segments.map(\.text) == ["one", "two"])
+        #expect(zip(segments.map(\.start), [0, 70.05]).allSatisfy { abs($0 - $1) < 0.001 })
+        #expect(zip(segments.map(\.end), [70.05, 120]).allSatisfy { abs($0 - $1) < 0.001 })
+    }
+
+    /// `CloudTranscription.transcribe` of a 120 s channel with silence at 70...71 s, its cap set to 100 s of the
+    /// channel's m4a so it splits once at 70.05 s; `answers` are the fake's two answers.
+    private func splitTranscription(
+        answers: [[CloudSegment]], returnsSegmentTimestamps: Bool = true
+    ) async throws -> [CloudSegment] {
+        let folder = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString, isDirectory: true)
+        try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: folder) }
+        let source = folder.appendingPathComponent("audio.caf")
+        try Self.writeTone(seconds: 120, silence: 70..<71, to: source)
+        let probe = folder.appendingPathComponent("probe.m4a")
+        try CloudTranscription.exportM4A(source, channel: 0, range: nil, to: probe)
+        let bytes = try #require(try FileManager.default.attributesOfItem(atPath: probe.path)[.size] as? Int)
+        let transcriber = ScriptedTranscriber(
+            maxUploadBytes: bytes * 100 / 120, returnsSegmentTimestamps: returnsSegmentTimestamps, answers: answers)
+
+        let segments = try await CloudTranscription.transcribe(
+            source: source, channel: 0, with: transcriber, language: nil, diarize: true)
+
+        #expect(transcriber.callCount == 2)
+        return segments
+    }
+
+    /// Answers call N with `answers[N]` and counts the calls.
+    private final class ScriptedTranscriber: CloudTranscriber {
+        let maxUploadBytes: Int?
+        let returnsSegmentTimestamps: Bool
+        private let answers: [[CloudSegment]]
+        private let calls = Mutex(0)
+        var callCount: Int { calls.withLock { $0 } }
+
+        init(maxUploadBytes: Int, returnsSegmentTimestamps: Bool, answers: [[CloudSegment]]) {
+            self.maxUploadBytes = maxUploadBytes
+            self.returnsSegmentTimestamps = returnsSegmentTimestamps
+            self.answers = answers
+        }
+
+        func transcribe(file: URL, language: String?, diarize: Bool) async throws -> [CloudSegment] {
+            let index = calls.withLock { count in
+                defer { count += 1 }
+                return count
+            }
+            return index < answers.count ? answers[index] : []
+        }
+    }
+
+    /// A 16 kHz mono Float32 CAF: a 440 Hz tone, silent over `silence` (seconds).
+    private static func writeTone(seconds: Int, silence: Range<Double>, to url: URL) throws {
+        let rate = 16_000.0
+        let frames = seconds * Int(rate)
+        let format = AVAudioFormat(commonFormat: .pcmFormatFloat32, sampleRate: rate, channels: 1, interleaved: false)!
+        let file = try AVAudioFile(forWriting: url, settings: format.settings, commonFormat: .pcmFormatFloat32, interleaved: false)
+        let buffer = AVAudioPCMBuffer(pcmFormat: format, frameCapacity: AVAudioFrameCount(frames))!
+        buffer.frameLength = buffer.frameCapacity
+        for index in 0..<frames {
+            let time = Double(index) / rate
+            buffer.floatChannelData![0][index] = silence.contains(time) ? 0 : Float(sin(time * 2 * .pi * 440) * 0.5)
+        }
+        try file.write(from: buffer)
     }
 
     // MARK: - Parsing

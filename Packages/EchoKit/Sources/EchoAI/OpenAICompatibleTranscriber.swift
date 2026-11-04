@@ -29,6 +29,9 @@ public struct OpenAICompatibleTranscriber: CloudTranscriber {
     /// Mistral takes up to 3 h per request; OpenAI, Groq (free tier) and unknown endpoints get the 25 MB cap.
     public var maxUploadBytes: Int? { Self.isMistral(config) ? nil : CloudTranscription.cappedUploadBytes }
 
+    /// False for the `json` (text-only) models, whose answer is one segment over the file.
+    public var returnsSegmentTimestamps: Bool { Self.isMistral(config) || !Self.returnsTextOnly(model) }
+
     public func transcribe(file: URL, language: String?, diarize: Bool) async throws -> [CloudSegment] {
         let request = try Self.makeRequest(
             config: config, apiKey: apiKey, model: model, audio: try Data(contentsOf: file), fileName: file.lastPathComponent,
@@ -57,7 +60,7 @@ public struct OpenAICompatibleTranscriber: CloudTranscriber {
             if model.hasSuffix("-diarize") {
                 form.add("response_format", "diarized_json")
                 form.add("chunking_strategy", "auto")
-            } else if model.hasPrefix("gpt-") {
+            } else if returnsTextOnly(model) {
                 form.add("response_format", "json")
             } else {
                 form.add("response_format", "verbose_json")
@@ -89,6 +92,9 @@ public struct OpenAICompatibleTranscriber: CloudTranscriber {
     }
 
     private static func isMistral(_ config: ProviderConfig) -> Bool { config.preset == "mistral" }
+
+    /// Off Mistral: a `gpt-*` model without `-diarize` is sent `response_format=json`, text with no timestamps.
+    private static func returnsTextOnly(_ model: String) -> Bool { !model.hasSuffix("-diarize") && model.hasPrefix("gpt-") }
 }
 
 private struct TranscriptionResponse: Decodable {

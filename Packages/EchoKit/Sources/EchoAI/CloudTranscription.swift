@@ -37,6 +37,9 @@ public protocol CloudTranscriber: Sendable {
     var maxUploadBytes: Int? { get }
     /// Timestamps come from an LLM and can drift (Gemini); the UI says so.
     var approximateTimestamps: Bool { get }
+    /// Each answer has per-segment timestamps; false when it can be one segment over the whole file (text only), so
+    /// split uploads must not overlap: the overlap's words would come back twice.
+    var returnsSegmentTimestamps: Bool { get }
     /// `file` is a mono audio file. `language`: a BCP-47 code, or nil / "auto" to detect. `diarize`: ask for
     /// speaker labels (only the system channel does).
     func transcribe(file: URL, language: String?, diarize: Bool) async throws -> [CloudSegment]
@@ -45,6 +48,7 @@ public protocol CloudTranscriber: Sendable {
 extension CloudTranscriber {
     public var maxUploadBytes: Int? { nil }
     public var approximateTimestamps: Bool { false }
+    public var returnsSegmentTimestamps: Bool { true }
 }
 
 /// Upload preparation shared by every cloud transcriber: mono AAC export, splitting under a size cap, offsets.
@@ -61,8 +65,11 @@ public enum CloudTranscription {
     private static let chunkFrames: AVAudioFrameCount = 16_384
 
     /// Transcribes `channel` of `source` with `transcriber`: exports it to mono m4a in a temporary folder, splits it
-    /// at the quietest moments when it is over `transcriber.maxUploadBytes`, sends the parts one by one and moves
-    /// each part's segments by the part's start. The temporary files are removed before returning.
+    /// at the quietest moments when it is over `transcriber.maxUploadBytes`, sends the parts one by one (when the
+    /// transcriber returns segment timestamps, each later part repeats the audio from `labelOverlapSeconds` before its
+    /// cut), moves each part's segments by the part's start and reconciles their speaker labels with the parts before.
+    /// Without timestamps the parts are contiguous and simply joined (text-only answers have no speaker labels). The
+    /// temporary files are removed before returning.
     public static func transcribe(
         source: URL, channel: Int, with transcriber: any CloudTranscriber, language: String?, diarize: Bool
     ) async throws -> [CloudSegment] {
@@ -71,14 +78,17 @@ public enum CloudTranscription {
         try fm.createDirectory(at: work, withIntermediateDirectories: true, attributes: [.posixPermissions: 0o700])
         defer { try? fm.removeItem(at: work) }
         let maxBytes = transcriber.maxUploadBytes
+        let overlap = transcriber.returnsSegmentTimestamps ? SpeakerLabelReconciler.labelOverlapSeconds : 0
         let parts = try await Task.detached(priority: .utility) {
-            try uploadParts(source: source, channel: channel, maxBytes: maxBytes, in: work)
+            try uploadParts(source: source, channel: channel, maxBytes: maxBytes, overlap: overlap, in: work)
         }.value
         var segments: [CloudSegment] = []
-        for part in parts {
+        for (index, part) in parts.enumerated() {
             try Task.checkCancellation()
             let result = try await transcriber.transcribe(file: part.url, language: language, diarize: diarize)
-            segments += sanitized(result, duration: part.duration).map { $0.offset(by: part.start) }
+            let partSegments = sanitized(result, duration: part.duration).map { $0.offset(by: part.start) }
+            segments = index == 0 || overlap == 0 ? segments + partSegments : SpeakerLabelReconciler.append(
+                partSegments, to: segments, overlap: part.start...part.cut, partIndex: index)
         }
         return segments
     }
@@ -98,19 +108,21 @@ public enum CloudTranscription {
         }
     }
 
-    /// Where to cut a file of `duration` seconds at `bytesPerSecond` so no part is over `maxBytes`: each cut is at
-    /// the quietest `window`-second slot of `levels` (RMS per slot from the start) in the second half of the
-    /// allowed length, else at the limit. Pure, for tests.
+    /// Where to cut a file of `duration` seconds at `bytesPerSecond` so no part is over `maxBytes`, counting the
+    /// `overlap` seconds each later part repeats from before its cut: each cut is at the quietest
+    /// `window`-second slot of `levels` (RMS per slot from the start) in the second half of the allowed length,
+    /// else at the limit. Pure, for tests.
     public static func planParts(
-        duration: Double, bytesPerSecond: Double, maxBytes: Int, levels: [Float], window: Double
+        duration: Double, bytesPerSecond: Double, maxBytes: Int, levels: [Float], window: Double,
+        overlap: Double = SpeakerLabelReconciler.labelOverlapSeconds
     ) -> [ClosedRange<Double>] {
         let maxLength = Double(maxBytes) / bytesPerSecond
-        guard maxLength.isFinite, maxLength > 0, duration > maxLength else { return [0...max(0, duration)] }
+        guard maxLength.isFinite, maxLength > overlap, duration > maxLength else { return [0...max(0, duration)] }
         var parts: [ClosedRange<Double>] = []
         var start = 0.0
-        while duration - start > maxLength {
-            let limit = start + maxLength
-            let first = Int(((start + maxLength / 2) / window).rounded(.up))
+        while duration - max(0, start - overlap) > maxLength {
+            let limit = max(0, start - overlap) + maxLength
+            let first = Int((((start + limit) / 2) / window).rounded(.up))
             let last = min(levels.count, Int((limit / window).rounded(.down))) - 1
             var cut = limit
             if first <= last, let quietest = (first...last).min(by: { levels[$0] < levels[$1] }) {
@@ -176,22 +188,24 @@ public enum CloudTranscription {
 
     // MARK: - Audio
 
-    /// The whole channel as one m4a, or parts when it is over `maxBytes`.
+    /// The whole channel as one m4a, or parts when it is over `maxBytes`; each later part starts `overlap` seconds
+    /// before its cut. `start` is where a part's audio starts, `cut` where its own stretch does.
     private static func uploadParts(
-        source: URL, channel: Int, maxBytes: Int?, in work: URL
-    ) throws -> [(url: URL, start: Double, duration: Double)] {
+        source: URL, channel: Int, maxBytes: Int?, overlap: Double, in work: URL
+    ) throws -> [(url: URL, start: Double, cut: Double, duration: Double)] {
         let whole = work.appendingPathComponent("channel.m4a")
         let duration = try exportM4A(source, channel: channel, range: nil, to: whole)
         let bytes = try FileManager.default.attributesOfItem(atPath: whole.path)[.size] as? Int ?? 0
-        guard let maxBytes, bytes > maxBytes, duration > 0 else { return [(whole, 0, duration)] }
+        guard let maxBytes, bytes > maxBytes, duration > 0 else { return [(whole, 0, 0, duration)] }
         try FileManager.default.removeItem(at: whole)
         let ranges = planParts(
             duration: duration, bytesPerSecond: Double(bytes) / duration, maxBytes: maxBytes,
-            levels: try levels(of: source, channel: channel), window: levelWindow)
+            levels: try levels(of: source, channel: channel), window: levelWindow, overlap: overlap)
         return try ranges.enumerated().map { index, range in
             let url = work.appendingPathComponent("part-\(index).m4a")
-            let length = try exportM4A(source, channel: channel, range: range, to: url)
-            return (url, range.lowerBound, length)
+            let start = max(0, range.lowerBound - overlap)
+            let length = try exportM4A(source, channel: channel, range: start...range.upperBound, to: url)
+            return (url, start, range.lowerBound, length)
         }
     }
 
