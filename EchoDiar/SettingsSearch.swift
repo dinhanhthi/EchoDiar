@@ -102,12 +102,13 @@ struct SettingsSearchItem: Identifiable {
               tab: .transcription, subTab: "general"),
         .init(title: "Transcription models", keywords: ["download", "Whisper", "fast", "balanced", "quality"],
               tab: .transcription, subTab: "transcriptionModels"),
-        .init(title: "Cloud transcription engines", keywords: ["upload", "API", "default engine"]
+        .init(title: "Cloud transcription engines", keywords: ["upload", "API", "default engine", "xAI"]
               + speechToTextNames, tab: .transcription, subTab: "transcriptionModels"),
         .init(title: "Diarization models", keywords: ["speaker model", "speakers", "pyannote", "Nemotron", "download"],
               tab: .transcription, subTab: "diarizationModels"),
         .init(title: "Cloud diarization",
-              keywords: ["OpenAI", "ElevenLabs", "Deepgram", "AssemblyAI", "Gemini", "speakers", "cloud"],
+              keywords: ["OpenAI", "ElevenLabs", "Deepgram", "AssemblyAI", "Gemini", "xAI", "Speechmatics", "Soniox",
+                         "Gladia", "speakers", "cloud"],
               tab: .transcription, subTab: "diarizationModels"),
         .init(title: "Tell speakers apart", keywords: ["diarization", "speakers", "who spoke"],
               tab: .transcription, subTab: "diarizationModels"),

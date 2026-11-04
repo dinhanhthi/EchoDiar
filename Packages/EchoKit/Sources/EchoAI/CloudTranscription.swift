@@ -268,7 +268,7 @@ public enum CloudTranscription {
 
 /// Cloud engines are picked by engine id `cloud:<provider id>` (Transcription tab default, Re-transcribe and Retry
 /// menus); the model is the config's `transcriptionModel`, else the vendor default. The provider id is also the
-/// Keychain id, so OpenAI, Groq, Mistral and Gemini share the key of their LLM config.
+/// Keychain id, so OpenAI, xAI, Groq, Mistral and Gemini share the key of their LLM config.
 extension CloudTranscription {
     public static let enginePrefix = "cloud:"
 
@@ -281,12 +281,12 @@ extension CloudTranscription {
         return id.isEmpty ? nil : id
     }
 
-    /// OpenAI, Groq, Mistral, Gemini (native audio API, not the LLM preset's OpenAI shim), the speech-to-text
-    /// presets and custom OpenAI-compatible endpoints.
+    /// OpenAI, Groq, Mistral, Gemini (native audio API, not the LLM preset's OpenAI shim), xAI (its `/v1/stt` API),
+    /// the speech-to-text presets and custom OpenAI-compatible endpoints.
     public static func supports(_ config: ProviderConfig) -> Bool {
         switch config.kind {
         case .speechToText: true
-        case .openAICompatible: config.preset == nil || ["openai", "groq", "mistral", "gemini"].contains(config.preset)
+        case .openAICompatible: config.preset == nil || ["openai", "groq", "mistral", "gemini", "xai"].contains(config.preset)
         case .anthropic, .cli, .local: false
         }
     }
@@ -297,6 +297,10 @@ extension CloudTranscription {
         case "gemini": GeminiAudioTranscriber.defaultModel
         case "elevenlabs": ElevenLabsTranscriber.defaultModel
         case "deepgram": DeepgramTranscriber.defaultModel
+        case "xai": XAITranscriber.defaultModel
+        case "speechmatics": SpeechmaticsTranscriber.defaultModel
+        case "soniox": SonioxTranscriber.defaultModel
+        case "gladia": GladiaTranscriber.defaultModel
         case let preset?: OpenAICompatibleTranscriber.presetModels[preset]?.first ?? ""
         case nil: ""
         }
@@ -308,7 +312,9 @@ extension CloudTranscription {
     }
 
     /// Presets that can be the default cloud diarizer. Mistral is left out until its model id is verified to diarize.
-    public static let diarizationPresets: Set<String> = ["openai", "elevenlabs", "deepgram", "assemblyai", "gemini"]
+    public static let diarizationPresets: Set<String> = [
+        "openai", "elevenlabs", "deepgram", "assemblyai", "gemini", "xai", "speechmatics", "soniox", "gladia",
+    ]
 
     /// Whether `model` of `config` returns speaker labels (a non-diarizing model would still bill a transcription).
     public static func diarizes(_ config: ProviderConfig, model: String) -> Bool {
@@ -321,6 +327,13 @@ extension CloudTranscription {
         case "deepgram": return model.hasPrefix("nova")
         case "gemini": return model.contains("gemini")
         case "assemblyai": return true
+        // xAI has one model (`diarize=true`).
+        case "xai": return true
+        // Speaker labels are documented for `standard` and `enhanced` only (`melia-1`, `oak-1`: channel only, live).
+        case "speechmatics": return ["standard", "enhanced"].contains(model)
+        // The async endpoint refuses the realtime `stt-rt-*` models.
+        case "soniox": return model.hasPrefix("stt-async")
+        case "gladia": return model.hasPrefix("solaria")
         default: return false
         }
     }
@@ -338,6 +351,10 @@ extension CloudTranscription {
         case "gemini": GeminiAudioTranscriber.defaultModel
         case "elevenlabs": ElevenLabsTranscriber.defaultModel
         case "deepgram": DeepgramTranscriber.defaultModel
+        case "xai": XAITranscriber.defaultModel
+        case "speechmatics": SpeechmaticsTranscriber.defaultModel
+        case "soniox": SonioxTranscriber.defaultModel
+        case "gladia": GladiaTranscriber.defaultModel
         default: ""
         }
     }
@@ -382,6 +399,10 @@ extension CloudTranscription {
         case "elevenlabs": return ElevenLabsTranscriber(apiKey: key, model: model)
         case "deepgram": return DeepgramTranscriber(apiKey: key, model: model)
         case "assemblyai": return AssemblyAITranscriber(apiKey: key)
+        case "xai": return XAITranscriber(apiKey: key, model: model)
+        case "speechmatics": return SpeechmaticsTranscriber(apiKey: key, model: model)
+        case "soniox": return SonioxTranscriber(apiKey: key, model: model)
+        case "gladia": return GladiaTranscriber(apiKey: key, model: model)
         default: return OpenAICompatibleTranscriber(config: config, model: model, apiKey: apiKey)
         }
     }
@@ -396,6 +417,11 @@ extension CloudTranscription {
         case "elevenlabs": url = ElevenLabsTranscriber.endpoint
         case "deepgram": url = DeepgramTranscriber.endpoint
         case "assemblyai": url = AssemblyAITranscriber.baseURL
+        // xAI transcribes at its fixed `/v1/stt` endpoint, not the LLM preset's base URL.
+        case "xai": url = XAITranscriber.endpoint
+        case "speechmatics": url = SpeechmaticsTranscriber.baseURL
+        case "soniox": url = SonioxTranscriber.baseURL
+        case "gladia": url = GladiaTranscriber.baseURL
         default:
             guard let base = try? ProviderHTTP.baseURL(config) else { return nil }
             url = base
@@ -414,6 +440,10 @@ extension CloudTranscription {
         case "elevenlabs": request = ElevenLabsTranscriber.makeKeyCheckRequest(apiKey: apiKey)
         case "deepgram": request = DeepgramTranscriber.makeKeyCheckRequest(apiKey: apiKey)
         case "assemblyai": request = AssemblyAITranscriber.makeKeyCheckRequest(apiKey: apiKey)
+        case "xai": request = XAITranscriber.makeKeyCheckRequest(apiKey: apiKey)
+        case "speechmatics": request = SpeechmaticsTranscriber.makeKeyCheckRequest(apiKey: apiKey)
+        case "soniox": request = SonioxTranscriber.makeKeyCheckRequest(apiKey: apiKey)
+        case "gladia": request = GladiaTranscriber.makeKeyCheckRequest(apiKey: apiKey)
         default: throw LLMError.provider("No key check for \(config.displayName).")
         }
         _ = try await ProviderHTTP.send(request, session: ProviderHTTP.session, retry: true)
@@ -480,8 +510,8 @@ extension ProviderHTTP {
         }
     }
 
-    /// Whether sending `request` twice costs nothing: GETs (polls, key checks) and audio uploads (AssemblyAI
-    /// `/v2/upload`, Gemini Files API). Billed one-shot POSTs (transcription requests, `generateContent`, AssemblyAI
+    /// Whether sending `request` twice costs nothing: GETs (polls, key checks) and audio uploads (AssemblyAI and
+    /// Gladia `/v2/upload`, Gemini Files API). Billed one-shot POSTs (transcription requests, `generateContent`, AssemblyAI
     /// `/v2/transcript`) are sent once, since a retry after a lost answer could start a second paid job. Pure, for
     /// tests.
     static func mayRetry(_ request: URLRequest) -> Bool {
@@ -497,7 +527,7 @@ extension ProviderHTTP {
     /// `body` with every key the request carries (auth header values, without their `Bearer` / `Token` scheme)
     /// replaced, so an echoed key never reaches an error, the UI or a log. Pure, for tests.
     static func redacted(_ body: String, request: URLRequest) -> String {
-        let headers = ["Authorization", "x-goog-api-key", "xi-api-key", "api-key", "x-api-key"]
+        let headers = ["Authorization", "x-goog-api-key", "xi-api-key", "api-key", "x-api-key", "x-gladia-key"]
         let secrets = headers.compactMap { request.value(forHTTPHeaderField: $0) }.flatMap { value in
             [value, value.split(separator: " ", maxSplits: 1).last.map(String.init) ?? value]
         }

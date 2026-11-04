@@ -220,6 +220,12 @@ let providerLinks: [String: (keys: URL, models: URL)] = [
                  URL(string: "https://developers.deepgram.com/docs/models-languages-overview")!),
     "assemblyai": (URL(string: "https://www.assemblyai.com/dashboard/api-keys")!,
                    URL(string: "https://www.assemblyai.com/docs/getting-started/models")!),
+    "speechmatics": (URL(string: "https://portal.speechmatics.com/settings/api-keys/")!,
+                     URL(string: "https://docs.speechmatics.com/speech-to-text/models")!),
+    "soniox": (URL(string: "https://console.soniox.com/org/projects/api/keys/")!,
+               URL(string: "https://docs.soniox.com/stt/models")!),
+    "gladia": (URL(string: "https://app.gladia.io/apikeys")!,
+               URL(string: "https://docs.gladia.io/chapters/introduction/models")!),
 ]
 
 extension View {

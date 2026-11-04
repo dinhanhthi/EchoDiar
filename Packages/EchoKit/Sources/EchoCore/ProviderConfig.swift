@@ -5,8 +5,9 @@ import Foundation
 public struct ProviderConfig: Codable, Equatable, Sendable, Identifiable {
     public enum Kind: String, Codable, Sendable {
         case openAICompatible, anthropic, cli, local
-        /// A speech-to-text-only API (ElevenLabs, Deepgram, AssemblyAI): its transcriber sets the vendor's own auth
-        /// header and endpoint, so `baseURL` and `authStyle` are unused; the key is still in the Keychain.
+        /// A speech-to-text-only API (ElevenLabs, Deepgram, AssemblyAI, Speechmatics, Soniox, Gladia): its transcriber
+        /// sets the vendor's own auth header and endpoint, so `baseURL` and `authStyle` are unused; the key is still in
+        /// the Keychain.
         case speechToText
     }
 
@@ -137,11 +138,14 @@ public struct ProviderConfig: Codable, Equatable, Sendable, Identifiable {
         cli("codex-cli", "Codex"),
         cli("opencode-cli", "OpenCode"),
         cli("gemini-cli", "Gemini CLI"),
-        // Speech to text only (OpenAI, Groq, Mistral, Gemini and custom endpoints transcribe through the configs above,
-        // so they share their Keychain key).
+        // Speech to text only (OpenAI, xAI, Groq, Mistral, Gemini and custom endpoints transcribe through the configs
+        // above, so they share their Keychain key).
         speechToText("elevenlabs", "ElevenLabs"),
         speechToText("deepgram", "Deepgram"),
         speechToText("assemblyai", "AssemblyAI"),
+        speechToText("speechmatics", "Speechmatics"),
+        speechToText("soniox", "Soniox"),
+        speechToText("gladia", "Gladia"),
     ]
 
     private static func cloud(_ id: String, _ name: String, _ base: String, model: String, auth: AuthStyle = .bearer) -> ProviderConfig {

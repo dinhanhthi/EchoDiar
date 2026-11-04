@@ -360,10 +360,12 @@ private struct CloudEngineRow: View {
     /// A cloud diarizer (Diarization models): its diarization model, Default and Set default of the default diarizer.
     var diarization = false
 
-    /// Approximate pay-as-you-go prices per audio hour (docs/research/asr-diarization-models.md F, 2026-10-18).
+    /// Approximate pay-as-you-go prices per audio hour (docs/research/asr-diarization-models.md F, 2026-10-18; xAI,
+    /// Speechmatics Enhanced, Soniox and Gladia solaria-1 2026-11-04).
     private static let prices: [String: String] = [
         "openai": "~$0.36/h", "groq": "~$0.04/h", "mistral": "~$0.18/h", "gemini": "~$0.23/h",
         "elevenlabs": "~$0.22/h", "deepgram": "~$0.26/h", "assemblyai": "~$0.23/h",
+        "xai": "~$0.10/h", "speechmatics": "~$0.38/h", "soniox": "~$0.10/h", "gladia": "~€0.27/h",
     ]
 
     private var engineID: String { CloudTranscription.engineID(providerID: config.id) }
@@ -442,7 +444,9 @@ private struct CloudModelField: View {
     /// The speech-to-text APIs have no model list; their known models are offered.
     private static let knownModels: [String: [String]] = OpenAICompatibleTranscriber.presetModels.merging([
         "elevenlabs": [ElevenLabsTranscriber.defaultModel], "deepgram": [DeepgramTranscriber.defaultModel],
-        "gemini": [GeminiAudioTranscriber.defaultModel],
+        "gemini": [GeminiAudioTranscriber.defaultModel], "xai": [XAITranscriber.defaultModel],
+        "speechmatics": [SpeechmaticsTranscriber.defaultModel, "standard", "melia-1"],
+        "soniox": [SonioxTranscriber.defaultModel], "gladia": [GladiaTranscriber.defaultModel],
     ]) { first, _ in first }
 
     var body: some View {

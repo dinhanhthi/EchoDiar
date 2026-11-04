@@ -183,6 +183,144 @@ struct CloudTranscriptionRequestTests {
         expectKeyNotInURL(upload)
     }
 
+    // MARK: - xAI
+
+    @Test func xAISystemChannelDiarizesWithLanguageAndSendsTheFileLast() throws {
+        let request = XAITranscriber.makeRequest(
+            apiKey: key, audio: audio, fileName: "channel.m4a", language: "vi-VN", diarize: true)
+
+        #expect(request.httpMethod == "POST")
+        #expect(request.url?.absoluteString == "https://api.x.ai/v1/stt")
+        #expect(request.value(forHTTPHeaderField: "Authorization") == "Bearer \(key)")
+        let fields = try formFields(request)
+        #expect(fields["model"] == "grok-voice-transcribe-2.0")
+        #expect(fields["language"] == "vi")
+        #expect(fields["diarize"] == "true")
+        #expect(fields["file"] == "fake-audio")
+        // xAI may ignore the fields sent after `file`.
+        #expect(try formFieldNames(request).last == "file")
+        expectKeyNotInURL(request)
+
+        let mic = try formFields(XAITranscriber.makeRequest(
+            apiKey: key, audio: audio, fileName: "channel.m4a", language: "auto", diarize: false))
+        #expect(mic["diarize"] == nil)
+        #expect(mic["language"] == nil)
+    }
+
+    // MARK: - Speechmatics
+
+    @Test func speechmaticsJobSendsTheConfigBeforeTheAudioThenPolls() throws {
+        let request = try SpeechmaticsTranscriber.makeJobRequest(
+            apiKey: key, audio: audio, fileName: "channel.m4a", language: "vi", diarize: true)
+
+        #expect(request.httpMethod == "POST")
+        #expect(request.url?.absoluteString == "https://eu1.asr.api.speechmatics.com/v2/jobs")
+        #expect(request.value(forHTTPHeaderField: "Authorization") == "Bearer \(key)")
+        #expect(try formFieldNames(request) == ["config", "data_file"])
+        let fields = try formFields(request)
+        #expect(fields["data_file"] == "fake-audio")
+        #expect(try jsonObject(fields["config"]) == [
+            "type": "transcription",
+            "transcription_config": ["language": "vi", "model": "enhanced", "diarization": "speaker"],
+        ] as NSDictionary)
+        expectKeyNotInURL(request)
+
+        // The mic channel on Auto: detection, no diarization; the multilingual `melia` models take `multi` + hints.
+        let mic = try formFields(SpeechmaticsTranscriber.makeJobRequest(
+            apiKey: key, audio: audio, fileName: "channel.m4a", language: "auto", diarize: false))
+        #expect(try jsonObject(mic["config"]) == [
+            "type": "transcription", "transcription_config": ["language": "auto", "model": "enhanced"],
+        ] as NSDictionary)
+        let melia = try formFields(SpeechmaticsTranscriber.makeJobRequest(
+            apiKey: key, model: "melia-1", audio: audio, fileName: "channel.m4a", language: "vi", diarize: false))
+        #expect(try jsonObject(melia["config"]) == [
+            "type": "transcription",
+            "transcription_config": ["language": "multi", "model": "melia-1", "language_hints": ["vi"]],
+        ] as NSDictionary)
+
+        let poll = SpeechmaticsTranscriber.makePollRequest(apiKey: key, id: "job-1")
+        #expect(poll.httpMethod == "GET")
+        #expect(poll.url?.absoluteString == "https://eu1.asr.api.speechmatics.com/v2/jobs/job-1")
+        let transcript = SpeechmaticsTranscriber.makeTranscriptRequest(apiKey: key, id: "job-1")
+        #expect(transcript.httpMethod == "GET")
+        #expect(transcript.url?.absoluteString
+            == "https://eu1.asr.api.speechmatics.com/v2/jobs/job-1/transcript?format=json-v2")
+        for request in [poll, transcript] {
+            #expect(request.value(forHTTPHeaderField: "Authorization") == "Bearer \(key)")
+            expectKeyNotInURL(request)
+        }
+    }
+
+    // MARK: - Soniox
+
+    @Test func sonioxUploadsThenCreatesAJobPollsAndDeletesBoth() throws {
+        let upload = SonioxTranscriber.makeUploadRequest(apiKey: key, audio: audio, fileName: "channel.m4a")
+        #expect(upload.httpMethod == "POST")
+        #expect(upload.url?.absoluteString == "https://api.soniox.com/v1/files")
+        #expect(try formFields(upload)["file"] == "fake-audio")
+
+        let system = try SonioxTranscriber.makeTranscriptionRequest(apiKey: key, fileID: "file-1", language: "vi-VN", diarize: true)
+        #expect(system.httpMethod == "POST")
+        #expect(system.url?.absoluteString == "https://api.soniox.com/v1/transcriptions")
+        #expect(try json(system) as NSDictionary == [
+            "model": "stt-async-v6", "file_id": "file-1", "language_hints": ["vi"], "enable_speaker_diarization": true,
+        ] as NSDictionary)
+        let mic = try SonioxTranscriber.makeTranscriptionRequest(apiKey: key, fileID: "file-1", language: "auto", diarize: false)
+        #expect(try json(mic) as NSDictionary == [
+            "model": "stt-async-v6", "file_id": "file-1", "enable_speaker_diarization": false,
+        ] as NSDictionary)
+
+        let gets = [
+            (SonioxTranscriber.makePollRequest(apiKey: key, id: "t-1"), "GET", "https://api.soniox.com/v1/transcriptions/t-1"),
+            (SonioxTranscriber.makeTranscriptRequest(apiKey: key, id: "t-1"), "GET",
+             "https://api.soniox.com/v1/transcriptions/t-1/transcript"),
+            (SonioxTranscriber.makeDeleteTranscriptionRequest(apiKey: key, id: "t-1"), "DELETE",
+             "https://api.soniox.com/v1/transcriptions/t-1"),
+            (SonioxTranscriber.makeDeleteFileRequest(apiKey: key, id: "file-1"), "DELETE", "https://api.soniox.com/v1/files/file-1"),
+        ]
+        for (request, method, url) in gets {
+            #expect(request.httpMethod == method)
+            #expect(request.url?.absoluteString == url)
+        }
+        for request in [upload, system, mic] + gets.map(\.0) {
+            #expect(request.value(forHTTPHeaderField: "Authorization") == "Bearer \(key)")
+            expectKeyNotInURL(request)
+        }
+    }
+
+    // MARK: - Gladia
+
+    @Test func gladiaUploadsThenCreatesAJobAndPollsWithTheGladiaKeyHeader() throws {
+        let upload = GladiaTranscriber.makeUploadRequest(apiKey: key, audio: audio, fileName: "channel.m4a")
+        #expect(upload.httpMethod == "POST")
+        #expect(upload.url?.absoluteString == "https://api.gladia.io/v2/upload")
+        #expect(try formFields(upload)["audio"] == "fake-audio")
+
+        let system = try GladiaTranscriber.makeJobRequest(
+            apiKey: key, audioURL: "https://api.gladia.io/file/abc", language: "fr-FR", diarize: true)
+        #expect(system.httpMethod == "POST")
+        #expect(system.url?.absoluteString == "https://api.gladia.io/v2/pre-recorded")
+        #expect(try json(system) as NSDictionary == [
+            "audio_url": "https://api.gladia.io/file/abc", "model": "solaria-1", "diarization": true,
+            "language_config": ["languages": ["fr"], "code_switching": false],
+        ] as NSDictionary)
+        let mic = try GladiaTranscriber.makeJobRequest(
+            apiKey: key, audioURL: "https://api.gladia.io/file/abc", language: nil, diarize: false)
+        #expect(try json(mic) as NSDictionary == [
+            "audio_url": "https://api.gladia.io/file/abc", "model": "solaria-1", "diarization": false,
+            "language_config": ["languages": [String](), "code_switching": false],
+        ] as NSDictionary)
+
+        let poll = GladiaTranscriber.makePollRequest(apiKey: key, id: "job-1")
+        #expect(poll.httpMethod == "GET")
+        #expect(poll.url?.absoluteString == "https://api.gladia.io/v2/pre-recorded/job-1")
+        for request in [upload, system, mic, poll] {
+            #expect(request.value(forHTTPHeaderField: "x-gladia-key") == key)
+            #expect(request.value(forHTTPHeaderField: "Authorization") == nil)
+            expectKeyNotInURL(request)
+        }
+    }
+
     // MARK: - Split
 
     @Test func overCapInputIsSplitAtTheQuietestMomentAndOffsetsAreReapplied() throws {
@@ -424,6 +562,134 @@ struct CloudTranscriptionRequestTests {
         }
     }
 
+    // The next four bodies are the recorded responses of stt-protocols.md part A (plan 2026-11-04-cloud-live-transcript),
+    // with the additions noted per test.
+
+    /// The docs' sample with `"speaker"` on each word (what `diarize=true` adds) and a second speaker's word.
+    @Test func xAIWordsWithIntegerSpeakersGroupIntoSegments() throws {
+        let body = #"""
+        {
+          "text": "The balance is $167,983.15. Thanks.",
+          "language": "en",
+          "duration": 3.45,
+          "words": [
+            { "text": "The", "start": 0.24, "end": 0.48, "speaker": 0 },
+            { "text": "balance", "start": 0.48, "end": 0.96, "speaker": 0 },
+            { "text": "is", "start": 0.96, "end": 1.12, "speaker": 0 },
+            { "text": "$167,983.15.", "start": 1.12, "end": 3.20, "speaker": 0 },
+            { "text": "Thanks.", "start": 3.25, "end": 3.45, "speaker": 1 }
+          ]
+        }
+        """#
+        #expect(try XAITranscriber.parse(Data(body.utf8)) == [
+            CloudSegment(start: 0.24, end: 3.20, text: "The balance is $167,983.15.", speaker: "0", language: "en"),
+            CloudSegment(start: 3.25, end: 3.45, text: "Thanks.", speaker: "1", language: "en"),
+        ])
+    }
+
+    /// The docs' sample (`world` takes the `.` that attaches to it), plus a word of an unknown (`UU`) speaker.
+    @Test func speechmaticsAttachesPunctuationAndDropsTheUnknownSpeaker() throws {
+        let body = #"""
+        {
+          "format": "2.7",
+          "job": { "created_at": "2018-01-09T12:29:01.853047Z", "data_name": "recording.mp3", "duration": 244, "id": "a1b2c3d4e5" },
+          "metadata": { "created_at": "2018-01-09T12:31:46.918860Z", "type": "transcription", "transcription_config": { "language": "en", "diarization": "speaker" } },
+          "results": [
+            { "start_time": 0.55, "end_time": 1.2, "type": "word", "alternatives": [ { "confidence": 0.95, "content": "Hello", "language": "en", "speaker": "S1" } ] },
+            { "start_time": 1.45, "end_time": 1.8, "type": "word", "alternatives": [ { "confidence": 0.76, "content": "world", "language": "en", "speaker": "S1" } ] },
+            { "start_time": 1.8, "end_time": 1.8, "type": "punctuation", "attaches_to": "previous", "alternatives": [ { "confidence": 1.0, "content": ".", "language": "en", "speaker": "S1" } ] },
+            { "start_time": 3.0, "end_time": 3.4, "type": "word", "alternatives": [ { "confidence": 0.6, "content": "Yes", "language": "en", "speaker": "UU" } ] }
+          ]
+        }
+        """#
+        #expect(try SpeechmaticsTranscriber.parse(Data(body.utf8)) == [
+            CloudSegment(start: 0.55, end: 1.8, text: "Hello world.", speaker: "S1", language: "en"),
+            CloudSegment(start: 3.0, end: 3.4, text: "Yes", language: "en"),
+        ])
+        #expect(try SpeechmaticsTranscriber.parseJobStatus(Data(#"{"job":{"id":"a1","status":"running"}}"#.utf8)) == false)
+        #expect(try SpeechmaticsTranscriber.parseJobStatus(Data(#"{"job":{"id":"a1","status":"done"}}"#.utf8)))
+        #expect(throws: LLMError.self) {
+            try SpeechmaticsTranscriber.parseJobStatus(Data(#"{"job":{"id":"a1","status":"rejected"}}"#.utf8))
+        }
+    }
+
+    /// The docs' sample (sub-word tokens in ms, joined without spaces), then the same with speakers and a second word
+    /// that carries its own leading space.
+    @Test func sonioxTokensJoinIntoWordsWithMillisecondsAsSeconds() throws {
+        let body = #"""
+        {
+          "id": "19b6d61d-02db-4c25-bc71-b4094dc310c8",
+          "text": "Hello",
+          "tokens": [
+            {"confidence": 0.95, "end_ms": 90, "start_ms": 10, "text": "Hel"},
+            {"confidence": 0.98, "end_ms": 160, "start_ms": 110, "text": "lo"}
+          ]
+        }
+        """#
+        #expect(try SonioxTranscriber.parse(Data(body.utf8)) == [CloudSegment(start: 0.01, end: 0.16, text: "Hello")])
+
+        let diarized = #"""
+        {"id": "t-1", "text": "Hello there", "tokens": [
+          {"confidence": 0.95, "end_ms": 90, "start_ms": 10, "text": "Hel", "speaker": "1", "language": "en"},
+          {"confidence": 0.98, "end_ms": 160, "start_ms": 110, "text": "lo", "speaker": "1", "language": "en"},
+          {"confidence": 0.9, "end_ms": 2500, "start_ms": 2000, "text": " there", "speaker": "2", "language": "en"}]}
+        """#
+        #expect(try SonioxTranscriber.parse(Data(diarized.utf8)) == [
+            CloudSegment(start: 0.01, end: 0.16, text: "Hello", speaker: "1", language: "en"),
+            CloudSegment(start: 2.0, end: 2.5, text: "there", speaker: "2", language: "en"),
+        ])
+
+        let queued = #"{"id": "73d4357d-cad2-4338-a60d-ec6f2044f721", "status": "queued", "model": "stt-async-preview", "file_id": null, "audio_duration_ms": 0, "error_message": null}"#
+        let status = try SonioxTranscriber.parseStatus(Data(queued.utf8))
+        #expect(status.id == "73d4357d-cad2-4338-a60d-ec6f2044f721" && !status.completed)
+        #expect(throws: LLMError.self) {
+            try SonioxTranscriber.parseStatus(Data(#"{"id":"t-1","status":"error","error_message":"Bad audio"}"#.utf8))
+        }
+    }
+
+    /// The docs' sample: each utterance is one segment with its integer speaker.
+    @Test func gladiaUtterancesBecomeSegments() throws {
+        let body = #"""
+        {
+        	"id": "0777a4fc-0b7e-40fb-9d37-690bdd83c9c6",
+        	"request_id": "G-0777a4fc",
+        	"status": "done",
+        	"created_at": "2024-01-03T11:11:03.872Z",
+        	"completed_at": "2024-01-03T11:11:14.962Z",
+        	"result": {
+        		"metadata": { "audio_duration": 20.555465, "number_of_channels": 1, "transcription_time": 11.09, "billing_time": 20.555465 },
+        		"transcription": {
+        			"languages": ["en"],
+        			"full_transcript": "Split infinity in a time when less is more, ...",
+        			"utterances": [
+        				{
+        					"text": "Split infinity in a time when less is more,",
+        					"language": "en",
+        					"start": 0.21001999999999998,
+        					"end": 4.71123,
+        					"channel": 0,
+        					"speaker": 0,
+        					"words": [
+        						{ "word": "Split", "start": 0.21001999999999998, "end": 0.69015, "confidence": 1 },
+        						{ "word": " infinity", "start": 0.91021, "end": 1.55038, "confidence": 0.95 }
+        					]
+        				}
+        			]
+        		}
+        	}
+        }
+        """#
+        #expect(try GladiaTranscriber.parseJob(Data(body.utf8)) == [
+            CloudSegment(
+                start: 0.21001999999999998, end: 4.71123, text: "Split infinity in a time when less is more,", speaker: "0",
+                language: "en"),
+        ])
+        #expect(try GladiaTranscriber.parseJob(Data(#"{"id":"job-1","status":"processing"}"#.utf8)) == nil)
+        #expect(throws: LLMError.self) {
+            try GladiaTranscriber.parseJob(Data(#"{"id":"job-1","status":"error"}"#.utf8))
+        }
+    }
+
     // MARK: - Settings Test and failure reasons
 
     @Test func keyChecksAreBodylessGetsWithTheKeyOnlyInTheVendorHeader() {
@@ -431,12 +697,27 @@ struct CloudTranscriptionRequestTests {
             (ElevenLabsTranscriber.makeKeyCheckRequest(apiKey: key), "xi-api-key", key),
             (DeepgramTranscriber.makeKeyCheckRequest(apiKey: key), "Authorization", "Token \(key)"),
             (AssemblyAITranscriber.makeKeyCheckRequest(apiKey: key), "Authorization", key),
+            (XAITranscriber.makeKeyCheckRequest(apiKey: key), "Authorization", "Bearer \(key)"),
+            (SpeechmaticsTranscriber.makeKeyCheckRequest(apiKey: key), "Authorization", "Bearer \(key)"),
+            (SonioxTranscriber.makeKeyCheckRequest(apiKey: key), "Authorization", "Bearer \(key)"),
+            (GladiaTranscriber.makeKeyCheckRequest(apiKey: key), "x-gladia-key", key),
         ]
         for (request, header, value) in checks {
             #expect(request.httpMethod == "GET" && request.httpBody == nil)
             #expect(request.value(forHTTPHeaderField: header) == value)
             #expect(request.url?.absoluteString.contains(key) == false)
         }
+    }
+
+    /// The new providers' Test is a free listing (no audio) on the transcription origin.
+    @Test func newProviderKeyChecksAreFreeListings() {
+        #expect(XAITranscriber.makeKeyCheckRequest(apiKey: key).url?.absoluteString == "https://api.x.ai/v1/api-key")
+        #expect(SpeechmaticsTranscriber.makeKeyCheckRequest(apiKey: key).url?.absoluteString
+            == "https://eu1.asr.api.speechmatics.com/v2/jobs?limit=1")
+        #expect(SonioxTranscriber.makeKeyCheckRequest(apiKey: key).url?.absoluteString == "https://api.soniox.com/v1/files?limit=1")
+        let gladia = GladiaTranscriber.makeKeyCheckRequest(apiKey: key)
+        #expect(gladia.url?.absoluteString == "https://api.gladia.io/v2/pre-recorded?limit=1")
+        #expect(gladia.value(forHTTPHeaderField: "Authorization") == nil)
     }
 
     @Test func refusedKeysBecomeAShortReason() {
@@ -471,6 +752,8 @@ struct CloudTranscriptionRequestTests {
             config: try preset("openai"), apiKey: key, model: "whisper-1", audio: audio, fileName: "a.m4a",
             language: nil, diarize: false)
         #expect(bearer.map { ProviderHTTP.redacted("key \(key)", request: $0) } == "key [redacted]")
+        #expect(ProviderHTTP.redacted("key \(key)", request: GladiaTranscriber.makePollRequest(apiKey: key, id: "j"))
+            == "key [redacted]")
     }
 
     // MARK: - Billing: retry only free requests
@@ -516,6 +799,16 @@ struct CloudTranscriptionRequestTests {
 
     @Test func consentIsBoundToTheRequestOrigin() throws {
         #expect(CloudTranscription.destination(for: try preset("deepgram"))?.consentKey == "deepgram@https://api.deepgram.com")
+        #expect(CloudTranscription.destination(for: try preset("speechmatics"))?.consentKey
+            == "speechmatics@https://eu1.asr.api.speechmatics.com")
+        #expect(CloudTranscription.destination(for: try preset("soniox"))?.consentKey == "soniox@https://api.soniox.com")
+        #expect(CloudTranscription.destination(for: try preset("gladia"))?.consentKey == "gladia@https://api.gladia.io")
+        // xAI transcribes on its fixed `/v1/stt` origin, whatever its LLM base URL says.
+        var xai = try preset("xai")
+        #expect(CloudTranscription.supports(xai))
+        #expect(CloudTranscription.destination(for: xai)?.consentKey == "xai@https://api.x.ai")
+        xai.baseURL = "https://evil.example/v1"
+        #expect(CloudTranscription.destination(for: xai)?.consentKey == "xai@https://api.x.ai")
         var gemini = try preset("gemini")
         gemini.baseURL = "https://evil.example/v1"
         #expect(CloudTranscription.destination(for: gemini)?.consentKey == "gemini@https://generativelanguage.googleapis.com")
@@ -586,6 +879,29 @@ struct CloudTranscriptionRequestTests {
         #expect(!CloudTranscription.diarizes(try preset("groq"), model: "whisper-large-v3-turbo"))
         #expect(CloudTranscription.diarizes(try preset("elevenlabs"), model: "scribe_v2"))
         #expect(!CloudTranscription.diarizes(try preset("elevenlabs"), model: "scribe_v2_realtime"))
+        for (id, model) in [
+            ("xai", "grok-voice-transcribe-2.0"), ("speechmatics", "enhanced"), ("soniox", "stt-async-v6"), ("gladia", "solaria-1"),
+        ] {
+            let config = try preset(id)
+            #expect(CloudTranscription.diarizationPresets.contains(id), "\(id)")
+            #expect(CloudTranscription.defaultModel(for: config) == model, "\(id)")
+            #expect(CloudTranscription.defaultDiarizationModel(for: config) == model, "\(id)")
+            #expect(CloudTranscription.diarizes(config, model: model), "\(id)")
+        }
+        #expect(CloudTranscription.diarizes(try preset("speechmatics"), model: "standard"))
+        #expect(!CloudTranscription.diarizes(try preset("speechmatics"), model: "melia-1"))
+        #expect(!CloudTranscription.diarizes(try preset("soniox"), model: "stt-rt-v3"))
+        #expect(!CloudTranscription.diarizes(try preset("gladia"), model: "whisper-1"))
+
+        // Each new preset reaches its own client, with the model it was given.
+        #expect((CloudTranscription.makeTranscriber(config: try preset("xai"), apiKey: key) as? XAITranscriber)?.model
+            == "grok-voice-transcribe-2.0")
+        #expect((CloudTranscription.makeTranscriber(config: try preset("speechmatics"), apiKey: key, model: "standard")
+            as? SpeechmaticsTranscriber)?.model == "standard")
+        #expect((CloudTranscription.makeTranscriber(config: try preset("soniox"), apiKey: key) as? SonioxTranscriber)?.model
+            == "stt-async-v6")
+        #expect((CloudTranscription.makeTranscriber(config: try preset("gladia"), apiKey: key) as? GladiaTranscriber)?.model
+            == "solaria-1")
     }
 
     /// Realtime models only stream over a WebSocket: the file endpoints refuse them (ElevenLabs: HTTP 400).
@@ -621,6 +937,22 @@ struct CloudTranscriptionRequestTests {
             fields[name] = String(part[headerEnd.upperBound...]).trimmingCharacters(in: .newlines)
         }
         return fields
+    }
+
+    /// The multipart part names in body order.
+    private func formFieldNames(_ request: URLRequest) throws -> [String] {
+        let contentType = try #require(request.value(forHTTPHeaderField: "Content-Type"))
+        let boundary = try #require(contentType.components(separatedBy: "boundary=").last)
+        let body = String(decoding: try #require(request.httpBody), as: UTF8.self)
+        return body.components(separatedBy: "--\(boundary)").compactMap { part in
+            part.range(of: "name=\"").map { String(part[$0.upperBound...].prefix { $0 != "\"" }) }
+        }
+    }
+
+    /// A JSON text (a multipart field) as a dictionary, compared as JSON so key order does not matter.
+    private func jsonObject(_ text: String?) throws -> NSDictionary {
+        let data = Data(try #require(text).utf8)
+        return try #require(JSONSerialization.jsonObject(with: data) as? NSDictionary)
     }
 
     private func expectKeyNotInURL(_ request: URLRequest) {
