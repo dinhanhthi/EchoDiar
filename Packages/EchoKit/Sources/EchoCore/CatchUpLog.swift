@@ -36,6 +36,9 @@ public struct CatchUp: Codable, Equatable, Identifiable, Sendable {
         self.stopped = stopped
     }
 
+    /// The longest `elapsed` and `throughTime` read from a file: 7 days.
+    public static let maxSeconds: Double = 7 * 24 * 3600
+
     private enum CodingKeys: String, CodingKey {
         case id, createdAt, elapsed, throughLineID, throughTime, fullPass, text, provider, model, stopped
     }
@@ -44,20 +47,26 @@ public struct CatchUp: Codable, Equatable, Identifiable, Sendable {
         let c = try decoder.container(keyedBy: CodingKeys.self)
         id = try c.decodeIfPresent(UUID.self, forKey: .id) ?? UUID()
         createdAt = try c.decodeIfPresent(Date.self, forKey: .createdAt) ?? Date(timeIntervalSince1970: 0)
-        elapsed = try c.decodeIfPresent(Double.self, forKey: .elapsed) ?? 0
-        throughLineID = try c.decodeIfPresent(Int.self, forKey: .throughLineID) ?? -1
-        throughTime = try c.decodeIfPresent(Double.self, forKey: .throughTime) ?? 0
+        // The file is untrusted: times finite within [0, maxSeconds] (formatting a huge one traps), a line id from -1.
+        elapsed = Self.seconds(try c.decodeIfPresent(Double.self, forKey: .elapsed) ?? 0)
+        throughLineID = max(try c.decodeIfPresent(Int.self, forKey: .throughLineID) ?? -1, -1)
+        throughTime = Self.seconds(try c.decodeIfPresent(Double.self, forKey: .throughTime) ?? 0)
         fullPass = try c.decodeIfPresent(Bool.self, forKey: .fullPass) ?? false
         text = try c.decodeIfPresent(String.self, forKey: .text) ?? ""
         provider = try c.decodeIfPresent(String.self, forKey: .provider) ?? ""
         model = try c.decodeIfPresent(String.self, forKey: .model) ?? ""
         stopped = try c.decodeIfPresent(Bool.self, forKey: .stopped) ?? false
     }
+
+    /// `value` within [0, `maxSeconds`]; 0 when it is not finite.
+    private static func seconds(_ value: Double) -> Double {
+        value.isFinite ? min(max(value, 0), maxSeconds) : 0
+    }
 }
 
 /// The `catchups.json` file format, version 1: a recording's catch-ups, oldest first. Dates are ISO 8601 (whole
-/// seconds). Every key is optional when read (`decodeIfPresent` + default), and an entry that does not decode is
-/// skipped.
+/// seconds). Every key is optional when read (`decodeIfPresent` + default), an entry that does not decode is skipped,
+/// and one whose id repeats an earlier entry's is dropped (the first is kept), so ids are unique.
 public struct CatchUpLog: Codable, Equatable, Sendable {
     public static let fileName = "catchups.json"
 
@@ -75,7 +84,9 @@ public struct CatchUpLog: Codable, Equatable, Sendable {
     public init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
         version = try c.decodeIfPresent(Int.self, forKey: .version) ?? 1
-        catchUps = try c.decodeIfPresent([Lossy].self, forKey: .catchUps)?.compactMap(\.catchUp) ?? []
+        let decoded = try c.decodeIfPresent([Lossy].self, forKey: .catchUps)?.compactMap(\.catchUp) ?? []
+        var seen = Set<UUID>()
+        catchUps = decoded.filter { seen.insert($0.id).inserted }
     }
 
     /// One entry of `catchUps`: nil when it does not decode, so one bad entry does not lose the others.

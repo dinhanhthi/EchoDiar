@@ -31,6 +31,12 @@ public sealed record AIProviderInfo(
 {
     /// <summary>What it is sent leaves this PC: a cloud API, a CLI, or a local host on another machine.</summary>
     public bool LeavesPC => Kind is AIProviderKind.Cloud or AIProviderKind.Cli || RemoteHost;
+
+    /// <summary>"Data sent to &lt;name&gt; leaves this PC." when it does (macOS <c>leavesMacNote</c>).</summary>
+    public string? LeavesPCNote => LeavesPC ? Loc.Format("Data sent to %@ leaves this PC.", Name) : null;
+
+    /// <summary>How far a CLI agent is contained (<see cref="CLIRunner.ContainmentNote"/>); null for the others.</summary>
+    public string? ContainmentNote => CliPreset is { } preset && CLIRunner.ContainmentNote(preset) is { } note ? Loc.T(note) : null;
 }
 
 public enum CLIState { Checking, NotInstalled, Found }
@@ -629,5 +635,22 @@ public sealed partial class ProvidersViewModel : ObservableObject
     {
         get => Settings.ChatContextMessages;
         set => _app.ApplySettings(Settings with { ChatContextMessages = value });
+    }
+
+    /// <summary>The "Catch-up provider" setting ("" = Automatic); picking one clears the model picked for the previous one.</summary>
+    public void SetCatchUpProvider(string id) => _app.ApplySettings(Settings with { CatchUpProviderID = id, CatchUpModel = "" });
+
+    /// <summary>The "Catch-up model" setting of the picked catch-up provider; "" = Automatic.</summary>
+    public string CatchUpModel
+    {
+        get => Settings.CatchUpModel.Trim();
+        set => _app.ApplySettings(Settings with { CatchUpModel = value });
+    }
+
+    /// <summary>Each catch-up reads the whole recording again instead of what was said since the previous one.</summary>
+    public bool CatchUpFromStart
+    {
+        get => Settings.CatchUpFromStart;
+        set => _app.ApplySettings(Settings with { CatchUpFromStart = value });
     }
 }

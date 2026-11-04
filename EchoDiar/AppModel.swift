@@ -199,8 +199,9 @@ final class AppModel {
         let jobID: UUID
         /// Seconds of recording when it was asked for, for its card.
         let elapsed: Double
-        /// The provider's name and the model it runs, for its card's header.
+        /// The provider's name, whether what it sends leaves this Mac and the model it runs, for its card's header.
         let providerName: String
+        let providerLeavesMac: Bool
         let model: String
         var status: Status = .starting
         /// The text streamed so far (every 50 ms), Markdown.
@@ -2005,7 +2006,9 @@ extension AppModel {
         catchUpFlush = nil
         pendingCatchUpText = ""
         let model = catchUpModel(for: provider)
-        catchUpRun = CatchUpRun(jobID: jobID, elapsed: elapsed, providerName: provider.name, model: model)
+        catchUpRun = CatchUpRun(
+            jobID: jobID, elapsed: elapsed, providerName: provider.name, providerLeavesMac: provider.leavesMac,
+            model: model)
         let client: (any LLMProvider)?
         do {
             client = try llmClient(for: provider)

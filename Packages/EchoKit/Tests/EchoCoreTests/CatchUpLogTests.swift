@@ -30,4 +30,21 @@ struct CatchUpLogTests {
         try Data(#"{"catchUps": 5}"#.utf8).write(to: url)
         #expect(throws: (any Error).self) { try CatchUpLog.load(from: folder) }
     }
+
+    /// The file is untrusted: a repeated id keeps its first entry (the cards are keyed by id), and the times are finite
+    /// within 7 days (the clock formatting traps on a huge one), so every reader is safe.
+    @Test func decodeDropsRepeatedIDsAndClampsTimes() throws {
+        let id = "5B0E3C1A-7D2F-4E8B-9A61-2C4D6E8F0A1B"
+        let catchUps = try CatchUpLog.decode(Data("""
+            {"catchUps": [
+              {"id": "\(id)", "elapsed": 1e300, "throughTime": 1e300, "throughLineID": -7, "text": "first"},
+              {"id": "\(id)", "elapsed": 2, "text": "again"},
+              {"elapsed": -5, "throughTime": -1, "throughLineID": 3}
+            ]}
+            """.utf8)).catchUps
+        #expect(catchUps.map(\.text) == ["first", ""])
+        #expect(catchUps.map(\.elapsed) == [7 * 24 * 3600, 0])
+        #expect(catchUps.map(\.throughTime) == [7 * 24 * 3600, 0])
+        #expect(catchUps.map(\.throughLineID) == [-1, 3])
+    }
 }

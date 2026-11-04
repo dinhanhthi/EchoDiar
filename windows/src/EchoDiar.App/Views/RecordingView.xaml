@@ -1,8 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!--
     The recording page (macOS RecordingViews.swift RecordingDetailView and RecordingHeader): the header with the
-    title, the state, the elapsed time, the mic and system meters and the language, the calendar suggestion, the capture
-    warnings, then the live transcript, or the wave and why there is none.
+    title, the state, the elapsed time, the mic and system meters, "Catch up" and the language, the calendar suggestion,
+    the capture warnings, the catch-ups, then the live transcript, or the wave and why there is none.
 -->
 <UserControl
     x:Class="EchoDiar.App.Views.RecordingView"
@@ -29,6 +29,7 @@
             <RowDefinition Height="Auto" />
             <RowDefinition Height="Auto" />
             <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
             <RowDefinition Height="*" />
         </Grid.RowDefinitions>
 
@@ -50,6 +51,7 @@
                         <ColumnDefinition Width="Auto" />
                         <ColumnDefinition Width="Auto" />
                         <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="Auto" />
                         <ColumnDefinition Width="Auto" />
                         <ColumnDefinition Width="Auto" />
                     </Grid.ColumnDefinitions>
@@ -141,8 +143,25 @@
                         </Grid>
                     </StackPanel>
 
+                    <!--
+                        "Catch up": its help as the button's tooltip; the reason it is off as the host's, as a disabled
+                        button shows none; Transparent, so the host is hit-tested under the disabled button.
+                    -->
+                    <Border
+                        x:Name="CatchUpButtonHost"
+                        Grid.Column="5"
+                        VerticalAlignment="Center"
+                        Background="Transparent">
+                        <Button x:Name="CatchUpButton">
+                            <StackPanel Orientation="Horizontal" Spacing="8">
+                                <FontIcon FontFamily="{ThemeResource SymbolThemeFontFamily}" FontSize="14" Glyph="&#xE8FD;" />
+                                <TextBlock Text="{local:T Text='Catch up'}" />
+                            </StackPanel>
+                        </Button>
+                    </Border>
+
                     <!-- The language menu, set in code. -->
-                    <ContentPresenter x:Name="LanguageHost" Grid.Column="5" VerticalAlignment="Center" />
+                    <ContentPresenter x:Name="LanguageHost" Grid.Column="6" VerticalAlignment="Center" />
                 </Grid>
             </StackPanel>
         </Border>
@@ -185,12 +204,26 @@
             Severity="Warning"
             Title="{local:T Text='No system audio'}" />
 
+        <!-- The catch-ups (CatchUpCard, set in code), newest first; at most 280 px tall, scrolled past it; hidden while none. -->
+        <Border
+            x:Name="CatchUpPanel"
+            Grid.Row="4"
+            Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
+            BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
+            BorderThickness="1"
+            CornerRadius="{StaticResource OverlayCornerRadius}"
+            Visibility="Collapsed">
+            <ScrollViewer MaxHeight="280" VerticalScrollBarVisibility="Auto">
+                <StackPanel x:Name="CatchUpCards" Padding="8" Spacing="6" />
+            </ScrollViewer>
+        </Border>
+
         <!-- LiveTranscriptView, set in code; shown while the recording has a live transcriber. -->
-        <Border x:Name="LiveHost" Grid.Row="4" Visibility="Collapsed" />
+        <Border x:Name="LiveHost" Grid.Row="5" Visibility="Collapsed" />
 
         <StackPanel
             x:Name="NoLivePanel"
-            Grid.Row="4"
+            Grid.Row="5"
             MaxWidth="560"
             HorizontalAlignment="Center"
             VerticalAlignment="Center"

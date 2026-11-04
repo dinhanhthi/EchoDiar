@@ -1,7 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!--
     The Summary or Chat tab of the open conversation (macOS AIPanelView.swift): Summary shows the kept summaries (the
-    newest first with a menu for the earlier ones) and Summarize / Re-summarize / Stop; Chat shows the questions with
+    newest first with a menu for the earlier ones), then the catch-ups written while recording (collapsed until its
+    header is clicked), and Summarize / Re-summarize / Stop; Chat shows the questions with
     their streamed answers, the History panel at the trailing edge, and the question row. The bottom bar has the model
     and language menus with the "i" (where the data goes), Copy as prompt and the tab's action. Fluent cards in theme
     resources (Light and Dark); the messages, menus and history rows are built in code.
@@ -69,7 +70,7 @@
             <RowDefinition Height="Auto" />
         </Grid.RowDefinitions>
 
-        <!-- Summary: the version menu over the summary, or a note while there is none. -->
+        <!-- Summary: the version menu over the summary, then the catch-ups if any; a note while there are neither. -->
         <Border x:Name="SummaryPane" Style="{StaticResource PaneStyle}">
             <Grid>
                 <TextBlock x:Name="SummaryEmptyText" Style="{StaticResource EmptyNoteStyle}" />
@@ -110,6 +111,48 @@
                                     Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
                             </StackPanel>
                             <RichTextBlock x:Name="SummaryText" />
+                            <!-- No summary yet, above the catch-ups. -->
+                            <TextBlock
+                                x:Name="SummaryNoneText"
+                                Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                                Style="{StaticResource BodyTextBlockStyle}"
+                                TextWrapping="Wrap"
+                                Visibility="Collapsed" />
+                            <!-- The catch-ups (macOS catchUpsSection): read-only, newest first, cards built in code. -->
+                            <StackPanel
+                                x:Name="CatchUpsSection"
+                                Margin="0,4,0,0"
+                                Spacing="6"
+                                Visibility="Collapsed">
+                                <Button
+                                    x:Name="CatchUpsHeader"
+                                    HorizontalAlignment="Stretch"
+                                    HorizontalContentAlignment="Left"
+                                    Style="{StaticResource SubtleButtonStyle}">
+                                    <StackPanel Orientation="Horizontal" Spacing="6">
+                                        <FontIcon
+                                            x:Name="CatchUpsChevron"
+                                            Width="12"
+                                            VerticalAlignment="Center"
+                                            FontFamily="{ThemeResource SymbolThemeFontFamily}"
+                                            FontSize="10"
+                                            Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                                            Glyph="&#xE76C;" />
+                                        <TextBlock
+                                            VerticalAlignment="Center"
+                                            Style="{StaticResource BodyStrongTextBlockStyle}"
+                                            Text="{local:T Text='Catch-ups'}" />
+                                        <TextBlock
+                                            x:Name="CatchUpsCount"
+                                            VerticalAlignment="Center"
+                                            Style="{StaticResource CaptionStyle}" />
+                                    </StackPanel>
+                                </Button>
+                                <StackPanel
+                                    x:Name="CatchUpCards"
+                                    Spacing="6"
+                                    Visibility="Collapsed" />
+                            </StackPanel>
                         </StackPanel>
                     </ScrollViewer>
                 </Grid>

@@ -74,7 +74,9 @@ struct CatchUpPanel: View {
         if let run = model.catchUpRun {
             cards.append(CatchUpCard(
                 id: run.jobID, elapsed: run.elapsed, text: run.text, running: run.isRunning, stopping: run.stopping,
-                statusLine: run.statusLine, error: run.error, provider: run.providerName, model: run.model))
+                statusLine: run.statusLine, error: run.error,
+                provider: CatchUpCard.providerLabel(run.providerName, leavesMac: run.providerLeavesMac),
+                model: run.model))
         }
         let providers = model.aiProviders
         cards += model.recordingCatchUps.reversed().map { CatchUpCard($0, providers: providers) }
@@ -97,7 +99,7 @@ struct CatchUpCard: Identifiable {
     var statusLine: String?
     var error: String?
     var stopped = false
-    /// The provider's name and the model that write or wrote it.
+    /// The provider's name, with "(leaves this Mac)" when its data does, and the model that write or wrote it.
     var provider: String?
     var model: String?
 }
@@ -107,7 +109,14 @@ extension CatchUpCard {
     init(_ catchUp: CatchUp, providers: [AppModel.AIProvider]) {
         self.init(
             id: catchUp.id, elapsed: catchUp.elapsed, text: catchUp.text, stopped: catchUp.stopped,
-            provider: providers.first { $0.id == catchUp.provider }?.name, model: catchUp.model)
+            provider: providers.first { $0.id == catchUp.provider }
+                .map { Self.providerLabel($0.name, leavesMac: $0.leavesMac) },
+            model: catchUp.model)
+    }
+
+    /// "<name> (leaves this Mac)" when its data does, as the AI menus say.
+    static func providerLabel(_ name: String, leavesMac: Bool) -> String {
+        leavesMac ? String(localized: "\(name) (leaves this Mac)") : name
     }
 }
 

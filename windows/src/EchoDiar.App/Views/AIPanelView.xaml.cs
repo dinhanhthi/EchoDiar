@@ -20,8 +20,9 @@ namespace EchoDiar.App.Views;
 /// <see cref="AppViewModel"/>, one per conversation, so one goes on when the page changes and the conversation's other
 /// tab shows it as busy, with Stop. Answers are Markdown rendered by <see cref="MarkdownView"/> (at most every 120 ms
 /// while streaming, as the model batches the text, and once more when saved); <c>[mm:ss]</c> citations call the seek
-/// action <see cref="ConversationView"/> passes, web links open once their destination is confirmed. Attach when the
-/// page shows, Detach when it goes.
+/// action <see cref="ConversationView"/> passes, web links open once their destination is confirmed. Under the
+/// summary, the catch-ups written while recording (<see cref="CatchUpCard"/>, read-only). Attach when the page shows,
+/// Detach when it goes.
 /// </summary>
 public sealed partial class AIPanelView : UserControl
 {
@@ -47,6 +48,15 @@ public sealed partial class AIPanelView : UserControl
 
     /// <summary>Chat opened before the files were read: the question takes the cursor once they are.</summary>
     private bool _focusPending;
+
+    /// <summary>The Catch-ups section under the summary is open; collapsed for each conversation.</summary>
+    private bool _showingCatchUps;
+
+    /// <summary>The catch-up cards by id, kept while shown, so a card's Markdown is not rendered again.</summary>
+    private readonly Dictionary<Guid, CatchUpCard> _catchUpCards = [];
+
+    /// <summary>The open state the user gave cards with a click; the others: the newest open, the older ones collapsed.</summary>
+    private readonly Dictionary<Guid, bool> _catchUpOpenStates = [];
 
     public AIPanelView()
     {
@@ -86,6 +96,11 @@ public sealed partial class AIPanelView : UserControl
         ClearHistoryButton.Click += (_, _) => _ = ClearHistoryAsync();
         QuestionBox.PreviewKeyDown += OnQuestionKeyDown;
         QuestionBox.TextChanged += (_, _) => UpdateActions();
+        CatchUpsHeader.Click += (_, _) =>
+        {
+            _showingCatchUps = !_showingCatchUps;
+            UpdateCatchUps();
+        };
     }
 
     /// <summary>The first read of the conversation's files has returned; until then its page shows the loading pane.</summary>
@@ -134,6 +149,10 @@ public sealed partial class AIPanelView : UserControl
         _streamSlot = null;
         _loadedSeen = false;
         _focusPending = false;
+        _showingCatchUps = false;
+        _catchUpCards.Clear();
+        _catchUpOpenStates.Clear();
+        CatchUpCards.Children.Clear();
     }
 
     private void OnModelChanged(object? sender, PropertyChangedEventArgs e)
@@ -197,6 +216,7 @@ public sealed partial class AIPanelView : UserControl
             if (_focusPending && _tab == DetailTab.Chat) FocusQuestionOnceLoaded();
         }
         UpdateSummary();
+        UpdateCatchUps();
         UpdateChat();
         UpdateHistory();
         var error = _panel.Error;
@@ -209,16 +229,23 @@ public sealed partial class AIPanelView : UserControl
 
     // Summary
 
-    /// <summary>The summary being written, else the shown version with its menu; a note while there is none.</summary>
+    /// <summary>
+    /// The summary being written, else the shown version with its menu, else a note above the catch-ups; a note in the
+    /// middle while there are neither.
+    /// </summary>
     private void UpdateSummary()
     {
         if (_panel is null) return;
         var job = _panel.SummaryJob;
         var shown = _panel.ShownSummary;
-        var empty = job is null && shown is null;
-        SummaryEmptyText.Text = _panel.EmptyNote ?? Loc.T("No summary yet.");
+        var none = job is null && shown is null;
+        var empty = none && _panel.CatchUps.Count == 0;
+        var note = _panel.EmptyNote ?? Loc.T("No summary yet.");
+        SummaryEmptyText.Text = note;
         SummaryEmptyText.Visibility = Shown(empty);
         SummaryContent.Visibility = Shown(!empty);
+        SummaryNoneText.Text = note;
+        SummaryNoneText.Visibility = Shown(none);
         VersionButton.Visibility = Shown(job is null && shown is not null);
         if (shown is not null)
         {
@@ -231,12 +258,64 @@ public sealed partial class AIPanelView : UserControl
         SummaryStatusPanel.Visibility = Shown(waiting);
         SummaryStatusText.Text = _panel.JobStatus ?? Loc.T("Writing the summary…");
         var text = job is not null ? job.Text : shown?.Text ?? "";
-        SummaryText.Visibility = Shown(!waiting);
+        SummaryText.Visibility = Shown(!waiting && !none);
         if (text != _summaryRendered)
         {
             _summaryRendered = text;
             MarkdownView.Render(SummaryText, text, Links());
         }
+    }
+
+    /// <summary>
+    /// The Catch-ups section (macOS <c>catchUpsSection</c>), shown while there are some: its header with the count, then,
+    /// open, the cards newest first, the newest open and the others collapsed unless clicked otherwise; each kept by id.
+    /// </summary>
+    private void UpdateCatchUps()
+    {
+        if (_panel is null) return;
+        var catchUps = _panel.CatchUps;
+        CatchUpsSection.Visibility = Shown(catchUps.Count > 0);
+        var count = catchUps.Count.ToString("N0", CultureInfo.CurrentCulture);
+        CatchUpsCount.Text = count;
+        AutomationProperties.SetName(CatchUpsHeader, $"{Loc.T("Catch-ups")}, {count}");
+        AutomationProperties.SetItemStatus(CatchUpsHeader, Loc.T(_showingCatchUps ? "Expanded" : "Collapsed"));
+        CatchUpsChevron.Glyph = _showingCatchUps ? "\uE70D" : "\uE76C";
+        CatchUpCards.Visibility = Shown(_showingCatchUps);
+        // Built only while open, as macOS.
+        if (!_showingCatchUps) return;
+        var providers = _panel.Providers.AIProviders;
+        List<CatchUpCard> cards = [];
+        for (var i = catchUps.Count - 1; i >= 0; i--)
+        {
+            var state = CatchUpCardState.From(catchUps[i], providers);
+            if (!_catchUpCards.TryGetValue(state.Id, out var card))
+            {
+                card = new CatchUpCard(Links());
+                var id = state.Id;
+                card.ToggleRequested += () => ToggleCatchUp(id);
+                _catchUpCards[id] = card;
+            }
+            card.IsOpen = _catchUpOpenStates.TryGetValue(state.Id, out var open) ? open : cards.Count == 0;
+            card.Show(state);
+            cards.Add(card);
+        }
+        foreach (var gone in _catchUpCards.Keys.Where(key => !catchUps.Any(c => c.Id == key)).ToList())
+        {
+            _catchUpCards.Remove(gone);
+            _catchUpOpenStates.Remove(gone);
+        }
+        if (!CatchUpCards.Children.SequenceEqual<UIElement>(cards))
+        {
+            CatchUpCards.Children.Clear();
+            foreach (var card in cards) CatchUpCards.Children.Add(card);
+        }
+    }
+
+    private void ToggleCatchUp(Guid id)
+    {
+        if (!_catchUpCards.TryGetValue(id, out var card)) return;
+        card.IsOpen = !card.IsOpen;
+        _catchUpOpenStates[id] = card.IsOpen;
     }
 
     /// <summary>The kept summaries, newest first, each with its model, date and whether it was stopped.</summary>

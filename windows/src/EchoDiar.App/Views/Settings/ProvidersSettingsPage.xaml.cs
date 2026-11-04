@@ -46,6 +46,10 @@ public sealed partial class ProvidersSettingsPage : UserControl
             ["LLM", "Windows AI", "Phi Silica", "local", "summary", "chat", "default model", "language", "download",
              "GGUF", "Qwen", "Gemma", "offline"], OnThisPCTab),
         new("Chat context", ["chat", "history", "context", "messages", "memory"], OnThisPCTab),
+        new("Catch-up", ["catch up", "live summary", "recording", "meeting so far"], OnThisPCTab),
+        new("Catch-up provider", ["catch up", "live summary", "cloud", "CLI", "local server"], OnThisPCTab),
+        new("Catch-up model", ["catch up", "live summary", "LLM"], OnThisPCTab),
+        new("Re-summarize from the start each time", ["catch up", "incremental", "whole recording", "from start"], OnThisPCTab),
         new("Local hosts", ["scan", "custom URL", "server", .. PresetNames(ProviderKind.Local)], OnThisPCTab),
         new("Cloud APIs",
             ["API key", "provider", "LLM", .. PresetNames(ProviderKind.OpenAICompatible), .. PresetNames(ProviderKind.Anthropic)],
@@ -92,6 +96,11 @@ public sealed partial class ProvidersSettingsPage : UserControl
     private List<string> _modelKeys = [];
     private List<string> _languageCodes = [];
     private List<int> _chatContextValues = [];
+
+    /// <summary>The catch-up pickers' values as listed ("" = Automatic) and their titles, rebuilt only when these change.</summary>
+    private List<string> _catchUpProviderIds = [];
+    private List<string> _catchUpProviderTitles = [];
+    private List<string> _catchUpModels = [];
     private string _foundHostsKey = "";
     private bool _scanned;
 
@@ -117,6 +126,24 @@ public sealed partial class ProvidersSettingsPage : UserControl
             if (_syncing || index < 0 || index >= _chatContextValues.Count
                 || _chatContextValues[index] == _providers.ChatContextMessages) return;
             _providers.ChatContextMessages = _chatContextValues[index];
+        };
+        CatchUpProviderCombo.SelectionChanged += (_, _) =>
+        {
+            var index = CatchUpProviderCombo.SelectedIndex;
+            if (_syncing || index < 0 || index >= _catchUpProviderIds.Count
+                || _catchUpProviderIds[index] == ShownCatchUpProviderId(CatchUpProviders())) return;
+            _providers.SetCatchUpProvider(_catchUpProviderIds[index]);
+        };
+        CatchUpModelCombo.SelectionChanged += (_, _) =>
+        {
+            var index = CatchUpModelCombo.SelectedIndex;
+            if (_syncing || index < 0 || index >= _catchUpModels.Count || _catchUpModels[index] == _providers.CatchUpModel) return;
+            _providers.CatchUpModel = _catchUpModels[index];
+        };
+        CatchUpFromStartToggle.Toggled += (_, _) =>
+        {
+            if (_syncing || CatchUpFromStartToggle.IsOn == _providers.CatchUpFromStart) return;
+            _providers.CatchUpFromStart = CatchUpFromStartToggle.IsOn;
         };
         ScanButton.Click += (_, _) => _ = _providers.ScanAsync();
         CustomUrlBox.TextChanged += (_, _) => AddCustomButton.IsEnabled = ProviderInput.HostAndPort(CustomUrlBox.Text) is not null;
@@ -224,6 +251,7 @@ public sealed partial class ProvidersSettingsPage : UserControl
             RefreshModelChoices();
             RefreshLanguages();
             RefreshChatContext();
+            RefreshCatchUp();
             UpdateFoundHosts();
             RefreshRows();
         }
@@ -453,6 +481,80 @@ public sealed partial class ProvidersSettingsPage : UserControl
         }
         ChatContextCombo.SelectedIndex = _chatContextValues.IndexOf(current);
     }
+
+    /// <summary>
+    /// The Catch-up group (macOS <c>catchUpSection</c>): the provider a catch-up runs on, among the usable ones outside
+    /// the app ("Automatic" names what it runs, as <see cref="AppViewModel.CatchUpProvider"/> resolves it); the model of a
+    /// picked one; the notes of the provider it runs on; why none can; from the start or not.
+    /// </summary>
+    private void RefreshCatchUp()
+    {
+        var external = CatchUpProviders();
+        List<string> ids = [""];
+        List<string> titles = [AutomaticCatchUpProvider(external) is { } automatic
+            ? WithLeavesPC(Loc.Format("Automatic (%@)", automatic.Name), automatic)
+            : Loc.T("Automatic")];
+        foreach (var provider in external)
+        {
+            ids.Add(provider.Id);
+            titles.Add(WithLeavesPC(provider.Name, provider));
+        }
+        // Rebuilt only when the choices change: rebuilding closes an open list.
+        if (!titles.SequenceEqual(_catchUpProviderTitles) || !ids.SequenceEqual(_catchUpProviderIds))
+        {
+            _catchUpProviderIds = ids;
+            _catchUpProviderTitles = titles;
+            CatchUpProviderCombo.Items.Clear();
+            foreach (var title in titles) CatchUpProviderCombo.Items.Add(title);
+        }
+        CatchUpProviderCombo.IsEnabled = external.Count > 0;
+        var pickedId = ShownCatchUpProviderId(external);
+        CatchUpProviderCombo.SelectedIndex = _catchUpProviderIds.IndexOf(pickedId);
+
+        var picked = external.FirstOrDefault(p => p.Id == pickedId);
+        CatchUpModelCard.Visibility = Show(picked is not null);
+        if (picked is not null)
+        {
+            // Its models without a CLI's own default ("Automatic" covers it), then the saved pick when no longer listed.
+            var saved = _providers.CatchUpModel;
+            List<string> models = ["", .. picked.Models.Where(m => m.Length > 0)];
+            if (!models.Contains(saved)) models.Add(saved);
+            if (!models.SequenceEqual(_catchUpModels))
+            {
+                _catchUpModels = models;
+                CatchUpModelCombo.Items.Clear();
+                foreach (var model in models) CatchUpModelCombo.Items.Add(model.Length == 0 ? Loc.T("Automatic") : model);
+            }
+            CatchUpModelCombo.SelectedIndex = _catchUpModels.IndexOf(saved);
+        }
+
+        var runsOn = _model.CatchUpProvider;
+        CatchUpLeavesText.Text = runsOn?.LeavesPCNote ?? "";
+        CatchUpLeavesRow.Visibility = Show(runsOn?.LeavesPCNote is not null);
+        CatchUpContainmentText.Text = runsOn?.ContainmentNote ?? "";
+        CatchUpContainmentRow.Visibility = Show(runsOn?.ContainmentNote is not null);
+        CatchUpNoProviderText.Visibility = Show(external.Count == 0);
+        CatchUpFromStartToggle.IsOn = _providers.CatchUpFromStart;
+    }
+
+    /// <summary>The usable providers outside the app, as <see cref="AppViewModel.CatchUpProvider"/> filters them.</summary>
+    private List<AIProviderInfo> CatchUpProviders() =>
+        [.. _providers.AIProviders.Where(p => p.Kind != AIProviderKind.InApp && p.UnavailableReason is null)];
+
+    /// <summary>What "Automatic" runs, as <see cref="AppViewModel.CatchUpProvider"/> resolves it with no provider picked.</summary>
+    private AIProviderInfo? AutomaticCatchUpProvider(List<AIProviderInfo> external) =>
+        _providers.CurrentAIProvider is { Kind: not AIProviderKind.InApp } main ? main : external.FirstOrDefault();
+
+    /// <summary>The picked provider, "" (Automatic) when it is not usable now, as a catch-up then runs on Automatic's.</summary>
+    private string ShownCatchUpProviderId(List<AIProviderInfo> external)
+    {
+        var id = _model.Settings.CatchUpProviderID;
+        return external.Any(p => p.Id == id) ? id : "";
+    }
+
+    /// <summary>The model menu's "(leaves this PC)" after <paramref name="title"/> when <paramref name="provider"/>'s data does.</summary>
+    private static string WithLeavesPC(string title, AIProviderInfo provider) =>
+        provider.LeavesPC ? Loc.Format("%@ (leaves this PC)", title) : title;
 
     /// <summary>The scan's state in the Local hosts header: its ring, "None found", Scan off while it runs.</summary>
     private void UpdateScan()

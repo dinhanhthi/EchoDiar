@@ -7,8 +7,9 @@ namespace EchoDiar.App.ViewModels;
 
 /// <summary>
 /// The Summary and Chat tabs of one conversation (macOS AIPanelView.swift state): its transcript, kept summaries (the
-/// version shown), open chat with its title and archived chats, read off the UI thread when the conversation gets a
-/// transcript, when this conversation's AI job ends and when the chat history changes; the job of this conversation
+/// version shown), open chat with its title and archived chats, and the catch-ups written while it was recorded, read
+/// off the UI thread when the conversation gets a transcript, when this conversation's AI job ends, when the chat history
+/// changes and (the catch-ups) when the recording's saved catch-ups change; the job of this conversation
 /// (other conversations' jobs run beside it); and the actions, which go through <see cref="AppViewModel"/>. A job that
 /// just ended stays shown until the files it wrote are read, so the answer does not flash back to the earlier state. Its
 /// streamed text is not raised here: the view follows <see cref="AppViewModel.AIJobTextChanged"/>. On the UI thread.
@@ -21,6 +22,7 @@ public sealed class AIPanelViewModel
     private (bool Listed, int Changes)? _chatLoadedFor;
     private int _loadGeneration;
     private int _chatGeneration;
+    private int _catchUpGeneration;
     private bool _attached;
 
     /// <summary>This conversation's job as last seen, and the one that just ended until its files are read.</summary>
@@ -53,6 +55,9 @@ public sealed class AIPanelViewModel
 
     /// <summary>The earlier chats, newest first.</summary>
     public IReadOnlyList<ChatArchive.Entry> Archives { get; private set; } = [];
+
+    /// <summary>The catch-ups written while it was recorded (its <c>catchups.json</c>), oldest first; none when unreadable.</summary>
+    public IReadOnlyList<CatchUp> CatchUps { get; private set; } = [];
 
     /// <summary>
     /// The first <see cref="LoadAsync"/> has returned (or there is nothing to read); until then the page shows its
@@ -160,6 +165,7 @@ public sealed class AIPanelViewModel
         Providers.Changed -= OnProvidersChanged;
         _loadGeneration++;
         _chatGeneration++;
+        _catchUpGeneration++;
         _loadedFor = null;
         _chatLoadedFor = null;
     }
@@ -187,6 +193,10 @@ public sealed class AIPanelViewModel
             case nameof(AppViewModel.AIJobEnds):
             case nameof(AppViewModel.ChatHistoryChanges):
                 Refresh();
+                break;
+            case nameof(AppViewModel.RecordingCatchUps):
+                // A catch-up still writing at Stop shows once saved (macOS CatchUpKey).
+                _ = LoadCatchUpsAsync();
                 break;
             case nameof(AppViewModel.AIError):
             case nameof(AppViewModel.ChatChanging):
@@ -216,10 +226,14 @@ public sealed class AIPanelViewModel
         Changed?.Invoke();
     }
 
-    /// <summary>The transcript, the summaries and the chat, off the UI thread (macOS <c>load</c>); shows the newest summary.</summary>
+    /// <summary>
+    /// The transcript, the summaries, the chat and the catch-ups, off the UI thread (macOS <c>load</c>); shows the newest
+    /// summary. The catch-ups too, so the Summary tab shows them with the summary, not a moment after it.
+    /// </summary>
     private async Task LoadAsync()
     {
         var generation = ++_loadGeneration;
+        var catchUpGeneration = ++_catchUpGeneration;
         if (Conversation is not { } conversation)
         {
             // Not listed (deleted, or not yet listed at launch): nothing to read, the tab shows why.
@@ -227,7 +241,7 @@ public sealed class AIPanelViewModel
             return;
         }
         var folder = conversation.Folder;
-        var (transcript, versions, chat) = await Task.Run(() =>
+        var (transcript, versions, chat, catchUps) = await Task.Run(() =>
         {
             Transcript? read = null;
             try
@@ -238,16 +252,44 @@ public sealed class AIPanelViewModel
             {
                 Debug.WriteLine($"EchoDiar: could not read the transcript of {folder}: {e.GetType().Name}");
             }
-            return (read, Conversation.ReadSummaryVersions(folder), ChatLog.Read(folder));
+            return (read, Conversation.ReadSummaryVersions(folder), ChatLog.Read(folder), ReadCatchUps(folder));
         });
         if (generation != _loadGeneration || !_attached || _model.IsClosing) return;
         Transcript = transcript;
         Summaries = versions;
         Chat = chat.Messages;
+        // Unless a newer read of the catch-ups alone returned first.
+        if (catchUpGeneration == _catchUpGeneration) CatchUps = catchUps;
         ShownVersion = null;
         _endedJob = null;
         HasLoaded = true;
         Changed?.Invoke();
+    }
+
+    /// <summary>The catch-ups again, off the UI thread (macOS <c>loadCatchUps</c>).</summary>
+    private async Task LoadCatchUpsAsync()
+    {
+        var generation = ++_catchUpGeneration;
+        if (Conversation is not { } conversation) return;
+        var folder = conversation.Folder;
+        var catchUps = await Task.Run(() => ReadCatchUps(folder));
+        if (generation != _catchUpGeneration || !_attached || _model.IsClosing) return;
+        CatchUps = catchUps;
+        Changed?.Invoke();
+    }
+
+    /// <summary>The catch-ups of <paramref name="folder"/>; none when its <c>catchups.json</c> is missing or unreadable.</summary>
+    private static IReadOnlyList<CatchUp> ReadCatchUps(string folder)
+    {
+        try
+        {
+            return CatchUpLog.Load(folder).CatchUps;
+        }
+        catch (Exception e)
+        {
+            Debug.WriteLine($"EchoDiar: could not read the catch-ups of {folder}: {e.GetType().Name}");
+            return [];
+        }
     }
 
     /// <summary>The open chat with its title and the earlier chats, off the UI thread (macOS <c>loadChat</c>).</summary>

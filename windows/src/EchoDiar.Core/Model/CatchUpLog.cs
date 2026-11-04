@@ -11,6 +11,9 @@ namespace EchoDiar.Core.Model;
 /// </summary>
 public sealed record CatchUp
 {
+    /// <summary>The longest <see cref="Elapsed"/> and <see cref="ThroughTime"/> read from a file: 7 days.</summary>
+    public const double MaxSeconds = 7 * 24 * 3600;
+
     [JsonPropertyName("id")] public Guid Id { get; set; } = Guid.NewGuid();
     [JsonPropertyName("createdAt"), JsonConverter(typeof(Iso8601SecondsConverter))]
     public DateTimeOffset CreatedAt { get; set; } = DateTimeOffset.UnixEpoch;
@@ -33,7 +36,8 @@ public sealed record CatchUp
 
 /// <summary>
 /// The <c>catchups.json</c> file format, version 1: a recording's catch-ups, oldest first. Dates are ISO 8601 (whole
-/// seconds). Every key is optional when read, and an entry that does not decode is skipped.
+/// seconds). Every key is optional when read, an entry that does not decode is skipped, and one whose id repeats an
+/// earlier entry's is dropped (the first is kept), so ids are unique.
 /// </summary>
 public sealed record CatchUpLog
 {
@@ -63,7 +67,9 @@ public sealed record CatchUpLog
 
     /// <summary>
     /// Swift's lossy <c>catchUps</c> decode: an entry that does not decode is skipped, so one bad entry does not lose the
-    /// others; a value that is not an array still throws.
+    /// others; a value that is not an array still throws. The file is untrusted: an entry whose id repeats an earlier
+    /// one's is dropped, the times are finite within [0, <see cref="CatchUp.MaxSeconds"/>] (a huge one throws in
+    /// <see cref="TimeSpan"/>) and a line id is from -1, as Swift's <c>CatchUp.init(from:)</c>.
     /// </summary>
     internal sealed class LossyCatchUpsConverter : JsonConverter<List<CatchUp>>
     {
@@ -72,11 +78,16 @@ public sealed record CatchUpLog
             using var document = JsonDocument.ParseValue(ref reader);
             if (document.RootElement.ValueKind != JsonValueKind.Array) throw new JsonException("Expected an array of catch-ups.");
             var catchUps = new List<CatchUp>();
+            var seen = new HashSet<Guid>();
             foreach (var element in document.RootElement.EnumerateArray())
             {
                 try
                 {
-                    if (element.Deserialize<CatchUp>(options) is { } catchUp) catchUps.Add(catchUp);
+                    if (element.Deserialize<CatchUp>(options) is not { } catchUp || !seen.Add(catchUp.Id)) continue;
+                    catchUp.Elapsed = Seconds(catchUp.Elapsed);
+                    catchUp.ThroughTime = Seconds(catchUp.ThroughTime);
+                    catchUp.ThroughLineID = Math.Max(catchUp.ThroughLineID, -1);
+                    catchUps.Add(catchUp);
                 }
                 catch (JsonException)
                 {
@@ -88,6 +99,10 @@ public sealed record CatchUpLog
 
         public override void Write(Utf8JsonWriter writer, List<CatchUp> value, JsonSerializerOptions options) =>
             JsonSerializer.Serialize(writer, value, options);
+
+        /// <summary><paramref name="value"/> within [0, <see cref="CatchUp.MaxSeconds"/>]; 0 when it is not finite.</summary>
+        private static double Seconds(double value) =>
+            double.IsFinite(value) ? Math.Clamp(value, 0, CatchUp.MaxSeconds) : 0;
     }
 }
 

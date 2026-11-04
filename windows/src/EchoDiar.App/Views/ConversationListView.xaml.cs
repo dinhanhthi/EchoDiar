@@ -439,10 +439,12 @@ public sealed partial class ConversationListView : UserControl
 /// <summary>Texts shared by the library list and the conversation page.</summary>
 internal static class ConversationText
 {
-    /// <summary>"m:ss", or "h:mm:ss" from one hour.</summary>
+    /// <summary>"m:ss", or "h:mm:ss" from one hour; 0 when not finite, at most 7 days.</summary>
     public static string Clock(double seconds)
     {
-        var time = TimeSpan.FromSeconds(Math.Max(0, Math.Floor(seconds)));
+        // A huge value (e.g. from an edited file) would throw in TimeSpan; Math.Max lets NaN through.
+        var safe = double.IsFinite(seconds) ? Math.Clamp(Math.Floor(seconds), 0, CatchUp.MaxSeconds) : 0;
+        var time = TimeSpan.FromSeconds(safe);
         return time.ToString(time.TotalHours >= 1 ? @"h\:mm\:ss" : @"m\:ss", CultureInfo.InvariantCulture);
     }
 

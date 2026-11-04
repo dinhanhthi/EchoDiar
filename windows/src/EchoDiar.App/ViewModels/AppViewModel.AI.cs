@@ -414,8 +414,9 @@ public sealed partial class AppViewModel
         {
             AIJobs.EntryFor(key)?.Payload.FlushTimer?.Stop();
         }
+        CatchUpRun?.FlushTimer?.Stop();
         _aiLifetime.Cancel();
-        if (!AIJobs.IsEmpty) _services.AI.Stop();
+        if (!AIJobs.IsEmpty || _runningCatchUps > 0) _services.AI.Stop();
     }
 
     // Chat history

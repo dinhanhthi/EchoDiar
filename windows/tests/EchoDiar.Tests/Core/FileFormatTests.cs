@@ -189,6 +189,24 @@ public sealed class FileFormatTests : IDisposable
         Assert.ThrowsAny<JsonException>(() => CatchUpLog.Load(_dir));
     }
 
+    // catchups.json is untrusted: a repeated id keeps its first entry (the cards are keyed by id), and the times are
+    // finite within 7 days (TimeSpan throws on a huge one), so every reader is safe (CatchUpLogTests.swift).
+    [Fact]
+    public void CatchUpDecodeDropsRepeatedIdsAndClampsTimes()
+    {
+        var catchUps = CatchUpLog.Decode("""
+            {"catchUps": [
+              {"id": "5B0E3C1A-7D2F-4E8B-9A61-2C4D6E8F0A1B", "elapsed": 1e300, "throughTime": 1e300, "throughLineID": -7, "text": "first"},
+              {"id": "5B0E3C1A-7D2F-4E8B-9A61-2C4D6E8F0A1B", "elapsed": 2, "text": "again"},
+              {"elapsed": -5, "throughTime": -1, "throughLineID": 3}
+            ]}
+            """u8).CatchUps;
+        Assert.Equal(["first", ""], catchUps.Select(c => c.Text));
+        Assert.Equal([7 * 24 * 3600.0, 0], catchUps.Select(c => c.Elapsed));
+        Assert.Equal([7 * 24 * 3600.0, 0], catchUps.Select(c => c.ThroughTime));
+        Assert.Equal([-1, 3], catchUps.Select(c => c.ThroughLineID));
+    }
+
     [Fact]
     public void ResumeRestoresTheArchivedChatAndArchivesTheOpenOne()
     {

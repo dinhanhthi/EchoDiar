@@ -3,8 +3,8 @@
     Settings › AI (macOS ProvidersSettingsView.swift), one panel per inner tab picked in the title bar:
     - On this PC: the AI models for summaries and chat (Windows AI's state, hidden when this PC can never run it; the
       GGUF models with Download, progress and Cancel, Installed and Delete; the default model and the language of
-      summaries and answers), the chat context, and the local hosts (a scan finds them, Foundry Local included; a host
-      is added, or typed by URL).
+      summaries and answers), the chat context, the catch-up (its provider outside the app, its model, from the start
+      or not), and the local hosts (a scan finds them, Foundry Local included; a host is added, or typed by URL).
     - Cloud APIs: the API presets, then the custom OpenAI-compatible endpoints and Add Endpoint.
     - CLIs: the subscription CLIs found on this PC.
     The provider rows are made in code (ProvidersSettingsPage.*Row): an expander with the Enabled switch, and its fields
@@ -146,6 +146,85 @@
                         MinWidth="160"
                         AutomationProperties.Name="{local:T Text='Chat context'}" />
                 </controls:SettingsCard>
+
+                <!-- Catch-up (macOS catchUpSection): where "Catch up" runs while recording; pickers filled in code. -->
+                <StackPanel Style="{StaticResource SectionHeaderStyle}" Tag="Catch-up">
+                    <TextBlock Style="{StaticResource BodyStrongTextBlockStyle}" Text="{local:T Text='Catch-up'}" />
+                    <TextBlock Style="{StaticResource SectionDescriptionStyle}" Text="{local:T Text='Quick summaries of the meeting so far, asked for while recording.'}" />
+                </StackPanel>
+                <controls:SettingsCard Header="{local:T Text='Catch-up provider'}" Tag="Catch-up provider">
+                    <ComboBox
+                        x:Name="CatchUpProviderCombo"
+                        MinWidth="260"
+                        MaxWidth="420"
+                        AutomationProperties.Name="{local:T Text='Catch-up provider'}" />
+                </controls:SettingsCard>
+                <!-- Only when a provider is picked. -->
+                <controls:SettingsCard
+                    x:Name="CatchUpModelCard"
+                    Header="{local:T Text='Catch-up model'}"
+                    Tag="Catch-up model"
+                    Visibility="Collapsed">
+                    <ComboBox
+                        x:Name="CatchUpModelCombo"
+                        MinWidth="260"
+                        MaxWidth="420"
+                        AutomationProperties.Name="{local:T Text='Catch-up model'}" />
+                </controls:SettingsCard>
+                <!-- As the AI pane's data notes, for the provider a catch-up runs on. -->
+                <Grid
+                    x:Name="CatchUpLeavesRow"
+                    Margin="1,4,0,0"
+                    ColumnSpacing="8"
+                    Visibility="Collapsed">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="*" />
+                    </Grid.ColumnDefinitions>
+                    <FontIcon Glyph="&#xE946;" Style="{StaticResource NoticeIconStyle}" />
+                    <TextBlock
+                        x:Name="CatchUpLeavesText"
+                        Grid.Column="1"
+                        Style="{StaticResource NoteStyle}" />
+                </Grid>
+                <Grid
+                    x:Name="CatchUpContainmentRow"
+                    Margin="1,4,0,0"
+                    ColumnSpacing="8"
+                    Visibility="Collapsed">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="*" />
+                    </Grid.ColumnDefinitions>
+                    <FontIcon Glyph="&#xEA18;" Style="{StaticResource NoticeIconStyle}" />
+                    <TextBlock
+                        x:Name="CatchUpContainmentText"
+                        Grid.Column="1"
+                        Style="{StaticResource NoteStyle}" />
+                </Grid>
+                <TextBlock
+                    x:Name="CatchUpNoProviderText"
+                    Margin="1,4,0,0"
+                    Style="{StaticResource NoteStyle}"
+                    Text="{local:T Text='Catch up needs an AI provider outside the app: a cloud API, a local server or a command-line tool. Add one in Settings › AI.'}"
+                    Visibility="Collapsed" />
+                <controls:SettingsCard
+                    Description="{local:T Text='Off: each catch-up adds what was said since the previous one. On: each one reads the whole recording again.'}"
+                    Header="{local:T Text='Re-summarize from the start each time'}"
+                    Tag="Re-summarize from the start each time">
+                    <ToggleSwitch x:Name="CatchUpFromStartToggle" AutomationProperties.Name="{local:T Text='Re-summarize from the start each time'}" />
+                </controls:SettingsCard>
+                <Grid Margin="1,4,0,0" ColumnSpacing="8">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="*" />
+                    </Grid.ColumnDefinitions>
+                    <FontIcon Glyph="&#xE946;" Style="{StaticResource NoticeIconStyle}" />
+                    <TextBlock
+                        Grid.Column="1"
+                        Style="{StaticResource NoteStyle}"
+                        Text="{local:T Text='In-app models are not offered: the live transcript holds the model during a recording.'}" />
+                </Grid>
 
                 <!-- Scan sits on the header's line, at its trailing edge (macOS). -->
                 <Grid

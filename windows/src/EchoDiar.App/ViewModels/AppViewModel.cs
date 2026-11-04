@@ -640,6 +640,8 @@ public sealed partial class AppViewModel : ObservableObject
         // Before the page shows, so the recording page and card show it from their first frame.
         var eventTitle = TrimmedTitle(calendarEvent?.Title);
         RecordingTitle = eventTitle;
+        // A catch-up still writing for the previous recording finishes and saves in its folder, out of sight.
+        ResetCatchUps();
         if (bringForward)
         {
             ShowRecording();
