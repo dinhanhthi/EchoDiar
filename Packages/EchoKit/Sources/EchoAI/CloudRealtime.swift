@@ -270,6 +270,8 @@ public struct RealtimeResampler: Sendable {
 /// session (it runs the init call when the adapter has one: a new, billed session each time), then `connect`.
 /// No reconnects here. Cancelling the task that awaits `send` or `receive` closes the socket.
 public final class RealtimeConnection: Sendable {
+    /// The socket's request timeout: how long it may receive nothing before URLSession fails it.
+    static let idleTimeout: TimeInterval = 300
     private let task: URLSessionWebSocketTask
 
     private init(task: URLSessionWebSocketTask) {
@@ -292,7 +294,9 @@ public final class RealtimeConnection: Sendable {
         guard CloudRealtime.allowsSocket(url, for: adapter) else {
             throw LLMError.provider("Unexpected realtime host.")
         }
-        var request = URLRequest(url: url)
+        // A WebSocket task fails once nothing was received for its request timeout (60 s by default), which would cut
+        // a quiet socket (no audio during a drain, a provider that only answers commits); the runner also pings.
+        var request = URLRequest(url: url, timeoutInterval: idleTimeout)
         for (name, value) in adapter.headers { request.setValue(value, forHTTPHeaderField: name) }
         let connection = RealtimeConnection(task: (session ?? ProviderHTTP.session).webSocketTask(with: request))
         connection.task.resume()
@@ -321,6 +325,12 @@ public final class RealtimeConnection: Sendable {
         case .data(let data): return .data(data)
         @unknown default: return .data(Data())
         }
+    }
+
+    /// A WebSocket ping, not awaited (a pong that never comes must not hold the audio back); a failed ping shows up
+    /// as a failed `send` or `receive`. Keeps idle sockets open (Speechmatics closes after 3 min without audio or ping).
+    public func ping() {
+        task.sendPing { _ in }
     }
 
     /// The close code the server sent (`.invalid` while open).

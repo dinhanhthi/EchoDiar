@@ -104,6 +104,21 @@ struct SettingsSearchItem: Identifiable {
               tab: .transcription, subTab: "transcriptionModels"),
         .init(title: "Cloud transcription engines", keywords: ["upload", "API", "default engine", "xAI"]
               + speechToTextNames, tab: .transcription, subTab: "transcriptionModels"),
+        .init(title: "While recording",
+              keywords: ["live transcript", "cloud live", "realtime", "real-time", "streaming", "captions"]
+              + realtimeNames, tab: .transcription, subTab: "transcriptionModels"),
+        .init(title: "Live with a local model",
+              keywords: ["live transcript", "cloud live", "while recording", "WhisperKit", "Parakeet", "live model"],
+              tab: .transcription, subTab: "transcriptionModels"),
+        .init(title: "Live with \("…") realtime",
+              keywords: ["live transcript", "cloud live", "realtime", "real-time", "streaming", "while recording",
+                         "WebSocket"] + realtimeNames,
+              tab: .transcription, subTab: "transcriptionModels"),
+        .init(title: "Realtime model", keywords: ["realtime", "streaming", "live model", "while recording"]
+              + realtimeNames, tab: .transcription, subTab: "transcriptionModels"),
+        .init(title: "Use the realtime result as the transcript",
+              keywords: ["use as final", "realtime", "streaming", "live transcript", "gap fill", "no upload"]
+              + realtimeNames, tab: .transcription, subTab: "transcriptionModels"),
         .init(title: "Diarization models", keywords: ["speaker model", "speakers", "pyannote", "Nemotron", "download"],
               tab: .transcription, subTab: "diarizationModels"),
         .init(title: "Cloud diarization",
@@ -193,6 +208,10 @@ struct SettingsSearchItem: Identifiable {
     }
 
     private static var speechToTextNames: [String] { presetNames(.speechToText) }
+
+    /// The cloud engines with a realtime stream ("Live with <Provider> realtime").
+    private static let realtimeNames = ["ElevenLabs", "Deepgram", "AssemblyAI", "OpenAI", "xAI", "Speechmatics",
+                                        "Soniox", "Gladia"]
 }
 
 /// The settings matching the search, as surface rows on the window background; a click opens the row's section and

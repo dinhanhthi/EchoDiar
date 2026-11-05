@@ -35,6 +35,12 @@ import Synchronization
 ///
 /// `displayOnly` makes the chunk path display only too (a local live transcript while a cloud engine writes the
 /// transcript after Stop): `finish()` then cancels and returns nil at once, as for Apple Speech.
+///
+/// Cloud realtime (`init(realtime:engineID:displayOnly:language:)`) streams both channels to the default cloud
+/// provider through a `RealtimeLiveStream`: its partials become the speaker's tentative text and its finals lines, as
+/// for Apple Speech. `.loading` until a channel's socket is live; `Snapshot.reconnecting` and
+/// `Snapshot.realtimeFailure` tell the rest. Display only, `finish()` cancels the stream at once and returns nil;
+/// else it drains the stream (at most ~5 s) and returns its finals and gaps as a prior (`cloud:<provider id>`).
 public actor RecordingTranscriber {
     public enum State: Sendable, Equatable {
         /// `preparing`: Apple Speech is installing a language; its audio waits.
@@ -48,6 +54,8 @@ public actor RecordingTranscriber {
         case chunks
         /// Apple Speech streaming each channel (macOS 26+).
         case appleSpeech
+        /// The default cloud provider's realtime WebSocket, one per channel.
+        case cloudRealtime
     }
 
     public enum Speaker: String, Sendable {
@@ -83,12 +91,20 @@ public actor RecordingTranscriber {
         public var deferred: Bool
         public var source: Source
         /// `finish()` returns nil: the live text is not kept, a batch job writes the transcript after Stop (Apple
-        /// Speech always, the chunk path with `displayOnly`).
+        /// Speech always, the chunk path and cloud realtime with `displayOnly`).
         public var displayOnly: Bool
+        /// Cloud realtime: a channel whose socket was live is connecting again (a drop, a rotation, a resume).
+        public var reconnecting: Bool
+        /// Cloud realtime: the first channel that stopped for this recording, as a short kind ("auth", "payment",
+        /// "plan_limit", "config", "http_<code>", ...; never a message), cleared once a channel is live and
+        /// none is failed (a "config" failure recovers at a language change); the state turns `.failed` once both did,
+        /// and back to running once a channel is live again.
+        public var realtimeFailure: String?
 
         public init(
             state: State, lines: [Line] = [], tentative: [Tentative] = [], pendingSeconds: Double = 0,
-            deferred: Bool = false, source: Source = .chunks, displayOnly: Bool = false
+            deferred: Bool = false, source: Source = .chunks, displayOnly: Bool = false, reconnecting: Bool = false,
+            realtimeFailure: String? = nil
         ) {
             self.state = state
             self.lines = lines
@@ -97,6 +113,8 @@ public actor RecordingTranscriber {
             self.deferred = deferred
             self.source = source
             self.displayOnly = displayOnly
+            self.reconnecting = reconnecting
+            self.realtimeFailure = realtimeFailure
         }
     }
 
@@ -144,16 +162,24 @@ public actor RecordingTranscriber {
     /// At most one pending wake-up: a chunk is waiting, the recording resumed, or the tick is due.
     private nonisolated let wake: AsyncStream<Void>
     private nonisolated let wakeContinuation: AsyncStream<Void>.Continuation
-    private nonisolated let entry: ModelEntry
-    private nonisolated let folder: URL
-    private nonisolated let gate: ModelLoadGate
+    /// nil for cloud realtime, as are `folder` and `gate`.
+    private nonisolated let entry: ModelEntry?
+    private nonisolated let folder: URL?
+    private nonisolated let gate: ModelLoadGate?
+    /// The prior's engine: the entry's catalog id, or `cloud:<provider id>` for cloud realtime.
+    private nonisolated let engineID: String
     private nonisolated let idleRelease: Duration?
     private nonisolated let deferWhenConstrained: Bool
     private nonisolated let language: @Sendable () -> String?
-    /// The Apple Speech streams; nil for WhisperKit and Parakeet.
+    /// The Apple Speech streams; nil for WhisperKit, Parakeet and cloud realtime.
     private nonisolated let live: Live?
+    /// The cloud realtime stream; nil otherwise.
+    private nonisolated let realtime: Realtime?
     /// `finish()` returns nil without draining: the `displayOnly` parameter, or Apple Speech.
     private nonisolated let displayOnly: Bool
+    /// Cloud realtime: each channel's last state (index = `RecordingSession.Channel`), and the channels that were live.
+    private var realtimeStates: [RealtimeLiveStream.State?] = [nil, nil]
+    private var realtimeConnected: Set<Int> = []
     private var snapshot: Snapshot
     private var published: Snapshot?
     private var nextLineID = 0
@@ -177,6 +203,7 @@ public actor RecordingTranscriber {
         self.entry = entry
         self.folder = folder
         self.gate = gate
+        engineID = entry.id
         self.idleRelease = idleRelease
         self.deferWhenConstrained = deferWhenConstrained
         self.language = language
@@ -190,10 +217,35 @@ public actor RecordingTranscriber {
                             displayOnly: displayOnly || appleSpeech)
         self.displayOnly = displayOnly || appleSpeech
         live = appleSpeech ? Live() : nil
+        realtime = nil
+    }
+
+    /// Cloud realtime: `stream` (`RealtimeLiveStream.make`) takes both channels' blocks; `engineID` is the prior's
+    /// (`CloudTranscription.engineID(providerID:)` of the stream's provider). `displayOnly` (the realtime result is
+    /// not the transcript) cancels the stream at Stop and returns nil; else `finish()` drains it and returns the
+    /// prior. `language` as for the other init, read per block. No model gate, no idle release, no constrained deferral.
+    public init(
+        realtime stream: RealtimeLiveStream, engineID: String, displayOnly: Bool,
+        language: @escaping @Sendable () -> String?
+    ) {
+        entry = nil
+        folder = nil
+        gate = nil
+        self.engineID = engineID
+        idleRelease = nil
+        deferWhenConstrained = false
+        self.language = language
+        buffer = Mutex(Buffer(maxChunkSeconds: Self.liveMaxChunkSeconds))
+        (updates, updatesContinuation) = AsyncStream.makeStream(bufferingPolicy: .bufferingNewest(1))
+        (wake, wakeContinuation) = AsyncStream.makeStream(bufferingPolicy: .bufferingNewest(1))
+        snapshot = Snapshot(state: .loading, source: .cloudRealtime, displayOnly: displayOnly)
+        self.displayOnly = displayOnly
+        live = nil
+        realtime = Realtime(stream: stream)
     }
 
     /// Waits for the model gate, loads the model at `.utility` QoS and starts decoding (Apple Speech: no gate, starts
-    /// the channel runners).
+    /// the channel runners; cloud realtime: starts the stream).
     public func start() {
         guard decoder == nil, !finished else { return }
         publish(.loading)
@@ -207,6 +259,10 @@ public actor RecordingTranscriber {
         let mic = Self.channel(RecordingSession.Channel.mic, of: samples, frames: frames, channels: channels)
         let system = Self.channel(RecordingSession.Channel.system, of: samples, frames: frames, channels: channels)
         let language = Self.chunkLanguage(language())
+        if let realtime {
+            stream(realtime, mic: mic, system: system, language: language)
+            return
+        }
         if let live {
             stream(live, mic: mic, system: system, language: language)
             return
@@ -231,10 +287,18 @@ public actor RecordingTranscriber {
         }
     }
 
-    /// On pause: closes the open chunk of each channel so it is decoded now.
+    /// Cloud realtime: hands the block, at its file position, to the stream, which never blocks nor queues here.
+    private nonisolated func stream(_ realtime: Realtime, mic: [Float], system: [Float], language: String?) {
+        guard let (startSample, resumed) = buffer.withLock({ $0.appendRealtime(mic.count) }) else { return }
+        realtime.stream.append(mic: mic, system: system, startSample: startSample, language: language)
+        if resumed { realtime.resultsContinuation.yield(.resumed) }
+    }
+
+    /// On pause: closes the open chunk of each channel so it is decoded now (cloud realtime: closes the sockets).
     public func flush() {
         buffer.withLock { $0.flush(paused: true) }
         wakeContinuation.yield()
+        realtime?.stream.pause()
         // Apple Speech: each runner ends its analysis (its finals come) and starts a new one at the next block; its
         // chunkers stay empty.
         live?.feeds.forEach { $0.yield(.finalize) }
@@ -244,10 +308,12 @@ public actor RecordingTranscriber {
     /// At Stop: decodes what is left (unless the Mac is constrained and `deferWhenConstrained`: then it stays a gap),
     /// unloads the model and returns what was transcribed; nil when no chunk was, or the model never loaded (the
     /// pipeline then transcribes the whole recording). Display only (Apple Speech or `displayOnly`): see `finishLive`.
+    /// Cloud realtime: see `finishRealtime`.
     public func finish() async -> PriorTranscription? {
         guard !finished else { return nil }
         finished = true
         if displayOnly { return finishLive() }
+        if let realtime { return await finishRealtime(realtime) }
         guard buffer.withLock({ $0.loaded }) else {
             cancel()
             return nil
@@ -271,14 +337,36 @@ public actor RecordingTranscriber {
         guard result.contains(where: { $0.chunks.contains { $0.outcome == .transcribed } }) else { return nil }
         let mic = result[RecordingSession.Channel.mic], system = result[RecordingSession.Channel.system]
         return PriorTranscription(
-            engineID: entry.id, mic: mic.segments.sorted { $0.start < $1.start },
+            engineID: engineID, mic: mic.segments.sorted { $0.start < $1.start },
             system: system.segments.sorted { $0.start < $1.start },
             micGaps: PriorTranscription.gaps(mic.chunks), systemGaps: PriorTranscription.gaps(system.chunks),
             duration: duration)
     }
 
-    /// Display only at Stop: always nil (a batch job writes the transcript). Cancels the runners or the decode task
-    /// without waiting for them, so it returns at once even with a `finalize(through:)` or a chunk decode in flight.
+    /// Cloud realtime as the transcript: drains the stream (at most its ~5 s drain) and returns its finals, its gaps
+    /// per channel and its model as the prior, also when no socket ever connected (the whole recording is then a gap);
+    /// nil when `cancel()` ran meanwhile.
+    private func finishRealtime(_ realtime: Realtime) async -> PriorTranscription? {
+        buffer.withLock { $0.finishing = true }
+        let result = await realtime.stream.finish()
+        await decoder?.value
+        decoder = nil
+        updatesContinuation.finish()
+        guard let duration = buffer.withLock({ buffer -> Double? in
+            guard !buffer.closed else { return nil }
+            defer { buffer.close() }
+            return Double(buffer.samplesSeen) / Double(Self.sampleRate)
+        }) else { return nil }
+        stats = Stats(transcribed: nextLineID)
+        return PriorTranscription(
+            engineID: engineID, mic: result.mic.sorted { $0.start < $1.start },
+            system: result.system.sorted { $0.start < $1.start }, micGaps: result.micGaps,
+            systemGaps: result.systemGaps, duration: duration, modelID: result.modelID,
+            systemBridges: result.systemBridges)
+    }
+
+    /// Display only at Stop: always nil (a batch job writes the transcript). Cancels the runners, the realtime stream or
+    /// the decode task without waiting for them, so it returns at once even with a `finalize(through:)` or a chunk decode in flight.
     /// `stats.transcribed` counts the lines shown, once an analyzer started or the model loaded.
     private func finishLive() -> PriorTranscription? {
         if buffer.withLock({ $0.loaded }) { stats = Stats(transcribed: nextLineID) }
@@ -293,6 +381,8 @@ public actor RecordingTranscriber {
         buffer.withLock { $0.close() }
         wakeContinuation.finish()
         live?.feeds.forEach { $0.finish() }
+        if let stream = realtime?.stream { Task { await stream.cancel() } }
+        realtime?.resultsContinuation.finish()
         decoder?.cancel()
         decoder = nil
         updatesContinuation.finish()
@@ -300,12 +390,16 @@ public actor RecordingTranscriber {
 
     // MARK: - Decode task
 
-    /// Holds the model gate from load to unload (Apple Speech: no gate).
+    /// Holds the model gate from load to unload (Apple Speech and cloud realtime: no gate).
     private nonisolated func decode() async {
+        if let realtime {
+            await runRealtime(realtime)
+            return
+        }
         do {
             if let live {
                 try await runLive(live)
-            } else {
+            } else if let gate {
                 try await gate.withExclusiveModel(owner: .liveTranscript) { [self] in try await run() }
             }
         } catch {
@@ -316,6 +410,7 @@ public actor RecordingTranscriber {
 
     /// Owns the session from load to unload, and loads it again after an idle release.
     private nonisolated func run() async throws {
+        guard let entry, let folder else { throw TranscriptionError.unknownEngine(engineID) }
         let load = { [entry, folder] () async throws -> any TranscriptionSession in
             guard let session = try await TranscriptionSessions.load(entry: entry, folder: folder) else {
                 throw TranscriptionError.unknownEngine(entry.id)
@@ -349,7 +444,7 @@ public actor RecordingTranscriber {
     /// Apple Speech: runs both channels' runners and applies their results in order, until both streams end or the
     /// task is cancelled (`finish()`, `cancel()`), or something throws (the other runner is then cancelled).
     private nonisolated func runLive(_ live: Live) async throws {
-        guard #available(macOS 26, *) else { throw TranscriptionError.unknownEngine(entry.id) }
+        guard #available(macOS 26, *) else { throw TranscriptionError.unknownEngine(engineID) }
         try await withThrowingTaskGroup(of: Void.self) { group in
             for channel in [RecordingSession.Channel.mic, RecordingSession.Channel.system] {
                 let results = live.resultsContinuation
@@ -387,6 +482,24 @@ public actor RecordingTranscriber {
             _ = try await group.next()
         }
         await apply(.ended)
+    }
+
+    /// Cloud realtime: starts the stream and applies its updates, with `append`'s `.resumed`, in order until the
+    /// stream ends (`finish()`) or the task is cancelled (`cancel()`).
+    private nonisolated func runRealtime(_ realtime: Realtime) async {
+        await realtime.stream.start()
+        await withTaskGroup(of: Void.self) { group in
+            group.addTask {
+                for await update in realtime.stream.updates {
+                    realtime.resultsContinuation.yield(Self.liveResult(update))
+                }
+                realtime.resultsContinuation.finish()
+            }
+            group.addTask { [self] in
+                for await result in realtime.results { await apply(result) }
+            }
+        }
+        if !Task.isCancelled { await apply(.ended) }
     }
 
     /// `events` as the runner takes them: each block leaves `Buffer.queuedSamples` when pulled, so what waits during
@@ -490,9 +603,12 @@ public actor RecordingTranscriber {
         publish(buffer.withLock { $0.paused } ? .paused : .listening)
     }
 
-    /// Apple Speech: one runner result or `append` notice, in the order they came.
-    private func apply(_ result: LiveResult) {
-        if case .failed = snapshot.state { return }
+    /// Apple Speech and cloud realtime: one runner result or `append` notice, in the order they came. Once failed,
+    /// only cloud realtime socket states still count: a stopped channel can stream again.
+    func apply(_ result: LiveResult) {
+        if case .failed = snapshot.state {
+            guard case .realtimeState = result else { return }
+        }
         switch result {
         case .preparing:
             publish(.preparing)
@@ -502,13 +618,71 @@ public actor RecordingTranscriber {
             setTentative(Self.speaker(channel), text, startSample: startSample)
         case .final(let channel, let segment):
             addFinal(channel, segment)
+        case .partial(let channel, let text, let start):
+            setPartial(channel, text, start: start)
+        case .realtimeState(let channel, let state):
+            setRealtimeState(channel, state)
         case .ended:
             snapshot.tentative = []
             publishRunning()
         }
     }
 
-    /// Apple Speech: records a final and shows its line in place of the speaker's tentative text.
+    /// Cloud realtime: a channel's text so far as its speaker's tentative text (nil clears it). Without a provider
+    /// time it keeps the start of the speaker's tentative text, else starts at the channel's last final end, else at
+    /// the samples seen.
+    private func setPartial(_ channel: Int, _ text: String?, start: Double?) {
+        let speaker = Self.speaker(channel)
+        let startSample = start.map { Int(($0 * Double(Self.sampleRate)).rounded()) }
+            ?? snapshot.tentative.first { $0.speaker == speaker }?.startSample
+            ?? buffer.withLock { $0.partialStart(channel: channel) }
+        setTentative(speaker, text, startSample: startSample)
+    }
+
+    /// Cloud realtime: `.loading` until a channel is live, `Snapshot.reconnecting` while a channel that was live
+    /// connects again, `Snapshot.realtimeFailure` from the first channel that stopped, `.failed` once both did, until
+    /// one is live again (a "config" failure recovers at a language change).
+    private func setRealtimeState(_ channel: Int, _ state: RealtimeLiveStream.State) {
+        guard realtimeStates.indices.contains(channel) else { return }
+        realtimeStates[channel] = state
+        switch state {
+        case .live:
+            realtimeConnected.insert(channel)
+            buffer.withLock { $0.loaded = true }
+            // Both channels had stopped: this one streams again, so `publishRunning` shows it running.
+            if case .failed = snapshot.state { snapshot.state = .loading }
+            // A "config" failure recovers at a language change.
+            if !realtimeStates.contains(where: { if case .failed = $0 { true } else { false } }) {
+                snapshot.realtimeFailure = nil
+            }
+        case .failed(let kind):
+            if snapshot.realtimeFailure == nil { snapshot.realtimeFailure = kind }
+            snapshot.tentative = Self.tentative(snapshot.tentative, setting: Self.speaker(channel), text: nil,
+                                                startSample: 0)
+        case .connecting, .reconnecting:
+            break
+        }
+        snapshot.reconnecting = realtimeStates.indices.contains { index in
+            switch realtimeStates[index] {
+            case .reconnecting: true
+            case .connecting: realtimeConnected.contains(index)
+            case .live, .failed, nil: false
+            }
+        }
+        let failures = realtimeStates.compactMap { state -> String? in
+            if case .failed(let kind) = state { kind } else { nil }
+        }
+        if failures.count == realtimeStates.count {
+            snapshot.reconnecting = false
+            publish(.failed("Cloud realtime stopped (\(failures[0]))."))
+            return
+        }
+        publishRunning()
+        // `publishRunning` leaves `.loading` alone: the new fields still show.
+        publish(snapshot.state)
+    }
+
+    /// Apple Speech and cloud realtime: records a final and shows its line in place of the speaker's tentative text.
     private func addFinal(_ channel: Int, _ segment: RawSegment) {
         buffer.withLock { $0.addLive(segment, channel: channel) }
         let speaker = Self.speaker(channel)
@@ -667,11 +841,35 @@ public actor RecordingTranscriber {
         }
     }
 
+    /// Cloud realtime: the stream, and its updates as `LiveResult`s with `append`'s `.resumed`, applied in order.
+    struct Realtime: Sendable {
+        let stream: RealtimeLiveStream
+        let results: AsyncStream<LiveResult>
+        let resultsContinuation: AsyncStream<LiveResult>.Continuation
+
+        init(stream: RealtimeLiveStream) {
+            self.stream = stream
+            (results, resultsContinuation) = AsyncStream.makeStream(bufferingPolicy: .unbounded)
+        }
+    }
+
+    static func liveResult(_ update: RealtimeLiveStream.Update) -> LiveResult {
+        switch update {
+        case .state(let channel, let state): .realtimeState(channel: channel, state)
+        case .partial(let channel, let text, let start): .partial(channel: channel, text: text, start: start)
+        case .final(let channel, let segment): .final(channel: channel, segment: segment)
+        }
+    }
+
     /// What `RecordingTranscriber.apply` handles; channel = `RecordingSession.Channel`.
     enum LiveResult: Sendable {
         case preparing, started
         case volatile(channel: Int, text: String, startSample: Int)
         case final(channel: Int, segment: RawSegment)
+        /// Cloud realtime: the channel's text so far (nil clears it), `start` in file seconds when timed.
+        case partial(channel: Int, text: String?, start: Double?)
+        /// Cloud realtime: a channel's socket state.
+        case realtimeState(channel: Int, RealtimeLiveStream.State)
         /// The first block after a pause.
         case resumed
         /// More than `maxQueuedSeconds` waits: the transcriber fails.
@@ -778,13 +976,31 @@ public actor RecordingTranscriber {
             return .queued(startSample: startSample, resumed: resumed)
         }
 
+        /// Cloud realtime: a block of `count` samples per channel goes to the stream, which queues nothing here: its
+        /// file position and whether it is the first after a pause; nil when closed, finishing or failed.
+        mutating func appendRealtime(_ count: Int) -> (startSample: Int, resumed: Bool)? {
+            guard !closed, !finishing, !failed else { return nil }
+            let startSample = samplesSeen
+            let resumed = paused
+            paused = false
+            samplesSeen += count
+            return (startSample, resumed)
+        }
+
+        /// Cloud realtime: where a partial without a provider time starts: the channel's last final end, else the
+        /// samples seen.
+        func partialStart(channel: Int) -> Int {
+            guard !closed, let last = channels[channel].segments.last else { return samplesSeen }
+            return Int((last.end * Double(RecordingTranscriber.sampleRate)).rounded())
+        }
+
         /// Apple Speech: a runner took a block of `count` samples.
         mutating func fedLive(_ count: Int) {
             guard !closed, !failed else { return }
             queuedSamples = max(0, queuedSamples - count)
         }
 
-        /// Apple Speech: a final result of `channel`, in file seconds.
+        /// Apple Speech and cloud realtime: a final result of `channel`, in file seconds.
         mutating func addLive(_ segment: RawSegment, channel: Int) {
             guard !closed else { return }
             channels[channel].segments.append(segment)

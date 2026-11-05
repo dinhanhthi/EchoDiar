@@ -94,6 +94,10 @@
     <value>About EchoDiar</value>
     <comment>About EchoDiar</comment>
   </data>
+  <data name="AboutPerHourOfStreamingForEachConnection" xml:space="preserve">
+    <value>about {0} per hour of streaming for each connection</value>
+    <comment>about %@ per hour of streaming for each connection</comment>
+  </data>
   <data name="AboutWhereDataGoes" xml:space="preserve">
     <value>About where data goes</value>
     <comment>About where data goes</comment>
@@ -342,6 +346,10 @@
     <value>Audio leaves this Mac: the recording's mic and system channels are uploaded to {0} ({1}) for transcription and billed by them. The provider may keep the audio under its own retention policy. You are asked once per provider and destination.</value>
     <comment>Audio leaves this Mac: the recording's mic and system channels are uploaded to %@ (%@) for transcription and billed by them. The provider may keep the audio under its own retention policy. You are asked once per provider and destination.</comment>
   </data>
+  <data name="AudioLeavesThisMacWhileRecordingTheMicAndSystemChannelsAreSt" xml:space="preserve">
+    <value>Audio leaves this Mac: while recording, the mic and system channels are streamed live to {0} ({1}) for transcription and billed by them. The provider may keep the audio under its own retention policy. You are asked once per provider and destination.</value>
+    <comment>Audio leaves this Mac: while recording, the mic and system channels are streamed live to %@ (%@) for transcription and billed by them. The provider may keep the audio under its own retention policy. You are asked once per provider and destination.</comment>
+  </data>
   <data name="AudioLeavesThisPCCloudEnginesUploadTheRecordingToTheProvider" xml:space="preserve">
     <value>Audio leaves this PC: cloud engines upload the recording to the provider.</value>
     <comment>Audio leaves this PC: cloud engines upload the recording to the provider.</comment>
@@ -421,6 +429,18 @@
   <data name="BeforeYouRecord" xml:space="preserve">
     <value>Before you record</value>
     <comment>Before you record</comment>
+  </data>
+  <data name="BilledBy" xml:space="preserve">
+    <value>billed by {0}</value>
+    <comment>billed by %@</comment>
+  </data>
+  <data name="BilledByConnectionTimeAboutPerHourForEachConnection" xml:space="preserve">
+    <value>billed by connection time, about {0} per hour for each connection</value>
+    <comment>billed by connection time, about %@ per hour for each connection</comment>
+  </data>
+  <data name="BilledPerStreamedMinuteAboutPerHourForEachConnection" xml:space="preserve">
+    <value>billed per streamed minute, about {0} per hour for each connection</value>
+    <comment>billed per streamed minute, about %@ per hour for each connection</comment>
   </data>
   <data name="BothVoicesInBothEars" xml:space="preserve">
     <value>Both voices in both ears</value>
@@ -641,6 +661,10 @@
   <data name="ConfirmTheEmbeddingProviderInSettingsRAG" xml:space="preserve">
     <value>Confirm the embedding provider in Settings › RAG.</value>
     <comment>Confirm the embedding provider in Settings › RAG.</comment>
+  </data>
+  <data name="ConnectingTo" xml:space="preserve">
+    <value>Connecting to {0}…</value>
+    <comment>Connecting to %@…</comment>
   </data>
   <data name="Consent" xml:space="preserve">
     <value>Consent</value>
@@ -958,6 +982,10 @@
     <value>Diarization models</value>
     <comment>Diarization models</comment>
   </data>
+  <data name="DoesnTSupportTheseSettingsOrThisLanguageLive" xml:space="preserve">
+    <value>{0} doesn't support these settings or this language live.</value>
+    <comment>%@ doesn't support these settings or this language live.</comment>
+  </data>
   <data name="Done" xml:space="preserve">
     <value>Done</value>
     <comment>Done</comment>
@@ -1238,6 +1266,10 @@
     <value>Grant Accessibility…</value>
     <comment>Grant Accessibility…</comment>
   </data>
+  <data name="HasNoRealtimeTranscriptionYouCanShowALiveTranscriptWithALoca" xml:space="preserve">
+    <value>{0} has no realtime transcription. You can show a live transcript with a local model in Settings.</value>
+    <comment>%@ has no realtime transcription. You can show a live transcript with a local model in Settings.</comment>
+  </data>
   <data name="HeadsUpIMRecordingThisCallToTakeNotesTheRecordingStaysOnMyMa" xml:space="preserve">
     <value>Heads up: I'm recording this call to take notes. The recording stays on my Mac.</value>
     <comment>Heads up: I'm recording this call to take notes. The recording stays on my Mac.</comment>
@@ -1514,6 +1546,10 @@
     <value>Listening…</value>
     <comment>Listening…</comment>
   </data>
+  <data name="LiveModel" xml:space="preserve">
+    <value>Live model</value>
+    <comment>Live model</comment>
+  </data>
   <data name="LiveTranscript" xml:space="preserve">
     <value>Live transcript</value>
     <comment>Live transcript</comment>
@@ -1541,6 +1577,14 @@
   <data name="LiveTranscriptStoppedTheTranscriptIsMadeAfterStop" xml:space="preserve">
     <value>Live transcript stopped. The transcript is made after Stop.</value>
     <comment>Live transcript stopped. The transcript is made after Stop.</comment>
+  </data>
+  <data name="LiveWithALocalModel" xml:space="preserve">
+    <value>Live with a local model</value>
+    <comment>Live with a local model</comment>
+  </data>
+  <data name="LiveWithRealtime" xml:space="preserve">
+    <value>Live with {0} realtime</value>
+    <comment>Live with %@ realtime</comment>
   </data>
   <data name="Lld" xml:space="preserve">
     <value>{0}</value>
@@ -1830,6 +1874,10 @@
     <value>Name for {0}</value>
     <comment>Name for %@</comment>
   </data>
+  <data name="NeedsBillingOrCreditsOnYourAccount" xml:space="preserve">
+    <value>{0} needs billing or credits on your account.</value>
+    <comment>%@ needs billing or credits on your account.</comment>
+  </data>
   <data name="NeedsConfirmation" xml:space="preserve">
     <value>Needs confirmation</value>
     <comment>Needs confirmation</comment>
@@ -1921,6 +1969,14 @@
   <data name="NoEmbeddingModelsListedTypeTheModelId" xml:space="preserve">
     <value>No embedding models listed; type the model id.</value>
     <comment>No embedding models listed; type the model id.</comment>
+  </data>
+  <data name="NoInstalledLiveModelSupportsThisRecordingSLanguageDownloadOn" xml:space="preserve">
+    <value>No installed live model supports this recording's language. Download one in Settings › Transcription.</value>
+    <comment>No installed live model supports this recording's language. Download one in Settings › Transcription.</comment>
+  </data>
+  <data name="NoLiveModelInstalledDownloadAWhisperKitOrParakeetModelAbove" xml:space="preserve">
+    <value>No live model installed. Download a WhisperKit or Parakeet model above.</value>
+    <comment>No live model installed. Download a WhisperKit or Parakeet model above.</comment>
   </data>
   <data name="NoModelChooseOneInSettings" xml:space="preserve">
     <value>No model: choose one in Settings</value>
@@ -2398,6 +2454,18 @@
     <value>Ready</value>
     <comment>Ready</comment>
   </data>
+  <data name="RealtimeIsNotConfirmedYetTurnItOnInSettingsToConfirmIt" xml:space="preserve">
+    <value>{0} realtime is not confirmed yet. Turn it on in Settings to confirm it.</value>
+    <comment>%@ realtime is not confirmed yet. Turn it on in Settings to confirm it.</comment>
+  </data>
+  <data name="RealtimeModel" xml:space="preserve">
+    <value>Realtime model</value>
+    <comment>Realtime model</comment>
+  </data>
+  <data name="RealtimeStartsOnceSendingAudioToAndToItsSpeakerDiarizerIfAny" xml:space="preserve">
+    <value>{0} realtime starts once sending audio to {1} (and to its speaker diarizer, if any) is confirmed. Confirm it in a conversation first.</value>
+    <comment>%@ realtime starts once sending audio to %@ (and to its speaker diarizer, if any) is confirmed. Confirm it in a conversation first.</comment>
+  </data>
   <data name="Rebuild" xml:space="preserve">
     <value>Rebuild</value>
     <comment>Rebuild</comment>
@@ -2405,6 +2473,10 @@
   <data name="RebuildIndex" xml:space="preserve">
     <value>Rebuild index</value>
     <comment>Rebuild index</comment>
+  </data>
+  <data name="Reconnecting" xml:space="preserve">
+    <value>Reconnecting…</value>
+    <comment>Reconnecting…</comment>
   </data>
   <data name="Record" xml:space="preserve">
     <value>Record</value>
@@ -2509,6 +2581,10 @@
   <data name="Redo" xml:space="preserve">
     <value>Redo</value>
     <comment>Redo</comment>
+  </data>
+  <data name="RejectedTheAPIKeyCheckItInSettingsAPIKeys" xml:space="preserve">
+    <value>{0} rejected the API key. Check it in Settings › API Keys.</value>
+    <comment>%@ rejected the API key. Check it in Settings › API Keys.</comment>
   </data>
   <data name="RelaunchNow" xml:space="preserve">
     <value>Relaunch now</value>
@@ -2634,6 +2710,10 @@
     <value>Saved</value>
     <comment>Saved</comment>
   </data>
+  <data name="SavesTheStreamedTranscriptInsteadOfUploadingTheRecordingAgai" xml:space="preserve">
+    <value>Saves the streamed transcript instead of uploading the recording again after Stop, so you pay for streaming only. Parts missed while the connection was down are sent to {0} after Stop, with about 30 s of audio on each side, and around each pause, so speakers keep their labels. A cloud diarizer is billed separately. Realtime models can be less accurate than {1}.</value>
+    <comment>Saves the streamed transcript instead of uploading the recording again after Stop, so you pay for streaming only. Parts missed while the connection was down are sent to %@ after Stop, with about 30 s of audio on each side, and around each pause, so speakers keep their labels. A cloud diarizer is billed separately. Realtime models can be less accurate than %@.</comment>
+  </data>
   <data name="Scan" xml:space="preserve">
     <value>Scan</value>
     <comment>Scan</comment>
@@ -2755,8 +2835,16 @@
     <comment>Shows the transcript during the recording and keeps it, so it is ready within seconds of Stop. Uses more CPU and memory while recording. Whisper and Parakeet models only; other engines transcribe after Stop.</comment>
   </data>
   <data name="ShowsTheTranscriptDuringTheRecordingWhisperKitAndParakeetMod" xml:space="preserve">
+    <value>Shows the transcript during the recording. WhisperKit and Parakeet models keep it, so it is ready within seconds of Stop; Apple Speech (macOS 26+) only shows it and transcribes after Stop. Uses more CPU and memory while recording. A cloud engine can show it with a local model or its realtime stream: see Transcription model › Cloud.</value>
+    <comment>Shows the transcript during the recording. WhisperKit and Parakeet models keep it, so it is ready within seconds of Stop; Apple Speech (macOS 26+) only shows it and transcribes after Stop. Uses more CPU and memory while recording. A cloud engine can show it with a local model or its realtime stream: see Transcription model › Cloud.</comment>
+  </data>
+  <data name="ShowsTheTranscriptDuringTheRecordingWhisperKitAndParakeetMod_2" xml:space="preserve">
     <value>Shows the transcript during the recording. WhisperKit and Parakeet models keep it, so it is ready within seconds of Stop; Apple Speech (macOS 26+) only shows it and transcribes after Stop. Uses more CPU and memory while recording. Other engines transcribe after Stop.</value>
     <comment>Shows the transcript during the recording. WhisperKit and Parakeet models keep it, so it is ready within seconds of Stop; Apple Speech (macOS 26+) only shows it and transcribes after Stop. Uses more CPU and memory while recording. Other engines transcribe after Stop.</comment>
+  </data>
+  <data name="ShowsTheTranscriptWhileRecordingWithAModelOnThisMacFreeNothi" xml:space="preserve">
+    <value>Shows the transcript while recording with a model on this Mac. Free: nothing is uploaded while recording, but it uses CPU, memory and battery. The saved transcript still comes from {0} after Stop, so it can differ from what you saw.</value>
+    <comment>Shows the transcript while recording with a model on this Mac. Free: nothing is uploaded while recording, but it uses CPU, memory and battery. The saved transcript still comes from %@ after Stop, so it can differ from what you saw.</comment>
   </data>
   <data name="SimulateState" xml:space="preserve">
     <value>Simulate state</value>
@@ -2925,6 +3013,14 @@
   <data name="StorageUsed" xml:space="preserve">
     <value>Storage used: {0}</value>
     <comment>Storage used: %@</comment>
+  </data>
+  <data name="StreamsTheMicAndTheSystemAudioToAsTwoLiveConnectionsForTheWh" xml:space="preserve">
+    <value>Streams the mic and the system audio to {0} as two live connections for the whole recording. Costs money: {1}, on top of the normal transcription after Stop. Long recordings reconnect before the provider's session limit and stream about 30 s twice at each reconnect so speakers keep their labels. A 1-hour meeting costs about 2 hours of streaming plus 2 hours of transcription.</value>
+    <comment>Streams the mic and the system audio to %@ as two live connections for the whole recording. Costs money: %@, on top of the normal transcription after Stop. Long recordings reconnect before the provider's session limit and stream about 30 s twice at each reconnect so speakers keep their labels. A 1-hour meeting costs about 2 hours of streaming plus 2 hours of transcription.</comment>
+  </data>
+  <data name="StreamsTo" xml:space="preserve">
+    <value>Streams to {0}</value>
+    <comment>Streams to %@</comment>
   </data>
   <data name="Summarize" xml:space="preserve">
     <value>Summarize</value>
@@ -3126,6 +3222,10 @@
     <value>The call seems to be over — stop recording?</value>
     <comment>The call seems to be over — stop recording?</comment>
   </data>
+  <data name="TheConnectionToWasLost" xml:space="preserve">
+    <value>The connection to {0} was lost.</value>
+    <comment>The connection to %@ was lost.</comment>
+  </data>
   <data name="TheDownloadFailed" xml:space="preserve">
     <value>The download failed: {0}</value>
     <comment>The download failed: %@</comment>
@@ -3202,6 +3302,10 @@
     <value>The repeat ends before this date.</value>
     <comment>The repeat ends before this date.</comment>
   </data>
+  <data name="TheSavedTranscriptIsMadeAfterStopAndCanDiffer" xml:space="preserve">
+    <value>The saved transcript is made after Stop and can differ.</value>
+    <comment>The saved transcript is made after Stop and can differ.</comment>
+  </data>
   <data name="TheSelectedAppStoppedPlayingAudioBeforeRecordingCouldResume" xml:space="preserve">
     <value>The selected app stopped playing audio before recording could resume.</value>
     <comment>The selected app stopped playing audio before recording could resume.</comment>
@@ -3225,6 +3329,10 @@
   <data name="TheTranscriptCouldNotBeRead" xml:space="preserve">
     <value>The transcript could not be read.</value>
     <comment>The transcript could not be read.</comment>
+  </data>
+  <data name="TheTranscriptIsMadeAfterStop" xml:space="preserve">
+    <value>The transcript is made after Stop.</value>
+    <comment>The transcript is made after Stop.</comment>
   </data>
   <data name="TheTranscriptionSpeakerAndAIModelsAreRemovedFromThisMacNotMo" xml:space="preserve">
     <value>The transcription, speaker and AI models are removed from this Mac (not moved to the Trash). Download them again in Settings › Transcription and Settings › AI.</value>
@@ -3334,6 +3442,10 @@
     <value>This PC's hardware does not support Windows AI (it needs a Copilot+ PC).</value>
     <comment>This PC's hardware does not support Windows AI (it needs a Copilot+ PC).</comment>
   </data>
+  <data name="ThisRealtimeModelLabelsNoSpeakersSoTheDiarizerRunsOnTheRecor" xml:space="preserve">
+    <value>This realtime model labels no speakers, so the diarizer runs on the recording after Stop; a cloud diarizer asks for its own consent.</value>
+    <comment>This realtime model labels no speakers, so the diarizer runs on the recording after Stop; a cloud diarizer asks for its own consent.</comment>
+  </data>
   <data name="Title" xml:space="preserve">
     <value>Title</value>
     <comment>Title</comment>
@@ -3389,6 +3501,14 @@
   <data name="Transcribed" xml:space="preserve">
     <value>Transcribed</value>
     <comment>Transcribed</comment>
+  </data>
+  <data name="TranscribesAfterStopYouCanShowALiveTranscriptWithALocalModel" xml:space="preserve">
+    <value>{0} transcribes after Stop. You can show a live transcript with a local model in Settings.</value>
+    <comment>%@ transcribes after Stop. You can show a live transcript with a local model in Settings.</comment>
+  </data>
+  <data name="TranscribesAfterStopYouCanShowALiveTranscriptWithALocalModel_2" xml:space="preserve">
+    <value>{0} transcribes after Stop. You can show a live transcript with a local model or {1} realtime in Settings.</value>
+    <comment>%@ transcribes after Stop. You can show a live transcript with a local model or %@ realtime in Settings.</comment>
   </data>
   <data name="Transcribing" xml:space="preserve">
     <value>Transcribing…</value>
@@ -3586,6 +3706,10 @@
     <value>Use ⌘, ⌥ or ⌃ with the key.</value>
     <comment>Use ⌘, ⌥ or ⌃ with the key.</comment>
   </data>
+  <data name="UseTheRealtimeResultAsTheTranscript" xml:space="preserve">
+    <value>Use the realtime result as the transcript</value>
+    <comment>Use the realtime result as the transcript</comment>
+  </data>
   <data name="UsedByLLamaSharp" xml:space="preserve">
     <value>Used by LLamaSharp</value>
     <comment>Used by LLamaSharp</comment>
@@ -3718,6 +3842,10 @@
     <value>While EchoDiar is in the background, a notification asks too, with Stop now and Keep recording.</value>
     <comment>While EchoDiar is in the background, a notification asks too, with Stop now and Keep recording.</comment>
   </data>
+  <data name="WhileRecording" xml:space="preserve">
+    <value>While recording</value>
+    <comment>While recording</comment>
+  </data>
   <data name="WhisperTranscription" xml:space="preserve">
     <value>Whisper transcription</value>
     <comment>Whisper transcription</comment>
@@ -3805,6 +3933,10 @@
   <data name="YourConversationsAreNotIndexedYet" xml:space="preserve">
     <value>Your conversations are not indexed yet.</value>
     <comment>Your conversations are not indexed yet.</comment>
+  </data>
+  <data name="YourPlanSLimitOnLiveSessionsWasReached" xml:space="preserve">
+    <value>Your {0} plan's limit on live sessions was reached.</value>
+    <comment>Your %@ plan's limit on live sessions was reached.</comment>
   </data>
   <data name="ZoomGoogleMeetMicrosoftTeamsOrWebexLinkInTheEvent" xml:space="preserve">
     <value>Zoom, Google Meet, Microsoft Teams or Webex link in the event.</value>

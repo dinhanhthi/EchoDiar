@@ -73,6 +73,18 @@ public enum CloudTranscription {
     public static func transcribe(
         source: URL, channel: Int, with transcriber: any CloudTranscriber, language: String?, diarize: Bool
     ) async throws -> [CloudSegment] {
+        try await transcribe(
+            source: source, channel: channel, range: nil, with: transcriber, language: language, diarize: diarize)
+    }
+
+    /// `range` (file seconds, clamped to the file; nil = the whole channel) of `channel`, sent as
+    /// `transcribe(source:channel:with:language:diarize:)` sends a whole channel: split under
+    /// `transcriber.maxUploadBytes` inside the range, with the overlap and the reconciled labels. Segments come back
+    /// in file time (seconds from the start of `source`), so a gap of a recording keeps its place.
+    public static func transcribe(
+        source: URL, channel: Int, range: ClosedRange<Double>?, with transcriber: any CloudTranscriber,
+        language: String?, diarize: Bool
+    ) async throws -> [CloudSegment] {
         let fm = FileManager.default
         let work = fm.temporaryDirectory.appendingPathComponent("EchoDiar-cloud-\(UUID().uuidString)")
         try fm.createDirectory(at: work, withIntermediateDirectories: true, attributes: [.posixPermissions: 0o700])
@@ -80,7 +92,8 @@ public enum CloudTranscription {
         let maxBytes = transcriber.maxUploadBytes
         let overlap = transcriber.returnsSegmentTimestamps ? SpeakerLabelReconciler.labelOverlapSeconds : 0
         let parts = try await Task.detached(priority: .utility) {
-            try uploadParts(source: source, channel: channel, maxBytes: maxBytes, overlap: overlap, in: work)
+            try uploadParts(
+                source: source, channel: channel, range: range, maxBytes: maxBytes, overlap: overlap, in: work)
         }.value
         var segments: [CloudSegment] = []
         for (index, part) in parts.enumerated() {
@@ -188,24 +201,26 @@ public enum CloudTranscription {
 
     // MARK: - Audio
 
-    /// The whole channel as one m4a, or parts when it is over `maxBytes`; each later part starts `overlap` seconds
-    /// before its cut. `start` is where a part's audio starts, `cut` where its own stretch does.
+    /// `range` of the channel (nil = all) as one m4a, or parts when it is over `maxBytes`; each later part starts
+    /// `overlap` seconds before its cut. `start` is where a part's audio starts, `cut` where its own stretch does, both
+    /// in file time.
     private static func uploadParts(
-        source: URL, channel: Int, maxBytes: Int?, overlap: Double, in work: URL
+        source: URL, channel: Int, range: ClosedRange<Double>?, maxBytes: Int?, overlap: Double, in work: URL
     ) throws -> [(url: URL, start: Double, cut: Double, duration: Double)] {
+        let base = max(0, range?.lowerBound ?? 0)
         let whole = work.appendingPathComponent("channel.m4a")
-        let duration = try exportM4A(source, channel: channel, range: nil, to: whole)
+        let duration = try exportM4A(source, channel: channel, range: range, to: whole)
         let bytes = try FileManager.default.attributesOfItem(atPath: whole.path)[.size] as? Int ?? 0
-        guard let maxBytes, bytes > maxBytes, duration > 0 else { return [(whole, 0, 0, duration)] }
+        guard let maxBytes, bytes > maxBytes, duration > 0 else { return [(whole, base, base, duration)] }
         try FileManager.default.removeItem(at: whole)
-        let ranges = planParts(
+        let parts = planParts(
             duration: duration, bytesPerSecond: Double(bytes) / duration, maxBytes: maxBytes,
-            levels: try levels(of: source, channel: channel), window: levelWindow, overlap: overlap)
-        return try ranges.enumerated().map { index, range in
+            levels: try levels(of: source, channel: channel, range: range), window: levelWindow, overlap: overlap)
+        return try parts.enumerated().map { index, part in
             let url = work.appendingPathComponent("part-\(index).m4a")
-            let start = max(0, range.lowerBound - overlap)
-            let length = try exportM4A(source, channel: channel, range: start...range.upperBound, to: url)
-            return (url, start, range.lowerBound, length)
+            let start = max(0, part.lowerBound - overlap)
+            let length = try exportM4A(source, channel: channel, range: (base + start)...(base + part.upperBound), to: url)
+            return (url, base + start, base + part.lowerBound, length)
         }
     }
 
@@ -241,15 +256,19 @@ public enum CloudTranscription {
         return Double(last - first) / format.sampleRate
     }
 
-    /// RMS of `channel` per `levelWindow` slot.
-    private static func levels(of source: URL, channel: Int) throws -> [Float] {
+    /// RMS of `channel` per `levelWindow` slot from the start of `range` (nil = all) to its end.
+    private static func levels(of source: URL, channel: Int, range: ClosedRange<Double>?) throws -> [Float] {
         let input = try AVAudioFile(forReading: source, commonFormat: .pcmFormatFloat32, interleaved: false)
-        let frames = AVAudioFrameCount(max(1, (input.processingFormat.sampleRate * levelWindow).rounded()))
+        let rate = input.processingFormat.sampleRate
+        let frames = AVAudioFrameCount(max(1, (rate * levelWindow).rounded()))
         guard channel < Int(input.processingFormat.channelCount),
               let buffer = AVAudioPCMBuffer(pcmFormat: input.processingFormat, frameCapacity: frames) else { return [] }
+        let first = min(input.length, AVAudioFramePosition(max(0, range?.lowerBound ?? 0) * rate))
+        let last = min(input.length, range.map { AVAudioFramePosition($0.upperBound * rate) } ?? input.length)
+        input.framePosition = first
         var levels: [Float] = []
-        while input.framePosition < input.length {
-            try input.read(into: buffer, frameCount: frames)
+        while input.framePosition < last {
+            try input.read(into: buffer, frameCount: AVAudioFrameCount(min(AVAudioFramePosition(frames), last - input.framePosition)))
             guard buffer.frameLength > 0 else { break }
             var rms: Float = 0
             vDSP_rmsqv(buffer.floatChannelData![channel], 1, &rms, vDSP_Length(buffer.frameLength))

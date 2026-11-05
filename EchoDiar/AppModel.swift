@@ -181,6 +181,8 @@ final class AppModel {
         let conversationID: UUID
         let folder: URL
         let language: String?
+        /// The recording transcriber's prior (a cloud realtime transcript), submitted with the run.
+        var prior: PriorTranscription?
     }
 
     /// What `aiJobs` keeps of a running job, beside its key, kind and status.
@@ -562,7 +564,9 @@ final class AppModel {
     ///   installed WhisperKit or Parakeet entry, or Apple Speech on macOS 26+ (its folder is the models root, unused);
     /// - or the default ASR is a cloud engine (confirmed or not: nothing leaves the Mac) with the live source "local
     ///   model": `cloudLiveEntry`, display only (`finish()` returns nil at once, so the cloud batch writes the
-    ///   transcript with no prior). "Realtime" is not wired yet and shows nothing, like "off".
+    ///   transcript with no prior);
+    /// - or the default ASR is a cloud engine with the live source "realtime" and `cloudLiveBlock` finds nothing in
+    ///   the way: `startRealtimeTranscriber`. When something is, nothing is streamed and there is no live transcript.
     /// Settings are read here, so a change during a recording applies from the next one.
     /// The caller sets `engine.liveSink` to its `append` before `engine.start` (the writer reads the sink once), calls
     /// `flush()` after a pause and `finish()` after the `.idle` snapshot.
@@ -581,6 +585,8 @@ final class AppModel {
         } else if defaultASRIsCloud, settings.cloudLiveSource == .local {
             found = cloudLiveEntry(language: language, isUsable: isUsable)
             displayOnly = true
+        } else if defaultASRIsCloud, settings.cloudLiveSource == .realtime {
+            return startRealtimeTranscriber(language: language)
         } else {
             return nil
         }
@@ -619,6 +625,161 @@ final class AppModel {
             }
         }
         return nil
+    }
+
+    /// A started cloud realtime transcriber for the default cloud engine, and its placeholder; nil when
+    /// `realtimeBlock` finds something in the way (nothing is streamed then). The key is read in each session's task
+    /// (`RealtimeLiveStream.make`), never here. Speaker labels are asked of the stream (system channel only) only with
+    /// "Tell speakers apart". Display only unless "Use the realtime result as the transcript" is on.
+    private func startRealtimeTranscriber(
+        language: String
+    ) -> (transcriber: RecordingTranscriber, placeholder: RecordingTranscriber.Snapshot)? {
+        guard let config = defaultCloudConfig, realtimeBlock(config) == nil else { return nil }
+        let providerID = config.id
+        guard let stream = RealtimeLiveStream.make(
+            config: config, diarize: settings.diarization,
+            apiKey: { try KeychainStore.apiKey(forProvider: providerID) ?? "" })
+        else { return nil }
+        let displayOnly = !settings.realtimeAsFinal
+        let transcriber = RecordingTranscriber(
+            realtime: stream, engineID: CloudTranscription.engineID(providerID: providerID), displayOnly: displayOnly
+        ) { [engine] in engine.currentLanguage() ?? language }
+        Task { await transcriber.start() }
+        return (transcriber, .init(state: .loading, source: .cloudRealtime, displayOnly: displayOnly))
+    }
+
+    /// The default ASR's cloud config when it is an available cloud engine.
+    var defaultCloudConfig: ProviderConfig? {
+        guard let providerID = CloudTranscription.providerID(engineID: settings.defaultASRModelID) else { return nil }
+        return cloudEngineConfigs.first { $0.id == providerID }
+    }
+
+    /// Why the cloud live transcript the settings ask for does not run, for the recording page.
+    enum CloudLiveBlock: Equatable {
+        /// "Live with a local model", but no installed live model accepts the recording's language.
+        case noLiveModel
+        /// "Live with <Provider> realtime", but the default provider has no realtime API (or no realtime model).
+        case realtimeUnsupported
+        /// The default cloud transcription (or its cloud diarizer) waits for its one-time confirmation.
+        case cloudConsentPending
+        /// The realtime destination is not confirmed (`confirmRealtimeDestination`): nothing is streamed.
+        case realtimeConsentPending
+    }
+
+    /// Why the next (or current) recording has no cloud live transcript although the default ASR is a cloud engine,
+    /// auto-transcribe and "Transcribe while recording" are on, and a live source is picked; nil when it runs, when
+    /// the source is "off", or when the default engines are local. The same checks as `startRecordingTranscriber`,
+    /// with the current settings.
+    var cloudLiveBlock: CloudLiveBlock? {
+        guard settings.autoTranscribe, settings.transcribeWhileRecording, let config = defaultCloudConfig else {
+            return nil
+        }
+        switch settings.cloudLiveSource {
+        case .off:
+            return nil
+        case .local:
+            let isUsable = { [modelStore] (entry: ModelEntry) in TranscriptionPipeline.isUsable(entry, in: modelStore) }
+            return cloudLiveEntry(language: recordingLanguage, isUsable: isUsable) == nil ? .noLiveModel : nil
+        case .realtime:
+            return realtimeBlock(config)
+        }
+    }
+
+    /// What keeps `config`'s realtime stream from starting now; nil when it can. Realtime starts only once the
+    /// cloud transcription is confirmed (with the diarizer the Stop job would need) and the realtime destination too.
+    private func realtimeBlock(_ config: ProviderConfig) -> CloudLiveBlock? {
+        guard realtimeAvailable(for: config) else { return .realtimeUnsupported }
+        guard autoEngine(realtimeFinal: settings.realtimeAsFinal) == .cloudConfirmed else {
+            return .cloudConsentPending
+        }
+        guard realtimeDestinationConfirmed(for: config) else { return .realtimeConsentPending }
+        return nil
+    }
+
+    // MARK: - Cloud live transcript settings
+
+    /// Whether `config` can stream realtime: a realtime API, a valid realtime destination and a model.
+    func realtimeAvailable(for config: ProviderConfig) -> Bool {
+        CloudRealtime.supports(config) && CloudRealtime.destination(for: config) != nil
+            && !CloudRealtime.model(for: config).isEmpty
+    }
+
+    /// Known realtime models of `config`, the default first; empty when it has no realtime API.
+    func realtimeModels(for config: ProviderConfig) -> [String] { CloudRealtime.models(for: config) }
+
+    func realtimeDefaultModel(for config: ProviderConfig) -> String { CloudRealtime.defaultModel(for: config) }
+
+    /// The realtime model streamed: `realtimeModel`, else the default.
+    func realtimeModel(for config: ProviderConfig) -> String { CloudRealtime.model(for: config) }
+
+    /// The host the realtime audio and key go to, for the consent dialog and the settings row; nil when unsupported.
+    func realtimeHost(for config: ProviderConfig) -> String? { CloudRealtime.destination(for: config)?.host }
+
+    /// Whether the realtime destination of `config` is confirmed: its realtime consent (`rt:<consent key>`) was
+    /// confirmed, or the batch destination on the same provider and origin was (the batch upload implies the
+    /// stream, never the reverse). Never queues a confirmation.
+    func realtimeDestinationConfirmed(for config: ProviderConfig) -> Bool {
+        guard let destination = CloudRealtime.destination(for: config) else { return false }
+        return settings.cloudSTTConfirmed.contains(Self.realtimeConsentKey(destination.consentKey))
+            || settings.cloudSTTConfirmed.contains(destination.consentKey)
+    }
+
+    /// Remembers the realtime destination of `config` as confirmed, after Settings' consent dialog. Stored under its
+    /// own `rt:` key, so it never confirms the batch upload after Stop, even on a shared origin.
+    func confirmRealtimeDestination(for config: ProviderConfig) {
+        guard let destination = CloudRealtime.destination(for: config) else { return }
+        let key = Self.realtimeConsentKey(destination.consentKey)
+        guard !settings.cloudSTTConfirmed.contains(key) else { return }
+        updateSettings { $0.cloudSTTConfirmed.append(key) }
+    }
+
+    /// The realtime consent key stored in `cloudSTTConfirmed`, apart from the batch key it is made from.
+    private static func realtimeConsentKey(_ consentKey: String) -> String { "rt:" + consentKey }
+
+    /// The local models the "Live with a local model" picker offers (`cloudLiveModelID`), Apple Speech included on
+    /// macOS 26+, in catalog order.
+    var cloudLiveModelChoices: [ModelEntry] {
+        _ = installedModelIDs
+        return TranscriptionPipeline.liveEntries { [modelStore] in TranscriptionPipeline.isUsable($0, in: modelStore) }
+    }
+
+    /// Picks one live source in cloud mode (off, local model, realtime); leaving realtime turns "Use the realtime
+    /// result as the transcript" off. Confirms nothing: Settings calls `confirmRealtimeDestination` after its dialog.
+    func setCloudLiveSource(_ source: CloudLiveSource) {
+        updateSettings {
+            $0.cloudLiveSource = source
+            if source != .realtime { $0.realtimeAsFinal = false }
+        }
+    }
+
+    /// "Use the realtime result as the transcript"; turning it on is ignored unless the live source is realtime.
+    func setRealtimeAsFinal(_ on: Bool) {
+        guard !on || settings.cloudLiveSource == .realtime else { return }
+        updateSettings { $0.realtimeAsFinal = on }
+    }
+
+    /// Whether `config`'s realtime `model` (nil = the configured one) streams speaker labels when asked. Pure: the
+    /// adapter is only built to read its flag, with no key.
+    private static func realtimeStreamsSpeakers(_ config: ProviderConfig, model: String? = nil) -> Bool {
+        var config = config
+        if let model { config.realtimeModel = model }
+        return CloudRealtime.make(config: config, apiKey: "", language: nil, diarize: true)?.streamsSpeakers ?? false
+    }
+
+    /// The realtime model of `prior` when it is a realtime prior of `config` (the pipeline's cloud-prior branch takes
+    /// it as the transcript); nil otherwise.
+    private static func realtimeModel(of prior: PriorTranscription?, for config: ProviderConfig) -> String? {
+        guard let prior, prior.engineID == CloudTranscription.engineID(providerID: config.id) else { return nil }
+        return prior.modelID ?? CloudRealtime.model(for: config)
+    }
+
+    /// Whether the cloud ASR `config` labels the speakers itself, so no diarizer is built: the `realtimeModel`'s
+    /// streaming labels when a realtime prior is the transcript, else the batch model's.
+    private static func asrLabelsSpeakers(_ config: ProviderConfig, realtimeModel: String?) -> Bool {
+        guard let realtimeModel else {
+            return CloudTranscription.diarizes(config, model: CloudTranscription.model(for: config))
+        }
+        return realtimeStreamsSpeakers(config, model: realtimeModel)
     }
 
     func stopRecording() {
@@ -773,7 +934,8 @@ final class AppModel {
                             self.compressionJobs += 1
                             defer { self.compressionJobs -= 1 }
                             // Unloads its model before the job may load one, so two never sit side by side.
-                            // Display only (Apple Speech, local live in cloud mode): nil at once, no drain.
+                            // Display only (Apple Speech, local live or realtime in cloud mode): nil at once, no
+                            // drain. Realtime as the transcript drains its sockets (at most ~5 s) on its actor.
                             let prior = await transcriber.finish()
                             if let folder { await self.finishRecording(folder, prior: prior) }
                         } else if let folder {
@@ -963,15 +1125,18 @@ final class AppModel {
               !(settings.deferTranscriptionWhenConstrained && TranscriptionPipeline.isConstrained)
                   || needsNoModel(prior)
         else { return false }
-        return autoEngine() != .consentPending
+        return autoEngine(prior: prior) != .consentPending
     }
 
-    /// The job writes `prior` without loading a model: no gaps to fill and speakers not told apart. It then runs
-    /// now even on a constrained Mac; should the pipeline find the prior unusable, its full batch runs now too
-    /// rather than holding the compression behind a wait.
+    /// The job writes `prior` without loading a model: no gaps to fill and speakers not told apart, or (a cloud
+    /// realtime prior) already labelled by the stream on the system channel. It then runs now even on a constrained
+    /// Mac; should the pipeline find the prior unusable, its full batch runs now too rather than holding the
+    /// compression behind a wait.
     private func needsNoModel(_ prior: PriorTranscription?) -> Bool {
-        guard let prior else { return false }
-        return prior.micGaps.isEmpty && prior.systemGaps.isEmpty && !settings.diarization
+        guard let prior, prior.micGaps.isEmpty, prior.systemGaps.isEmpty else { return false }
+        guard settings.diarization else { return true }
+        return CloudTranscription.providerID(engineID: prior.engineID) != nil
+            && prior.system.contains { $0.speaker?.isEmpty == false }
     }
 
     /// What the default engines of an automatic transcription resolve to, as `submitTranscription` decides it.
@@ -983,8 +1148,10 @@ final class AppModel {
     }
 
     /// Side-effect free (reads `cloudSTTConfirmed` only, never queues a confirmation): mirrors the cloud ASR and
-    /// cloud diarizer gates of `submitTranscription` with the default engines.
-    private func autoEngine() -> AutoEngine {
+    /// cloud diarizer gates of `submitTranscription` with the default engines. With a cloud realtime `prior` (or
+    /// `realtimeFinal`: a realtime transcript about to start that will be the transcript), whether a diarizer is
+    /// needed follows the realtime model's streaming labels, not the batch model's.
+    private func autoEngine(prior: PriorTranscription? = nil, realtimeFinal: Bool = false) -> AutoEngine {
         let confirmed: (ProviderConfig) -> Bool = { [settings] config in
             guard let destination = CloudTranscription.destination(for: config) else { return false }
             return settings.cloudSTTConfirmed.contains(destination.consentKey)
@@ -995,7 +1162,9 @@ final class AppModel {
            let config = cloudEngineConfigs.first(where: { $0.id == providerID }) {
             guard confirmed(config) else { return .consentPending }
             engine = .cloudConfirmed
-            asrLabelsSpeakers = CloudTranscription.diarizes(config, model: CloudTranscription.model(for: config))
+            let realtimeModel = realtimeFinal
+                ? CloudRealtime.model(for: config) : Self.realtimeModel(of: prior, for: config)
+            asrLabelsSpeakers = Self.asrLabelsSpeakers(config, realtimeModel: realtimeModel)
         }
         if settings.diarization, !asrLabelsSpeakers,
            let providerID = CloudTranscription.providerID(engineID: settings.defaultDiarizerModelID),
@@ -1051,7 +1220,9 @@ final class AppModel {
     /// speakers; its destination is confirmed the same way, after the ASR's, before anything is uploaded. With "Tell
     /// speakers apart" off, no diarizer runs. `deleteAudioAfter` nil = "Delete audio after transcription", read when
     /// the job succeeds. `processNow` runs it now even when "wait" would defer it on a constrained Mac. `prior` goes
-    /// to the job (see `TranscriptionJob.prior`). Returns the job (true when it succeeded), nil when none was
+    /// to the job (see `TranscriptionJob.prior`). With a cloud realtime prior of the cloud ASR (the transcript, only
+    /// its gaps uploaded), whether the ASR labels speakers follows the realtime model's streaming labels, and its gaps
+    /// may go to the diarization model (`gapModel`). Returns the job (true when it succeeded), nil when none was
     /// submitted.
     @discardableResult
     private func submitTranscription(
@@ -1068,10 +1239,11 @@ final class AppModel {
             if let config = cloudEngineConfigs.first(where: { $0.id == providerID }) {
                 guard cloudDestinationConfirmed(
                     config, engineID: CloudTranscription.engineID(providerID: providerID), session: session,
-                    folder: folder, language: language) else { return nil }
-                cloud = makeCloudEngine(config)
+                    folder: folder, language: language, prior: prior) else { return nil }
+                let realtimeModel = Self.realtimeModel(of: prior, for: config)
+                asrLabelsSpeakers = Self.asrLabelsSpeakers(config, realtimeModel: realtimeModel)
+                cloud = makeCloudEngine(config, model: gapModel(config, prior: prior, realtimeModel: realtimeModel))
                 engineID = cloud?.engineID
-                asrLabelsSpeakers = CloudTranscription.diarizes(config, model: CloudTranscription.model(for: config))
             } else if CloudTranscription.providerID(engineID: engineID) != nil {
                 engineID = nil
             }
@@ -1084,7 +1256,7 @@ final class AppModel {
             // A model that labels no speakers would bill a transcription for nothing: the local diarizer runs instead.
             if CloudTranscription.diarizes(config, model: model) {
                 guard cloudDestinationConfirmed(
-                    config, engineID: engineID, session: session, folder: folder, language: language
+                    config, engineID: engineID, session: session, folder: folder, language: language, prior: prior
                 ) else { return nil }
                 cloudDiarizer = makeCloudEngine(config, model: model)
             }
@@ -1126,11 +1298,27 @@ final class AppModel {
         }
     }
 
+    /// The batch model of a cloud realtime prior's gap uploads: `config`'s diarization model when "Tell speakers
+    /// apart" is on, the stream labelled the system channel, a system gap (or a resume to bridge) is to fill and the
+    /// transcription model labels no speakers, so the upload gets labels the pipeline bridges onto the stream's;
+    /// nil = the transcription model.
+    private func gapModel(_ config: ProviderConfig, prior: PriorTranscription?, realtimeModel: String?) -> String? {
+        guard let prior, realtimeModel != nil, settings.diarization,
+              !prior.systemGaps.isEmpty || !prior.systemBridges.isEmpty,
+              prior.system.contains(where: { $0.speaker?.isEmpty == false }),
+              !CloudTranscription.diarizes(config, model: CloudTranscription.model(for: config))
+        else { return nil }
+        let model = CloudTranscription.diarizationModel(for: config)
+        return CloudTranscription.diarizes(config, model: model) ? model : nil
+    }
+
     /// Whether `config`'s destination is confirmed, for the cloud ASR and the cloud diarizer alike; else the run is
     /// queued for the main window's confirmation (submitted again with `engineID`) unless its folder already waits.
-    /// Bound to the destination, so an edited base URL asks again; an invalid one never counts as confirmed.
+    /// Bound to the destination, so an edited base URL asks again; an invalid one never counts as confirmed. `prior`
+    /// stays with the queued run, so a realtime transcript is not lost to the wait.
     private func cloudDestinationConfirmed(
-        _ config: ProviderConfig, engineID: String?, session: RecordingSession, folder: URL, language: String?
+        _ config: ProviderConfig, engineID: String?, session: RecordingSession, folder: URL, language: String?,
+        prior: PriorTranscription?
     ) -> Bool {
         let destination = CloudTranscription.destination(for: config)
         guard let destination, settings.cloudSTTConfirmed.contains(destination.consentKey) else {
@@ -1139,7 +1327,7 @@ final class AppModel {
                 pendingCloudRuns.append(PendingCloudRun(
                     engineID: engineID, providerName: config.displayName,
                     consentKey: destination.consentKey, host: destination.host, conversationID: session.id,
-                    folder: folder, language: language))
+                    folder: folder, language: language, prior: prior))
             }
             return false
         }
@@ -1190,7 +1378,7 @@ final class AppModel {
             updateSettings { $0.cloudSTTConfirmed.append(first.consentKey) }
         }
         for run in runs where !isTranscribing(run.conversationID) {
-            submitTranscription(folder: run.folder, engineID: run.engineID, language: run.language)
+            submitTranscription(folder: run.folder, engineID: run.engineID, language: run.language, prior: run.prior)
         }
     }
 
@@ -2068,7 +2256,7 @@ extension AppModel {
     /// the newest catch-up that was not stopped.
     var catchUpDisabledReason: String? {
         guard let captions = recordingCaptions, recordingTranscriber != nil else {
-            return RecordingDetailView.noCaptionsReason(settings: settings)
+            return RecordingDetailView.noCaptionsReason(model: self)
         }
         if catchUpRun?.isRunning == true { return String(localized: "A catch-up is being written.") }
         if catchUpProvider == nil {

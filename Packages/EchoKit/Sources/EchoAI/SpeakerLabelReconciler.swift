@@ -34,8 +34,9 @@ public enum SpeakerLabelReconciler {
         }
     }
 
-    /// Every labelled `next` speaker's reconciled label.
-    private static func labels(
+    /// Every labelled `next` speaker's reconciled label, as `append` applies it (the realtime runner maps a new
+    /// session's later finals with it).
+    public static func labels(
         for next: [CloudSegment], earlier: [CloudSegment], overlap: ClosedRange<Double>, partIndex: Int
     ) -> [String: String] {
         var total: [String: Double] = [:]

@@ -418,6 +418,62 @@
         }
       }
     },
+    "%@ doesn't support these settings or this language live." : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ no admite estos ajustes o este idioma en directo."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ ne prend pas en charge ces réglages ou cette langue en direct."
+          }
+        },
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ không hỗ trợ các cài đặt này hoặc ngôn ngữ này khi chép lời trực tiếp."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ 的实时转写不支持这些设置或这种语言。"
+          }
+        }
+      }
+    },
+    "%@ has no realtime transcription. You can show a live transcript with a local model in Settings." : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ no tiene transcripción en tiempo real. Puedes mostrar una transcripción en directo con un modelo local en Ajustes."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ n’a pas de transcription en temps réel. Vous pouvez afficher une transcription en direct avec un modèle local dans Réglages."
+          }
+        },
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ không có chép lời thời gian thực. Bạn có thể hiển thị bản chép lời trực tiếp bằng một mô hình cục bộ trong Cài đặt."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ 不提供实时流式转写。你可以在“设置”中使用本地模型显示实时转写。"
+          }
+        }
+      }
+    },
     "%@ is already used by another app. Pick another shortcut." : {
       "localizations" : {
         "es" : {
@@ -593,6 +649,34 @@
         }
       }
     },
+    "%@ needs billing or credits on your account." : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ requiere facturación o créditos en tu cuenta."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ exige un moyen de paiement ou des crédits sur votre compte."
+          }
+        },
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ cần thiết lập thanh toán hoặc có tín dụng trong tài khoản của bạn."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ 需要你的账户开通付费或有可用额度。"
+          }
+        }
+      }
+    },
     "%@ quit — stop recording?" : {
       "localizations" : {
         "es" : {
@@ -621,6 +705,96 @@
         }
       }
     },
+    "%@ realtime is not confirmed yet. Turn it on in Settings to confirm it." : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ en tiempo real aún no está confirmado. Actívalo en Ajustes para confirmarlo."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Le temps réel de %@ n’est pas encore confirmé. Activez-le dans Réglages pour le confirmer."
+          }
+        },
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Chép lời thời gian thực của %@ chưa được xác nhận. Hãy bật trong Cài đặt để xác nhận."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ 实时流尚未确认。请在“设置”中打开以确认。"
+          }
+        }
+      }
+    },
+    "%@ realtime starts once sending audio to %@ (and to its speaker diarizer, if any) is confirmed. Confirm it in a conversation first." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "%1$@ realtime starts once sending audio to %2$@ (and to its speaker diarizer, if any) is confirmed. Confirm it in a conversation first."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$@ en tiempo real empieza cuando se confirma el envío de audio a %2$@ (y a su diarizador, si lo hay). Confírmalo primero en una conversación."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Le temps réel de %1$@ démarre une fois l’envoi de l’audio à %2$@ (et à sa diarisation, le cas échéant) confirmé. Confirmez-le d’abord dans une conversation."
+          }
+        },
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Chép lời thời gian thực của %1$@ bắt đầu khi việc gửi âm thanh đến %2$@ (và đến công cụ phân biệt người nói của nó, nếu có) được xác nhận. Hãy xác nhận trong một cuộc hội thoại trước."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$@ 实时流会在确认将音频发送到 %2$@（以及其说话人分离服务，如有）后开始。请先在一个对话中确认。"
+          }
+        }
+      }
+    },
+    "%@ rejected the API key. Check it in Settings › API Keys." : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ rechazó la clave de API. Revísala en Ajustes › Claves de API."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ a refusé la clé API. Vérifiez-la dans Réglages › Clés API."
+          }
+        },
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ đã từ chối khoá API. Hãy kiểm tra trong Cài đặt › Khoá API."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ 拒绝了 API 密钥。请在“设置 › API 密钥”中检查。"
+          }
+        }
+      }
+    },
     "%@ stopped using audio — stop recording?" : {
       "localizations" : {
         "es" : {
@@ -645,6 +819,68 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "%@ 已停止使用音频 — 要停止录音吗？"
+          }
+        }
+      }
+    },
+    "%@ transcribes after Stop. You can show a live transcript with a local model in Settings." : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ transcribe después de Detener. Puedes mostrar una transcripción en directo con un modelo local en Ajustes."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ transcrit après l’arrêt. Vous pouvez afficher une transcription en direct avec un modèle local dans Réglages."
+          }
+        },
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ chép lời sau khi bấm Dừng. Bạn có thể hiển thị bản chép lời trực tiếp bằng một mô hình cục bộ trong Cài đặt."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ 会在停止后转写。你可以在“设置”中使用本地模型显示实时转写。"
+          }
+        }
+      }
+    },
+    "%@ transcribes after Stop. You can show a live transcript with a local model or %@ realtime in Settings." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "%1$@ transcribes after Stop. You can show a live transcript with a local model or %2$@ realtime in Settings."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$@ transcribe después de Detener. Puedes mostrar una transcripción en directo con un modelo local o con %2$@ en tiempo real en Ajustes."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$@ transcrit après l’arrêt. Vous pouvez afficher une transcription en direct avec un modèle local ou le temps réel de %2$@ dans Réglages."
+          }
+        },
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$@ chép lời sau khi bấm Dừng. Bạn có thể hiển thị bản chép lời trực tiếp bằng một mô hình cục bộ hoặc chép lời thời gian thực của %2$@ trong Cài đặt."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$@ 会在停止后转写。你可以在“设置”中使用本地模型或 %2$@ 实时流显示实时转写。"
           }
         }
       }
@@ -3041,6 +3277,40 @@
         }
       }
     },
+    "Audio leaves this Mac: while recording, the mic and system channels are streamed live to %@ (%@) for transcription and billed by them. The provider may keep the audio under its own retention policy. You are asked once per provider and destination." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Audio leaves this Mac: while recording, the mic and system channels are streamed live to %1$@ (%2$@) for transcription and billed by them. The provider may keep the audio under its own retention policy. You are asked once per provider and destination."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "El audio sale de este Mac: durante la grabación, los canales del micrófono y del sistema se transmiten en directo a %1$@ (%2$@) para transcribirlos, y este los factura. El proveedor puede conservar el audio según su propia política de retención. Se te pregunta una vez por proveedor y destino."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "L’audio quitte ce Mac : pendant l’enregistrement, les canaux micro et système sont diffusés en direct vers %1$@ (%2$@) pour la transcription, et facturés par celui-ci. Le fournisseur peut conserver l’audio selon sa propre politique de conservation. La question vous est posée une fois par fournisseur et par destination."
+          }
+        },
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Âm thanh rời khỏi máy Mac này: trong khi ghi âm, kênh micrô và kênh hệ thống được truyền trực tiếp đến %1$@ (%2$@) để chép lời và do họ tính phí. Nhà cung cấp có thể lưu giữ âm thanh theo chính sách lưu trữ riêng của họ. Bạn chỉ được hỏi một lần cho mỗi nhà cung cấp và nơi nhận."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "音频会离开这台 Mac：录音期间，麦克风声道和系统声道会实时流式传输到 %1$@（%2$@）进行转写，并由其计费。提供商可能会按照其自身的保留政策保存音频。每个提供商和目标位置只会询问你一次。"
+          }
+        }
+      }
+    },
     "Audio only (keep transcript, summary and chat)" : {
       "localizations" : {
         "es" : {
@@ -4737,6 +5007,34 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "确认…"
+          }
+        }
+      }
+    },
+    "Connecting to %@…" : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Conectando con %@…"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Connexion à %@…"
+          }
+        },
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Đang kết nối với %@…"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "正在连接 %@…"
           }
         }
       }
@@ -9940,6 +10238,34 @@
         }
       }
     },
+    "Live model" : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Modelo en directo"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Modèle en direct"
+          }
+        },
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Mô hình chép lời trực tiếp"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "实时转写模型"
+          }
+        }
+      }
+    },
     "Live transcript" : {
       "localizations" : {
         "es" : {
@@ -10132,6 +10458,62 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "实时转写：正在准备语言…"
+          }
+        }
+      }
+    },
+    "Live with %@ realtime" : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "En directo con %@ en tiempo real"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "En direct avec %@ en temps réel"
+          }
+        },
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Chép lời trực tiếp bằng %@ thời gian thực"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "使用 %@ 实时流"
+          }
+        }
+      }
+    },
+    "Live with a local model" : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "En directo con un modelo local"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "En direct avec un modèle local"
+          }
+        },
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Chép lời trực tiếp bằng mô hình cục bộ"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "使用本地模型实时转写"
           }
         }
       }
@@ -11791,6 +12173,62 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "未列出嵌入模型；请输入模型 ID。"
+          }
+        }
+      }
+    },
+    "No installed live model supports this recording's language. Download one in Settings › Transcription." : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ningún modelo en directo instalado admite el idioma de esta grabación. Descarga uno en Ajustes › Transcripción."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Aucun modèle en direct installé ne prend en charge la langue de cet enregistrement. Téléchargez-en un dans Réglages › Transcription."
+          }
+        },
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Không có mô hình chép lời trực tiếp nào đã cài hỗ trợ ngôn ngữ của bản ghi âm này. Hãy tải về một mô hình trong Cài đặt › Chép lời."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "已安装的实时转写模型都不支持此录音的语言。请在“设置 › 转写”中下载一个。"
+          }
+        }
+      }
+    },
+    "No live model installed. Download a WhisperKit or Parakeet model above." : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "No hay ningún modelo en directo instalado. Descarga arriba un modelo WhisperKit o Parakeet."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Aucun modèle en direct installé. Téléchargez un modèle WhisperKit ou Parakeet ci-dessus."
+          }
+        },
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Chưa cài mô hình chép lời trực tiếp nào. Hãy tải về một mô hình WhisperKit hoặc Parakeet ở trên."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "未安装实时转写模型。请在上方下载 WhisperKit 或 Parakeet 模型。"
           }
         }
       }
@@ -14612,6 +15050,34 @@
         }
       }
     },
+    "Realtime model" : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Modelo en tiempo real"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Modèle temps réel"
+          }
+        },
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Mô hình thời gian thực"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "实时流模型"
+          }
+        }
+      }
+    },
     "Rebuild" : {
       "localizations" : {
         "es" : {
@@ -14664,6 +15130,34 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "重建索引"
+          }
+        }
+      }
+    },
+    "Reconnecting…" : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Reconectando…"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Reconnexion…"
+          }
+        },
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Đang kết nối lại…"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "正在重新连接…"
           }
         }
       }
@@ -16063,6 +16557,40 @@
         }
       }
     },
+    "Saves the streamed transcript instead of uploading the recording again after Stop, so you pay for streaming only. Parts missed while the connection was down are sent to %@ after Stop, with about 30 s of audio on each side, and around each pause, so speakers keep their labels. A cloud diarizer is billed separately. Realtime models can be less accurate than %@." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Saves the streamed transcript instead of uploading the recording again after Stop, so you pay for streaming only. Parts missed while the connection was down are sent to %1$@ after Stop, with about 30 s of audio on each side, and around each pause, so speakers keep their labels. A cloud diarizer is billed separately. Realtime models can be less accurate than %2$@."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Guarda la transcripción transmitida en lugar de volver a subir la grabación después de Detener, así que solo pagas la transmisión. Las partes perdidas mientras la conexión estaba caída se envían a %1$@ después de Detener, con unos 30 s de audio a cada lado, y alrededor de cada pausa, para que los hablantes conserven sus etiquetas. Un diarizador en la nube se factura aparte. Los modelos en tiempo real pueden ser menos precisos que %2$@."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Enregistre la transcription diffusée au lieu d’envoyer à nouveau l’enregistrement après l’arrêt : vous ne payez que la diffusion. Les parties manquées pendant une coupure de la connexion sont envoyées à %1$@ après l’arrêt, avec environ 30 s d’audio de chaque côté, et autour de chaque pause, pour que les intervenants gardent leurs libellés. Une diarisation cloud est facturée séparément. Les modèles temps réel peuvent être moins précis que %2$@."
+          }
+        },
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Lưu bản chép lời đã truyền trực tiếp thay vì tải bản ghi âm lên lại sau khi bấm Dừng, nên bạn chỉ trả phí truyền trực tiếp. Các phần bị lỡ khi mất kết nối được gửi đến %1$@ sau khi bấm Dừng, kèm khoảng 30 giây âm thanh ở mỗi bên, và quanh mỗi lần tạm dừng, để người nói giữ nguyên nhãn. Công cụ phân biệt người nói trên đám mây được tính phí riêng. Mô hình thời gian thực có thể kém chính xác hơn %2$@."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "保存实时流式转写文本，停止后不再重新上传录音，因此只需支付流式传输费用。连接中断期间漏掉的部分会在停止后发送到 %1$@，前后各带约 30 秒音频，每次暂停前后也一样，以便说话人保持原有标签。云端说话人分离服务单独计费。实时流模型可能不如 %2$@ 准确。"
+          }
+        }
+      }
+    },
     "Scan" : {
       "comment" : "A button that scans for local hosts.",
       "isCommentAutoGenerated" : true,
@@ -16877,7 +17405,36 @@
         }
       }
     },
+    "Shows the transcript during the recording. WhisperKit and Parakeet models keep it, so it is ready within seconds of Stop; Apple Speech (macOS 26+) only shows it and transcribes after Stop. Uses more CPU and memory while recording. A cloud engine can show it with a local model or its realtime stream: see Transcription model › Cloud." : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Muestra la transcripción durante la grabación. Los modelos WhisperKit y Parakeet la conservan, para que esté lista segundos después de Detener; Apple Speech (macOS 26+) solo la muestra y transcribe después de Detener. Usa más CPU y memoria al grabar. Un motor en la nube puede mostrarla con un modelo local o con su transmisión en tiempo real: consulta Modelo de transcripción › Nube."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Affiche la transcription pendant l’enregistrement. Les modèles WhisperKit et Parakeet la conservent, pour qu’elle soit prête quelques secondes après l’arrêt ; Apple Speech (macOS 26+) l’affiche seulement et transcrit après l’arrêt. Utilise plus de processeur et de mémoire pendant l’enregistrement. Un moteur cloud peut l’afficher avec un modèle local ou son flux temps réel : voir Modèle de transcription › Cloud."
+          }
+        },
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Hiển thị bản chép lời trong khi ghi âm. Mô hình WhisperKit và Parakeet giữ lại bản này, nhờ đó bản chép lời sẵn sàng trong vài giây sau khi bấm Dừng; Apple Speech (macOS 26+) chỉ hiển thị và chép lời sau khi bấm Dừng. Dùng nhiều CPU và bộ nhớ hơn khi ghi âm. Công cụ đám mây có thể hiển thị bản này bằng một mô hình cục bộ hoặc luồng thời gian thực của nó: xem Mô hình chép lời › Đám mây."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "在录音期间显示转写文本。WhisperKit 和 Parakeet 模型会保留下来，因此停止后几秒内即可就绪；Apple Speech（macOS 26+）仅显示，停止后再转写。录音时会占用更多 CPU 和内存。云端引擎可以通过本地模型或其实时流显示转写文本：请参阅“转写模型 › 云端”。"
+          }
+        }
+      }
+    },
     "Shows the transcript during the recording. WhisperKit and Parakeet models keep it, so it is ready within seconds of Stop; Apple Speech (macOS 26+) only shows it and transcribes after Stop. Uses more CPU and memory while recording. Other engines transcribe after Stop." : {
+      "extractionState" : "stale",
       "localizations" : {
         "es" : {
           "stringUnit" : {
@@ -16901,6 +17458,34 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "在录音期间显示转写文本。WhisperKit 和 Parakeet 模型会保留下来，因此停止后几秒内即可就绪；Apple Speech（macOS 26+）仅显示，停止后再转写。录音时会占用更多 CPU 和内存。其他引擎会在停止后转写。"
+          }
+        }
+      }
+    },
+    "Shows the transcript while recording with a model on this Mac. Free: nothing is uploaded while recording, but it uses CPU, memory and battery. The saved transcript still comes from %@ after Stop, so it can differ from what you saw." : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Muestra la transcripción durante la grabación con un modelo de este Mac. Gratis: no se sube nada durante la grabación, pero usa CPU, memoria y batería. La transcripción guardada sigue viniendo de %@ después de Detener, así que puede diferir de lo que viste."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Affiche la transcription pendant l’enregistrement avec un modèle sur ce Mac. Gratuit : rien n’est envoyé pendant l’enregistrement, mais cela utilise processeur, mémoire et batterie. La transcription enregistrée vient toujours de %@ après l’arrêt et peut donc différer de ce que vous avez vu."
+          }
+        },
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Hiển thị bản chép lời trong khi ghi âm bằng một mô hình trên máy Mac này. Miễn phí: không có gì được tải lên trong khi ghi âm, nhưng dùng CPU, bộ nhớ và pin. Bản chép lời được lưu vẫn do %@ tạo sau khi bấm Dừng, nên có thể khác với những gì bạn đã thấy."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "录音时使用这台 Mac 上的模型显示转写文本。免费：录音期间不会上传任何内容，但会占用 CPU、内存和电量。保存的转写文本仍会在停止后由 %@ 生成，因此可能与你看到的不同。"
           }
         }
       }
@@ -17976,6 +18561,68 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "已用存储空间：%@"
+          }
+        }
+      }
+    },
+    "Streams the mic and the system audio to %@ as two live connections for the whole recording. Costs money: %@, on top of the normal transcription after Stop. Long recordings reconnect before the provider's session limit and stream about 30 s twice at each reconnect so speakers keep their labels. A 1-hour meeting costs about 2 hours of streaming plus 2 hours of transcription." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Streams the mic and the system audio to %1$@ as two live connections for the whole recording. Costs money: %2$@, on top of the normal transcription after Stop. Long recordings reconnect before the provider's session limit and stream about 30 s twice at each reconnect so speakers keep their labels. A 1-hour meeting costs about 2 hours of streaming plus 2 hours of transcription."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Transmite el micrófono y el audio del sistema a %1$@ como dos conexiones en directo durante toda la grabación. Cuesta dinero: %2$@, además de la transcripción normal después de Detener. Las grabaciones largas se reconectan antes del límite de sesión del proveedor y transmiten unos 30 s dos veces en cada reconexión para que los hablantes conserven sus etiquetas. Una reunión de 1 hora cuesta unas 2 horas de transmisión más 2 horas de transcripción."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Diffuse le micro et l’audio système vers %1$@ par deux connexions en direct pendant tout l’enregistrement. Payant : %2$@, en plus de la transcription normale après l’arrêt. Les longs enregistrements se reconnectent avant la limite de session du fournisseur et diffusent environ 30 s deux fois à chaque reconnexion pour que les intervenants gardent leurs libellés. Une réunion d’une heure coûte environ 2 heures de diffusion plus 2 heures de transcription."
+          }
+        },
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Truyền âm thanh micrô và âm thanh hệ thống đến %1$@ qua hai kết nối trực tiếp trong suốt bản ghi âm. Có tính phí: %2$@, cộng thêm lượt chép lời thông thường sau khi bấm Dừng. Bản ghi âm dài sẽ kết nối lại trước giới hạn phiên của nhà cung cấp và truyền khoảng 30 giây hai lần ở mỗi lần kết nối lại để người nói giữ nguyên nhãn. Một cuộc họp 1 giờ tốn khoảng 2 giờ truyền trực tiếp cộng 2 giờ chép lời."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "在整个录音期间，通过两条实时连接将麦克风和系统音频流式传输到 %1$@。需要付费：%2$@，另加停止后的常规转写费用。长录音会在达到提供商的会话时长上限前重新连接，并在每次重连时将约 30 秒音频传输两次，以便说话人保持原有标签。1 小时的会议约需 2 小时流式传输加 2 小时转写的费用。"
+          }
+        }
+      }
+    },
+    "Streams to %@" : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Transmite a %@"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Diffuse vers %@"
+          }
+        },
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Truyền đến %@"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "流式传输到 %@"
           }
         }
       }
@@ -19063,6 +19710,34 @@
         }
       }
     },
+    "The connection to %@ was lost." : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Se perdió la conexión con %@."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "La connexion à %@ a été perdue."
+          }
+        },
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Đã mất kết nối với %@."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "与 %@ 的连接已断开。"
+          }
+        }
+      }
+    },
     "The embedding model lets a question find passages with the same meaning, in any language. Models are downloaded only when you click Download." : {
       "localizations" : {
         "es" : {
@@ -19457,6 +20132,34 @@
         }
       }
     },
+    "The saved transcript is made after Stop and can differ." : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "La transcripción guardada se hace después de Detener y puede diferir."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "La transcription enregistrée est faite après l’arrêt et peut différer."
+          }
+        },
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Bản chép lời được lưu sẽ được tạo sau khi bấm Dừng và có thể khác."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "保存的转写文本会在停止后生成，可能有所不同。"
+          }
+        }
+      }
+    },
     "The selected app stopped playing audio before recording could resume." : {
       "localizations" : {
         "es" : {
@@ -19623,6 +20326,34 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "无法读取转写文本。"
+          }
+        }
+      }
+    },
+    "The transcript is made after Stop." : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "La transcripción se hace después de Detener."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "La transcription est faite après l’arrêt."
+          }
+        },
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Bản chép lời sẽ được tạo sau khi bấm Dừng."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "转写文本会在停止后生成。"
           }
         }
       }
@@ -20019,6 +20750,34 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "此模型只能处理实时音频流，无法转写录音。请选择其他模型。"
+          }
+        }
+      }
+    },
+    "This realtime model labels no speakers, so the diarizer runs on the recording after Stop; a cloud diarizer asks for its own consent." : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Este modelo en tiempo real no etiqueta a los hablantes, así que el diarizador se ejecuta sobre la grabación después de Detener; un diarizador en la nube pide su propio consentimiento."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ce modèle temps réel n’attribue pas les intervenants : la diarisation s’exécute donc sur l’enregistrement après l’arrêt ; une diarisation cloud demande son propre consentement."
+          }
+        },
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Mô hình thời gian thực này không gắn nhãn người nói, nên công cụ phân biệt người nói chạy trên bản ghi âm sau khi bấm Dừng; công cụ phân biệt người nói trên đám mây sẽ hỏi sự đồng ý riêng."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "此实时流模型不会标注说话人，因此停止后会对录音运行说话人分离；云端说话人分离服务会单独征求你的同意。"
           }
         }
       }
@@ -21347,6 +22106,34 @@
         }
       }
     },
+    "Use the realtime result as the transcript" : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Usar el resultado en tiempo real como transcripción"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Utiliser le résultat temps réel comme transcription"
+          }
+        },
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Dùng kết quả thời gian thực làm bản chép lời"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "将实时流结果用作转写文本"
+          }
+        }
+      }
+    },
     "Use ⌘, ⌥ or ⌃ with the key." : {
       "localizations" : {
         "es" : {
@@ -22054,6 +22841,34 @@
         }
       }
     },
+    "While recording" : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Durante la grabación"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Pendant l’enregistrement"
+          }
+        },
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Trong khi ghi âm"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "录音时"
+          }
+        }
+      }
+    },
     "Whisper transcription" : {
       "localizations" : {
         "es" : {
@@ -22361,6 +23176,34 @@
         }
       }
     },
+    "Your %@ plan's limit on live sessions was reached." : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Se alcanzó el límite de sesiones en directo de tu plan de %@."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "La limite de sessions en direct de votre forfait %@ est atteinte."
+          }
+        },
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Đã đạt giới hạn phiên trực tiếp trong gói %@ của bạn."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "已达到你的 %@ 套餐的实时会话上限。"
+          }
+        }
+      }
+    },
     "Your conversations are not indexed yet." : {
       "localizations" : {
         "es" : {
@@ -22417,6 +23260,34 @@
         }
       }
     },
+    "about %@ per hour of streaming for each connection" : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "unos %@ por hora de transmisión por cada conexión"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "environ %@ par heure de diffusion pour chaque connexion"
+          }
+        },
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "khoảng %@ cho mỗi giờ truyền trực tiếp trên mỗi kết nối"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "每条连接每小时流式传输约 %@"
+          }
+        }
+      }
+    },
     "api-key header" : {
       "comment" : "The text for the API key header option in the picker.",
       "isCommentAutoGenerated" : true,
@@ -22443,6 +23314,90 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "api-key 标头"
+          }
+        }
+      }
+    },
+    "billed by %@" : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "facturado por %@"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "facturé par %@"
+          }
+        },
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "do %@ tính phí"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "由 %@ 计费"
+          }
+        }
+      }
+    },
+    "billed by connection time, about %@ per hour for each connection" : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "facturado por tiempo de conexión, unos %@ por hora por cada conexión"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "facturé au temps de connexion, environ %@ par heure pour chaque connexion"
+          }
+        },
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "tính phí theo thời gian kết nối, khoảng %@ mỗi giờ cho mỗi kết nối"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "按连接时长计费，每条连接每小时约 %@"
+          }
+        }
+      }
+    },
+    "billed per streamed minute, about %@ per hour for each connection" : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "facturado por minuto transmitido, unos %@ por hora por cada conexión"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "facturé à la minute diffusée, environ %@ par heure pour chaque connexion"
+          }
+        },
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "tính phí theo số phút truyền, khoảng %@ mỗi giờ cho mỗi kết nối"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "按流式传输分钟数计费，每条连接每小时约 %@"
           }
         }
       }

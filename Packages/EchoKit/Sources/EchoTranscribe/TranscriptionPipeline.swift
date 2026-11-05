@@ -115,6 +115,35 @@ public actor TranscriptionPipeline {
         // Creates `conversation.json` when missing (transcribed before compression); nil while unreadable.
         var stored: RecordingSession?
         do {
+            if let cloud, let prior = job.prior, prior.engineID == cloud.engineID,
+               let session = try? RecordingSession.read(from: job.folder),
+               let sources = try? channelSources(session: session, job: job), sources.mic != nil,
+               let audio = ConversationFiles.audioURL(in: job.folder, fileName: session.audioFileName),
+               let duration = try? MonoAudio.duration(of: audio),
+               prior.isUsable(
+                   engineID: cloud.engineID, engineFallback: nil, languageOverride: job.language,
+                   audioDuration: duration) {
+                // A cloud realtime stream as the transcript: only its gaps are uploaded, and a diarizer runs only when
+                // the stream labelled no speakers.
+                stored = session
+                let streamLabels = job.diarize && prior.system.contains { $0.speaker?.isEmpty == false }
+                let (diarizer, cloudDiarizer) = streamLabels ? (nil, nil) : diarizers(for: job, cloud: cloudDiarizer)
+                let fillsGaps = !prior.micGaps.isEmpty || (sources.system != nil && !prior.systemGaps.isEmpty)
+                    || (sources.system != nil && streamLabels && !prior.systemBridges.isEmpty)
+                let diarizes = sources.system != nil && (diarizer != nil || cloudDiarizer != nil)
+                if (fillsGaps || diarizes) && deferWhenConstrained && !job.processNow { await waitWhileConstrained(job) }
+                started = true
+                let url = try await transcribeCloudPrior(
+                    job, prior: prior, session: session, sources: sources, cloud: cloud, streamLabels: streamLabels,
+                    duration: duration, diarizer: diarizer, cloudDiarizer: cloudDiarizer)
+                Self.updateConversation(in: job.folder, session: session) {
+                    $0.status = .transcribed
+                    $0.hasTranscript = true
+                    $0.sizeBytes = LibraryStore.sizeOnDisk(of: job.folder)
+                }
+                emit(job, .finished, 1)
+                return url
+            }
             if cloud == nil, let prior = job.prior, let session = try? RecordingSession.read(from: job.folder),
                let sources = try? channelSources(session: session, job: job), sources.mic != nil,
                let entry = await usableEntry(for: prior, job: job, session: session) {
@@ -346,6 +375,166 @@ public actor TranscriptionPipeline {
                 throw error
             }
         }
+    }
+
+    /// Covered audio a gap upload takes on each side of the gap on a channel without stream speaker labels (mic, or a
+    /// system stream with none); a labelled channel takes `SpeakerLabelReconciler.labelOverlapSeconds`.
+    static let gapPaddingSeconds = 0.5
+
+    /// A cloud realtime `prior` as the transcript: each channel's gaps go to `cloud` (`fillCloudGaps`), then `process`
+    /// merges, with no gaps left, so nothing else is uploaded unless a diarizer is given. `streamLabels`: `job.diarize`
+    /// is on and the stream labelled the system channel's speakers, so its gaps are diarized and bridged onto those
+    /// labels and the caller passes no diarizer, and the audio around each resume with scoped labels is uploaded only
+    /// to map them back (`fillCloudGaps`' bridges). With `job.diarize` off the stream labels are dropped (one speaker).
+    /// The transcript records the realtime model.
+    private func transcribeCloudPrior(
+        _ job: TranscriptionJob, prior: PriorTranscription, session: RecordingSession,
+        sources: (mic: ChannelSource?, system: ChannelSource?), cloud: CloudEngine, streamLabels: Bool,
+        duration: Double, diarizer: SpeakerDiarizer?, cloudDiarizer: CloudEngine?
+    ) async throws -> URL {
+        Self.updateConversation(in: job.folder, session: session) { $0.status = .transcribing }
+        let language = Self.cloudLanguage(LanguageRange.ranges(from: session.languageMarkers))
+        var filled = prior
+        if !job.diarize {
+            filled.system = prior.system.map { segment in
+                var segment = segment
+                segment.speaker = nil
+                return segment
+            }
+        }
+        if let source = sources.mic, !prior.micGaps.isEmpty {
+            emit(job, .transcribingMic, 0.05)
+            filled.mic = try await Self.fillCloudGaps(
+                prior.micGaps, into: filled.mic, source: source, cloud: cloud, language: language, labels: false,
+                duration: duration
+            ) { [self] fraction in emit(job, .transcribingMic, 0.05 + 0.35 * fraction) }
+        }
+        if let source = sources.system, !prior.systemGaps.isEmpty || (streamLabels && !prior.systemBridges.isEmpty) {
+            emit(job, .transcribingSystem, 0.45)
+            filled.system = try await Self.fillCloudGaps(
+                prior.systemGaps, bridges: prior.systemBridges, into: filled.system, source: source, cloud: cloud,
+                language: language, labels: streamLabels, duration: duration
+            ) { [self] fraction in emit(job, .transcribingSystem, 0.45 + 0.35 * fraction) }
+        }
+        filled.micGaps = []
+        filled.systemGaps = []
+        filled.systemBridges = []
+        return try await process(
+            job, session: session, sources: sources, engineID: cloud.engineID,
+            modelID: prior.modelID ?? (cloud.model.isEmpty ? nil : cloud.model), engineFallback: nil,
+            diarizer: diarizer, cloudDiarizer: cloudDiarizer, gateDiarization: true, prior: filled
+        ) { _, _, _, _ in [] }
+    }
+
+    /// One channel's `segments` with each of its `gaps` transcribed by `cloud` from the compressed source: the gap
+    /// padded into covered audio (`labelOverlapSeconds` each side with `labels`, else `gapPaddingSeconds`), clamped to
+    /// `0...duration`, sent through the range API (split under the provider's cap) and joined by `joinGap`. `labels`:
+    /// the upload asks for speaker labels and they are bridged onto the stream's. With `labels`, each of `bridges`
+    /// (file seconds of a resume with session-scoped labels and no gap) is a zero-length gap: its upload adds no
+    /// segment and only maps the labels first heard after it back; none is uploaded when no label is new after it (a
+    /// gap's padding bridged it) or the batch model only streams. In file order, so each later span bridges onto the
+    /// earlier ones.
+    private static func fillCloudGaps(
+        _ gaps: [Span], bridges: [Double] = [], into segments: [RawSegment], source: ChannelSource,
+        cloud: CloudEngine, language: String?, labels: Bool, duration: Double, progress: @Sendable (Double) -> Void
+    ) async throws -> [RawSegment] {
+        guard !CloudTranscription.isStreamingOnly(cloud.model) else {
+            if gaps.isEmpty { return segments }
+            throw TranscriptionError.cloud(
+                provider: cloud.name, reason: "\(cloud.model) only streams live audio; pick another model in Settings")
+        }
+        let padding = labels ? SpeakerLabelReconciler.labelOverlapSeconds : gapPaddingSeconds
+        let spans = (gaps + (labels ? bridges.map { Span(start: $0, end: $0) } : [])).sorted { $0.start < $1.start }
+        var segments = segments.sorted { $0.start < $1.start }
+        for (index, gap) in spans.enumerated() {
+            try Task.checkCancellation()
+            let lower = max(0, gap.start - padding)
+            let upper = min(duration, gap.end + padding)
+            guard gap.end >= gap.start, upper > lower else { continue }
+            if gap.end == gap.start, !hasNewLabels(segments, after: gap.start) { continue }
+            let response: [CloudSegment]
+            do {
+                response = try await CloudTranscription.transcribe(
+                    source: source.url, channel: source.channel, range: lower...upper, with: cloud.transcriber,
+                    language: language, diarize: labels)
+            } catch let error as CancellationError {
+                throw error
+            } catch {
+                throw TranscriptionError.cloud(provider: cloud.name, reason: CloudTranscription.failureReason(error))
+            }
+            segments = joinGap(response, gap: gap, upload: lower...upper, into: segments, labels: labels, partIndex: index + 1)
+            progress(Double(index + 1) / Double(spans.count))
+        }
+        return segments
+    }
+
+    /// Whether a speaker label of `segments` is first heard at or after `time`.
+    private static func hasNewLabels(_ segments: [RawSegment], after time: Double) -> Bool {
+        var before = Set<String>(), after = Set<String>()
+        for segment in segments {
+            guard let speaker = segment.speaker, !speaker.isEmpty else { continue }
+            if segment.start < time { before.insert(speaker) } else { after.insert(speaker) }
+        }
+        return !after.subtracting(before).isEmpty
+    }
+
+    /// `segments` (one channel, file time) with a gap's upload `response` (file time, covering `upload` = the gap and
+    /// its padding) joined, sorted by start. The response's segments whose midpoint is inside `gap` are kept; the
+    /// padding's only serve the labels. Without `labels` every speaker label is dropped. With `labels`, two steps:
+    /// the response's labels map onto the labels before the gap by the left padding (`SpeakerLabelReconciler`, a label
+    /// with no match gets its own `"p<N>:"` scope, `partIndex` and up, so it never merges); then each label first heard
+    /// after the gap (the session after an unplanned disconnect, `"r<N>:"`) takes the label of (before + response)
+    /// it matches in the right padding, unless that label is already in use after the gap; a label with no match
+    /// keeps its own. Pure, for tests.
+    static func joinGap(
+        _ response: [CloudSegment], gap: Span, upload: ClosedRange<Double>, into segments: [RawSegment], labels: Bool,
+        partIndex: Int
+    ) -> [RawSegment] {
+        func inGap(_ segment: CloudSegment) -> Bool {
+            let middle = (segment.start + segment.end) / 2
+            return middle >= gap.start && middle < gap.end
+        }
+        func label(_ speaker: String?) -> String? { speaker.flatMap { $0.isEmpty ? nil : $0 } }
+        func raw(_ segment: CloudSegment) -> RawSegment {
+            RawSegment(
+                start: segment.start, end: segment.end, text: segment.text, detectedLanguage: segment.language,
+                speaker: labels ? label(segment.speaker) : nil)
+        }
+        guard labels else {
+            return (segments + response.filter(inGap).map(raw)).sorted { $0.start < $1.start }
+        }
+        let existing = segments.map {
+            CloudSegment(start: $0.start, end: $0.end, text: $0.text, speaker: $0.speaker, language: $0.detectedLanguage)
+        }
+        // Step 1: the gap onto the session before. Every existing label counts for the scope; only the left padding
+        // counts for the matches.
+        let left = upload.lowerBound...max(upload.lowerBound, gap.start)
+        let gapMapping = SpeakerLabelReconciler.labels(
+            for: response, earlier: existing, overlap: left, partIndex: partIndex)
+        let mapped = response.map { segment in
+            var segment = segment
+            segment.speaker = label(segment.speaker).flatMap { gapMapping[$0] }
+            return segment
+        }
+        // Step 2: the session after onto (before + gap).
+        let before = existing.filter { $0.start < gap.start }
+        let after = existing.filter { $0.start >= gap.start }
+        let beforeLabels = Set(before.compactMap { label($0.speaker) })
+        let afterLabels = Set(after.compactMap { label($0.speaker) })
+        let newLabels = afterLabels.subtracting(beforeLabels)
+        let earlier = before + mapped
+        let earlierLabels = Set(earlier.compactMap { label($0.speaker) })
+        let right = min(max(gap.end, upload.lowerBound), upload.upperBound)...upload.upperBound
+        let afterMapping = newLabels.isEmpty ? [:] : SpeakerLabelReconciler.labels(
+            for: after.filter { label($0.speaker).map(newLabels.contains) ?? false }, earlier: earlier, overlap: right,
+            partIndex: partIndex
+        ).filter { earlierLabels.contains($0.value) && !afterLabels.contains($0.value) }
+        let bridged = segments.map { segment in
+            var segment = segment
+            if let speaker = label(segment.speaker), let target = afterMapping[speaker] { segment.speaker = target }
+            return segment
+        }
+        return (bridged + mapped.filter(inGap).map(raw)).sorted { $0.start < $1.start }
     }
 
     /// The gaps of one channel's 16 kHz extract, in file time: each read in slabs of at most `slabSeconds` and cut

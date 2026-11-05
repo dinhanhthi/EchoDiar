@@ -94,6 +94,10 @@
     <value>关于 EchoDiar</value>
     <comment>About EchoDiar</comment>
   </data>
+  <data name="AboutPerHourOfStreamingForEachConnection" xml:space="preserve">
+    <value>每条连接每小时流式传输约 {0}</value>
+    <comment>about %@ per hour of streaming for each connection</comment>
+  </data>
   <data name="AboutWhereDataGoes" xml:space="preserve">
     <value>关于数据的去向</value>
     <comment>About where data goes</comment>
@@ -318,6 +322,10 @@
     <value>音频会离开这台 Mac：录音的麦克风声道和系统声道会上传到 {0}（{1}）进行转写，并由其计费。提供商可能会按照其自身的保留政策保存音频。每个提供商和目标位置只会询问你一次。</value>
     <comment>Audio leaves this Mac: the recording's mic and system channels are uploaded to %@ (%@) for transcription and billed by them. The provider may keep the audio under its own retention policy. You are asked once per provider and destination.</comment>
   </data>
+  <data name="AudioLeavesThisMacWhileRecordingTheMicAndSystemChannelsAreSt" xml:space="preserve">
+    <value>音频会离开这台 Mac：录音期间，麦克风声道和系统声道会实时流式传输到 {0}（{1}）进行转写，并由其计费。提供商可能会按照其自身的保留政策保存音频。每个提供商和目标位置只会询问你一次。</value>
+    <comment>Audio leaves this Mac: while recording, the mic and system channels are streamed live to %@ (%@) for transcription and billed by them. The provider may keep the audio under its own retention policy. You are asked once per provider and destination.</comment>
+  </data>
   <data name="AudioLeavesThisPCCloudEnginesUploadTheRecordingToTheProvider" xml:space="preserve">
     <value>音频会离开这台电脑：云端引擎会将录音上传到提供商。</value>
     <comment>Audio leaves this PC: cloud engines upload the recording to the provider.</comment>
@@ -397,6 +405,18 @@
   <data name="BeforeYouRecord" xml:space="preserve">
     <value>录音之前</value>
     <comment>Before you record</comment>
+  </data>
+  <data name="BilledBy" xml:space="preserve">
+    <value>由 {0} 计费</value>
+    <comment>billed by %@</comment>
+  </data>
+  <data name="BilledByConnectionTimeAboutPerHourForEachConnection" xml:space="preserve">
+    <value>按连接时长计费，每条连接每小时约 {0}</value>
+    <comment>billed by connection time, about %@ per hour for each connection</comment>
+  </data>
+  <data name="BilledPerStreamedMinuteAboutPerHourForEachConnection" xml:space="preserve">
+    <value>按流式传输分钟数计费，每条连接每小时约 {0}</value>
+    <comment>billed per streamed minute, about %@ per hour for each connection</comment>
   </data>
   <data name="BothVoicesInBothEars" xml:space="preserve">
     <value>双耳都能听到双方声音</value>
@@ -617,6 +637,10 @@
   <data name="ConfirmTheEmbeddingProviderInSettingsRAG" xml:space="preserve">
     <value>请在“设置 › RAG”中确认嵌入提供商。</value>
     <comment>Confirm the embedding provider in Settings › RAG.</comment>
+  </data>
+  <data name="ConnectingTo" xml:space="preserve">
+    <value>正在连接 {0}…</value>
+    <comment>Connecting to %@…</comment>
   </data>
   <data name="Consent" xml:space="preserve">
     <value>知情同意</value>
@@ -910,6 +934,10 @@
     <value>说话人分离模型</value>
     <comment>Diarization models</comment>
   </data>
+  <data name="DoesnTSupportTheseSettingsOrThisLanguageLive" xml:space="preserve">
+    <value>{0} 的实时转写不支持这些设置或这种语言。</value>
+    <comment>%@ doesn't support these settings or this language live.</comment>
+  </data>
   <data name="Done" xml:space="preserve">
     <value>完成</value>
     <comment>Done</comment>
@@ -1190,6 +1218,10 @@
     <value>授予“无障碍”权限…</value>
     <comment>Grant Accessibility…</comment>
   </data>
+  <data name="HasNoRealtimeTranscriptionYouCanShowALiveTranscriptWithALoca" xml:space="preserve">
+    <value>{0} 不提供实时流式转写。你可以在“设置”中使用本地模型显示实时转写。</value>
+    <comment>%@ has no realtime transcription. You can show a live transcript with a local model in Settings.</comment>
+  </data>
   <data name="HeadsUpIMRecordingThisCallToTakeNotesTheRecordingStaysOnMyMa" xml:space="preserve">
     <value>提醒一下：我正在录制这次通话以便记笔记。录音会保留在我的 Mac 上。</value>
     <comment>Heads up: I'm recording this call to take notes. The recording stays on my Mac.</comment>
@@ -1462,6 +1494,10 @@
     <value>正在聆听…</value>
     <comment>Listening…</comment>
   </data>
+  <data name="LiveModel" xml:space="preserve">
+    <value>实时转写模型</value>
+    <comment>Live model</comment>
+  </data>
   <data name="LiveTranscript" xml:space="preserve">
     <value>实时转写</value>
     <comment>Live transcript</comment>
@@ -1489,6 +1525,14 @@
   <data name="LiveTranscriptStoppedTheTranscriptIsMadeAfterStop" xml:space="preserve">
     <value>实时转写已停止。转写文本会在停止后生成。</value>
     <comment>Live transcript stopped. The transcript is made after Stop.</comment>
+  </data>
+  <data name="LiveWithALocalModel" xml:space="preserve">
+    <value>使用本地模型实时转写</value>
+    <comment>Live with a local model</comment>
+  </data>
+  <data name="LiveWithRealtime" xml:space="preserve">
+    <value>使用 {0} 实时流</value>
+    <comment>Live with %@ realtime</comment>
   </data>
   <data name="LldBytes" xml:space="preserve">
     <value>{0} 字节</value>
@@ -1734,6 +1778,10 @@
     <value>“{0}”的名称</value>
     <comment>Name for %@</comment>
   </data>
+  <data name="NeedsBillingOrCreditsOnYourAccount" xml:space="preserve">
+    <value>{0} 需要你的账户开通付费或有可用额度。</value>
+    <comment>%@ needs billing or credits on your account.</comment>
+  </data>
   <data name="NeedsConfirmation" xml:space="preserve">
     <value>需要确认</value>
     <comment>Needs confirmation</comment>
@@ -1821,6 +1869,14 @@
   <data name="NoEmbeddingModelsListedTypeTheModelId" xml:space="preserve">
     <value>未列出嵌入模型；请输入模型 ID。</value>
     <comment>No embedding models listed; type the model id.</comment>
+  </data>
+  <data name="NoInstalledLiveModelSupportsThisRecordingSLanguageDownloadOn" xml:space="preserve">
+    <value>已安装的实时转写模型都不支持此录音的语言。请在“设置 › 转写”中下载一个。</value>
+    <comment>No installed live model supports this recording's language. Download one in Settings › Transcription.</comment>
+  </data>
+  <data name="NoLiveModelInstalledDownloadAWhisperKitOrParakeetModelAbove" xml:space="preserve">
+    <value>未安装实时转写模型。请在上方下载 WhisperKit 或 Parakeet 模型。</value>
+    <comment>No live model installed. Download a WhisperKit or Parakeet model above.</comment>
   </data>
   <data name="NoModelChooseOneInSettings" xml:space="preserve">
     <value>没有模型：请在设置中选择一个</value>
@@ -2298,6 +2354,18 @@
     <value>就绪</value>
     <comment>Ready</comment>
   </data>
+  <data name="RealtimeIsNotConfirmedYetTurnItOnInSettingsToConfirmIt" xml:space="preserve">
+    <value>{0} 实时流尚未确认。请在“设置”中打开以确认。</value>
+    <comment>%@ realtime is not confirmed yet. Turn it on in Settings to confirm it.</comment>
+  </data>
+  <data name="RealtimeModel" xml:space="preserve">
+    <value>实时流模型</value>
+    <comment>Realtime model</comment>
+  </data>
+  <data name="RealtimeStartsOnceSendingAudioToAndToItsSpeakerDiarizerIfAny" xml:space="preserve">
+    <value>{0} 实时流会在确认将音频发送到 {1}（以及其说话人分离服务，如有）后开始。请先在一个对话中确认。</value>
+    <comment>%@ realtime starts once sending audio to %@ (and to its speaker diarizer, if any) is confirmed. Confirm it in a conversation first.</comment>
+  </data>
   <data name="Rebuild" xml:space="preserve">
     <value>重建</value>
     <comment>Rebuild</comment>
@@ -2305,6 +2373,10 @@
   <data name="RebuildIndex" xml:space="preserve">
     <value>重建索引</value>
     <comment>Rebuild index</comment>
+  </data>
+  <data name="Reconnecting" xml:space="preserve">
+    <value>正在重新连接…</value>
+    <comment>Reconnecting…</comment>
   </data>
   <data name="Record" xml:space="preserve">
     <value>录制</value>
@@ -2409,6 +2481,10 @@
   <data name="Redo" xml:space="preserve">
     <value>重做</value>
     <comment>Redo</comment>
+  </data>
+  <data name="RejectedTheAPIKeyCheckItInSettingsAPIKeys" xml:space="preserve">
+    <value>{0} 拒绝了 API 密钥。请在“设置 › API 密钥”中检查。</value>
+    <comment>%@ rejected the API key. Check it in Settings › API Keys.</comment>
   </data>
   <data name="RelaunchNow" xml:space="preserve">
     <value>立即重新启动</value>
@@ -2521,6 +2597,10 @@
   <data name="Saved" xml:space="preserve">
     <value>已存储</value>
     <comment>Saved</comment>
+  </data>
+  <data name="SavesTheStreamedTranscriptInsteadOfUploadingTheRecordingAgai" xml:space="preserve">
+    <value>保存实时流式转写文本，停止后不再重新上传录音，因此只需支付流式传输费用。连接中断期间漏掉的部分会在停止后发送到 {0}，前后各带约 30 秒音频，每次暂停前后也一样，以便说话人保持原有标签。云端说话人分离服务单独计费。实时流模型可能不如 {1} 准确。</value>
+    <comment>Saves the streamed transcript instead of uploading the recording again after Stop, so you pay for streaming only. Parts missed while the connection was down are sent to %@ after Stop, with about 30 s of audio on each side, and around each pause, so speakers keep their labels. A cloud diarizer is billed separately. Realtime models can be less accurate than %@.</comment>
   </data>
   <data name="Scan" xml:space="preserve">
     <value>扫描</value>
@@ -2643,8 +2723,16 @@
     <comment>Shows the transcript during the recording and keeps it, so it is ready within seconds of Stop. Uses more CPU and memory while recording. Whisper and Parakeet models only; other engines transcribe after Stop.</comment>
   </data>
   <data name="ShowsTheTranscriptDuringTheRecordingWhisperKitAndParakeetMod" xml:space="preserve">
+    <value>在录音期间显示转写文本。WhisperKit 和 Parakeet 模型会保留下来，因此停止后几秒内即可就绪；Apple Speech（macOS 26+）仅显示，停止后再转写。录音时会占用更多 CPU 和内存。云端引擎可以通过本地模型或其实时流显示转写文本：请参阅“转写模型 › 云端”。</value>
+    <comment>Shows the transcript during the recording. WhisperKit and Parakeet models keep it, so it is ready within seconds of Stop; Apple Speech (macOS 26+) only shows it and transcribes after Stop. Uses more CPU and memory while recording. A cloud engine can show it with a local model or its realtime stream: see Transcription model › Cloud.</comment>
+  </data>
+  <data name="ShowsTheTranscriptDuringTheRecordingWhisperKitAndParakeetMod_2" xml:space="preserve">
     <value>在录音期间显示转写文本。WhisperKit 和 Parakeet 模型会保留下来，因此停止后几秒内即可就绪；Apple Speech（macOS 26+）仅显示，停止后再转写。录音时会占用更多 CPU 和内存。其他引擎会在停止后转写。</value>
     <comment>Shows the transcript during the recording. WhisperKit and Parakeet models keep it, so it is ready within seconds of Stop; Apple Speech (macOS 26+) only shows it and transcribes after Stop. Uses more CPU and memory while recording. Other engines transcribe after Stop.</comment>
+  </data>
+  <data name="ShowsTheTranscriptWhileRecordingWithAModelOnThisMacFreeNothi" xml:space="preserve">
+    <value>录音时使用这台 Mac 上的模型显示转写文本。免费：录音期间不会上传任何内容，但会占用 CPU、内存和电量。保存的转写文本仍会在停止后由 {0} 生成，因此可能与你看到的不同。</value>
+    <comment>Shows the transcript while recording with a model on this Mac. Free: nothing is uploaded while recording, but it uses CPU, memory and battery. The saved transcript still comes from %@ after Stop, so it can differ from what you saw.</comment>
   </data>
   <data name="SimulateState" xml:space="preserve">
     <value>模拟状态</value>
@@ -2813,6 +2901,14 @@
   <data name="StorageUsed" xml:space="preserve">
     <value>已用存储空间：{0}</value>
     <comment>Storage used: %@</comment>
+  </data>
+  <data name="StreamsTheMicAndTheSystemAudioToAsTwoLiveConnectionsForTheWh" xml:space="preserve">
+    <value>在整个录音期间，通过两条实时连接将麦克风和系统音频流式传输到 {0}。需要付费：{1}，另加停止后的常规转写费用。长录音会在达到提供商的会话时长上限前重新连接，并在每次重连时将约 30 秒音频传输两次，以便说话人保持原有标签。1 小时的会议约需 2 小时流式传输加 2 小时转写的费用。</value>
+    <comment>Streams the mic and the system audio to %@ as two live connections for the whole recording. Costs money: %@, on top of the normal transcription after Stop. Long recordings reconnect before the provider's session limit and stream about 30 s twice at each reconnect so speakers keep their labels. A 1-hour meeting costs about 2 hours of streaming plus 2 hours of transcription.</comment>
+  </data>
+  <data name="StreamsTo" xml:space="preserve">
+    <value>流式传输到 {0}</value>
+    <comment>Streams to %@</comment>
   </data>
   <data name="Summarize" xml:space="preserve">
     <value>生成摘要</value>
@@ -2990,6 +3086,10 @@
     <value>通话似乎已结束 — 要停止录音吗？</value>
     <comment>The call seems to be over — stop recording?</comment>
   </data>
+  <data name="TheConnectionToWasLost" xml:space="preserve">
+    <value>与 {0} 的连接已断开。</value>
+    <comment>The connection to %@ was lost.</comment>
+  </data>
   <data name="TheDownloadFailed" xml:space="preserve">
     <value>下载失败：{0}</value>
     <comment>The download failed: %@</comment>
@@ -3066,6 +3166,10 @@
     <value>重复在此日期之前结束。</value>
     <comment>The repeat ends before this date.</comment>
   </data>
+  <data name="TheSavedTranscriptIsMadeAfterStopAndCanDiffer" xml:space="preserve">
+    <value>保存的转写文本会在停止后生成，可能有所不同。</value>
+    <comment>The saved transcript is made after Stop and can differ.</comment>
+  </data>
   <data name="TheSelectedAppStoppedPlayingAudioBeforeRecordingCouldResume" xml:space="preserve">
     <value>所选应用在录音继续之前停止了播放音频。</value>
     <comment>The selected app stopped playing audio before recording could resume.</comment>
@@ -3089,6 +3193,10 @@
   <data name="TheTranscriptCouldNotBeRead" xml:space="preserve">
     <value>无法读取转写文本。</value>
     <comment>The transcript could not be read.</comment>
+  </data>
+  <data name="TheTranscriptIsMadeAfterStop" xml:space="preserve">
+    <value>转写文本会在停止后生成。</value>
+    <comment>The transcript is made after Stop.</comment>
   </data>
   <data name="TheTranscriptionSpeakerAndAIModelsAreRemovedFromThisMacNotMo" xml:space="preserve">
     <value>转写模型、说话人模型和 AI 模型会从这台 Mac 上移除（不会移到废纸篓）。可在“设置 › 转写”和“设置 › AI”中重新下载。</value>
@@ -3198,6 +3306,10 @@
     <value>这台电脑的硬件不支持 Windows AI（需要 Copilot+ PC）。</value>
     <comment>This PC's hardware does not support Windows AI (it needs a Copilot+ PC).</comment>
   </data>
+  <data name="ThisRealtimeModelLabelsNoSpeakersSoTheDiarizerRunsOnTheRecor" xml:space="preserve">
+    <value>此实时流模型不会标注说话人，因此停止后会对录音运行说话人分离；云端说话人分离服务会单独征求你的同意。</value>
+    <comment>This realtime model labels no speakers, so the diarizer runs on the recording after Stop; a cloud diarizer asks for its own consent.</comment>
+  </data>
   <data name="Title" xml:space="preserve">
     <value>标题</value>
     <comment>Title</comment>
@@ -3253,6 +3365,14 @@
   <data name="Transcribed" xml:space="preserve">
     <value>已转写</value>
     <comment>Transcribed</comment>
+  </data>
+  <data name="TranscribesAfterStopYouCanShowALiveTranscriptWithALocalModel" xml:space="preserve">
+    <value>{0} 会在停止后转写。你可以在“设置”中使用本地模型显示实时转写。</value>
+    <comment>%@ transcribes after Stop. You can show a live transcript with a local model in Settings.</comment>
+  </data>
+  <data name="TranscribesAfterStopYouCanShowALiveTranscriptWithALocalModel_2" xml:space="preserve">
+    <value>{0} 会在停止后转写。你可以在“设置”中使用本地模型或 {1} 实时流显示实时转写。</value>
+    <comment>%@ transcribes after Stop. You can show a live transcript with a local model or %@ realtime in Settings.</comment>
   </data>
   <data name="Transcribing" xml:space="preserve">
     <value>正在转写…</value>
@@ -3446,6 +3566,10 @@
     <value>请将 ⌘、⌥ 或 ⌃ 与该键配合使用。</value>
     <comment>Use ⌘, ⌥ or ⌃ with the key.</comment>
   </data>
+  <data name="UseTheRealtimeResultAsTheTranscript" xml:space="preserve">
+    <value>将实时流结果用作转写文本</value>
+    <comment>Use the realtime result as the transcript</comment>
+  </data>
   <data name="UsedByLLamaSharp" xml:space="preserve">
     <value>由 LLamaSharp 使用</value>
     <comment>Used by LLamaSharp</comment>
@@ -3578,6 +3702,10 @@
     <value>EchoDiar 在后台时，也会发送通知询问，附带“立即停止”和“继续录音”。</value>
     <comment>While EchoDiar is in the background, a notification asks too, with Stop now and Keep recording.</comment>
   </data>
+  <data name="WhileRecording" xml:space="preserve">
+    <value>录音时</value>
+    <comment>While recording</comment>
+  </data>
   <data name="WhisperTranscription" xml:space="preserve">
     <value>Whisper 转写</value>
     <comment>Whisper transcription</comment>
@@ -3661,6 +3789,10 @@
   <data name="YourConversationsAreNotIndexedYet" xml:space="preserve">
     <value>你的对话尚未编入索引。</value>
     <comment>Your conversations are not indexed yet.</comment>
+  </data>
+  <data name="YourPlanSLimitOnLiveSessionsWasReached" xml:space="preserve">
+    <value>已达到你的 {0} 套餐的实时会话上限。</value>
+    <comment>Your %@ plan's limit on live sessions was reached.</comment>
   </data>
   <data name="ZoomGoogleMeetMicrosoftTeamsOrWebexLinkInTheEvent" xml:space="preserve">
     <value>日程中包含 Zoom、Google Meet、Microsoft Teams 或 Webex 链接。</value>
