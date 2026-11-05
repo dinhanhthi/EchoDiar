@@ -38,8 +38,11 @@ public static class SpeakerLabelReconciler
         return result;
     }
 
-    /// <summary>Every labelled <paramref name="next"/> speaker's reconciled label.</summary>
-    private static Dictionary<string, string> Labels(
+    /// <summary>
+    /// Every labelled <paramref name="next"/> speaker's reconciled label, as <see cref="Append"/> applies it (the realtime
+    /// runner maps a new session's later finals with it).
+    /// </summary>
+    public static Dictionary<string, string> Labels(
         IReadOnlyList<CloudSegment> next, IReadOnlyList<CloudSegment> earlier, TimeRange overlap, int partIndex)
     {
         var total = new Dictionary<string, double>(StringComparer.Ordinal);

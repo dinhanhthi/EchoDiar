@@ -103,9 +103,21 @@ public static partial class CloudTranscription
     /// Without timestamps the parts are contiguous and simply joined (text-only answers have no speaker labels). The
     /// temporary files are removed before returning.
     /// </summary>
-    public static async Task<List<CloudSegment>> TranscribeAsync(
+    public static Task<List<CloudSegment>> TranscribeAsync(
         string source, int channel, ICloudTranscriber transcriber, IAudioExporter exporter, string? language, bool diarize,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken = default) =>
+        TranscribeAsync(source, channel, null, transcriber, exporter, language, diarize, cancellationToken);
+
+    /// <summary>
+    /// <paramref name="range"/> (file seconds, its start clamped to 0; null = the whole channel) of
+    /// <paramref name="channel"/>, sent as the whole-channel overload sends a channel: split under
+    /// <see cref="ICloudTranscriber.MaxUploadBytes"/> inside the range, with the overlap and the reconciled labels.
+    /// Segments come back in file time (seconds from the start of <paramref name="source"/>), so a gap of a recording
+    /// keeps its place (Swift <c>transcribe(source:channel:range:with:language:diarize:)</c>).
+    /// </summary>
+    public static async Task<List<CloudSegment>> TranscribeAsync(
+        string source, int channel, TimeRange? range, ICloudTranscriber transcriber, IAudioExporter exporter,
+        string? language, bool diarize, CancellationToken cancellationToken = default)
     {
         // Created user-only (0700 on Unix; the user's own temp folder on Windows).
         var work = Directory.CreateTempSubdirectory("EchoDiar-cloud-").FullName;
@@ -114,7 +126,7 @@ public static partial class CloudTranscription
             var maxBytes = transcriber.MaxUploadBytes;
             var overlap = transcriber.ReturnsSegmentTimestamps ? SpeakerLabelReconciler.LabelOverlapSeconds : 0;
             var parts = await Task.Run(
-                () => UploadParts(exporter, source, channel, maxBytes, overlap, work, cancellationToken), cancellationToken);
+                () => UploadParts(exporter, source, channel, range, maxBytes, overlap, work, cancellationToken), cancellationToken);
             var segments = new List<CloudSegment>();
             for (var index = 0; index < parts.Count; index++)
             {
@@ -316,27 +328,34 @@ public static partial class CloudTranscription
             : throw LLMException.Provider($"{provider} returned an invalid job id.");
 
     /// <summary>
-    /// The whole channel as one m4a, or parts when it is over <paramref name="maxBytes"/>; each later part starts
-    /// <paramref name="overlap"/> seconds before its cut.
+    /// <paramref name="range"/> of the channel (null = all) as one m4a, or parts when it is over
+    /// <paramref name="maxBytes"/>; each later part starts <paramref name="overlap"/> seconds before its cut. Starts and
+    /// cuts in file time. The exporter measures loudness from the file's start only, so a range takes its slots
+    /// (a cut may sit up to one <see cref="LevelWindow"/> off the quietest moment).
     /// </summary>
     private static List<UploadPart> UploadParts(
-        IAudioExporter exporter, string source, int channel, int? maxBytes, double overlap, string work,
+        IAudioExporter exporter, string source, int channel, TimeRange? range, int? maxBytes, double overlap, string work,
         CancellationToken cancellationToken)
     {
+        var offset = Math.Max(0, range?.Start ?? 0);
+        if (range is { } requested) range = requested with { Start = offset };
         var whole = Path.Combine(work, "channel.m4a");
-        var duration = exporter.ExportMonoAac(source, channel, null, whole, cancellationToken);
+        var duration = exporter.ExportMonoAac(source, channel, range, whole, cancellationToken);
         var bytes = new FileInfo(whole).Length;
-        if (maxBytes is not { } max || bytes <= max || !(duration > 0)) return [new(whole, 0, 0, duration)];
+        if (maxBytes is not { } max || bytes <= max || !(duration > 0)) return [new(whole, offset, offset, duration)];
         File.Delete(whole);
-        var ranges = PlanParts(
-            duration, bytes / duration, max, exporter.Levels(source, channel, LevelWindow, cancellationToken), LevelWindow,
-            overlap);
-        return ranges.Select((range, index) =>
+        var levels = exporter.Levels(source, channel, LevelWindow, cancellationToken);
+        if (range is not null)
+        {
+            levels = [.. levels.Skip((int)Math.Floor(offset / LevelWindow)).Take((int)Math.Ceiling(duration / LevelWindow))];
+        }
+        var parts = PlanParts(duration, bytes / duration, max, levels, LevelWindow, overlap);
+        return parts.Select((part, index) =>
         {
             var file = Path.Combine(work, $"part-{index}.m4a");
-            var start = Math.Max(0, range.Start - overlap);
-            var length = exporter.ExportMonoAac(source, channel, new(start, range.End), file, cancellationToken);
-            return new UploadPart(file, start, range.Start, length);
+            var start = Math.Max(0, part.Start - overlap);
+            var length = exporter.ExportMonoAac(source, channel, new(offset + start, offset + part.End), file, cancellationToken);
+            return new UploadPart(file, offset + start, offset + part.Start, length);
         }).ToList();
     }
 }

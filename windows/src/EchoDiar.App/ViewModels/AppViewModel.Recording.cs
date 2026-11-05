@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using EchoDiar.AI.Cloud;
 using EchoDiar.App.Services;
 using EchoDiar.App.Views;
 using EchoDiar.Core;
@@ -215,7 +216,7 @@ public sealed partial class AppViewModel
             // Read here, not when the job starts: a deferred job would hold the CAF uncompressed until energy saver is off,
             // and a cloud confirmation (macOS consentPending) until it is answered.
             var deferred = _services.Deferral.ShouldDefer && !needsNoModel;
-            var consentPending = AutoEngine() == AutoEngineKind.ConsentPending;
+            var consentPending = AutoEngine(transcribed) == AutoEngineKind.ConsentPending;
             if (session is not null && !deferred && !consentPending && await Task.Run(() => TranscribesFirst(folder, session, autoTranscribe))
                 && SubmitTranscription(folder, session, deleteAudioAfter: false, prior: transcribed, processNow: needsNoModel) is { } job)
             {
@@ -311,12 +312,17 @@ public sealed partial class AppViewModel
     }
 
     /// <summary>
-    /// The job writes <paramref name="prior"/> without loading a model: no gaps to fill and speakers not told apart. It
-    /// then runs now even while energy saver is on, and is transcribed before compression (macOS <c>needsNoModel</c>);
-    /// should the pipeline find the prior unusable, its full batch runs now too.
+    /// The job writes <paramref name="prior"/> without loading a model: no gaps to fill and speakers not told apart, or
+    /// (a cloud realtime prior) already labelled by the stream on the system channel. It then runs now even while energy
+    /// saver is on, and is transcribed before compression (macOS <c>needsNoModel</c>); should the pipeline find the
+    /// prior unusable, its full batch runs now too.
     /// </summary>
-    private bool NeedsNoModel(PriorTranscription? prior) =>
-        prior is not null && prior.MicGaps.Count == 0 && prior.SystemGaps.Count == 0 && !Settings.Diarization;
+    private bool NeedsNoModel(PriorTranscription? prior)
+    {
+        if (prior is null || prior.MicGaps.Count > 0 || prior.SystemGaps.Count > 0) return false;
+        if (!Settings.Diarization) return true;
+        return CloudTranscription.ProviderId(prior.EngineID) is not null && prior.System.Any(s => !string.IsNullOrEmpty(s.Speaker));
+    }
 
     /// <summary>
     /// Whether the recording is transcribed from its CAF before compression: auto-transcribe is on, the recording is

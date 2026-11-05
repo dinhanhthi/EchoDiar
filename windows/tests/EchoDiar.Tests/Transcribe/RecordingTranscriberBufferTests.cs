@@ -1,3 +1,4 @@
+using EchoDiar.AI.Cloud;
 using EchoDiar.Core;
 using EchoDiar.Core.Model;
 using EchoDiar.Transcribe;
@@ -181,4 +182,179 @@ public sealed class RecordingTranscriberBufferTests
         [.. buffer.Channels[Mic].Chunks.Select(c => c.Outcome)];
 
     private static List<Span> Gaps(RecordingTranscriber.Buffer buffer) => PriorTranscription.Gaps(buffer.Channels[Mic].Chunks);
+}
+
+// Swift RealtimeCoverageTests: guards the cloud realtime coverage (RealtimeCoverage): stream time becomes file time by
+// the session's offset, a disconnect and the audio after an undrained session's last final become gaps, a planned
+// rotation's parallel overlap keeps one speaker when the new session labels the same voice differently, and an unplanned
+// disconnect's scoped labels join only through the gap upload's padding (TranscriptionPipeline.JoinGap).
+public sealed class RealtimeCoverageTests
+{
+    // (c) A session from 0 that sent through 10 s with its last final at 8 s and did not drain, then a reconnect at 15 s
+    // that drained through 25 s, in a 30 s recording.
+    [Fact]
+    public void AReconnectLeavesTheDisconnectAndTheUnfinalizedAudioAsGaps()
+    {
+        var coverage = new RealtimeCoverage();
+        var first = coverage.Open(0, bridged: false);
+        coverage.Sent(first, 10);
+        coverage.Final(first, new CloudSegment(1, 3, "one"));
+        coverage.Final(first, new CloudSegment(4, 8, "two"));
+        coverage.Close(first, drained: false);
+        var second = coverage.Open(15, bridged: false);
+        coverage.Sent(second, 25);
+        var final = coverage.Final(second, new CloudSegment(2, 4, "three"));
+        coverage.Close(second, drained: true);
+
+        Assert.Equal((17.0, 19.0), (final.Start, final.End));
+        Assert.Equal([new Span(8, 15), new Span(25, 30)], coverage.Gaps(30));
+        Assert.Equal([1.0, 4, 17], coverage.Segments().Select(s => s.Start));
+    }
+
+    // (d) A rotation opens session 1 at 30 s while session 0 streams through 60 s; session 1 calls the voice "B", session
+    // 0 "A": the joined finals and the live label after FreezeLabels are all "A", none repeated.
+    [Fact]
+    public void AParallelRotationKeepsOneSpeaker()
+    {
+        var coverage = new RealtimeCoverage();
+        var old = coverage.Open(0, bridged: false);
+        coverage.Sent(old, 60);
+        for (var start = 0.0; start < 60; start += 2) coverage.Final(old, new CloudSegment(start, start + 2, "old", "A"));
+        var next = coverage.Open(30, bridged: true);
+        coverage.Sent(next, 90);
+        for (var start = 0.0; start < 60; start += 2) coverage.Final(next, new CloudSegment(start, start + 2, "new", "B"));
+        coverage.Close(old, drained: true);
+        coverage.FreezeLabels(next);
+        coverage.Close(next, drained: true);
+
+        var segments = coverage.Segments();
+        Assert.Equal(["A"], segments.Select(s => s.Speaker).Distinct());
+        Assert.Equal(Enumerable.Range(0, 45).Select(i => i * 2.0), segments.Select(s => s.Start));
+        Assert.Equal("A", coverage.LiveLabel(next, "B"));
+        Assert.Empty(coverage.Gaps(90));
+    }
+
+    // (e) Two sessions around an unplanned disconnect both call their speaker "A": the second's labels are scoped (r1:A).
+    // When the gap upload hears nobody in its padding the two stay two speakers; when it hears the same voice through the
+    // left padding, the gap and the right padding, the second session's "A" joins the first's.
+    [Fact]
+    public void ScopedSessionLabelsJoinOnlyThroughTheGapsPadding()
+    {
+        var coverage = new RealtimeCoverage();
+        foreach (var (offset, sent) in new[] { (0.0, 40.0), (60.0, 100.0) })
+        {
+            var session = coverage.Open(offset, bridged: false);
+            coverage.Sent(session, sent);
+            foreach (var final in Pieces("A", 0, 40)) coverage.Final(session, final);
+            coverage.Close(session, drained: false);
+        }
+        var gap = new Span(40, 60);
+        Assert.Equal([gap], coverage.Gaps(100));
+        var stream = coverage.Segments().Select(s => new RawSegment(s.Start, s.End, s.Text, Speaker: s.Speaker)).ToList();
+        Assert.Equal(["A", "r1:A"], Labels(stream));
+
+        Assert.Equal(["A", "r1:A"], Labels(TranscriptionPipeline.JoinGap([], gap, new TimeRange(10, 90), stream, labels: true, partIndex: 1)));
+        Assert.Equal(["A"], Labels(TranscriptionPipeline.JoinGap(
+            Pieces("X", 10, 90), gap, new TimeRange(10, 90), stream, labels: true, partIndex: 1)));
+    }
+
+    private static List<CloudSegment> Pieces(string label, double from, double to)
+    {
+        var pieces = new List<CloudSegment>();
+        for (var start = from; start < to; start += 2) pieces.Add(new CloudSegment(start, Math.Min(start + 2, to), "stream", label));
+        return pieces;
+    }
+
+    private static List<string> Labels(IEnumerable<RawSegment> segments) =>
+        [.. segments.Select(s => s.Speaker).OfType<string>().Distinct().Order(StringComparer.Ordinal)];
+}
+
+// Swift RealtimeRecoveryTests: guards the cloud realtime transcriber's recovery: once both channels stopped (Failed), a
+// final is dropped; a channel that is live again (a "config" failure recovers at a language change) brings the state back
+// to listening and its finals show.
+public sealed class RealtimeRecoveryTests
+{
+    [Fact]
+    public void BothChannelsFailedRecoverOnceOneIsLiveAgain()
+    {
+        var stream = new RealtimeLiveStream(
+            "rt-model", RealtimePolicy.Of("speechmatics")!, (_, _, _) => throw new RealtimeLiveStream.Failure("config"));
+        var transcriber = new RecordingTranscriber(stream, "cloud:fake", displayOnly: true, () => null);
+        var snapshots = new List<RecordingTranscriber.Snapshot>();
+        transcriber.Updated += snapshots.Add;
+        const int system = RecordingSession.Channel.System;
+        static RealtimeLiveStream.Update State(int channel, RealtimeLiveStream.State state) =>
+            new RealtimeLiveStream.Update.StateChanged(channel, state);
+
+        for (var channel = 0; channel < 2; channel++) transcriber.Apply(State(channel, new RealtimeLiveStream.State.Failed("config")));
+        Assert.Equal(RecordingTranscriber.TranscriberState.Failed, snapshots[^1].State);
+
+        transcriber.Apply(new RealtimeLiveStream.Update.Final(system, new RawSegment(0, 1, "dropped")));
+        transcriber.Apply(State(system, new RealtimeLiveStream.State.Connecting()));
+        transcriber.Apply(State(system, new RealtimeLiveStream.State.Live()));
+        transcriber.Apply(new RealtimeLiveStream.Update.Final(system, new RawSegment(2, 3, "hello again")));
+        var recovered = snapshots[^1];
+        Assert.Equal(RecordingTranscriber.TranscriberState.Listening, recovered.State);
+        Assert.Contains(recovered.Lines, l => l.Text.Contains("hello again", StringComparison.Ordinal));
+        Assert.DoesNotContain(recovered.Lines, l => l.Text.Contains("dropped", StringComparison.Ordinal));
+        transcriber.Cancel();
+    }
+}
+
+// The realtime runner's ends without a socket: an adapter factory that refuses ("config") stops both channels, and
+// FinishAsync still returns within its drain bound with the whole recording as gaps; Cancel while a connect hangs lets
+// FinishAsync return.
+public sealed class RealtimeLiveStreamEndTests
+{
+    private static readonly TimeSpan Bound = RealtimeLiveStream.DrainTimeout + TimeSpan.FromSeconds(3);
+
+    [Fact]
+    public async Task AFactoryFailureStopsBothChannelsAndFinishReturnsTheGaps()
+    {
+        var token = TestContext.Current.CancellationToken;
+        var stream = new RealtimeLiveStream(
+            "rt-model", RealtimePolicy.Of("deepgram")!, (_, _, _) => throw new RealtimeLiveStream.Failure("config"));
+        stream.Start();
+        stream.Append(Tone(), Tone(), 0, null);
+
+        var failed = new HashSet<int>();
+        using var timeout = CancellationTokenSource.CreateLinkedTokenSource(token);
+        timeout.CancelAfter(Bound);
+        await foreach (var update in stream.Updates.ReadAllAsync(timeout.Token))
+        {
+            if (update is RealtimeLiveStream.Update.StateChanged { State: RealtimeLiveStream.State.Failed { Kind: "config" } } state)
+                failed.Add(state.Channel);
+            if (failed.Count == 2) break;
+        }
+        var result = await stream.FinishAsync().WaitAsync(Bound, token);
+
+        Assert.Equal([new Span(0, 1)], result.MicGaps);
+        Assert.Equal([new Span(0, 1)], result.SystemGaps);
+        Assert.Equal("rt-model", result.ModelId);
+        Assert.Equal(1, result.Duration);
+    }
+
+    [Fact]
+    public async Task CancelWhileAConnectHangsLetsFinishReturn()
+    {
+        var token = TestContext.Current.CancellationToken;
+        var connecting = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var stream = new RealtimeLiveStream("rt-model", RealtimePolicy.Of("deepgram")!, async (_, _, cancellationToken) =>
+        {
+            connecting.TrySetResult();
+            await Task.Delay(Timeout.Infinite, cancellationToken);
+            throw new InvalidOperationException("unreachable");
+        });
+        stream.Start();
+        stream.Append(Tone(), Tone(), 0, null);
+        await connecting.Task.WaitAsync(Bound, token);
+
+        stream.Cancel();
+
+        await stream.FinishAsync().WaitAsync(Bound, token);
+    }
+
+    /// <summary>One second of a 440 Hz tone at 16 kHz (not silence, so no session covers it for free).</summary>
+    private static float[] Tone() =>
+        [.. Enumerable.Range(0, RecordingTranscriber.SampleRate).Select(i => (float)(0.5 * Math.Sin(i * 2 * Math.PI * 440 / 16_000)))];
 }

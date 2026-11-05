@@ -151,13 +151,21 @@ public sealed record PriorTranscription
         Pending,
     }
 
-    /// <summary>Catalog id of the engine that transcribed the segments.</summary>
+    /// <summary>Catalog id of the engine that transcribed the segments, or <c>cloud:&lt;provider id&gt;</c> for a cloud realtime stream.</summary>
     [JsonPropertyName("engineID")] public required string EngineID { get; init; }
+    /// <summary>The cloud realtime model that streamed the segments; null for a local engine (and in older jobs).</summary>
+    [JsonPropertyName("modelID")] public string? ModelId { get; init; }
     [JsonPropertyName("mic")] public IReadOnlyList<RawSegment> Mic { get; init; } = [];
     [JsonPropertyName("system")] public IReadOnlyList<RawSegment> System { get; init; } = [];
     /// <summary>Spans not transcribed, to transcribe at Stop.</summary>
     [JsonPropertyName("micGaps")] public IReadOnlyList<Span> MicGaps { get; init; } = [];
     [JsonPropertyName("systemGaps")] public IReadOnlyList<Span> SystemGaps { get; init; } = [];
+    /// <summary>
+    /// A cloud realtime stream: file seconds where the system channel resumed after a pause with session-scoped speaker
+    /// labels and no gap; the pipeline uploads the audio around each, with labels, only to map them back. Empty for a
+    /// local engine (and in older jobs).
+    /// </summary>
+    [JsonPropertyName("systemBridges")] public IReadOnlyList<double> SystemBridges { get; init; } = [];
     /// <summary>Seconds of audio the transcriber saw (= the file's duration when every frame reached it).</summary>
     [JsonPropertyName("duration")] public double Duration { get; init; }
 

@@ -450,6 +450,12 @@ public sealed class RealtimeConnection : IDisposable
     /// <summary>The longest handshake (URLSession's default request timeout).</summary>
     public static readonly TimeSpan ConnectTimeout = TimeSpan.FromSeconds(60);
 
+    /// <summary>How often the socket sends a WebSocket ping.</summary>
+    public static readonly TimeSpan PingInterval = TimeSpan.FromSeconds(30);
+
+    /// <summary>How long a ping may go unanswered before the socket is aborted (Swift <c>idleTimeout</c>).</summary>
+    public static readonly TimeSpan IdleTimeout = TimeSpan.FromSeconds(300);
+
     /// <summary>How long <see cref="CloseAsync"/> waits to send the close frame.</summary>
     private static readonly TimeSpan CloseTimeout = TimeSpan.FromSeconds(2);
 
@@ -499,6 +505,11 @@ public sealed class RealtimeConnection : IDisposable
         try
         {
             socket.Options.CollectHttpResponseDetails = true;
+            // WebSocket pings every 30 s (Swift: the runner's ping()), so idle sockets stay open (Speechmatics closes after
+            // 3 min without audio or ping/pong); a ping unanswered for IdleTimeout aborts the socket (Swift: the request
+            // timeout), which fails the pending receive.
+            socket.Options.KeepAliveInterval = PingInterval;
+            socket.Options.KeepAliveTimeout = IdleTimeout;
             foreach (var (name, value) in adapter.Headers) socket.Options.SetRequestHeader(name, value);
             using (var timeout = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken))
             {
