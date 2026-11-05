@@ -437,10 +437,10 @@ public sealed class TranscriptionPipeline(
     /// <summary>
     /// <paramref name="segments"/> (one channel, file time) with a gap's upload <paramref name="response"/> (file time,
     /// covering <paramref name="upload"/> = the gap and its padding) joined, sorted by start (Swift <c>joinGap</c>). The
-    /// response's segments whose midpoint is inside <paramref name="gap"/> (<c>[start, end)</c>) are kept; one whose
-    /// midpoint is outside but that straddles an edge of the gap is cut into its sentences first
-    /// (<see cref="SentencePieces"/>), so a long segment's speech inside the gap is not dropped with its half outside;
-    /// the padding's only serve the labels. Without <paramref name="labels"/> every speaker label is dropped. With
+    /// response segment that straddles an edge of <paramref name="gap"/> is cut into its sentences first
+    /// (<see cref="SentencePieces"/>; one without sentence ends stays whole); a piece is kept when its overlap with the gap
+    /// is at least half of the shorter of the two (<see cref="GapKeeps"/>), so a long word-grouped segment neither loses
+    /// its speech inside the gap nor repeats what the stream has around it; the padding's only serve the labels. Without <paramref name="labels"/> every speaker label is dropped. With
     /// <paramref name="labels"/>, two steps: the response's labels map onto the labels before the gap by the left padding
     /// (<see cref="SpeakerLabelReconciler.Labels"/>; a label with no match gets its own <c>"p&lt;N&gt;:"</c> scope,
     /// <paramref name="partIndex"/> and up, so it never merges); then each label first heard after the gap (the session
@@ -452,11 +452,7 @@ public sealed class TranscriptionPipeline(
         IReadOnlyList<CloudSegment> response, Span gap, TimeRange upload, IReadOnlyList<RawSegment> segments, bool labels,
         int partIndex)
     {
-        bool InGap(CloudSegment segment)
-        {
-            var middle = (segment.Start + segment.End) / 2;
-            return middle >= gap.Start && middle < gap.End;
-        }
+        bool InGap(CloudSegment segment) => GapKeeps(segment, gap);
         static string? Label(string? speaker) => string.IsNullOrEmpty(speaker) ? null : speaker;
         RawSegment Raw(CloudSegment segment) =>
             new(segment.Start, segment.End, segment.Text, segment.Language, labels ? Label(segment.Speaker) : null);
@@ -464,7 +460,7 @@ public sealed class TranscriptionPipeline(
             list.Select(s => Label(s.Speaker)).OfType<string>().ToHashSet(StringComparer.Ordinal);
 
         IEnumerable<RawSegment> Kept(IEnumerable<CloudSegment> list) =>
-            list.SelectMany(segment => InGap(segment) ? [segment] : SentencePieces(segment, gap)).Where(InGap).Select(Raw);
+            list.SelectMany(segment => SentencePieces(segment, gap)).Where(InGap).Select(Raw);
 
         if (!labels) return [.. segments.Concat(Kept(response)).OrderBy(s => s.Start)];
         var existing = segments.Select(s => new CloudSegment(s.Start, s.End, s.Text, s.Speaker, s.DetectedLanguage)).ToList();
@@ -495,6 +491,21 @@ public sealed class TranscriptionPipeline(
                 ? segment with { Speaker = target }
                 : segment);
         return [.. bridged.Concat(Kept(mapped)).OrderBy(s => s.Start)];
+    }
+
+    /// <summary>
+    /// Whether a gap upload's <paramref name="segment"/> belongs to <paramref name="gap"/>: it overlaps it by at least half
+    /// of the shorter of the two (a zero-length segment: its time is inside the gap). A zero-length gap (a resume bridge)
+    /// keeps nothing. Chosen trade-off: next to a hole shorter than a sentence, the one sentence over it is kept whole and
+    /// may repeat words the stream has around the hole, rather than losing the hole's speech; a segment without sentence
+    /// ends (not cut) can repeat more (Swift <c>gapKeeps</c>). Pure, for tests.
+    /// </summary>
+    internal static bool GapKeeps(CloudSegment segment, Span gap)
+    {
+        var length = segment.End - segment.Start;
+        if (length <= 0) return segment.Start >= gap.Start && segment.Start < gap.End;
+        var overlap = Math.Min(segment.End, gap.End) - Math.Max(segment.Start, gap.Start);
+        return overlap > 0 && overlap >= Math.Min(length, gap.End - gap.Start) / 2;
     }
 
     /// <summary>

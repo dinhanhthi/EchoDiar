@@ -479,9 +479,10 @@ public actor TranscriptionPipeline {
     }
 
     /// `segments` (one channel, file time) with a gap's upload `response` (file time, covering `upload` = the gap and
-    /// its padding) joined, sorted by start. The response's segments whose midpoint is inside `gap` are kept; one whose
-    /// midpoint is outside but that straddles an edge of the gap is cut into its sentences first (`sentencePieces`), so
-    /// a long segment's speech inside the gap is not dropped with its half outside; the padding's only serve the labels.
+    /// its padding) joined, sorted by start. A response segment that straddles an edge of the gap is cut into its
+    /// sentences first (`sentencePieces`; one without sentence ends stays whole); a piece is kept when its overlap with
+    /// `gap` is at least half of the shorter of the two (`gapKeeps`), so a long word-grouped segment neither loses its
+    /// speech inside the gap nor repeats what the stream has around it; the padding's only serve the labels.
     /// Without `labels` every speaker label is dropped. With `labels`, two steps:
     /// the response's labels map onto the labels before the gap by the left padding (`SpeakerLabelReconciler`, a label
     /// with no match gets its own `"p<N>:"` scope, `partIndex` and up, so it never merges); then each label first heard
@@ -492,10 +493,7 @@ public actor TranscriptionPipeline {
         _ response: [CloudSegment], gap: Span, upload: ClosedRange<Double>, into segments: [RawSegment], labels: Bool,
         partIndex: Int
     ) -> [RawSegment] {
-        func inGap(_ segment: CloudSegment) -> Bool {
-            let middle = (segment.start + segment.end) / 2
-            return middle >= gap.start && middle < gap.end
-        }
+        func inGap(_ segment: CloudSegment) -> Bool { gapKeeps(segment, gap) }
         func label(_ speaker: String?) -> String? { speaker.flatMap { $0.isEmpty ? nil : $0 } }
         func raw(_ segment: CloudSegment) -> RawSegment {
             RawSegment(
@@ -503,7 +501,7 @@ public actor TranscriptionPipeline {
                 speaker: labels ? label(segment.speaker) : nil)
         }
         func kept(_ response: [CloudSegment]) -> [RawSegment] {
-            response.flatMap { inGap($0) ? [$0] : sentencePieces($0, straddling: gap) }.filter(inGap).map(raw)
+            response.flatMap { sentencePieces($0, straddling: gap) }.filter(inGap).map(raw)
         }
         guard labels else {
             return (segments + kept(response)).sorted { $0.start < $1.start }
@@ -540,6 +538,18 @@ public actor TranscriptionPipeline {
             return segment
         }
         return (bridged + kept(mapped)).sorted { $0.start < $1.start }
+    }
+
+    /// Whether a gap upload's `segment` belongs to `gap`: it overlaps it by at least half of the shorter of the two
+    /// (a zero-length segment: its time is inside `gap`). A zero-length gap (a resume bridge) keeps nothing. Chosen
+    /// trade-off: next to a hole shorter than a sentence, the one sentence over it is kept whole and may repeat words
+    /// the stream has around the hole, rather than losing the hole's speech; a segment without sentence ends (not cut)
+    /// can repeat more. Pure, for tests.
+    static func gapKeeps(_ segment: CloudSegment, _ gap: Span) -> Bool {
+        let length = segment.end - segment.start
+        guard length > 0 else { return segment.start >= gap.start && segment.start < gap.end }
+        let overlap = min(segment.end, gap.end) - max(segment.start, gap.start)
+        return overlap > 0 && overlap >= min(length, gap.end - gap.start) / 2
     }
 
     /// `segment` cut after each sentence end (`.?!` before a space, `。？！`, or the end) when it straddles the start or

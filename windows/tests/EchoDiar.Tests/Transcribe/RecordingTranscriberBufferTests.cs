@@ -259,8 +259,8 @@ public sealed class RealtimeCoverageTests
     }
 
     // A gap upload's segment that straddles an edge of the gap (word-timed providers group up to ~15 s) is cut at its
-    // sentence ends, each piece timed by its share of the text, and the pieces whose midpoint is in the gap are kept: the
-    // speech inside the gap is not lost with the half outside it. A segment inside the gap stays whole; one in the padding
+    // sentence ends, each piece timed by its share of the text, and the pieces that overlap the gap by at least half of the
+    // shorter of the two are kept: the speech inside the gap is not lost with the half outside it. A segment inside the gap stays whole; one in the padding
     // adds nothing.
     [Theory]
     [InlineData(false)]
@@ -283,10 +283,21 @@ public sealed class RealtimeCoverageTests
         Assert.Equal((50.0, 60.0), (joined[2].Start, joined[2].End));
         Assert.All(joined, s => Assert.Equal(labels ? joined[0].Speaker : null, s.Speaker));
 
-        // A short gap inside one segment whose midpoint is in it: the segment stays whole (none of its sentences has its
-        // midpoint in the gap). CJK sentence ends cut without a space.
+        // A short gap inside one long segment keeps only the sentence it overlaps, not the whole segment (the stream has
+        // the rest): a 1.2 s gap, and a 4.7 s hole in a four-sentence 17 s upload segment. CJK sentence ends cut without a
+        // space.
         var shortGap = TranscriptionPipeline.JoinGap([response[1]], new Span(39.8, 41), new TimeRange(9.8, 71), [], labels, partIndex: 1);
-        Assert.Equal(["One one. Two two. Tri tri. For for."], shortGap.Select(s => s.Text));
+        Assert.Equal(["Tri tri."], shortGap.Select(s => s.Text));
+        var longSegment = new CloudSegment(44.5, 61.1, "Good morning, thanks for joining the weekly planning meeting. Morning, I have the numbers from last week ready to share. Great, let's start with the release schedule and then talk about hiring. The release is on track, we fixed the last two crashes on Thursday.", "X");
+        var hole = TranscriptionPipeline.JoinGap([longSegment], new Span(52.1, 56.8), new TimeRange(22.1, 86.8), [], labels, partIndex: 1);
+        Assert.Equal(["Great, let's start with the release schedule and then talk about hiring."], hole.Select(s => s.Text));
+        // With the stream's finals on both sides of the hole, no sentence appears twice.
+        List<RawSegment> stream = [new(44.5, 52.1, "Good morning. Morning, I have the numbers."), new(56.8, 61.1, "The release is on track.")];
+        var seam = TranscriptionPipeline.JoinGap([longSegment], new Span(52.1, 56.8), new TimeRange(22.1, 86.8), stream, labels: false, partIndex: 1);
+        Assert.Equal(
+            ["Good morning. Morning, I have the numbers.", "Great, let's start with the release schedule and then talk about hiring.", "The release is on track."],
+            seam.Select(s => s.Text));
+        Assert.Empty(TranscriptionPipeline.JoinGap([longSegment], new Span(50, 50), new TimeRange(20, 80), [], labels, partIndex: 1));
         var cjk = TranscriptionPipeline.SentencePieces(new CloudSegment(0, 6, "你好。我们开始吧！"), new Span(5, 9));
         Assert.Equal(["你好。", "我们开始吧！"], cjk.Select(s => s.Text));
     }

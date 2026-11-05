@@ -160,8 +160,8 @@ struct CloudPriorPipelineTests {
     }
 
     /// A gap upload's segment that straddles an edge of the gap (word-timed providers group up to ~15 s) is cut at
-    /// its sentence ends, each piece timed by its share of the text, and the pieces whose midpoint is in the gap are
-    /// kept: the speech inside the gap is not lost with the half outside it. A segment inside the gap stays whole; one
+    /// its sentence ends, each piece timed by its share of the text, and the pieces that overlap the gap by at least
+    /// half of the shorter of the two are kept: the speech inside the gap is not lost with the half outside it. A segment inside the gap stays whole; one
     /// in the padding adds nothing.
     @Test(arguments: [false, true])
     func gapEdgeSegmentsKeepTheirSentencesInsideTheGap(_ labels: Bool) throws {
@@ -182,11 +182,30 @@ struct CloudPriorPipelineTests {
         #expect(joined[2].start == 50 && joined[2].end == 60)
         #expect(joined.allSatisfy { $0.speaker == (labels ? joined[0].speaker : nil) })
 
-        // A short gap inside one segment whose midpoint is in it: the segment stays whole (none of its sentences has
-        // its midpoint in the gap). CJK sentence ends cut without a space.
+        // A short gap inside one long segment keeps only the sentence it overlaps, not the whole segment (the stream
+        // has the rest): a 1.2 s gap, and a 4.7 s hole in a four-sentence 17 s upload segment. CJK sentence ends cut
+        // without a space.
         let short = TranscriptionPipeline.joinGap(
             [response[1]], gap: Span(start: 39.8, end: 41), upload: 9.8...71, into: [], labels: labels, partIndex: 1)
-        #expect(short.map(\.text) == ["One one. Two two. Tri tri. For for."])
+        #expect(short.map(\.text) == ["Tri tri."])
+        let long = CloudSegment(start: 44.5, end: 61.1, text: "Good morning, thanks for joining the weekly planning meeting. Morning, I have the numbers from last week ready to share. Great, let's start with the release schedule and then talk about hiring. The release is on track, we fixed the last two crashes on Thursday.", speaker: "X")
+        let hole = TranscriptionPipeline.joinGap(
+            [long], gap: Span(start: 52.1, end: 56.8), upload: 22.1...86.8, into: [], labels: labels, partIndex: 1)
+        #expect(hole.map(\.text) == ["Great, let's start with the release schedule and then talk about hiring."])
+        // With the stream's finals on both sides of the hole, no sentence appears twice.
+        let stream = [
+            RawSegment(start: 44.5, end: 52.1, text: "Good morning. Morning, I have the numbers."),
+            RawSegment(start: 56.8, end: 61.1, text: "The release is on track."),
+        ]
+        let seam = TranscriptionPipeline.joinGap(
+            [long], gap: Span(start: 52.1, end: 56.8), upload: 22.1...86.8, into: stream, labels: false, partIndex: 1)
+        #expect(seam.map(\.text) == [
+            "Good morning. Morning, I have the numbers.",
+            "Great, let's start with the release schedule and then talk about hiring.",
+            "The release is on track.",
+        ])
+        #expect(TranscriptionPipeline.joinGap(
+            [long], gap: Span(start: 50, end: 50), upload: 20...80, into: [], labels: labels, partIndex: 1).isEmpty)
         let cjk = TranscriptionPipeline.sentencePieces(
             CloudSegment(start: 0, end: 6, text: "你好。我们开始吧！"), straddling: Span(start: 5, end: 9))
         #expect(cjk.map(\.text) == ["你好。", "我们开始吧！"])
