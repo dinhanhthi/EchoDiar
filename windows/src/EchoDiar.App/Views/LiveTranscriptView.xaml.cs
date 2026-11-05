@@ -21,7 +21,8 @@ namespace EchoDiar.App.Views;
 /// text), built in code once: at most <see cref="RecordingTranscriber.MaxLines"/>. The open chunks' greyed tentative
 /// text follows as more paragraphs. Updates edit the text in place (new lines added, dropped lines removed from the
 /// front, the tentative paragraphs replaced) and keep the selection. The newest line is scrolled into view unless the
-/// user scrolled up.
+/// user scrolled up. Cloud realtime says when it connects, reconnects or a connection stopped (a short message per
+/// failure kind); a display-only transcript says the saved one is made after Stop.
 /// </summary>
 public sealed partial class LiveTranscriptView : UserControl
 {
@@ -72,6 +73,7 @@ public sealed partial class LiveTranscriptView : UserControl
         _model = model;
         InitializeComponent();
         AutomationProperties.SetName(Scroller, Loc.T("Live transcript"));
+        DisplayOnlyText.Text = Loc.T("The saved transcript is made after Stop and can differ.");
         Scroller.ViewChanged += (_, e) =>
         {
             if (!e.IsIntermediate) _followsNewest = Scroller.VerticalOffset >= Scroller.ScrollableHeight - BottomSlack;
@@ -102,6 +104,7 @@ public sealed partial class LiveTranscriptView : UserControl
         {
             ClearText();
             Scroller.Visibility = Visibility.Collapsed;
+            DisplayOnlyText.Visibility = Visibility.Collapsed;
             return;
         }
         ShowState(snapshot);
@@ -109,15 +112,21 @@ public sealed partial class LiveTranscriptView : UserControl
         Scroller.Visibility = snapshot.Lines.Count > 0 || snapshot.Tentative.Count > 0
             ? Visibility.Visible
             : Visibility.Collapsed;
+        DisplayOnlyText.Visibility = snapshot.DisplayOnly ? Visibility.Visible : Visibility.Collapsed;
     }
 
     /// <summary>
     /// The state line (how far behind decoding is when it falls behind); why the transcriber stopped as its tooltip.
+    /// Cloud realtime has its own line (<see cref="RealtimeStatusText"/>), in the error color while a channel is
+    /// stopped, and no tooltip.
     /// </summary>
     private void ShowState(RecordingTranscriber.Snapshot snapshot)
     {
+        var realtime = snapshot.Source == RecordingTranscriber.TranscriberSource.CloudRealtime;
         var failed = snapshot.State == RecordingTranscriber.TranscriberState.Failed;
-        RecordingCard.SetText(StatusText, snapshot.State switch
+        var isError = failed || (realtime && snapshot.RealtimeFailure is not null
+            && snapshot.State != RecordingTranscriber.TranscriberState.Paused);
+        RecordingCard.SetText(StatusText, realtime ? RealtimeStatusText(snapshot) : snapshot.State switch
         {
             RecordingTranscriber.TranscriberState.Loading => Loc.T("Live transcript: loading the model…"),
             RecordingTranscriber.TranscriberState.Paused => Loc.T("Live transcript: paused"),
@@ -129,13 +138,48 @@ public sealed partial class LiveTranscriptView : UserControl
                         : Loc.T("Live transcript"),
             _ => Loc.T("Live transcript stopped. The transcript is made after Stop."),
         });
-        var textStyle = (Style)Resources[failed ? "LiveStatusErrorText" : "LiveStatusText"];
+        var textStyle = (Style)Resources[isError ? "LiveStatusErrorText" : "LiveStatusText"];
         if (StatusText.Style != textStyle) StatusText.Style = textStyle;
-        var iconStyle = (Style)Resources[failed ? "LiveStatusErrorIcon" : "LiveStatusIcon"];
+        var iconStyle = (Style)Resources[isError ? "LiveStatusErrorIcon" : "LiveStatusIcon"];
         if (StatusIcon.Style != iconStyle) StatusIcon.Style = iconStyle;
-        var tip = failed ? snapshot.Error : null;
+        var tip = failed && !realtime ? snapshot.Error : null;
         if (!Equals(ToolTipService.GetToolTip(StatusPanel), tip)) ToolTipService.SetToolTip(StatusPanel, tip);
     }
+
+    /// <summary>
+    /// Cloud realtime (macOS <c>realtimeStatusText</c>): connecting until a channel is live, then reconnecting or why a
+    /// channel stopped; never the failure's raw kind.
+    /// </summary>
+    private string RealtimeStatusText(RecordingTranscriber.Snapshot snapshot)
+    {
+        var name = _model.DefaultCloudConfig?.DisplayName ?? Loc.T("the provider");
+        return snapshot.State switch
+        {
+            RecordingTranscriber.TranscriberState.Failed =>
+                RealtimeFailureText(snapshot.RealtimeFailure, name) + " " + Loc.T("The transcript is made after Stop."),
+            RecordingTranscriber.TranscriberState.Paused => Loc.T("Live transcript: paused"),
+            // One channel stopped, the other is live or still connecting.
+            _ when snapshot.RealtimeFailure is not null => RealtimeFailureText(snapshot.RealtimeFailure, name),
+            RecordingTranscriber.TranscriberState.Loading => Loc.Format("Connecting to %@…", name),
+            _ when snapshot.Reconnecting => Loc.T("Reconnecting…"),
+            _ => snapshot.Lines.Count == 0 && snapshot.Tentative.Count == 0
+                ? Loc.T("Live transcript: listening…")
+                : Loc.T("Live transcript"),
+        };
+    }
+
+    /// <summary>
+    /// A short message for <see cref="RecordingTranscriber.Snapshot.RealtimeFailure"/>'s kind; other kinds (network,
+    /// HTTP codes) are a lost connection.
+    /// </summary>
+    private static string RealtimeFailureText(string? kind, string name) => kind switch
+    {
+        "auth" => Loc.Format("%@ rejected the API key. Check it in Settings › API Keys.", name),
+        "payment" => Loc.Format("%@ needs billing or credits on your account.", name),
+        "plan_limit" => Loc.Format("Your %@ plan's limit on live sessions was reached.", name),
+        "config" => Loc.Format("%@ doesn't support these settings or this language live.", name),
+        _ => Loc.Format("The connection to %@ was lost.", name),
+    };
 
     /// <summary>
     /// Applies the snapshot to the text in place: drops the paragraphs of the lines it no longer has (the oldest), adds

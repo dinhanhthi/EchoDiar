@@ -5,12 +5,14 @@
       delete audio after transcription (the same setting as Storage › Audio). Transcribe automatically and waiting while
       energy saver is on are in Recording › After recording, as on macOS.
     - Transcription model: what transcription is, then the speech models by tier, each with its details, Download,
-      progress and Cancel, Installed and Delete, Set default; then Cloud (the default cloud engine's model, then every
-      provider that transcribes, with Set default or Set Up) and the speech-to-text APIs (key, model, Test).
+      progress and Cancel, Installed and Delete, Set default; then Cloud (every provider that transcribes, with its
+      model, Set default once configured, and its key status: "API key" opens Settings › API Keys); below the default
+      cloud engine's row, its "While recording" group (live with a local model, or with its realtime stream, and using
+      the realtime result as the transcript), greyed while a master switch is off.
     - Diarization model: tell speakers apart, the number of other speakers, what diarization is, then the speaker
-      models, then Cloud (the default cloud diarizer's model, then the providers that label speakers).
-    The model, cloud and API rows are made in code (TranscriptionSettingsPage.CreateRow, CloudSection,
-    SpeechProviderRow). The footer gives every installed model's size.
+      models, then Cloud (the providers that label speakers, with their diarization model).
+    The model and cloud rows are made in code (TranscriptionSettingsPage.CreateRow, CloudSection). The footer gives
+    every installed model's size.
     Each searchable element's Tag is its search entry's title (SearchEntries), so a search result can bring it into view.
 -->
 <UserControl
@@ -143,9 +145,6 @@
                         Style="{StaticResource IntroStyle}"
                         Tag="Transcription models"
                         Text="{local:T Text='Transcription turns speech into text. The transcription model listens to the recording and writes what was said, with timestamps.'}" />
-
-                    <!-- First, as macOS speechToTextSection. -->
-                    <StackPanel x:Name="SpeechToTextList" Spacing="4" />
 
                     <!-- A header per tier, then its rows (made in code). -->
                     <StackPanel x:Name="TranscriptionList" Spacing="4" />

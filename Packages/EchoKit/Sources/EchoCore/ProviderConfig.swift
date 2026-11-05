@@ -5,8 +5,9 @@ import Foundation
 public struct ProviderConfig: Codable, Equatable, Sendable, Identifiable {
     public enum Kind: String, Codable, Sendable {
         case openAICompatible, anthropic, cli, local
-        /// A speech-to-text-only API (ElevenLabs, Deepgram, AssemblyAI): its transcriber sets the vendor's own auth
-        /// header and endpoint, so `baseURL` and `authStyle` are unused; the key is still in the Keychain.
+        /// A speech-to-text-only API (ElevenLabs, Deepgram, AssemblyAI, Speechmatics, Soniox, Gladia): its transcriber
+        /// sets the vendor's own auth header and endpoint, so `baseURL` and `authStyle` are unused; the key is still in
+        /// the Keychain.
         case speechToText
     }
 
@@ -40,6 +41,9 @@ public struct ProviderConfig: Codable, Equatable, Sendable, Identifiable {
     /// The provider's diarization model id, used when it is the default cloud diarizer; empty = the provider default.
     public var diarizationModel: String
     public var enabled: Bool
+    /// Realtime (WebSocket) model for the live transcript; empty = the provider default. Separate from
+    /// `transcriptionModel`, so a streaming-only batch check never applies to it.
+    public var realtimeModel: String
 
     public init(
         id: String,
@@ -53,7 +57,8 @@ public struct ProviderConfig: Codable, Equatable, Sendable, Identifiable {
         shownModels: [String] = [],
         transcriptionModel: String = "",
         diarizationModel: String = "",
-        enabled: Bool = false
+        enabled: Bool = false,
+        realtimeModel: String = ""
     ) {
         self.id = id
         self.kind = kind
@@ -67,6 +72,7 @@ public struct ProviderConfig: Codable, Equatable, Sendable, Identifiable {
         self.transcriptionModel = transcriptionModel
         self.diarizationModel = diarizationModel
         self.enabled = enabled
+        self.realtimeModel = realtimeModel
     }
 
     /// Tolerant: a missing, malformed or unknown (newer) value falls back to a default instead of failing, so one bad
@@ -87,6 +93,21 @@ public struct ProviderConfig: Codable, Equatable, Sendable, Identifiable {
         transcriptionModel = value(.transcriptionModel) ?? ""
         diarizationModel = value(.diarizationModel) ?? ""
         enabled = value(.enabled) ?? false
+        realtimeModel = value(.realtimeModel) ?? ""
+    }
+
+    /// A cloud API (every kind but `.local` servers and `.cli` tools): usable once its key is saved, whatever `enabled`
+    /// says; local servers and CLIs keep the `enabled` toggle.
+    public var isCloud: Bool { kind != .local && kind != .cli }
+
+    /// Whether the provider can be used: a cloud API when `hasKey` (its Keychain key is saved), or for a custom
+    /// OpenAI-compatible endpoint without auth when its base URL is set; a local server or CLI when `enabled`.
+    public func isAvailable(hasKey: Bool) -> Bool {
+        guard isCloud else { return enabled }
+        if kind == .openAICompatible && preset == nil && authStyle == .none {
+            return !baseURL.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+        }
+        return hasKey
     }
 
     /// A new custom OpenAI-compatible endpoint with its own UUID id.
@@ -123,11 +144,14 @@ public struct ProviderConfig: Codable, Equatable, Sendable, Identifiable {
         cli("codex-cli", "Codex"),
         cli("opencode-cli", "OpenCode"),
         cli("gemini-cli", "Gemini CLI"),
-        // Speech to text only (OpenAI, Groq, Mistral, Gemini and custom endpoints transcribe through the configs above,
-        // so they share their Keychain key).
+        // Speech to text only (OpenAI, xAI, Groq, Mistral, Gemini and custom endpoints transcribe through the configs
+        // above, so they share their Keychain key).
         speechToText("elevenlabs", "ElevenLabs"),
         speechToText("deepgram", "Deepgram"),
         speechToText("assemblyai", "AssemblyAI"),
+        speechToText("speechmatics", "Speechmatics"),
+        speechToText("soniox", "Soniox"),
+        speechToText("gladia", "Gladia"),
     ]
 
     private static func cloud(_ id: String, _ name: String, _ base: String, model: String, auth: AuthStyle = .bearer) -> ProviderConfig {

@@ -355,6 +355,9 @@ public sealed partial class AppViewModel : ObservableObject
             StartupTrace.Write("end settings load");
             return settings;
         });
+        // Before any launch-time automatic path (library indexing, retried transcriptions) reads the providers; saved
+        // through the usual delayed write.
+        ApplySettings(Settings.MigratingProviderAvailability());
         OnPropertyChanged(nameof(NeedsDiarizer));
         StartupTrace.Write("settings applied");
         await Task.Run(Recover);
@@ -966,7 +969,7 @@ public sealed partial class AppViewModel : ObservableObject
             TranscriptionErrors = With(TranscriptionErrors, id, InstallingNotice);
             return null;
         }
-        if (PlanCloud(engineId, id, folder, language) is not { } cloud) return null;
+        if (PlanCloud(engineId, id, folder, language, prior) is not { } cloud) return null;
         engineId = cloud.EngineId;
         var firstLanguage = language ?? session.LanguageMarkers.MinBy(m => m.FileTime)?.Language ?? "auto";
         var job = new TranscriptionJob
@@ -1000,7 +1003,7 @@ public sealed partial class AppViewModel : ObservableObject
         {
             await Task.Run(() =>
             {
-                var asr = cloud.Asr is { } config ? _services.MakeCloudEngine(config) : null;
+                var asr = cloud.Asr is { } config ? _services.MakeCloudEngine(config, cloud.AsrModel) : null;
                 var diarizer = cloud.Diarizer is { } diarizerConfig
                     ? _services.MakeCloudEngine(diarizerConfig, CloudTranscription.DiarizationModel(diarizerConfig))
                     : null;

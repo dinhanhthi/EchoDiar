@@ -113,6 +113,18 @@ public struct AppSettings: Codable, Equatable, Sendable {
     /// Global pause/resume shortcut, same terms as `globalHotKey`.
     public var globalPauseHotKey: HotKey
     public var globalPauseHotKeyEnabled: Bool
+    /// Cloud provider ids that automatic picks (first usable AI provider, automatic catch-up, ...) skip; an explicit
+    /// pick or a saved key removes the id. Filled by `migratingProviderAvailability()`.
+    public var autoExcludedProviderIDs: Set<String>
+    /// `migratingProviderAvailability()` ran. A fresh install (the init's default) has nothing to migrate, so new
+    /// users get automatic picks once they save a key; a file from an older build (key missing) decodes as false.
+    public var providerAvailabilityMigrated: Bool
+    /// What the live transcript shows while recording when the default transcription engine is a cloud one.
+    public var cloudLiveSource: CloudLiveSource
+    /// Catalog id of the local model for `cloudLiveSource == .local` (display only); nil = the catalog default.
+    public var cloudLiveModelID: String?
+    /// With `cloudLiveSource == .realtime`, keep the realtime transcript as the final one instead of a cloud batch.
+    public var realtimeAsFinal: Bool
 
     public static let defaultEmbeddingModelID = "mlx-qwen3-embedding-0.6b"
 
@@ -169,7 +181,12 @@ public struct AppSettings: Codable, Equatable, Sendable {
         globalHotKey: HotKey = .defaultRecord,
         globalHotKeyEnabled: Bool = true,
         globalPauseHotKey: HotKey = .defaultPause,
-        globalPauseHotKeyEnabled: Bool = true
+        globalPauseHotKeyEnabled: Bool = true,
+        autoExcludedProviderIDs: Set<String> = [],
+        providerAvailabilityMigrated: Bool = true,
+        cloudLiveSource: CloudLiveSource = .off,
+        cloudLiveModelID: String? = nil,
+        realtimeAsFinal: Bool = false
     ) {
         self.launchAtLogin = launchAtLogin
         self.defaultLanguage = defaultLanguage
@@ -224,6 +241,11 @@ public struct AppSettings: Codable, Equatable, Sendable {
         self.globalHotKeyEnabled = globalHotKeyEnabled
         self.globalPauseHotKey = globalPauseHotKey
         self.globalPauseHotKeyEnabled = globalPauseHotKeyEnabled
+        self.autoExcludedProviderIDs = autoExcludedProviderIDs
+        self.providerAvailabilityMigrated = providerAvailabilityMigrated
+        self.cloudLiveSource = cloudLiveSource
+        self.cloudLiveModelID = cloudLiveModelID
+        self.realtimeAsFinal = realtimeAsFinal
     }
 
     public static let autoDeleteDaysRange = 1...3650
@@ -248,6 +270,8 @@ public struct AppSettings: Codable, Equatable, Sendable {
         case autoTranscribe, transcribeWhileRecording, speakerCountHint, diarization, deferTranscriptionWhenConstrained
         case autoDeleteEnabled, autoDeleteAfterDays, autoDeleteMode, deleteAudioAfterTranscription
         case deleteWithoutConfirmation, globalHotKey, globalHotKeyEnabled, globalPauseHotKey, globalPauseHotKeyEnabled
+        case autoExcludedProviderIDs, providerAvailabilityMigrated
+        case cloudLiveSource, cloudLiveModelID, realtimeAsFinal
     }
 
     public init(from decoder: Decoder) throws {
@@ -318,6 +342,39 @@ public struct AppSettings: Codable, Equatable, Sendable {
         let pauseHotKey = try container.decodeIfPresent(HotKey.self, forKey: .globalPauseHotKey) ?? .defaultPause
         globalPauseHotKey = pauseHotKey.hasCommandModifier ? pauseHotKey : .defaultPause
         globalPauseHotKeyEnabled = try container.decodeIfPresent(Bool.self, forKey: .globalPauseHotKeyEnabled) ?? true
+        autoExcludedProviderIDs = try container.decodeIfPresent(
+            Set<String>.self, forKey: .autoExcludedProviderIDs) ?? []
+        providerAvailabilityMigrated = try container.decodeIfPresent(
+            Bool.self, forKey: .providerAvailabilityMigrated) ?? false
+        cloudLiveSource = try container.decodeIfPresent(CloudLiveSource.self, forKey: .cloudLiveSource) ?? .off
+        cloudLiveModelID = try container.decodeIfPresent(String.self, forKey: .cloudLiveModelID)
+        realtimeAsFinal = try container.decodeIfPresent(Bool.self, forKey: .realtimeAsFinal) ?? false
+    }
+
+    /// One-time move to "key saved = available" for cloud providers (settings only, no Keychain read). Every cloud
+    /// provider whose effective config (the saved one, else its preset) is not enabled loses its references, which
+    /// fell back to local while it was off and would otherwise switch to the cloud silently, and joins
+    /// `autoExcludedProviderIDs`. Unchanged once `providerAvailabilityMigrated`.
+    public func migratingProviderAvailability() -> AppSettings {
+        guard !providerAvailabilityMigrated else { return self }
+        var settings = self
+        let saved = Dictionary(providers.map { ($0.id, $0) }, uniquingKeysWith: { first, _ in first })
+        let ids = ProviderConfig.presets.map(\.id) + providers.map(\.id).filter { id in
+            !ProviderConfig.presets.contains { $0.id == id }
+        }
+        for id in ids {
+            guard let config = saved[id] ?? ProviderConfig.presets.first(where: { $0.id == id }),
+                  config.isCloud, !config.enabled else { continue }
+            // The "cleared" values are each field's default, as when the reference is invalid.
+            if defaultASRModelID == "cloud:" + id { settings.defaultASRModelID = nil }
+            if defaultDiarizerModelID == "cloud:" + id { settings.defaultDiarizerModelID = nil }
+            if defaultAIProviderID == id { settings.defaultAIProviderID = nil }
+            if catchUpProviderID == id { settings.catchUpProviderID = "" }
+            if embeddingModelID == "api:" + id { settings.embeddingModelID = Self.defaultEmbeddingModelID }
+            settings.autoExcludedProviderIDs.insert(id)
+        }
+        settings.providerAvailabilityMigrated = true
+        return settings
     }
 
     private static func clamped(_ value: Int, to range: ClosedRange<Int>) -> Int {
@@ -353,6 +410,21 @@ public enum PlaybackChannels: String, Codable, Sendable {
     /// An unrecognized raw value (written by another build) falls back to `mixed`.
     public init(from decoder: Decoder) throws {
         self = PlaybackChannels(rawValue: try decoder.singleValueContainer().decode(String.self)) ?? .mixed
+    }
+}
+
+/// Where the live transcript comes from while recording with a cloud default transcription engine.
+public enum CloudLiveSource: String, Codable, Sendable {
+    /// No live transcript.
+    case off
+    /// A local model, display only; the cloud batch still writes the transcript.
+    case local
+    /// The default provider's realtime WebSocket.
+    case realtime
+
+    /// An unrecognized raw value (written by another build) falls back to `off`.
+    public init(from decoder: Decoder) throws {
+        self = CloudLiveSource(rawValue: try decoder.singleValueContainer().decode(String.self)) ?? .off
     }
 }
 

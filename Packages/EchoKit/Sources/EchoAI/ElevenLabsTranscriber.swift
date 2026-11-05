@@ -49,8 +49,8 @@ public struct ElevenLabsTranscriber: CloudTranscriber {
     }
 
     /// `words` (`word`, `spacing`, `audio_event`) to segments; spacing stays in the text, audio events are dropped.
-    /// Pure, for tests.
-    public static func parse(_ data: Data) throws -> [CloudSegment] {
+    /// `longSegment` as in `CloudTranscription.segments` (0: a segment per sentence). Pure, for tests.
+    public static func parse(_ data: Data, longSegment: Double = 15) throws -> [CloudSegment] {
         let decoder = JSONDecoder()
         decoder.keyDecodingStrategy = .convertFromSnakeCase
         let response = try decoder.decode(SpeechToTextResponse.self, from: data)
@@ -66,7 +66,8 @@ public struct ElevenLabsTranscriber: CloudTranscriber {
                 words.append(.init(start: start, end: end, text: word.text, speaker: word.speakerId))
             }
         }
-        return CloudTranscription.segments(from: words, separator: "", language: response.languageCode)
+        return CloudTranscription.segments(
+            from: words, separator: "", language: response.languageCode, longSegment: longSegment)
     }
 }
 
@@ -81,4 +82,109 @@ private struct SpeechToTextResponse: Decodable {
 
     var languageCode: String?
     var words: [Word]?
+}
+
+extension ElevenLabsTranscriber {
+    /// Scribe v2 Realtime: `wss://api.elevenlabs.io/v1/speech-to-text/realtime?...` (settings in the query, no start
+    /// message), `xi-api-key` handshake header, 16 kHz PCM sent as base64 in JSON. The server commits on silence
+    /// (`commit_strategy=vad`); `finalize` and `closeMessages` also send a manual commit (when audio came since the last
+    /// one) so the last stretch becomes final. Partials have no times (display only); finals are `committed_transcript_with_timestamps` words in
+    /// seconds (the plain `committed_transcript` repeats them without times and is ignored). No streaming speakers
+    /// and no end message: once closing, the timed answer to the last manual commit gives `ended` (even without
+    /// words) and `isDrained`, and the runner closes the socket. A manual commit counts as answered by the next
+    /// timed commit message (VAD commits answer too, so the count stops at 0); the plain one is not waited for,
+    /// since its order against the timed one is not documented.
+    public struct Realtime: RealtimeAdapter {
+        public static let models = ["scribe_v2_realtime"]
+        public static let endpoint = URL(string: "wss://api.elevenlabs.io/v1/speech-to-text/realtime")!
+
+        public let model: String
+        private let apiKey: String
+        private let language: String?
+        /// Audio was framed since the last manual commit: a commit without new audio could be `commit_throttled`,
+        /// and the server closes after an error.
+        private var uncommitted = false
+        /// Manual commits sent and not yet answered by a `committed_transcript_with_timestamps`.
+        private var unansweredCommits = 0
+        private var closing = false
+
+        public init(apiKey: String, model: String, language: String?, diarize: Bool) {
+            self.apiKey = apiKey
+            self.model = model
+            self.language = CloudTranscription.languageCode(language)
+        }
+
+        public var headers: [String: String] { ["xi-api-key": apiKey] }
+
+        public func socketURL(sessionAnswer: Data?) throws -> URL {
+            var query = [
+                URLQueryItem(name: "model_id", value: model),
+                URLQueryItem(name: "audio_format", value: "pcm_\(sampleRate)"),
+                URLQueryItem(name: "commit_strategy", value: "vad"),
+                URLQueryItem(name: "include_timestamps", value: "true"),
+            ]
+            if let language { query.append(URLQueryItem(name: "language_code", value: language)) }
+            return Self.endpoint.appending(queryItems: query)
+        }
+
+        public mutating func frame(_ pcm: Data) -> RealtimeMessage {
+            uncommitted = true
+            return chunk(pcm.base64EncodedString(), commit: false)
+        }
+
+        /// A manual commit, only when audio was framed since the last one.
+        public mutating func finalize(at streamSeconds: Double) -> [RealtimeMessage] {
+            guard uncommitted else { return [] }
+            uncommitted = false
+            unansweredCommits += 1
+            return [chunk("", commit: true)]
+        }
+
+        public mutating func closeMessages() -> [RealtimeMessage] {
+            closing = true
+            return finalize(at: 0)
+        }
+
+        /// Closing, and every manual commit is answered.
+        public var isDrained: Bool { closing && unansweredCommits == 0 }
+
+        /// `session_started` starts; a non-empty `partial_transcript` is a partial; the timed words of
+        /// `committed_transcript_with_timestamps` become finals (a segment per sentence: without speakers, the diarizer
+        /// after Stop labels each one, so a commit spanning two speakers is not one speaker's); a
+        /// message with an `error` fails with its `message_type`; `ended` follows the answer to the last commit
+        /// once closing.
+        public mutating func parse(_ message: RealtimeMessage) throws -> [RealtimeEvent] {
+            guard let envelope = try CloudRealtime.decode(LiveEnvelope.self, from: message) else { return [] }
+            if envelope.error != nil { return [.failed(kind: CloudRealtime.errorKind(envelope.messageType))] }
+            switch envelope.messageType {
+            case "session_started":
+                return [.started(expiresAt: nil)]
+            case "partial_transcript":
+                let text = envelope.text?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+                return text.isEmpty ? [] : [.partial(text: text, start: nil, end: nil, speaker: nil)]
+            case "committed_transcript_with_timestamps":
+                let segments = try ElevenLabsTranscriber.parse(CloudRealtime.payload(message), longSegment: 0)
+                let finals: [RealtimeEvent] = segments.map {
+                    var segment = $0
+                    segment.speaker = nil
+                    return .final(segment)
+                }
+                let answered = unansweredCommits > 0
+                unansweredCommits = max(unansweredCommits - 1, 0)
+                return finals + (answered && isDrained ? [.ended] : [])
+            default:
+                return []
+            }
+        }
+
+        private func chunk(_ base64: String, commit: Bool) -> RealtimeMessage {
+            .text(#"{"message_type":"input_audio_chunk","audio_base_64":"\#(base64)","commit":\#(commit),"sample_rate":\#(sampleRate)}"#)
+        }
+    }
+}
+
+private struct LiveEnvelope: Decodable {
+    var messageType: String?
+    var text: String?
+    var error: String?
 }

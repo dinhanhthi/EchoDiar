@@ -176,11 +176,11 @@ struct RecordingDetailView: View {
             if let event = model.calendarSuggestion { suggestionRow(event) }
             CatchUpPanel(model: model)
             if let captions = model.recordingCaptions {
-                LiveTranscriptView(snapshot: captions)
+                LiveTranscriptView(snapshot: captions, providerName: model.defaultCloudConfig?.displayName)
             } else {
                 VStack(spacing: 16) {
                     RecordingWave(model: model)
-                    Text(Self.noCaptionsReason(settings: model.settings))
+                    Text(Self.noCaptionsReason(model: model))
                         .font(.callout)
                         .foregroundStyle(.secondary)
                         .multilineTextAlignment(.center)
@@ -214,6 +214,30 @@ struct RecordingDetailView: View {
         .padding(.horizontal, 14)
         .padding(.vertical, 8)
         .modifier(GlassCard(cornerRadius: 14))
+    }
+
+    /// Why the recording has no live transcript, with the cloud live options when the default engine is a cloud
+    /// one: the live source is off, or `AppModel.cloudLiveBlock` says what is in the way.
+    static func noCaptionsReason(model: AppModel) -> String {
+        let settings = model.settings
+        guard settings.autoTranscribe, settings.transcribeWhileRecording, let config = model.defaultCloudConfig else {
+            return noCaptionsReason(settings: settings)
+        }
+        let name = config.displayName
+        switch model.cloudLiveBlock {
+        case .noLiveModel:
+            return String(localized: "No installed live model supports this recording's language. Download one in Settings › Transcription.")
+        case .realtimeUnsupported:
+            return String(localized: "\(name) has no realtime transcription. You can show a live transcript with a local model in Settings.")
+        case .cloudConsentPending:
+            return String(localized: "\(name) realtime starts once sending audio to \(name) (and to its speaker diarizer, if any) is confirmed. Confirm it in a conversation first.")
+        case .realtimeConsentPending:
+            return String(localized: "\(name) realtime is not confirmed yet. Turn it on in Settings to confirm it.")
+        case nil:
+            return model.realtimeAvailable(for: config)
+                ? String(localized: "\(name) transcribes after Stop. You can show a live transcript with a local model or \(name) realtime in Settings.")
+                : String(localized: "\(name) transcribes after Stop. You can show a live transcript with a local model in Settings.")
+        }
     }
 
     /// Why the recording has no live transcript, from `settings`; also why "Catch up" cannot run.

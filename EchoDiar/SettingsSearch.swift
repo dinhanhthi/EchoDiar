@@ -102,14 +102,28 @@ struct SettingsSearchItem: Identifiable {
               tab: .transcription, subTab: "general"),
         .init(title: "Transcription models", keywords: ["download", "Whisper", "fast", "balanced", "quality"],
               tab: .transcription, subTab: "transcriptionModels"),
-        .init(title: "Cloud transcription engines", keywords: ["upload", "API", "default engine"]
+        .init(title: "Cloud transcription engines", keywords: ["upload", "API", "default engine", "xAI"]
               + speechToTextNames, tab: .transcription, subTab: "transcriptionModels"),
-        .init(title: "Speech-to-text APIs", keywords: ["API key", "cloud transcription"] + speechToTextNames,
+        .init(title: "While recording",
+              keywords: ["live transcript", "cloud live", "realtime", "real-time", "streaming", "captions"]
+              + realtimeNames, tab: .transcription, subTab: "transcriptionModels"),
+        .init(title: "Live with a local model",
+              keywords: ["live transcript", "cloud live", "while recording", "WhisperKit", "Parakeet", "live model"],
               tab: .transcription, subTab: "transcriptionModels"),
+        .init(title: "Live with \("…") realtime",
+              keywords: ["live transcript", "cloud live", "realtime", "real-time", "streaming", "while recording",
+                         "WebSocket"] + realtimeNames,
+              tab: .transcription, subTab: "transcriptionModels"),
+        .init(title: "Realtime model", keywords: ["realtime", "streaming", "live model", "while recording"]
+              + realtimeNames, tab: .transcription, subTab: "transcriptionModels"),
+        .init(title: "Use the realtime result as the transcript",
+              keywords: ["use as final", "realtime", "streaming", "live transcript", "gap fill", "no upload"]
+              + realtimeNames, tab: .transcription, subTab: "transcriptionModels"),
         .init(title: "Diarization models", keywords: ["speaker model", "speakers", "pyannote", "Nemotron", "download"],
               tab: .transcription, subTab: "diarizationModels"),
         .init(title: "Cloud diarization",
-              keywords: ["OpenAI", "ElevenLabs", "Deepgram", "AssemblyAI", "Gemini", "speakers", "cloud"],
+              keywords: ["OpenAI", "ElevenLabs", "Deepgram", "AssemblyAI", "Gemini", "xAI", "Speechmatics", "Soniox",
+                         "Gladia", "speakers", "cloud"],
               tab: .transcription, subTab: "diarizationModels"),
         .init(title: "Tell speakers apart", keywords: ["diarization", "speakers", "who spoke"],
               tab: .transcription, subTab: "diarizationModels"),
@@ -133,12 +147,21 @@ struct SettingsSearchItem: Identifiable {
               tab: .providers, subTab: "onThisMac"),
         .init(title: "Local hosts", keywords: ["scan", "custom URL", "server"] + presetNames(.local),
               tab: .providers, subTab: "onThisMac"),
-        .init(title: "Cloud APIs", keywords: ["API key", "provider", "LLM"] + presetNames(.openAICompatible)
-              + presetNames(.anthropic), tab: .providers, subTab: "cloudAPIs"),
-        .init(title: "Custom OpenAI-compatible endpoints", keywords: ["add endpoint", "base URL", "API key"],
-              tab: .providers, subTab: "cloudAPIs"),
+        .init(title: "Cloud APIs", keywords: ["provider", "LLM", "model"] + presetNames(.openAICompatible)
+              + presetNames(.anthropic), tab: .providers, subTab: "cloud"),
+        .init(title: "Custom OpenAI-compatible endpoints", keywords: ["custom endpoint", "model"],
+              tab: .providers, subTab: "cloud"),
         .init(title: "CLIs", keywords: ["subscription", "command line", "terminal"] + presetNames(.cli),
               tab: .providers, subTab: "cli"),
+
+        // API Keys
+        .init(title: "Language models", keywords: ["API key", "key", "Keychain", "cloud", "LLM"]
+              + presetNames(.openAICompatible) + presetNames(.anthropic), tab: .apiKeys),
+        .init(title: "Speech-to-text APIs", keywords: ["API key", "key", "Keychain", "cloud transcription"]
+              + speechToTextNames, tab: .apiKeys),
+        .init(title: "Custom OpenAI-compatible endpoints",
+              keywords: ["API key", "key", "custom endpoint", "add endpoint", "base URL", "authentication"],
+              tab: .apiKeys),
 
         // RAG
         .init(title: "Ask across conversations", keywords: ["RAG", "global chat", "library", "search", "index"],
@@ -185,6 +208,10 @@ struct SettingsSearchItem: Identifiable {
     }
 
     private static var speechToTextNames: [String] { presetNames(.speechToText) }
+
+    /// The cloud engines with a realtime stream ("Live with <Provider> realtime").
+    private static let realtimeNames = ["ElevenLabs", "Deepgram", "AssemblyAI", "OpenAI", "xAI", "Speechmatics",
+                                        "Soniox", "Gladia"]
 }
 
 /// The settings matching the search, as surface rows on the window background; a click opens the row's section and

@@ -1,3 +1,4 @@
+import EchoAI
 import EchoCore
 @testable import EchoTranscribe
 import Testing
@@ -166,5 +167,83 @@ struct RecordingTranscriberBufferTests {
 
     private static func gaps(_ buffer: Buffer) -> [Span] {
         PriorTranscription.gaps(buffer.channels[mic].chunks)
+    }
+}
+
+/// Guards the cloud realtime coverage (`RealtimeCoverage`): stream time becomes file time by the session's offset, a
+/// disconnect and the audio after an undrained session's last final become gaps, and a planned rotation's parallel
+/// overlap keeps one speaker when the new session labels the same voice differently.
+struct RealtimeCoverageTests {
+    /// (c) A session from 0 that sent through 10 s with its last final at 8 s and did not drain, then a reconnect at
+    /// 15 s that drained through 25 s, in a 30 s recording.
+    @Test func aReconnectLeavesTheDisconnectAndTheUnfinalizedAudioAsGaps() {
+        var coverage = RealtimeCoverage()
+        let first = coverage.open(at: 0, bridged: false)
+        coverage.sent(first, through: 10)
+        coverage.final(first, CloudSegment(start: 1, end: 3, text: "one"))
+        coverage.final(first, CloudSegment(start: 4, end: 8, text: "two"))
+        coverage.close(first, drained: false)
+        let second = coverage.open(at: 15, bridged: false)
+        coverage.sent(second, through: 25)
+        let final = coverage.final(second, CloudSegment(start: 2, end: 4, text: "three"))
+        coverage.close(second, drained: true)
+
+        #expect(final.start == 17 && final.end == 19)
+        #expect(coverage.gaps(through: 30) == [Span(start: 8, end: 15), Span(start: 25, end: 30)])
+        #expect(coverage.segments().map(\.start) == [1, 4, 17])
+    }
+
+    /// (d) A rotation opens session 1 at 30 s while session 0 streams through 60 s; session 1 calls the voice "B",
+    /// session 0 "A": the joined finals and the live label after `freezeLabels` are all "A", none repeated.
+    @Test func aParallelRotationKeepsOneSpeaker() {
+        var coverage = RealtimeCoverage()
+        let old = coverage.open(at: 0, bridged: false)
+        coverage.sent(old, through: 60)
+        for start in stride(from: 0.0, to: 60, by: 2) {
+            coverage.final(old, CloudSegment(start: start, end: start + 2, text: "old", speaker: "A"))
+        }
+        let new = coverage.open(at: 30, bridged: true)
+        coverage.sent(new, through: 90)
+        for start in stride(from: 0.0, to: 60, by: 2) {
+            coverage.final(new, CloudSegment(start: start, end: start + 2, text: "new", speaker: "B"))
+        }
+        coverage.close(old, drained: true)
+        coverage.freezeLabels(new)
+        coverage.close(new, drained: true)
+
+        let segments = coverage.segments()
+        #expect(Set(segments.compactMap(\.speaker)) == ["A"])
+        #expect(segments.map(\.start) == Array(stride(from: 0.0, to: 90, by: 2)))
+        #expect(coverage.liveLabel(new, "B") == "A")
+        #expect(coverage.gaps(through: 90).isEmpty)
+    }
+}
+
+/// Guards the cloud realtime transcriber's recovery: once both channels stopped (`.failed`), a channel that is live
+/// again (a "config" failure recovers at a language change) brings the state back to listening and its finals show.
+struct RealtimeRecoveryTests {
+    @Test func bothChannelsFailedRecoverOnceOneIsLiveAgain() async throws {
+        let policy = try #require(RealtimePolicy.of(preset: "speechmatics"))
+        let stream = RealtimeLiveStream(modelID: "rt-model", policy: policy) { _, _ in
+            throw RealtimeLiveStream.Failure(kind: "config")
+        }
+        let transcriber = RecordingTranscriber(
+            realtime: stream, engineID: "cloud:fake", displayOnly: true, language: { nil })
+        var updates = transcriber.updates.makeAsyncIterator()
+        let system = RecordingSession.Channel.system
+
+        for channel in 0..<2 { await transcriber.apply(.realtimeState(channel: channel, .failed(kind: "config"))) }
+        let failed = try #require(await updates.next())
+        #expect({ if case .failed = failed.state { true } else { false } }())
+
+        await transcriber.apply(.final(channel: system, segment: RawSegment(start: 0, end: 1, text: "dropped")))
+        await transcriber.apply(.realtimeState(channel: system, .connecting))
+        await transcriber.apply(.realtimeState(channel: system, .live))
+        await transcriber.apply(.final(channel: system, segment: RawSegment(start: 2, end: 3, text: "hello again")))
+        let recovered = try #require(await updates.next())
+        #expect(recovered.state == .listening)
+        #expect(recovered.lines.map(\.text).contains { $0.contains("hello again") })
+        #expect(!recovered.lines.contains { $0.text.contains("dropped") })
+        await transcriber.cancel()
     }
 }

@@ -35,10 +35,31 @@ namespace EchoDiar.Transcribe;
 /// task. Thread-safe: <see cref="AppendInterleaved"/> runs on the writer's thread, the decode task on the thread pool,
 /// the rest on any thread.
 /// </para>
+/// <para>
+/// <c>displayOnly</c> (Swift <c>displayOnly</c>): a local live transcript while a cloud engine writes the transcript
+/// after Stop. <see cref="FinishAsync"/> then cancels and returns null at once, without draining.
+/// </para>
+/// <para>
+/// Cloud realtime (the <see cref="RealtimeLiveStream"/> constructor; Swift <c>init(realtime:engineID:displayOnly:language:)</c>)
+/// streams both channels to the default cloud provider: its partials become the speaker's tentative text and its
+/// finals lines, applied in order from a results queue on a background task. <see cref="TranscriberState.Loading"/>
+/// until a channel's socket is live; <see cref="Snapshot.Reconnecting"/> and <see cref="Snapshot.RealtimeFailure"/>
+/// tell the rest. Display only, <see cref="FinishAsync"/> cancels the stream at once and returns null; else it drains
+/// the stream (at most ~5 s) and returns its finals and gaps as a prior (<c>cloud:&lt;provider id&gt;</c>).
+/// </para>
 /// </remarks>
 public sealed class RecordingTranscriber : IAsyncDisposable
 {
     public enum TranscriberState { Loading, Listening, Paused, Failed }
+
+    /// <summary>What produces the live text (Swift <c>Source</c>; no Apple Speech on Windows).</summary>
+    public enum TranscriberSource
+    {
+        /// <summary>Whisper or Parakeet decoding speech chunks.</summary>
+        Chunks,
+        /// <summary>The default cloud provider's realtime WebSocket, one per channel.</summary>
+        CloudRealtime,
+    }
 
     /// <summary>Who spoke a line: <c>ToString()</c> is the macOS label ("Me", "Others").</summary>
     public enum Speaker { Me, Others }
@@ -57,6 +78,25 @@ public sealed class RecordingTranscriber : IAsyncDisposable
         /// <see cref="Lines"/> (Swift <c>tentative</c>); a new array whenever it changes.
         /// </summary>
         public IReadOnlyList<Tentative> Tentative { get; init; } = [];
+
+        public TranscriberSource Source { get; init; } = TranscriberSource.Chunks;
+
+        /// <summary>
+        /// <see cref="FinishAsync"/> returns null: the live text is not kept, a batch job writes the transcript after
+        /// Stop (Swift <c>displayOnly</c>).
+        /// </summary>
+        public bool DisplayOnly { get; init; }
+
+        /// <summary>Cloud realtime: a channel whose socket was live is connecting again (a drop, a rotation, a resume).</summary>
+        public bool Reconnecting { get; init; }
+
+        /// <summary>
+        /// Cloud realtime: the first channel that stopped for this recording, as a short kind ("auth", "payment",
+        /// "plan_limit", "config", "http_&lt;code&gt;", ...; never a message), cleared once a channel is live and none is
+        /// failed (a "config" failure recovers at a language change); the state turns
+        /// <see cref="TranscriberState.Failed"/> once both did, and back to running once a channel is live again.
+        /// </summary>
+        public string? RealtimeFailure { get; init; }
     }
 
     /// <summary>The text of a chunk still open, decoded so far; its line replaces it once the chunk closes (Swift <c>Tentative</c>).</summary>
@@ -114,11 +154,27 @@ public sealed class RecordingTranscriber : IAsyncDisposable
     /// </summary>
     public const int BehindNoticeSeconds = 25;
 
-    private readonly ModelEntry _entry;
-    private readonly ISessionTranscriptionEngine _engine;
-    private readonly ModelLoadGate _gate;
+    /// <summary>null for cloud realtime, as are <see cref="_engine"/> and <see cref="_gate"/>.</summary>
+    private readonly ModelEntry? _entry;
+    private readonly ISessionTranscriptionEngine? _engine;
+    private readonly ModelLoadGate? _gate;
+    /// <summary>The prior's engine: the entry's catalog id, or <c>cloud:&lt;provider id&gt;</c> for cloud realtime.</summary>
+    private readonly string _engineId;
+    /// <summary>The cloud realtime stream; null for the chunk path.</summary>
+    private readonly RealtimeLiveStream? _realtime;
+    /// <summary>
+    /// Cloud realtime: the stream's updates and <see cref="AppendInterleaved"/>'s resume notices (null), applied in order
+    /// by the realtime task.
+    /// </summary>
+    private readonly Channel<RealtimeLiveStream.Update?> _results =
+        Channel.CreateUnbounded<RealtimeLiveStream.Update?>(new UnboundedChannelOptions { SingleReader = true });
+    /// <summary>Cloud realtime: one channel's samples of a block, reused on the writer's thread (the stream copies them).</summary>
+    private float[] _micScratch = [];
+    private float[] _systemScratch = [];
     private readonly TimeSpan? _idleRelease;
     private readonly Func<string?> _language;
+    /// <summary><see cref="FinishAsync"/> returns null without draining.</summary>
+    private readonly bool _displayOnly;
     /// <summary>Filled by <see cref="AppendInterleaved"/> on the writer's thread, emptied by the decode task; locked on itself.</summary>
     private readonly Buffer _buffer;
     /// <summary>At most one pending wake-up: a chunk is waiting, the recording resumed, or the tick is due.</summary>
@@ -139,6 +195,11 @@ public sealed class RecordingTranscriber : IAsyncDisposable
     private bool _finished;
     /// <summary>No more <see cref="Updated"/>: <see cref="FinishAsync"/> drained the queue or <see cref="Cancel"/> ran.</summary>
     private bool _ended;
+    /// <summary>Cloud realtime: each channel's last state (index = <see cref="RecordingSession.Channel"/>), and the channels that were live.</summary>
+    private readonly RealtimeLiveStream.State?[] _realtimeStates = [null, null];
+    private readonly HashSet<int> _realtimeConnected = [];
+    private bool _reconnecting;
+    private string? _realtimeFailure;
 
     /// <summary>
     /// <paramref name="entry"/> is the installed Whisper or Parakeet entry <paramref name="engine"/> loads
@@ -146,19 +207,38 @@ public sealed class RecordingTranscriber : IAsyncDisposable
     /// chunk came for that long (a paused recording) and loads it again for the next one; null keeps it until
     /// <see cref="FinishAsync"/>. <paramref name="language"/> gives the current marker language ("auto", a BCP-47
     /// code, or null = detect); it is called for every block on the writer's thread, so it must be cheap and thread-safe.
+    /// <paramref name="displayOnly"/> keeps nothing at Stop (<see cref="FinishAsync"/> returns null at once).
     /// </summary>
     public RecordingTranscriber(
         ModelEntry entry, ISessionTranscriptionEngine engine, ModelLoadGate gate, TimeSpan? idleRelease,
-        Func<string?> language)
+        Func<string?> language, bool displayOnly = false)
     {
         _entry = entry;
         _engine = engine;
         _gate = gate;
+        _engineId = entry.Id;
         _idleRelease = idleRelease;
         _language = language;
+        _displayOnly = displayOnly;
         _buffer = new Buffer(
             Math.Min(entry.WindowSeconds ?? TranscriptionPipeline.DefaultWindowSeconds, LiveMaxChunkSeconds),
             shortPauseMinSeconds: LiveShortPauseMinSeconds, shortPauseFrames: LiveShortPauseFrames);
+    }
+
+    /// <summary>
+    /// Cloud realtime: <paramref name="stream"/> (<see cref="RealtimeLiveStream.Make"/>) takes both channels' blocks;
+    /// <paramref name="engineId"/> is the prior's (<c>cloud:&lt;provider id&gt;</c> of the stream's provider).
+    /// <paramref name="displayOnly"/> (the realtime result is not the transcript) cancels the stream at Stop and returns
+    /// null; else <see cref="FinishAsync"/> drains it and returns the prior. <paramref name="language"/> as for the
+    /// other constructor, read per block. No model gate, no idle release.
+    /// </summary>
+    public RecordingTranscriber(RealtimeLiveStream stream, string engineId, bool displayOnly, Func<string?> language)
+    {
+        _realtime = stream;
+        _engineId = engineId;
+        _language = language;
+        _displayOnly = displayOnly;
+        _buffer = new Buffer(LiveMaxChunkSeconds);
     }
 
     /// <summary>
@@ -171,14 +251,17 @@ public sealed class RecordingTranscriber : IAsyncDisposable
     /// <summary>What <see cref="FinishAsync"/> left; null before it, or when the model never loaded or <see cref="Cancel"/> ran.</summary>
     public ChunkStats? Stats { get; private set; }
 
-    /// <summary>Waits for the model gate on the thread pool, loads the model there and starts decoding.</summary>
+    /// <summary>
+    /// Waits for the model gate on the thread pool, loads the model there and starts decoding (cloud realtime: starts
+    /// the stream and applies its updates on the thread pool).
+    /// </summary>
     public void Start()
     {
         lock (_lock)
         {
             if (_decoder is not null || _finished) return;
             PublishLocked(TranscriberState.Loading);
-            _decoder = Task.Run(DecodeAsync);
+            _decoder = _realtime is { } realtime ? Task.Run(() => RunRealtimeAsync(realtime)) : Task.Run(DecodeAsync);
         }
     }
 
@@ -190,22 +273,55 @@ public sealed class RecordingTranscriber : IAsyncDisposable
     {
         if (frames <= 0 || channels <= Math.Max(RecordingSession.Channel.Mic, RecordingSession.Channel.System)) return;
         var language = ChunkLanguage(_language());
+        if (_realtime is { } realtime)
+        {
+            StreamBlock(realtime, interleaved, frames, channels, language);
+            return;
+        }
         bool wake;
         lock (_buffer) wake = _buffer.Append(interleaved, frames, channels, language);
         if (wake) _wake.Writer.TryWrite(true);
     }
 
-    /// <summary>On pause: closes the open chunk of each channel so it is decoded now.</summary>
+    /// <summary>
+    /// Cloud realtime: hands the block, at its file position, to the stream, which copies it and never blocks; the first
+    /// block after a pause queues a resume notice.
+    /// </summary>
+    private void StreamBlock(RealtimeLiveStream realtime, ReadOnlySpan<short> interleaved, int frames, int channels, string? language)
+    {
+        (long StartSample, bool Resumed)? slot;
+        lock (_buffer) slot = _buffer.AppendRealtime(frames);
+        if (slot is not { } block) return;
+        if (_micScratch.Length < frames)
+        {
+            _micScratch = new float[frames];
+            _systemScratch = new float[frames];
+        }
+        var mic = _micScratch.AsSpan(0, frames);
+        var system = _systemScratch.AsSpan(0, frames);
+        for (var i = 0; i < frames; i++)
+        {
+            mic[i] = interleaved[i * channels + RecordingSession.Channel.Mic] / 32_768f;
+            system[i] = interleaved[i * channels + RecordingSession.Channel.System] / 32_768f;
+        }
+        realtime.Append(mic, system, block.StartSample, language);
+        if (block.Resumed) _results.Writer.TryWrite(null);
+    }
+
+    /// <summary>On pause: closes the open chunk of each channel so it is decoded now (cloud realtime: closes the sockets).</summary>
     public void Flush()
     {
         lock (_buffer) _buffer.Flush(paused: true);
         _wake.Writer.TryWrite(true);
+        _realtime?.Pause();
         PublishRunning();
     }
 
     /// <summary>
     /// At Stop: decodes what is left, unloads the model (releasing the gate) and returns what was transcribed; null
-    /// when no chunk was, or the model never loaded (the pipeline then transcribes the whole recording).
+    /// when no chunk was, or the model never loaded (the pipeline then transcribes the whole recording). Display only:
+    /// cancels without waiting for a decode in flight and returns null at once; <see cref="Stats"/> then counts the
+    /// lines shown as transcribed, once the model loaded. Cloud realtime: see <see cref="FinishRealtimeAsync"/>.
     /// </summary>
     public async Task<PriorTranscription?> FinishAsync()
     {
@@ -218,6 +334,13 @@ public sealed class RecordingTranscriber : IAsyncDisposable
         }
         bool loaded;
         lock (_buffer) loaded = _buffer.Loaded;
+        if (_displayOnly)
+        {
+            if (loaded) lock (_lock) Stats = new ChunkStats(_nextLineID, 0, 0, 0, 0);
+            Cancel();
+            return null;
+        }
+        if (_realtime is { } realtime) return await FinishRealtimeAsync(realtime, decoder).ConfigureAwait(false);
         if (!loaded)
         {
             Cancel();
@@ -252,12 +375,50 @@ public sealed class RecordingTranscriber : IAsyncDisposable
         var system = result[RecordingSession.Channel.System];
         return new PriorTranscription
         {
-            EngineID = _entry.Id,
+            EngineID = _engineId,
             Mic = [.. mic.Segments.OrderBy(s => s.Start)],
             System = [.. system.Segments.OrderBy(s => s.Start)],
             MicGaps = PriorTranscription.Gaps(mic.Chunks),
             SystemGaps = PriorTranscription.Gaps(system.Chunks),
             Duration = duration,
+        };
+    }
+
+    /// <summary>
+    /// Cloud realtime as the transcript: drains the stream (at most its ~5 s drain) and returns its finals, its gaps per
+    /// channel and its model as the prior, also when no socket ever connected (the whole recording is then a gap); null
+    /// when <see cref="Cancel"/> ran meanwhile.
+    /// </summary>
+    private async Task<PriorTranscription?> FinishRealtimeAsync(RealtimeLiveStream realtime, Task? decoder)
+    {
+        lock (_buffer) _buffer.Finishing = true;
+        var result = await realtime.FinishAsync().ConfigureAwait(false);
+        // The realtime task applies the updates left and ends once the stream's updates complete.
+        if (decoder is not null) await decoder.ConfigureAwait(false);
+        else _results.Writer.TryComplete();
+        lock (_lock)
+        {
+            _decoder = null;
+            _ended = true;
+        }
+        double duration;
+        lock (_buffer)
+        {
+            if (_buffer.Closed) return null;
+            duration = (double)_buffer.SamplesSeen / SampleRate;
+            _buffer.Close();
+        }
+        lock (_lock) Stats = new ChunkStats(_nextLineID, 0, 0, 0, 0);
+        return new PriorTranscription
+        {
+            EngineID = _engineId,
+            Mic = [.. result.Mic.OrderBy(s => s.Start)],
+            System = [.. result.System.OrderBy(s => s.Start)],
+            MicGaps = result.MicGaps,
+            SystemGaps = result.SystemGaps,
+            Duration = duration,
+            ModelId = result.ModelId,
+            SystemBridges = result.SystemBridges,
         };
     }
 
@@ -272,6 +433,8 @@ public sealed class RecordingTranscriber : IAsyncDisposable
         }
         lock (_buffer) _buffer.Close();
         _wake.Writer.TryComplete();
+        _realtime?.Cancel();
+        _results.Writer.TryComplete();
         _cancel.Cancel();
     }
 
@@ -290,9 +453,10 @@ public sealed class RecordingTranscriber : IAsyncDisposable
     private async Task DecodeAsync()
     {
         var token = _cancel.Token;
+        if (_gate is not { } gate) return;
         try
         {
-            await _gate.WithExclusiveModelAsync(ModelLoadGate.Owner.LiveTranscript, async t =>
+            await gate.WithExclusiveModelAsync(ModelLoadGate.Owner.LiveTranscript, async t =>
             {
                 await RunAsync(t).ConfigureAwait(false);
                 return true;
@@ -315,9 +479,10 @@ public sealed class RecordingTranscriber : IAsyncDisposable
     /// <summary>Owns the session from load to unload, and loads it again after an idle release.</summary>
     private async Task RunAsync(CancellationToken token)
     {
-        var session = await _engine.OpenSessionAsync(token).ConfigureAwait(false);
+        if (_engine is not { } engine) throw new TranscriptionException(TranscriptionErrorKind.UnknownEngine, _engineId);
+        var session = await engine.OpenSessionAsync(token).ConfigureAwait(false);
         await using var model = new IdleModel<ITranscriptionSession>(
-            session, _idleRelease, _engine.OpenSessionAsync, s => s.DisposeAsync());
+            session, _idleRelease, engine.OpenSessionAsync, s => s.DisposeAsync());
         lock (_buffer) _buffer.Loaded = true;
         PublishRunning();
         using var tickCancel = CancellationTokenSource.CreateLinkedTokenSource(token);
@@ -434,6 +599,171 @@ public sealed class RecordingTranscriber : IAsyncDisposable
             }
         }, token);
 
+    // Cloud realtime
+
+    /// <summary>
+    /// Starts the stream and applies its updates, with <see cref="AppendInterleaved"/>'s resume notices, in order until
+    /// the stream ends (<see cref="FinishAsync"/>) or <see cref="Cancel"/> ran; never throws.
+    /// </summary>
+    private async Task RunRealtimeAsync(RealtimeLiveStream realtime)
+    {
+        var token = _cancel.Token;
+        realtime.Start();
+        var pump = PumpRealtimeAsync(realtime, token);
+        try
+        {
+            await foreach (var result in _results.Reader.ReadAllAsync(token).ConfigureAwait(false))
+            {
+                if (result is null) ApplyResumed();
+                else Apply(result);
+            }
+        }
+        catch (OperationCanceledException)
+        {
+        }
+        await pump.ConfigureAwait(false);
+        if (token.IsCancellationRequested) return;
+        lock (_lock) _tentative = [];
+        PublishRunning();
+    }
+
+    /// <summary>Moves the stream's updates into the results queue, and completes it once the stream ends.</summary>
+    private async Task PumpRealtimeAsync(RealtimeLiveStream realtime, CancellationToken token)
+    {
+        try
+        {
+            await foreach (var update in realtime.Updates.ReadAllAsync(token).ConfigureAwait(false))
+                _results.Writer.TryWrite(update);
+        }
+        catch (OperationCanceledException)
+        {
+        }
+        _results.Writer.TryComplete();
+    }
+
+    /// <summary>The first block after a pause: listening again.</summary>
+    private void ApplyResumed()
+    {
+        lock (_lock)
+        {
+            if (_state == TranscriberState.Failed) return;
+        }
+        PublishRunning();
+    }
+
+    /// <summary>
+    /// One update of the stream, in the order they came (Swift <c>apply</c>). Once failed, only socket states still
+    /// count: a stopped channel can stream again. Internal for the tests.
+    /// </summary>
+    internal void Apply(RealtimeLiveStream.Update update)
+    {
+        lock (_lock)
+        {
+            if (_state == TranscriberState.Failed && update is not RealtimeLiveStream.Update.StateChanged) return;
+        }
+        switch (update)
+        {
+            case RealtimeLiveStream.Update.StateChanged state:
+                SetRealtimeState(state.Channel, state.State);
+                break;
+            case RealtimeLiveStream.Update.Partial partial:
+                SetPartial(partial.Channel, partial.Text, partial.Start);
+                break;
+            case RealtimeLiveStream.Update.Final final:
+                AddFinal(final.Channel, final.Segment);
+                break;
+        }
+    }
+
+    /// <summary>
+    /// A channel's text so far as its speaker's tentative text (null clears it). Without a provider time it keeps the
+    /// start of the speaker's tentative text, else starts at the channel's last final end, else at the samples seen.
+    /// </summary>
+    private void SetPartial(int channel, string? text, double? start)
+    {
+        var speaker = SpeakerOf(channel);
+        lock (_lock)
+        {
+            long startSample;
+            if (start is { } seconds) startSample = (long)Math.Round(seconds * SampleRate, MidpointRounding.AwayFromZero);
+            else if (_tentative.FirstOrDefault(t => t.Speaker == speaker) is { } current) startSample = current.StartSample;
+            else lock (_buffer) startSample = _buffer.PartialStart(channel);
+            _tentative = WithTentative(_tentative, speaker, text, startSample);
+        }
+        PublishRunning();
+    }
+
+    /// <summary>
+    /// <see cref="TranscriberState.Loading"/> until a channel is live, <see cref="Snapshot.Reconnecting"/> while a
+    /// channel that was live connects again, <see cref="Snapshot.RealtimeFailure"/> from the first channel that stopped,
+    /// <see cref="TranscriberState.Failed"/> once both did, until one is live again (a "config" failure recovers at a
+    /// language change).
+    /// </summary>
+    private void SetRealtimeState(int channel, RealtimeLiveStream.State state)
+    {
+        if (channel < 0 || channel >= _realtimeStates.Length) return;
+        lock (_lock)
+        {
+            _realtimeStates[channel] = state;
+            switch (state)
+            {
+                case RealtimeLiveStream.State.Live:
+                    _realtimeConnected.Add(channel);
+                    lock (_buffer) _buffer.Loaded = true;
+                    // Both channels had stopped: this one streams again, so the running publish shows it running.
+                    if (_state == TranscriberState.Failed) _state = TranscriberState.Loading;
+                    // A "config" failure recovers at a language change.
+                    if (!_realtimeStates.Any(s => s is RealtimeLiveStream.State.Failed)) _realtimeFailure = null;
+                    break;
+                case RealtimeLiveStream.State.Failed failed:
+                    _realtimeFailure ??= failed.Kind;
+                    _tentative = WithTentative(_tentative, SpeakerOf(channel), null, 0);
+                    break;
+            }
+            _reconnecting = Enumerable.Range(0, _realtimeStates.Length).Any(index => _realtimeStates[index] switch
+            {
+                RealtimeLiveStream.State.Reconnecting => true,
+                RealtimeLiveStream.State.Connecting => _realtimeConnected.Contains(index),
+                _ => false,
+            });
+            var failures = _realtimeStates.OfType<RealtimeLiveStream.State.Failed>().Select(f => f.Kind).ToList();
+            if (failures.Count == _realtimeStates.Length)
+            {
+                _reconnecting = false;
+                _error = $"Cloud realtime stopped ({failures[0]}).";
+                PublishLocked(TranscriberState.Failed);
+                return;
+            }
+            PublishRunningLocked();
+            // The running publish leaves loading alone: the new fields still show.
+            PublishLocked(_state);
+        }
+    }
+
+    /// <summary>Records a final and shows its line in place of the speaker's tentative text.</summary>
+    private void AddFinal(int channel, RawSegment segment)
+    {
+        var speaker = SpeakerOf(channel);
+        var span = new Span(segment.Start, segment.End);
+        lock (_lock)
+        {
+            lock (_buffer) _buffer.AddLive(segment, channel);
+            // The system's text still tentative counts like the chunk path's open chunk: its final lags the mic's.
+            var othersPending = _tentative.Any(t => t.Speaker == Speaker.Others
+                && (double)t.StartSample / SampleRate <= span.End + TranscriptMerger.BleedTimeTolerance);
+            var text = LiveLine([segment], speaker == Speaker.Me, () =>
+            {
+                if (othersPending) return true;
+                lock (_buffer) return _buffer.OthersFinal(span);
+            });
+            _tentative = WithTentative(_tentative, speaker, null, 0);
+            if (text is not null) AppendLineLocked(speaker, text, segment.Start);
+        }
+        PublishRunning();
+    }
+
+    private static Speaker SpeakerOf(int channel) => channel == RecordingSession.Channel.Mic ? Speaker.Me : Speaker.Others;
+
     // State
 
     /// <summary>Raises <see cref="Updated"/> when the snapshot changed; call inside <see cref="_lock"/>.</summary>
@@ -447,6 +777,10 @@ public sealed class RecordingTranscriber : IAsyncDisposable
         var snapshot = new Snapshot(_state, _lines, pending, _state == TranscriberState.Failed ? _error : null)
         {
             Tentative = _tentative,
+            Source = _realtime is null ? TranscriberSource.Chunks : TranscriberSource.CloudRealtime,
+            DisplayOnly = _displayOnly,
+            Reconnecting = _reconnecting,
+            RealtimeFailure = _realtimeFailure,
         };
         if (snapshot == _published) return;
         _published = snapshot;
@@ -456,17 +790,20 @@ public sealed class RecordingTranscriber : IAsyncDisposable
     /// <summary>Listening or paused once loaded; leaves loading (before the load) and failed alone.</summary>
     private void PublishRunning()
     {
-        lock (_lock)
+        lock (_lock) PublishRunningLocked();
+    }
+
+    /// <summary><see cref="PublishRunning"/>; call inside <see cref="_lock"/>.</summary>
+    private void PublishRunningLocked()
+    {
+        bool loaded, paused;
+        lock (_buffer)
         {
-            bool loaded, paused;
-            lock (_buffer)
-            {
-                loaded = _buffer.Loaded;
-                paused = _buffer.Paused;
-            }
-            if ((_state == TranscriberState.Loading && !loaded) || _state == TranscriberState.Failed) return;
-            PublishLocked(paused ? TranscriberState.Paused : TranscriberState.Listening);
+            loaded = _buffer.Loaded;
+            paused = _buffer.Paused;
         }
+        if ((_state == TranscriberState.Loading && !loaded) || _state == TranscriberState.Failed) return;
+        PublishLocked(paused ? TranscriberState.Paused : TranscriberState.Listening);
     }
 
     /// <summary>
@@ -479,15 +816,21 @@ public sealed class RecordingTranscriber : IAsyncDisposable
         lock (_lock)
         {
             _tentative = WithoutTentative(_tentative, speaker, startSample);
-            if (text is not null)
-            {
-                var line = new Line(_nextLineID++, speaker, text, (double)startSample / SampleRate);
-                _finalized.Add(line);
-                var lines = new List<Line>(_lines) { line };
-                _lines = [.. lines.Skip(Math.Max(0, lines.Count - MaxLines))];
-            }
+            if (text is not null) AppendLineLocked(speaker, text, (double)startSample / SampleRate);
         }
         PublishRunning();
+    }
+
+    /// <summary>
+    /// Adds a line with the next id starting at <paramref name="start"/> seconds to the snapshot (the newest
+    /// <see cref="MaxLines"/>) and the finalized log (all of them); call inside <see cref="_lock"/>.
+    /// </summary>
+    private void AppendLineLocked(Speaker speaker, string text, double start)
+    {
+        var line = new Line(_nextLineID++, speaker, text, start);
+        _finalized.Add(line);
+        var lines = new List<Line>(_lines) { line };
+        _lines = [.. lines.Skip(Math.Max(0, lines.Count - MaxLines))];
     }
 
     /// <summary>
@@ -673,6 +1016,49 @@ public sealed class RecordingTranscriber : IAsyncDisposable
             var partialDue = false;
             for (var channel = 0; channel < Channels.Count; channel++) partialDue |= SignalPartial(channel);
             return resumed || micQueued || systemQueued || partialDue;
+        }
+
+        /// <summary>
+        /// Cloud realtime: a block of <paramref name="count"/> samples per channel goes to the stream, which queues
+        /// nothing here: its file position and whether it is the first after a pause; null when closed, finishing or failed.
+        /// </summary>
+        public (long StartSample, bool Resumed)? AppendRealtime(int count)
+        {
+            if (Closed || Finishing || _failed) return null;
+            var startSample = SamplesSeen;
+            var resumed = Paused;
+            Paused = false;
+            SamplesSeen += count;
+            return (startSample, resumed);
+        }
+
+        /// <summary>
+        /// Cloud realtime: where a partial without a provider time starts: the channel's last final end, else the
+        /// samples seen.
+        /// </summary>
+        public long PartialStart(int channel)
+        {
+            if (Closed || Channels[channel].Segments.Count == 0) return SamplesSeen;
+            return (long)Math.Round(Channels[channel].Segments[^1].End * SampleRate, MidpointRounding.AwayFromZero);
+        }
+
+        /// <summary>Cloud realtime: a final of <paramref name="channel"/>, in file seconds.</summary>
+        public void AddLive(RawSegment segment, int channel)
+        {
+            if (Closed) return;
+            Channels[channel].Segments.Add(segment);
+        }
+
+        /// <summary>
+        /// Cloud realtime: true when a system final overlaps <paramref name="span"/> widened by
+        /// <see cref="TranscriptMerger.BleedTimeTolerance"/>.
+        /// </summary>
+        public bool OthersFinal(Span span)
+        {
+            if (Closed) return false;
+            var start = span.Start - TranscriptMerger.BleedTimeTolerance;
+            var end = span.End + TranscriptMerger.BleedTimeTolerance;
+            return Channels[RecordingSession.Channel.System].Segments.Any(s => s.Start < end && s.End > start);
         }
 
         public void Flush(bool paused)

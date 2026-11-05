@@ -4,9 +4,9 @@ import EchoTranscribe
 import SwiftUI
 
 /// The Transcription tab, one inner tab per section: the default language with the transcribe-while-recording switch
-/// and deleting the audio after transcription, the transcription models (local by tier, then cloud: the configured
-/// engines and the speech-to-text APIs), and the diarization models (local by tier, then the cloud diarizers), with
-/// Download, Cancel, Delete and Set default. Rows that cannot transcribe the default language are disabled with a note.
+/// and deleting the audio after transcription, the transcription models (local by tier, then the cloud engines with
+/// their models), and the diarization models (local by tier, then the cloud diarizers), with Download, Cancel, Delete
+/// and Set default. Rows that cannot transcribe the default language are disabled with a note.
 struct ModelsSettingsView: View {
     let model: AppModel
 
@@ -22,27 +22,12 @@ struct ModelsSettingsView: View {
     ).filter { $0.kind == .asr || $0.kind == .diarization }
 
     var body: some View {
-        ScrollViewReader { proxy in
-            page
-                // A cloud row's Set Up: the speech-to-text API's row below (which expands itself) comes into view.
-                .onChange(of: model.settingsExpandedProvider, initial: true) { _, id in
-                    guard let id, tab == .transcriptionModels else { return }
-                    Task {
-                        await Task.yield()
-                        withAnimation { proxy.scrollTo(id, anchor: .top) }
-                    }
-                }
-        }
-    }
-
-    private var page: some View {
         VStack(spacing: 0) {
             Form {
                 switch tab {
                 case .general: generalSection
                 case .transcriptionModels:
                     intro("Transcription turns speech into text. The transcription model listens to the recording and writes what was said, with timestamps.")
-                    speechToTextSection
                     tierSections(.asr)
                     cloudSection(diarization: false)
                 case .diarizationModels:
@@ -78,7 +63,7 @@ struct ModelsSettingsView: View {
             }
             Toggle(isOn: model.setting(\.transcribeWhileRecording)) {
                 Text("Transcribe while recording")
-                Text("Shows the transcript during the recording. WhisperKit and Parakeet models keep it, so it is ready within seconds of Stop; Apple Speech (macOS 26+) only shows it and transcribes after Stop. Uses more CPU and memory while recording. Other engines transcribe after Stop.")
+                Text("Shows the transcript during the recording. WhisperKit and Parakeet models keep it, so it is ready within seconds of Stop; Apple Speech (macOS 26+) only shows it and transcribes after Stop. Uses more CPU and memory while recording. A cloud engine can show it with a local model or its realtime stream: see Transcription model › Cloud.")
             }
             Picker(selection: model.setting(\.modelIdleMinutes)) {
                 ForEach(idleMinutesOptions, id: \.self) { Text("\($0) min").tag($0) }
@@ -113,24 +98,10 @@ struct ModelsSettingsView: View {
         }
     }
 
-    /// "Cloud": the model of the default cloud engine (its own box, as it follows the default), then every provider
-    /// that transcribes, with Set default once configured (enabled, with a key and a model) or Set Up. With
-    /// `diarization`, the default cloud diarizer's model and the providers that label speakers (configured: enabled,
-    /// with a key).
-    @ViewBuilder private func cloudSection(diarization: Bool) -> some View {
-        if let config = defaultCloudConfig(diarization: diarization) {
-            Section {
-                CloudModelField(config: config, model: model, diarization: diarization)
-            } header: {
-                cloudHeader(diarization: diarization)
-            }
-            cloudProviders(header: false, diarization: diarization)
-        } else {
-            cloudProviders(header: true, diarization: diarization)
-        }
-    }
-
-    private func cloudProviders(header: Bool, diarization: Bool) -> some View {
+    /// "Cloud": every provider that transcribes, with its model, its key status and Set default once configured
+    /// (available, with a model). With `diarization`, the providers that label speakers, with their diarization model
+    /// (configured: available).
+    private func cloudSection(diarization: Bool) -> some View {
         Section {
             Label(diarization
                   ? "Audio leaves this Mac: the cloud diarizer uploads the system channel to the provider."
@@ -144,9 +115,12 @@ struct ModelsSettingsView: View {
             }) { config in
                 CloudEngineRow(config: config, model: model, configured: configured.contains(config.id),
                                diarization: diarization)
+                if !diarization, model.defaultCloudConfig?.id == config.id {
+                    CloudLiveOptions(config: config, model: model)
+                }
             }
         } header: {
-            if header { cloudHeader(diarization: diarization) }
+            cloudHeader(diarization: diarization)
         }
     }
 
@@ -156,27 +130,6 @@ struct ModelsSettingsView: View {
             description: diarization
                 ? "Only the system channel is uploaded, as one extra transcription billed by the provider; only the speaker labels are kept. Not used when the transcription model already labels speakers. Prices are approximate list prices per audio hour."
                 : "Prices are approximate list prices per audio hour; the mic and system channels are sent and billed separately.")
-    }
-
-    /// The provider of the default transcription model (or, with `diarization`, of the default diarizer) when it is a
-    /// configured cloud engine.
-    private func defaultCloudConfig(diarization: Bool) -> ProviderConfig? {
-        let defaultID = diarization ? model.defaultDiarizerModelID : model.defaultASRModelID
-        guard let id = CloudTranscription.providerID(engineID: defaultID) else { return nil }
-        return (diarization ? model.cloudDiarizerConfigs : model.cloudEngineConfigs).first { $0.id == id }
-    }
-
-    /// The speech-to-text APIs' keys and models; the LLM APIs that transcribe too are set up in AI.
-    private var speechToTextSection: some View {
-        Section {
-            ForEach(model.providerConfigs.filter { $0.kind == .speechToText }) { config in
-                SpeechProviderRow(config: config, model: model)
-            }
-        } header: {
-            SectionHeader(
-                title: "Speech-to-text APIs",
-                description: "OpenAI, Groq, Mistral, Google Gemini and custom endpoints transcribe too, with their transcription model: set them up in Settings › AI.")
-        }
     }
 
     /// The offered idle times, plus a hand-edited one, so the picker never shows an empty selection.
@@ -404,16 +357,18 @@ struct ModelRow: View {
 private struct CloudEngineRow: View {
     let config: ProviderConfig
     let model: AppModel
-    /// Enabled, with a key and a model (a key alone with `diarization`): it can be the default. Else Set Up opens where
-    /// it is configured.
+    /// Available, with a model (available alone with `diarization`): it can be the default. Its key is saved in API
+    /// Keys, which "API key" opens.
     let configured: Bool
     /// A cloud diarizer (Diarization models): its diarization model, Default and Set default of the default diarizer.
     var diarization = false
 
-    /// Approximate pay-as-you-go prices per audio hour (docs/research/asr-diarization-models.md F, 2026-10-18).
+    /// Approximate pay-as-you-go prices per audio hour (docs/research/asr-diarization-models.md F, 2026-10-18; xAI,
+    /// Speechmatics Enhanced, Soniox and Gladia solaria-1 2026-11-04).
     private static let prices: [String: String] = [
         "openai": "~$0.36/h", "groq": "~$0.04/h", "mistral": "~$0.18/h", "gemini": "~$0.23/h",
         "elevenlabs": "~$0.22/h", "deepgram": "~$0.26/h", "assemblyai": "~$0.23/h",
+        "xai": "~$0.10/h", "speechmatics": "~$0.38/h", "soniox": "~$0.10/h", "gladia": "~€0.27/h",
     ]
 
     private var engineID: String { CloudTranscription.engineID(providerID: config.id) }
@@ -438,14 +393,11 @@ private struct CloudEngineRow: View {
                     Badge(text: String(localized: "Default"), color: .accentColor, filled: true)
                 }
                 Spacer(minLength: 8)
-                if !configured {
-                    Button("Set Up…", action: setUp)
-                        .controlSize(.small)
-                        .help(setUpHelp)
-                } else if defaultID != engineID {
+                if configured && defaultID != engineID {
                     Button("Set default", action: setDefault)
                         .controlSize(.small)
                 }
+                APIKeyStatus(config: config, model: model)
             }
             HStack(spacing: 4) {
                 Badge(text: String(localized: "Cloud"))
@@ -462,40 +414,189 @@ private struct CloudEngineRow: View {
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
+            CloudModelField(config: config, model: model, diarization: diarization)
+            // A custom endpoint transcribes once its base URL (set in API Keys) and its model are set.
+            if config.preset == nil, config.baseURL.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                Text("Base URL not set")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .inputColumn()
+            }
         }
         .padding(.vertical, 2)
-    }
-
-    private var setUpHelp: LocalizedStringKey {
-        guard config.kind == .speechToText else { return "Turn on \(config.displayName) in Settings › AI" }
-        return diarization
-            ? "Add the key of \(config.displayName) in Transcription models"
-            : "Add the key of \(config.displayName) below"
     }
 
     private func setDefault() {
         if diarization { model.setDefaultDiarizer(engineID) } else { model.setDefaultASRModel(engineID) }
     }
+}
 
-    /// Speech-to-text APIs are set up in their row on the Transcription models page (from Diarization models, that
-    /// page is opened first, so its scroll to the expanded row applies), the LLM APIs in Settings › AI.
-    private func setUp() {
-        if diarization && config.kind == .speechToText {
-            model.openSettings(tab: .transcription, subTab: "transcriptionModels")
+/// "While recording" in the default cloud engine's card: one live source at a time (off, a local model, or the
+/// provider's realtime stream; `setCloudLiveSource`), the realtime model and host, and "Use the realtime result as the
+/// transcript", each with what it costs. Greyed with the reason while a master switch is off.
+private struct CloudLiveOptions: View {
+    let config: ProviderConfig
+    let model: AppModel
+
+    /// The realtime destination's one-time consent, asked before the source switches to realtime.
+    @State private var confirmingRealtime = false
+
+    /// Billing basis of each realtime API (`stt-protocols.md`); not stated for xAI, Speechmatics and Gladia.
+    private enum Billing { case connection, audio }
+
+    private static let billing: [String: Billing] = [
+        "assemblyai": .connection, "soniox": .connection,
+        "elevenlabs": .audio, "deepgram": .audio, "openai": .audio,
+    ]
+
+    /// Approximate realtime list prices per hour of one connection, by "<preset>/<model>"
+    /// (docs/research/asr-diarization-models.md F.1, 2026-11-04).
+    private static let prices: [String: String] = [
+        "elevenlabs/scribe_v2_realtime": "$0.39", "deepgram/nova-3": "$0.46",
+        "assemblyai/universal-3-6-pro": "$0.45", "assemblyai/universal-streaming-multilingual": "$0.15",
+        "assemblyai/universal-streaming-english": "$0.15", "openai/gpt-live-transcribe": "$1.02",
+        "openai/gpt-transcribe": "$0.27", "openai/gpt-realtime-whisper": "$1.02", "xai/grok-voice-transcribe-2.0": "$0.20",
+        "speechmatics/enhanced": "$0.40", "speechmatics/standard": "$0.23", "speechmatics/melia-1": "$0.20",
+        "speechmatics/oak-1": "$0.23", "soniox/stt-rt-v6": "$0.12", "gladia/solaria-1": "€0.68",
+    ]
+
+    /// With streaming speaker labels ("Tell speakers apart"): Deepgram and AssemblyAI add $0.12/h.
+    private static let speakerPrices: [String: String] = [
+        "deepgram/nova-3": "$0.58", "assemblyai/universal-3-6-pro": "$0.57",
+        "assemblyai/universal-streaming-multilingual": "$0.27", "assemblyai/universal-streaming-english": "$0.27",
+    ]
+
+    private var source: CloudLiveSource { model.settings.cloudLiveSource }
+
+    /// "Transcribe automatically" or "Transcribe while recording" is off: nothing runs while recording.
+    private var masterOff: Bool { !model.settings.autoTranscribe || !model.settings.transcribeWhileRecording }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 2) {
+            Text("While recording")
+                .font(.headline)
+            if masterOff {
+                Text(RecordingDetailView.noCaptionsReason(settings: model.settings))
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
         }
-        model.settingsExpandedProvider = config.id
-        if config.kind != .speechToText { model.openSettings(tab: .providers, subTab: "cloudAPIs") }
+        Group {
+            localRows
+            if model.realtimeAvailable(for: config) { realtimeRows }
+        }
+        .disabled(masterOff)
+    }
+
+    @ViewBuilder private var localRows: some View {
+        Toggle(isOn: Binding(get: { source == .local }, set: { model.setCloudLiveSource($0 ? .local : .off) })) {
+            Text("Live with a local model")
+            Text("Shows the transcript while recording with a model on this Mac. Free: nothing is uploaded while recording, but it uses CPU, memory and battery. The saved transcript still comes from \(config.displayName) after Stop, so it can differ from what you saw.")
+        }
+        let choices = model.cloudLiveModelChoices
+        if choices.isEmpty {
+            Text("No live model installed. Download a WhisperKit or Parakeet model above.")
+                .font(.caption)
+                .foregroundStyle(.orange)
+        } else if source == .local {
+            Picker("Live model", selection: Binding(
+                get: { choices.contains { $0.id == model.settings.cloudLiveModelID } ? model.settings.cloudLiveModelID : nil },
+                set: { id in model.updateSettings { $0.cloudLiveModelID = id } }
+            )) {
+                Text("Automatic").tag(String?.none)
+                ForEach(choices) { entry in Text(entry.displayName).tag(Optional(entry.id)) }
+            }
+        }
+    }
+
+    @ViewBuilder private var realtimeRows: some View {
+        Toggle(isOn: Binding(get: { source == .realtime }, set: setRealtime)) {
+            Text("Live with \(config.displayName) realtime")
+            Text(realtimeCopy)
+        }
+        .alert("Send audio to \(config.displayName)?", isPresented: $confirmingRealtime) {
+            Button("Send") {
+                model.confirmRealtimeDestination(for: config)
+                model.setCloudLiveSource(.realtime)
+            }
+            Button("Cancel", role: .cancel) {}
+        } message: {
+            Text("Audio leaves this Mac: while recording, the mic and system channels are streamed live to \(config.displayName) (\(model.realtimeHost(for: config) ?? "")) for transcription and billed by them. The provider may keep the audio under its own retention policy. You are asked once per provider and destination.")
+        }
+        if source == .realtime {
+            VStack(alignment: .leading, spacing: 4) {
+                CloudModelField(config: config, model: model, realtime: true)
+                if let host = model.realtimeHost(for: config) {
+                    Text("Streams to \(host)")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .inputColumn()
+                }
+            }
+        }
+        Toggle(isOn: Binding(get: { model.settings.realtimeAsFinal }, set: { model.setRealtimeAsFinal($0) })) {
+            Text("Use the realtime result as the transcript")
+            Text(finalCopy)
+        }
+        .disabled(source != .realtime)
+    }
+
+    /// Turning realtime on asks the destination's consent first when it is not confirmed; the source stays as it is
+    /// until Send.
+    private func setRealtime(_ on: Bool) {
+        if on, !model.realtimeDestinationConfirmed(for: config) {
+            confirmingRealtime = true
+        } else {
+            model.setCloudLiveSource(on ? .realtime : .off)
+        }
+    }
+
+    private var realtimeCopy: String {
+        let name = config.displayName
+        return String(localized: "Streams the mic and the system audio to \(name) as two live connections for the whole recording. Costs money: \(billingText), on top of the normal transcription after Stop. Long recordings reconnect before the provider's session limit and stream about 30 s twice at each reconnect so speakers keep their labels. A 1-hour meeting costs about 2 hours of streaming plus 2 hours of transcription.")
+    }
+
+    /// "billed by connection time, about $0.45 per hour for each connection", from the streamed model's price (the
+    /// default model's when it has none listed); the speaker-label add-on included with "Tell speakers apart".
+    private var billingText: String {
+        let preset = config.preset ?? ""
+        let key = "\(preset)/\(model.realtimeModel(for: config))"
+        let defaultKey = "\(preset)/\(model.realtimeDefaultModel(for: config))"
+        let speakers = model.settings.diarization
+        let price = (speakers ? Self.speakerPrices[key] : nil) ?? Self.prices[key]
+            ?? (speakers ? Self.speakerPrices[defaultKey] : nil) ?? Self.prices[defaultKey]
+        guard let price else { return String(localized: "billed by \(config.displayName)") }
+        switch Self.billing[preset] {
+        case .connection: return String(localized: "billed by connection time, about \(price) per hour for each connection")
+        case .audio: return String(localized: "billed per streamed minute, about \(price) per hour for each connection")
+        case nil: return String(localized: "about \(price) per hour of streaming for each connection")
+        }
+    }
+
+    private var finalCopy: String {
+        let name = config.displayName
+        let batch = model.cloudEngineName(config)
+        let copy = String(localized: "Saves the streamed transcript instead of uploading the recording again after Stop, so you pay for streaming only. Parts missed while the connection was down are sent to \(name) after Stop, with about 30 s of audio on each side, and around each pause, so speakers keep their labels. A cloud diarizer is billed separately. Realtime models can be less accurate than \(batch).")
+        // The batch model labelled the speakers itself; the realtime one does not, so the diarizer comes back.
+        let streamsSpeakers = CloudRealtime.make(config: config, apiKey: "", language: nil, diarize: true)?
+            .streamsSpeakers ?? false
+        guard model.settings.diarization, !streamsSpeakers,
+              CloudTranscription.diarizes(config, model: CloudTranscription.model(for: config)) else { return copy }
+        return copy + " " + String(localized: "This realtime model labels no speakers, so the diarizer runs on the recording after Stop; a cloud diarizer asks for its own consent.")
     }
 }
 
-/// The default cloud engine's transcription model: free text, a menu of the known models and, for the APIs that list
-/// their models, "Load models" (only the ones that transcribe). With `diarization`, the default cloud diarizer's
-/// diarization model: only models that label speakers are listed, and a note says when the typed one does not.
+/// A cloud engine's transcription model: free text, a menu of the known models and, for the APIs that list their
+/// models, "Load models" (only the ones that transcribe). With `diarization`, the cloud diarizer's diarization model:
+/// only models that label speakers are listed, and a note says when the typed one does not. With `realtime`, the
+/// realtime model streamed while recording: its known models only.
 private struct CloudModelField: View {
     let config: ProviderConfig
     let model: AppModel
     /// Edits `diarizationModel` (Diarization models) instead of `transcriptionModel`.
     var diarization = false
+    /// Edits `realtimeModel` ("Live with <Provider> realtime") instead of `transcriptionModel`.
+    var realtime = false
 
     @State private var loaded: [String]?
     @State private var loading = false
@@ -504,25 +605,31 @@ private struct CloudModelField: View {
     /// The speech-to-text APIs have no model list; their known models are offered.
     private static let knownModels: [String: [String]] = OpenAICompatibleTranscriber.presetModels.merging([
         "elevenlabs": [ElevenLabsTranscriber.defaultModel], "deepgram": [DeepgramTranscriber.defaultModel],
-        "gemini": [GeminiAudioTranscriber.defaultModel],
+        "gemini": [GeminiAudioTranscriber.defaultModel], "xai": [XAITranscriber.defaultModel],
+        "speechmatics": [SpeechmaticsTranscriber.defaultModel, "standard", "melia-1"],
+        "soniox": [SonioxTranscriber.defaultModel], "gladia": [GladiaTranscriber.defaultModel],
     ]) { first, _ in first }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 4) {
-            if config.preset == "assemblyai" {
-                LabeledContent("Model") {
+            if config.preset == "assemblyai", !realtime {
+                FieldRow("Model") {
                     Text(diarization
                          ? "Picked by AssemblyAI (Universal, speaker labels)"
                          : "Picked by AssemblyAI for the language (Universal)")
                 }
             } else {
-                HStack(spacing: 8) {
+                FieldRow(realtime ? "Realtime model" : "Model") {
                     TextField("Model", text: Binding(
-                        get: { diarization ? config.diarizationModel : config.transcriptionModel },
+                        get: {
+                            realtime ? config.realtimeModel
+                                : diarization ? config.diarizationModel : config.transcriptionModel
+                        },
                         set: { value in setModel(value) }
                     ), prompt: Text(prompt))
-                    let known = diarization
-                        ? [CloudTranscription.defaultDiarizationModel(for: config)]
+                    .labelsHidden()
+                    let known = realtime ? model.realtimeModels(for: config)
+                        : diarization ? [CloudTranscription.defaultDiarizationModel(for: config)]
                         : Self.knownModels[config.preset ?? ""] ?? []
                     let choices = Self.unique(known + (loaded ?? []))
                     if !choices.isEmpty {
@@ -533,40 +640,36 @@ private struct CloudModelField: View {
                         }
                         .fixedSize()
                     }
-                    if config.kind == .openAICompatible {
+                    if config.kind == .openAICompatible, !realtime {
                         Button("Load models") { Task { await load() } }
                             .disabled(loading)
                         if loading { ProgressView().controlSize(.small) }
                     }
                 }
                 if let error {
-                    Text(error).font(.caption).foregroundStyle(.red).lineLimit(2)
+                    Text(error).font(.caption).foregroundStyle(.red).lineLimit(2).inputColumn()
                 } else if loaded?.isEmpty == true {
                     Text(diarization
                          ? "No diarization models listed; type the model id."
                          : "No transcription models listed; type the model id.")
-                        .font(.caption).foregroundStyle(.secondary)
+                        .font(.caption).foregroundStyle(.secondary).inputColumn()
                 }
                 // A streaming-only diarization model falls back to this Mac's diarizer: the note below says so.
-                if !diarization, CloudTranscription.isStreamingOnly(CloudTranscription.model(for: config)) {
+                if !diarization, !realtime, CloudTranscription.isStreamingOnly(CloudTranscription.model(for: config)) {
                     Text("This model only streams live audio and can't transcribe a recording. Pick another model.")
-                        .font(.caption).foregroundStyle(.red)
+                        .font(.caption).foregroundStyle(.red).inputColumn()
                 }
                 if diarization,
                    !CloudTranscription.diarizes(config, model: CloudTranscription.diarizationModel(for: config)) {
                     Text("This model does not label speakers; a model on this Mac is used instead.")
-                        .font(.caption).foregroundStyle(.orange)
+                        .font(.caption).foregroundStyle(.orange).inputColumn()
                 }
             }
-        }
-        // Loaded models belong to the provider they came from.
-        .onChange(of: config.id) {
-            loaded = nil
-            error = nil
         }
     }
 
     private var prompt: String {
+        if realtime { return model.realtimeDefaultModel(for: config) }
         if diarization {
             let fallback = CloudTranscription.defaultDiarizationModel(for: config)
             return fallback.isEmpty ? String(localized: "Diarization model id") : fallback
@@ -577,7 +680,13 @@ private struct CloudModelField: View {
 
     private func setModel(_ id: String) {
         model.updateProvider(id: config.id) { provider in
-            if diarization { provider.diarizationModel = id } else { provider.transcriptionModel = id }
+            if realtime {
+                provider.realtimeModel = id
+            } else if diarization {
+                provider.diarizationModel = id
+            } else {
+                provider.transcriptionModel = id
+            }
         }
     }
 

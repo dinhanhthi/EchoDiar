@@ -247,8 +247,8 @@ public sealed partial class ProvidersViewModel : ObservableObject
 
     /// <summary>
     /// Saves a typed key, its spaces and line breaks dropped anywhere (macOS <c>saveAPIKey</c>: a key copied across a
-    /// wrapped line has one inside). Nothing happens for a blank text. Returns the error to show, which never contains key
-    /// text, or null once saved.
+    /// wrapped line has one inside), and lets automatic picks use the provider again. Nothing happens for a blank text.
+    /// Returns the error to show, which never contains key text, or null once saved.
     /// </summary>
     public async Task<string?> SaveApiKeyAsync(string id, string text)
     {
@@ -266,6 +266,12 @@ public sealed partial class ProvidersViewModel : ObservableObject
         {
             Debug.WriteLine($"EchoDiar: could not save the key of {id}: {e.GetType().Name}");
             error = ShortMessage(e);
+        }
+        if (error is null && Settings.AutoExcludedProviderIDs.Contains(id))
+        {
+            var excluded = new HashSet<string>(Settings.AutoExcludedProviderIDs, StringComparer.OrdinalIgnoreCase);
+            excluded.Remove(id);
+            _app.ApplySettings(Settings with { AutoExcludedProviderIDs = excluded });
         }
         _app.EmbeddingKeyChanged();
         await RefreshKeysAsync();
@@ -555,7 +561,8 @@ public sealed partial class ProvidersViewModel : ObservableObject
 
     /// <summary>
     /// Windows AI (unless this PC can never run it; with why it cannot run now), the installed GGUF models, then the
-    /// enabled providers with what they need: a base URL and, when they send one, a saved key (macOS <c>aiProviders</c>).
+    /// available providers (<see cref="ProviderConfig.IsAvailable"/>) with what they need: a base URL and, when they send
+    /// one, a saved key (macOS <c>aiProviders</c>).
     /// </summary>
     public IReadOnlyList<AIProviderInfo> AIProviders
     {
@@ -575,7 +582,7 @@ public sealed partial class ProvidersViewModel : ObservableObject
             }
             foreach (var config in ProviderConfigs)
             {
-                if (!config.Enabled || config.Kind == ProviderKind.SpeechToText) continue;
+                if (!config.IsAvailable(HasApiKey(config.Id)) || config.Kind == ProviderKind.SpeechToText) continue;
                 var kind = config.Kind switch
                 {
                     ProviderKind.Cli => AIProviderKind.Cli,
@@ -602,13 +609,17 @@ public sealed partial class ProvidersViewModel : ObservableObject
         }
     }
 
-    /// <summary>The default provider when it can run, else the first one that can (macOS <c>currentAIProvider</c>).</summary>
+    /// <summary>
+    /// The default provider when it can run, else the first one that can and is not in
+    /// <see cref="AppSettings.AutoExcludedProviderIDs"/> (macOS <c>currentAIProvider</c>).
+    /// </summary>
     public AIProviderInfo? CurrentAIProvider
     {
         get
         {
             var usable = AIProviders.Where(p => p.UnavailableReason is null).ToList();
-            return usable.FirstOrDefault(p => p.Id == Settings.DefaultAIProviderID) ?? usable.FirstOrDefault();
+            return usable.FirstOrDefault(p => p.Id == Settings.DefaultAIProviderID)
+                ?? usable.FirstOrDefault(p => !Settings.AutoExcludedProviderIDs.Contains(p.Id));
         }
     }
 

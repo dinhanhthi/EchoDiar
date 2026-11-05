@@ -111,8 +111,13 @@ public sealed class ModelStore(string root, HttpClient http, Func<string, long>?
     /// <summary>Bytes of the model's files under <c>Models/&lt;id&gt;/</c> (its <see cref="MarkerName"/> file aside).</summary>
     public long InstalledBytes(ModelEntry entry)
     {
-        var marker = new FileInfo(Path.Combine(Folder(entry), MarkerName));
-        return SizeOf(Folder(entry)) - (marker.Exists ? marker.Length : 0);
+        var folder = new DirectoryInfo(Folder(entry));
+        if (!folder.Exists) return 0;
+        // One listing, the marker skipped by name: subtracting a marker read on its own raced with a VerifiedFolder
+        // moving it in between the two reads (the sum without it, minus its length), so the install looked partial.
+        return folder.EnumerateFiles("*", SearchOption.AllDirectories)
+            .Where(f => !(f.Name == MarkerName && f.DirectoryName == folder.FullName))
+            .Sum(f => f.Length);
     }
 
     // Verification

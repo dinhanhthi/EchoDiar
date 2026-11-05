@@ -1,6 +1,8 @@
 using System.Diagnostics;
+using EchoDiar.AI.Cloud;
 using EchoDiar.App.Services;
 using EchoDiar.Core;
+using EchoDiar.Core.Models;
 using EchoDiar.Core.Settings;
 using Microsoft.UI.Dispatching;
 
@@ -91,12 +93,14 @@ public sealed partial class AppViewModel
     /// Applies <paramref name="settings"/> at once (the screens and the next recording read them) and saves them 300 ms
     /// after the last change, through the same ordered writes as every other settings change. Turning auto-delete on or
     /// off starts or stops its schedule at once, a changed global shortcut is registered at once, a changed embedder
-    /// restarts the library index, and turning the end prompt's notification off removes a shown one (macOS
-    /// <c>updateSettings</c>).
+    /// restarts the library index, turning the end prompt's notification off removes a shown one, and an explicit pick
+    /// of an auto-excluded provider lets automatic picks use it again (macOS <c>updateSettings</c>).
     /// </summary>
     internal void ApplySettings(AppSettings settings)
     {
-        if (_closing || settings == Settings) return;
+        if (_closing) return;
+        settings = Unexcluding(Settings, settings);
+        if (settings == Settings) return;
         var retentionChanged = settings.AutoDeleteEnabled != Settings.AutoDeleteEnabled;
         var hotKeysChanged = HotKeysChanged(Settings, settings);
         var ragChanged = RagChanged(Settings, settings);
@@ -115,6 +119,30 @@ public sealed partial class AppViewModel
         }
         _settingsSaveTimer.Stop();
         _settingsSaveTimer.Start();
+    }
+
+    /// <summary>
+    /// <paramref name="updated"/> without the auto-excluded ids that one of its picks now points at, where that pick
+    /// changed from <paramref name="old"/>: the engine and diarizer (<c>cloud:&lt;id&gt;</c>), the AI and catch-up
+    /// providers (the id) and the embedder (<c>api:&lt;id&gt;</c>).
+    /// </summary>
+    private static AppSettings Unexcluding(AppSettings old, AppSettings updated)
+    {
+        if (updated.AutoExcludedProviderIDs.Count == 0) return updated;
+        List<string?> picked = [];
+        if (updated.DefaultASRModelID != old.DefaultASRModelID) picked.Add(CloudTranscription.ProviderId(updated.DefaultASRModelID));
+        if (updated.DefaultDiarizerModelID != old.DefaultDiarizerModelID)
+            picked.Add(CloudTranscription.ProviderId(updated.DefaultDiarizerModelID));
+        if (updated.DefaultAIProviderID != old.DefaultAIProviderID) picked.Add(updated.DefaultAIProviderID);
+        if (updated.CatchUpProviderID != old.CatchUpProviderID) picked.Add(updated.CatchUpProviderID);
+        if (updated.EmbeddingModelID != old.EmbeddingModelID
+            && updated.EmbeddingModelID.StartsWith(ModelCatalog.ApiEmbedderPrefix, StringComparison.Ordinal))
+            picked.Add(updated.EmbeddingModelID[ModelCatalog.ApiEmbedderPrefix.Length..]);
+        var ids = picked.OfType<string>().Where(id => id.Length > 0 && updated.AutoExcludedProviderIDs.Contains(id)).ToList();
+        if (ids.Count == 0) return updated;
+        var excluded = new HashSet<string>(updated.AutoExcludedProviderIDs, StringComparer.OrdinalIgnoreCase);
+        excluded.ExceptWith(ids);
+        return updated with { AutoExcludedProviderIDs = excluded };
     }
 
     /// <summary>Writes a change still waiting for its delay now (the window closes).</summary>

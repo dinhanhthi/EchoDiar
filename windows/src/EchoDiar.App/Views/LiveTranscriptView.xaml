@@ -2,8 +2,8 @@
 <!--
     Live captions on the recording page, under its header (macOS LiveTranscriptView.swift, setting "Transcribe while
     recording"): the transcriber's state, then the newest lines and the open chunks' greyed tentative text as one
-    selectable text, scrolled to the bottom as they arrive unless the user scrolled up, filling the page. The lines are
-    built in code.
+    selectable text, scrolled to the bottom as they arrive unless the user scrolled up, filling the page, then a note
+    when the transcript is display only. The lines are built in code.
 -->
 <UserControl
     x:Class="EchoDiar.App.Views.LiveTranscriptView"
@@ -46,13 +46,15 @@
         BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
         BorderThickness="1"
         CornerRadius="{StaticResource OverlayCornerRadius}">
-        <Grid RowSpacing="8">
+        <!-- The rows below the state space themselves by their top margins: a collapsed one takes no room. -->
+        <Grid>
             <Grid.RowDefinitions>
                 <RowDefinition Height="Auto" />
                 <RowDefinition Height="*" />
+                <RowDefinition Height="Auto" />
             </Grid.RowDefinitions>
 
-            <!-- Why the transcriber stopped shows as the state's tooltip. -->
+            <!-- Why the transcriber stopped shows as the state's tooltip (cloud realtime's state already says it). -->
             <Grid x:Name="StatusPanel" ColumnSpacing="8">
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="Auto" />
@@ -78,6 +80,7 @@
             <ScrollViewer
                 x:Name="Scroller"
                 Grid.Row="1"
+                Margin="0,8,0,0"
                 HorizontalScrollBarVisibility="Disabled"
                 HorizontalScrollMode="Disabled"
                 VerticalScrollBarVisibility="Auto"
@@ -93,6 +96,15 @@
                     SelectionFlyout="{x:Null}"
                     TextWrapping="Wrap" />
             </ScrollViewer>
+
+            <!-- A display-only transcript (DisplayOnly): the saved one is made after Stop. -->
+            <TextBlock
+                x:Name="DisplayOnlyText"
+                Grid.Row="2"
+                Margin="0,8,0,0"
+                Style="{StaticResource LiveStatusText}"
+                TextWrapping="Wrap"
+                Visibility="Collapsed" />
 
             <!-- The brushes of the styles above, in the current theme, for the text's runs. -->
             <StackPanel Visibility="Collapsed">

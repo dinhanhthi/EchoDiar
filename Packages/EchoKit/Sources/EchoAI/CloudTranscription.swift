@@ -37,6 +37,9 @@ public protocol CloudTranscriber: Sendable {
     var maxUploadBytes: Int? { get }
     /// Timestamps come from an LLM and can drift (Gemini); the UI says so.
     var approximateTimestamps: Bool { get }
+    /// Each answer has per-segment timestamps; false when it can be one segment over the whole file (text only), so
+    /// split uploads must not overlap: the overlap's words would come back twice.
+    var returnsSegmentTimestamps: Bool { get }
     /// `file` is a mono audio file. `language`: a BCP-47 code, or nil / "auto" to detect. `diarize`: ask for
     /// speaker labels (only the system channel does).
     func transcribe(file: URL, language: String?, diarize: Bool) async throws -> [CloudSegment]
@@ -45,6 +48,7 @@ public protocol CloudTranscriber: Sendable {
 extension CloudTranscriber {
     public var maxUploadBytes: Int? { nil }
     public var approximateTimestamps: Bool { false }
+    public var returnsSegmentTimestamps: Bool { true }
 }
 
 /// Upload preparation shared by every cloud transcriber: mono AAC export, splitting under a size cap, offsets.
@@ -61,24 +65,43 @@ public enum CloudTranscription {
     private static let chunkFrames: AVAudioFrameCount = 16_384
 
     /// Transcribes `channel` of `source` with `transcriber`: exports it to mono m4a in a temporary folder, splits it
-    /// at the quietest moments when it is over `transcriber.maxUploadBytes`, sends the parts one by one and moves
-    /// each part's segments by the part's start. The temporary files are removed before returning.
+    /// at the quietest moments when it is over `transcriber.maxUploadBytes`, sends the parts one by one (when the
+    /// transcriber returns segment timestamps, each later part repeats the audio from `labelOverlapSeconds` before its
+    /// cut), moves each part's segments by the part's start and reconciles their speaker labels with the parts before.
+    /// Without timestamps the parts are contiguous and simply joined (text-only answers have no speaker labels). The
+    /// temporary files are removed before returning.
     public static func transcribe(
         source: URL, channel: Int, with transcriber: any CloudTranscriber, language: String?, diarize: Bool
+    ) async throws -> [CloudSegment] {
+        try await transcribe(
+            source: source, channel: channel, range: nil, with: transcriber, language: language, diarize: diarize)
+    }
+
+    /// `range` (file seconds, clamped to the file; nil = the whole channel) of `channel`, sent as
+    /// `transcribe(source:channel:with:language:diarize:)` sends a whole channel: split under
+    /// `transcriber.maxUploadBytes` inside the range, with the overlap and the reconciled labels. Segments come back
+    /// in file time (seconds from the start of `source`), so a gap of a recording keeps its place.
+    public static func transcribe(
+        source: URL, channel: Int, range: ClosedRange<Double>?, with transcriber: any CloudTranscriber,
+        language: String?, diarize: Bool
     ) async throws -> [CloudSegment] {
         let fm = FileManager.default
         let work = fm.temporaryDirectory.appendingPathComponent("EchoDiar-cloud-\(UUID().uuidString)")
         try fm.createDirectory(at: work, withIntermediateDirectories: true, attributes: [.posixPermissions: 0o700])
         defer { try? fm.removeItem(at: work) }
         let maxBytes = transcriber.maxUploadBytes
+        let overlap = transcriber.returnsSegmentTimestamps ? SpeakerLabelReconciler.labelOverlapSeconds : 0
         let parts = try await Task.detached(priority: .utility) {
-            try uploadParts(source: source, channel: channel, maxBytes: maxBytes, in: work)
+            try uploadParts(
+                source: source, channel: channel, range: range, maxBytes: maxBytes, overlap: overlap, in: work)
         }.value
         var segments: [CloudSegment] = []
-        for part in parts {
+        for (index, part) in parts.enumerated() {
             try Task.checkCancellation()
             let result = try await transcriber.transcribe(file: part.url, language: language, diarize: diarize)
-            segments += sanitized(result, duration: part.duration).map { $0.offset(by: part.start) }
+            let partSegments = sanitized(result, duration: part.duration).map { $0.offset(by: part.start) }
+            segments = index == 0 || overlap == 0 ? segments + partSegments : SpeakerLabelReconciler.append(
+                partSegments, to: segments, overlap: part.start...part.cut, partIndex: index)
         }
         return segments
     }
@@ -98,19 +121,21 @@ public enum CloudTranscription {
         }
     }
 
-    /// Where to cut a file of `duration` seconds at `bytesPerSecond` so no part is over `maxBytes`: each cut is at
-    /// the quietest `window`-second slot of `levels` (RMS per slot from the start) in the second half of the
-    /// allowed length, else at the limit. Pure, for tests.
+    /// Where to cut a file of `duration` seconds at `bytesPerSecond` so no part is over `maxBytes`, counting the
+    /// `overlap` seconds each later part repeats from before its cut: each cut is at the quietest
+    /// `window`-second slot of `levels` (RMS per slot from the start) in the second half of the allowed length,
+    /// else at the limit. Pure, for tests.
     public static func planParts(
-        duration: Double, bytesPerSecond: Double, maxBytes: Int, levels: [Float], window: Double
+        duration: Double, bytesPerSecond: Double, maxBytes: Int, levels: [Float], window: Double,
+        overlap: Double = SpeakerLabelReconciler.labelOverlapSeconds
     ) -> [ClosedRange<Double>] {
         let maxLength = Double(maxBytes) / bytesPerSecond
-        guard maxLength.isFinite, maxLength > 0, duration > maxLength else { return [0...max(0, duration)] }
+        guard maxLength.isFinite, maxLength > overlap, duration > maxLength else { return [0...max(0, duration)] }
         var parts: [ClosedRange<Double>] = []
         var start = 0.0
-        while duration - start > maxLength {
-            let limit = start + maxLength
-            let first = Int(((start + maxLength / 2) / window).rounded(.up))
+        while duration - max(0, start - overlap) > maxLength {
+            let limit = max(0, start - overlap) + maxLength
+            let first = Int((((start + limit) / 2) / window).rounded(.up))
             let last = min(levels.count, Int((limit / window).rounded(.down))) - 1
             var cut = limit
             if first <= last, let quietest = (first...last).min(by: { levels[$0] < levels[$1] }) {
@@ -176,22 +201,26 @@ public enum CloudTranscription {
 
     // MARK: - Audio
 
-    /// The whole channel as one m4a, or parts when it is over `maxBytes`.
+    /// `range` of the channel (nil = all) as one m4a, or parts when it is over `maxBytes`; each later part starts
+    /// `overlap` seconds before its cut. `start` is where a part's audio starts, `cut` where its own stretch does, both
+    /// in file time.
     private static func uploadParts(
-        source: URL, channel: Int, maxBytes: Int?, in work: URL
-    ) throws -> [(url: URL, start: Double, duration: Double)] {
+        source: URL, channel: Int, range: ClosedRange<Double>?, maxBytes: Int?, overlap: Double, in work: URL
+    ) throws -> [(url: URL, start: Double, cut: Double, duration: Double)] {
+        let base = max(0, range?.lowerBound ?? 0)
         let whole = work.appendingPathComponent("channel.m4a")
-        let duration = try exportM4A(source, channel: channel, range: nil, to: whole)
+        let duration = try exportM4A(source, channel: channel, range: range, to: whole)
         let bytes = try FileManager.default.attributesOfItem(atPath: whole.path)[.size] as? Int ?? 0
-        guard let maxBytes, bytes > maxBytes, duration > 0 else { return [(whole, 0, duration)] }
+        guard let maxBytes, bytes > maxBytes, duration > 0 else { return [(whole, base, base, duration)] }
         try FileManager.default.removeItem(at: whole)
-        let ranges = planParts(
+        let parts = planParts(
             duration: duration, bytesPerSecond: Double(bytes) / duration, maxBytes: maxBytes,
-            levels: try levels(of: source, channel: channel), window: levelWindow)
-        return try ranges.enumerated().map { index, range in
+            levels: try levels(of: source, channel: channel, range: range), window: levelWindow, overlap: overlap)
+        return try parts.enumerated().map { index, part in
             let url = work.appendingPathComponent("part-\(index).m4a")
-            let length = try exportM4A(source, channel: channel, range: range, to: url)
-            return (url, range.lowerBound, length)
+            let start = max(0, part.lowerBound - overlap)
+            let length = try exportM4A(source, channel: channel, range: (base + start)...(base + part.upperBound), to: url)
+            return (url, base + start, base + part.lowerBound, length)
         }
     }
 
@@ -227,15 +256,19 @@ public enum CloudTranscription {
         return Double(last - first) / format.sampleRate
     }
 
-    /// RMS of `channel` per `levelWindow` slot.
-    private static func levels(of source: URL, channel: Int) throws -> [Float] {
+    /// RMS of `channel` per `levelWindow` slot from the start of `range` (nil = all) to its end.
+    private static func levels(of source: URL, channel: Int, range: ClosedRange<Double>?) throws -> [Float] {
         let input = try AVAudioFile(forReading: source, commonFormat: .pcmFormatFloat32, interleaved: false)
-        let frames = AVAudioFrameCount(max(1, (input.processingFormat.sampleRate * levelWindow).rounded()))
+        let rate = input.processingFormat.sampleRate
+        let frames = AVAudioFrameCount(max(1, (rate * levelWindow).rounded()))
         guard channel < Int(input.processingFormat.channelCount),
               let buffer = AVAudioPCMBuffer(pcmFormat: input.processingFormat, frameCapacity: frames) else { return [] }
+        let first = min(input.length, AVAudioFramePosition(max(0, range?.lowerBound ?? 0) * rate))
+        let last = min(input.length, range.map { AVAudioFramePosition($0.upperBound * rate) } ?? input.length)
+        input.framePosition = first
         var levels: [Float] = []
-        while input.framePosition < input.length {
-            try input.read(into: buffer, frameCount: frames)
+        while input.framePosition < last {
+            try input.read(into: buffer, frameCount: AVAudioFrameCount(min(AVAudioFramePosition(frames), last - input.framePosition)))
             guard buffer.frameLength > 0 else { break }
             var rms: Float = 0
             vDSP_rmsqv(buffer.floatChannelData![channel], 1, &rms, vDSP_Length(buffer.frameLength))
@@ -254,7 +287,7 @@ public enum CloudTranscription {
 
 /// Cloud engines are picked by engine id `cloud:<provider id>` (Transcription tab default, Re-transcribe and Retry
 /// menus); the model is the config's `transcriptionModel`, else the vendor default. The provider id is also the
-/// Keychain id, so OpenAI, Groq, Mistral and Gemini share the key of their LLM config.
+/// Keychain id, so OpenAI, xAI, Groq, Mistral and Gemini share the key of their LLM config.
 extension CloudTranscription {
     public static let enginePrefix = "cloud:"
 
@@ -267,12 +300,12 @@ extension CloudTranscription {
         return id.isEmpty ? nil : id
     }
 
-    /// OpenAI, Groq, Mistral, Gemini (native audio API, not the LLM preset's OpenAI shim), the speech-to-text
-    /// presets and custom OpenAI-compatible endpoints.
+    /// OpenAI, Groq, Mistral, Gemini (native audio API, not the LLM preset's OpenAI shim), xAI (its `/v1/stt` API),
+    /// the speech-to-text presets and custom OpenAI-compatible endpoints.
     public static func supports(_ config: ProviderConfig) -> Bool {
         switch config.kind {
         case .speechToText: true
-        case .openAICompatible: config.preset == nil || ["openai", "groq", "mistral", "gemini"].contains(config.preset)
+        case .openAICompatible: config.preset == nil || ["openai", "groq", "mistral", "gemini", "xai"].contains(config.preset)
         case .anthropic, .cli, .local: false
         }
     }
@@ -283,6 +316,10 @@ extension CloudTranscription {
         case "gemini": GeminiAudioTranscriber.defaultModel
         case "elevenlabs": ElevenLabsTranscriber.defaultModel
         case "deepgram": DeepgramTranscriber.defaultModel
+        case "xai": XAITranscriber.defaultModel
+        case "speechmatics": SpeechmaticsTranscriber.defaultModel
+        case "soniox": SonioxTranscriber.defaultModel
+        case "gladia": GladiaTranscriber.defaultModel
         case let preset?: OpenAICompatibleTranscriber.presetModels[preset]?.first ?? ""
         case nil: ""
         }
@@ -294,7 +331,9 @@ extension CloudTranscription {
     }
 
     /// Presets that can be the default cloud diarizer. Mistral is left out until its model id is verified to diarize.
-    public static let diarizationPresets: Set<String> = ["openai", "elevenlabs", "deepgram", "assemblyai", "gemini"]
+    public static let diarizationPresets: Set<String> = [
+        "openai", "elevenlabs", "deepgram", "assemblyai", "gemini", "xai", "speechmatics", "soniox", "gladia",
+    ]
 
     /// Whether `model` of `config` returns speaker labels (a non-diarizing model would still bill a transcription).
     public static func diarizes(_ config: ProviderConfig, model: String) -> Bool {
@@ -307,6 +346,13 @@ extension CloudTranscription {
         case "deepgram": return model.hasPrefix("nova")
         case "gemini": return model.contains("gemini")
         case "assemblyai": return true
+        // xAI has one model (`diarize=true`).
+        case "xai": return true
+        // Speaker labels are documented for `standard` and `enhanced` only (`melia-1`, `oak-1`: channel only, live).
+        case "speechmatics": return ["standard", "enhanced"].contains(model)
+        // The async endpoint refuses the realtime `stt-rt-*` models.
+        case "soniox": return model.hasPrefix("stt-async")
+        case "gladia": return model.hasPrefix("solaria")
         default: return false
         }
     }
@@ -324,6 +370,10 @@ extension CloudTranscription {
         case "gemini": GeminiAudioTranscriber.defaultModel
         case "elevenlabs": ElevenLabsTranscriber.defaultModel
         case "deepgram": DeepgramTranscriber.defaultModel
+        case "xai": XAITranscriber.defaultModel
+        case "speechmatics": SpeechmaticsTranscriber.defaultModel
+        case "soniox": SonioxTranscriber.defaultModel
+        case "gladia": GladiaTranscriber.defaultModel
         default: ""
         }
     }
@@ -368,6 +418,10 @@ extension CloudTranscription {
         case "elevenlabs": return ElevenLabsTranscriber(apiKey: key, model: model)
         case "deepgram": return DeepgramTranscriber(apiKey: key, model: model)
         case "assemblyai": return AssemblyAITranscriber(apiKey: key)
+        case "xai": return XAITranscriber(apiKey: key, model: model)
+        case "speechmatics": return SpeechmaticsTranscriber(apiKey: key, model: model)
+        case "soniox": return SonioxTranscriber(apiKey: key, model: model)
+        case "gladia": return GladiaTranscriber(apiKey: key, model: model)
         default: return OpenAICompatibleTranscriber(config: config, model: model, apiKey: apiKey)
         }
     }
@@ -382,6 +436,11 @@ extension CloudTranscription {
         case "elevenlabs": url = ElevenLabsTranscriber.endpoint
         case "deepgram": url = DeepgramTranscriber.endpoint
         case "assemblyai": url = AssemblyAITranscriber.baseURL
+        // xAI transcribes at its fixed `/v1/stt` endpoint, not the LLM preset's base URL.
+        case "xai": url = XAITranscriber.endpoint
+        case "speechmatics": url = SpeechmaticsTranscriber.baseURL
+        case "soniox": url = SonioxTranscriber.baseURL
+        case "gladia": url = GladiaTranscriber.baseURL
         default:
             guard let base = try? ProviderHTTP.baseURL(config) else { return nil }
             url = base
@@ -400,6 +459,10 @@ extension CloudTranscription {
         case "elevenlabs": request = ElevenLabsTranscriber.makeKeyCheckRequest(apiKey: apiKey)
         case "deepgram": request = DeepgramTranscriber.makeKeyCheckRequest(apiKey: apiKey)
         case "assemblyai": request = AssemblyAITranscriber.makeKeyCheckRequest(apiKey: apiKey)
+        case "xai": request = XAITranscriber.makeKeyCheckRequest(apiKey: apiKey)
+        case "speechmatics": request = SpeechmaticsTranscriber.makeKeyCheckRequest(apiKey: apiKey)
+        case "soniox": request = SonioxTranscriber.makeKeyCheckRequest(apiKey: apiKey)
+        case "gladia": request = GladiaTranscriber.makeKeyCheckRequest(apiKey: apiKey)
         default: throw LLMError.provider("No key check for \(config.displayName).")
         }
         _ = try await ProviderHTTP.send(request, session: ProviderHTTP.session, retry: true)
@@ -466,8 +529,8 @@ extension ProviderHTTP {
         }
     }
 
-    /// Whether sending `request` twice costs nothing: GETs (polls, key checks) and audio uploads (AssemblyAI
-    /// `/v2/upload`, Gemini Files API). Billed one-shot POSTs (transcription requests, `generateContent`, AssemblyAI
+    /// Whether sending `request` twice costs nothing: GETs (polls, key checks) and audio uploads (AssemblyAI and
+    /// Gladia `/v2/upload`, Gemini Files API). Billed one-shot POSTs (transcription requests, `generateContent`, AssemblyAI
     /// `/v2/transcript`) are sent once, since a retry after a lost answer could start a second paid job. Pure, for
     /// tests.
     static func mayRetry(_ request: URLRequest) -> Bool {
@@ -483,7 +546,7 @@ extension ProviderHTTP {
     /// `body` with every key the request carries (auth header values, without their `Bearer` / `Token` scheme)
     /// replaced, so an echoed key never reaches an error, the UI or a log. Pure, for tests.
     static func redacted(_ body: String, request: URLRequest) -> String {
-        let headers = ["Authorization", "x-goog-api-key", "xi-api-key", "api-key", "x-api-key"]
+        let headers = ["Authorization", "x-goog-api-key", "xi-api-key", "api-key", "x-api-key", "x-gladia-key"]
         let secrets = headers.compactMap { request.value(forHTTPHeaderField: $0) }.flatMap { value in
             [value, value.split(separator: " ", maxSplits: 1).last.map(String.init) ?? value]
         }

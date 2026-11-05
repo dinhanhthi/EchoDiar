@@ -373,7 +373,7 @@ public sealed partial class MainWindow : Window
         {
             { Kind: RouteKind.Recording } when _model.IsRecording => new RecordingView(_model),
             { Kind: RouteKind.Conversation, ConversationId: { } id } => new ConversationView(_model, id),
-            { Kind: RouteKind.Settings } => new SettingsPage(_model),
+            { Kind: RouteKind.Settings } => new SettingsPage(_model) { ShowDialog = Toolbar.ShowDialogAsync },
             { Kind: RouteKind.Calendar } => new CalendarPage(_model) { ShowDialog = Toolbar.ShowDialogAsync },
             _ => _welcome ??= new WelcomeView(_model),
         };

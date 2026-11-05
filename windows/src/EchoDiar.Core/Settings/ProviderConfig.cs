@@ -9,7 +9,10 @@ namespace EchoDiar.Core.Settings;
 public enum ProviderKind
 {
     OpenAICompatible, Anthropic, Cli, Local,
-    /// <summary>A speech-to-text-only API (ElevenLabs, Deepgram, AssemblyAI): <c>baseURL</c> and <c>authStyle</c> are unused.</summary>
+    /// <summary>
+    /// A speech-to-text-only API (ElevenLabs, Deepgram, AssemblyAI, Speechmatics, Soniox, Gladia): <c>baseURL</c> and
+    /// <c>authStyle</c> are unused.
+    /// </summary>
     SpeechToText,
 }
 
@@ -60,6 +63,31 @@ public sealed record ProviderConfig
     /// <summary>Diarization model id when this is the default cloud diarizer; empty = the provider default.</summary>
     public string DiarizationModel { get; set; } = "";
     public bool Enabled { get; set; }
+    /// <summary>
+    /// Realtime (WebSocket) model for the live transcript; empty = the provider default. Separate from
+    /// <see cref="TranscriptionModel"/>, so a streaming-only batch check never applies to it.
+    /// </summary>
+    public string RealtimeModel { get; set; } = "";
+
+    /// <summary>
+    /// A cloud API (every kind but <see cref="ProviderKind.Local"/> servers and <see cref="ProviderKind.Cli"/> tools,
+    /// macOS <c>isCloud</c>): usable once its key is saved, whatever <see cref="Enabled"/> says; local servers and CLIs
+    /// keep the toggle.
+    /// </summary>
+    public bool IsCloud => Kind is not (ProviderKind.Local or ProviderKind.Cli);
+
+    /// <summary>
+    /// Whether the provider can be used (macOS <c>isAvailable(hasKey:)</c>): a cloud API when <paramref name="hasKey"/>
+    /// (its key is saved), or for a custom OpenAI-compatible endpoint without auth when its base URL is set; a local
+    /// server or CLI when <see cref="Enabled"/>.
+    /// </summary>
+    public bool IsAvailable(bool hasKey)
+    {
+        if (!IsCloud) return Enabled;
+        if (Kind == ProviderKind.OpenAICompatible && Preset is null && AuthStyle == AuthStyle.None)
+            return BaseURL.Trim().Length > 0;
+        return hasKey;
+    }
 
     /// <summary>A new custom OpenAI-compatible endpoint with its own UUID id.</summary>
     public static ProviderConfig Custom(string displayName = "Custom", string baseURL = "") => new()
@@ -98,10 +126,14 @@ public sealed record ProviderConfig
         Other("codex-cli", "Codex", ProviderKind.Cli),
         Other("opencode-cli", "OpenCode", ProviderKind.Cli),
         Other("gemini-cli", "Gemini CLI", ProviderKind.Cli),
-        // Speech to text only (OpenAI, Groq, Mistral, Gemini and custom endpoints transcribe through the configs above).
+        // Speech to text only (OpenAI, xAI, Groq, Mistral, Gemini and custom endpoints transcribe through the configs
+        // above).
         Other("elevenlabs", "ElevenLabs", ProviderKind.SpeechToText),
         Other("deepgram", "Deepgram", ProviderKind.SpeechToText),
         Other("assemblyai", "AssemblyAI", ProviderKind.SpeechToText),
+        Other("speechmatics", "Speechmatics", ProviderKind.SpeechToText),
+        Other("soniox", "Soniox", ProviderKind.SpeechToText),
+        Other("gladia", "Gladia", ProviderKind.SpeechToText),
     ];
 
     private static ProviderConfig Cloud(string id, string name, string baseURL, string model, AuthStyle auth = AuthStyle.Bearer) => new()
@@ -149,6 +181,7 @@ public sealed class ProviderConfigConverter : JsonConverter<ProviderConfig>
             TranscriptionModel = Value(obj, "transcriptionModel", "", options),
             DiarizationModel = Value(obj, "diarizationModel", "", options),
             Enabled = Value(obj, "enabled", false, options),
+            RealtimeModel = Value(obj, "realtimeModel", "", options),
         };
     }
 
@@ -190,6 +223,7 @@ public sealed class ProviderConfigConverter : JsonConverter<ProviderConfig>
         writer.WriteString("transcriptionModel", value.TranscriptionModel);
         writer.WriteString("diarizationModel", value.DiarizationModel);
         writer.WriteBoolean("enabled", value.Enabled);
+        writer.WriteString("realtimeModel", value.RealtimeModel);
         writer.WriteEndObject();
     }
 }

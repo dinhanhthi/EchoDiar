@@ -400,10 +400,16 @@ public sealed partial class AppViewModel
     /// <summary>
     /// The API embedder sends transcripts off this PC and its destination was not confirmed yet (macOS
     /// <c>embedderNeedsConsent</c>). Loopback hosts (<see cref="ProviderInput.IsLoopback"/>, wider than
-    /// <see cref="ITextEmbedder.IsLocal"/>) need no confirmation; a base URL with no destination is never confirmed.
+    /// <see cref="ITextEmbedder.IsLocal"/>) need no confirmation; a base URL with no destination is never confirmed. Every
+    /// key counts as saved here: the key cache can lag behind the fresh read of <see cref="AppServices.MakeEmbedder"/>, and
+    /// a stale "no key" must never skip the confirmation.
     /// </summary>
     private static bool EmbedderNeedsConsent(AppSettings settings, IReadOnlyList<ProviderConfig> configs) =>
-        AppServices.EmbeddingConfig(settings, configs) is { } config && NeedsEmbeddingConsent(settings, config);
+        ConsentConfig(settings, configs) is { } config && NeedsEmbeddingConsent(settings, config);
+
+    /// <summary>The API embedder's config as the confirmation sees it (<see cref="EmbedderNeedsConsent"/>).</summary>
+    private static ProviderConfig? ConsentConfig(AppSettings settings, IReadOnlyList<ProviderConfig> configs) =>
+        AppServices.EmbeddingConfig(settings, configs, _ => true);
 
     /// <summary>
     /// <paramref name="config"/> as an embedder would send transcripts off this PC to a destination not confirmed yet
@@ -420,7 +426,7 @@ public sealed partial class AppViewModel
     public void RequestCloudEmbeddingConsent()
     {
         var configs = ProvidersModel.ProviderConfigs;
-        if (_closing || !EmbedderNeedsConsent(Settings, configs) || AppServices.EmbeddingConfig(Settings, configs) is not { } config
+        if (_closing || !EmbedderNeedsConsent(Settings, configs) || ConsentConfig(Settings, configs) is not { } config
             || LibraryChat.EmbeddingDestination(config) is not { } destination) return;
         PendingEmbeddingConsent = EmbeddingConsent(config, destination);
     }

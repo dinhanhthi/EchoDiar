@@ -90,8 +90,8 @@ public sealed partial class AppViewModel
     public event Action? CatchUpTextChanged;
 
     /// <summary>
-    /// Where a catch-up runs: the "Catch-up provider" setting when it is a usable provider outside the app, else the AI
-    /// tab's provider when it is not in-app, else the first usable provider outside the app; null when there is none.
+    /// Where a catch-up runs: the "Catch-up provider" setting when it is a usable provider outside the app, else
+    /// <see cref="AutomaticCatchUpProvider"/>; null when there is none.
     /// Never an in-app model: the live transcriber holds the model gate for the whole recording.
     /// </summary>
     public AIProviderInfo? CatchUpProvider
@@ -101,8 +101,23 @@ public sealed partial class AppViewModel
             var external = ProvidersModel.AIProviders
                 .Where(p => p.Kind != AIProviderKind.InApp && p.UnavailableReason is null).ToList();
             if (external.FirstOrDefault(p => p.Id == Settings.CatchUpProviderID) is { } picked) return picked;
+            return AutomaticCatchUpProvider;
+        }
+    }
+
+    /// <summary>
+    /// What <see cref="CatchUpProvider"/> runs with no usable provider picked (macOS <c>automaticCatchUpProvider</c>): the
+    /// AI tab's provider when it is not in-app, else the first usable provider outside the app not in
+    /// <see cref="AppSettings.AutoExcludedProviderIDs"/>. <see cref="ProvidersViewModel.CurrentAIProvider"/> is never an
+    /// excluded one by accident: the migration clears <c>DefaultAIProviderID</c> for those, and picking one un-excludes it.
+    /// </summary>
+    public AIProviderInfo? AutomaticCatchUpProvider
+    {
+        get
+        {
             if (ProvidersModel.CurrentAIProvider is { Kind: not AIProviderKind.InApp } main) return main;
-            return external.FirstOrDefault();
+            return ProvidersModel.AIProviders.FirstOrDefault(p => p.Kind != AIProviderKind.InApp
+                && p.UnavailableReason is null && !Settings.AutoExcludedProviderIDs.Contains(p.Id));
         }
     }
 
@@ -125,7 +140,7 @@ public sealed partial class AppViewModel
         get
         {
             if (RecordingCaptions is not { } captions || _recordingTranscriber is null)
-                return RecordingView.NoCaptionsReason(Settings);
+                return RecordingView.NoCaptionsReason(this);
             if (CatchUpRun is { IsRunning: true }) return Loc.T("A catch-up is being written.");
             if (CatchUpProvider is null)
             {

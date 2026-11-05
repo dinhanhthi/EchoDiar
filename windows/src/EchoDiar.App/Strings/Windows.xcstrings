@@ -841,6 +841,36 @@
         }
       }
     },
+    "Audio leaves this PC: while recording, the mic and system channels are streamed live to %@ (%@) for transcription and billed by them. The provider may keep the audio under its own retention policy. You are asked once per provider and destination." : {
+      "comment" : "Windows only: Views/Settings/TranscriptionSettingsPage.xaml.cs.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "El audio sale de este PC: durante la grabación, los canales del micrófono y del sistema se transmiten en directo a %1$@ (%2$@) para transcribirlos, y este los factura. El proveedor puede conservar el audio según su propia política de retención. Se te pregunta una vez por proveedor y destino."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "L’audio quitte ce PC : pendant l’enregistrement, les canaux micro et système sont diffusés en direct vers %1$@ (%2$@) pour la transcription, et facturés par celui-ci. Le fournisseur peut conserver l’audio selon sa propre politique de conservation. La question vous est posée une fois par fournisseur et par destination."
+          }
+        },
+        "vi" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Âm thanh rời khỏi máy tính này: trong khi ghi âm, kênh micrô và kênh hệ thống được truyền trực tiếp đến %1$@ (%2$@) để chép lời và do họ tính phí. Nhà cung cấp có thể lưu giữ âm thanh theo chính sách lưu trữ riêng của họ. Bạn chỉ được hỏi một lần cho mỗi nhà cung cấp và nơi nhận."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "音频会离开这台电脑：录音期间，麦克风声道和系统声道会实时流式传输到 %1$@（%2$@）进行转写，并由其计费。提供商可能会按照其自身的保留政策保存音频。每个提供商和目标位置只会询问你一次。"
+          }
+        }
+      }
+    },
     "Auto = the transcript's language for summaries, the question's for answers." : {
       "comment" : "Windows only: Views/Settings/ProvidersSettingsPage.xaml.cs.",
       "extractionState" : "manual",
@@ -2221,6 +2251,36 @@
         }
       }
     },
+    "No live model installed. Download a Whisper or Parakeet model above." : {
+      "comment" : "Windows only: Views/Settings/TranscriptionSettingsPage.xaml.cs.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "No hay ningún modelo en directo instalado. Descarga arriba un modelo Whisper o Parakeet."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Aucun modèle en direct installé. Téléchargez un modèle Whisper ou Parakeet ci-dessus."
+          }
+        },
+        "vi" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Chưa cài mô hình chép lời trực tiếp nào. Hãy tải về một mô hình Whisper hoặc Parakeet ở trên."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "未安装实时转写模型。请在上方下载 Whisper 或 Parakeet 模型。"
+          }
+        }
+      }
+    },
     "Not checked yet" : {
       "comment" : "Windows only: Views/Settings/AboutSettingsPage.xaml.cs.",
       "extractionState" : "manual",
@@ -2851,32 +2911,62 @@
         }
       }
     },
-    "Shows the transcript during the recording and keeps it, so it is ready within seconds of Stop. Uses more CPU and memory while recording. Whisper and Parakeet models only; other engines transcribe after Stop." : {
+    "Shows the transcript during the recording. Whisper and Parakeet models keep it, so it is ready within seconds of Stop. Uses more CPU and memory while recording. A cloud engine can show it with a local model or its realtime stream: see Transcription model › Cloud." : {
       "comment" : "Windows only: Views/Settings/TranscriptionSettingsPage.xaml.cs.",
       "extractionState" : "manual",
       "localizations" : {
         "es" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Muestra la transcripción durante la grabación y la conserva, para que esté lista segundos después de Detener. Usa más CPU y memoria al grabar. Solo modelos Whisper y Parakeet; los demás motores transcriben después de Detener."
+            "value" : "Muestra la transcripción durante la grabación. Los modelos Whisper y Parakeet la conservan, para que esté lista segundos después de Detener. Usa más CPU y memoria al grabar. Un motor en la nube puede mostrarla con un modelo local o con su transmisión en tiempo real: consulta Modelo de transcripción › Nube."
           }
         },
         "fr" : {
           "stringUnit" : {
             "state" : "needs_review",
-            "value" : "Affiche la transcription pendant l’enregistrement et la conserve, pour qu’elle soit prête quelques secondes après l’arrêt. Utilise plus de processeur et de mémoire pendant l’enregistrement. Modèles Whisper et Parakeet uniquement ; les autres moteurs transcrivent après l’arrêt."
+            "value" : "Affiche la transcription pendant l’enregistrement. Les modèles Whisper et Parakeet la conservent, pour qu’elle soit prête quelques secondes après l’arrêt. Utilise plus de processeur et de mémoire pendant l’enregistrement. Un moteur cloud peut l’afficher avec un modèle local ou son flux temps réel : voir Modèle de transcription › Cloud."
           }
         },
         "vi" : {
           "stringUnit" : {
             "state" : "needs_review",
-            "value" : "Hiển thị bản chép lời trong khi ghi âm và giữ lại, nhờ đó bản chép lời sẵn sàng trong vài giây sau khi bấm Dừng. Dùng nhiều CPU và bộ nhớ hơn khi ghi âm. Chỉ dành cho mô hình Whisper và Parakeet; các công cụ khác chép lời sau khi bấm Dừng."
+            "value" : "Hiển thị bản chép lời trong khi ghi âm. Mô hình Whisper và Parakeet giữ lại bản này, nhờ đó bản chép lời sẵn sàng trong vài giây sau khi bấm Dừng. Dùng nhiều CPU và bộ nhớ hơn khi ghi âm. Công cụ đám mây có thể hiển thị bản này bằng một mô hình cục bộ hoặc luồng thời gian thực của nó: xem Mô hình chép lời › Đám mây."
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "在录音期间显示转写文本并保留下来，因此停止后几秒内即可就绪。录音时会占用更多 CPU 和内存。仅限 Whisper 和 Parakeet 模型；其他引擎会在停止后转写。"
+            "value" : "在录音期间显示转写文本。Whisper 和 Parakeet 模型会保留下来，因此停止后几秒内即可就绪。录音时会占用更多 CPU 和内存。云端引擎可以通过本地模型或其实时流显示转写文本：请参阅“转写模型 › 云端”。"
+          }
+        }
+      }
+    },
+    "Shows the transcript while recording with a model on this PC. Free: nothing is uploaded while recording, but it uses CPU, memory and battery. The saved transcript still comes from %@ after Stop, so it can differ from what you saw." : {
+      "comment" : "Windows only: Views/Settings/TranscriptionSettingsPage.xaml.cs.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Muestra la transcripción durante la grabación con un modelo de este PC. Gratis: no se sube nada durante la grabación, pero usa CPU, memoria y batería. La transcripción guardada sigue viniendo de %@ después de Detener, así que puede diferir de lo que viste."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Affiche la transcription pendant l’enregistrement avec un modèle sur ce PC. Gratuit : rien n’est envoyé pendant l’enregistrement, mais cela utilise processeur, mémoire et batterie. La transcription enregistrée vient toujours de %@ après l’arrêt et peut donc différer de ce que vous avez vu."
+          }
+        },
+        "vi" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Hiển thị bản chép lời trong khi ghi âm bằng một mô hình trên máy tính này. Miễn phí: không có gì được tải lên trong khi ghi âm, nhưng dùng CPU, bộ nhớ và pin. Bản chép lời được lưu vẫn do %@ tạo sau khi bấm Dừng, nên có thể khác với những gì bạn đã thấy."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "录音时使用这台电脑上的模型显示转写文本。免费：录音期间不会上传任何内容，但会占用 CPU、内存和电量。保存的转写文本仍会在停止后由 %@ 生成，因此可能与你看到的不同。"
           }
         }
       }

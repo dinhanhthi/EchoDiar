@@ -31,6 +31,12 @@ public interface ICloudTranscriber
     bool ApproximateTimestamps => false;
 
     /// <summary>
+    /// Each answer has per-segment timestamps; false when it can be one segment over the whole file (text only), so split
+    /// uploads must not overlap: the overlap's words would come back twice.
+    /// </summary>
+    bool ReturnsSegmentTimestamps => true;
+
+    /// <summary>
     /// <paramref name="file"/> is a mono audio file of <paramref name="duration"/> seconds (Swift reads the duration
     /// from the file; here the exporter reports it). <paramref name="language"/>: a BCP-47 code, or null / <c>auto</c>
     /// to detect. <paramref name="diarize"/>: ask for speaker labels (only the system channel does).
@@ -91,26 +97,45 @@ public static partial class CloudTranscription
     /// <summary>
     /// Transcribes <paramref name="channel"/> of <paramref name="source"/> with <paramref name="transcriber"/>: exports
     /// it to mono m4a in a private temporary folder, splits it at the quietest moments when it is over
-    /// <see cref="ICloudTranscriber.MaxUploadBytes"/>, sends the parts one by one and moves each part's segments by the
-    /// part's start. The temporary files are removed before returning.
+    /// <see cref="ICloudTranscriber.MaxUploadBytes"/>, sends the parts one by one (when the transcriber returns segment
+    /// timestamps, each later part repeats the audio from <see cref="SpeakerLabelReconciler.LabelOverlapSeconds"/> before
+    /// its cut), moves each part's segments by the part's start and reconciles their speaker labels with the parts before.
+    /// Without timestamps the parts are contiguous and simply joined (text-only answers have no speaker labels). The
+    /// temporary files are removed before returning.
+    /// </summary>
+    public static Task<List<CloudSegment>> TranscribeAsync(
+        string source, int channel, ICloudTranscriber transcriber, IAudioExporter exporter, string? language, bool diarize,
+        CancellationToken cancellationToken = default) =>
+        TranscribeAsync(source, channel, null, transcriber, exporter, language, diarize, cancellationToken);
+
+    /// <summary>
+    /// <paramref name="range"/> (file seconds, its start clamped to 0; null = the whole channel) of
+    /// <paramref name="channel"/>, sent as the whole-channel overload sends a channel: split under
+    /// <see cref="ICloudTranscriber.MaxUploadBytes"/> inside the range, with the overlap and the reconciled labels.
+    /// Segments come back in file time (seconds from the start of <paramref name="source"/>), so a gap of a recording
+    /// keeps its place (Swift <c>transcribe(source:channel:range:with:language:diarize:)</c>).
     /// </summary>
     public static async Task<List<CloudSegment>> TranscribeAsync(
-        string source, int channel, ICloudTranscriber transcriber, IAudioExporter exporter, string? language, bool diarize,
-        CancellationToken cancellationToken = default)
+        string source, int channel, TimeRange? range, ICloudTranscriber transcriber, IAudioExporter exporter,
+        string? language, bool diarize, CancellationToken cancellationToken = default)
     {
         // Created user-only (0700 on Unix; the user's own temp folder on Windows).
         var work = Directory.CreateTempSubdirectory("EchoDiar-cloud-").FullName;
         try
         {
             var maxBytes = transcriber.MaxUploadBytes;
+            var overlap = transcriber.ReturnsSegmentTimestamps ? SpeakerLabelReconciler.LabelOverlapSeconds : 0;
             var parts = await Task.Run(
-                () => UploadParts(exporter, source, channel, maxBytes, work, cancellationToken), cancellationToken);
+                () => UploadParts(exporter, source, channel, range, maxBytes, overlap, work, cancellationToken), cancellationToken);
             var segments = new List<CloudSegment>();
-            foreach (var part in parts)
+            for (var index = 0; index < parts.Count; index++)
             {
                 cancellationToken.ThrowIfCancellationRequested();
+                var part = parts[index];
                 var result = await transcriber.TranscribeAsync(part.File, part.Duration, language, diarize, cancellationToken);
-                segments.AddRange(Sanitized(result, part.Duration).Select(segment => segment.Offset(part.Start)));
+                var partSegments = Sanitized(result, part.Duration).Select(segment => segment.Offset(part.Start)).ToList();
+                segments = index == 0 || overlap == 0 ? [.. segments, .. partSegments] : SpeakerLabelReconciler.Append(
+                    partSegments, segments, new(part.Start, part.Cut), index);
             }
             return segments;
         }
@@ -148,21 +173,23 @@ public static partial class CloudTranscription
 
     /// <summary>
     /// Where to cut a file of <paramref name="duration"/> seconds at <paramref name="bytesPerSecond"/> so no part is over
-    /// <paramref name="maxBytes"/>: each cut is at the quietest <paramref name="window"/>-second slot of
+    /// <paramref name="maxBytes"/>, counting the <paramref name="overlap"/> seconds each later part repeats from before its
+    /// cut: each cut is at the quietest <paramref name="window"/>-second slot of
     /// <paramref name="levels"/> (RMS per slot from the start) in the second half of the allowed length, else at the
     /// limit. Pure, for tests.
     /// </summary>
     public static List<TimeRange> PlanParts(
-        double duration, double bytesPerSecond, int maxBytes, IReadOnlyList<float> levels, double window)
+        double duration, double bytesPerSecond, int maxBytes, IReadOnlyList<float> levels, double window,
+        double overlap = SpeakerLabelReconciler.LabelOverlapSeconds)
     {
         var maxLength = maxBytes / bytesPerSecond;
-        if (!double.IsFinite(maxLength) || !(maxLength > 0) || !(duration > maxLength)) return [new(0, Math.Max(0, duration))];
+        if (!double.IsFinite(maxLength) || !(maxLength > overlap) || !(duration > maxLength)) return [new(0, Math.Max(0, duration))];
         var parts = new List<TimeRange>();
         var start = 0.0;
-        while (duration - start > maxLength)
+        while (duration - Math.Max(0, start - overlap) > maxLength)
         {
-            var limit = start + maxLength;
-            var first = (int)Math.Ceiling((start + maxLength / 2) / window);
+            var limit = Math.Max(0, start - overlap) + maxLength;
+            var first = (int)Math.Ceiling((start + limit) / 2 / window);
             var last = Math.Min(levels.Count, (int)Math.Floor(limit / window)) - 1;
             var cut = limit;
             if (first <= last)
@@ -235,7 +262,8 @@ public static partial class CloudTranscription
 
     // Audio.
 
-    private sealed record UploadPart(string File, double Start, double Duration);
+    /// <summary><c>Start</c> is where a part's audio starts, <c>Cut</c> where its own stretch does.</summary>
+    private sealed record UploadPart(string File, double Start, double Cut, double Duration);
 
     // Requests.
 
@@ -261,37 +289,73 @@ public static partial class CloudTranscription
     /// A multipart/form-data body: the audio file part <c>file</c> (streamed from disk, with its name and MIME type),
     /// then <paramref name="fields"/> in order. Names are quoted as Swift's <c>MultipartForm</c> writes them.
     /// </summary>
-    internal static MultipartFormDataContent MultipartForm(string file, IEnumerable<(string Name, string Value)> fields)
+    internal static MultipartFormDataContent MultipartForm(string file, IEnumerable<(string Name, string Value)> fields) =>
+        MultipartForm([], "file", file, fields);
+
+    /// <summary>
+    /// A multipart/form-data body: <paramref name="before"/>, then the audio file part named <paramref name="fileField"/>,
+    /// then <paramref name="after"/>, in order (xAI wants the file last, Speechmatics its <c>config</c> first).
+    /// </summary>
+    internal static MultipartFormDataContent MultipartForm(
+        IEnumerable<(string Name, string Value)> before, string fileField, string file,
+        IEnumerable<(string Name, string Value)> after)
     {
         var form = new MultipartFormDataContent("EchoDiar-" + Guid.NewGuid().ToString("D").ToUpperInvariant());
-        var audio = FileContent(file, MimeType(file));
-        audio.Headers.ContentDisposition = new("form-data") { Name = $"\"file\"", FileName = $"\"{Path.GetFileName(file)}\"" };
-        form.Add(audio);
-        foreach (var (name, value) in fields)
+        void AddFields(IEnumerable<(string Name, string Value)> fields)
         {
-            var part = new ByteArrayContent(System.Text.Encoding.UTF8.GetBytes(value));
-            part.Headers.ContentDisposition = new("form-data") { Name = $"\"{name}\"" };
-            form.Add(part);
+            foreach (var (name, value) in fields)
+            {
+                var part = new ByteArrayContent(System.Text.Encoding.UTF8.GetBytes(value));
+                part.Headers.ContentDisposition = new("form-data") { Name = $"\"{name}\"" };
+                form.Add(part);
+            }
         }
+        AddFields(before);
+        var audio = FileContent(file, MimeType(file));
+        audio.Headers.ContentDisposition = new("form-data") { Name = $"\"{fileField}\"", FileName = $"\"{Path.GetFileName(file)}\"" };
+        form.Add(audio);
+        AddFields(after);
         return form;
     }
 
-    /// <summary>The whole channel as one m4a, or parts when it is over <paramref name="maxBytes"/>.</summary>
+    /// <summary>
+    /// <paramref name="id"/> when it is a plain id (letters, digits, <c>-</c>, <c>_</c>): job ids come from the API and go
+    /// into a path with the key, so anything else could reach another path.
+    /// </summary>
+    internal static string CheckedId(string id, string provider) =>
+        id.Length > 0 && id.All(c => char.IsAsciiLetterOrDigit(c) || c is '-' or '_')
+            ? id
+            : throw LLMException.Provider($"{provider} returned an invalid job id.");
+
+    /// <summary>
+    /// <paramref name="range"/> of the channel (null = all) as one m4a, or parts when it is over
+    /// <paramref name="maxBytes"/>; each later part starts <paramref name="overlap"/> seconds before its cut. Starts and
+    /// cuts in file time. The exporter measures loudness from the file's start only, so a range takes its slots
+    /// (a cut may sit up to one <see cref="LevelWindow"/> off the quietest moment).
+    /// </summary>
     private static List<UploadPart> UploadParts(
-        IAudioExporter exporter, string source, int channel, int? maxBytes, string work, CancellationToken cancellationToken)
+        IAudioExporter exporter, string source, int channel, TimeRange? range, int? maxBytes, double overlap, string work,
+        CancellationToken cancellationToken)
     {
+        var offset = Math.Max(0, range?.Start ?? 0);
+        if (range is { } requested) range = requested with { Start = offset };
         var whole = Path.Combine(work, "channel.m4a");
-        var duration = exporter.ExportMonoAac(source, channel, null, whole, cancellationToken);
+        var duration = exporter.ExportMonoAac(source, channel, range, whole, cancellationToken);
         var bytes = new FileInfo(whole).Length;
-        if (maxBytes is not { } max || bytes <= max || !(duration > 0)) return [new(whole, 0, duration)];
+        if (maxBytes is not { } max || bytes <= max || !(duration > 0)) return [new(whole, offset, offset, duration)];
         File.Delete(whole);
-        var ranges = PlanParts(
-            duration, bytes / duration, max, exporter.Levels(source, channel, LevelWindow, cancellationToken), LevelWindow);
-        return ranges.Select((range, index) =>
+        var levels = exporter.Levels(source, channel, LevelWindow, cancellationToken);
+        if (range is not null)
+        {
+            levels = [.. levels.Skip((int)Math.Floor(offset / LevelWindow)).Take((int)Math.Ceiling(duration / LevelWindow))];
+        }
+        var parts = PlanParts(duration, bytes / duration, max, levels, LevelWindow, overlap);
+        return parts.Select((part, index) =>
         {
             var file = Path.Combine(work, $"part-{index}.m4a");
-            var length = exporter.ExportMonoAac(source, channel, range, file, cancellationToken);
-            return new UploadPart(file, range.Start, length);
+            var start = Math.Max(0, part.Start - overlap);
+            var length = exporter.ExportMonoAac(source, channel, new(offset + start, offset + part.End), file, cancellationToken);
+            return new UploadPart(file, offset + start, offset + part.Start, length);
         }).ToList();
     }
 }
@@ -299,7 +363,7 @@ public static partial class CloudTranscription
 /// <summary>
 /// Cloud engines are picked by engine id <c>cloud:&lt;provider id&gt;</c> (Transcription tab default, Re-transcribe and
 /// Retry menus); the model is the config's <c>TranscriptionModel</c>, else the vendor default. The provider id is also
-/// the <see cref="ISecretStore"/> id, so OpenAI, Groq, Mistral and Gemini share the key of their LLM config.
+/// the <see cref="ISecretStore"/> id, so OpenAI, xAI, Groq, Mistral and Gemini share the key of their LLM config.
 /// </summary>
 public static partial class CloudTranscription
 {
@@ -316,19 +380,19 @@ public static partial class CloudTranscription
     }
 
     /// <summary>
-    /// OpenAI, Groq, Mistral, Gemini (native audio API, not the LLM preset's OpenAI shim), the speech-to-text presets
-    /// and custom OpenAI-compatible endpoints.
+    /// OpenAI, Groq, Mistral, Gemini (native audio API, not the LLM preset's OpenAI shim), xAI (its <c>/v1/stt</c> API),
+    /// the speech-to-text presets and custom OpenAI-compatible endpoints.
     /// </summary>
     public static bool Supports(ProviderConfig config) => config.Kind switch
     {
         ProviderKind.SpeechToText => true,
-        ProviderKind.OpenAICompatible => config.Preset is null or "openai" or "groq" or "mistral" or "gemini",
+        ProviderKind.OpenAICompatible => config.Preset is null or "openai" or "groq" or "mistral" or "gemini" or "xai",
         _ => false,
     };
 
     /// <summary>Presets that can be the default cloud diarizer. Mistral is left out until its model id is verified to diarize.</summary>
     public static readonly IReadOnlySet<string> DiarizationPresets =
-        new HashSet<string> { "openai", "elevenlabs", "deepgram", "assemblyai", "gemini" };
+        new HashSet<string> { "openai", "elevenlabs", "deepgram", "assemblyai", "gemini", "xai", "speechmatics", "soniox", "gladia" };
 
     /// <summary>Whether <paramref name="model"/> of <paramref name="config"/> returns speaker labels (a non-diarizing model would still bill a transcription).</summary>
     public static bool Diarizes(ProviderConfig config, string model)
@@ -343,6 +407,13 @@ public static partial class CloudTranscription
             "deepgram" => model.StartsWith("nova", StringComparison.Ordinal),
             "gemini" => model.Contains("gemini", StringComparison.Ordinal),
             "assemblyai" => true,
+            // xAI has one model (diarize=true).
+            "xai" => true,
+            // Speaker labels are documented for standard and enhanced only (melia-1, oak-1: channel only, live).
+            "speechmatics" => model is "standard" or "enhanced",
+            // The async endpoint refuses the realtime stt-rt-* models.
+            "soniox" => model.StartsWith("stt-async", StringComparison.Ordinal),
+            "gladia" => model.StartsWith("solaria", StringComparison.Ordinal),
             _ => false,
         };
     }
@@ -379,6 +450,10 @@ public static partial class CloudTranscription
         "gemini" => GeminiAudioTranscriber.DefaultModel,
         "elevenlabs" => ElevenLabsTranscriber.DefaultModel,
         "deepgram" => DeepgramTranscriber.DefaultModel,
+        "xai" => XAITranscriber.DefaultModel,
+        "speechmatics" => SpeechmaticsTranscriber.DefaultModel,
+        "soniox" => SonioxTranscriber.DefaultModel,
+        "gladia" => GladiaTranscriber.DefaultModel,
         { } preset => OpenAICompatibleTranscriber.PresetModels.TryGetValue(preset, out var models) ? models[0] : "",
         null => "",
     };
@@ -396,6 +471,10 @@ public static partial class CloudTranscription
         "gemini" => GeminiAudioTranscriber.DefaultModel,
         "elevenlabs" => ElevenLabsTranscriber.DefaultModel,
         "deepgram" => DeepgramTranscriber.DefaultModel,
+        "xai" => XAITranscriber.DefaultModel,
+        "speechmatics" => SpeechmaticsTranscriber.DefaultModel,
+        "soniox" => SonioxTranscriber.DefaultModel,
+        "gladia" => GladiaTranscriber.DefaultModel,
         _ => "",
     };
 
@@ -431,6 +510,10 @@ public static partial class CloudTranscription
             "elevenlabs" => new ElevenLabsTranscriber(key, model, handler),
             "deepgram" => new DeepgramTranscriber(key, model, handler),
             "assemblyai" => new AssemblyAITranscriber(key, handler),
+            "xai" => new XAITranscriber(key, model, handler),
+            "speechmatics" => new SpeechmaticsTranscriber(key, model, handler),
+            "soniox" => new SonioxTranscriber(key, model, handler),
+            "gladia" => new GladiaTranscriber(key, model, handler),
             _ => new OpenAICompatibleTranscriber(config, model, apiKey, handler),
         };
     }
@@ -448,6 +531,11 @@ public static partial class CloudTranscription
             case "elevenlabs": url = ElevenLabsTranscriber.Endpoint; break;
             case "deepgram": url = DeepgramTranscriber.Endpoint; break;
             case "assemblyai": url = AssemblyAITranscriber.BaseUrl; break;
+            // xAI transcribes at its fixed /v1/stt endpoint, not the LLM preset's base URL.
+            case "xai": url = XAITranscriber.Endpoint; break;
+            case "speechmatics": url = SpeechmaticsTranscriber.BaseUrl; break;
+            case "soniox": url = SonioxTranscriber.BaseUrl; break;
+            case "gladia": url = GladiaTranscriber.BaseUrl; break;
             default:
                 try
                 {
@@ -474,6 +562,10 @@ public static partial class CloudTranscription
             "elevenlabs" => () => ElevenLabsTranscriber.MakeKeyCheckRequest(apiKey),
             "deepgram" => () => DeepgramTranscriber.MakeKeyCheckRequest(apiKey),
             "assemblyai" => () => AssemblyAITranscriber.MakeKeyCheckRequest(apiKey),
+            "xai" => () => XAITranscriber.MakeKeyCheckRequest(apiKey),
+            "speechmatics" => () => SpeechmaticsTranscriber.MakeKeyCheckRequest(apiKey),
+            "soniox" => () => SonioxTranscriber.MakeKeyCheckRequest(apiKey),
+            "gladia" => () => GladiaTranscriber.MakeKeyCheckRequest(apiKey),
             _ => throw LLMException.Provider($"No key check for {config.DisplayName}."),
         };
         await ProviderHttp.SendAsync(

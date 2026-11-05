@@ -346,6 +346,235 @@ public sealed class PipelineTests : IDisposable
         Assert.Empty(cloud.Diarize);
     }
 
+    // Swift CloudPriorPipelineTests: a cloud realtime prior as the transcript (job.Prior.EngineID == cloud.EngineID):
+    // only its gaps are uploaded (padded, by range, split under the cap), their speaker labels are bridged onto the
+    // stream's, and a diarizer runs only when speakers are on and the stream labelled none. The scripted fake answers
+    // relative to the upload start.
+
+    // (a) A mic gap is one upload of about the gap (±0.5 s padding) whose segment inside the gap joins the prior's; a
+    // system gap goes up with ±30 s of padding and its own label for the stream's voice is mapped back onto the
+    // stream's. The transcript records cloud:fake and the realtime model, not the batch one.
+    [Fact]
+    public async Task CloudPriorGapsAreUploadedPaddedAndJoinTheStream()
+    {
+        var prior = CloudPrior(
+            100, [new RawSegment(38, 39.9, "hello from me"), new RawSegment(60, 62, "later from me")],
+            Raw([.. Pieces("A", 0, 50), .. Pieces("A", 52, 100)]), micGaps: [new Span(40, 42)], systemGaps: [new Span(50, 52)]);
+        var asr = new ScriptedCloud((_, diarize, seconds) => diarize
+            ? Pieces("X", 0, seconds, "upload")
+            : [new CloudSegment(0, 0.4, "padding word"), new CloudSegment(0.6, 2.4, "words in the gap")]);
+
+        var transcript = await TranscribeCloudPriorAsync(prior, diarize: true, asr);
+
+        Assert.Equal([false, true], asr.Calls.Select(c => c.Diarize));
+        Assert.InRange(asr.Calls[0].Seconds, 2.7, 3.3);
+        Assert.InRange(asr.Calls[1].Seconds, 61.7, 62.3);
+        Assert.Equal("cloud:fake", transcript.EngineID);
+        Assert.Equal("rt-model", transcript.ModelID);
+        Assert.Equal(
+            ["hello from me", "words in the gap", "later from me"],
+            transcript.Segments.Where(s => s.Channel == TranscriptChannel.Mic).Select(s => s.Text));
+        var system = transcript.Segments.Where(s => s.Channel == TranscriptChannel.System).ToList();
+        Assert.Equal(prior.System.Count + 1, system.Count);
+        Assert.Equal([50.0], system.Where(s => s.Text == "upload").Select(s => s.Start));
+        Assert.Equal([Transcript.Speaker.System(1)], system.Select(s => s.Speaker).Distinct());
+    }
+
+    // Two gaps with only covered silence between them (one drop with a pause in the speech): each one's upload (±30 s with
+    // labels) hears the other's speech, but the widening of a gap stops at the next gap, so every second of the uploads is
+    // kept once (Swift twoGapsSeparatedBySilenceKeepEachUploadedSecondOnce).
+    [Fact]
+    public async Task TwoGapsSeparatedBySilenceKeepEachUploadedSecondOnce()
+    {
+        var prior = CloudPrior(
+            100, [], Raw([.. Pieces("A", 0, 49), .. Pieces("A", 63, 100)]), systemGaps: [new Span(50, 52), new Span(60, 62)]);
+        var asr = new ScriptedCloud((_, _, seconds) => Pieces("X", 0, seconds, "upload"));
+
+        var transcript = await TranscribeCloudPriorAsync(prior, diarize: true, asr);
+
+        Assert.Equal(2, asr.Calls.Count);
+        var starts = transcript.Segments
+            .Where(s => s.Channel == TranscriptChannel.System && s.Text == "upload").Select(s => s.Start).ToList();
+        Assert.Equal(starts.Count, starts.Distinct().Count());
+        Assert.Contains(50.0, starts);
+        Assert.Contains(60.0, starts);
+    }
+
+    // (b) A prior with no gaps whose stream labelled its speakers: nothing is uploaded, no diarizer runs.
+    [Fact]
+    public async Task ACloudPriorWithoutGapsUploadsNothing()
+    {
+        var prior = CloudPrior(
+            4, [new RawSegment(0, 1, "hello from me")], [new RawSegment(2, 3, "hi there", Speaker: "A")]);
+        var asr = new ScriptedCloud((_, _, _) => []);
+        var diarizer = new ScriptedCloud((_, _, _) => []);
+
+        var transcript = await TranscribeCloudPriorAsync(prior, diarize: true, asr, diarizer);
+
+        Assert.Empty(asr.Calls);
+        Assert.Empty(diarizer.Calls);
+        Assert.Equal(["hello from me", "hi there"], transcript.Segments.Select(s => s.Text));
+    }
+
+    // (b2) A system gap whose padded upload is over the fake's MaxUploadBytes goes up as several parts inside the range,
+    // each labelling the one voice differently; the parts' labels and the stream's stay one speaker.
+    [Fact]
+    public async Task ALongCloudPriorGapIsSplitInsideItsRangeAndKeepsOneSpeaker()
+    {
+        var prior = CloudPrior(
+            140, [], Raw([.. Pieces("A", 0, 40), .. Pieces("A", 100, 140)]), systemGaps: [new Span(40, 100)]);
+        var asr = new ScriptedCloud((call, _, seconds) => Pieces($"L{call}", 0, seconds, "upload")) { MaxUploadBytes = 60_000 };
+        var exporter = new RangeExporter(bytesPerSecond: 1_000);
+
+        var transcript = await TranscribeCloudPriorAsync(prior, diarize: true, asr, exporter: exporter);
+
+        Assert.True(asr.Calls.Count >= 2);
+        Assert.All(asr.Calls, c => Assert.True(c.Diarize && c.Seconds < 70));
+        Assert.All(exporter.Ranges, r => Assert.True(r is { Start: >= 10, End: <= 130 }));
+        var system = transcript.Segments.Where(s => s.Channel == TranscriptChannel.System).ToList();
+        var uploaded = system.Where(s => s.Text == "upload").ToList();
+        Assert.True(uploaded.Count >= 25);
+        Assert.All(uploaded, s => Assert.True(s.Start >= 39 && s.End <= 101));
+        Assert.Equal([Transcript.Speaker.System(1)], system.Select(s => s.Speaker).Distinct());
+    }
+
+    // (g) Speakers off: the stream's labels are dropped, the system gap is uploaded without diarization and its labels
+    // dropped too, the system channel is one speaker, and the cloud diarizer is never called.
+    [Fact]
+    public async Task SpeakersOffDropTheCloudPriorLabelsAndRunNoDiarizer()
+    {
+        var prior = CloudPrior(
+            10, [],
+            [new RawSegment(0, 2, "first voice", Speaker: "A"), new RawSegment(6, 8, "second voice", Speaker: "B")],
+            systemGaps: [new Span(3, 5)]);
+        var asr = new ScriptedCloud((_, _, _) => [new CloudSegment(0.5, 2.5, "gap words", "Q")]);
+        var diarizer = new ScriptedCloud((_, _, _) => [new CloudSegment(0, 2, "x", "D")]);
+
+        var transcript = await TranscribeCloudPriorAsync(prior, diarize: false, asr, diarizer);
+
+        Assert.Equal([false], asr.Calls.Select(c => c.Diarize));
+        Assert.Empty(diarizer.Calls);
+        var system = transcript.Segments.Where(s => s.Channel == TranscriptChannel.System).ToList();
+        Assert.Equal(["first voice", "gap words", "second voice"], system.Select(s => s.Text));
+        Assert.Equal([Transcript.Speaker.System(1)], system.Select(s => s.Speaker).Distinct());
+    }
+
+    // (f) Speakers on and a stream without labels: the picked cloud diarizer runs once on the whole system channel and
+    // labels it; nothing is transcribed again.
+    [Fact]
+    public async Task SpeakersOnWithoutCloudPriorLabelsRunTheCloudDiarizerOnce()
+    {
+        var prior = CloudPrior(6, [], [new RawSegment(0, 2, "first voice"), new RawSegment(3, 5, "second voice")]);
+        var asr = new ScriptedCloud((_, _, _) => []);
+        var diarizer = new ScriptedCloud((_, _, _) => [new CloudSegment(0, 2, "x", "A"), new CloudSegment(3, 5, "y", "B")]);
+
+        var transcript = await TranscribeCloudPriorAsync(prior, diarize: true, asr, diarizer);
+
+        Assert.Empty(asr.Calls);
+        Assert.Equal([true], diarizer.Calls.Select(c => c.Diarize));
+        Assert.InRange(diarizer.Calls[0].Seconds, 5.7, 6.3);
+        Assert.Equal([Transcript.Speaker.System(1), Transcript.Speaker.System(2)], transcript.Segments.Select(s => s.Speaker));
+    }
+
+    // A resume after a pause with no gap (SystemBridges): the stream scoped the resumed session's labels (r1:A); the audio
+    // ±30 s around the resume goes up once with labels, hears one voice there, and maps r1:A back onto A. The upload adds
+    // no segment.
+    [Fact]
+    public async Task ACloudPriorResumeBridgeMapsTheScopedLabelsBackAndAddsNoSegment()
+    {
+        var prior = CloudPrior(100, [], Raw([.. Pieces("A", 0, 50), .. Pieces("r1:A", 50, 100)])) with { SystemBridges = [50] };
+        var asr = new ScriptedCloud((_, _, seconds) => Pieces("X", 0, seconds, "upload"));
+
+        var transcript = await TranscribeCloudPriorAsync(prior, diarize: true, asr);
+
+        Assert.Equal([true], asr.Calls.Select(c => c.Diarize));
+        Assert.InRange(asr.Calls[0].Seconds, 59.7, 60.3);
+        var system = transcript.Segments.Where(s => s.Channel == TranscriptChannel.System).ToList();
+        Assert.Equal(prior.System.Count, system.Count);
+        Assert.DoesNotContain(system, s => s.Text == "upload");
+        Assert.Equal([Transcript.Speaker.System(1)], system.Select(s => s.Speaker).Distinct());
+    }
+
+    private static PriorTranscription CloudPrior(
+        int seconds, IReadOnlyList<RawSegment> mic, IReadOnlyList<RawSegment> system, IReadOnlyList<Span>? micGaps = null,
+        IReadOnlyList<Span>? systemGaps = null) => new()
+        {
+            EngineID = "cloud:fake",
+            Mic = mic,
+            System = system,
+            MicGaps = micGaps ?? [],
+            SystemGaps = systemGaps ?? [],
+            Duration = seconds,
+            ModelId = "rt-model",
+        };
+
+    /// <summary>Runs a job with <paramref name="prior"/> on a recording of its duration through cloud:fake (batch model "batch-model").</summary>
+    private async Task<Transcript> TranscribeCloudPriorAsync(
+        PriorTranscription prior, bool diarize, ScriptedCloud asr, ScriptedCloud? diarizer = null, RangeExporter? exporter = null)
+    {
+        var (session, folder) = MakeRecording((int)prior.Duration, toneOnMic: false);
+        var pipeline = new TranscriptionPipeline(
+            new Dictionary<ModelRuntime, TranscriptionPipeline.EngineFactory>(), null, _ => false,
+            e => Path.Combine(_root, "Models", e.Id), new ModelLoadGate(), exporter: exporter ?? new RangeExporter(1_000));
+        var job = new TranscriptionJob
+        {
+            ConversationID = session.Id, Folder = folder, ProcessNow = true, Diarize = diarize, Prior = prior,
+        };
+        await pipeline.TranscribeAsync(
+            job, new CloudEngine("cloud:fake", "Fake", "batch-model", asr),
+            diarizer is null ? null : new CloudEngine("cloud:fake-diarizer", "Fake", "", diarizer),
+            TestContext.Current.CancellationToken);
+        return Transcript.Read(folder);
+    }
+
+    /// <summary>2 s segments of <paramref name="label"/> from <paramref name="from"/> to <paramref name="to"/> (the last one shorter).</summary>
+    private static List<CloudSegment> Pieces(string label, double from, double to, string text = "stream")
+    {
+        var pieces = new List<CloudSegment>();
+        for (var start = from; start < to; start += 2) pieces.Add(new CloudSegment(start, Math.Min(start + 2, to), text, label));
+        return pieces;
+    }
+
+    private static List<RawSegment> Raw(IEnumerable<CloudSegment> segments) =>
+        [.. segments.Select(s => new RawSegment(s.Start, s.End, s.Text, Speaker: s.Speaker))];
+
+    /// <summary>Records each export's range and writes <paramref name="bytesPerSecond"/> bytes per second of it (the whole file without a range).</summary>
+    private sealed class RangeExporter(double bytesPerSecond) : IAudioExporter
+    {
+        public List<TimeRange?> Ranges { get; } = [];
+
+        public double ExportMonoAac(string source, int channel, TimeRange? range, string destination, CancellationToken cancellationToken)
+        {
+            lock (Ranges) Ranges.Add(range);
+            var length = range is { } r ? r.End - r.Start : MonoAudio.Duration(source);
+            File.WriteAllBytes(destination, new byte[(int)Math.Round(length * bytesPerSecond)]);
+            return length;
+        }
+
+        public float[] Levels(string source, int channel, double window, CancellationToken cancellationToken) =>
+            Enumerable.Repeat(0.2f, (int)(MonoAudio.Duration(source) / window)).ToArray();
+    }
+
+    /// <summary>Records each call's diarize flag and upload seconds, and answers <c>script(call index from 0, diarize, seconds)</c>.</summary>
+    private sealed class ScriptedCloud(Func<int, bool, double, IReadOnlyList<CloudSegment>> script) : ICloudTranscriber
+    {
+        public List<(bool Diarize, double Seconds)> Calls { get; } = [];
+
+        public int? MaxUploadBytes { get; init; }
+
+        public Task<IReadOnlyList<CloudSegment>> TranscribeAsync(
+            string file, double duration, string? language, bool diarize, CancellationToken cancellationToken = default)
+        {
+            int index;
+            lock (Calls)
+            {
+                Calls.Add((diarize, duration));
+                index = Calls.Count - 1;
+            }
+            return Task.FromResult(script(index, diarize, duration));
+        }
+    }
+
     private (RecordingSession Session, string Folder) MakeRecording(int seconds, bool toneOnMic)
     {
         var session = new RecordingSession { State = SessionState.Stopped, AudioFileName = "audio.caf" };

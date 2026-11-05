@@ -123,21 +123,28 @@ public struct PriorTranscription: Codable, Equatable, Sendable {
         case pending
     }
 
-    /// Catalog id of the engine that transcribed the segments.
+    /// Catalog id of the engine that transcribed the segments, or `cloud:<provider id>` for a cloud realtime stream.
     public var engineID: String
+    /// The cloud realtime model that streamed the segments; nil for a local engine.
+    public var modelID: String?
     public var mic: [RawSegment]
     public var system: [RawSegment]
     /// Spans not transcribed, to transcribe at Stop.
     public var micGaps: [Span]
     public var systemGaps: [Span]
+    /// A cloud realtime stream: file seconds where the system channel resumed after a pause with session-scoped
+    /// speaker labels and no gap; the pipeline uploads the audio around each, with labels, only to map them back.
+    public var systemBridges: [Double]
     /// Seconds of audio the transcriber saw (= the file's duration when every frame reached it).
     public var duration: Double
 
     public init(
         engineID: String, mic: [RawSegment], system: [RawSegment], micGaps: [Span], systemGaps: [Span],
-        duration: Double
+        duration: Double, modelID: String? = nil, systemBridges: [Double] = []
     ) {
         self.engineID = engineID
+        self.modelID = modelID
+        self.systemBridges = systemBridges
         self.mic = mic
         self.system = system
         self.micGaps = micGaps

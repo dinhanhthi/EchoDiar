@@ -809,7 +809,7 @@ struct AIModelMenu: View {
                 }
             }
             Divider()
-            Button("Choose Models…") { model.openSettings(tab: .providers) }
+            Button("Choose Models…") { model.openSettings(tab: .providers, subTab: "cloud") }
         } label: {
             AIMenuLabel(title: modelTitle, systemImage: "cpu")
         }

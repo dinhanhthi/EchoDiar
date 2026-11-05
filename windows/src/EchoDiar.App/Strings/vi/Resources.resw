@@ -82,6 +82,10 @@
     <value>Khoá API</value>
     <comment>API key</comment>
   </data>
+  <data name="APIKeys" xml:space="preserve">
+    <value>Khoá API</value>
+    <comment>API Keys</comment>
+  </data>
   <data name="About" xml:space="preserve">
     <value>Giới thiệu</value>
     <comment>About</comment>
@@ -89,6 +93,10 @@
   <data name="AboutEchoDiar" xml:space="preserve">
     <value>Giới thiệu về EchoDiar</value>
     <comment>About EchoDiar</comment>
+  </data>
+  <data name="AboutPerHourOfStreamingForEachConnection" xml:space="preserve">
+    <value>khoảng {0} cho mỗi giờ truyền trực tiếp trên mỗi kết nối</value>
+    <comment>about %@ per hour of streaming for each connection</comment>
   </data>
   <data name="AboutWhereDataGoes" xml:space="preserve">
     <value>Về nơi dữ liệu được gửi đến</value>
@@ -117,14 +125,6 @@
   <data name="AddEndpoint" xml:space="preserve">
     <value>Thêm endpoint</value>
     <comment>Add Endpoint</comment>
-  </data>
-  <data name="AddTheKeyOfBelow" xml:space="preserve">
-    <value>Thêm khoá của {0} ở bên dưới</value>
-    <comment>Add the key of %@ below</comment>
-  </data>
-  <data name="AddTheKeyOfInTranscriptionModels" xml:space="preserve">
-    <value>Thêm khoá của {0} trong Mô hình chép lời</value>
-    <comment>Add the key of %@ in Transcription models</comment>
   </data>
   <data name="Added" xml:space="preserve">
     <value>Đã thêm</value>
@@ -286,10 +286,6 @@
     <value>Hỏi có dừng không</value>
     <comment>Ask to stop</comment>
   </data>
-  <data name="AssemblyAIPicksItsModelForTheLanguageUniversal" xml:space="preserve">
-    <value>AssemblyAI tự chọn mô hình theo ngôn ngữ (Universal).</value>
-    <comment>AssemblyAI picks its model for the language (Universal).</comment>
-  </data>
   <data name="AttachTheIndicatorToTheMeetingWindow" xml:space="preserve">
     <value>Gắn chỉ báo vào cửa sổ cuộc họp</value>
     <comment>Attach the indicator to the meeting window</comment>
@@ -326,6 +322,10 @@
     <value>Âm thanh rời khỏi máy Mac này: kênh micrô và kênh hệ thống của bản ghi âm được tải lên {0} ({1}) để chép lời và do họ tính phí. Nhà cung cấp có thể lưu giữ âm thanh theo chính sách lưu trữ riêng của họ. Bạn chỉ được hỏi một lần cho mỗi nhà cung cấp và nơi nhận.</value>
     <comment>Audio leaves this Mac: the recording's mic and system channels are uploaded to %@ (%@) for transcription and billed by them. The provider may keep the audio under its own retention policy. You are asked once per provider and destination.</comment>
   </data>
+  <data name="AudioLeavesThisMacWhileRecordingTheMicAndSystemChannelsAreSt" xml:space="preserve">
+    <value>Âm thanh rời khỏi máy Mac này: trong khi ghi âm, kênh micrô và kênh hệ thống được truyền trực tiếp đến {0} ({1}) để chép lời và do họ tính phí. Nhà cung cấp có thể lưu giữ âm thanh theo chính sách lưu trữ riêng của họ. Bạn chỉ được hỏi một lần cho mỗi nhà cung cấp và nơi nhận.</value>
+    <comment>Audio leaves this Mac: while recording, the mic and system channels are streamed live to %@ (%@) for transcription and billed by them. The provider may keep the audio under its own retention policy. You are asked once per provider and destination.</comment>
+  </data>
   <data name="AudioLeavesThisPCCloudEnginesUploadTheRecordingToTheProvider" xml:space="preserve">
     <value>Âm thanh rời khỏi máy tính này: các công cụ đám mây tải bản ghi âm lên nhà cung cấp.</value>
     <comment>Audio leaves this PC: cloud engines upload the recording to the provider.</comment>
@@ -337,6 +337,10 @@
   <data name="AudioLeavesThisPCTheRecordingSMicAndSystemChannelsAreUploade" xml:space="preserve">
     <value>Âm thanh rời khỏi máy tính này: kênh micrô và kênh hệ thống của bản ghi âm được tải lên {0} ({1}) để chép lời và do họ tính phí. Nhà cung cấp có thể lưu giữ âm thanh theo chính sách lưu trữ riêng của họ. Bạn chỉ được hỏi một lần cho mỗi nhà cung cấp và nơi nhận.</value>
     <comment>Audio leaves this PC: the recording's mic and system channels are uploaded to %@ (%@) for transcription and billed by them. The provider may keep the audio under its own retention policy. You are asked once per provider and destination.</comment>
+  </data>
+  <data name="AudioLeavesThisPCWhileRecordingTheMicAndSystemChannelsAreStr" xml:space="preserve">
+    <value>Âm thanh rời khỏi máy tính này: trong khi ghi âm, kênh micrô và kênh hệ thống được truyền trực tiếp đến {0} ({1}) để chép lời và do họ tính phí. Nhà cung cấp có thể lưu giữ âm thanh theo chính sách lưu trữ riêng của họ. Bạn chỉ được hỏi một lần cho mỗi nhà cung cấp và nơi nhận.</value>
+    <comment>Audio leaves this PC: while recording, the mic and system channels are streamed live to %@ (%@) for transcription and billed by them. The provider may keep the audio under its own retention policy. You are asked once per provider and destination.</comment>
   </data>
   <data name="AudioOnlyKeepTranscriptSummaryAndChat" xml:space="preserve">
     <value>Chỉ âm thanh (giữ bản chép lời, bản tóm tắt và cuộc trò chuyện)</value>
@@ -405,6 +409,18 @@
   <data name="BeforeYouRecord" xml:space="preserve">
     <value>Trước khi ghi âm</value>
     <comment>Before you record</comment>
+  </data>
+  <data name="BilledBy" xml:space="preserve">
+    <value>do {0} tính phí</value>
+    <comment>billed by %@</comment>
+  </data>
+  <data name="BilledByConnectionTimeAboutPerHourForEachConnection" xml:space="preserve">
+    <value>tính phí theo thời gian kết nối, khoảng {0} mỗi giờ cho mỗi kết nối</value>
+    <comment>billed by connection time, about %@ per hour for each connection</comment>
+  </data>
+  <data name="BilledPerStreamedMinuteAboutPerHourForEachConnection" xml:space="preserve">
+    <value>tính phí theo số phút truyền, khoảng {0} mỗi giờ cho mỗi kết nối</value>
+    <comment>billed per streamed minute, about %@ per hour for each connection</comment>
   </data>
   <data name="BothVoicesInBothEars" xml:space="preserve">
     <value>Cả hai giọng ở cả hai tai</value>
@@ -625,6 +641,10 @@
   <data name="ConfirmTheEmbeddingProviderInSettingsRAG" xml:space="preserve">
     <value>Hãy xác nhận nhà cung cấp mô hình nhúng trong Cài đặt › RAG.</value>
     <comment>Confirm the embedding provider in Settings › RAG.</comment>
+  </data>
+  <data name="ConnectingTo" xml:space="preserve">
+    <value>Đang kết nối với {0}…</value>
+    <comment>Connecting to %@…</comment>
   </data>
   <data name="Consent" xml:space="preserve">
     <value>Sự đồng ý</value>
@@ -918,6 +938,10 @@
     <value>Mô hình phân biệt người nói</value>
     <comment>Diarization models</comment>
   </data>
+  <data name="DoesnTSupportTheseSettingsOrThisLanguageLive" xml:space="preserve">
+    <value>{0} không hỗ trợ các cài đặt này hoặc ngôn ngữ này khi chép lời trực tiếp.</value>
+    <comment>%@ doesn't support these settings or this language live.</comment>
+  </data>
   <data name="Done" xml:space="preserve">
     <value>Xong</value>
     <comment>Done</comment>
@@ -1198,6 +1222,10 @@
     <value>Cấp quyền Trợ năng…</value>
     <comment>Grant Accessibility…</comment>
   </data>
+  <data name="HasNoRealtimeTranscriptionYouCanShowALiveTranscriptWithALoca" xml:space="preserve">
+    <value>{0} không có chép lời thời gian thực. Bạn có thể hiển thị bản chép lời trực tiếp bằng một mô hình cục bộ trong Cài đặt.</value>
+    <comment>%@ has no realtime transcription. You can show a live transcript with a local model in Settings.</comment>
+  </data>
   <data name="HeadsUpIMRecordingThisCallToTakeNotesTheRecordingStaysOnMyMa" xml:space="preserve">
     <value>Xin lưu ý: tôi đang ghi âm cuộc gọi này để ghi chú. Bản ghi âm được lưu giữ trên máy Mac của tôi.</value>
     <comment>Heads up: I'm recording this call to take notes. The recording stays on my Mac.</comment>
@@ -1414,6 +1442,10 @@
     <value>Ngôn ngữ từ giờ trở đi</value>
     <comment>Language from now on</comment>
   </data>
+  <data name="LanguageModels" xml:space="preserve">
+    <value>Mô hình ngôn ngữ</value>
+    <comment>Language models</comment>
+  </data>
   <data name="LanguageOfSummariesAndAnswers" xml:space="preserve">
     <value>Ngôn ngữ của bản tóm tắt và câu trả lời</value>
     <comment>Language of summaries and answers</comment>
@@ -1466,6 +1498,10 @@
     <value>Đang nghe…</value>
     <comment>Listening…</comment>
   </data>
+  <data name="LiveModel" xml:space="preserve">
+    <value>Mô hình chép lời trực tiếp</value>
+    <comment>Live model</comment>
+  </data>
   <data name="LiveTranscript" xml:space="preserve">
     <value>Chép lời trực tiếp</value>
     <comment>Live transcript</comment>
@@ -1493,6 +1529,14 @@
   <data name="LiveTranscriptStoppedTheTranscriptIsMadeAfterStop" xml:space="preserve">
     <value>Đã dừng chép lời trực tiếp. Bản chép lời sẽ được tạo sau khi bấm Dừng.</value>
     <comment>Live transcript stopped. The transcript is made after Stop.</comment>
+  </data>
+  <data name="LiveWithALocalModel" xml:space="preserve">
+    <value>Chép lời trực tiếp bằng mô hình cục bộ</value>
+    <comment>Live with a local model</comment>
+  </data>
+  <data name="LiveWithRealtime" xml:space="preserve">
+    <value>Chép lời trực tiếp bằng {0} thời gian thực</value>
+    <comment>Live with %@ realtime</comment>
   </data>
   <data name="LldBytes" xml:space="preserve">
     <value>{0} byte</value>
@@ -1682,10 +1726,6 @@
     <value>ID mô hình</value>
     <comment>Model id</comment>
   </data>
-  <data name="ModelIdEGWhisper1" xml:space="preserve">
-    <value>ID mô hình, ví dụ: whisper-1</value>
-    <comment>Model id, e.g. whisper-1</comment>
-  </data>
   <data name="Models" xml:space="preserve">
     <value>Mô hình</value>
     <comment>Models</comment>
@@ -1741,6 +1781,10 @@
   <data name="NameFor" xml:space="preserve">
     <value>Tên cho {0}</value>
     <comment>Name for %@</comment>
+  </data>
+  <data name="NeedsBillingOrCreditsOnYourAccount" xml:space="preserve">
+    <value>{0} cần thiết lập thanh toán hoặc có tín dụng trong tài khoản của bạn.</value>
+    <comment>%@ needs billing or credits on your account.</comment>
   </data>
   <data name="NeedsConfirmation" xml:space="preserve">
     <value>Cần xác nhận</value>
@@ -1829,6 +1873,18 @@
   <data name="NoEmbeddingModelsListedTypeTheModelId" xml:space="preserve">
     <value>Không có mô hình nhúng nào trong danh sách; hãy nhập ID mô hình.</value>
     <comment>No embedding models listed; type the model id.</comment>
+  </data>
+  <data name="NoInstalledLiveModelSupportsThisRecordingSLanguageDownloadOn" xml:space="preserve">
+    <value>Không có mô hình chép lời trực tiếp nào đã cài hỗ trợ ngôn ngữ của bản ghi âm này. Hãy tải về một mô hình trong Cài đặt › Chép lời.</value>
+    <comment>No installed live model supports this recording's language. Download one in Settings › Transcription.</comment>
+  </data>
+  <data name="NoLiveModelInstalledDownloadAWhisperKitOrParakeetModelAbove" xml:space="preserve">
+    <value>Chưa cài mô hình chép lời trực tiếp nào. Hãy tải về một mô hình WhisperKit hoặc Parakeet ở trên.</value>
+    <comment>No live model installed. Download a WhisperKit or Parakeet model above.</comment>
+  </data>
+  <data name="NoLiveModelInstalledDownloadAWhisperOrParakeetModelAbove" xml:space="preserve">
+    <value>Chưa cài mô hình chép lời trực tiếp nào. Hãy tải về một mô hình Whisper hoặc Parakeet ở trên.</value>
+    <comment>No live model installed. Download a Whisper or Parakeet model above.</comment>
   </data>
   <data name="NoModelChooseOneInSettings" xml:space="preserve">
     <value>Không có mô hình: hãy chọn một mô hình trong Cài đặt</value>
@@ -2014,10 +2070,6 @@
     <value>Mở</value>
     <comment>Open</comment>
   </data>
-  <data name="OpenAIGroqMistralGoogleGeminiAndCustomEndpointsTranscribeToo" xml:space="preserve">
-    <value>OpenAI, Groq, Mistral, Google Gemini và các endpoint tuỳ chỉnh cũng có thể chép lời bằng mô hình chép lời của chúng: hãy thiết lập trong Cài đặt › AI.</value>
-    <comment>OpenAI, Groq, Mistral, Google Gemini and custom endpoints transcribe too, with their transcription model: set them up in Settings › AI.</comment>
-  </data>
   <data name="OpenCodeDeniesEveryToolButMCPServersInYourOpenCodeConfigStil" xml:space="preserve">
     <value>OpenCode từ chối mọi công cụ, nhưng các máy chủ MCP trong cấu hình OpenCode của bạn vẫn khởi động (các công cụ của chúng bị từ chối).</value>
     <comment>OpenCode denies every tool, but MCP servers in your OpenCode config still start (their tools are denied).</comment>
@@ -2170,13 +2222,13 @@
     <value>Hãy chọn một cuộc hội thoại trong thanh bên.</value>
     <comment>Pick a conversation in the sidebar.</comment>
   </data>
+  <data name="PickAProviderInSettingsRAG" xml:space="preserve">
+    <value>Hãy chọn một nhà cung cấp trong Cài đặt › RAG</value>
+    <comment>Pick a provider in Settings › RAG</comment>
+  </data>
   <data name="PickAnEmbeddingModelInSettingsRAG" xml:space="preserve">
     <value>Hãy chọn một mô hình nhúng trong Cài đặt › RAG</value>
     <comment>Pick an embedding model in Settings › RAG</comment>
-  </data>
-  <data name="PickAnEnabledProviderInSettingsRAG" xml:space="preserve">
-    <value>Hãy chọn một nhà cung cấp đã bật trong Cài đặt › RAG</value>
-    <comment>Pick an enabled provider in Settings › RAG</comment>
   </data>
   <data name="PickedByAssemblyAIForTheLanguageUniversal" xml:space="preserve">
     <value>Do AssemblyAI chọn theo ngôn ngữ (Universal)</value>
@@ -2310,6 +2362,18 @@
     <value>Sẵn sàng</value>
     <comment>Ready</comment>
   </data>
+  <data name="RealtimeIsNotConfirmedYetTurnItOnInSettingsToConfirmIt" xml:space="preserve">
+    <value>Chép lời thời gian thực của {0} chưa được xác nhận. Hãy bật trong Cài đặt để xác nhận.</value>
+    <comment>%@ realtime is not confirmed yet. Turn it on in Settings to confirm it.</comment>
+  </data>
+  <data name="RealtimeModel" xml:space="preserve">
+    <value>Mô hình thời gian thực</value>
+    <comment>Realtime model</comment>
+  </data>
+  <data name="RealtimeStartsOnceSendingAudioToAndToItsSpeakerDiarizerIfAny" xml:space="preserve">
+    <value>Chép lời thời gian thực của {0} bắt đầu khi việc gửi âm thanh đến {1} (và đến công cụ phân biệt người nói của nó, nếu có) được xác nhận. Hãy xác nhận trong một cuộc hội thoại trước.</value>
+    <comment>%@ realtime starts once sending audio to %@ (and to its speaker diarizer, if any) is confirmed. Confirm it in a conversation first.</comment>
+  </data>
   <data name="Rebuild" xml:space="preserve">
     <value>Tạo lại</value>
     <comment>Rebuild</comment>
@@ -2317,6 +2381,10 @@
   <data name="RebuildIndex" xml:space="preserve">
     <value>Tạo lại chỉ mục</value>
     <comment>Rebuild index</comment>
+  </data>
+  <data name="Reconnecting" xml:space="preserve">
+    <value>Đang kết nối lại…</value>
+    <comment>Reconnecting…</comment>
   </data>
   <data name="Record" xml:space="preserve">
     <value>Ghi âm</value>
@@ -2422,6 +2490,10 @@
     <value>Làm lại</value>
     <comment>Redo</comment>
   </data>
+  <data name="RejectedTheAPIKeyCheckItInSettingsAPIKeys" xml:space="preserve">
+    <value>{0} đã từ chối khoá API. Hãy kiểm tra trong Cài đặt › Khoá API.</value>
+    <comment>%@ rejected the API key. Check it in Settings › API Keys.</comment>
+  </data>
   <data name="RelaunchNow" xml:space="preserve">
     <value>Khởi động lại ngay</value>
     <comment>Relaunch now</comment>
@@ -2522,9 +2594,9 @@
     <value>Hãy lưu khoá trước.</value>
     <comment>Save a key first.</comment>
   </data>
-  <data name="SaveAKeyForInSettingsAI" xml:space="preserve">
-    <value>Lưu khoá cho {0} trong Cài đặt › AI</value>
-    <comment>Save a key for %@ in Settings › AI</comment>
+  <data name="SaveAKeyForInSettingsAPIKeys" xml:space="preserve">
+    <value>Lưu khoá cho {0} trong Cài đặt › Khoá API</value>
+    <comment>Save a key for %@ in Settings › API Keys</comment>
   </data>
   <data name="SaveChangesToARepeatingEvent" xml:space="preserve">
     <value>Lưu thay đổi cho một sự kiện lặp lại?</value>
@@ -2533,6 +2605,10 @@
   <data name="Saved" xml:space="preserve">
     <value>Đã lưu</value>
     <comment>Saved</comment>
+  </data>
+  <data name="SavesTheStreamedTranscriptInsteadOfUploadingTheRecordingAgai" xml:space="preserve">
+    <value>Lưu bản chép lời đã truyền trực tiếp thay vì tải bản ghi âm lên lại sau khi bấm Dừng, nên bạn chỉ trả phí truyền trực tiếp. Các phần bị lỡ khi mất kết nối được gửi đến {0} sau khi bấm Dừng, kèm khoảng 30 giây âm thanh ở mỗi bên, và quanh mỗi lần tạm dừng, để người nói giữ nguyên nhãn. Công cụ phân biệt người nói trên đám mây được tính phí riêng. Mô hình thời gian thực có thể kém chính xác hơn {1}.</value>
+    <comment>Saves the streamed transcript instead of uploading the recording again after Stop, so you pay for streaming only. Parts missed while the connection was down are sent to %@ after Stop, with about 30 s of audio on each side, and around each pause, so speakers keep their labels. A cloud diarizer is billed separately. Realtime models can be less accurate than %@.</comment>
   </data>
   <data name="Scan" xml:space="preserve">
     <value>Quét</value>
@@ -2650,13 +2726,25 @@
     <value>Đang hiển thị các cuộc họp trong 7 ngày tới. Danh sách tự động cập nhật.</value>
     <comment>Showing meetings in the next 7 days. The list updates automatically.</comment>
   </data>
-  <data name="ShowsTheTranscriptDuringTheRecordingAndKeepsItSoItIsReadyWit" xml:space="preserve">
-    <value>Hiển thị bản chép lời trong khi ghi âm và giữ lại, nhờ đó bản chép lời sẵn sàng trong vài giây sau khi bấm Dừng. Dùng nhiều CPU và bộ nhớ hơn khi ghi âm. Chỉ dành cho mô hình Whisper và Parakeet; các công cụ khác chép lời sau khi bấm Dừng.</value>
-    <comment>Shows the transcript during the recording and keeps it, so it is ready within seconds of Stop. Uses more CPU and memory while recording. Whisper and Parakeet models only; other engines transcribe after Stop.</comment>
+  <data name="ShowsTheTranscriptDuringTheRecordingWhisperAndParakeetModels" xml:space="preserve">
+    <value>Hiển thị bản chép lời trong khi ghi âm. Mô hình Whisper và Parakeet giữ lại bản này, nhờ đó bản chép lời sẵn sàng trong vài giây sau khi bấm Dừng. Dùng nhiều CPU và bộ nhớ hơn khi ghi âm. Công cụ đám mây có thể hiển thị bản này bằng một mô hình cục bộ hoặc luồng thời gian thực của nó: xem Mô hình chép lời › Đám mây.</value>
+    <comment>Shows the transcript during the recording. Whisper and Parakeet models keep it, so it is ready within seconds of Stop. Uses more CPU and memory while recording. A cloud engine can show it with a local model or its realtime stream: see Transcription model › Cloud.</comment>
   </data>
   <data name="ShowsTheTranscriptDuringTheRecordingWhisperKitAndParakeetMod" xml:space="preserve">
+    <value>Hiển thị bản chép lời trong khi ghi âm. Mô hình WhisperKit và Parakeet giữ lại bản này, nhờ đó bản chép lời sẵn sàng trong vài giây sau khi bấm Dừng; Apple Speech (macOS 26+) chỉ hiển thị và chép lời sau khi bấm Dừng. Dùng nhiều CPU và bộ nhớ hơn khi ghi âm. Công cụ đám mây có thể hiển thị bản này bằng một mô hình cục bộ hoặc luồng thời gian thực của nó: xem Mô hình chép lời › Đám mây.</value>
+    <comment>Shows the transcript during the recording. WhisperKit and Parakeet models keep it, so it is ready within seconds of Stop; Apple Speech (macOS 26+) only shows it and transcribes after Stop. Uses more CPU and memory while recording. A cloud engine can show it with a local model or its realtime stream: see Transcription model › Cloud.</comment>
+  </data>
+  <data name="ShowsTheTranscriptDuringTheRecordingWhisperKitAndParakeetMod_2" xml:space="preserve">
     <value>Hiển thị bản chép lời trong khi ghi âm. Mô hình WhisperKit và Parakeet giữ lại bản này, nhờ đó bản chép lời sẵn sàng trong vài giây sau khi bấm Dừng; Apple Speech (macOS 26+) chỉ hiển thị và chép lời sau khi bấm Dừng. Dùng nhiều CPU và bộ nhớ hơn khi ghi âm. Các công cụ khác chép lời sau khi bấm Dừng.</value>
     <comment>Shows the transcript during the recording. WhisperKit and Parakeet models keep it, so it is ready within seconds of Stop; Apple Speech (macOS 26+) only shows it and transcribes after Stop. Uses more CPU and memory while recording. Other engines transcribe after Stop.</comment>
+  </data>
+  <data name="ShowsTheTranscriptWhileRecordingWithAModelOnThisMacFreeNothi" xml:space="preserve">
+    <value>Hiển thị bản chép lời trong khi ghi âm bằng một mô hình trên máy Mac này. Miễn phí: không có gì được tải lên trong khi ghi âm, nhưng dùng CPU, bộ nhớ và pin. Bản chép lời được lưu vẫn do {0} tạo sau khi bấm Dừng, nên có thể khác với những gì bạn đã thấy.</value>
+    <comment>Shows the transcript while recording with a model on this Mac. Free: nothing is uploaded while recording, but it uses CPU, memory and battery. The saved transcript still comes from %@ after Stop, so it can differ from what you saw.</comment>
+  </data>
+  <data name="ShowsTheTranscriptWhileRecordingWithAModelOnThisPCFreeNothin" xml:space="preserve">
+    <value>Hiển thị bản chép lời trong khi ghi âm bằng một mô hình trên máy tính này. Miễn phí: không có gì được tải lên trong khi ghi âm, nhưng dùng CPU, bộ nhớ và pin. Bản chép lời được lưu vẫn do {0} tạo sau khi bấm Dừng, nên có thể khác với những gì bạn đã thấy.</value>
+    <comment>Shows the transcript while recording with a model on this PC. Free: nothing is uploaded while recording, but it uses CPU, memory and battery. The saved transcript still comes from %@ after Stop, so it can differ from what you saw.</comment>
   </data>
   <data name="SimulateState" xml:space="preserve">
     <value>Mô phỏng trạng thái</value>
@@ -2825,6 +2913,14 @@
   <data name="StorageUsed" xml:space="preserve">
     <value>Dung lượng đã dùng: {0}</value>
     <comment>Storage used: %@</comment>
+  </data>
+  <data name="StreamsTheMicAndTheSystemAudioToAsTwoLiveConnectionsForTheWh" xml:space="preserve">
+    <value>Truyền âm thanh micrô và âm thanh hệ thống đến {0} qua hai kết nối trực tiếp trong suốt bản ghi âm. Có tính phí: {1}, cộng thêm lượt chép lời thông thường sau khi bấm Dừng. Bản ghi âm dài sẽ kết nối lại trước giới hạn phiên của nhà cung cấp và truyền khoảng 30 giây hai lần ở mỗi lần kết nối lại để người nói giữ nguyên nhãn. Một cuộc họp 1 giờ tốn khoảng 2 giờ truyền trực tiếp cộng 2 giờ chép lời.</value>
+    <comment>Streams the mic and the system audio to %@ as two live connections for the whole recording. Costs money: %@, on top of the normal transcription after Stop. Long recordings reconnect before the provider's session limit and stream about 30 s twice at each reconnect so speakers keep their labels. A 1-hour meeting costs about 2 hours of streaming plus 2 hours of transcription.</comment>
+  </data>
+  <data name="StreamsTo" xml:space="preserve">
+    <value>Truyền đến {0}</value>
+    <comment>Streams to %@</comment>
   </data>
   <data name="Summarize" xml:space="preserve">
     <value>Tóm tắt</value>
@@ -3002,6 +3098,10 @@
     <value>Cuộc gọi có vẻ đã kết thúc — dừng ghi âm?</value>
     <comment>The call seems to be over — stop recording?</comment>
   </data>
+  <data name="TheConnectionToWasLost" xml:space="preserve">
+    <value>Đã mất kết nối với {0}.</value>
+    <comment>The connection to %@ was lost.</comment>
+  </data>
   <data name="TheDownloadFailed" xml:space="preserve">
     <value>Tải về không thành công: {0}</value>
     <comment>The download failed: %@</comment>
@@ -3078,6 +3178,10 @@
     <value>Lặp lại kết thúc trước ngày này.</value>
     <comment>The repeat ends before this date.</comment>
   </data>
+  <data name="TheSavedTranscriptIsMadeAfterStopAndCanDiffer" xml:space="preserve">
+    <value>Bản chép lời được lưu sẽ được tạo sau khi bấm Dừng và có thể khác.</value>
+    <comment>The saved transcript is made after Stop and can differ.</comment>
+  </data>
   <data name="TheSelectedAppStoppedPlayingAudioBeforeRecordingCouldResume" xml:space="preserve">
     <value>Ứng dụng đã chọn ngừng phát âm thanh trước khi có thể tiếp tục ghi âm.</value>
     <comment>The selected app stopped playing audio before recording could resume.</comment>
@@ -3101,6 +3205,10 @@
   <data name="TheTranscriptCouldNotBeRead" xml:space="preserve">
     <value>Không thể đọc bản chép lời.</value>
     <comment>The transcript could not be read.</comment>
+  </data>
+  <data name="TheTranscriptIsMadeAfterStop" xml:space="preserve">
+    <value>Bản chép lời sẽ được tạo sau khi bấm Dừng.</value>
+    <comment>The transcript is made after Stop.</comment>
   </data>
   <data name="TheTranscriptionSpeakerAndAIModelsAreRemovedFromThisMacNotMo" xml:space="preserve">
     <value>Các mô hình chép lời, người nói và AI bị xoá khỏi máy Mac này (không chuyển vào Thùng rác). Hãy tải về lại trong Cài đặt › Chép lời và Cài đặt › AI.</value>
@@ -3210,6 +3318,10 @@
     <value>Phần cứng của máy tính này không hỗ trợ Windows AI (cần Copilot+ PC).</value>
     <comment>This PC's hardware does not support Windows AI (it needs a Copilot+ PC).</comment>
   </data>
+  <data name="ThisRealtimeModelLabelsNoSpeakersSoTheDiarizerRunsOnTheRecor" xml:space="preserve">
+    <value>Mô hình thời gian thực này không gắn nhãn người nói, nên công cụ phân biệt người nói chạy trên bản ghi âm sau khi bấm Dừng; công cụ phân biệt người nói trên đám mây sẽ hỏi sự đồng ý riêng.</value>
+    <comment>This realtime model labels no speakers, so the diarizer runs on the recording after Stop; a cloud diarizer asks for its own consent.</comment>
+  </data>
   <data name="Title" xml:space="preserve">
     <value>Tiêu đề</value>
     <comment>Title</comment>
@@ -3265,6 +3377,14 @@
   <data name="Transcribed" xml:space="preserve">
     <value>Đã chép lời</value>
     <comment>Transcribed</comment>
+  </data>
+  <data name="TranscribesAfterStopYouCanShowALiveTranscriptWithALocalModel" xml:space="preserve">
+    <value>{0} chép lời sau khi bấm Dừng. Bạn có thể hiển thị bản chép lời trực tiếp bằng một mô hình cục bộ trong Cài đặt.</value>
+    <comment>%@ transcribes after Stop. You can show a live transcript with a local model in Settings.</comment>
+  </data>
+  <data name="TranscribesAfterStopYouCanShowALiveTranscriptWithALocalModel_2" xml:space="preserve">
+    <value>{0} chép lời sau khi bấm Dừng. Bạn có thể hiển thị bản chép lời trực tiếp bằng một mô hình cục bộ hoặc chép lời thời gian thực của {1} trong Cài đặt.</value>
+    <comment>%@ transcribes after Stop. You can show a live transcript with a local model or %@ realtime in Settings.</comment>
   </data>
   <data name="Transcribing" xml:space="preserve">
     <value>Đang chép lời…</value>
@@ -3458,6 +3578,10 @@
     <value>Dùng ⌘, ⌥ hoặc ⌃ cùng với phím.</value>
     <comment>Use ⌘, ⌥ or ⌃ with the key.</comment>
   </data>
+  <data name="UseTheRealtimeResultAsTheTranscript" xml:space="preserve">
+    <value>Dùng kết quả thời gian thực làm bản chép lời</value>
+    <comment>Use the realtime result as the transcript</comment>
+  </data>
   <data name="UsedByLLamaSharp" xml:space="preserve">
     <value>Được LLamaSharp sử dụng</value>
     <comment>Used by LLamaSharp</comment>
@@ -3590,6 +3714,10 @@
     <value>Khi EchoDiar chạy nền, một thông báo cũng hỏi, kèm nút Dừng ngay và Tiếp tục ghi âm.</value>
     <comment>While EchoDiar is in the background, a notification asks too, with Stop now and Keep recording.</comment>
   </data>
+  <data name="WhileRecording" xml:space="preserve">
+    <value>Trong khi ghi âm</value>
+    <comment>While recording</comment>
+  </data>
   <data name="WhisperTranscription" xml:space="preserve">
     <value>Chép lời Whisper</value>
     <comment>Whisper transcription</comment>
@@ -3673,6 +3801,10 @@
   <data name="YourConversationsAreNotIndexedYet" xml:space="preserve">
     <value>Các cuộc hội thoại của bạn chưa được lập chỉ mục.</value>
     <comment>Your conversations are not indexed yet.</comment>
+  </data>
+  <data name="YourPlanSLimitOnLiveSessionsWasReached" xml:space="preserve">
+    <value>Đã đạt giới hạn phiên trực tiếp trong gói {0} của bạn.</value>
+    <comment>Your %@ plan's limit on live sessions was reached.</comment>
   </data>
   <data name="ZoomGoogleMeetMicrosoftTeamsOrWebexLinkInTheEvent" xml:space="preserve">
     <value>Có liên kết Zoom, Google Meet, Microsoft Teams hoặc Webex trong sự kiện.</value>

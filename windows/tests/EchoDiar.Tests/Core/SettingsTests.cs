@@ -4,6 +4,7 @@ using System.Text.Json.Nodes;
 using EchoDiar.Core;
 using EchoDiar.Core.Calendar;
 using EchoDiar.Core.Json;
+using EchoDiar.Core.Models;
 using EchoDiar.Core.Settings;
 
 namespace EchoDiar.Tests.Core;
@@ -132,6 +133,53 @@ public sealed class SettingsTests : IDisposable
     }
 
     [Fact]
+    public void OldFileReadsTheLiveTranscriptOff()
+    {
+        File.WriteAllText(_store.FilePath, """{"version":1,"providers":[{"id":"deepgram","kind":"deepgram"}]}""");
+
+        var loaded = _store.Load();
+        Assert.Equal(CloudLiveSource.Off, loaded.CloudLiveSource);
+        Assert.Null(loaded.CloudLiveModelID);
+        Assert.False(loaded.RealtimeAsFinal);
+        Assert.Equal("", Assert.Single(loaded.Providers).RealtimeModel);
+    }
+
+    [Fact]
+    public void UnknownCloudLiveSourceReadsOffAndKeepsTheOtherSettings()
+    {
+        File.WriteAllText(_store.FilePath,
+            """{"launchAtLogin":true,"cloudLiveSource":"telepathy","cloudLiveModelID":"m","realtimeAsFinal":true}""");
+
+        var loaded = _store.Load();
+        Assert.Equal(CloudLiveSource.Off, loaded.CloudLiveSource);
+        Assert.True(loaded.LaunchAtLogin);
+        Assert.Equal("m", loaded.CloudLiveModelID);
+        Assert.True(loaded.RealtimeAsFinal);
+    }
+
+    [Theory]
+    [InlineData(CloudLiveSource.Local, "local")]
+    [InlineData(CloudLiveSource.Realtime, "realtime")]
+    public void LiveTranscriptSettingsRoundTrip(CloudLiveSource source, string raw)
+    {
+        var provider = Config("deepgram", enabled: false);
+        provider.RealtimeModel = "nova-3";
+        _store.Save(new AppSettings
+        {
+            CloudLiveSource = source, CloudLiveModelID = "parakeet", RealtimeAsFinal = true, Providers = [provider],
+        });
+
+        var written = JsonNode.Parse(File.ReadAllBytes(_store.FilePath))!.AsObject();
+        Assert.Equal(raw, written["cloudLiveSource"]!.GetValue<string>());
+        Assert.Equal("nova-3", written["providers"]![0]!["realtimeModel"]!.GetValue<string>());
+        var loaded = _store.Load();
+        Assert.Equal(source, loaded.CloudLiveSource);
+        Assert.Equal("parakeet", loaded.CloudLiveModelID);
+        Assert.True(loaded.RealtimeAsFinal);
+        Assert.Equal("nova-3", Assert.Single(loaded.Providers).RealtimeModel);
+    }
+
+    [Fact]
     public void CorruptFileIsMovedAsideAndDefaultsAreReturned()
     {
         var now = new DateTimeOffset(2026, 10, 22, 9, 30, 15, TimeSpan.Zero).AddMilliseconds(7);
@@ -174,13 +222,13 @@ public sealed class SettingsTests : IDisposable
         Assert.True(JsonNode.DeepEquals(JsonNode.Parse("""
             [
               {"id":"x","kind":"openAICompatible","displayName":"x","baseURL":"","authStyle":"none","extraHeaders":{},
-               "defaultModel":"","shownModels":[],"transcriptionModel":"","diarizationModel":"","enabled":false},
+               "defaultModel":"","shownModels":[],"transcriptionModel":"","diarizationModel":"","enabled":false,"realtimeModel":""},
               {"id":"future","kind":"openAICompatible","displayName":"future","baseURL":"https://h/v1","authStyle":"none",
                "extraHeaders":{},"defaultModel":"m","shownModels":[],"transcriptionModel":"","diarizationModel":"",
-               "enabled":false},
+               "enabled":false,"realtimeModel":""},
               {"id":"anthropic","kind":"anthropic","preset":"anthropic","displayName":"A","baseURL":"https://a",
                "authStyle":"xApiKey","extraHeaders":{"h":"v"},"defaultModel":"m","shownModels":[],
-               "transcriptionModel":"","diarizationModel":"","enabled":true}
+               "transcriptionModel":"","diarizationModel":"","enabled":true,"realtimeModel":""}
             ]
             """), JsonNode.Parse(Json(settings))!["providers"]));
     }
@@ -204,10 +252,124 @@ public sealed class SettingsTests : IDisposable
         Assert.Equal("", settings.Providers[0].BaseURL);
     }
 
+    // "Key saved = available" and its one-time migration: same rows as macOS ProviderAvailabilityTests.
+    private const string CustomID = "3F2504E0-4F89-11D3-9A0C-0305E82C3301";
+
+    /// <summary>A preset by id, or a custom OpenAI-compatible endpoint with <see cref="CustomID"/> for "custom".</summary>
+    private static ProviderConfig Config(string id, bool enabled, AuthStyle? auth = null, string? baseURL = null)
+    {
+        var config = ProviderConfig.Presets().FirstOrDefault(p => p.Id == id) ?? ProviderConfig.Custom(baseURL: "https://h/v1");
+        if (id is "custom" or CustomID) config.Id = CustomID;
+        config.Enabled = enabled;
+        if (auth is { } style) config.AuthStyle = style;
+        if (baseURL is not null) config.BaseURL = baseURL;
+        return config;
+    }
+
+    [Theory]
+    // Cloud preset: the key decides, Enabled does not.
+    [InlineData("openai", false, null, null, true, true, true)]
+    [InlineData("openai", true, null, null, false, true, false)]
+    [InlineData("openai", false, null, null, false, true, false)]
+    [InlineData("anthropic", true, null, null, false, true, false)]
+    [InlineData("deepgram", false, null, null, true, true, true)]
+    [InlineData("deepgram", true, null, null, false, true, false)]
+    // Custom endpoint with auth: the key decides.
+    [InlineData("custom", false, null, null, true, true, true)]
+    [InlineData("custom", true, null, null, false, true, false)]
+    // Custom endpoint without auth: the base URL decides, the key does not.
+    [InlineData("custom", false, AuthStyle.None, "https://h/v1", false, true, true)]
+    [InlineData("custom", false, AuthStyle.None, "https://h/v1", true, true, true)]
+    [InlineData("custom", true, AuthStyle.None, "", true, true, false)]
+    [InlineData("custom", true, AuthStyle.None, "  \n", true, true, false)]
+    // Local server and CLI: Enabled decides, the key does not.
+    [InlineData("ollama", true, null, null, false, false, true)]
+    [InlineData("ollama", false, null, null, true, false, false)]
+    [InlineData("claude-cli", true, null, null, false, false, true)]
+    [InlineData("claude-cli", false, null, null, true, false, false)]
+    public void ProviderAvailability(string id, bool enabled, AuthStyle? auth, string? baseURL, bool hasKey, bool cloud,
+        bool available)
+    {
+        var config = Config(id, enabled, auth, baseURL);
+
+        Assert.Equal(cloud, config.IsCloud);
+        Assert.Equal(available, config.IsAvailable(hasKey));
+    }
+
+    // Every reference points at id; savedEnabled null = the provider was never saved to Providers (its preset applies).
+    [Theory]
+    [InlineData("openai", false, true)]
+    [InlineData("openai", true, false)]
+    [InlineData("deepgram", null, true)]
+    [InlineData("deepgram", false, true)]
+    [InlineData("deepgram", true, false)]
+    [InlineData(CustomID, false, true)]
+    [InlineData(CustomID, true, false)]
+    [InlineData("ollama", false, false)]
+    [InlineData("claude-cli", false, false)]
+    public void MigratingProviderAvailability(string id, bool? savedEnabled, bool cleared)
+    {
+        var settings = new AppSettings
+        {
+            DefaultASRModelID = "cloud:" + id, DefaultDiarizerModelID = "cloud:" + id,
+            Providers = savedEnabled is { } enabled ? [Config(id, enabled)] : [],
+            DefaultAIProviderID = id, CatchUpProviderID = id, EmbeddingModelID = ModelCatalog.ApiEmbedderPrefix + id,
+            ProviderAvailabilityMigrated = false,
+        };
+
+        var migrated = settings.MigratingProviderAvailability();
+
+        Assert.True(migrated.ProviderAvailabilityMigrated);
+        Assert.Equal(cleared, migrated.AutoExcludedProviderIDs.Contains(id));
+        Assert.Equal(cleared ? null : "cloud:" + id, migrated.DefaultASRModelID);
+        Assert.Equal(cleared ? null : "cloud:" + id, migrated.DefaultDiarizerModelID);
+        Assert.Equal(cleared ? null : id, migrated.DefaultAIProviderID);
+        Assert.Equal(cleared ? "" : id, migrated.CatchUpProviderID);
+        Assert.Equal(cleared ? AppSettings.DefaultEmbeddingModelID : ModelCatalog.ApiEmbedderPrefix + id,
+            migrated.EmbeddingModelID);
+        Assert.Equal(Json(settings.Providers), Json(migrated.Providers));
+    }
+
+    [Fact]
+    public void ProviderAvailabilityMigrationRunsOnce()
+    {
+        var settings = new AppSettings
+        {
+            DefaultASRModelID = "cloud:openai", Providers = [Config("openai", enabled: false)],
+            CatchUpProviderID = "openai", ProviderAvailabilityMigrated = false,
+        };
+        var once = settings.MigratingProviderAvailability();
+        Assert.Same(once, once.MigratingProviderAvailability());
+
+        // Already migrated (a fresh install): a disabled cloud config keeps its references.
+        var fresh = settings with { ProviderAvailabilityMigrated = true };
+        Assert.Same(fresh, fresh.MigratingProviderAvailability());
+        Assert.Equal("cloud:openai", fresh.DefaultASRModelID);
+        Assert.Empty(fresh.AutoExcludedProviderIDs);
+    }
+
+    [Fact]
+    public void ProviderAvailabilityMigrationFlagAndExcludedIdsRoundTrip()
+    {
+        Assert.True(new AppSettings().ProviderAvailabilityMigrated);
+        Assert.False(SwiftJson.Deserialize<AppSettings>("""{"version":1}"""u8).ProviderAvailabilityMigrated);
+        Assert.True(SwiftJson.Deserialize<AppSettings>("""{"providerAvailabilityMigrated":true}"""u8)
+            .ProviderAvailabilityMigrated);
+
+        var migrated = new AppSettings { ProviderAvailabilityMigrated = false }.MigratingProviderAvailability();
+        var read = SwiftJson.Deserialize<AppSettings>(SwiftJson.Serialize(migrated));
+        Assert.True(read.ProviderAvailabilityMigrated);
+        Assert.True(read.AutoExcludedProviderIDs.SetEquals(migrated.AutoExcludedProviderIDs));
+        // Case-insensitive after a read, as Credential Manager names keys (the ISet overload asks the set itself).
+        Assert.Contains("OpenAI", read.AutoExcludedProviderIDs);
+        Assert.Contains("deepgram",
+            SwiftJson.Deserialize<AppSettings>("""{"autoExcludedProviderIDs":["DeepGram"]}"""u8).AutoExcludedProviderIDs);
+    }
+
     private static string Json<T>(T value) => Encoding.UTF8.GetString(SwiftJson.Serialize(value));
 
     // Every key Windows writes, with the macOS read defaults (Carbon shortcuts excluded, see AppSettings) except
-    // embeddingModelID, the Windows catalog id.
+    // embeddingModelID, the Windows catalog id. A file from an older build still has the availability migration to run.
     private const string DefaultsJson = """
         {
           "version": 1, "launchAtLogin": false, "defaultLanguage": "auto", "recentLanguages": [],
@@ -228,7 +390,9 @@ public sealed class SettingsTests : IDisposable
           "deferTranscriptionWhenConstrained": true, "autoDeleteEnabled": false, "autoDeleteAfterDays": 90,
           "autoDeleteMode": "audioOnly", "deleteAudioAfterTranscription": false, "deleteWithoutConfirmation": false,
           "globalHotKeyWindows": {"virtualKey": 82, "modifiers": 3}, "globalHotKeyEnabled": true,
-          "globalPauseHotKeyWindows": {"virtualKey": 80, "modifiers": 3}, "globalPauseHotKeyEnabled": true
+          "globalPauseHotKeyWindows": {"virtualKey": 80, "modifiers": 3}, "globalPauseHotKeyEnabled": true,
+          "autoExcludedProviderIDs": [], "providerAvailabilityMigrated": false,
+          "cloudLiveSource": "off", "realtimeAsFinal": false
         }
         """;
 }

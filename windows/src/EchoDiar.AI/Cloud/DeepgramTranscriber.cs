@@ -71,6 +71,109 @@ public sealed class DeepgramTranscriber : ICloudTranscriber
         return text.Length == 0 ? [] : [new CloudSegment(0, response.Metadata?.Duration ?? 0, text, Language: language)];
     }
 
+    /// <summary>The realtime adapter's descriptor (<see cref="Realtime"/>).</summary>
+    public static readonly RealtimeAdapterType RealtimeType = new(
+        ["nova-3", "nova-2"], new Uri("wss://api.deepgram.com/v1/listen"), null,
+        (apiKey, model, language, diarize) => new Realtime(apiKey, model, language, diarize));
+
+    /// <summary>
+    /// Live <c>wss://api.deepgram.com/v1/listen?...</c> (settings in the query, no start message), <c>Authorization:
+    /// Token</c> handshake header, binary 16 kHz linear16 frames. <c>Results</c> with <c>is_final:false</c> are partials
+    /// (they grow over the same <c>start</c>), <c>is_final:true</c> are finals: the transcript over its words' span (else
+    /// <c>start...start+duration</c>), or, when the words carry speakers (<c>diarize_model=latest</c>, integers), the words
+    /// grouped by speaker and pause. <c>Finalize</c> flushes, <c>CloseStream</c> ends (answered by <c>Metadata</c>, then
+    /// the close); <c>KeepAlive</c> every 4 s while no audio flows (Deepgram closes after 10 s). No ready message: the
+    /// session accepts audio once connected. Auto language is <c>language=multi</c> (code-switching; no Vietnamese there,
+    /// so pick it explicitly).
+    /// </summary>
+    public sealed class Realtime : IRealtimeAdapter
+    {
+        private readonly string _apiKey;
+        private readonly string? _language;
+        private readonly bool _diarize;
+
+        public Realtime(string apiKey, string model, string? language, bool diarize)
+        {
+            _apiKey = apiKey;
+            Model = model;
+            _language = CloudTranscription.LanguageCode(language);
+            _diarize = diarize;
+        }
+
+        public string Model { get; }
+
+        public RealtimeAdapterType Type => RealtimeType;
+
+        public int SampleRate => 16_000;
+
+        public bool StreamsSpeakers => _diarize;
+
+        public IReadOnlyDictionary<string, string> Headers => new Dictionary<string, string> { ["Authorization"] = "Token " + _apiKey };
+
+        public RealtimeKeepAlive? KeepAlive => new(new RealtimeMessage.Text("{\"type\":\"KeepAlive\"}"), TimeSpan.FromSeconds(4));
+
+        public Uri SocketUrl(byte[]? sessionAnswer)
+        {
+            var query = new List<(string, string)>
+            {
+                ("model", Model), ("encoding", "linear16"), ("sample_rate", CloudRealtime.Invariant(SampleRate)), ("channels", "1"),
+                ("interim_results", "true"), ("smart_format", "true"), ("endpointing", "300"), ("utterance_end_ms", "1000"),
+                ("language", _language ?? "multi"),
+            };
+            if (_diarize) query.Add(("diarize_model", "latest"));
+            return CloudRealtime.WithQuery(RealtimeType.Endpoint, query);
+        }
+
+        public IReadOnlyList<RealtimeMessage> Finalize(double streamSeconds) => [new RealtimeMessage.Text("{\"type\":\"Finalize\"}")];
+
+        public IReadOnlyList<RealtimeMessage> CloseMessages() => [new RealtimeMessage.Text("{\"type\":\"CloseStream\"}")];
+
+        /// <summary>
+        /// A message with a <c>channel</c> is a <c>Results</c> (the documented interim example has no <c>type</c>);
+        /// <c>Metadata</c> ends; <c>Error</c> fails; <c>SpeechStarted</c>, <c>UtteranceEnd</c> and others give nothing.
+        /// </summary>
+        public IReadOnlyList<RealtimeEvent> Parse(RealtimeMessage message)
+        {
+            // The type first: `UtteranceEnd` and `SpeechStarted` have an array `channel`, which `LiveResults` refuses.
+            if (CloudRealtime.Decode<LiveType>(message) is not { } envelope) return [];
+            switch (envelope.Type)
+            {
+                case "Metadata": return [new RealtimeEvent.Ended()];
+                case "Error": return [new RealtimeEvent.Failed(CloudRealtime.ErrorKind(envelope.Type))];
+                case null or "Results": break;
+                default: return [];
+            }
+            if (CloudRealtime.Decode<LiveResults>(message) is not { } live
+                || live.Channel?.Alternatives.FirstOrDefault() is not { } alternative) return [];
+            var text = alternative.Transcript.Trim();
+            if (text.Length == 0) return [];
+            var start = live.Start ?? alternative.Words?.FirstOrDefault()?.Start ?? 0;
+            var end = live.Duration is { } duration ? start + duration : alternative.Words?.LastOrDefault()?.End ?? start;
+            var words = (alternative.Words ?? []).Select(word => new CloudTranscription.Word(
+                word.Start, word.End, word.PunctuatedWord ?? word.Word,
+                word.Speaker?.ToString(System.Globalization.CultureInfo.InvariantCulture))).ToList();
+            if (live.IsFinal != true)
+                return [new RealtimeEvent.Partial(text, start, end, words.Count > 0 ? words[0].Speaker : null)];
+            if (!words.Any(word => word.Speaker is not null))
+            {
+                return [new RealtimeEvent.Final(new CloudSegment(
+                    words.Count > 0 ? words[0].Start : start, words.Count > 0 ? words[^1].End : end, text))];
+            }
+            return CloudTranscription.Segments(words, " ", null).Select(segment => (RealtimeEvent)new RealtimeEvent.Final(segment)).ToList();
+        }
+    }
+
+    private sealed record LiveType(string? Type = null);
+
+    private sealed record LiveResults(
+        string? Type = null, double? Start = null, double? Duration = null, bool? IsFinal = null, LiveChannel? Channel = null);
+
+    private sealed record LiveChannel(List<LiveAlternative> Alternatives);
+
+    private sealed record LiveAlternative(string Transcript, List<LiveWord>? Words = null);
+
+    private sealed record LiveWord(string Word, double Start, double End, string? PunctuatedWord = null, int? Speaker = null);
+
     private sealed record ListenResponse(ListenResults Results, ListenMetadata? Metadata = null);
 
     private sealed record ListenMetadata(double? Duration = null);

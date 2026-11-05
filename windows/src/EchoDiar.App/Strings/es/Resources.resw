@@ -82,6 +82,10 @@
     <value>Clave de API</value>
     <comment>API key</comment>
   </data>
+  <data name="APIKeys" xml:space="preserve">
+    <value>Claves de API</value>
+    <comment>API Keys</comment>
+  </data>
   <data name="About" xml:space="preserve">
     <value>Acerca de</value>
     <comment>About</comment>
@@ -89,6 +93,10 @@
   <data name="AboutEchoDiar" xml:space="preserve">
     <value>Acerca de EchoDiar</value>
     <comment>About EchoDiar</comment>
+  </data>
+  <data name="AboutPerHourOfStreamingForEachConnection" xml:space="preserve">
+    <value>unos {0} por hora de transmisión por cada conexión</value>
+    <comment>about %@ per hour of streaming for each connection</comment>
   </data>
   <data name="AboutWhereDataGoes" xml:space="preserve">
     <value>Adónde van los datos</value>
@@ -117,14 +125,6 @@
   <data name="AddEndpoint" xml:space="preserve">
     <value>Añadir endpoint</value>
     <comment>Add Endpoint</comment>
-  </data>
-  <data name="AddTheKeyOfBelow" xml:space="preserve">
-    <value>Añade la clave de {0} abajo</value>
-    <comment>Add the key of %@ below</comment>
-  </data>
-  <data name="AddTheKeyOfInTranscriptionModels" xml:space="preserve">
-    <value>Añade la clave de {0} en Modelos de transcripción</value>
-    <comment>Add the key of %@ in Transcription models</comment>
   </data>
   <data name="Added" xml:space="preserve">
     <value>Añadido</value>
@@ -310,10 +310,6 @@
     <value>Preguntar si detener</value>
     <comment>Ask to stop</comment>
   </data>
-  <data name="AssemblyAIPicksItsModelForTheLanguageUniversal" xml:space="preserve">
-    <value>AssemblyAI elige su modelo según el idioma (Universal).</value>
-    <comment>AssemblyAI picks its model for the language (Universal).</comment>
-  </data>
   <data name="AttachTheIndicatorToTheMeetingWindow" xml:space="preserve">
     <value>Fijar el indicador a la ventana de la reunión</value>
     <comment>Attach the indicator to the meeting window</comment>
@@ -350,6 +346,10 @@
     <value>El audio sale de este Mac: los canales del micrófono y del sistema de la grabación se suben para transcribirlos; los recibe y los factura {0} ({1}). El proveedor puede conservar el audio según su propia política de retención. Se te pregunta una vez por proveedor y destino.</value>
     <comment>Audio leaves this Mac: the recording's mic and system channels are uploaded to %@ (%@) for transcription and billed by them. The provider may keep the audio under its own retention policy. You are asked once per provider and destination.</comment>
   </data>
+  <data name="AudioLeavesThisMacWhileRecordingTheMicAndSystemChannelsAreSt" xml:space="preserve">
+    <value>El audio sale de este Mac: durante la grabación, los canales del micrófono y del sistema se transmiten en directo a {0} ({1}) para transcribirlos, y este los factura. El proveedor puede conservar el audio según su propia política de retención. Se te pregunta una vez por proveedor y destino.</value>
+    <comment>Audio leaves this Mac: while recording, the mic and system channels are streamed live to %@ (%@) for transcription and billed by them. The provider may keep the audio under its own retention policy. You are asked once per provider and destination.</comment>
+  </data>
   <data name="AudioLeavesThisPCCloudEnginesUploadTheRecordingToTheProvider" xml:space="preserve">
     <value>El audio sale de este PC: los motores en la nube suben la grabación al proveedor.</value>
     <comment>Audio leaves this PC: cloud engines upload the recording to the provider.</comment>
@@ -361,6 +361,10 @@
   <data name="AudioLeavesThisPCTheRecordingSMicAndSystemChannelsAreUploade" xml:space="preserve">
     <value>El audio sale de este PC: los canales del micrófono y del sistema de la grabación se suben para transcribirlos; los recibe y los factura {0} ({1}). El proveedor puede conservar el audio según su propia política de retención. Se te pregunta una vez por proveedor y destino.</value>
     <comment>Audio leaves this PC: the recording's mic and system channels are uploaded to %@ (%@) for transcription and billed by them. The provider may keep the audio under its own retention policy. You are asked once per provider and destination.</comment>
+  </data>
+  <data name="AudioLeavesThisPCWhileRecordingTheMicAndSystemChannelsAreStr" xml:space="preserve">
+    <value>El audio sale de este PC: durante la grabación, los canales del micrófono y del sistema se transmiten en directo a {0} ({1}) para transcribirlos, y este los factura. El proveedor puede conservar el audio según su propia política de retención. Se te pregunta una vez por proveedor y destino.</value>
+    <comment>Audio leaves this PC: while recording, the mic and system channels are streamed live to %@ (%@) for transcription and billed by them. The provider may keep the audio under its own retention policy. You are asked once per provider and destination.</comment>
   </data>
   <data name="AudioOnlyKeepTranscriptSummaryAndChat" xml:space="preserve">
     <value>Solo el audio (conservar transcripción, resumen y chat)</value>
@@ -429,6 +433,18 @@
   <data name="BeforeYouRecord" xml:space="preserve">
     <value>Antes de grabar</value>
     <comment>Before you record</comment>
+  </data>
+  <data name="BilledBy" xml:space="preserve">
+    <value>facturado por {0}</value>
+    <comment>billed by %@</comment>
+  </data>
+  <data name="BilledByConnectionTimeAboutPerHourForEachConnection" xml:space="preserve">
+    <value>facturado por tiempo de conexión, unos {0} por hora por cada conexión</value>
+    <comment>billed by connection time, about %@ per hour for each connection</comment>
+  </data>
+  <data name="BilledPerStreamedMinuteAboutPerHourForEachConnection" xml:space="preserve">
+    <value>facturado por minuto transmitido, unos {0} por hora por cada conexión</value>
+    <comment>billed per streamed minute, about %@ per hour for each connection</comment>
   </data>
   <data name="BothVoicesInBothEars" xml:space="preserve">
     <value>Ambas voces en ambos oídos</value>
@@ -649,6 +665,10 @@
   <data name="ConfirmTheEmbeddingProviderInSettingsRAG" xml:space="preserve">
     <value>Confirma el proveedor de embeddings en Ajustes › RAG.</value>
     <comment>Confirm the embedding provider in Settings › RAG.</comment>
+  </data>
+  <data name="ConnectingTo" xml:space="preserve">
+    <value>Conectando con {0}…</value>
+    <comment>Connecting to %@…</comment>
   </data>
   <data name="Consent" xml:space="preserve">
     <value>Consentimiento</value>
@@ -966,6 +986,10 @@
     <value>Modelos de diarización</value>
     <comment>Diarization models</comment>
   </data>
+  <data name="DoesnTSupportTheseSettingsOrThisLanguageLive" xml:space="preserve">
+    <value>{0} no admite estos ajustes o este idioma en directo.</value>
+    <comment>%@ doesn't support these settings or this language live.</comment>
+  </data>
   <data name="Done" xml:space="preserve">
     <value>Listo</value>
     <comment>Done</comment>
@@ -1246,6 +1270,10 @@
     <value>Conceder Accesibilidad…</value>
     <comment>Grant Accessibility…</comment>
   </data>
+  <data name="HasNoRealtimeTranscriptionYouCanShowALiveTranscriptWithALoca" xml:space="preserve">
+    <value>{0} no tiene transcripción en tiempo real. Puedes mostrar una transcripción en directo con un modelo local en Ajustes.</value>
+    <comment>%@ has no realtime transcription. You can show a live transcript with a local model in Settings.</comment>
+  </data>
   <data name="HeadsUpIMRecordingThisCallToTakeNotesTheRecordingStaysOnMyMa" xml:space="preserve">
     <value>Aviso: estoy grabando esta llamada para tomar notas. La grabación se queda en mi Mac.</value>
     <comment>Heads up: I'm recording this call to take notes. The recording stays on my Mac.</comment>
@@ -1466,6 +1494,10 @@
     <value>Idioma a partir de ahora</value>
     <comment>Language from now on</comment>
   </data>
+  <data name="LanguageModels" xml:space="preserve">
+    <value>Modelos de lenguaje</value>
+    <comment>Language models</comment>
+  </data>
   <data name="LanguageOfSummariesAndAnswers" xml:space="preserve">
     <value>Idioma de los resúmenes y las respuestas</value>
     <comment>Language of summaries and answers</comment>
@@ -1518,6 +1550,10 @@
     <value>Escuchando…</value>
     <comment>Listening…</comment>
   </data>
+  <data name="LiveModel" xml:space="preserve">
+    <value>Modelo en directo</value>
+    <comment>Live model</comment>
+  </data>
   <data name="LiveTranscript" xml:space="preserve">
     <value>Transcripción en directo</value>
     <comment>Live transcript</comment>
@@ -1545,6 +1581,14 @@
   <data name="LiveTranscriptStoppedTheTranscriptIsMadeAfterStop" xml:space="preserve">
     <value>La transcripción en directo se ha detenido. La transcripción se hará después de Detener.</value>
     <comment>Live transcript stopped. The transcript is made after Stop.</comment>
+  </data>
+  <data name="LiveWithALocalModel" xml:space="preserve">
+    <value>En directo con un modelo local</value>
+    <comment>Live with a local model</comment>
+  </data>
+  <data name="LiveWithRealtime" xml:space="preserve">
+    <value>En directo con {0} en tiempo real</value>
+    <comment>Live with %@ realtime</comment>
   </data>
   <data name="LldBytes" xml:space="preserve">
     <value>{0} bytes</value>
@@ -1770,10 +1814,6 @@
     <value>ID del modelo</value>
     <comment>Model id</comment>
   </data>
-  <data name="ModelIdEGWhisper1" xml:space="preserve">
-    <value>ID del modelo, p. ej., whisper-1</value>
-    <comment>Model id, e.g. whisper-1</comment>
-  </data>
   <data name="Models" xml:space="preserve">
     <value>Modelos</value>
     <comment>Models</comment>
@@ -1829,6 +1869,10 @@
   <data name="NameFor" xml:space="preserve">
     <value>Nombre para {0}</value>
     <comment>Name for %@</comment>
+  </data>
+  <data name="NeedsBillingOrCreditsOnYourAccount" xml:space="preserve">
+    <value>{0} requiere facturación o créditos en tu cuenta.</value>
+    <comment>%@ needs billing or credits on your account.</comment>
   </data>
   <data name="NeedsConfirmation" xml:space="preserve">
     <value>Requiere confirmación</value>
@@ -1921,6 +1965,18 @@
   <data name="NoEmbeddingModelsListedTypeTheModelId" xml:space="preserve">
     <value>No hay modelos de embeddings en la lista; escribe el ID del modelo.</value>
     <comment>No embedding models listed; type the model id.</comment>
+  </data>
+  <data name="NoInstalledLiveModelSupportsThisRecordingSLanguageDownloadOn" xml:space="preserve">
+    <value>Ningún modelo en directo instalado admite el idioma de esta grabación. Descarga uno en Ajustes › Transcripción.</value>
+    <comment>No installed live model supports this recording's language. Download one in Settings › Transcription.</comment>
+  </data>
+  <data name="NoLiveModelInstalledDownloadAWhisperKitOrParakeetModelAbove" xml:space="preserve">
+    <value>No hay ningún modelo en directo instalado. Descarga arriba un modelo WhisperKit o Parakeet.</value>
+    <comment>No live model installed. Download a WhisperKit or Parakeet model above.</comment>
+  </data>
+  <data name="NoLiveModelInstalledDownloadAWhisperOrParakeetModelAbove" xml:space="preserve">
+    <value>No hay ningún modelo en directo instalado. Descarga arriba un modelo Whisper o Parakeet.</value>
+    <comment>No live model installed. Download a Whisper or Parakeet model above.</comment>
   </data>
   <data name="NoModelChooseOneInSettings" xml:space="preserve">
     <value>Sin modelo: elige uno en Ajustes</value>
@@ -2106,10 +2162,6 @@
     <value>Abrir</value>
     <comment>Open</comment>
   </data>
-  <data name="OpenAIGroqMistralGoogleGeminiAndCustomEndpointsTranscribeToo" xml:space="preserve">
-    <value>OpenAI, Groq, Mistral, Google Gemini y los endpoints personalizados también transcriben, con su modelo de transcripción: configúralos en Ajustes › IA.</value>
-    <comment>OpenAI, Groq, Mistral, Google Gemini and custom endpoints transcribe too, with their transcription model: set them up in Settings › AI.</comment>
-  </data>
   <data name="OpenCodeDeniesEveryToolButMCPServersInYourOpenCodeConfigStil" xml:space="preserve">
     <value>OpenCode deniega todas las herramientas, pero los servidores MCP de tu configuración de OpenCode se siguen iniciando (sus herramientas se deniegan).</value>
     <comment>OpenCode denies every tool, but MCP servers in your OpenCode config still start (their tools are denied).</comment>
@@ -2262,13 +2314,13 @@
     <value>Elige una conversación en la barra lateral.</value>
     <comment>Pick a conversation in the sidebar.</comment>
   </data>
+  <data name="PickAProviderInSettingsRAG" xml:space="preserve">
+    <value>Elige un proveedor en Ajustes › RAG</value>
+    <comment>Pick a provider in Settings › RAG</comment>
+  </data>
   <data name="PickAnEmbeddingModelInSettingsRAG" xml:space="preserve">
     <value>Elige un modelo de embeddings en Ajustes › RAG</value>
     <comment>Pick an embedding model in Settings › RAG</comment>
-  </data>
-  <data name="PickAnEnabledProviderInSettingsRAG" xml:space="preserve">
-    <value>Elige un proveedor activado en Ajustes › RAG</value>
-    <comment>Pick an enabled provider in Settings › RAG</comment>
   </data>
   <data name="PickedByAssemblyAIForTheLanguageUniversal" xml:space="preserve">
     <value>Elegido por AssemblyAI según el idioma (Universal)</value>
@@ -2402,6 +2454,18 @@
     <value>Listo</value>
     <comment>Ready</comment>
   </data>
+  <data name="RealtimeIsNotConfirmedYetTurnItOnInSettingsToConfirmIt" xml:space="preserve">
+    <value>{0} en tiempo real aún no está confirmado. Actívalo en Ajustes para confirmarlo.</value>
+    <comment>%@ realtime is not confirmed yet. Turn it on in Settings to confirm it.</comment>
+  </data>
+  <data name="RealtimeModel" xml:space="preserve">
+    <value>Modelo en tiempo real</value>
+    <comment>Realtime model</comment>
+  </data>
+  <data name="RealtimeStartsOnceSendingAudioToAndToItsSpeakerDiarizerIfAny" xml:space="preserve">
+    <value>{0} en tiempo real empieza cuando se confirma el envío de audio a {1} (y a su diarizador, si lo hay). Confírmalo primero en una conversación.</value>
+    <comment>%@ realtime starts once sending audio to %@ (and to its speaker diarizer, if any) is confirmed. Confirm it in a conversation first.</comment>
+  </data>
   <data name="Rebuild" xml:space="preserve">
     <value>Reconstruir</value>
     <comment>Rebuild</comment>
@@ -2409,6 +2473,10 @@
   <data name="RebuildIndex" xml:space="preserve">
     <value>Reconstruir el índice</value>
     <comment>Rebuild index</comment>
+  </data>
+  <data name="Reconnecting" xml:space="preserve">
+    <value>Reconectando…</value>
+    <comment>Reconnecting…</comment>
   </data>
   <data name="Record" xml:space="preserve">
     <value>Grabar</value>
@@ -2514,6 +2582,10 @@
     <value>Rehacer</value>
     <comment>Redo</comment>
   </data>
+  <data name="RejectedTheAPIKeyCheckItInSettingsAPIKeys" xml:space="preserve">
+    <value>{0} rechazó la clave de API. Revísala en Ajustes › Claves de API.</value>
+    <comment>%@ rejected the API key. Check it in Settings › API Keys.</comment>
+  </data>
   <data name="RelaunchNow" xml:space="preserve">
     <value>Reiniciar ahora</value>
     <comment>Relaunch now</comment>
@@ -2614,9 +2686,9 @@
     <value>Primero guarda una clave.</value>
     <comment>Save a key first.</comment>
   </data>
-  <data name="SaveAKeyForInSettingsAI" xml:space="preserve">
-    <value>Guarda una clave para {0} en Ajustes › IA</value>
-    <comment>Save a key for %@ in Settings › AI</comment>
+  <data name="SaveAKeyForInSettingsAPIKeys" xml:space="preserve">
+    <value>Guarda una clave para {0} en Ajustes › Claves de API</value>
+    <comment>Save a key for %@ in Settings › API Keys</comment>
   </data>
   <data name="SaveChangesToARepeatingEvent" xml:space="preserve">
     <value>¿Guardar los cambios de un evento que se repite?</value>
@@ -2625,6 +2697,10 @@
   <data name="Saved" xml:space="preserve">
     <value>Guardada</value>
     <comment>Saved</comment>
+  </data>
+  <data name="SavesTheStreamedTranscriptInsteadOfUploadingTheRecordingAgai" xml:space="preserve">
+    <value>Guarda la transcripción transmitida en lugar de volver a subir la grabación después de Detener, así que solo pagas la transmisión. Las partes perdidas mientras la conexión estaba caída se envían a {0} después de Detener, con unos 30 s de audio a cada lado, y alrededor de cada pausa, para que los hablantes conserven sus etiquetas. Un diarizador en la nube se factura aparte. Los modelos en tiempo real pueden ser menos precisos que {1}.</value>
+    <comment>Saves the streamed transcript instead of uploading the recording again after Stop, so you pay for streaming only. Parts missed while the connection was down are sent to %@ after Stop, with about 30 s of audio on each side, and around each pause, so speakers keep their labels. A cloud diarizer is billed separately. Realtime models can be less accurate than %@.</comment>
   </data>
   <data name="Scan" xml:space="preserve">
     <value>Escanear</value>
@@ -2742,13 +2818,25 @@
     <value>Se muestran las reuniones de los próximos 7 días. La lista se actualiza automáticamente.</value>
     <comment>Showing meetings in the next 7 days. The list updates automatically.</comment>
   </data>
-  <data name="ShowsTheTranscriptDuringTheRecordingAndKeepsItSoItIsReadyWit" xml:space="preserve">
-    <value>Muestra la transcripción durante la grabación y la conserva, para que esté lista segundos después de Detener. Usa más CPU y memoria al grabar. Solo modelos Whisper y Parakeet; los demás motores transcriben después de Detener.</value>
-    <comment>Shows the transcript during the recording and keeps it, so it is ready within seconds of Stop. Uses more CPU and memory while recording. Whisper and Parakeet models only; other engines transcribe after Stop.</comment>
+  <data name="ShowsTheTranscriptDuringTheRecordingWhisperAndParakeetModels" xml:space="preserve">
+    <value>Muestra la transcripción durante la grabación. Los modelos Whisper y Parakeet la conservan, para que esté lista segundos después de Detener. Usa más CPU y memoria al grabar. Un motor en la nube puede mostrarla con un modelo local o con su transmisión en tiempo real: consulta Modelo de transcripción › Nube.</value>
+    <comment>Shows the transcript during the recording. Whisper and Parakeet models keep it, so it is ready within seconds of Stop. Uses more CPU and memory while recording. A cloud engine can show it with a local model or its realtime stream: see Transcription model › Cloud.</comment>
   </data>
   <data name="ShowsTheTranscriptDuringTheRecordingWhisperKitAndParakeetMod" xml:space="preserve">
+    <value>Muestra la transcripción durante la grabación. Los modelos WhisperKit y Parakeet la conservan, para que esté lista segundos después de Detener; Apple Speech (macOS 26+) solo la muestra y transcribe después de Detener. Usa más CPU y memoria al grabar. Un motor en la nube puede mostrarla con un modelo local o con su transmisión en tiempo real: consulta Modelo de transcripción › Nube.</value>
+    <comment>Shows the transcript during the recording. WhisperKit and Parakeet models keep it, so it is ready within seconds of Stop; Apple Speech (macOS 26+) only shows it and transcribes after Stop. Uses more CPU and memory while recording. A cloud engine can show it with a local model or its realtime stream: see Transcription model › Cloud.</comment>
+  </data>
+  <data name="ShowsTheTranscriptDuringTheRecordingWhisperKitAndParakeetMod_2" xml:space="preserve">
     <value>Muestra la transcripción durante la grabación. Los modelos WhisperKit y Parakeet la conservan, para que esté lista segundos después de Detener; Apple Speech (macOS 26+) solo la muestra y transcribe después de Detener. Usa más CPU y memoria al grabar. Los demás motores transcriben después de Detener.</value>
     <comment>Shows the transcript during the recording. WhisperKit and Parakeet models keep it, so it is ready within seconds of Stop; Apple Speech (macOS 26+) only shows it and transcribes after Stop. Uses more CPU and memory while recording. Other engines transcribe after Stop.</comment>
+  </data>
+  <data name="ShowsTheTranscriptWhileRecordingWithAModelOnThisMacFreeNothi" xml:space="preserve">
+    <value>Muestra la transcripción durante la grabación con un modelo de este Mac. Gratis: no se sube nada durante la grabación, pero usa CPU, memoria y batería. La transcripción guardada sigue viniendo de {0} después de Detener, así que puede diferir de lo que viste.</value>
+    <comment>Shows the transcript while recording with a model on this Mac. Free: nothing is uploaded while recording, but it uses CPU, memory and battery. The saved transcript still comes from %@ after Stop, so it can differ from what you saw.</comment>
+  </data>
+  <data name="ShowsTheTranscriptWhileRecordingWithAModelOnThisPCFreeNothin" xml:space="preserve">
+    <value>Muestra la transcripción durante la grabación con un modelo de este PC. Gratis: no se sube nada durante la grabación, pero usa CPU, memoria y batería. La transcripción guardada sigue viniendo de {0} después de Detener, así que puede diferir de lo que viste.</value>
+    <comment>Shows the transcript while recording with a model on this PC. Free: nothing is uploaded while recording, but it uses CPU, memory and battery. The saved transcript still comes from %@ after Stop, so it can differ from what you saw.</comment>
   </data>
   <data name="SimulateState" xml:space="preserve">
     <value>Simular estado</value>
@@ -2917,6 +3005,14 @@
   <data name="StorageUsed" xml:space="preserve">
     <value>Almacenamiento usado: {0}</value>
     <comment>Storage used: %@</comment>
+  </data>
+  <data name="StreamsTheMicAndTheSystemAudioToAsTwoLiveConnectionsForTheWh" xml:space="preserve">
+    <value>Transmite el micrófono y el audio del sistema a {0} como dos conexiones en directo durante toda la grabación. Cuesta dinero: {1}, además de la transcripción normal después de Detener. Las grabaciones largas se reconectan antes del límite de sesión del proveedor y transmiten unos 30 s dos veces en cada reconexión para que los hablantes conserven sus etiquetas. Una reunión de 1 hora cuesta unas 2 horas de transmisión más 2 horas de transcripción.</value>
+    <comment>Streams the mic and the system audio to %@ as two live connections for the whole recording. Costs money: %@, on top of the normal transcription after Stop. Long recordings reconnect before the provider's session limit and stream about 30 s twice at each reconnect so speakers keep their labels. A 1-hour meeting costs about 2 hours of streaming plus 2 hours of transcription.</comment>
+  </data>
+  <data name="StreamsTo" xml:space="preserve">
+    <value>Transmite a {0}</value>
+    <comment>Streams to %@</comment>
   </data>
   <data name="Summarize" xml:space="preserve">
     <value>Resumir</value>
@@ -3118,6 +3214,10 @@
     <value>La llamada parece haber terminado — ¿detener la grabación?</value>
     <comment>The call seems to be over — stop recording?</comment>
   </data>
+  <data name="TheConnectionToWasLost" xml:space="preserve">
+    <value>Se perdió la conexión con {0}.</value>
+    <comment>The connection to %@ was lost.</comment>
+  </data>
   <data name="TheDownloadFailed" xml:space="preserve">
     <value>La descarga ha fallado: {0}</value>
     <comment>The download failed: %@</comment>
@@ -3194,6 +3294,10 @@
     <value>La repetición termina antes de esta fecha.</value>
     <comment>The repeat ends before this date.</comment>
   </data>
+  <data name="TheSavedTranscriptIsMadeAfterStopAndCanDiffer" xml:space="preserve">
+    <value>La transcripción guardada se hace después de Detener y puede diferir.</value>
+    <comment>The saved transcript is made after Stop and can differ.</comment>
+  </data>
   <data name="TheSelectedAppStoppedPlayingAudioBeforeRecordingCouldResume" xml:space="preserve">
     <value>La app seleccionada ha dejado de reproducir audio antes de que la grabación pudiera reanudarse.</value>
     <comment>The selected app stopped playing audio before recording could resume.</comment>
@@ -3217,6 +3321,10 @@
   <data name="TheTranscriptCouldNotBeRead" xml:space="preserve">
     <value>No se ha podido leer la transcripción.</value>
     <comment>The transcript could not be read.</comment>
+  </data>
+  <data name="TheTranscriptIsMadeAfterStop" xml:space="preserve">
+    <value>La transcripción se hace después de Detener.</value>
+    <comment>The transcript is made after Stop.</comment>
   </data>
   <data name="TheTranscriptionSpeakerAndAIModelsAreRemovedFromThisMacNotMo" xml:space="preserve">
     <value>Los modelos de transcripción, de hablantes y de IA se eliminan de este Mac (no se trasladan a la Papelera). Vuelve a descargarlos en Ajustes › Transcripción y Ajustes › IA.</value>
@@ -3326,6 +3434,10 @@
     <value>El hardware de este PC no es compatible con Windows AI (requiere un Copilot+ PC).</value>
     <comment>This PC's hardware does not support Windows AI (it needs a Copilot+ PC).</comment>
   </data>
+  <data name="ThisRealtimeModelLabelsNoSpeakersSoTheDiarizerRunsOnTheRecor" xml:space="preserve">
+    <value>Este modelo en tiempo real no etiqueta a los hablantes, así que el diarizador se ejecuta sobre la grabación después de Detener; un diarizador en la nube pide su propio consentimiento.</value>
+    <comment>This realtime model labels no speakers, so the diarizer runs on the recording after Stop; a cloud diarizer asks for its own consent.</comment>
+  </data>
   <data name="Title" xml:space="preserve">
     <value>Título</value>
     <comment>Title</comment>
@@ -3381,6 +3493,14 @@
   <data name="Transcribed" xml:space="preserve">
     <value>Transcrita</value>
     <comment>Transcribed</comment>
+  </data>
+  <data name="TranscribesAfterStopYouCanShowALiveTranscriptWithALocalModel" xml:space="preserve">
+    <value>{0} transcribe después de Detener. Puedes mostrar una transcripción en directo con un modelo local en Ajustes.</value>
+    <comment>%@ transcribes after Stop. You can show a live transcript with a local model in Settings.</comment>
+  </data>
+  <data name="TranscribesAfterStopYouCanShowALiveTranscriptWithALocalModel_2" xml:space="preserve">
+    <value>{0} transcribe después de Detener. Puedes mostrar una transcripción en directo con un modelo local o con {1} en tiempo real en Ajustes.</value>
+    <comment>%@ transcribes after Stop. You can show a live transcript with a local model or %@ realtime in Settings.</comment>
   </data>
   <data name="Transcribing" xml:space="preserve">
     <value>Transcribiendo…</value>
@@ -3578,6 +3698,10 @@
     <value>Usa ⌘, ⌥ o ⌃ con la tecla.</value>
     <comment>Use ⌘, ⌥ or ⌃ with the key.</comment>
   </data>
+  <data name="UseTheRealtimeResultAsTheTranscript" xml:space="preserve">
+    <value>Usar el resultado en tiempo real como transcripción</value>
+    <comment>Use the realtime result as the transcript</comment>
+  </data>
   <data name="UsedByLLamaSharp" xml:space="preserve">
     <value>Usado por LLamaSharp</value>
     <comment>Used by LLamaSharp</comment>
@@ -3710,6 +3834,10 @@
     <value>Cuando EchoDiar está en segundo plano, una notificación también lo pregunta, con Detener ahora y Seguir grabando.</value>
     <comment>While EchoDiar is in the background, a notification asks too, with Stop now and Keep recording.</comment>
   </data>
+  <data name="WhileRecording" xml:space="preserve">
+    <value>Durante la grabación</value>
+    <comment>While recording</comment>
+  </data>
   <data name="WhisperTranscription" xml:space="preserve">
     <value>Transcripción con Whisper</value>
     <comment>Whisper transcription</comment>
@@ -3797,6 +3925,10 @@
   <data name="YourConversationsAreNotIndexedYet" xml:space="preserve">
     <value>Tus conversaciones aún no están indexadas.</value>
     <comment>Your conversations are not indexed yet.</comment>
+  </data>
+  <data name="YourPlanSLimitOnLiveSessionsWasReached" xml:space="preserve">
+    <value>Se alcanzó el límite de sesiones en directo de tu plan de {0}.</value>
+    <comment>Your %@ plan's limit on live sessions was reached.</comment>
   </data>
   <data name="ZoomGoogleMeetMicrosoftTeamsOrWebexLinkInTheEvent" xml:space="preserve">
     <value>Enlace de Zoom, Google Meet, Microsoft Teams o Webex en el evento.</value>

@@ -131,3 +131,100 @@ private struct TranscriptResponse: Decodable {
     var utterances: [Utterance]?
     var words: [Utterance]?
 }
+
+extension AssemblyAITranscriber {
+    /// Universal-Streaming v3: `wss://streaming.assemblyai.com/v3/ws?...` (settings in the query, no start message),
+    /// `Authorization: <key>` handshake header, binary 16 kHz pcm_s16le frames (each 20-1000 ms). `Begin` starts
+    /// (with `expires_at`, the 3 h cap). A `Turn` is a partial until `end_of_turn` and `turn_is_formatted` (with
+    /// `format_turns` an unformatted end of turn comes first); the final is the whole turn, times in ms from the
+    /// stream start, speaker the turn's `speaker_label` ("A", "B"; `PENDING`/`UNKNOWN` = none). `ForceEndpoint` ends
+    /// the turn, `Terminate` ends the stream (answered by `Termination`). No idle timeout, so no keep-alive.
+    /// `SpeakerRevision` (relabels at close) is not applied.
+    public struct Realtime: RealtimeAdapter {
+        public static let models = [
+            "universal-3-6-pro", "universal-3-5-pro", "universal-streaming-multilingual", "universal-streaming-english",
+        ]
+        public static let endpoint = URL(string: "wss://streaming.assemblyai.com/v3/ws")!
+
+        public let model: String
+        private let apiKey: String
+        private let language: String?
+        private let diarize: Bool
+
+        public init(apiKey: String, model: String, language: String?, diarize: Bool) {
+            self.apiKey = apiKey
+            self.model = model
+            self.language = CloudTranscription.languageCode(language)
+            self.diarize = diarize
+        }
+
+        public var streamsSpeakers: Bool { diarize }
+        public var headers: [String: String] { ["Authorization": apiKey] }
+
+        public func socketURL(sessionAnswer: Data?) throws -> URL {
+            var query = [
+                URLQueryItem(name: "sample_rate", value: String(sampleRate)),
+                URLQueryItem(name: "encoding", value: "pcm_s16le"),
+                URLQueryItem(name: "speech_model", value: model),
+                URLQueryItem(name: "format_turns", value: "true"),
+            ]
+            if diarize { query.append(URLQueryItem(name: "speaker_labels", value: "true")) }
+            if let language {
+                query.append(URLQueryItem(name: "language_codes", value: language))
+            } else {
+                query.append(URLQueryItem(name: "language_detection", value: "true"))
+            }
+            return Self.endpoint.appending(queryItems: query)
+        }
+
+        public mutating func finalize(at streamSeconds: Double) -> [RealtimeMessage] {
+            [.text(#"{"type":"ForceEndpoint"}"#)]
+        }
+
+        public mutating func closeMessages() -> [RealtimeMessage] {
+            [.text(#"{"type":"Terminate"}"#)]
+        }
+
+        public mutating func parse(_ message: RealtimeMessage) throws -> [RealtimeEvent] {
+            guard let live = try CloudRealtime.decode(LiveMessage.self, from: message) else { return [] }
+            switch live.type {
+            case "Begin":
+                return [.started(expiresAt: live.expiresAt.map { Date(timeIntervalSince1970: $0) })]
+            case "Termination":
+                return [.ended]
+            case "Error":
+                return [.failed(kind: CloudRealtime.errorKind(live.errorCode.map(String.init) ?? live.type))]
+            case "Turn":
+                let text = live.transcript?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+                guard !text.isEmpty else { return [] }
+                let words = live.words ?? []
+                let start = (words.first?.start).map { $0 / 1000 }
+                let end = (words.last?.end).map { $0 / 1000 }
+                let speaker = live.speakerLabel.flatMap { ["PENDING", "UNKNOWN"].contains($0) ? nil : $0 }
+                guard live.endOfTurn == true, live.turnIsFormatted == true, let start, let end else {
+                    return [.partial(text: text, start: start, end: end, speaker: speaker)]
+                }
+                return [.final(CloudSegment(start: start, end: end, text: text, speaker: speaker, language: live.languageCode))]
+            default:
+                return []
+            }
+        }
+    }
+}
+
+private struct LiveMessage: Decodable {
+    struct Word: Decodable {
+        var start: Double
+        var end: Double
+    }
+
+    var type: String?
+    var expiresAt: Double?
+    var errorCode: Int?
+    var transcript: String?
+    var endOfTurn: Bool?
+    var turnIsFormatted: Bool?
+    var speakerLabel: String?
+    var languageCode: String?
+    var words: [Word]?
+}

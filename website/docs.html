@@ -183,7 +183,7 @@
             <li>Engines on Windows: Whisper (whisper.cpp: Large v3 Turbo by default, Small, Base, Large v3, and PhoWhisper Medium, Vietnamese only) and Parakeet TDT 0.6B v3.</li>
             <li>Models are downloaded only when you click <strong>Download</strong> in <strong>Settings &gt; Transcription</strong>. On Mac, macOS installs Apple Speech language assets the first time you use a language.</li>
             <li>Speakers: your mic is <strong>Me</strong>. Turn on <strong>Tell speakers apart</strong> in <strong>Settings &gt; Recording</strong> (or <strong>Settings &gt; Transcription &gt; Diarization model</strong>) to label each voice in the meeting audio: Speaker 1, Speaker 2… Set the number of other speakers there as a hint. Off (the default), the meeting audio is one speaker, Speaker 1, and cloud transcription is asked for no speaker labels.</li>
-            <li><strong>Transcribe while recording</strong> (on by default, Whisper and Parakeet): transcribes during the recording and shows live captions, so the transcript is ready seconds after Stop. Uses more CPU and memory while recording. Turn it off in <strong>Settings &gt; Transcription &gt; General</strong>. See <a href="#how-it-works">How it works</a>.</li>
+            <li><strong>Transcribe while recording</strong> (on by default, Whisper and Parakeet): transcribes during the recording and shows live captions, so the transcript is ready seconds after Stop. Uses more CPU and memory while recording. Turn it off in <strong>Settings &gt; Transcription &gt; General</strong>. See <a href="#how-it-works">How it works</a>. With a cloud engine, see <a href="#cloud-transcription">Cloud transcription</a>.</li>
             <li>Re-transcribe a conversation with another engine or language.</li>
             <li>On Mac, can wait while the Mac is hot or in Low Power Mode: what is left after Stop is done once the Mac cools down or leaves Low Power Mode.</li>
             <li>On Windows, can wait while energy saver is on, with <strong>Wait while energy saver is on</strong> (on by default) in <strong>Settings &gt; Recording &gt; After recording</strong>: what is left after Stop is done once energy saver is off.</li>
@@ -315,9 +315,13 @@
           <section id="cloud-transcription" class="doc">
             <h2>Cloud transcription</h2>
 <ul class="list">
-            <li>Optional: OpenAI, Groq, Mistral, Gemini, ElevenLabs, Deepgram, AssemblyAI or a custom OpenAI-compatible endpoint. Set up ElevenLabs, Deepgram and AssemblyAI in <strong>Settings &gt; Transcription &gt; Transcription model</strong>, the others in <strong>Settings &gt; AI</strong>.</li>
+            <li>Optional: OpenAI, Groq, Mistral, Gemini, xAI, ElevenLabs, Deepgram, AssemblyAI, Speechmatics, Soniox, Gladia or a custom OpenAI-compatible endpoint.</li>
+            <li>Save each key in <strong>Settings &gt; API Keys</strong>, with <strong>Test</strong> and a link to get a key; custom endpoints are set up there too. A provider is available once its key is saved. Pick the model in <strong>Settings &gt; Transcription &gt; Transcription model</strong>: a checkmark marks each provider with a saved key, and <strong>API key</strong> opens its card in API Keys.</li>
             <li>The first run for each provider and address asks before any audio leaves your computer. A changed URL asks again.</li>
-            <li>The mic and system channels are uploaded, and billed, separately.</li>
+            <li>The mic and system channels are uploaded, and billed, separately. Speakers keep their labels when a long recording is uploaded in parts.</li>
+            <li><strong>Live transcript</strong> while recording (with <strong>Transcribe automatically</strong> and <strong>Transcribe while recording</strong> on), in the <strong>While recording</strong> section of <strong>Settings &gt; Transcription &gt; Transcription model</strong>. <strong>Live with a local model</strong> shows it with a model on your computer, free; it is display only, and the saved transcript still comes from the cloud provider after Stop.</li>
+            <li><strong>Live with … realtime</strong> streams to the default provider instead: ElevenLabs, Deepgram, AssemblyAI, OpenAI, xAI, Speechmatics, Soniox or Gladia (Mistral, Gemini, Groq and custom endpoints have no realtime). It costs money: two live connections, mic and system audio, for the whole recording, on top of the normal transcription after Stop. It asks first for a host you have not confirmed yet, naming it.</li>
+            <li><strong>Use the realtime result as the transcript</strong> skips the upload after Stop: only the parts missed while disconnected, and around pauses, are sent then. Realtime models can be less accurate.</li>
             <li>API keys are stored in the Keychain on Mac, in Credential Manager on Windows.</li>
 </ul>
           </section>
@@ -338,7 +342,7 @@
             <li>Response language, for summaries and answers: automatic (the transcript's language for summaries, the question's for answers), English, French or Vietnamese.</li>
             <li><strong>On-device:</strong> on Mac, MLX models, and Apple Foundation Models on macOS 26. On Windows, GGUF models (Qwen3.5 2B, 4B or 9B, Gemma 4 E2B or E4B), and Phi Silica on Copilot+ PCs.</li>
             <li><strong>Local servers:</strong> LM Studio, Ollama, Jan, llama.cpp, vLLM, plus Foundry Local on Windows. <strong>Scan</strong> finds the ones running on this computer.</li>
-            <li><strong>Cloud APIs:</strong> OpenAI, Anthropic, xAI, Gemini, Mistral, Azure OpenAI, OpenRouter, Groq, DeepSeek or a custom endpoint. Keys go in the Keychain on Mac, in Credential Manager on Windows.</li>
+            <li><strong>Cloud APIs:</strong> OpenAI, Anthropic, xAI, Gemini, Mistral, Azure OpenAI, OpenRouter, Groq, DeepSeek or a custom endpoint. Keys go in <strong>Settings &gt; API Keys</strong>, stored in the Keychain on Mac, in Credential Manager on Windows.</li>
             <li><strong>Subscription CLIs:</strong> Claude Code, Codex, OpenCode or Gemini CLI, with your own login.</li>
             <li><strong>Copy as prompt</strong> copies the transcript and your question, ready to paste into any chat app. On Windows, <kbd>Ctrl+Shift+C</kbd> does it from the Summary or Chat tab.</li>
 </ul>
@@ -367,7 +371,7 @@
           <section id="settings" class="doc">
             <h2>Settings &amp; shortcuts</h2>
 <ul class="list">
-            <li>Open with <kbd>Cmd+,</kbd> on Mac, <kbd>Ctrl+,</kbd> on Windows. Sections: General, Recording, Transcription, AI, RAG, Storage, Shortcuts, About, Acknowledgements.</li>
+            <li>Open with <kbd>Cmd+,</kbd> on Mac, <kbd>Ctrl+,</kbd> on Windows. Sections: General, Recording, Transcription, AI, API Keys, RAG, Storage, Shortcuts, About, Acknowledgements.</li>
             <li>Change the global record and pause shortcuts, and view the app's shortcuts, in <strong>Settings &gt; Shortcuts</strong>.</li>
             <li>Launch at login and the floating indicator are in <strong>Settings &gt; General</strong>.</li>
             <li>Default language, <strong>Remember last record language</strong> (off by default: keeps the language picked in the Record button's menu for the next recordings), <strong>Transcribe while recording</strong> and <strong>Free unused models after</strong> are in <strong>Settings &gt; Transcription &gt; General</strong>. <strong>Tell speakers apart</strong> is in both <strong>Settings &gt; Recording</strong> and <strong>Settings &gt; Transcription &gt; Diarization model</strong>.</li>

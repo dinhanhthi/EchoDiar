@@ -18,7 +18,8 @@ struct SettingsStoreTests {
     func fileMissingNewerKeysDecodesWithDefaults(json: String) throws {
         try withTemporaryStore { store in
             try Data(json.utf8).write(to: store.fileURL)
-            #expect(store.load() == AppSettings())
+            // A file from an older build still has the availability migration to run; a fresh install does not.
+            #expect(store.load() == AppSettings(providerAvailabilityMigrated: false))
             #expect(store.load().chatContextMessages == 10)
             #expect(store.load().ragEnabled == false)
             #expect(store.load().embeddingModelID == "mlx-qwen3-embedding-0.6b")

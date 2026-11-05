@@ -115,6 +115,27 @@ public sealed class TranscriptionPipeline(
                 throw new TranscriptionException(TranscriptionErrorKind.SessionUnreadable, inner: e);
             }
             stored = session;
+            if (cloud is not null && job.Prior is { } cloudPrior && cloudPrior.EngineID == cloud.EngineID
+                && PriorSources(session, job) is { } cloudSources && AudioDuration(job, session) is { } audioDuration
+                && cloudPrior.IsUsable(cloud.EngineID, null, job.Language, audioDuration))
+            {
+                // A cloud realtime stream as the transcript: only its gaps are uploaded, and a diarizer runs only when the
+                // stream labelled no speakers.
+                var streamLabels = job.Diarize && cloudPrior.System.Any(s => !string.IsNullOrEmpty(s.Speaker));
+                var streamDiarizer = streamLabels ? null : Diarizer(job);
+                var streamCloudDiarizer = streamLabels ? null : cloudDiarizer;
+                var fillsGaps = cloudPrior.MicGaps.Count > 0
+                    || (cloudSources.System is not null && cloudPrior.SystemGaps.Count > 0)
+                    || (cloudSources.System is not null && streamLabels && cloudPrior.SystemBridges.Count > 0);
+                var diarizes = cloudSources.System is not null && (streamDiarizer is not null || streamCloudDiarizer is not null);
+                if (fillsGaps || diarizes) await WaitWhileDeferredAsync(job, cancellationToken).ConfigureAwait(false);
+                started = true;
+                var cloudPriorPath = await TranscribeCloudPriorAsync(
+                    job, cloudPrior, session, cloudSources, cloud, streamLabels, audioDuration, streamDiarizer,
+                    streamCloudDiarizer, cancellationToken).ConfigureAwait(false);
+                Finished(job, session);
+                return cloudPriorPath;
+            }
             if (cloud is null && job.Prior is { } prior && PriorSources(session, job) is { } priorSources
                 && UsableEntry(prior, job, session) is { } priorEntry)
             {
@@ -299,6 +320,255 @@ public sealed class TranscriptionPipeline(
     }
 
     /// <summary>
+    /// Covered audio a gap upload takes on each side of the gap on a channel without stream speaker labels (mic, or a
+    /// system stream with none); a labelled channel takes <see cref="SpeakerLabelReconciler.LabelOverlapSeconds"/>.
+    /// </summary>
+    internal const double GapPaddingSeconds = 0.5;
+
+    /// <summary>
+    /// A cloud realtime <paramref name="prior"/> as the transcript (Swift <c>transcribeCloudPrior</c>): each channel's
+    /// gaps go to <paramref name="cloud"/> (<see cref="FillCloudGapsAsync"/>), then <see cref="ProcessAsync"/> merges,
+    /// with no gaps left, so nothing else is uploaded unless a diarizer is given. <paramref name="streamLabels"/>:
+    /// <see cref="TranscriptionJob.Diarize"/> is on and the stream labelled the system channel's speakers, so its gaps are
+    /// diarized and bridged onto those labels and the caller passes no diarizer, and the audio around each resume with
+    /// scoped labels is uploaded only to map them back (the bridges). With <see cref="TranscriptionJob.Diarize"/> off the
+    /// stream labels are dropped (one speaker). The transcript records the realtime model.
+    /// </summary>
+    private async Task<string> TranscribeCloudPriorAsync(
+        TranscriptionJob job, PriorTranscription prior, RecordingSession session,
+        (ChannelSource? Mic, ChannelSource? System) sources, CloudEngine cloud, bool streamLabels, double duration,
+        ISpeakerDiarizer? localDiarizer, CloudEngine? cloudDiarizer, CancellationToken cancellationToken)
+    {
+        UpdateConversation(job.Folder, session, c => c.Status = ConversationStatus.Transcribing);
+        var language = CloudLanguage(LanguageRange.Ranges(session.LanguageMarkers));
+        IReadOnlyList<RawSegment> mic = prior.Mic;
+        IReadOnlyList<RawSegment> system = job.Diarize ? prior.System : [.. prior.System.Select(s => s with { Speaker = null })];
+        if (sources.Mic is { } micSource && prior.MicGaps.Count > 0)
+        {
+            Emit(job, JobStep.TranscribingMic, 0.05);
+            mic = await FillCloudGapsAsync(
+                prior.MicGaps, [], mic, micSource, cloud, language, labels: false, duration,
+                f => Emit(job, JobStep.TranscribingMic, 0.05 + 0.35 * f), cancellationToken).ConfigureAwait(false);
+        }
+        if (sources.System is { } systemSource && (prior.SystemGaps.Count > 0 || (streamLabels && prior.SystemBridges.Count > 0)))
+        {
+            Emit(job, JobStep.TranscribingSystem, 0.45);
+            system = await FillCloudGapsAsync(
+                prior.SystemGaps, prior.SystemBridges, system, systemSource, cloud, language, labels: streamLabels, duration,
+                f => Emit(job, JobStep.TranscribingSystem, 0.45 + 0.35 * f), cancellationToken).ConfigureAwait(false);
+        }
+        var filled = prior with { Mic = mic, System = system, MicGaps = [], SystemGaps = [], SystemBridges = [] };
+        return await ProcessAsync(
+            job, session, sources, cloud.EngineID, prior.ModelId ?? (cloud.Model.Length == 0 ? null : cloud.Model), null,
+            localDiarizer, cloudDiarizer, gateDiarization: true, filled,
+            (_, _, _, _, _) => Task.FromResult<IReadOnlyList<RawSegment>>([]), cancellationToken).ConfigureAwait(false);
+    }
+
+    /// <summary>
+    /// One channel's <paramref name="segments"/> with each of its <paramref name="gaps"/> transcribed by
+    /// <paramref name="cloud"/> from the compressed source (Swift <c>fillCloudGaps</c>): the gap padded into covered audio
+    /// (<see cref="SpeakerLabelReconciler.LabelOverlapSeconds"/> each side with <paramref name="labels"/>, else
+    /// <see cref="GapPaddingSeconds"/>), clamped to <c>0...duration</c>, sent through the range API (split under the
+    /// provider's cap) and joined by <see cref="JoinGap"/>. <paramref name="labels"/>: the upload asks for speaker labels
+    /// and they are bridged onto the stream's. With <paramref name="labels"/>, each of <paramref name="bridges"/> (file
+    /// seconds of a resume with session-scoped labels and no gap) is a zero-length gap: its upload adds no segment and
+    /// only maps the labels first heard after it back; none is uploaded when no label is new after it (a gap's padding
+    /// bridged it) or the batch model only streams. In file order, so each later span bridges onto the earlier ones.
+    /// Errors other than a cancellation become <see cref="TranscriptionErrorKind.Cloud"/> with a short, key-free reason.
+    /// </summary>
+    private async Task<IReadOnlyList<RawSegment>> FillCloudGapsAsync(
+        IReadOnlyList<Span> gaps, IReadOnlyList<double> bridges, IReadOnlyList<RawSegment> segments, ChannelSource source,
+        CloudEngine cloud, string? language, bool labels, double duration, Action<double> progress,
+        CancellationToken cancellationToken)
+    {
+        if (CloudTranscription.IsStreamingOnly(cloud.Model))
+        {
+            if (gaps.Count == 0) return segments;
+            throw new TranscriptionException(
+                TranscriptionErrorKind.Cloud, $"{cloud.Name}: {cloud.Model} only streams live audio; pick another model in Settings");
+        }
+        var padding = labels ? SpeakerLabelReconciler.LabelOverlapSeconds : GapPaddingSeconds;
+        var spans = gaps.Concat(labels ? bridges.Select(t => new Span(t, t)) : []).OrderBy(s => s.Start).ToList();
+        var joined = segments.OrderBy(s => s.Start).ToList();
+        for (var index = 0; index < spans.Count; index++)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            var gap = spans[index];
+            var lower = Math.Max(0, gap.Start - padding);
+            var upper = Math.Min(duration, gap.End + padding);
+            if (gap.End < gap.Start || !(upper > lower)) continue;
+            if (gap.End == gap.Start && !HasNewLabels(joined, gap.Start)) continue;
+            var upload = new TimeRange(lower, upper);
+            List<CloudSegment> response;
+            try
+            {
+                response = await CloudTranscription.TranscribeAsync(
+                    source.Path, source.Channel, upload, cloud.Transcriber, Exporter, language, labels, cancellationToken)
+                    .ConfigureAwait(false);
+            }
+            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+            {
+                throw;
+            }
+            catch (Exception e)
+            {
+                // Not kept as the inner exception: a provider message can carry the request or response body.
+                throw new TranscriptionException(TranscriptionErrorKind.Cloud, $"{cloud.Name}: {CloudTranscription.FailureReason(e)}");
+            }
+            // The widening of the gap (Hole) stops at the gaps around it: their speech is theirs to fill.
+            var limits = (
+                gaps.Where(g => g.End <= gap.Start).Select(g => (double?)g.End).Max() ?? double.NegativeInfinity,
+                gaps.Where(g => g.Start >= gap.End).Select(g => (double?)g.Start).Min() ?? double.PositiveInfinity);
+            joined = JoinGap(response, gap, upload, joined, labels, index + 1, limits);
+            progress((index + 1.0) / spans.Count);
+        }
+        return joined;
+    }
+
+    /// <summary>Whether a speaker label of <paramref name="segments"/> is first heard at or after <paramref name="time"/>.</summary>
+    private static bool HasNewLabels(IEnumerable<RawSegment> segments, double time)
+    {
+        var before = new HashSet<string>(StringComparer.Ordinal);
+        var after = new HashSet<string>(StringComparer.Ordinal);
+        foreach (var segment in segments)
+        {
+            if (string.IsNullOrEmpty(segment.Speaker)) continue;
+            (segment.Start < time ? before : after).Add(segment.Speaker);
+        }
+        return after.Except(before).Any();
+    }
+
+    /// <summary>
+    /// <paramref name="segments"/> (one channel, file time) with a gap's upload <paramref name="response"/> (file time,
+    /// covering <paramref name="upload"/> = the gap and its padding) joined, sorted by start (Swift <c>joinGap</c>). The
+    /// gap is first widened to the stream's finals around it, within <paramref name="limits"/> (the gaps before and after
+    /// it; <see cref="Hole"/>); a response segment that straddles an edge of it is cut into its sentences
+    /// (<see cref="SentencePieces"/>; one without sentence ends stays whole); a piece is kept when its overlap with it is
+    /// at least half of the shorter of the two (<see cref="GapKeeps"/>), so a long word-grouped segment neither loses
+    /// its speech inside the gap nor repeats what the stream has around it; the padding's only serve the labels. Without <paramref name="labels"/> every speaker label is dropped. With
+    /// <paramref name="labels"/>, two steps: the response's labels map onto the labels before the gap by the left padding
+    /// (<see cref="SpeakerLabelReconciler.Labels"/>; a label with no match gets its own <c>"p&lt;N&gt;:"</c> scope,
+    /// <paramref name="partIndex"/> and up, so it never merges); then each label first heard after the gap (the session
+    /// after an unplanned disconnect, <c>"r&lt;N&gt;:"</c>) takes the label of (before + response) it matches in the
+    /// right padding, unless that label is already in use after the gap; a label with no match keeps its own. Pure, for
+    /// tests.
+    /// </summary>
+    internal static List<RawSegment> JoinGap(
+        IReadOnlyList<CloudSegment> response, Span gap, TimeRange upload, IReadOnlyList<RawSegment> segments, bool labels,
+        int partIndex, (double Start, double End)? limits = null)
+    {
+        var hole = Hole(gap, segments, limits);
+        bool InGap(CloudSegment segment) => GapKeeps(segment, hole);
+        static string? Label(string? speaker) => string.IsNullOrEmpty(speaker) ? null : speaker;
+        RawSegment Raw(CloudSegment segment) =>
+            new(segment.Start, segment.End, segment.Text, segment.Language, labels ? Label(segment.Speaker) : null);
+        static HashSet<string> LabelSet(IEnumerable<CloudSegment> list) =>
+            list.Select(s => Label(s.Speaker)).OfType<string>().ToHashSet(StringComparer.Ordinal);
+
+        IEnumerable<RawSegment> Kept(IEnumerable<CloudSegment> list) =>
+            list.SelectMany(segment => SentencePieces(segment, hole)).Where(InGap).Select(Raw);
+
+        if (!labels) return [.. segments.Concat(Kept(response)).OrderBy(s => s.Start)];
+        var existing = segments.Select(s => new CloudSegment(s.Start, s.End, s.Text, s.Speaker, s.DetectedLanguage)).ToList();
+        // Step 1: the gap onto the session before. Every existing label counts for the scope; only the left padding
+        // counts for the matches.
+        var left = new TimeRange(upload.Start, Math.Max(upload.Start, gap.Start));
+        var gapMapping = SpeakerLabelReconciler.Labels(response, existing, left, partIndex);
+        var mapped = response.Select(segment => segment with
+        {
+            Speaker = Label(segment.Speaker) is { } label && gapMapping.TryGetValue(label, out var target) ? target : null,
+        }).ToList();
+        // Step 2: the session after onto (before + gap).
+        var before = existing.Where(s => s.Start < gap.Start).ToList();
+        var after = existing.Where(s => s.Start >= gap.Start).ToList();
+        var afterLabels = LabelSet(after);
+        var newLabels = afterLabels.Except(LabelSet(before)).ToHashSet(StringComparer.Ordinal);
+        var earlier = before.Concat(mapped).ToList();
+        var earlierLabels = LabelSet(earlier);
+        var right = new TimeRange(Math.Min(Math.Max(gap.End, upload.Start), upload.End), upload.End);
+        var afterMapping = newLabels.Count == 0
+            ? new Dictionary<string, string>(StringComparer.Ordinal)
+            : SpeakerLabelReconciler.Labels(
+                    [.. after.Where(s => Label(s.Speaker) is { } label && newLabels.Contains(label))], earlier, right, partIndex)
+                .Where(pair => earlierLabels.Contains(pair.Value) && !afterLabels.Contains(pair.Value))
+                .ToDictionary(pair => pair.Key, pair => pair.Value, StringComparer.Ordinal);
+        var bridged = segments.Select(segment =>
+            Label(segment.Speaker) is { } speaker && afterMapping.TryGetValue(speaker, out var target)
+                ? segment with { Speaker = target }
+                : segment);
+        return [.. bridged.Concat(Kept(mapped)).OrderBy(s => s.Start)];
+    }
+
+    /// <summary>
+    /// <paramref name="gap"/> widened to the stream's finals around it: from the end of the last segment that starts
+    /// before it to the start of the first one that starts in or after it, never past <paramref name="limits"/> (the end
+    /// of the gap before, the start of the gap after: their speech is filled by their own uploads; Swift <c>hole</c>).
+    /// The widening is covered silence (a session's audio up to its last final, or below
+    /// <see cref="MonoAudio.SilencePeak"/>), so it holds no stream speech, while a sentence piece timed by its share of
+    /// the text can land there; a long silence widens more, so a sentence of a batch segment spanning it can repeat the
+    /// stream's (the <see cref="GapKeeps"/> trade-off). A zero-length gap (a resume bridge) stays as it is. Pure, for
+    /// tests.
+    /// </summary>
+    internal static Span Hole(Span gap, IReadOnlyList<RawSegment> segments, (double Start, double End)? limits = null)
+    {
+        if (!(gap.End > gap.Start)) return gap;
+        var (lower, upper) = limits ?? (double.NegativeInfinity, double.PositiveInfinity);
+        var previous = segments.Where(s => s.Start < gap.Start).Select(s => (double?)s.End).Max();
+        var next = segments.Where(s => s.Start >= gap.Start).Select(s => (double?)s.Start).Min();
+        return new Span(
+            Math.Max(lower, Math.Min(gap.Start, previous ?? gap.Start)), Math.Min(upper, Math.Max(gap.End, next ?? gap.End)));
+    }
+
+    /// <summary>
+    /// Whether a gap upload's <paramref name="segment"/> belongs to <paramref name="gap"/>: it overlaps it by at least half
+    /// of the shorter of the two (a zero-length segment: its time is inside the gap). A zero-length gap (a resume bridge)
+    /// keeps nothing. Chosen trade-off: next to a hole shorter than a sentence, the one sentence over it is kept whole and
+    /// may repeat words the stream has around the hole, rather than losing the hole's speech; a segment without sentence
+    /// ends (not cut) can repeat more (Swift <c>gapKeeps</c>). Pure, for tests.
+    /// </summary>
+    internal static bool GapKeeps(CloudSegment segment, Span gap)
+    {
+        var length = segment.End - segment.Start;
+        if (length <= 0) return segment.Start >= gap.Start && segment.Start < gap.End;
+        var overlap = Math.Min(segment.End, gap.End) - Math.Max(segment.Start, gap.Start);
+        return overlap > 0 && overlap >= Math.Min(length, gap.End - gap.Start) / 2;
+    }
+
+    /// <summary>
+    /// <paramref name="segment"/> cut after each sentence end (<c>.?!</c> before a space, <c>。？！</c>, or the end) when it straddles
+    /// the start or the end of <paramref name="gap"/>, each piece timed by its share of the text (approximate: the
+    /// providers' segments carry no word times); else <paramref name="segment"/> itself (Swift <c>sentencePieces</c>).
+    /// Pure, for tests.
+    /// </summary>
+    internal static List<CloudSegment> SentencePieces(CloudSegment segment, Span gap)
+    {
+        bool Straddles(double edge) => segment.Start < edge && edge < segment.End;
+        var text = segment.Text;
+        if (!(Straddles(gap.Start) || Straddles(gap.End)) || text.Length == 0) return [segment];
+        double Time(int offset) => segment.Start + (segment.End - segment.Start) * offset / text.Length;
+        var pieces = new List<CloudSegment>();
+        var from = 0;
+        var last = text.Length - 1;
+        for (var index = 0; index <= last; index++)
+        {
+            var ends = index == last || "\u3002\uFF1F\uFF01".Contains(text[index])
+                || (".?!".Contains(text[index]) && char.IsWhiteSpace(text[index + 1]));
+            if (!ends) continue;
+            var start = from;
+            while (start <= index && char.IsWhiteSpace(text[start])) start++;
+            if (start <= index)
+            {
+                pieces.Add(segment with
+                {
+                    Start = Time(start), End = Time(index + 1), Text = text[start..(index + 1)].Trim(),
+                });
+            }
+            from = index + 1;
+        }
+        return pieces.Count == 0 ? [segment] : pieces;
+    }
+
+    /// <summary>
     /// The gaps of one channel's 16 kHz extract, in file time (Swift <c>fillGaps</c>): each gap is read in slabs of at
     /// most <see cref="MonoAudio.SlabSeconds"/> into one <see cref="SpeechChunker"/>, so silence is not decoded; a chunk
     /// below <see cref="MonoAudio.SilencePeak"/> is skipped, and each chunk gets the language of
@@ -376,6 +646,20 @@ public sealed class TranscriptionPipeline(
         return prior.IsUsable(resolved.Id, engineFallback, job.Language, duration) ? resolved : null;
     }
 
+    /// <summary>The session audio's duration; null when it is missing or unreadable.</summary>
+    private double? AudioDuration(TranscriptionJob job, RecordingSession session)
+    {
+        if (ConversationFiles.AudioPath(job.Folder, session.AudioFileName) is not { } audio) return null;
+        try
+        {
+            return MonoAudio.Duration(audio, decoder);
+        }
+        catch (TranscriptionException)
+        {
+            return null;
+        }
+    }
+
     /// <summary>The channel sources when the recording has a mic channel (a prior needs one); null otherwise.</summary>
     private (ChannelSource? Mic, ChannelSource? System)? PriorSources(RecordingSession session, TranscriptionJob job)
     {
@@ -393,6 +677,15 @@ public sealed class TranscriptionPipeline(
     /// <summary>A batch ASR entry that also loads as an <see cref="ITranscriptionSession"/>: Whisper or Parakeet.</summary>
     public static bool TranscribesChunks(ModelEntry entry) =>
         entry.Kind == ModelKind.Asr && entry.Runtime is ModelRuntime.WhisperNet or ModelRuntime.SherpaOnnx;
+
+    /// <summary>
+    /// The local models a recording transcriber can run, in catalog order, for the cloud live-transcript picker (Swift
+    /// <c>liveEntries</c>): the usable Whisper and Parakeet entries (<see cref="TranscribesChunks"/>; no Apple Speech on
+    /// Windows). <paramref name="isUsable"/> includes "its runtime is registered". Any language: the picked id still
+    /// goes through the incremental-entry check at Start.
+    /// </summary>
+    public static IReadOnlyList<ModelEntry> LiveEntries(Func<ModelEntry, bool> isUsable) =>
+        [.. ModelCatalog.Asr.Where(e => isUsable(e) && TranscribesChunks(e))];
 
     /// <summary>
     /// Extracts each channel (skipping silent ones), runs <paramref name="asr"/> on it, diarizes the system channel
