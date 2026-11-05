@@ -7,6 +7,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.5.0] - 2026-11-05
+
+### Added
+
+- An API Keys section in Settings holds every provider key in one place, with Test and a link to get a key. Custom OpenAI-compatible endpoints are set up there too.
+- Four new cloud transcription providers: xAI, Speechmatics, Soniox and Gladia.
+- Live transcript with a cloud engine: while recording, the live transcript can come from a local model (free and display only: the saved transcript still comes from the cloud after Stop) or from the provider's realtime stream (ElevenLabs, Deepgram, AssemblyAI, OpenAI, xAI, Speechmatics, Soniox or Gladia). Realtime costs money, with two live connections for the whole recording on top of the transcription after Stop, and it asks before it sends audio to a host you have not confirmed yet.
+- "Use the realtime result as the transcript" saves the streamed transcript instead of uploading the recording again after Stop. Only the parts missed while the connection was down are sent after Stop.
+
+### Changed
+
+- A provider is available as soon as its key is saved; the on/off switches are gone. The Transcription model tab lists the speech-to-text APIs first, marks each provider with a saved key, and its API key button opens that provider in API Keys.
+
+### Fixed
+
+- Speakers keep their labels when a long recording is uploaded to a cloud provider in parts.
+- A realtime-only model set as the transcription model now shows a warning, and transcription after Stop asks to pick another model instead of failing.
+- An installed model could rarely show as not installed when it was checked from several places at once. (Windows)
+
 ## [1.4.0] - 2026-11-03
 
 ### Added
