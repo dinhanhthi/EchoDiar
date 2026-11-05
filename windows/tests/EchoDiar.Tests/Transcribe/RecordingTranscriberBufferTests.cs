@@ -258,6 +258,39 @@ public sealed class RealtimeCoverageTests
             Pieces("X", 10, 90), gap, new TimeRange(10, 90), stream, labels: true, partIndex: 1)));
     }
 
+    // A gap upload's segment that straddles an edge of the gap (word-timed providers group up to ~15 s) is cut at its
+    // sentence ends, each piece timed by its share of the text, and the pieces whose midpoint is in the gap are kept: the
+    // speech inside the gap is not lost with the half outside it. A segment inside the gap stays whole; one in the padding
+    // adds nothing.
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void GapEdgeSegmentsKeepTheirSentencesInsideTheGap(bool labels)
+    {
+        List<CloudSegment> response =
+        [
+            new(12, 20, "Pad pad.", "X"),
+            new(30, 50, "One one. Two two. Tri tri. For for.", "X"),
+            new(50, 60, "Mid mid. Mid two.", "X"),
+            new(65, 85, "Fiv fiv. Six six. Sev sev. Eig eig.", "X"),
+            new(95, 100, "Pad two.", "X"),
+        ];
+        var joined = TranscriptionPipeline.JoinGap(response, new Span(41, 73), new TimeRange(11, 103), [], labels, partIndex: 1);
+
+        Assert.Equal(["Tri tri.", "For for.", "Mid mid. Mid two.", "Fiv fiv.", "Six six."], joined.Select(s => s.Text));
+        Assert.Equal(30 + 20.0 * 18 / 35, joined[0].Start, 2);
+        Assert.Equal(30 + 20.0 * 26 / 35, joined[0].End, 2);
+        Assert.Equal((50.0, 60.0), (joined[2].Start, joined[2].End));
+        Assert.All(joined, s => Assert.Equal(labels ? joined[0].Speaker : null, s.Speaker));
+
+        // A short gap inside one segment whose midpoint is in it: the segment stays whole (none of its sentences has its
+        // midpoint in the gap). CJK sentence ends cut without a space.
+        var shortGap = TranscriptionPipeline.JoinGap([response[1]], new Span(39.8, 41), new TimeRange(9.8, 71), [], labels, partIndex: 1);
+        Assert.Equal(["One one. Two two. Tri tri. For for."], shortGap.Select(s => s.Text));
+        var cjk = TranscriptionPipeline.SentencePieces(new CloudSegment(0, 6, "你好。我们开始吧！"), new Span(5, 9));
+        Assert.Equal(["你好。", "我们开始吧！"], cjk.Select(s => s.Text));
+    }
+
     private static List<CloudSegment> Pieces(string label, double from, double to)
     {
         var pieces = new List<CloudSegment>();

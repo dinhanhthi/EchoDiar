@@ -479,8 +479,10 @@ public actor TranscriptionPipeline {
     }
 
     /// `segments` (one channel, file time) with a gap's upload `response` (file time, covering `upload` = the gap and
-    /// its padding) joined, sorted by start. The response's segments whose midpoint is inside `gap` are kept; the
-    /// padding's only serve the labels. Without `labels` every speaker label is dropped. With `labels`, two steps:
+    /// its padding) joined, sorted by start. The response's segments whose midpoint is inside `gap` are kept; one whose
+    /// midpoint is outside but that straddles an edge of the gap is cut into its sentences first (`sentencePieces`), so
+    /// a long segment's speech inside the gap is not dropped with its half outside; the padding's only serve the labels.
+    /// Without `labels` every speaker label is dropped. With `labels`, two steps:
     /// the response's labels map onto the labels before the gap by the left padding (`SpeakerLabelReconciler`, a label
     /// with no match gets its own `"p<N>:"` scope, `partIndex` and up, so it never merges); then each label first heard
     /// after the gap (the session after an unplanned disconnect, `"r<N>:"`) takes the label of (before + response)
@@ -500,8 +502,11 @@ public actor TranscriptionPipeline {
                 start: segment.start, end: segment.end, text: segment.text, detectedLanguage: segment.language,
                 speaker: labels ? label(segment.speaker) : nil)
         }
+        func kept(_ response: [CloudSegment]) -> [RawSegment] {
+            response.flatMap { inGap($0) ? [$0] : sentencePieces($0, straddling: gap) }.filter(inGap).map(raw)
+        }
         guard labels else {
-            return (segments + response.filter(inGap).map(raw)).sorted { $0.start < $1.start }
+            return (segments + kept(response)).sorted { $0.start < $1.start }
         }
         let existing = segments.map {
             CloudSegment(start: $0.start, end: $0.end, text: $0.text, speaker: $0.speaker, language: $0.detectedLanguage)
@@ -534,7 +539,37 @@ public actor TranscriptionPipeline {
             if let speaker = label(segment.speaker), let target = afterMapping[speaker] { segment.speaker = target }
             return segment
         }
-        return (bridged + mapped.filter(inGap).map(raw)).sorted { $0.start < $1.start }
+        return (bridged + kept(mapped)).sorted { $0.start < $1.start }
+    }
+
+    /// `segment` cut after each sentence end (`.?!` before a space, `。？！`, or the end) when it straddles the start or
+    /// the end of `gap`, each piece timed by its share of the text (approximate: the providers' segments carry no word
+    /// times); else `segment` itself. Pure, for tests.
+    static func sentencePieces(_ segment: CloudSegment, straddling gap: Span) -> [CloudSegment] {
+        let straddles = { (edge: Double) in segment.start < edge && edge < segment.end }
+        let text = Array(segment.text)
+        guard straddles(gap.start) || straddles(gap.end), !text.isEmpty else { return [segment] }
+        let time = { (offset: Int) in
+            segment.start + (segment.end - segment.start) * Double(offset) / Double(text.count)
+        }
+        var pieces: [CloudSegment] = []
+        var from = 0
+        let last = text.count - 1
+        for index in text.indices
+        where index == last || "。？！".contains(text[index])
+            || (".?!".contains(text[index]) && text[index + 1].isWhitespace) {
+            var start = from
+            while start <= index, text[start].isWhitespace { start += 1 }
+            if start <= index {
+                var piece = segment
+                piece.start = time(start)
+                piece.end = time(index + 1)
+                piece.text = String(text[start...index]).trimmingCharacters(in: .whitespacesAndNewlines)
+                pieces.append(piece)
+            }
+            from = index + 1
+        }
+        return pieces.isEmpty ? [segment] : pieces
     }
 
     /// The gaps of one channel's 16 kHz extract, in file time: each read in slabs of at most `slabSeconds` and cut

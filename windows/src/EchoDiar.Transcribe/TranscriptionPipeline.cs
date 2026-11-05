@@ -437,8 +437,10 @@ public sealed class TranscriptionPipeline(
     /// <summary>
     /// <paramref name="segments"/> (one channel, file time) with a gap's upload <paramref name="response"/> (file time,
     /// covering <paramref name="upload"/> = the gap and its padding) joined, sorted by start (Swift <c>joinGap</c>). The
-    /// response's segments whose midpoint is inside <paramref name="gap"/> (<c>[start, end)</c>) are kept; the padding's
-    /// only serve the labels. Without <paramref name="labels"/> every speaker label is dropped. With
+    /// response's segments whose midpoint is inside <paramref name="gap"/> (<c>[start, end)</c>) are kept; one whose
+    /// midpoint is outside but that straddles an edge of the gap is cut into its sentences first
+    /// (<see cref="SentencePieces"/>), so a long segment's speech inside the gap is not dropped with its half outside;
+    /// the padding's only serve the labels. Without <paramref name="labels"/> every speaker label is dropped. With
     /// <paramref name="labels"/>, two steps: the response's labels map onto the labels before the gap by the left padding
     /// (<see cref="SpeakerLabelReconciler.Labels"/>; a label with no match gets its own <c>"p&lt;N&gt;:"</c> scope,
     /// <paramref name="partIndex"/> and up, so it never merges); then each label first heard after the gap (the session
@@ -461,7 +463,10 @@ public sealed class TranscriptionPipeline(
         static HashSet<string> LabelSet(IEnumerable<CloudSegment> list) =>
             list.Select(s => Label(s.Speaker)).OfType<string>().ToHashSet(StringComparer.Ordinal);
 
-        if (!labels) return [.. segments.Concat(response.Where(InGap).Select(Raw)).OrderBy(s => s.Start)];
+        IEnumerable<RawSegment> Kept(IEnumerable<CloudSegment> list) =>
+            list.SelectMany(segment => InGap(segment) ? [segment] : SentencePieces(segment, gap)).Where(InGap).Select(Raw);
+
+        if (!labels) return [.. segments.Concat(Kept(response)).OrderBy(s => s.Start)];
         var existing = segments.Select(s => new CloudSegment(s.Start, s.End, s.Text, s.Speaker, s.DetectedLanguage)).ToList();
         // Step 1: the gap onto the session before. Every existing label counts for the scope; only the left padding
         // counts for the matches.
@@ -489,7 +494,41 @@ public sealed class TranscriptionPipeline(
             Label(segment.Speaker) is { } speaker && afterMapping.TryGetValue(speaker, out var target)
                 ? segment with { Speaker = target }
                 : segment);
-        return [.. bridged.Concat(mapped.Where(InGap).Select(Raw)).OrderBy(s => s.Start)];
+        return [.. bridged.Concat(Kept(mapped)).OrderBy(s => s.Start)];
+    }
+
+    /// <summary>
+    /// <paramref name="segment"/> cut after each sentence end (<c>.?!</c> before a space, <c>。？！</c>, or the end) when it straddles
+    /// the start or the end of <paramref name="gap"/>, each piece timed by its share of the text (approximate: the
+    /// providers' segments carry no word times); else <paramref name="segment"/> itself (Swift <c>sentencePieces</c>).
+    /// Pure, for tests.
+    /// </summary>
+    internal static List<CloudSegment> SentencePieces(CloudSegment segment, Span gap)
+    {
+        bool Straddles(double edge) => segment.Start < edge && edge < segment.End;
+        var text = segment.Text;
+        if (!(Straddles(gap.Start) || Straddles(gap.End)) || text.Length == 0) return [segment];
+        double Time(int offset) => segment.Start + (segment.End - segment.Start) * offset / text.Length;
+        var pieces = new List<CloudSegment>();
+        var from = 0;
+        var last = text.Length - 1;
+        for (var index = 0; index <= last; index++)
+        {
+            var ends = index == last || "\u3002\uFF1F\uFF01".Contains(text[index])
+                || (".?!".Contains(text[index]) && char.IsWhiteSpace(text[index + 1]));
+            if (!ends) continue;
+            var start = from;
+            while (start <= index && char.IsWhiteSpace(text[start])) start++;
+            if (start <= index)
+            {
+                pieces.Add(segment with
+                {
+                    Start = Time(start), End = Time(index + 1), Text = text[start..(index + 1)].Trim(),
+                });
+            }
+            from = index + 1;
+        }
+        return pieces.Count == 0 ? [segment] : pieces;
     }
 
     /// <summary>

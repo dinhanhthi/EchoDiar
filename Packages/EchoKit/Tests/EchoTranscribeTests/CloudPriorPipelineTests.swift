@@ -159,6 +159,39 @@ struct CloudPriorPipelineTests {
         }
     }
 
+    /// A gap upload's segment that straddles an edge of the gap (word-timed providers group up to ~15 s) is cut at
+    /// its sentence ends, each piece timed by its share of the text, and the pieces whose midpoint is in the gap are
+    /// kept: the speech inside the gap is not lost with the half outside it. A segment inside the gap stays whole; one
+    /// in the padding adds nothing.
+    @Test(arguments: [false, true])
+    func gapEdgeSegmentsKeepTheirSentencesInsideTheGap(_ labels: Bool) throws {
+        let response = [
+            CloudSegment(start: 12, end: 20, text: "Pad pad.", speaker: "X"),
+            CloudSegment(start: 30, end: 50, text: "One one. Two two. Tri tri. For for.", speaker: "X"),
+            CloudSegment(start: 50, end: 60, text: "Mid mid. Mid two.", speaker: "X"),
+            CloudSegment(start: 65, end: 85, text: "Fiv fiv. Six six. Sev sev. Eig eig.", speaker: "X"),
+            CloudSegment(start: 95, end: 100, text: "Pad two.", speaker: "X"),
+        ]
+        let joined = TranscriptionPipeline.joinGap(
+            response, gap: Span(start: 41, end: 73), upload: 11...103, into: [], labels: labels, partIndex: 1)
+
+        #expect(joined.map(\.text) == ["Tri tri.", "For for.", "Mid mid. Mid two.", "Fiv fiv.", "Six six."])
+        let tri = try #require(joined.first)
+        #expect(abs(tri.start - (30 + 20 * 18 / 35)) < 0.01)
+        #expect(abs(tri.end - (30 + 20 * 26 / 35)) < 0.01)
+        #expect(joined[2].start == 50 && joined[2].end == 60)
+        #expect(joined.allSatisfy { $0.speaker == (labels ? joined[0].speaker : nil) })
+
+        // A short gap inside one segment whose midpoint is in it: the segment stays whole (none of its sentences has
+        // its midpoint in the gap). CJK sentence ends cut without a space.
+        let short = TranscriptionPipeline.joinGap(
+            [response[1]], gap: Span(start: 39.8, end: 41), upload: 9.8...71, into: [], labels: labels, partIndex: 1)
+        #expect(short.map(\.text) == ["One one. Two two. Tri tri. For for."])
+        let cjk = TranscriptionPipeline.sentencePieces(
+            CloudSegment(start: 0, end: 6, text: "你好。我们开始吧！"), straddling: Span(start: 5, end: 9))
+        #expect(cjk.map(\.text) == ["你好。", "我们开始吧！"])
+    }
+
     /// A resume after a pause with no gap (`systemBridges`): the stream scoped the resumed session's labels
     /// (`r1:A`); the audio ±30 s around the resume goes up once with labels, hears one voice there, and maps `r1:A`
     /// back onto `A`. The upload adds no segment.
