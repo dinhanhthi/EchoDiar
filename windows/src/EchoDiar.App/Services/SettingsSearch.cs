@@ -2,6 +2,7 @@ using EchoDiar.App.ViewModels;
 using EchoDiar.App.Views;
 using EchoDiar.Core;
 using Microsoft.UI.Xaml;
+using Microsoft.UI.Xaml.Controls;
 
 namespace EchoDiar.App.Services;
 
@@ -17,7 +18,8 @@ public sealed record SettingsEntry(string Title, IReadOnlyList<string> Keywords,
 /// <summary>
 /// A sidebar section of Settings (macOS <c>SettingsTab</c>): its id, its macOS title, its Segoe Fluent Icons glyph, its
 /// inner tabs (shown in the title bar after Record; none for most), its searchable rows, and its page, made the first
-/// time the section is shown on the Settings page.
+/// time the section is shown on the Settings page from the model and the toolbar's dialog queue (a page that shows its
+/// own dialog shows it there; null when there is none).
 /// </summary>
 public sealed record SettingsSection(
     string Id,
@@ -25,7 +27,7 @@ public sealed record SettingsSection(
     string Glyph,
     IReadOnlyList<SettingsSubTab> SubTabs,
     IReadOnlyList<SettingsEntry> Entries,
-    Func<AppViewModel, FrameworkElement> CreatePage)
+    Func<AppViewModel, Func<ContentDialog, Task<bool>>?, FrameworkElement> CreatePage)
 {
     /// <summary>The shown title of the inner tab <paramref name="id"/>, or null.</summary>
     public string? SubTabTitle(string? id) => SubTabs.FirstOrDefault(t => t.Id == id) is { } tab ? Loc.T(tab.Title) : null;
@@ -54,22 +56,22 @@ public static class SettingsSearch
     /// <summary>Every section, in sidebar order (macOS: General, Recording, Transcription, AI, API Keys, RAG, Storage, Shortcuts, About, Acknowledgements).</summary>
     public static IReadOnlyList<SettingsSection> Sections { get; } =
     [
-        new(General, "General", "\uE713", [], GeneralSettingsPage.SearchEntries, model => new GeneralSettingsPage(model)),
+        new(General, "General", "\uE713", [], GeneralSettingsPage.SearchEntries, (model, _) => new GeneralSettingsPage(model)),
         new(
             Recording, "Recording", "\uE7C8", RecordingSettingsPage.SubTabs, RecordingSettingsPage.SearchEntries,
-            model => new RecordingSettingsPage(model)),
+            (model, _) => new RecordingSettingsPage(model)),
         new(
             Transcription, "Transcription", "\uE8D6", TranscriptionSettingsPage.SubTabs, TranscriptionSettingsPage.SearchEntries,
-            model => new TranscriptionSettingsPage(model)),
+            (model, showDialog) => new TranscriptionSettingsPage(model) { ShowDialog = showDialog }),
         new(
             Providers, "AI", "\uE99A", ProvidersSettingsPage.SubTabs, ProvidersSettingsPage.SearchEntries,
-            model => new ProvidersSettingsPage(model)),
-        new(ApiKeys, "API Keys", "\uE8D7", [], ApiKeysSettingsPage.SearchEntries, model => new ApiKeysSettingsPage(model)),
-        new(Rag, "RAG", "\uE773", [], RAGSettingsPage.SearchEntries, model => new RAGSettingsPage(model)),
-        new(Storage, "Storage", "\uEDA2", StorageSettingsPage.SubTabs, StorageSettingsPage.SearchEntries, model => new StorageSettingsPage(model)),
-        new(Shortcuts, "Shortcuts", "\uE765", [], ShortcutsSettingsPage.SearchEntries, model => new ShortcutsSettingsPage(model)),
-        new(About, "About", "\uE946", [], AboutSettingsPage.SearchEntries, model => new AboutSettingsPage(model)),
-        new(Acknowledgements, "Acknowledgements", "\uE8A5", [], AcknowledgementsSettingsPage.SearchEntries, _ => new AcknowledgementsSettingsPage()),
+            (model, _) => new ProvidersSettingsPage(model)),
+        new(ApiKeys, "API Keys", "\uE8D7", [], ApiKeysSettingsPage.SearchEntries, (model, _) => new ApiKeysSettingsPage(model)),
+        new(Rag, "RAG", "\uE773", [], RAGSettingsPage.SearchEntries, (model, _) => new RAGSettingsPage(model)),
+        new(Storage, "Storage", "\uEDA2", StorageSettingsPage.SubTabs, StorageSettingsPage.SearchEntries, (model, _) => new StorageSettingsPage(model)),
+        new(Shortcuts, "Shortcuts", "\uE765", [], ShortcutsSettingsPage.SearchEntries, (model, _) => new ShortcutsSettingsPage(model)),
+        new(About, "About", "\uE946", [], AboutSettingsPage.SearchEntries, (model, _) => new AboutSettingsPage(model)),
+        new(Acknowledgements, "Acknowledgements", "\uE8A5", [], AcknowledgementsSettingsPage.SearchEntries, (_, _) => new AcknowledgementsSettingsPage()),
     ];
 
     private static readonly Lazy<IReadOnlyList<SettingsSearchItem>> AllItems = new(() =>

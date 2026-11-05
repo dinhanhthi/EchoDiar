@@ -338,6 +338,10 @@
     <value>音频会离开这台电脑：录音的麦克风声道和系统声道会上传到 {0}（{1}）进行转写，并由其计费。提供商可能会按照其自身的保留政策保存音频。每个提供商和目标位置只会询问你一次。</value>
     <comment>Audio leaves this PC: the recording's mic and system channels are uploaded to %@ (%@) for transcription and billed by them. The provider may keep the audio under its own retention policy. You are asked once per provider and destination.</comment>
   </data>
+  <data name="AudioLeavesThisPCWhileRecordingTheMicAndSystemChannelsAreStr" xml:space="preserve">
+    <value>音频会离开这台电脑：录音期间，麦克风声道和系统声道会实时流式传输到 {0}（{1}）进行转写，并由其计费。提供商可能会按照其自身的保留政策保存音频。每个提供商和目标位置只会询问你一次。</value>
+    <comment>Audio leaves this PC: while recording, the mic and system channels are streamed live to %@ (%@) for transcription and billed by them. The provider may keep the audio under its own retention policy. You are asked once per provider and destination.</comment>
+  </data>
   <data name="AudioOnlyKeepTranscriptSummaryAndChat" xml:space="preserve">
     <value>仅音频（保留转写文本、摘要和聊天）</value>
     <comment>Audio only (keep transcript, summary and chat)</comment>
@@ -1878,6 +1882,10 @@
     <value>未安装实时转写模型。请在上方下载 WhisperKit 或 Parakeet 模型。</value>
     <comment>No live model installed. Download a WhisperKit or Parakeet model above.</comment>
   </data>
+  <data name="NoLiveModelInstalledDownloadAWhisperOrParakeetModelAbove" xml:space="preserve">
+    <value>未安装实时转写模型。请在上方下载 Whisper 或 Parakeet 模型。</value>
+    <comment>No live model installed. Download a Whisper or Parakeet model above.</comment>
+  </data>
   <data name="NoModelChooseOneInSettings" xml:space="preserve">
     <value>没有模型：请在设置中选择一个</value>
     <comment>No model: choose one in Settings</comment>
@@ -2718,9 +2726,9 @@
     <value>显示未来 7 天内的会议。列表会自动更新。</value>
     <comment>Showing meetings in the next 7 days. The list updates automatically.</comment>
   </data>
-  <data name="ShowsTheTranscriptDuringTheRecordingAndKeepsItSoItIsReadyWit" xml:space="preserve">
-    <value>在录音期间显示转写文本并保留下来，因此停止后几秒内即可就绪。录音时会占用更多 CPU 和内存。仅限 Whisper 和 Parakeet 模型；其他引擎会在停止后转写。</value>
-    <comment>Shows the transcript during the recording and keeps it, so it is ready within seconds of Stop. Uses more CPU and memory while recording. Whisper and Parakeet models only; other engines transcribe after Stop.</comment>
+  <data name="ShowsTheTranscriptDuringTheRecordingWhisperAndParakeetModels" xml:space="preserve">
+    <value>在录音期间显示转写文本。Whisper 和 Parakeet 模型会保留下来，因此停止后几秒内即可就绪。录音时会占用更多 CPU 和内存。云端引擎可以通过本地模型或其实时流显示转写文本：请参阅“转写模型 › 云端”。</value>
+    <comment>Shows the transcript during the recording. Whisper and Parakeet models keep it, so it is ready within seconds of Stop. Uses more CPU and memory while recording. A cloud engine can show it with a local model or its realtime stream: see Transcription model › Cloud.</comment>
   </data>
   <data name="ShowsTheTranscriptDuringTheRecordingWhisperKitAndParakeetMod" xml:space="preserve">
     <value>在录音期间显示转写文本。WhisperKit 和 Parakeet 模型会保留下来，因此停止后几秒内即可就绪；Apple Speech（macOS 26+）仅显示，停止后再转写。录音时会占用更多 CPU 和内存。云端引擎可以通过本地模型或其实时流显示转写文本：请参阅“转写模型 › 云端”。</value>
@@ -2733,6 +2741,10 @@
   <data name="ShowsTheTranscriptWhileRecordingWithAModelOnThisMacFreeNothi" xml:space="preserve">
     <value>录音时使用这台 Mac 上的模型显示转写文本。免费：录音期间不会上传任何内容，但会占用 CPU、内存和电量。保存的转写文本仍会在停止后由 {0} 生成，因此可能与你看到的不同。</value>
     <comment>Shows the transcript while recording with a model on this Mac. Free: nothing is uploaded while recording, but it uses CPU, memory and battery. The saved transcript still comes from %@ after Stop, so it can differ from what you saw.</comment>
+  </data>
+  <data name="ShowsTheTranscriptWhileRecordingWithAModelOnThisPCFreeNothin" xml:space="preserve">
+    <value>录音时使用这台电脑上的模型显示转写文本。免费：录音期间不会上传任何内容，但会占用 CPU、内存和电量。保存的转写文本仍会在停止后由 {0} 生成，因此可能与你看到的不同。</value>
+    <comment>Shows the transcript while recording with a model on this PC. Free: nothing is uploaded while recording, but it uses CPU, memory and battery. The saved transcript still comes from %@ after Stop, so it can differ from what you saw.</comment>
   </data>
   <data name="SimulateState" xml:space="preserve">
     <value>模拟状态</value>

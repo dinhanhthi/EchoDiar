@@ -338,6 +338,10 @@
     <value>Âm thanh rời khỏi máy tính này: kênh micrô và kênh hệ thống của bản ghi âm được tải lên {0} ({1}) để chép lời và do họ tính phí. Nhà cung cấp có thể lưu giữ âm thanh theo chính sách lưu trữ riêng của họ. Bạn chỉ được hỏi một lần cho mỗi nhà cung cấp và nơi nhận.</value>
     <comment>Audio leaves this PC: the recording's mic and system channels are uploaded to %@ (%@) for transcription and billed by them. The provider may keep the audio under its own retention policy. You are asked once per provider and destination.</comment>
   </data>
+  <data name="AudioLeavesThisPCWhileRecordingTheMicAndSystemChannelsAreStr" xml:space="preserve">
+    <value>Âm thanh rời khỏi máy tính này: trong khi ghi âm, kênh micrô và kênh hệ thống được truyền trực tiếp đến {0} ({1}) để chép lời và do họ tính phí. Nhà cung cấp có thể lưu giữ âm thanh theo chính sách lưu trữ riêng của họ. Bạn chỉ được hỏi một lần cho mỗi nhà cung cấp và nơi nhận.</value>
+    <comment>Audio leaves this PC: while recording, the mic and system channels are streamed live to %@ (%@) for transcription and billed by them. The provider may keep the audio under its own retention policy. You are asked once per provider and destination.</comment>
+  </data>
   <data name="AudioOnlyKeepTranscriptSummaryAndChat" xml:space="preserve">
     <value>Chỉ âm thanh (giữ bản chép lời, bản tóm tắt và cuộc trò chuyện)</value>
     <comment>Audio only (keep transcript, summary and chat)</comment>
@@ -1878,6 +1882,10 @@
     <value>Chưa cài mô hình chép lời trực tiếp nào. Hãy tải về một mô hình WhisperKit hoặc Parakeet ở trên.</value>
     <comment>No live model installed. Download a WhisperKit or Parakeet model above.</comment>
   </data>
+  <data name="NoLiveModelInstalledDownloadAWhisperOrParakeetModelAbove" xml:space="preserve">
+    <value>Chưa cài mô hình chép lời trực tiếp nào. Hãy tải về một mô hình Whisper hoặc Parakeet ở trên.</value>
+    <comment>No live model installed. Download a Whisper or Parakeet model above.</comment>
+  </data>
   <data name="NoModelChooseOneInSettings" xml:space="preserve">
     <value>Không có mô hình: hãy chọn một mô hình trong Cài đặt</value>
     <comment>No model: choose one in Settings</comment>
@@ -2718,9 +2726,9 @@
     <value>Đang hiển thị các cuộc họp trong 7 ngày tới. Danh sách tự động cập nhật.</value>
     <comment>Showing meetings in the next 7 days. The list updates automatically.</comment>
   </data>
-  <data name="ShowsTheTranscriptDuringTheRecordingAndKeepsItSoItIsReadyWit" xml:space="preserve">
-    <value>Hiển thị bản chép lời trong khi ghi âm và giữ lại, nhờ đó bản chép lời sẵn sàng trong vài giây sau khi bấm Dừng. Dùng nhiều CPU và bộ nhớ hơn khi ghi âm. Chỉ dành cho mô hình Whisper và Parakeet; các công cụ khác chép lời sau khi bấm Dừng.</value>
-    <comment>Shows the transcript during the recording and keeps it, so it is ready within seconds of Stop. Uses more CPU and memory while recording. Whisper and Parakeet models only; other engines transcribe after Stop.</comment>
+  <data name="ShowsTheTranscriptDuringTheRecordingWhisperAndParakeetModels" xml:space="preserve">
+    <value>Hiển thị bản chép lời trong khi ghi âm. Mô hình Whisper và Parakeet giữ lại bản này, nhờ đó bản chép lời sẵn sàng trong vài giây sau khi bấm Dừng. Dùng nhiều CPU và bộ nhớ hơn khi ghi âm. Công cụ đám mây có thể hiển thị bản này bằng một mô hình cục bộ hoặc luồng thời gian thực của nó: xem Mô hình chép lời › Đám mây.</value>
+    <comment>Shows the transcript during the recording. Whisper and Parakeet models keep it, so it is ready within seconds of Stop. Uses more CPU and memory while recording. A cloud engine can show it with a local model or its realtime stream: see Transcription model › Cloud.</comment>
   </data>
   <data name="ShowsTheTranscriptDuringTheRecordingWhisperKitAndParakeetMod" xml:space="preserve">
     <value>Hiển thị bản chép lời trong khi ghi âm. Mô hình WhisperKit và Parakeet giữ lại bản này, nhờ đó bản chép lời sẵn sàng trong vài giây sau khi bấm Dừng; Apple Speech (macOS 26+) chỉ hiển thị và chép lời sau khi bấm Dừng. Dùng nhiều CPU và bộ nhớ hơn khi ghi âm. Công cụ đám mây có thể hiển thị bản này bằng một mô hình cục bộ hoặc luồng thời gian thực của nó: xem Mô hình chép lời › Đám mây.</value>
@@ -2733,6 +2741,10 @@
   <data name="ShowsTheTranscriptWhileRecordingWithAModelOnThisMacFreeNothi" xml:space="preserve">
     <value>Hiển thị bản chép lời trong khi ghi âm bằng một mô hình trên máy Mac này. Miễn phí: không có gì được tải lên trong khi ghi âm, nhưng dùng CPU, bộ nhớ và pin. Bản chép lời được lưu vẫn do {0} tạo sau khi bấm Dừng, nên có thể khác với những gì bạn đã thấy.</value>
     <comment>Shows the transcript while recording with a model on this Mac. Free: nothing is uploaded while recording, but it uses CPU, memory and battery. The saved transcript still comes from %@ after Stop, so it can differ from what you saw.</comment>
+  </data>
+  <data name="ShowsTheTranscriptWhileRecordingWithAModelOnThisPCFreeNothin" xml:space="preserve">
+    <value>Hiển thị bản chép lời trong khi ghi âm bằng một mô hình trên máy tính này. Miễn phí: không có gì được tải lên trong khi ghi âm, nhưng dùng CPU, bộ nhớ và pin. Bản chép lời được lưu vẫn do {0} tạo sau khi bấm Dừng, nên có thể khác với những gì bạn đã thấy.</value>
+    <comment>Shows the transcript while recording with a model on this PC. Free: nothing is uploaded while recording, but it uses CPU, memory and battery. The saved transcript still comes from %@ after Stop, so it can differ from what you saw.</comment>
   </data>
   <data name="SimulateState" xml:space="preserve">
     <value>Mô phỏng trạng thái</value>

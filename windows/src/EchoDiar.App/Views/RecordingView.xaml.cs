@@ -99,6 +99,8 @@ public sealed partial class RecordingView : UserControl
                 Update();
                 break;
             case nameof(AppViewModel.Settings):
+            case nameof(AppViewModel.RecordingLanguage):
+            case nameof(AppViewModel.InstalledModelIds):
                 UpdateReason();
                 UpdateCatchUpButton();
                 break;
@@ -174,11 +176,15 @@ public sealed partial class RecordingView : UserControl
         NoLivePanel.Visibility = live ? Visibility.Collapsed : Visibility.Visible;
     }
 
-    private void UpdateReason() => ReasonText.Text = NoCaptionsReason(_model.Settings);
+    private void UpdateReason() => RecordingCard.SetText(ReasonText, NoCaptionsReason(_model));
 
-    /// <summary>The providers changed: which one "Catch up" runs on, and the saved cards' provider names.</summary>
+    /// <summary>
+    /// The providers changed: which one "Catch up" runs on, the saved cards' provider names, and the default cloud
+    /// engine the reason names.
+    /// </summary>
     private void OnProvidersChanged()
     {
+        UpdateReason();
         UpdateCatchUps();
         UpdateCatchUpButton();
     }
@@ -262,8 +268,35 @@ public sealed partial class RecordingView : UserControl
     }
 
     /// <summary>
+    /// Why the recording has no live transcript, with the cloud live options when the default engine is a cloud one
+    /// (macOS <c>noCaptionsReason(model:)</c>): the live source is off, or
+    /// <see cref="AppViewModel.CurrentCloudLiveBlock"/> says what is in the way; also why "Catch up" is off.
+    /// </summary>
+    internal static string NoCaptionsReason(AppViewModel model)
+    {
+        var settings = model.Settings;
+        if (!settings.AutoTranscribe || !settings.TranscribeWhileRecording || model.DefaultCloudConfig is not { } config)
+            return NoCaptionsReason(settings);
+        var name = config.DisplayName;
+        return model.CurrentCloudLiveBlock switch
+        {
+            CloudLiveBlock.NoLiveModel =>
+                Loc.T("No installed live model supports this recording's language. Download one in Settings › Transcription."),
+            CloudLiveBlock.RealtimeUnsupported =>
+                Loc.Format("%@ has no realtime transcription. You can show a live transcript with a local model in Settings.", name),
+            CloudLiveBlock.CloudConsentPending =>
+                Loc.Format("%@ realtime starts once sending audio to %@ (and to its speaker diarizer, if any) is confirmed. Confirm it in a conversation first.", name, name),
+            CloudLiveBlock.RealtimeConsentPending =>
+                Loc.Format("%@ realtime is not confirmed yet. Turn it on in Settings to confirm it.", name),
+            _ => AppViewModel.RealtimeAvailable(config)
+                ? Loc.Format("%@ transcribes after Stop. You can show a live transcript with a local model or %@ realtime in Settings.", name, name)
+                : Loc.Format("%@ transcribes after Stop. You can show a live transcript with a local model in Settings.", name),
+        };
+    }
+
+    /// <summary>
     /// Why there is no live transcript (the conditions of AppViewModel.AttachRecordingTranscriberAsync, read from the
-    /// settings); also why "Catch up" is off. The last one names the Windows engines (macOS: WhisperKit and Parakeet).
+    /// settings); also why "Catch up" is off with a local default engine. The last one names the Windows engines (macOS: WhisperKit and Parakeet).
     /// </summary>
     internal static string NoCaptionsReason(AppSettings settings) =>
         !settings.AutoTranscribe

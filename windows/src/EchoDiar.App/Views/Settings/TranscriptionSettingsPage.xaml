@@ -6,7 +6,9 @@
       energy saver is on are in Recording › After recording, as on macOS.
     - Transcription model: what transcription is, then the speech models by tier, each with its details, Download,
       progress and Cancel, Installed and Delete, Set default; then Cloud (every provider that transcribes, with its
-      model, Set default once configured, and its key status: "API key" opens Settings › API Keys).
+      model, Set default once configured, and its key status: "API key" opens Settings › API Keys); below the default
+      cloud engine's row, its "While recording" group (live with a local model, or with its realtime stream, and using
+      the realtime result as the transcript), greyed while a master switch is off.
     - Diarization model: tell speakers apart, the number of other speakers, what diarization is, then the speaker
       models, then Cloud (the providers that label speakers, with their diarization model).
     The model and cloud rows are made in code (TranscriptionSettingsPage.CreateRow, CloudSection). The footer gives

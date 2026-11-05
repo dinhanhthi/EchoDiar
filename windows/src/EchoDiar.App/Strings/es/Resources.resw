@@ -362,6 +362,10 @@
     <value>El audio sale de este PC: los canales del micrófono y del sistema de la grabación se suben para transcribirlos; los recibe y los factura {0} ({1}). El proveedor puede conservar el audio según su propia política de retención. Se te pregunta una vez por proveedor y destino.</value>
     <comment>Audio leaves this PC: the recording's mic and system channels are uploaded to %@ (%@) for transcription and billed by them. The provider may keep the audio under its own retention policy. You are asked once per provider and destination.</comment>
   </data>
+  <data name="AudioLeavesThisPCWhileRecordingTheMicAndSystemChannelsAreStr" xml:space="preserve">
+    <value>El audio sale de este PC: durante la grabación, los canales del micrófono y del sistema se transmiten en directo a {0} ({1}) para transcribirlos, y este los factura. El proveedor puede conservar el audio según su propia política de retención. Se te pregunta una vez por proveedor y destino.</value>
+    <comment>Audio leaves this PC: while recording, the mic and system channels are streamed live to %@ (%@) for transcription and billed by them. The provider may keep the audio under its own retention policy. You are asked once per provider and destination.</comment>
+  </data>
   <data name="AudioOnlyKeepTranscriptSummaryAndChat" xml:space="preserve">
     <value>Solo el audio (conservar transcripción, resumen y chat)</value>
     <comment>Audio only (keep transcript, summary and chat)</comment>
@@ -1970,6 +1974,10 @@
     <value>No hay ningún modelo en directo instalado. Descarga arriba un modelo WhisperKit o Parakeet.</value>
     <comment>No live model installed. Download a WhisperKit or Parakeet model above.</comment>
   </data>
+  <data name="NoLiveModelInstalledDownloadAWhisperOrParakeetModelAbove" xml:space="preserve">
+    <value>No hay ningún modelo en directo instalado. Descarga arriba un modelo Whisper o Parakeet.</value>
+    <comment>No live model installed. Download a Whisper or Parakeet model above.</comment>
+  </data>
   <data name="NoModelChooseOneInSettings" xml:space="preserve">
     <value>Sin modelo: elige uno en Ajustes</value>
     <comment>No model: choose one in Settings</comment>
@@ -2810,9 +2818,9 @@
     <value>Se muestran las reuniones de los próximos 7 días. La lista se actualiza automáticamente.</value>
     <comment>Showing meetings in the next 7 days. The list updates automatically.</comment>
   </data>
-  <data name="ShowsTheTranscriptDuringTheRecordingAndKeepsItSoItIsReadyWit" xml:space="preserve">
-    <value>Muestra la transcripción durante la grabación y la conserva, para que esté lista segundos después de Detener. Usa más CPU y memoria al grabar. Solo modelos Whisper y Parakeet; los demás motores transcriben después de Detener.</value>
-    <comment>Shows the transcript during the recording and keeps it, so it is ready within seconds of Stop. Uses more CPU and memory while recording. Whisper and Parakeet models only; other engines transcribe after Stop.</comment>
+  <data name="ShowsTheTranscriptDuringTheRecordingWhisperAndParakeetModels" xml:space="preserve">
+    <value>Muestra la transcripción durante la grabación. Los modelos Whisper y Parakeet la conservan, para que esté lista segundos después de Detener. Usa más CPU y memoria al grabar. Un motor en la nube puede mostrarla con un modelo local o con su transmisión en tiempo real: consulta Modelo de transcripción › Nube.</value>
+    <comment>Shows the transcript during the recording. Whisper and Parakeet models keep it, so it is ready within seconds of Stop. Uses more CPU and memory while recording. A cloud engine can show it with a local model or its realtime stream: see Transcription model › Cloud.</comment>
   </data>
   <data name="ShowsTheTranscriptDuringTheRecordingWhisperKitAndParakeetMod" xml:space="preserve">
     <value>Muestra la transcripción durante la grabación. Los modelos WhisperKit y Parakeet la conservan, para que esté lista segundos después de Detener; Apple Speech (macOS 26+) solo la muestra y transcribe después de Detener. Usa más CPU y memoria al grabar. Un motor en la nube puede mostrarla con un modelo local o con su transmisión en tiempo real: consulta Modelo de transcripción › Nube.</value>
@@ -2825,6 +2833,10 @@
   <data name="ShowsTheTranscriptWhileRecordingWithAModelOnThisMacFreeNothi" xml:space="preserve">
     <value>Muestra la transcripción durante la grabación con un modelo de este Mac. Gratis: no se sube nada durante la grabación, pero usa CPU, memoria y batería. La transcripción guardada sigue viniendo de {0} después de Detener, así que puede diferir de lo que viste.</value>
     <comment>Shows the transcript while recording with a model on this Mac. Free: nothing is uploaded while recording, but it uses CPU, memory and battery. The saved transcript still comes from %@ after Stop, so it can differ from what you saw.</comment>
+  </data>
+  <data name="ShowsTheTranscriptWhileRecordingWithAModelOnThisPCFreeNothin" xml:space="preserve">
+    <value>Muestra la transcripción durante la grabación con un modelo de este PC. Gratis: no se sube nada durante la grabación, pero usa CPU, memoria y batería. La transcripción guardada sigue viniendo de {0} después de Detener, así que puede diferir de lo que viste.</value>
+    <comment>Shows the transcript while recording with a model on this PC. Free: nothing is uploaded while recording, but it uses CPU, memory and battery. The saved transcript still comes from %@ after Stop, so it can differ from what you saw.</comment>
   </data>
   <data name="SimulateState" xml:space="preserve">
     <value>Simular estado</value>

@@ -42,6 +42,9 @@ public sealed partial class SettingsPage : UserControl
     /// <summary>The row outlined now.</summary>
     private Control? _highlighted;
 
+    /// <summary>The toolbar's dialog queue, handed to the sections that show their own dialog.</summary>
+    internal Func<ContentDialog, Task<bool>>? ShowDialog { get; set; }
+
     public SettingsPage(AppViewModel model)
     {
         _model = model;
@@ -114,7 +117,7 @@ public sealed partial class SettingsPage : UserControl
         if (SettingsSearch.Section(id) is not { } section) return;
         if (!_pages.TryGetValue(id, out var page))
         {
-            page = section.CreatePage(_model);
+            page = section.CreatePage(_model, ShowDialog);
             _pages[id] = page;
         }
         if (!ReferenceEquals(SectionHost.Content, page)) SectionHost.Content = page;

@@ -140,7 +140,7 @@ public sealed partial class AppViewModel
         get
         {
             if (RecordingCaptions is not { } captions || _recordingTranscriber is null)
-                return RecordingView.NoCaptionsReason(Settings);
+                return RecordingView.NoCaptionsReason(this);
             if (CatchUpRun is { IsRunning: true }) return Loc.T("A catch-up is being written.");
             if (CatchUpProvider is null)
             {
