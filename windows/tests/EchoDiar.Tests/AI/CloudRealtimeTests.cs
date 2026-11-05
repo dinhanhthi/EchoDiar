@@ -267,6 +267,17 @@ public sealed class CloudRealtimeTests
                            {"text": " ", "start": 0.48, "end": 0.52, "type": "spacing", "logprob": 0.0},
                            {"text": "world", "start": 0.52, "end": 0.9, "type": "word", "logprob": -0.1}]}
                 """, Final(0.12, 0.9, "hello world", language: "en"))),
+        // Constructed from documented fields: realtime words have no speaker, so each sentence is its own final (the
+        // diarizer after Stop labels them one by one).
+        ["elevenlabs sentences"] = new("elevenlabs", null,
+            new Step("""
+                {"message_type": "committed_transcript_with_timestamps", "text": "Hi there. Fine.", "language_code": "en",
+                 "words": [{"text": "Hi", "start": 0.1, "end": 0.3, "type": "word"},
+                           {"text": " ", "start": 0.3, "end": 0.35, "type": "spacing"},
+                           {"text": "there.", "start": 0.35, "end": 0.7, "type": "word"},
+                           {"text": " ", "start": 0.7, "end": 1.2, "type": "spacing"},
+                           {"text": "Fine.", "start": 1.3, "end": 1.6, "type": "word"}]}
+                """, Final(0.1, 0.7, "Hi there.", language: "en"), Final(1.3, 1.6, "Fine.", language: "en"))),
         ["deepgram"] = new("deepgram", null,
             // Verbatim (interim-results.md): no `type`, times from `start` + `duration`.
             new("""
@@ -370,6 +381,13 @@ public sealed class CloudRealtimeTests
                 """),
             // Verbatim (ws.json).
             new("""{"type":"transcript.done","text":"","words":[],"duration":6.43}""", new RealtimeEvent.Ended())),
+        // Constructed from documented fields: a chunk final of two sentences without speakers is two finals.
+        ["xai sentences"] = new("xai", null,
+            new Step("""
+                {"type":"transcript.partial","text":"Hi there. Fine.","words":[
+                 {"text":"Hi","start":0.1,"end":0.3},{"text":"there.","start":0.35,"end":0.7},{"text":"Fine.","start":1.3,"end":1.6}],
+                 "is_final":true,"speech_final":false,"start":0.0,"duration":1.6}
+                """, Final(0.1, 0.7, "Hi there."), Final(1.3, 1.6, "Fine."))),
         ["speechmatics"] = new("speechmatics", null,
             // Schema-derived (partials have the final's structure): constructed from documented fields.
             new("""
@@ -387,19 +405,40 @@ public sealed class CloudRealtimeTests
                    {"type": "word", "start_time": 0.11, "end_time": 0.4, "alternatives": [{"content": "full", "confidence": 0.7}]},
                    {"type": "word", "start_time": 0.41, "end_time": 0.62, "alternatives": [{"content": "tell", "confidence": 0.6}]},
                    {"type": "word", "start_time": 0.65, "end_time": 1.07, "alternatives": [{"content": "radar", "confidence": 1.0}]}]}
-                """, Final(0.11, 1.07, "full tell radar")),
-            // Constructed from documented fields: with diarization each alternative has its speaker.
+                """, new RealtimeEvent.Partial("full tell radar", 0.11, 1.07)),
+            // Constructed from documented fields: with diarization each alternative has its speaker. The speaker change
+            // ends the held words' segment.
             new("""
                 {"message": "AddTranscript", "format": "2.9",
                  "metadata": {"transcript": "radar", "start_time": 1.2, "end_time": 1.6},
                  "results": [{"type": "word", "start_time": 1.2, "end_time": 1.6,
                               "alternatives": [{"content": "radar", "confidence": 1.0, "speaker": "S2"}]}]}
-                """, Final(1.2, 1.6, "radar", speaker: "S2")),
+                """, Final(0.11, 1.07, "full tell radar"), new RealtimeEvent.Partial("radar", 1.2, 1.6, "S2")),
             // Constructed from documented fields (realtime WebSocket reference): `ForceEndOfUtterance`'s answer, metadata
-            // without a transcript, gives nothing.
-            new("""{"message":"EndOfUtterance","format":"2.9","metadata":{"start_time":1.6,"end_time":1.6},"forced":true}"""),
+            // without a transcript, flushes the held words.
+            new("""{"message":"EndOfUtterance","format":"2.9","metadata":{"start_time":1.6,"end_time":1.6},"forced":true}""",
+                Final(1.2, 1.6, "radar", speaker: "S2")),
             // Constructed from documented fields.
             new("""{"message":"EndOfTranscript"}""", new RealtimeEvent.Ended())),
+        // Constructed from documented fields: an `AddTranscript` carries a few words; they are held across messages until
+        // a sentence ends (punctuation attached across messages), and the rest is flushed before `Ended`.
+        ["speechmatics sentences"] = new("speechmatics", null,
+            new("""
+                {"message": "AddTranscript", "metadata": {"transcript": "Hello", "start_time": 0.1, "end_time": 0.5},
+                 "results": [{"type": "word", "start_time": 0.1, "end_time": 0.5, "alternatives": [{"content": "Hello", "speaker": "S1"}]}]}
+                """, new RealtimeEvent.Partial("Hello", 0.1, 0.5, "S1")),
+            new("""
+                {"message": "AddTranscript", "metadata": {"transcript": ". How", "start_time": 0.5, "end_time": 1.2},
+                 "results": [
+                   {"type": "punctuation", "start_time": 0.5, "end_time": 0.5, "is_eos": true, "attaches_to": "previous",
+                    "alternatives": [{"content": ".", "speaker": "S1"}]},
+                   {"type": "word", "start_time": 0.9, "end_time": 1.2, "alternatives": [{"content": "How", "speaker": "S1"}]}]}
+                """, Final(0.1, 0.5, "Hello.", speaker: "S1"), new RealtimeEvent.Partial("How", 0.9, 1.2, "S1")),
+            new("""
+                {"message": "AddPartialTranscript", "metadata": {"transcript": "are you", "start_time": 1.2, "end_time": 1.8},
+                 "results": [{"type": "word", "start_time": 1.2, "end_time": 1.5, "alternatives": [{"content": "are", "speaker": "S1"}]}]}
+                """, new RealtimeEvent.Partial("How are you", 0.9, 1.8, "S1")),
+            new("""{"message":"EndOfTranscript"}""", Final(0.9, 1.2, "How", speaker: "S1"), new RealtimeEvent.Ended())),
         // Verbatim (real-time-transcription, "Example token evolution"): this example has no token times.
         ["soniox partial"] = new("soniox", null,
             new Step("""

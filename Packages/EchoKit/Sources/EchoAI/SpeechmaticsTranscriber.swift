@@ -98,35 +98,44 @@ public struct SpeechmaticsTranscriber: CloudTranscriber {
     public static func parse(_ data: Data) throws -> [CloudSegment] {
         let decoder = JSONDecoder()
         decoder.keyDecodingStrategy = .convertFromSnakeCase
-        let response = try decoder.decode(TranscriptResponse.self, from: data)
+        var reader = WordReader()
+        reader.add(try decoder.decode(TranscriptResponse.self, from: data).results ?? [])
+        return CloudTranscription.segments(from: reader.words, separator: "", language: reader.language)
+    }
+
+    /// json-v2 `results` read into timed words, item by item; the realtime adapter keeps one across `AddTranscript`
+    /// messages, so a punctuation item attaches to a word of an earlier message.
+    fileprivate struct WordReader {
         var words: [CloudTranscription.Word] = []
         var language: String?
-        var glued = false
-        var prefix = ""
-        for item in response.results ?? [] {
-            guard let alternative = item.alternatives?.first, !alternative.content.isEmpty else { continue }
-            language = language ?? alternative.language
-            let attachment = item.type == "punctuation" ? item.attachesTo ?? "previous" : nil
-            if attachment == "previous" || attachment == "both", !words.isEmpty {
-                words[words.count - 1].text += prefix + alternative.content
-                words[words.count - 1].end = max(words[words.count - 1].end, item.endTime)
+        private var glued = false
+        private var prefix = ""
+
+        mutating func add(_ items: [TranscriptResponse.Item]) {
+            for item in items {
+                guard let alternative = item.alternatives?.first, !alternative.content.isEmpty else { continue }
+                language = language ?? alternative.language
+                let attachment = item.type == "punctuation" ? item.attachesTo ?? "previous" : nil
+                if attachment == "previous" || attachment == "both", !words.isEmpty {
+                    words[words.count - 1].text += prefix + alternative.content
+                    words[words.count - 1].end = max(words[words.count - 1].end, item.endTime)
+                    prefix = ""
+                    glued = attachment == "both"
+                    continue
+                }
+                if attachment == "next" {
+                    prefix += (prefix.isEmpty && !glued ? " " : "") + alternative.content
+                    glued = true
+                    continue
+                }
+                let speaker = alternative.speaker == "UU" ? nil : alternative.speaker
+                let space = glued || !prefix.isEmpty ? "" : " "
+                words.append(.init(
+                    start: item.startTime, end: item.endTime, text: space + prefix + alternative.content, speaker: speaker))
                 prefix = ""
-                glued = attachment == "both"
-                continue
+                glued = false
             }
-            if attachment == "next" {
-                prefix += (prefix.isEmpty && !glued ? " " : "") + alternative.content
-                glued = true
-                continue
-            }
-            let speaker = alternative.speaker == "UU" ? nil : alternative.speaker
-            let space = glued || !prefix.isEmpty ? "" : " "
-            words.append(.init(
-                start: item.startTime, end: item.endTime, text: space + prefix + alternative.content, speaker: speaker))
-            prefix = ""
-            glued = false
         }
-        return CloudTranscription.segments(from: words, separator: "", language: language)
     }
 
     private static func request(_ path: String, apiKey: String) -> URLRequest {
@@ -184,9 +193,10 @@ extension SpeechmaticsTranscriber {
     /// Realtime `wss://eu.rt.speechmatics.com/v2` (one fixed region), `Authorization: Bearer` handshake header, a
     /// `StartRecognition` start message (raw pcm_s16le 16 kHz, the model, partials, `max_delay` 2 s, speaker
     /// diarization with `standard`/`enhanced`), binary audio frames (`AddAudio`), each counted for `EndOfStream`'s
-    /// `last_seq_no`. `RecognitionStarted` starts; `AddPartialTranscript` is a partial, `AddTranscript` finals
-    /// (json-v2 results, read like the batch transcript: punctuation attached, speakers `S1`, `S2`, `UU` = none),
-    /// times in seconds from the stream start. `ForceEndOfUtterance` flushes; `EndOfStream` ends (answered by
+    /// `last_seq_no`. `RecognitionStarted` starts; `AddPartialTranscript` is a partial (after the held words),
+    /// `AddTranscript` final words (json-v2 results, read like the batch transcript: punctuation attached, speakers
+    /// `S1`, `S2`, `UU` = none), held until their sentence ends, times in seconds from the stream start.
+    /// `ForceEndOfUtterance` flushes (answered by `EndOfUtterance`); `EndOfStream` ends (answered by
     /// `EndOfTranscript`). Realtime has no automatic language: Auto is refused (except the multilingual `melia`
     /// models, sent `multi`). Keep-alive is WebSocket ping/pong (3 min idle close), not a message.
     public struct Realtime: RealtimeAdapter {
@@ -199,6 +209,9 @@ extension SpeechmaticsTranscriber {
         private let diarize: Bool
         /// `AddAudio` frames sent: Speechmatics numbers them from 1.
         private var framesSent = 0
+        /// Final words not emitted yet: an `AddTranscript` carries a few words, so they are held until their
+        /// sentence ends (or the speaker changes), and flushed by `EndOfUtterance` and `EndOfTranscript`.
+        private var held = SpeechmaticsTranscriber.WordReader()
 
         public init(apiKey: String, model: String, language: String?, diarize: Bool) {
             self.apiKey = apiKey
@@ -251,18 +264,45 @@ extension SpeechmaticsTranscriber {
                 return [.started(expiresAt: nil)]
             case "AddPartialTranscript":
                 let text = live.metadata?.transcript?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
-                guard !text.isEmpty else { return [] }
                 let speaker = live.results?.lazy.compactMap { $0.alternatives?.first?.speaker }.first { $0 != "UU" }
-                return [.partial(text: text, start: live.metadata?.startTime, end: live.metadata?.endTime, speaker: speaker)]
+                return partial(text, start: live.metadata?.startTime, end: live.metadata?.endTime, speaker: speaker)
             case "AddTranscript":
-                return try SpeechmaticsTranscriber.parse(CloudRealtime.payload(message)).map { .final($0) }
+                let decoder = JSONDecoder()
+                decoder.keyDecodingStrategy = .convertFromSnakeCase
+                held.add(try decoder.decode(TranscriptResponse.self, from: CloudRealtime.payload(message)).results ?? [])
+                return emitHeld(all: false) + partial("", start: nil, end: nil, speaker: nil)
+            case "EndOfUtterance":
+                return emitHeld(all: true)
             case "EndOfTranscript":
-                return [.ended]
+                return emitHeld(all: true) + [.ended]
             case "Error":
                 return [.failed(kind: CloudRealtime.errorKind(live.type ?? live.message))]
             default:
                 return []
             }
+        }
+
+        /// The held words' complete segments as finals (all of them with `all`); the last one stays held otherwise.
+        private mutating func emitHeld(all: Bool) -> [RealtimeEvent] {
+            var segments = CloudTranscription.segments(
+                from: held.words, separator: "", language: held.language, longSegment: 0)
+            if all || segments.isEmpty {
+                held.words = []
+                return segments.map { .final($0) }
+            }
+            let last = segments.removeLast()
+            held.words = held.words.filter { $0.start >= last.start }
+            return segments.map { .final($0) }
+        }
+
+        /// The held words followed by the partial `text`; nothing when both are empty.
+        private func partial(_ text: String, start: Double?, end: Double?, speaker: String?) -> [RealtimeEvent] {
+            let heldText = held.words.map(\.text).joined().trimmingCharacters(in: .whitespacesAndNewlines)
+            let full = [heldText, text].filter { !$0.isEmpty }.joined(separator: " ")
+            guard !full.isEmpty else { return [] }
+            return [.partial(
+                text: full, start: held.words.first?.start ?? start, end: end ?? held.words.last?.end,
+                speaker: held.words.first?.speaker ?? speaker)]
         }
     }
 }

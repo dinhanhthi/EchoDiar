@@ -49,8 +49,8 @@ public struct ElevenLabsTranscriber: CloudTranscriber {
     }
 
     /// `words` (`word`, `spacing`, `audio_event`) to segments; spacing stays in the text, audio events are dropped.
-    /// Pure, for tests.
-    public static func parse(_ data: Data) throws -> [CloudSegment] {
+    /// `longSegment` as in `CloudTranscription.segments` (0: a segment per sentence). Pure, for tests.
+    public static func parse(_ data: Data, longSegment: Double = 15) throws -> [CloudSegment] {
         let decoder = JSONDecoder()
         decoder.keyDecodingStrategy = .convertFromSnakeCase
         let response = try decoder.decode(SpeechToTextResponse.self, from: data)
@@ -66,7 +66,8 @@ public struct ElevenLabsTranscriber: CloudTranscriber {
                 words.append(.init(start: start, end: end, text: word.text, speaker: word.speakerId))
             }
         }
-        return CloudTranscription.segments(from: words, separator: "", language: response.languageCode)
+        return CloudTranscription.segments(
+            from: words, separator: "", language: response.languageCode, longSegment: longSegment)
     }
 }
 
@@ -148,7 +149,8 @@ extension ElevenLabsTranscriber {
         public var isDrained: Bool { closing && unansweredCommits == 0 }
 
         /// `session_started` starts; a non-empty `partial_transcript` is a partial; the timed words of
-        /// `committed_transcript_with_timestamps` become finals (grouped like the batch words, without speakers); a
+        /// `committed_transcript_with_timestamps` become finals (a segment per sentence: without speakers, the diarizer
+        /// after Stop labels each one, so a commit spanning two speakers is not one speaker's); a
         /// message with an `error` fails with its `message_type`; `ended` follows the answer to the last commit
         /// once closing.
         public mutating func parse(_ message: RealtimeMessage) throws -> [RealtimeEvent] {
@@ -161,7 +163,8 @@ extension ElevenLabsTranscriber {
                 let text = envelope.text?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
                 return text.isEmpty ? [] : [.partial(text: text, start: nil, end: nil, speaker: nil)]
             case "committed_transcript_with_timestamps":
-                let finals: [RealtimeEvent] = try ElevenLabsTranscriber.parse(CloudRealtime.payload(message)).map {
+                let segments = try ElevenLabsTranscriber.parse(CloudRealtime.payload(message), longSegment: 0)
+                let finals: [RealtimeEvent] = segments.map {
                     var segment = $0
                     segment.speaker = nil
                     return .final(segment)

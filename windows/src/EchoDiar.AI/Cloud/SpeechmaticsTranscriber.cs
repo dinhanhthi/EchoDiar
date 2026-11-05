@@ -113,37 +113,52 @@ public sealed class SpeechmaticsTranscriber : ICloudTranscriber
     /// </summary>
     public static List<CloudSegment> Parse(ReadOnlySpan<byte> data)
     {
-        var response = ProviderHttp.Decode<TranscriptResponse>(data);
-        var words = new List<CloudTranscription.Word>();
-        string? language = null;
-        var glued = false;
-        var prefix = "";
-        foreach (var item in response.Results ?? [])
+        var reader = new WordReader();
+        reader.Add(ProviderHttp.Decode<TranscriptResponse>(data).Results ?? []);
+        return CloudTranscription.Segments(reader.Words, "", reader.Language);
+    }
+
+    /// <summary>
+    /// json-v2 <c>results</c> read into timed words, item by item; the realtime adapter keeps one across
+    /// <c>AddTranscript</c> messages, so a punctuation item attaches to a word of an earlier message.
+    /// </summary>
+    private sealed class WordReader
+    {
+        private bool _glued;
+        private string _prefix = "";
+
+        public List<CloudTranscription.Word> Words { get; set; } = [];
+
+        public string? Language { get; private set; }
+
+        public void Add(List<TranscriptItem> items)
         {
-            if (item.Alternatives?.FirstOrDefault() is not { Content.Length: > 0 } alternative) continue;
-            language ??= alternative.Language;
-            var attachment = item.Type == "punctuation" ? item.AttachesTo ?? "previous" : null;
-            if (attachment is ("previous" or "both") && words.Count > 0)
+            foreach (var item in items)
             {
-                var last = words[^1];
-                words[^1] = last with { Text = last.Text + prefix + alternative.Content, End = Math.Max(last.End, item.EndTime) };
-                prefix = "";
-                glued = attachment == "both";
-                continue;
+                if (item.Alternatives?.FirstOrDefault() is not { Content.Length: > 0 } alternative) continue;
+                Language ??= alternative.Language;
+                var attachment = item.Type == "punctuation" ? item.AttachesTo ?? "previous" : null;
+                if (attachment is ("previous" or "both") && Words.Count > 0)
+                {
+                    var last = Words[^1];
+                    Words[^1] = last with { Text = last.Text + _prefix + alternative.Content, End = Math.Max(last.End, item.EndTime) };
+                    _prefix = "";
+                    _glued = attachment == "both";
+                    continue;
+                }
+                if (attachment == "next")
+                {
+                    _prefix += (_prefix.Length == 0 && !_glued ? " " : "") + alternative.Content;
+                    _glued = true;
+                    continue;
+                }
+                var speaker = alternative.Speaker == "UU" ? null : alternative.Speaker;
+                var space = _glued || _prefix.Length > 0 ? "" : " ";
+                Words.Add(new(item.StartTime, item.EndTime, space + _prefix + alternative.Content, speaker));
+                _prefix = "";
+                _glued = false;
             }
-            if (attachment == "next")
-            {
-                prefix += (prefix.Length == 0 && !glued ? " " : "") + alternative.Content;
-                glued = true;
-                continue;
-            }
-            var speaker = alternative.Speaker == "UU" ? null : alternative.Speaker;
-            var space = glued || prefix.Length > 0 ? "" : " ";
-            words.Add(new(item.StartTime, item.EndTime, space + prefix + alternative.Content, speaker));
-            prefix = "";
-            glued = false;
         }
-        return CloudTranscription.Segments(words, "", language);
     }
 
     private static HttpRequestMessage Request(HttpMethod method, string pathAndQuery, string apiKey) =>
@@ -159,9 +174,10 @@ public sealed class SpeechmaticsTranscriber : ICloudTranscriber
     /// Realtime <c>wss://eu.rt.speechmatics.com/v2</c> (one fixed region), <c>Authorization: Bearer</c> handshake header, a
     /// <c>StartRecognition</c> start message (raw pcm_s16le 16 kHz, the model, partials, <c>max_delay</c> 2 s, speaker
     /// diarization with <c>standard</c>/<c>enhanced</c>), binary audio frames (<c>AddAudio</c>), each counted for
-    /// <c>EndOfStream</c>'s <c>last_seq_no</c>. <c>RecognitionStarted</c> starts; <c>AddPartialTranscript</c> is a partial,
-    /// <c>AddTranscript</c> finals (json-v2 results, read like the batch transcript: punctuation attached, speakers
-    /// <c>S1</c>, <c>S2</c>, <c>UU</c> = none), times in seconds from the stream start. <c>ForceEndOfUtterance</c> flushes;
+    /// <c>EndOfStream</c>'s <c>last_seq_no</c>. <c>RecognitionStarted</c> starts; <c>AddPartialTranscript</c> is a partial
+    /// (after the held words), <c>AddTranscript</c> final words (json-v2 results, read like the batch transcript:
+    /// punctuation attached, speakers <c>S1</c>, <c>S2</c>, <c>UU</c> = none), held until their sentence ends, times in
+    /// seconds from the stream start. <c>ForceEndOfUtterance</c> flushes (answered by <c>EndOfUtterance</c>);
     /// <c>EndOfStream</c> ends (answered by <c>EndOfTranscript</c>). Realtime has no automatic language: Auto is refused
     /// (except the multilingual <c>melia</c> models, sent <c>multi</c>). Keep-alive is WebSocket ping/pong (3 min idle
     /// close), not a message.
@@ -174,6 +190,12 @@ public sealed class SpeechmaticsTranscriber : ICloudTranscriber
 
         /// <summary><c>AddAudio</c> frames sent: Speechmatics numbers them from 1.</summary>
         private int _framesSent;
+
+        /// <summary>
+        /// Final words not emitted yet: an <c>AddTranscript</c> carries a few words, so they are held until their sentence
+        /// ends (or the speaker changes), and flushed by <c>EndOfUtterance</c> and <c>EndOfTranscript</c>.
+        /// </summary>
+        private readonly WordReader _held = new();
 
         public Realtime(string apiKey, string model, string? language, bool diarize)
         {
@@ -242,21 +264,51 @@ public sealed class SpeechmaticsTranscriber : ICloudTranscriber
                     return [new RealtimeEvent.Started()];
                 case "AddPartialTranscript":
                     var text = live.Metadata?.Transcript?.Trim() ?? "";
-                    if (text.Length == 0) return [];
                     var speaker = (live.Results ?? [])
                         .Select(result => result.Alternatives?.FirstOrDefault()?.Speaker)
                         .FirstOrDefault(label => label is not null && label != "UU");
-                    return [new RealtimeEvent.Partial(text, live.Metadata?.StartTime, live.Metadata?.EndTime, speaker)];
+                    return Partial(text, live.Metadata?.StartTime, live.Metadata?.EndTime, speaker);
                 case "AddTranscript":
-                    return SpeechmaticsTranscriber.Parse(CloudRealtime.Payload(message))
-                        .Select(segment => (RealtimeEvent)new RealtimeEvent.Final(segment)).ToList();
+                    _held.Add(ProviderHttp.Decode<TranscriptResponse>(CloudRealtime.Payload(message)).Results ?? []);
+                    return [.. EmitHeld(all: false), .. Partial("", null, null, null)];
+                case "EndOfUtterance":
+                    return EmitHeld(all: true);
                 case "EndOfTranscript":
-                    return [new RealtimeEvent.Ended()];
+                    return [.. EmitHeld(all: true), new RealtimeEvent.Ended()];
                 case "Error":
                     return [new RealtimeEvent.Failed(CloudRealtime.ErrorKind(live.Type ?? live.Message))];
                 default:
                     return [];
             }
+        }
+
+        /// <summary>The held words' complete segments as finals (all of them with <paramref name="all"/>); the last one stays held otherwise.</summary>
+        private List<RealtimeEvent> EmitHeld(bool all)
+        {
+            var segments = CloudTranscription.Segments(_held.Words, "", _held.Language, longSegment: 0);
+            if (all || segments.Count == 0)
+            {
+                _held.Words = [];
+            }
+            else
+            {
+                var last = segments[^1];
+                segments.RemoveAt(segments.Count - 1);
+                _held.Words = _held.Words.Where(word => word.Start >= last.Start).ToList();
+            }
+            return segments.Select(segment => (RealtimeEvent)new RealtimeEvent.Final(segment)).ToList();
+        }
+
+        /// <summary>The held words followed by the partial <paramref name="text"/>; nothing when both are empty.</summary>
+        private List<RealtimeEvent> Partial(string text, double? start, double? end, string? speaker)
+        {
+            var heldText = string.Concat(_held.Words.Select(word => word.Text)).Trim();
+            var full = string.Join(" ", new[] { heldText, text }.Where(part => part.Length > 0));
+            if (full.Length == 0) return [];
+            var words = _held.Words;
+            return [new RealtimeEvent.Partial(
+                full, words.Count > 0 ? words[0].Start : start, end ?? (words.Count > 0 ? words[^1].End : null),
+                words.Count > 0 ? words[0].Speaker ?? speaker : speaker)];
         }
     }
 

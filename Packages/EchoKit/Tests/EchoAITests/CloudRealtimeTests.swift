@@ -240,6 +240,21 @@ struct CloudRealtimeTests {
                        {"text": "world", "start": 0.52, "end": 0.9, "type": "word", "logprob": -0.1}]}
             """#, events: [.final(CloudSegment(start: 0.12, end: 0.9, text: "hello world", language: "en"))]),
         ]),
+        // Constructed from documented fields: realtime words have no speaker, so each sentence is its own final (the
+        // diarizer after Stop labels them one by one).
+        Recording(name: "elevenlabs sentences", preset: "elevenlabs", steps: [
+            Step(message: #"""
+            {"message_type": "committed_transcript_with_timestamps", "text": "Hi there. Fine.", "language_code": "en",
+             "words": [{"text": "Hi", "start": 0.1, "end": 0.3, "type": "word"},
+                       {"text": " ", "start": 0.3, "end": 0.35, "type": "spacing"},
+                       {"text": "there.", "start": 0.35, "end": 0.7, "type": "word"},
+                       {"text": " ", "start": 0.7, "end": 1.2, "type": "spacing"},
+                       {"text": "Fine.", "start": 1.3, "end": 1.6, "type": "word"}]}
+            """#, events: [
+                .final(CloudSegment(start: 0.1, end: 0.7, text: "Hi there.", language: "en")),
+                .final(CloudSegment(start: 1.3, end: 1.6, text: "Fine.", language: "en")),
+            ]),
+        ]),
         Recording(name: "deepgram", preset: "deepgram", steps: [
             // Verbatim (interim-results.md): no `type`, times from `start` + `duration`.
             Step(message: #"""
@@ -349,6 +364,17 @@ struct CloudRealtimeTests {
             // Verbatim (ws.json).
             Step(message: #"{"type":"transcript.done","text":"","words":[],"duration":6.43}"#, events: [.ended]),
         ]),
+        // Constructed from documented fields: a chunk final of two sentences without speakers is two finals.
+        Recording(name: "xai sentences", preset: "xai", steps: [
+            Step(message: #"""
+            {"type":"transcript.partial","text":"Hi there. Fine.","words":[
+             {"text":"Hi","start":0.1,"end":0.3},{"text":"there.","start":0.35,"end":0.7},{"text":"Fine.","start":1.3,"end":1.6}],
+             "is_final":true,"speech_final":false,"start":0.0,"duration":1.6}
+            """#, events: [
+                .final(CloudSegment(start: 0.1, end: 0.7, text: "Hi there.")),
+                .final(CloudSegment(start: 1.3, end: 1.6, text: "Fine.")),
+            ]),
+        ]),
         Recording(name: "speechmatics", preset: "speechmatics", steps: [
             // Schema-derived (partials have the final's structure): constructed from documented fields.
             Step(message: #"""
@@ -366,20 +392,49 @@ struct CloudRealtimeTests {
                {"type": "word", "start_time": 0.11, "end_time": 0.4, "alternatives": [{"content": "full", "confidence": 0.7}]},
                {"type": "word", "start_time": 0.41, "end_time": 0.62, "alternatives": [{"content": "tell", "confidence": 0.6}]},
                {"type": "word", "start_time": 0.65, "end_time": 1.07, "alternatives": [{"content": "radar", "confidence": 1.0}]}]}
-            """#, events: [.final(CloudSegment(start: 0.11, end: 1.07, text: "full tell radar"))]),
-            // Constructed from documented fields: with diarization each alternative has its speaker.
+            """#, events: [.partial(text: "full tell radar", start: 0.11, end: 1.07, speaker: nil)]),
+            // Constructed from documented fields: with diarization each alternative has its speaker. The speaker
+            // change ends the held words' segment.
             Step(message: #"""
             {"message": "AddTranscript", "format": "2.9",
              "metadata": {"transcript": "radar", "start_time": 1.2, "end_time": 1.6},
              "results": [{"type": "word", "start_time": 1.2, "end_time": 1.6,
                           "alternatives": [{"content": "radar", "confidence": 1.0, "speaker": "S2"}]}]}
-            """#, events: [.final(CloudSegment(start: 1.2, end: 1.6, text: "radar", speaker: "S2"))]),
+            """#, events: [
+                .final(CloudSegment(start: 0.11, end: 1.07, text: "full tell radar")),
+                .partial(text: "radar", start: 1.2, end: 1.6, speaker: "S2"),
+            ]),
             // Constructed from documented fields (realtime WebSocket reference): `ForceEndOfUtterance`'s answer,
-            // metadata without a transcript, gives nothing.
+            // metadata without a transcript, flushes the held words.
             Step(message: #"{"message":"EndOfUtterance","format":"2.9","metadata":{"start_time":1.6,"end_time":1.6},"forced":true}"#,
-                 events: []),
+                 events: [.final(CloudSegment(start: 1.2, end: 1.6, text: "radar", speaker: "S2"))]),
             // Constructed from documented fields.
             Step(message: #"{"message":"EndOfTranscript"}"#, events: [.ended]),
+        ]),
+        // Constructed from documented fields: an `AddTranscript` carries a few words; they are held across messages
+        // until a sentence ends (punctuation attached across messages), and the rest is flushed before `.ended`.
+        Recording(name: "speechmatics sentences", preset: "speechmatics", steps: [
+            Step(message: #"""
+            {"message": "AddTranscript", "metadata": {"transcript": "Hello", "start_time": 0.1, "end_time": 0.5},
+             "results": [{"type": "word", "start_time": 0.1, "end_time": 0.5, "alternatives": [{"content": "Hello", "speaker": "S1"}]}]}
+            """#, events: [.partial(text: "Hello", start: 0.1, end: 0.5, speaker: "S1")]),
+            Step(message: #"""
+            {"message": "AddTranscript", "metadata": {"transcript": ". How", "start_time": 0.5, "end_time": 1.2},
+             "results": [
+               {"type": "punctuation", "start_time": 0.5, "end_time": 0.5, "is_eos": true, "attaches_to": "previous",
+                "alternatives": [{"content": ".", "speaker": "S1"}]},
+               {"type": "word", "start_time": 0.9, "end_time": 1.2, "alternatives": [{"content": "How", "speaker": "S1"}]}]}
+            """#, events: [
+                .final(CloudSegment(start: 0.1, end: 0.5, text: "Hello.", speaker: "S1")),
+                .partial(text: "How", start: 0.9, end: 1.2, speaker: "S1"),
+            ]),
+            Step(message: #"""
+            {"message": "AddPartialTranscript", "metadata": {"transcript": "are you", "start_time": 1.2, "end_time": 1.8},
+             "results": [{"type": "word", "start_time": 1.2, "end_time": 1.5, "alternatives": [{"content": "are", "speaker": "S1"}]}]}
+            """#, events: [.partial(text: "How are you", start: 0.9, end: 1.8, speaker: "S1")]),
+            Step(message: #"{"message":"EndOfTranscript"}"#, events: [
+                .final(CloudSegment(start: 0.9, end: 1.2, text: "How", speaker: "S1")), .ended,
+            ]),
         ]),
         // Verbatim (real-time-transcription, "Example token evolution"): this example has no token times.
         Recording(name: "soniox partial", preset: "soniox", steps: [

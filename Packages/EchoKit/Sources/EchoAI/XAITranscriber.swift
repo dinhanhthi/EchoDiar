@@ -147,8 +147,8 @@ extension XAITranscriber {
             }
         }
 
-        /// The new words of a final (by start time) grouped into segments; a chunk final without words is its text
-        /// over `start...start+duration`.
+        /// The new words of a final (by start time), a segment per sentence (the diarizer after Stop labels each one
+        /// when the words have no speaker); a chunk final without words is its text over `start...start+duration`.
         private mutating func finals(_ live: LiveTranscript) -> [RealtimeEvent] {
             let fresh = (live.words ?? []).filter { $0.start > lastFinalStart }
             if let last = fresh.map(\.start).max() { lastFinalStart = last }
@@ -156,7 +156,8 @@ extension XAITranscriber {
                 CloudTranscription.Word(start: $0.start, end: $0.end, text: $0.text, speaker: $0.speaker.map(String.init))
             }
             if !words.isEmpty {
-                return CloudTranscription.segments(from: words, separator: " ", language: nil).map { .final($0) }
+                return CloudTranscription.segments(from: words, separator: " ", language: nil, longSegment: 0)
+                    .map { .final($0) }
             }
             let text = live.text?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
             guard live.type == "transcript.partial", live.speechFinal != true, live.words?.isEmpty ?? true, !text.isEmpty,

@@ -46,9 +46,10 @@ public sealed class ElevenLabsTranscriber : ICloudTranscriber
 
     /// <summary>
     /// <c>words</c> (<c>word</c>, <c>spacing</c>, <c>audio_event</c>) to segments; spacing stays in the text, audio events
-    /// are dropped. Pure, for tests.
+    /// are dropped. <paramref name="longSegment"/> as in <c>CloudTranscription.Segments</c> (0: a segment per sentence).
+    /// Pure, for tests.
     /// </summary>
-    public static List<CloudSegment> Parse(ReadOnlySpan<byte> data)
+    public static List<CloudSegment> Parse(ReadOnlySpan<byte> data, double longSegment = 15)
     {
         var response = ProviderHttp.Decode<SpeechToTextResponse>(data);
         var words = new List<CloudTranscription.Word>();
@@ -66,7 +67,7 @@ public sealed class ElevenLabsTranscriber : ICloudTranscriber
                     break;
             }
         }
-        return CloudTranscription.Segments(words, "", response.LanguageCode);
+        return CloudTranscription.Segments(words, "", response.LanguageCode, longSegment: longSegment);
     }
 
     /// <summary>The realtime adapter's descriptor (<see cref="Realtime"/>).</summary>
@@ -154,7 +155,8 @@ public sealed class ElevenLabsTranscriber : ICloudTranscriber
 
         /// <summary>
         /// <c>session_started</c> starts; a non-empty <c>partial_transcript</c> is a partial; the timed words of
-        /// <c>committed_transcript_with_timestamps</c> become finals (grouped like the batch words, without speakers); a
+        /// <c>committed_transcript_with_timestamps</c> become finals (a segment per sentence: without speakers, the diarizer
+        /// after Stop labels each one, so a commit spanning two speakers is not one speaker's); a
         /// message with an <c>error</c> fails with its <c>message_type</c>; <see cref="RealtimeEvent.Ended"/> follows the
         /// answer to the last commit once closing.
         /// </summary>
@@ -171,7 +173,7 @@ public sealed class ElevenLabsTranscriber : ICloudTranscriber
                     return text.Length == 0 ? [] : [new RealtimeEvent.Partial(text)];
                 case "committed_transcript_with_timestamps":
                     var events = new List<RealtimeEvent>();
-                    foreach (var segment in ElevenLabsTranscriber.Parse(CloudRealtime.Payload(message)))
+                    foreach (var segment in ElevenLabsTranscriber.Parse(CloudRealtime.Payload(message), longSegment: 0))
                         events.Add(new RealtimeEvent.Final(segment with { Speaker = null }));
                     var answered = _unansweredCommits > 0;
                     _unansweredCommits = Math.Max(_unansweredCommits - 1, 0);

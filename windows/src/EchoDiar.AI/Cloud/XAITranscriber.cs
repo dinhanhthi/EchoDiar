@@ -142,8 +142,8 @@ public sealed class XAITranscriber : ICloudTranscriber
         }
 
         /// <summary>
-        /// The new words of a final (by start time) grouped into segments; a chunk final without words is its text over
-        /// <c>start...start+duration</c>.
+        /// The new words of a final (by start time), a segment per sentence (the diarizer after Stop labels each one when
+        /// the words have no speaker); a chunk final without words is its text over <c>start...start+duration</c>.
         /// </summary>
         private List<RealtimeEvent> Finals(LiveTranscript live)
         {
@@ -151,7 +151,8 @@ public sealed class XAITranscriber : ICloudTranscriber
             if (fresh.Count > 0) _lastFinalStart = fresh.Max(word => word.Start);
             var words = fresh.Select(word => new CloudTranscription.Word(word.Start, word.End, word.Text, Speaker(word.Speaker))).ToList();
             if (words.Count > 0)
-                return CloudTranscription.Segments(words, " ", null).Select(segment => (RealtimeEvent)new RealtimeEvent.Final(segment)).ToList();
+                return CloudTranscription.Segments(words, " ", null, longSegment: 0)
+                    .Select(segment => (RealtimeEvent)new RealtimeEvent.Final(segment)).ToList();
             var text = live.Text?.Trim() ?? "";
             if (live.Type != "transcript.partial" || live.SpeechFinal == true || live.Words is { Count: > 0 } || text.Length == 0
                 || live.Start is not { } start || !(start > _lastFinalStart)) return [];
