@@ -186,7 +186,7 @@
             <li><strong>On your computer</strong>: Whisper (WhisperKit on Mac, whisper.cpp on Windows) and Parakeet, plus Qwen3-ASR and Apple Speech (macOS 26) on Mac.</li>
             <li><strong>Speakers</strong>: diarization of the meeting audio (FluidAudio on Mac, sherpa-onnx on Windows), when "Tell speakers apart" is on (off by default).</li>
             <li><strong>Transcribe while recording</strong>: Whisper or Parakeet transcribes each channel as you speak, and the live captions come from it. On a Mac, for a 15-minute call, the transcript is ready 0.8 seconds after Stop (about 10 seconds with speakers told apart) instead of about a minute and a half. Other engines transcribe the whole recording after Stop.</li>
-            <li><strong>Cloud</strong> (optional): OpenAI, Groq, Mistral, Gemini, ElevenLabs, Deepgram, AssemblyAI or an OpenAI-compatible endpoint. Asks once before audio goes to each one.</li>
+            <li><strong>Cloud</strong> (optional): OpenAI, Groq, Mistral, Gemini, xAI, ElevenLabs, Deepgram, AssemblyAI, Speechmatics, Soniox, Gladia or an OpenAI-compatible endpoint, with keys in Settings &gt; API Keys. Asks once before audio goes to each one. A live transcript can then come from a local model (free) or the provider's realtime stream (paid, on top of the transcription after Stop).</li>
           </ul>
         </section>
 
@@ -195,7 +195,7 @@
           <ul class="list">
             <li><strong>On-device</strong>: MLX models and Apple Foundation Models (macOS 26) on Mac; GGUF models, and Phi Silica on Copilot+ PCs, on Windows.</li>
             <li><strong>Local servers</strong>: LM Studio, Ollama, Jan, llama.cpp and vLLM, plus Foundry Local on Windows.</li>
-            <li><strong>Cloud APIs</strong>: OpenAI, Anthropic, xAI, Gemini, Mistral, Azure OpenAI, OpenRouter, Groq, DeepSeek or a custom endpoint, with your own key.</li>
+            <li><strong>Cloud APIs</strong>: OpenAI, Anthropic, xAI, Gemini, Mistral, Azure OpenAI, OpenRouter, Groq, DeepSeek or a custom endpoint, with your own key in Settings &gt; API Keys.</li>
             <li><strong>Subscription CLIs</strong>: Claude Code, Codex, OpenCode and Gemini CLI.</li>
           </ul>
         </section>
