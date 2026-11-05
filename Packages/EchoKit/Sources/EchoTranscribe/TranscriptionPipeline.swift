@@ -462,7 +462,12 @@ public actor TranscriptionPipeline {
             } catch {
                 throw TranscriptionError.cloud(provider: cloud.name, reason: CloudTranscription.failureReason(error))
             }
-            segments = joinGap(response, gap: gap, upload: lower...upper, into: segments, labels: labels, partIndex: index + 1)
+            // The widening of the gap (`hole`) stops at the gaps around it: their speech is theirs to fill.
+            let limits = (gaps.filter { $0.end <= gap.start }.map(\.end).max() ?? -.infinity)
+                ... (gaps.filter { $0.start >= gap.end }.map(\.start).min() ?? .infinity)
+            segments = joinGap(
+                response, gap: gap, upload: lower...upper, into: segments, labels: labels, partIndex: index + 1,
+                within: limits)
             progress(Double(index + 1) / Double(spans.count))
         }
         return segments
@@ -479,10 +484,11 @@ public actor TranscriptionPipeline {
     }
 
     /// `segments` (one channel, file time) with a gap's upload `response` (file time, covering `upload` = the gap and
-    /// its padding) joined, sorted by start. A response segment that straddles an edge of the gap is cut into its
-    /// sentences first (`sentencePieces`; one without sentence ends stays whole); a piece is kept when its overlap with
-    /// `gap` is at least half of the shorter of the two (`gapKeeps`), so a long word-grouped segment neither loses its
-    /// speech inside the gap nor repeats what the stream has around it; the padding's only serve the labels.
+    /// its padding) joined, sorted by start. The gap is first widened to the stream's finals around it, within
+    /// `limits` (the gaps before and after it; `hole`); a response segment that straddles an edge of it is cut into its
+    /// sentences (`sentencePieces`; one without sentence ends stays whole); a piece is kept when its overlap with it is
+    /// at least half of the shorter of the two (`gapKeeps`), so a long word-grouped segment neither loses its speech
+    /// inside the gap nor repeats what the stream has around it; the padding's only serve the labels.
     /// Without `labels` every speaker label is dropped. With `labels`, two steps:
     /// the response's labels map onto the labels before the gap by the left padding (`SpeakerLabelReconciler`, a label
     /// with no match gets its own `"p<N>:"` scope, `partIndex` and up, so it never merges); then each label first heard
@@ -491,9 +497,10 @@ public actor TranscriptionPipeline {
     /// keeps its own. Pure, for tests.
     static func joinGap(
         _ response: [CloudSegment], gap: Span, upload: ClosedRange<Double>, into segments: [RawSegment], labels: Bool,
-        partIndex: Int
+        partIndex: Int, within limits: ClosedRange<Double> = -.infinity ... .infinity
     ) -> [RawSegment] {
-        func inGap(_ segment: CloudSegment) -> Bool { gapKeeps(segment, gap) }
+        let hole = hole(gap, between: segments, within: limits)
+        func inGap(_ segment: CloudSegment) -> Bool { gapKeeps(segment, hole) }
         func label(_ speaker: String?) -> String? { speaker.flatMap { $0.isEmpty ? nil : $0 } }
         func raw(_ segment: CloudSegment) -> RawSegment {
             RawSegment(
@@ -501,7 +508,7 @@ public actor TranscriptionPipeline {
                 speaker: labels ? label(segment.speaker) : nil)
         }
         func kept(_ response: [CloudSegment]) -> [RawSegment] {
-            response.flatMap { sentencePieces($0, straddling: gap) }.filter(inGap).map(raw)
+            response.flatMap { sentencePieces($0, straddling: hole) }.filter(inGap).map(raw)
         }
         guard labels else {
             return (segments + kept(response)).sorted { $0.start < $1.start }
@@ -538,6 +545,24 @@ public actor TranscriptionPipeline {
             return segment
         }
         return (bridged + kept(mapped)).sorted { $0.start < $1.start }
+    }
+
+    /// `gap` widened to the stream's finals around it: from the end of the last segment that starts before it to the
+    /// start of the first one that starts in or after it, never past `limits` (the end of the gap before, the start of
+    /// the gap after: their speech is filled by their own uploads). The widening is covered silence (a session's audio
+    /// up to its last final, or below `silencePeak`), so it holds no stream speech, while a sentence piece timed by its
+    /// share of the text can land there; a long silence widens more, so a sentence of a batch segment spanning it can
+    /// repeat the stream's (the `gapKeeps` trade-off). A zero-length gap (a resume bridge) stays as it is. Pure, for
+    /// tests.
+    static func hole(
+        _ gap: Span, between segments: [RawSegment], within limits: ClosedRange<Double> = -.infinity ... .infinity
+    ) -> Span {
+        guard gap.end > gap.start else { return gap }
+        let previous = segments.filter { $0.start < gap.start }.map(\.end).max()
+        let next = segments.filter { $0.start >= gap.start }.map(\.start).min()
+        return Span(
+            start: max(limits.lowerBound, min(gap.start, previous ?? gap.start)),
+            end: min(limits.upperBound, max(gap.end, next ?? gap.end)))
     }
 
     /// Whether a gap upload's `segment` belongs to `gap`: it overlaps it by at least half of the shorter of the two

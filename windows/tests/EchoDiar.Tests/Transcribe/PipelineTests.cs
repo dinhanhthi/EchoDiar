@@ -358,7 +358,7 @@ public sealed class PipelineTests : IDisposable
     public async Task CloudPriorGapsAreUploadedPaddedAndJoinTheStream()
     {
         var prior = CloudPrior(
-            100, [new RawSegment(10, 12, "hello from me"), new RawSegment(60, 62, "later from me")],
+            100, [new RawSegment(38, 39.9, "hello from me"), new RawSegment(60, 62, "later from me")],
             Raw([.. Pieces("A", 0, 50), .. Pieces("A", 52, 100)]), micGaps: [new Span(40, 42)], systemGaps: [new Span(50, 52)]);
         var asr = new ScriptedCloud((_, diarize, seconds) => diarize
             ? Pieces("X", 0, seconds, "upload")
@@ -378,6 +378,26 @@ public sealed class PipelineTests : IDisposable
         Assert.Equal(prior.System.Count + 1, system.Count);
         Assert.Equal([50.0], system.Where(s => s.Text == "upload").Select(s => s.Start));
         Assert.Equal([Transcript.Speaker.System(1)], system.Select(s => s.Speaker).Distinct());
+    }
+
+    // Two gaps with only covered silence between them (one drop with a pause in the speech): each one's upload (±30 s with
+    // labels) hears the other's speech, but the widening of a gap stops at the next gap, so every second of the uploads is
+    // kept once (Swift twoGapsSeparatedBySilenceKeepEachUploadedSecondOnce).
+    [Fact]
+    public async Task TwoGapsSeparatedBySilenceKeepEachUploadedSecondOnce()
+    {
+        var prior = CloudPrior(
+            100, [], Raw([.. Pieces("A", 0, 49), .. Pieces("A", 63, 100)]), systemGaps: [new Span(50, 52), new Span(60, 62)]);
+        var asr = new ScriptedCloud((_, _, seconds) => Pieces("X", 0, seconds, "upload"));
+
+        var transcript = await TranscribeCloudPriorAsync(prior, diarize: true, asr);
+
+        Assert.Equal(2, asr.Calls.Count);
+        var starts = transcript.Segments
+            .Where(s => s.Channel == TranscriptChannel.System && s.Text == "upload").Select(s => s.Start).ToList();
+        Assert.Equal(starts.Count, starts.Distinct().Count());
+        Assert.Contains(50.0, starts);
+        Assert.Contains(60.0, starts);
     }
 
     // (b) A prior with no gaps whose stream labelled its speakers: nothing is uploaded, no diarizer runs.

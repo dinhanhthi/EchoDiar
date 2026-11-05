@@ -302,6 +302,32 @@ public sealed class RealtimeCoverageTests
         Assert.Equal(["你好。", "我们开始吧！"], cjk.Select(s => s.Text));
     }
 
+    // Windows 0.0.919, xAI drop: the gap starts where speech starts again (53.8: the silence after the stream's last final
+    // at 53.1 is covered), and the share-of-text time of the piece "Morning." (53.13...53.67) falls in that silence. Judged
+    // against the hole between the stream's finals, it is kept; the sentence the stream has is not.
+    [Fact]
+    public void APieceTimedIntoTheCoveredSilenceBeforeTheGapIsKept()
+    {
+        List<RawSegment> stream =
+        [
+            new(50.0, 53.1, "Thanks for joining the weekly planning meeting."),
+            new(77.5, 80.7, "K, please send me the test plan by tomorrow afternoon."),
+        ];
+        List<CloudSegment> response =
+        [
+            new(49, 57, "Good morning, thanks for joining the weekly planning meeting. Morning. I have the numbers from last week ready to share.", "X"),
+        ];
+        var joined = TranscriptionPipeline.JoinGap(response, new Span(53.8, 77.5), new TimeRange(23.8, 107.5), stream, labels: false, partIndex: 1);
+        Assert.Equal(
+            [
+                "Thanks for joining the weekly planning meeting.", "Morning.", "I have the numbers from last week ready to share.",
+                "K, please send me the test plan by tomorrow afternoon.",
+            ],
+            joined.Select(s => s.Text));
+        Assert.Equal(new Span(53.1, 77.5), TranscriptionPipeline.Hole(new Span(53.8, 77.5), stream));
+        Assert.Equal(new Span(60, 60), TranscriptionPipeline.Hole(new Span(60, 60), stream));
+    }
+
     private static List<CloudSegment> Pieces(string label, double from, double to)
     {
         var pieces = new List<CloudSegment>();

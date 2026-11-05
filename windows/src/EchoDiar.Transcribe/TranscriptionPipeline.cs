@@ -415,7 +415,11 @@ public sealed class TranscriptionPipeline(
                 // Not kept as the inner exception: a provider message can carry the request or response body.
                 throw new TranscriptionException(TranscriptionErrorKind.Cloud, $"{cloud.Name}: {CloudTranscription.FailureReason(e)}");
             }
-            joined = JoinGap(response, gap, upload, joined, labels, index + 1);
+            // The widening of the gap (Hole) stops at the gaps around it: their speech is theirs to fill.
+            var limits = (
+                gaps.Where(g => g.End <= gap.Start).Select(g => (double?)g.End).Max() ?? double.NegativeInfinity,
+                gaps.Where(g => g.Start >= gap.End).Select(g => (double?)g.Start).Min() ?? double.PositiveInfinity);
+            joined = JoinGap(response, gap, upload, joined, labels, index + 1, limits);
             progress((index + 1.0) / spans.Count);
         }
         return joined;
@@ -437,9 +441,10 @@ public sealed class TranscriptionPipeline(
     /// <summary>
     /// <paramref name="segments"/> (one channel, file time) with a gap's upload <paramref name="response"/> (file time,
     /// covering <paramref name="upload"/> = the gap and its padding) joined, sorted by start (Swift <c>joinGap</c>). The
-    /// response segment that straddles an edge of <paramref name="gap"/> is cut into its sentences first
-    /// (<see cref="SentencePieces"/>; one without sentence ends stays whole); a piece is kept when its overlap with the gap
-    /// is at least half of the shorter of the two (<see cref="GapKeeps"/>), so a long word-grouped segment neither loses
+    /// gap is first widened to the stream's finals around it, within <paramref name="limits"/> (the gaps before and after
+    /// it; <see cref="Hole"/>); a response segment that straddles an edge of it is cut into its sentences
+    /// (<see cref="SentencePieces"/>; one without sentence ends stays whole); a piece is kept when its overlap with it is
+    /// at least half of the shorter of the two (<see cref="GapKeeps"/>), so a long word-grouped segment neither loses
     /// its speech inside the gap nor repeats what the stream has around it; the padding's only serve the labels. Without <paramref name="labels"/> every speaker label is dropped. With
     /// <paramref name="labels"/>, two steps: the response's labels map onto the labels before the gap by the left padding
     /// (<see cref="SpeakerLabelReconciler.Labels"/>; a label with no match gets its own <c>"p&lt;N&gt;:"</c> scope,
@@ -450,9 +455,10 @@ public sealed class TranscriptionPipeline(
     /// </summary>
     internal static List<RawSegment> JoinGap(
         IReadOnlyList<CloudSegment> response, Span gap, TimeRange upload, IReadOnlyList<RawSegment> segments, bool labels,
-        int partIndex)
+        int partIndex, (double Start, double End)? limits = null)
     {
-        bool InGap(CloudSegment segment) => GapKeeps(segment, gap);
+        var hole = Hole(gap, segments, limits);
+        bool InGap(CloudSegment segment) => GapKeeps(segment, hole);
         static string? Label(string? speaker) => string.IsNullOrEmpty(speaker) ? null : speaker;
         RawSegment Raw(CloudSegment segment) =>
             new(segment.Start, segment.End, segment.Text, segment.Language, labels ? Label(segment.Speaker) : null);
@@ -460,7 +466,7 @@ public sealed class TranscriptionPipeline(
             list.Select(s => Label(s.Speaker)).OfType<string>().ToHashSet(StringComparer.Ordinal);
 
         IEnumerable<RawSegment> Kept(IEnumerable<CloudSegment> list) =>
-            list.SelectMany(segment => SentencePieces(segment, gap)).Where(InGap).Select(Raw);
+            list.SelectMany(segment => SentencePieces(segment, hole)).Where(InGap).Select(Raw);
 
         if (!labels) return [.. segments.Concat(Kept(response)).OrderBy(s => s.Start)];
         var existing = segments.Select(s => new CloudSegment(s.Start, s.End, s.Text, s.Speaker, s.DetectedLanguage)).ToList();
@@ -491,6 +497,26 @@ public sealed class TranscriptionPipeline(
                 ? segment with { Speaker = target }
                 : segment);
         return [.. bridged.Concat(Kept(mapped)).OrderBy(s => s.Start)];
+    }
+
+    /// <summary>
+    /// <paramref name="gap"/> widened to the stream's finals around it: from the end of the last segment that starts
+    /// before it to the start of the first one that starts in or after it, never past <paramref name="limits"/> (the end
+    /// of the gap before, the start of the gap after: their speech is filled by their own uploads; Swift <c>hole</c>).
+    /// The widening is covered silence (a session's audio up to its last final, or below
+    /// <see cref="MonoAudio.SilencePeak"/>), so it holds no stream speech, while a sentence piece timed by its share of
+    /// the text can land there; a long silence widens more, so a sentence of a batch segment spanning it can repeat the
+    /// stream's (the <see cref="GapKeeps"/> trade-off). A zero-length gap (a resume bridge) stays as it is. Pure, for
+    /// tests.
+    /// </summary>
+    internal static Span Hole(Span gap, IReadOnlyList<RawSegment> segments, (double Start, double End)? limits = null)
+    {
+        if (!(gap.End > gap.Start)) return gap;
+        var (lower, upper) = limits ?? (double.NegativeInfinity, double.PositiveInfinity);
+        var previous = segments.Where(s => s.Start < gap.Start).Select(s => (double?)s.End).Max();
+        var next = segments.Where(s => s.Start >= gap.Start).Select(s => (double?)s.Start).Min();
+        return new Span(
+            Math.Max(lower, Math.Min(gap.Start, previous ?? gap.Start)), Math.Min(upper, Math.Max(gap.End, next ?? gap.End)));
     }
 
     /// <summary>

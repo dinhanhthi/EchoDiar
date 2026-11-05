@@ -19,7 +19,7 @@ struct CloudPriorPipelineTests {
         defer { recording.remove() }
         let prior = PriorTranscription(
             engineID: "cloud:fake",
-            mic: [RawSegment(start: 10, end: 12, text: "hello from me"),
+            mic: [RawSegment(start: 38, end: 39.9, text: "hello from me"),
                   RawSegment(start: 60, end: 62, text: "later from me")],
             system: Self.raw(Self.pieces("A", 0...50) + Self.pieces("A", 52...100)),
             micGaps: [Span(start: 40, end: 42)], systemGaps: [Span(start: 50, end: 52)], duration: 100,
@@ -209,6 +209,52 @@ struct CloudPriorPipelineTests {
         let cjk = TranscriptionPipeline.sentencePieces(
             CloudSegment(start: 0, end: 6, text: "你好。我们开始吧！"), straddling: Span(start: 5, end: 9))
         #expect(cjk.map(\.text) == ["你好。", "我们开始吧！"])
+    }
+
+    /// Windows 0.0.919, xAI drop: the gap starts where speech starts again (53.8: the silence after the stream's last
+    /// final at 53.1 is covered), and the share-of-text time of the piece "Morning." (53.13...53.67) falls in that
+    /// silence. Judged against the hole between the stream's finals, it is kept; the sentence the stream has is not.
+    @Test func aPieceTimedIntoTheCoveredSilenceBeforeTheGapIsKept() {
+        let stream = [
+            RawSegment(start: 50.0, end: 53.1, text: "Thanks for joining the weekly planning meeting."),
+            RawSegment(start: 77.5, end: 80.7, text: "K, please send me the test plan by tomorrow afternoon."),
+        ]
+        let response = [CloudSegment(
+            start: 49, end: 57,
+            text: "Good morning, thanks for joining the weekly planning meeting. Morning. I have the numbers from last week ready to share.",
+            speaker: "X")]
+        let joined = TranscriptionPipeline.joinGap(
+            response, gap: Span(start: 53.8, end: 77.5), upload: 23.8...107.5, into: stream, labels: false, partIndex: 1)
+        #expect(joined.map(\.text) == [
+            "Thanks for joining the weekly planning meeting.",
+            "Morning.",
+            "I have the numbers from last week ready to share.",
+            "K, please send me the test plan by tomorrow afternoon.",
+        ])
+        let hole = TranscriptionPipeline.hole(Span(start: 53.8, end: 77.5), between: stream)
+        #expect(hole == Span(start: 53.1, end: 77.5))
+        #expect(TranscriptionPipeline.hole(Span(start: 60, end: 60), between: stream) == Span(start: 60, end: 60))
+    }
+
+    /// Two gaps with only covered silence between them (one drop with a pause in the speech): each one's upload (±30 s
+    /// with labels) hears the other's speech, but the widening of a gap stops at the next gap, so every second of the
+    /// uploads is kept once.
+    @Test func twoGapsSeparatedBySilenceKeepEachUploadedSecondOnce() async throws {
+        let recording = try Self.makeRecording(seconds: 100)
+        defer { recording.remove() }
+        let prior = PriorTranscription(
+            engineID: "cloud:fake", mic: [],
+            system: Self.raw(Self.pieces("A", 0...49) + Self.pieces("A", 63...100)),
+            micGaps: [], systemGaps: [Span(start: 50, end: 52), Span(start: 60, end: 62)], duration: 100,
+            modelID: "rt-model")
+        let asr = FakeTranscriber { _, _, seconds in Self.pieces("X", 0...seconds, text: "upload") }
+
+        let transcript = try await recording.transcribe(prior: prior, diarize: true, asr: asr)
+
+        #expect(asr.calls.count == 2)
+        let starts = transcript.segments.filter { $0.channel == .system && $0.text == "upload" }.map(\.start)
+        #expect(Set(starts).count == starts.count)
+        #expect(starts.contains(50) && starts.contains(60))
     }
 
     /// A resume after a pause with no gap (`systemBridges`): the stream scoped the resumed session's labels
