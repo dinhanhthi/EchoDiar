@@ -1,4 +1,5 @@
 using System.Text.Json;
+using System.Text.Json.Nodes;
 
 namespace EchoDiar.AI.Cloud;
 
@@ -148,6 +149,126 @@ public sealed class SpeechmaticsTranscriber : ICloudTranscriber
     private static HttpRequestMessage Request(HttpMethod method, string pathAndQuery, string apiKey) =>
         CloudTranscription.Request(
             method, new Uri(BaseUrl, pathAndQuery), CloudTranscription.RequestTimeout, "Authorization", "Bearer " + apiKey);
+
+    /// <summary>The realtime adapter's descriptor (<see cref="Realtime"/>).</summary>
+    public static readonly RealtimeAdapterType RealtimeType = new(
+        ["enhanced", "standard", "melia-1", "oak-1"], new Uri("wss://eu.rt.speechmatics.com/v2"), null,
+        (apiKey, model, language, diarize) => new Realtime(apiKey, model, language, diarize));
+
+    /// <summary>
+    /// Realtime <c>wss://eu.rt.speechmatics.com/v2</c> (one fixed region), <c>Authorization: Bearer</c> handshake header, a
+    /// <c>StartRecognition</c> start message (raw pcm_s16le 16 kHz, the model, partials, <c>max_delay</c> 2 s, speaker
+    /// diarization with <c>standard</c>/<c>enhanced</c>), binary audio frames (<c>AddAudio</c>), each counted for
+    /// <c>EndOfStream</c>'s <c>last_seq_no</c>. <c>RecognitionStarted</c> starts; <c>AddPartialTranscript</c> is a partial,
+    /// <c>AddTranscript</c> finals (json-v2 results, read like the batch transcript: punctuation attached, speakers
+    /// <c>S1</c>, <c>S2</c>, <c>UU</c> = none), times in seconds from the stream start. <c>ForceEndOfUtterance</c> flushes;
+    /// <c>EndOfStream</c> ends (answered by <c>EndOfTranscript</c>). Realtime has no automatic language: Auto is refused
+    /// (except the multilingual <c>melia</c> models, sent <c>multi</c>). Keep-alive is WebSocket ping/pong (3 min idle
+    /// close), not a message.
+    /// </summary>
+    public sealed class Realtime : IRealtimeAdapter
+    {
+        private readonly string _apiKey;
+        private readonly string? _language;
+        private readonly bool _diarize;
+
+        /// <summary><c>AddAudio</c> frames sent: Speechmatics numbers them from 1.</summary>
+        private int _framesSent;
+
+        public Realtime(string apiKey, string model, string? language, bool diarize)
+        {
+            _apiKey = apiKey;
+            Model = model;
+            _language = CloudTranscription.LanguageCode(language);
+            _diarize = diarize;
+        }
+
+        public string Model { get; }
+
+        public RealtimeAdapterType Type => RealtimeType;
+
+        public int SampleRate => 16_000;
+
+        /// <summary>Only <c>standard</c> and <c>enhanced</c> label speakers in realtime.</summary>
+        public bool StreamsSpeakers => _diarize && Model is "standard" or "enhanced";
+
+        public IReadOnlyDictionary<string, string> Headers => new Dictionary<string, string> { ["Authorization"] = "Bearer " + _apiKey };
+
+        public Uri SocketUrl(byte[]? sessionAnswer) => RealtimeType.Endpoint;
+
+        public IReadOnlyList<RealtimeMessage> StartMessages()
+        {
+            var config = new JsonObject { ["model"] = Model, ["enable_partials"] = true, ["max_delay"] = 2 };
+            if (Model.StartsWith("melia", StringComparison.OrdinalIgnoreCase))
+            {
+                config["language"] = "multi";
+                if (_language is { } hint) config["language_hints"] = new JsonArray(hint);
+            }
+            else if (_language is { } language)
+            {
+                config["language"] = language;
+            }
+            else
+            {
+                throw LLMException.Provider("Speechmatics live transcription needs a language: choose one instead of Auto.");
+            }
+            if (StreamsSpeakers) config["diarization"] = "speaker";
+            return [CloudRealtime.Json(new JsonObject
+            {
+                ["message"] = "StartRecognition",
+                ["audio_format"] = new JsonObject { ["type"] = "raw", ["encoding"] = "pcm_s16le", ["sample_rate"] = SampleRate },
+                ["transcription_config"] = config,
+            })];
+        }
+
+        public RealtimeMessage Frame(byte[] pcm)
+        {
+            _framesSent++;
+            return new RealtimeMessage.Binary(pcm);
+        }
+
+        public IReadOnlyList<RealtimeMessage> Finalize(double streamSeconds) =>
+            [new RealtimeMessage.Text("{\"message\":\"ForceEndOfUtterance\"}")];
+
+        public IReadOnlyList<RealtimeMessage> CloseMessages() =>
+            [new RealtimeMessage.Text("{\"message\":\"EndOfStream\",\"last_seq_no\":" + CloudRealtime.Invariant(_framesSent) + "}")];
+
+        public IReadOnlyList<RealtimeEvent> Parse(RealtimeMessage message)
+        {
+            if (CloudRealtime.Decode<LiveMessage>(message) is not { } live) return [];
+            switch (live.Message)
+            {
+                case "RecognitionStarted":
+                    return [new RealtimeEvent.Started()];
+                case "AddPartialTranscript":
+                    var text = live.Metadata?.Transcript?.Trim() ?? "";
+                    if (text.Length == 0) return [];
+                    var speaker = (live.Results ?? [])
+                        .Select(result => result.Alternatives?.FirstOrDefault()?.Speaker)
+                        .FirstOrDefault(label => label is not null && label != "UU");
+                    return [new RealtimeEvent.Partial(text, live.Metadata?.StartTime, live.Metadata?.EndTime, speaker)];
+                case "AddTranscript":
+                    return SpeechmaticsTranscriber.Parse(CloudRealtime.Payload(message))
+                        .Select(segment => (RealtimeEvent)new RealtimeEvent.Final(segment)).ToList();
+                case "EndOfTranscript":
+                    return [new RealtimeEvent.Ended()];
+                case "Error":
+                    return [new RealtimeEvent.Failed(CloudRealtime.ErrorKind(live.Type ?? live.Message))];
+                default:
+                    return [];
+            }
+        }
+    }
+
+    /// <summary><c>EndOfUtterance</c> (the answer to <c>ForceEndOfUtterance</c>) has metadata without a transcript.</summary>
+    private sealed record LiveMessage(
+        string? Message = null, string? Type = null, LiveMetadata? Metadata = null, List<LiveResult>? Results = null);
+
+    private sealed record LiveMetadata(string? Transcript = null, double? StartTime = null, double? EndTime = null);
+
+    private sealed record LiveResult(List<LiveAlternative>? Alternatives = null);
+
+    private sealed record LiveAlternative(string? Speaker = null);
 
     private sealed record JobConfig(string Type, TranscriptionConfig TranscriptionConfig);
 

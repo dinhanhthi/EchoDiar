@@ -1,3 +1,5 @@
+using System.Text.Json.Nodes;
+
 namespace EchoDiar.AI.Cloud;
 
 /// <summary>
@@ -193,6 +195,137 @@ public sealed class SonioxTranscriber : ICloudTranscriber
         request.Options.Set(ProviderHttp.TimeoutOption, ProviderHttp.ListTimeout);
         return request;
     }
+
+    /// <summary>The realtime adapter's descriptor (<see cref="Realtime"/>).</summary>
+    public static readonly RealtimeAdapterType RealtimeType = new(
+        ["stt-rt-v6"], new Uri("wss://stt-rt.soniox.com/transcribe-websocket"), null,
+        (apiKey, model, language, diarize) => new Realtime(apiKey, model, language, diarize));
+
+    /// <summary>
+    /// Realtime <c>wss://stt-rt.soniox.com/transcribe-websocket</c>, <c>Authorization: Bearer</c> handshake header (the
+    /// start message's <c>api_key</c> is deprecated), a JSON start message (model, raw pcm_s16le 16 kHz mono, language
+    /// hints, speaker diarization, language identification, endpoint detection), binary audio frames. Each answer
+    /// re-sends the non-final tokens and adds new final ones once; tokens are sub-words with their own spacing, times in
+    /// ms. Final tokens are held until a segment is complete (a later segment began, or an <c>&lt;end&gt;</c> /
+    /// <c>&lt;fin&gt;</c> marker or the end of the stream), so a word is never split across finals; the partial is the
+    /// held text plus the non-final tokens. Speakers <c>1</c>, <c>2</c>, ... <c>finalize</c> flushes, an empty text frame
+    /// ends (answered by <c>finished</c>, then the close), <c>keepalive</c> every 10 s while no audio flows (Soniox closes
+    /// after 20 s). No ready message: the session accepts audio once connected.
+    /// </summary>
+    public sealed class Realtime : IRealtimeAdapter
+    {
+        /// <summary>End-of-utterance (<c>&lt;end&gt;</c>, endpoint detection) and manual-finalize (<c>&lt;fin&gt;</c>) markers.</summary>
+        private static readonly HashSet<string> Markers = ["<end>", "<fin>"];
+
+        private readonly string _apiKey;
+        private readonly string? _language;
+        private readonly bool _diarize;
+
+        /// <summary>Final tokens not emitted yet, and the first language among them.</summary>
+        private List<CloudTranscription.Word> _held = [];
+        private string? _heldLanguage;
+
+        public Realtime(string apiKey, string model, string? language, bool diarize)
+        {
+            _apiKey = apiKey;
+            Model = model;
+            _language = CloudTranscription.LanguageCode(language);
+            _diarize = diarize;
+        }
+
+        public string Model { get; }
+
+        public RealtimeAdapterType Type => RealtimeType;
+
+        public int SampleRate => 16_000;
+
+        public bool StreamsSpeakers => _diarize;
+
+        public IReadOnlyDictionary<string, string> Headers => new Dictionary<string, string> { ["Authorization"] = "Bearer " + _apiKey };
+
+        public RealtimeKeepAlive? KeepAlive => new(new RealtimeMessage.Text("{\"type\":\"keepalive\"}"), TimeSpan.FromSeconds(10));
+
+        public Uri SocketUrl(byte[]? sessionAnswer) => RealtimeType.Endpoint;
+
+        public IReadOnlyList<RealtimeMessage> StartMessages()
+        {
+            var config = new JsonObject
+            {
+                ["model"] = Model, ["audio_format"] = "pcm_s16le", ["sample_rate"] = SampleRate, ["num_channels"] = 1,
+                ["enable_speaker_diarization"] = _diarize, ["enable_language_identification"] = true,
+                ["enable_endpoint_detection"] = true,
+            };
+            if (_language is { } language) config["language_hints"] = new JsonArray(language);
+            return [CloudRealtime.Json(config)];
+        }
+
+        public IReadOnlyList<RealtimeMessage> Finalize(double streamSeconds) => [new RealtimeMessage.Text("{\"type\":\"finalize\"}")];
+
+        public IReadOnlyList<RealtimeMessage> CloseMessages() => [new RealtimeMessage.Text("")];
+
+        public IReadOnlyList<RealtimeEvent> Parse(RealtimeMessage message)
+        {
+            if (CloudRealtime.Decode<LiveResponse>(message) is not { } live) return [];
+            if (live.ErrorCode is not null || live.ErrorType is not null)
+            {
+                return [new RealtimeEvent.Failed(CloudRealtime.ErrorKind(
+                    live.ErrorType ?? live.ErrorCode?.ToString(System.Globalization.CultureInfo.InvariantCulture)))];
+            }
+            var flush = live.Finished == true;
+            var pending = new List<LiveToken>();
+            foreach (var token in live.Tokens ?? [])
+            {
+                if (Markers.Contains(token.Text))
+                {
+                    flush = flush || token.IsFinal == true;
+                }
+                else if (token.IsFinal == true)
+                {
+                    var start = token.StartMs / 1000 ?? (_held.Count > 0 ? _held[^1].End : 0);
+                    _held.Add(new(start, token.EndMs / 1000 ?? start, token.Text, token.Speaker));
+                    _heldLanguage ??= token.Language;
+                }
+                else
+                {
+                    pending.Add(token);
+                }
+            }
+            var events = EmitHeld(flush).Select(segment => (RealtimeEvent)new RealtimeEvent.Final(segment)).ToList();
+            var text = string.Concat(_held.Select(word => word.Text).Concat(pending.Select(token => token.Text))).Trim();
+            if (text.Length > 0)
+            {
+                var start = _held.Count > 0 ? _held[0].Start : pending.FirstOrDefault()?.StartMs / 1000;
+                var end = pending.LastOrDefault()?.EndMs / 1000 ?? (_held.Count > 0 ? _held[^1].End : null);
+                var speaker = (_held.Count > 0 ? _held[0].Speaker : null) ?? pending.FirstOrDefault()?.Speaker;
+                events.Add(new RealtimeEvent.Partial(text, start, end, speaker));
+            }
+            if (live.Finished == true) events.Add(new RealtimeEvent.Ended());
+            return events;
+        }
+
+        /// <summary>The held tokens' complete segments (all of them with <paramref name="all"/>); the last one stays held otherwise.</summary>
+        private List<CloudSegment> EmitHeld(bool all)
+        {
+            var segments = CloudTranscription.Segments(_held, "", _heldLanguage);
+            if (all || segments.Count == 0)
+            {
+                _held = [];
+                _heldLanguage = null;
+                return segments;
+            }
+            var last = segments[^1];
+            segments.RemoveAt(segments.Count - 1);
+            _held = _held.Where(word => word.Start >= last.Start).ToList();
+            return segments;
+        }
+    }
+
+    private sealed record LiveResponse(
+        List<LiveToken>? Tokens = null, bool? Finished = null, int? ErrorCode = null, string? ErrorType = null);
+
+    private sealed record LiveToken(
+        string Text, double? StartMs = null, double? EndMs = null, bool? IsFinal = null, string? Speaker = null,
+        string? Language = null);
 
     private sealed record TranscriptionBody(string Model, string FileId, List<string>? LanguageHints, bool EnableSpeakerDiarization);
 

@@ -1,4 +1,5 @@
 using System.Globalization;
+using System.Text.Json;
 
 namespace EchoDiar.AI.Cloud;
 
@@ -131,6 +132,102 @@ public sealed class GladiaTranscriber : ICloudTranscriber
 
     private static HttpRequestMessage Request(HttpMethod method, string pathAndQuery, string apiKey) =>
         CloudTranscription.Request(method, new Uri(BaseUrl, pathAndQuery), CloudTranscription.RequestTimeout, "x-gladia-key", apiKey);
+
+    /// <summary>The realtime adapter's descriptor (<see cref="Realtime"/>).</summary>
+    public static readonly RealtimeAdapterType RealtimeType = new(
+        ["solaria-1"], new Uri("wss://api.gladia.io/v2/live"), new Uri(BaseUrl, "v2/live"),
+        (apiKey, model, language, diarize) => new Realtime(apiKey, model, language));
+
+    /// <summary>
+    /// Live v2: <c>POST https://api.gladia.io/v2/live</c> with <c>x-gladia-key</c> (all settings: wav/pcm 16-bit 16 kHz
+    /// mono, the model, languages, partial and final transcripts; Gladia refuses 24 kHz) answers a <c>url</c>
+    /// (<c>wss://api.gladia.io/v2/live?token=...</c>) whose session token authenticates the socket: the key is not sent
+    /// there, and the URL must never be logged. Binary audio frames. <c>transcript</c> messages with <c>is_final:false</c>
+    /// are partials, <c>is_final:true</c> finals (utterance text and times in seconds from the session start). No
+    /// streaming speakers, no per-utterance finalize, no keep-alive; <c>stop_recording</c> ends (the server closes with
+    /// 1000). No ready or end message is read: the session accepts audio once connected, and ends with the close
+    /// (<c>IsDrained</c> stays false).
+    /// </summary>
+    public sealed class Realtime : IRealtimeAdapter
+    {
+        private readonly string _apiKey;
+        private readonly string? _language;
+
+        public Realtime(string apiKey, string model, string? language)
+        {
+            _apiKey = apiKey;
+            Model = model;
+            _language = CloudTranscription.LanguageCode(language);
+        }
+
+        public string Model { get; }
+
+        public RealtimeAdapterType Type => RealtimeType;
+
+        public int SampleRate => 16_000;
+
+        /// <summary>Billed: a new live session each time it is sent.</summary>
+        public HttpRequestMessage? SessionRequest()
+        {
+            var request = Request(HttpMethod.Post, "v2/live", _apiKey);
+            request.Options.Set(ProviderHttp.TimeoutOption, ProviderHttp.ListTimeout);
+            ProviderHttp.SetJsonBody(request, new LiveInitBody(
+                "wav/pcm", SampleRate, 16, 1, Model, new(_language is { } language ? [language] : [], false), new(true, true)));
+            return request;
+        }
+
+        /// <summary>The answer's <c>url</c>; <see cref="RealtimeConnection.ConnectAsync"/> checks it is <c>wss</c> on <c>api.gladia.io</c>.</summary>
+        public Uri SocketUrl(byte[]? sessionAnswer)
+        {
+            LiveSession? answer = null;
+            try
+            {
+                if (sessionAnswer is not null) answer = ProviderHttp.Decode<LiveSession>(sessionAnswer);
+            }
+            catch (JsonException)
+            {
+                // Refused below, without the answer's text.
+            }
+            if (answer is null || !Uri.TryCreate(answer.Url, UriKind.RelativeOrAbsolute, out var url))
+                throw LLMException.Provider("Gladia did not start a live session.");
+            return url;
+        }
+
+        public IReadOnlyList<RealtimeMessage> CloseMessages() => [new RealtimeMessage.Text("{\"type\":\"stop_recording\"}")];
+
+        public IReadOnlyList<RealtimeEvent> Parse(RealtimeMessage message)
+        {
+            if (CloudRealtime.Decode<LiveMessage>(message) is not { } live) return [];
+            if (live.Exception is { } exception) return [new RealtimeEvent.Failed(CloudRealtime.ErrorKind(exception))];
+            switch (live.Type)
+            {
+                case "transcript":
+                    if (live.Data is not { Utterance: { } utterance } data) return [];
+                    var text = utterance.Text.Trim();
+                    if (text.Length == 0) return [];
+                    if (data.IsFinal != true) return [new RealtimeEvent.Partial(text, utterance.Start, utterance.End)];
+                    return [new RealtimeEvent.Final(new CloudSegment(utterance.Start, utterance.End, text, Language: utterance.Language))];
+                case "error":
+                    return [new RealtimeEvent.Failed(CloudRealtime.ErrorKind(live.Type))];
+                default:
+                    return [];
+            }
+        }
+    }
+
+    private sealed record LiveInitBody(
+        string Encoding, int SampleRate, int BitDepth, int Channels, string Model, LanguageConfig LanguageConfig,
+        LiveMessagesConfig MessagesConfig);
+
+    private sealed record LiveMessagesConfig(bool ReceivePartialTranscripts, bool ReceiveFinalTranscripts);
+
+    private sealed record LiveSession(string Url);
+
+    private sealed record LiveMessage(string? Type = null, string? Exception = null, LivePayload? Data = null);
+
+    private sealed record LivePayload(bool? IsFinal = null, LiveUtterance? Utterance = null);
+
+    private sealed record LiveUtterance(string Text, double Start, double End, string? Language = null);
 
     private sealed record JobBody(string AudioUrl, string Model, bool Diarization, LanguageConfig LanguageConfig);
 

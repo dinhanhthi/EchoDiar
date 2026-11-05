@@ -122,6 +122,95 @@ public sealed class AssemblyAITranscriber : ICloudTranscriber
         CloudTranscription.Request(
             method, new Uri(BaseUrl, pathAndQuery), CloudTranscription.RequestTimeout, "Authorization", apiKey);
 
+    /// <summary>The realtime adapter's descriptor (<see cref="Realtime"/>).</summary>
+    public static readonly RealtimeAdapterType RealtimeType = new(
+        ["universal-3-6-pro", "universal-3-5-pro", "universal-streaming-multilingual", "universal-streaming-english"],
+        new Uri("wss://streaming.assemblyai.com/v3/ws"), null,
+        (apiKey, model, language, diarize) => new Realtime(apiKey, model, language, diarize));
+
+    /// <summary>
+    /// Universal-Streaming v3: <c>wss://streaming.assemblyai.com/v3/ws?...</c> (settings in the query, no start message),
+    /// <c>Authorization: &lt;key&gt;</c> handshake header, binary 16 kHz pcm_s16le frames (each 20-1000 ms). <c>Begin</c>
+    /// starts (with <c>expires_at</c>, the 3 h cap). A <c>Turn</c> is a partial until <c>end_of_turn</c> and
+    /// <c>turn_is_formatted</c> (with <c>format_turns</c> an unformatted end of turn comes first); the final is the whole
+    /// turn, times in ms from the stream start, speaker the turn's <c>speaker_label</c> ("A", "B"; <c>PENDING</c> /
+    /// <c>UNKNOWN</c> = none). <c>ForceEndpoint</c> ends the turn, <c>Terminate</c> ends the stream (answered by
+    /// <c>Termination</c>). No idle timeout, so no keep-alive. <c>SpeakerRevision</c> (relabels at close) is not applied.
+    /// </summary>
+    public sealed class Realtime : IRealtimeAdapter
+    {
+        private readonly string _apiKey;
+        private readonly string? _language;
+        private readonly bool _diarize;
+
+        public Realtime(string apiKey, string model, string? language, bool diarize)
+        {
+            _apiKey = apiKey;
+            Model = model;
+            _language = CloudTranscription.LanguageCode(language);
+            _diarize = diarize;
+        }
+
+        public string Model { get; }
+
+        public RealtimeAdapterType Type => RealtimeType;
+
+        public int SampleRate => 16_000;
+
+        public bool StreamsSpeakers => _diarize;
+
+        public IReadOnlyDictionary<string, string> Headers => new Dictionary<string, string> { ["Authorization"] = _apiKey };
+
+        public Uri SocketUrl(byte[]? sessionAnswer)
+        {
+            var query = new List<(string, string)>
+            {
+                ("sample_rate", CloudRealtime.Invariant(SampleRate)), ("encoding", "pcm_s16le"), ("speech_model", Model),
+                ("format_turns", "true"),
+            };
+            if (_diarize) query.Add(("speaker_labels", "true"));
+            query.Add(_language is { } language ? ("language_codes", language) : ("language_detection", "true"));
+            return CloudRealtime.WithQuery(RealtimeType.Endpoint, query);
+        }
+
+        public IReadOnlyList<RealtimeMessage> Finalize(double streamSeconds) => [new RealtimeMessage.Text("{\"type\":\"ForceEndpoint\"}")];
+
+        public IReadOnlyList<RealtimeMessage> CloseMessages() => [new RealtimeMessage.Text("{\"type\":\"Terminate\"}")];
+
+        public IReadOnlyList<RealtimeEvent> Parse(RealtimeMessage message)
+        {
+            if (CloudRealtime.Decode<LiveMessage>(message) is not { } live) return [];
+            switch (live.Type)
+            {
+                case "Begin":
+                    return [new RealtimeEvent.Started(CloudRealtime.ExpiresAt(live.ExpiresAt))];
+                case "Termination":
+                    return [new RealtimeEvent.Ended()];
+                case "Error":
+                    return [new RealtimeEvent.Failed(CloudRealtime.ErrorKind(
+                        live.ErrorCode?.ToString(System.Globalization.CultureInfo.InvariantCulture) ?? live.Type))];
+                case "Turn":
+                    var text = live.Transcript?.Trim() ?? "";
+                    if (text.Length == 0) return [];
+                    var words = live.Words ?? [];
+                    double? start = words.Count > 0 ? words[0].Start / 1000 : null;
+                    double? end = words.Count > 0 ? words[^1].End / 1000 : null;
+                    var speaker = live.SpeakerLabel is "PENDING" or "UNKNOWN" ? null : live.SpeakerLabel;
+                    if (live.EndOfTurn != true || live.TurnIsFormatted != true || start is not { } from || end is not { } to)
+                        return [new RealtimeEvent.Partial(text, start, end, speaker)];
+                    return [new RealtimeEvent.Final(new CloudSegment(from, to, text, speaker, live.LanguageCode))];
+                default:
+                    return [];
+            }
+        }
+    }
+
+    private sealed record LiveMessage(
+        string? Type = null, double? ExpiresAt = null, int? ErrorCode = null, string? Transcript = null, bool? EndOfTurn = null,
+        bool? TurnIsFormatted = null, string? SpeakerLabel = null, string? LanguageCode = null, List<LiveWord>? Words = null);
+
+    private sealed record LiveWord(double Start, double End);
+
     private sealed record TranscriptBody(string AudioUrl, bool SpeakerLabels, string? LanguageCode, bool? LanguageDetection);
 
     private sealed record UploadResponse(string UploadUrl);

@@ -61,6 +61,113 @@ public sealed class XAITranscriber : ICloudTranscriber
         return text.Length == 0 ? [] : [new CloudSegment(0, response.Duration ?? 0, text, Language: response.Language)];
     }
 
+    /// <summary>The realtime adapter's descriptor (<see cref="Realtime"/>).</summary>
+    public static readonly RealtimeAdapterType RealtimeType = new(
+        ["grok-voice-transcribe-2.0"], new Uri("wss://api.x.ai/v1/stt"), null,
+        (apiKey, model, language, diarize) => new Realtime(apiKey, model, language, diarize));
+
+    /// <summary>
+    /// Streaming <c>wss://api.x.ai/v1/stt?...</c> (settings in the query, no start message), <c>Authorization: Bearer</c>
+    /// handshake header, binary 16 kHz PCM frames. <c>transcript.created</c> starts: audio waits for it. A
+    /// <c>transcript.partial</c> with <c>is_final:false</c> is a partial; with <c>is_final:true</c> its words become finals
+    /// (integer speakers with <c>diarize</c>), except the words a <c>speech_final</c> repeats from the chunk finals before
+    /// it: only words that start after the last final word are new. <c>finalize</c> forces an utterance final;
+    /// <c>audio.done</c> ends (answered by <c>transcript.done</c>, then the close). No keep-alive documented.
+    /// </summary>
+    public sealed class Realtime : IRealtimeAdapter
+    {
+        private readonly string _apiKey;
+        private readonly string? _language;
+        private readonly bool _diarize;
+
+        /// <summary>Start of the last word emitted as final; repeated words start at or before it.</summary>
+        private double _lastFinalStart = double.NegativeInfinity;
+
+        public Realtime(string apiKey, string model, string? language, bool diarize)
+        {
+            _apiKey = apiKey;
+            Model = model;
+            _language = CloudTranscription.LanguageCode(language);
+            _diarize = diarize;
+        }
+
+        public string Model { get; }
+
+        public RealtimeAdapterType Type => RealtimeType;
+
+        public int SampleRate => 16_000;
+
+        public bool StreamsSpeakers => _diarize;
+
+        public IReadOnlyDictionary<string, string> Headers => new Dictionary<string, string> { ["Authorization"] = "Bearer " + _apiKey };
+
+        public Uri SocketUrl(byte[]? sessionAnswer)
+        {
+            var query = new List<(string, string)>
+            {
+                ("model", Model), ("sample_rate", CloudRealtime.Invariant(SampleRate)), ("encoding", "pcm"), ("interim_results", "true"),
+            };
+            if (_language is { } language) query.Add(("language", language));
+            if (_diarize) query.Add(("diarize", "true"));
+            return CloudRealtime.WithQuery(RealtimeType.Endpoint, query);
+        }
+
+        public IReadOnlyList<RealtimeMessage> Finalize(double streamSeconds) => [new RealtimeMessage.Text("{\"type\":\"finalize\"}")];
+
+        public IReadOnlyList<RealtimeMessage> CloseMessages() => [new RealtimeMessage.Text("{\"type\":\"audio.done\"}")];
+
+        public IReadOnlyList<RealtimeEvent> Parse(RealtimeMessage message)
+        {
+            if (CloudRealtime.Decode<LiveTranscript>(message) is not { } live) return [];
+            switch (live.Type)
+            {
+                case "transcript.created":
+                    return [new RealtimeEvent.Started()];
+                case "transcript.partial" when live.IsFinal != true:
+                    var text = live.Text?.Trim() ?? "";
+                    if (text.Length == 0) return [];
+                    var start = live.Start ?? live.Words?.FirstOrDefault()?.Start;
+                    var end = (start is { } from && live.Duration is { } duration ? from + duration : (double?)null)
+                              ?? live.Words?.LastOrDefault()?.End;
+                    return [new RealtimeEvent.Partial(text, start, end, Speaker(live.Words?.FirstOrDefault()?.Speaker))];
+                case "transcript.partial":
+                    return Finals(live);
+                case "transcript.done":
+                    return [.. Finals(live), new RealtimeEvent.Ended()];
+                case "error":
+                    return [new RealtimeEvent.Failed(CloudRealtime.ErrorKind(live.Type))];
+                default:
+                    return [];
+            }
+        }
+
+        /// <summary>
+        /// The new words of a final (by start time) grouped into segments; a chunk final without words is its text over
+        /// <c>start...start+duration</c>.
+        /// </summary>
+        private List<RealtimeEvent> Finals(LiveTranscript live)
+        {
+            var fresh = (live.Words ?? []).Where(word => word.Start > _lastFinalStart).ToList();
+            if (fresh.Count > 0) _lastFinalStart = fresh.Max(word => word.Start);
+            var words = fresh.Select(word => new CloudTranscription.Word(word.Start, word.End, word.Text, Speaker(word.Speaker))).ToList();
+            if (words.Count > 0)
+                return CloudTranscription.Segments(words, " ", null).Select(segment => (RealtimeEvent)new RealtimeEvent.Final(segment)).ToList();
+            var text = live.Text?.Trim() ?? "";
+            if (live.Type != "transcript.partial" || live.SpeechFinal == true || live.Words is { Count: > 0 } || text.Length == 0
+                || live.Start is not { } start || !(start > _lastFinalStart)) return [];
+            _lastFinalStart = start;
+            return [new RealtimeEvent.Final(new CloudSegment(start, start + (live.Duration ?? 0), text))];
+        }
+
+        private static string? Speaker(int? speaker) => speaker?.ToString(CultureInfo.InvariantCulture);
+    }
+
+    private sealed record LiveTranscript(
+        string? Type = null, string? Text = null, List<LiveWord>? Words = null, bool? IsFinal = null, bool? SpeechFinal = null,
+        double? Start = null, double? Duration = null);
+
+    private sealed record LiveWord(string Text, double Start, double End, int? Speaker = null);
+
     private sealed record SttResponse(
         string? Text = null, string? Language = null, double? Duration = null, List<SttWord>? Words = null);
 
