@@ -151,6 +151,17 @@ struct APIKeyCard: View {
             VStack(alignment: .leading, spacing: 4) {
                 CloudModelField(config: config, model: model, label: "Transcription model")
                 CloudPriceBadge(config: config).inputColumn()
+                Text("Prices are approximate list prices per audio hour; the mic and system channels are sent and billed separately.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .inputColumn()
+                if config.preset == "gemini" {
+                    Text("LLM transcription — timestamps approximate.")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .inputColumn()
+                }
                 // A custom endpoint transcribes once its base URL and its model are set.
                 if isCustom, config.baseURL.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
                     Text("Base URL not set")
@@ -161,7 +172,20 @@ struct APIKeyCard: View {
             }
         }
         if diarizes {
-            CloudModelField(config: config, model: model, diarization: true, label: "Diarization model")
+            VStack(alignment: .leading, spacing: 4) {
+                CloudModelField(config: config, model: model, diarization: true, label: "Diarization model")
+                Text("Only the system channel is uploaded, as one extra transcription billed by the provider; only the speaker labels are kept. Not used when the transcription model already labels speakers. Prices are approximate list prices per audio hour.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .inputColumn()
+                if config.preset == "gemini" {
+                    Text("LLM diarization — timestamps approximate, speakers can be mislabeled.")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .inputColumn()
+                }
+            }
         }
         if embeds {
             EmbeddingModelField(config: config, model: model)

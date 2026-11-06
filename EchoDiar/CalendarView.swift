@@ -63,7 +63,7 @@ struct CalendarView: View {
                 Spacer()
                 Button("New Event…") { editor = .new }
                     .disabled(!model.calendarAuthorized)
-                Button("Calendar settings…") { model.openSettings(tab: .recording, subTab: "calendar") }
+                Button("Calendar settings…") { model.openSettings(tab: .calendar) }
             }
             Text("Showing meetings in the next 7 days. The list updates automatically.")
                 .font(.callout)

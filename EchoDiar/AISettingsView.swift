@@ -3,13 +3,14 @@ import EchoCore
 import SwiftUI
 
 /// The AI Settings tab, in inner tabs: the chat model with the chat context and the answer language, the summary model,
-/// catch-up while recording, and Library chat (`RAGSettingsView`). The providers themselves are set up in AI Providers.
+/// catch-up while recording, the default transcription and diarization models (the Transcription page's settings), and
+/// Library chat (`RAGSettingsView`). The providers themselves are set up in AI Providers.
 struct AISettingsView: View {
     let model: AppModel
 
     /// Ids in `SettingsTab.aiSettings.subTabs`; picked in the toolbar.
     private enum Tab: String {
-        case chat, summary, catchUp, library
+        case chat, summary, catchUp, transcription, library
     }
 
     private var tab: Tab { model.settingsSubTab(.aiSettings).flatMap(Tab.init) ?? .chat }
@@ -18,6 +19,13 @@ struct AISettingsView: View {
         switch tab {
         case .library:
             RAGSettingsView(model: model)
+        case .transcription:
+            Form {
+                Section("Transcription model") { DefaultEnginePicker(kind: .asr, model: model) }
+                Section("Speakers") { DefaultEnginePicker(kind: .diarization, model: model) }
+            }
+            .formStyle(.grouped)
+            .task { model.refreshInstalledModels() }
         case .chat, .summary, .catchUp:
             Form {
                 switch tab {

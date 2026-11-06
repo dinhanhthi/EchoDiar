@@ -265,7 +265,7 @@ struct TranscriptionStatus: View {
         if let progress, progress.step != .needsModel {
             ProgressLabel(progress: progress, conversationID: conversation.id, model: model)
         } else if progress != nil {
-            Button("Needs model") { model.openSettings(tab: .transcription) }
+            Button("Needs model") { model.openSettings(tab: .providers, subTab: "localAI") }
                 .buttonStyle(RowTextButtonStyle())
                 .fixedSize()
                 .foregroundStyle(.orange)
@@ -375,8 +375,9 @@ struct TranscriptionFailureReason: View {
     }
 }
 
-/// Installed local engines, then the configured cloud engines under "Cloud", for the Retry and Re-transcribe menus;
-/// "Download a model…" when there are none. `pick` gets a catalog or cloud engine id.
+/// The default engine (`AppModel.defaultASRModelID`, when installed or configured) first, marked "(default)", then the
+/// other installed local engines, then the other configured cloud engines under "Cloud", for the Retry and
+/// Re-transcribe menus; "Download a model…" when there are none. `pick` gets a catalog or cloud engine id.
 struct EngineMenuItems: View {
     let title: LocalizedStringKey
     let model: AppModel
@@ -386,21 +387,38 @@ struct EngineMenuItems: View {
         let local = model.installedBatchEngines
         let cloud = model.cloudEngineConfigs
         if local.isEmpty && cloud.isEmpty {
-            Button("Download a model…") { model.openSettings(tab: .transcription) }
+            Button("Download a model…") { model.openSettings(tab: .providers, subTab: "localAI") }
         } else {
-            if !local.isEmpty {
+            let defaultID = model.defaultASRModelID
+            let defaultCloud = cloud.first { Self.engineID($0) == defaultID }
+            let otherCloud = cloud.filter { Self.engineID($0) != defaultID }
+            let localFirst = local.filter { $0.id == defaultID } + local.filter { $0.id != defaultID }
+            if defaultCloud != nil || !local.isEmpty {
                 Section(title) {
-                    ForEach(local) { entry in Button(entry.displayName) { pick(entry.id) } }
+                    if let defaultCloud {
+                        item(model.cloudEngineName(defaultCloud), id: Self.engineID(defaultCloud), isDefault: true)
+                    }
+                    ForEach(localFirst) { entry in
+                        item(entry.displayName, id: entry.id, isDefault: entry.id == defaultID)
+                    }
                 }
             }
-            if !cloud.isEmpty {
-                Section(local.isEmpty ? "\(Text(title)) (cloud)" : "Cloud") {
-                    ForEach(cloud) { config in
-                        Button(model.cloudEngineName(config)) { pick(CloudTranscription.engineID(providerID: config.id)) }
+            if !otherCloud.isEmpty {
+                Section(defaultCloud == nil && local.isEmpty ? "\(Text(title)) (cloud)" : "Cloud") {
+                    ForEach(otherCloud) { config in
+                        item(model.cloudEngineName(config), id: Self.engineID(config), isDefault: false)
                     }
                 }
             }
         }
+    }
+
+    private static func engineID(_ config: ProviderConfig) -> String {
+        CloudTranscription.engineID(providerID: config.id)
+    }
+
+    private func item(_ name: String, id: String, isDefault: Bool) -> some View {
+        Button(isDefault ? String(localized: "\(name) (default)") : name) { pick(id) }
     }
 }
 

@@ -174,12 +174,12 @@ struct TranscriptView: View {
                 if installed {
                     Text("Speakers were not told apart. The speaker model is installed now: re-transcribe.")
                 } else {
-                    Text("Speakers were not told apart: the speaker model is not installed (Transcription › Diarization model).")
+                    Text("Speakers were not told apart: the speaker model is not installed (Settings › AI Providers › Local AI).")
                 }
             }
             .foregroundStyle(.secondary)
             if !installed {
-                Button("Download…") { model.openSettings(tab: .transcription) }
+                Button("Download…") { model.openSettings(tab: .providers, subTab: "localAI") }
                     .buttonStyle(.link)
             }
         }
@@ -198,7 +198,7 @@ struct TranscriptView: View {
             }
             .foregroundStyle(.secondary)
             if localMissing {
-                Button("Download…") { model.openSettings(tab: .transcription) }
+                Button("Download…") { model.openSettings(tab: .providers, subTab: "localAI") }
                     .buttonStyle(.link)
             }
         }
