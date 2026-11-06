@@ -329,8 +329,9 @@ struct AIPanelView: View {
 
     // MARK: - Summary
 
-    /// The summary with the version menu pinned above it, then the catch-ups if any; a note in the middle while there
-    /// are neither.
+    /// The summary with the version menu pinned above it, then the Catch-ups bar pinned at the bottom if there are
+    /// catch-ups; a note in the middle while there are neither. The open catch-ups take half the tab beside a summary
+    /// (shown or being written), else the whole of it.
     private var summaryPane: some View {
         Group {
             if summaryJob == nil && summaries.isEmpty && catchUps.isEmpty {
@@ -340,43 +341,48 @@ struct AIPanelView: View {
                     .padding(20)
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
             } else {
+                let hasSummary = summaryJob != nil || shownSummary != nil
                 VStack(alignment: .leading, spacing: 0) {
-                    if summaryJob == nil, let shown = shownSummary {
-                        versionMenu(shown)
-                            .padding(.horizontal, 14)
-                            .padding(.top, 16)
-                    }
-                    ScrollView {
-                        VStack(alignment: .leading, spacing: 8) {
-                            if summaryJob != nil {
-                                // Until the first text: a remote provider sends no status before it.
-                                if let text = jobText {
-                                    MarkdownText(text: text)
-                                } else {
-                                    HStack(spacing: 6) {
-                                        ProgressView().controlSize(.small)
-                                        Text(jobStatus ?? String(localized: "Writing the summary…"))
-                                            .foregroundStyle(.secondary)
-                                    }
-                                }
-                            } else if let shown = shownSummary {
-                                MarkdownText(text: shown.text)
-                            } else {
-                                Text(emptyNote ?? "No summary yet.")
-                                    .foregroundStyle(.secondary)
-                            }
-                            if !catchUps.isEmpty {
-                                catchUpsSection
-                                    .padding(.top, 12)
-                            }
+                    if !(showingCatchUps && !catchUps.isEmpty && !hasSummary) {
+                        if summaryJob == nil, let shown = shownSummary {
+                            versionMenu(shown)
+                                .padding(.horizontal, 14)
+                                .padding(.top, 16)
                         }
-                        .padding(.horizontal, 14)
-                        // Below the version menu (shown while no summary is being written), its gap stays as it was.
-                        .padding(.top, summaryJob == nil ? 10 : 16)
-                        .padding(.bottom, 16)
-                        .frame(maxWidth: .infinity, alignment: .leading)
+                        ScrollView {
+                            VStack(alignment: .leading, spacing: 8) {
+                                if summaryJob != nil {
+                                    // Until the first text: a remote provider sends no status before it.
+                                    if let text = jobText {
+                                        MarkdownText(text: text)
+                                    } else {
+                                        HStack(spacing: 6) {
+                                            ProgressView().controlSize(.small)
+                                            Text(jobStatus ?? String(localized: "Writing the summary…"))
+                                                .foregroundStyle(.secondary)
+                                        }
+                                    }
+                                } else if let shown = shownSummary {
+                                    MarkdownText(text: shown.text)
+                                } else {
+                                    Text(emptyNote ?? "No summary yet.")
+                                        .foregroundStyle(.secondary)
+                                }
+                            }
+                            .padding(.horizontal, 14)
+                            // Below the version menu (shown while no summary is being written), its gap stays as
+                            // it was.
+                            .padding(.top, summaryJob == nil ? 10 : 16)
+                            .padding(.bottom, 16)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                        }
+                        .frame(maxHeight: .infinity)
+                    }
+                    if !catchUps.isEmpty {
+                        catchUpsSection
                     }
                 }
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
@@ -422,41 +428,54 @@ struct AIPanelView: View {
             .joined(separator: " · ")
     }
 
-    /// The catch-ups written while recording, read-only and collapsed until its header is clicked: newest first, the
-    /// newest open and the others collapsed, each opening or closing with a click on its header, each with Copy.
-    private var catchUpsSection: some View {
-        VStack(alignment: .leading, spacing: 6) {
-            Button {
-                withAnimation(reduceMotion ? nil : Motion.standard) { showingCatchUps.toggle() }
-            } label: {
-                HStack(spacing: 6) {
-                    Image(systemName: showingCatchUps ? "chevron.down" : "chevron.right")
-                        .font(.system(size: 10, weight: .bold))
-                        .frame(width: 12)
-                        .foregroundStyle(.secondary)
-                    Text("Catch-ups").font(.headline)
-                    Text(catchUps.count, format: .number)
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                    Spacer(minLength: 0)
-                }
-                .contentShape(Rectangle())
+    /// The catch-ups written while recording, read-only and collapsed until the bar is clicked: newest first, the
+    /// newest open and the others collapsed, each opening or closing with a click on its header, each with Copy. The
+    /// open list scrolls on its own. No stack of its own: the bar and the list sit in the tab's stack, so beside a
+    /// summary the two scrollers share the height equally (as Windows' star rows), else the list takes it all.
+    @ViewBuilder private var catchUpsSection: some View {
+        Divider()
+        Button {
+            withAnimation(reduceMotion ? nil : Motion.standard) { showingCatchUps.toggle() }
+        } label: {
+            HStack(spacing: 6) {
+                Image(systemName: showingCatchUps ? "chevron.down" : "chevron.right")
+                    .font(.system(size: 10, weight: .bold))
+                    .frame(width: 12)
+                    .foregroundStyle(.secondary)
+                Text("Catch-ups").font(.headline)
+                Text(catchUps.count, format: .number)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                Spacer(minLength: 0)
             }
-            .buttonStyle(.plain)
-            .accessibilityValue(showingCatchUps ? Text("Expanded") : Text("Collapsed"))
-            if showingCatchUps {
-                let providers = model.aiProviders
-                ForEach(Array(catchUps.reversed().enumerated()), id: \.element.id) { index, catchUp in
-                    let open = catchUpOpenStates[catchUp.id] ?? (index == 0)
-                    CatchUpCardView(
-                        card: CatchUpCard(catchUp, providers: providers),
-                        open: open,
-                        toggle: {
-                            withAnimation(reduceMotion ? nil : Motion.standard) { catchUpOpenStates[catchUp.id] = !open }
-                        },
-                        stop: {})
+            .padding(.horizontal, 14)
+            .padding(.vertical, 10)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .accessibilityValue(showingCatchUps ? Text("Expanded") : Text("Collapsed"))
+        if showingCatchUps {
+            ScrollView {
+                VStack(alignment: .leading, spacing: 6) {
+                    let providers = model.aiProviders
+                    ForEach(Array(catchUps.reversed().enumerated()), id: \.element.id) { index, catchUp in
+                        let open = catchUpOpenStates[catchUp.id] ?? (index == 0)
+                        CatchUpCardView(
+                            card: CatchUpCard(catchUp, providers: providers),
+                            open: open,
+                            toggle: {
+                                withAnimation(reduceMotion ? nil : Motion.standard) {
+                                    catchUpOpenStates[catchUp.id] = !open
+                                }
+                            },
+                            stop: {})
+                    }
                 }
+                .padding(.horizontal, 14)
+                .padding(.bottom, 16)
+                .frame(maxWidth: .infinity, alignment: .leading)
             }
+            .frame(maxHeight: .infinity)
         }
     }
 

@@ -21,8 +21,8 @@ namespace EchoDiar.App.Views;
 /// tab shows it as busy, with Stop. Answers are Markdown rendered by <see cref="MarkdownView"/> (at most every 120 ms
 /// while streaming, as the model batches the text, and once more when saved); <c>[mm:ss]</c> citations call the seek
 /// action <see cref="ConversationView"/> passes, web links open once their destination is confirmed. Under the
-/// summary, the catch-ups written while recording (<see cref="CatchUpCard"/>, read-only). Attach when the page shows,
-/// Detach when it goes.
+/// summary, the Catch-ups bar with the catch-ups written while recording (<see cref="CatchUpCard"/>, read-only).
+/// Attach when the page shows, Detach when it goes.
 /// </summary>
 public sealed partial class AIPanelView : UserControl
 {
@@ -264,11 +264,27 @@ public sealed partial class AIPanelView : UserControl
             _summaryRendered = text;
             MarkdownView.Render(SummaryText, text, Links());
         }
+        UpdateRowHeights();
     }
 
     /// <summary>
-    /// The Catch-ups section (macOS <c>catchUpsSection</c>), shown while there are some: its header with the count, then,
-    /// open, the cards newest first, the newest open and the others collapsed unless clicked otherwise; each kept by id.
+    /// The heights of the summary and the catch-up cards (macOS <c>summaryPane</c>): the summary takes all the height
+    /// above the Catch-ups bar while it is collapsed or absent; open, the cards share it 1:1 with a summary (shown or
+    /// being written), else take all of it, the summary area hidden.
+    /// </summary>
+    private void UpdateRowHeights()
+    {
+        if (_panel is null) return;
+        var open = _showingCatchUps && _panel.CatchUps.Count > 0;
+        var hasSummary = _panel.SummaryJob is not null || _panel.ShownSummary is not null;
+        SummaryRow.Height = open && !hasSummary ? new GridLength(0) : new GridLength(1, GridUnitType.Star);
+        CatchUpsCardsRow.Height = open ? new GridLength(1, GridUnitType.Star) : new GridLength(0);
+    }
+
+    /// <summary>
+    /// The Catch-ups bar (macOS <c>catchUpsSection</c>), pinned under the summary while there are some: its header with
+    /// the count, then, open, the cards newest first in their own scroller, the newest open and the others collapsed
+    /// unless clicked otherwise; each kept by id.
     /// </summary>
     private void UpdateCatchUps()
     {
@@ -281,6 +297,7 @@ public sealed partial class AIPanelView : UserControl
         AutomationProperties.SetItemStatus(CatchUpsHeader, Loc.T(_showingCatchUps ? "Expanded" : "Collapsed"));
         CatchUpsChevron.Glyph = _showingCatchUps ? "\uE70D" : "\uE76C";
         CatchUpCards.Visibility = Shown(_showingCatchUps);
+        UpdateRowHeights();
         // Built only while open, as macOS.
         if (!_showingCatchUps) return;
         var providers = _panel.Providers.AIProviders;
