@@ -102,8 +102,9 @@ struct SettingsView: View {
             .frame(width: 200)
             // A raised card like the toolbar's capsules, instead of a divider beside the sections.
             .modifier(GlassCard(cornerRadius: 20, raised: true))
-            // On top as far as the form's first section (`GlassForm`'s top margin), so the card and the form start level.
-            .padding(.top, 12)
+            // On top as far as the form's first section (`GlassForm`'s top margin), so the card and the form start level;
+            // 4 pt like the library's panes, the toolbar's safe area already leaves room above.
+            .padding(.top, 4)
             .padding([.leading, .bottom], 12)
             ZStack {
                 ForEach(SettingsTab.allCases.filter(opened.contains)) { tab in
@@ -206,7 +207,7 @@ private struct GlassForm: ViewModifier {
     func body(content: Content) -> some View {
         content
             .scrollContentBackground(.hidden)
-            .contentMargins(.top, 12, for: .scrollContent)
+            .contentMargins(.top, 4, for: .scrollContent)
             .background(WindowGlass().ignoresSafeArea())
     }
 }
