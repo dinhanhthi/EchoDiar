@@ -7,14 +7,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.5.1] - 2026-11-06
+
 ### Changed
 
+- Settings are reorganised. "AI Providers" holds the local models (language, transcription, diarization, embedding), the cloud providers with their API keys, and the command-line tools. "AI Settings" picks what to use for chat, summaries, catch-up, transcription and library chat. Calendar has its own page, and Transcription is one page without sub-tabs.
+- Chat and summaries each have their own default AI provider and model. Your current choice is kept for both.
+- The Catch-ups bar stays pinned at the bottom of the Summary tab: a long summary no longer pushes it out of view, and expanding it splits the tab in two.
 - Settings > Storage says that uninstalling EchoDiar keeps its data folder, and how to remove everything.
 - Windows: only the EchoDiar data folder (%LOCALAPPDATA%\EchoDiar) is written outside the app package; other app data is removed at uninstall, as for any Store app.
+- Windows: the default transcription engine is listed first.
 
 ### Fixed
 
 - "Stop when the event ends" no longer stops a meeting that runs over while people are still talking: it asks only once the event is over and the recording has been silent for 1 min.
+- The catch-up model row shows in Settings when the catch-up provider is Automatic.
 
 ## [1.5.0] - 2026-11-05
 
