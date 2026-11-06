@@ -127,6 +127,8 @@ public sealed partial class TranscriptView : UserControl
         TranscribeButton.Click += (_, _) => Transcribe(null);
         CopyButton.Click += (_, _) => Copy();
         SummarizeButton.Click += (_, _) => Summarize();
+        NeedsModelBadge.Click += (_, _) => _model?.OpenLocalAI(ProvidersSettingsPage.TranscriptionGroup);
+        NoticeDownloadButton.Click += (_, _) => _model?.OpenLocalAI(ProvidersSettingsPage.DiarizationGroup);
         RenameBox.KeyDown += OnRenameKeyDown;
         RenameFlyout.Opened += (_, _) =>
         {
@@ -800,7 +802,7 @@ public sealed partial class TranscriptView : UserControl
             var installed = ModelCatalog.Diarization.Any(e => _model.InstalledModelIds.Contains(e.Id));
             text = Loc.T(installed
                 ? "Speakers were not told apart. The speaker model is installed now: re-transcribe."
-                : "Speakers were not told apart: the speaker model is not installed (Transcription › Diarization model).");
+                : "Speakers were not told apart: the speaker model is not installed (Settings › AI Providers › Local AI).");
             download = !installed;
         }
         NoticePanel.Visibility = Shown(text is not null);
@@ -862,8 +864,8 @@ public sealed partial class TranscriptView : UserControl
     }
 
     /// <summary>
-    /// macOS EngineMenuItems under "Transcribe again with" (cloud engines come with Phase 26), then the language of
-    /// the next run with "As recorded" first; "Download a model…" (Settings, a later phase) when no engine is installed.
+    /// macOS EngineMenuItems under "Transcribe again with", then the language of the next run with "As recorded" first;
+    /// "Download a model…" when no engine is installed or configured.
     /// </summary>
     private void BuildRetranscribeMenu()
     {
@@ -898,19 +900,26 @@ public sealed partial class TranscriptView : UserControl
         AddEngineItems(RetryMenu, "Retry with another engine", id => Transcribe(id));
     }
 
-    /// <summary>The installed local engines under <paramref name="title"/>; false (and "Download a model…") without any.</summary>
+    /// <summary>
+    /// macOS EngineMenuItems: the installed local and configured cloud engines under <paramref name="title"/>, the
+    /// default one first, marked "(default)" (<see cref="AppViewModel.InstalledBatchEngines"/>); false without any,
+    /// with "Download a model…", which opens AI Providers › Local AI › Transcription (macOS
+    /// <c>openLocalAI(.transcription)</c>).
+    /// </summary>
     private bool AddEngineItems(MenuFlyout menu, string title, Action<string> pick)
     {
         var engines = _model?.InstalledBatchEngines ?? [];
         if (engines.Count == 0)
         {
-            menu.Items.Add(new MenuFlyoutItem { Text = Loc.T("Download a model…"), IsEnabled = false });
+            var download = new MenuFlyoutItem { Text = Loc.T("Download a model…") };
+            download.Click += (_, _) => _model?.OpenLocalAI(ProvidersSettingsPage.TranscriptionGroup);
+            menu.Items.Add(download);
             return false;
         }
         menu.Items.Add(new MenuFlyoutItem { Text = Loc.T(title), IsEnabled = false });
         foreach (var engine in engines)
         {
-            var item = new MenuFlyoutItem { Text = engine.DisplayName };
+            var item = new MenuFlyoutItem { Text = engine.MenuText };
             var id = engine.Id;
             item.Click += (_, _) => pick(id);
             menu.Items.Add(item);
@@ -934,10 +943,10 @@ public sealed partial class TranscriptView : UserControl
         if (_model is not { } model || _transcript is not { } pane) return;
         model.DetailTab = DetailTab.Summary;
         if (pane.Conversation is not { HasSummary: false } conversation || pane.Transcript is not { } transcript
-            || model.ProvidersModel.CurrentAIProvider is not { } provider
+            || model.ProvidersModel.CurrentAIProvider(AIPurpose.Summary) is not { } provider
             || model.AIJobs.EntryFor(conversation.Id) is not null || model.ChatChanging || model.Updater.IsInstalling) return;
         model.StartAIJob(AIJobKind.Summary, null, conversation, transcript, null, [], provider,
-            model.ProvidersModel.AIModelFor(provider));
+            model.ProvidersModel.AIModelFor(provider, AIPurpose.Summary));
     }
 
     /// <summary>One "Name [mm:ss]: text" line per segment of the shown version.</summary>

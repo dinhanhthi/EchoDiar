@@ -163,10 +163,14 @@ public sealed partial class SettingsPage : UserControl
         return card;
     }
 
-    /// <summary>A result opens its section on its inner tab, clears the search and points at its row.</summary>
+    /// <summary>
+    /// A result opens its section on its inner tab (and Local AI group, macOS <c>settingsLocalAIGroup</c>), clears the
+    /// search and points at its row.
+    /// </summary>
     private void OpenResult(SettingsSearchItem item)
     {
         StartupTrace.Write($"settings result opened {item.Section}/{item.Title}");
+        if (item.LocalAIGroup is { } group) _model.SettingsLocalAIGroup = group;
         Open(item.Section, item.SubTab);
         if (SectionHost.Content is FrameworkElement page) ShowRow(page, item.Title);
     }
@@ -221,9 +225,13 @@ public sealed partial class SettingsPage : UserControl
         _highlighted = null;
     }
 
-    /// <summary>The element under <paramref name="root"/> whose Tag is the source text of <paramref name="title"/>.</summary>
+    /// <summary>
+    /// The shown element under <paramref name="root"/> whose Tag is the source text of <paramref name="title"/>; hidden
+    /// tabs and groups are skipped, so a title on two tabs (AI Settings' "AI answer language") finds the opened one.
+    /// </summary>
     private static FrameworkElement? FindRow(DependencyObject root, string title)
     {
+        if (root is UIElement { Visibility: Visibility.Collapsed }) return null;
         if (root is FrameworkElement { Tag: string tag } element && Loc.T(tag) == title) return element;
         var count = VisualTreeHelper.GetChildrenCount(root);
         for (var i = 0; i < count; i++)

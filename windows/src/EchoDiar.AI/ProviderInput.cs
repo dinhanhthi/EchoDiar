@@ -3,8 +3,8 @@ using EchoDiar.Core.Settings;
 namespace EchoDiar.AI;
 
 /// <summary>
-/// The checks Settings › AI makes on what the user types in a provider's row: its base URL (this PC or not, the key sent
-/// in clear, the host shown, the <c>/v1</c> hint) and its extra headers.
+/// The checks Settings › AI Providers makes on what the user types in a provider's row: its base URL (this PC or not,
+/// the key sent in clear, the host shown, the <c>/v1</c> hint) and its extra headers.
 /// </summary>
 public static class ProviderInput
 {

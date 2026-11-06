@@ -152,6 +152,8 @@ struct CapsuleTabs<Tab: Hashable>: View {
     @Binding var selection: Tab
     let tabs: [Tab]
     let title: (Tab) -> Text
+    /// Draws its own track, for tabs outside the toolbar (whose capsule is the track on macOS 26).
+    var drawsTrack = false
     @Namespace private var namespace
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
@@ -171,15 +173,17 @@ struct CapsuleTabs<Tab: Hashable>: View {
         }
         // Also animates a selection set from code (menu, shortcuts, card buttons).
         .animation(animation, value: selection)
-        .modifier(SurfaceTrack())
+        .modifier(SurfaceTrack(always: drawsTrack))
     }
 
     private var animation: Animation? { reduceMotion ? nil : Motion.standard }
 
-    /// Before macOS 26 the toolbar draws no capsule around its items.
+    /// Before macOS 26 the toolbar draws no capsule around its items; tabs outside the toolbar always need one.
     private struct SurfaceTrack: ViewModifier {
+        let always: Bool
+
         func body(content: Content) -> some View {
-            if #available(macOS 26, *) {
+            if #available(macOS 26, *), !always {
                 content
             } else {
                 content

@@ -101,17 +101,19 @@ public sealed class AIPanelViewModel
     public string? EmptyNote => Conversation is { HasTranscript: true } ? null : Loc.T("This conversation has no transcript yet.");
 
     /// <summary>
-    /// A summary or a question can start now (macOS <c>canRun</c>, as <see cref="AppViewModel.StartAIJob"/>'s guard): one
-    /// job per conversation; other conversations' jobs do not block it.
+    /// A summary (<see cref="AIPurpose.Summary"/>) or a question (<see cref="AIPurpose.Chat"/>) can start now (macOS
+    /// <c>canRun</c>, with the purpose of its tab; as <see cref="AppViewModel.StartAIJob"/>'s guard): one job per
+    /// conversation; other conversations' jobs do not block it.
     /// </summary>
-    public bool CanRun => RunningJob is null && !_model.ChatChanging && Transcript is not null && Providers.CurrentAIProvider is not null
-        && !_model.Updater.IsInstalling;
+    public bool CanRun(AIPurpose purpose) => RunningJob is null && !_model.ChatChanging && Transcript is not null
+        && Providers.CurrentAIProvider(purpose) is not null && !_model.Updater.IsInstalling;
 
     /// <summary>Why this conversation's last job or chat change failed; null when none did.</summary>
     public string? Error => _model.AIError is { } error && error.ConversationId == ConversationId ? error.Message : null;
 
-    /// <summary>The current provider's picked model ("" = a CLI's own default).</summary>
-    public string? CurrentModel => Providers.CurrentAIProvider is { } provider ? Providers.AIModelFor(provider) : null;
+    /// <summary>The chat provider's picked model ("" = a CLI's own default), shown on the streaming answer.</summary>
+    public string? CurrentModel =>
+        Providers.CurrentAIProvider(AIPurpose.Chat) is { } provider ? Providers.AIModelFor(provider, AIPurpose.Chat) : null;
 
     // Versions
 
@@ -315,17 +317,18 @@ public sealed class AIPanelViewModel
     public bool Ask(string question)
     {
         var text = question.Trim();
-        if (!CanRun || text.Length == 0) return false;
+        if (!CanRun(AIPurpose.Chat) || text.Length == 0) return false;
         Start(AIJobKind.Question, text);
         return true;
     }
 
     private void Start(AIJobKind kind, string? question)
     {
-        if (!CanRun || Conversation is not { } conversation || Transcript is not { } transcript
-            || Providers.CurrentAIProvider is not { } provider) return;
+        var purpose = kind == AIJobKind.Summary ? AIPurpose.Summary : AIPurpose.Chat;
+        if (!CanRun(purpose) || Conversation is not { } conversation || Transcript is not { } transcript
+            || Providers.CurrentAIProvider(purpose) is not { } provider) return;
         _model.StartAIJob(kind, question, conversation, transcript, Summaries.LastOrDefault()?.Text, Chat, provider,
-            Providers.AIModelFor(provider));
+            Providers.AIModelFor(provider, purpose));
     }
 
     public void Stop() => _model.StopAIJob(ConversationId);

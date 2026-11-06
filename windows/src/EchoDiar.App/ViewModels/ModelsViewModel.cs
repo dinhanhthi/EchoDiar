@@ -10,7 +10,7 @@ using EchoDiar.Transcribe;
 namespace EchoDiar.App.ViewModels;
 
 /// <summary>
-/// What a model's row on Settings › Transcription shows and offers now (macOS ModelsSettingsView.swift
+/// What a model's row on AI Providers › Local AI shows and offers now (macOS ModelsSettingsView.swift
 /// <c>ModelRow</c>): the Default badge, Set default (installed, not the default; off when it cannot transcribe the
 /// default language), the download's fraction with Cancel, Installed with Delete (off while a transcription, the
 /// recording's transcriber or an in-app AI job runs), or Download (off when it cannot transcribe the default language).
@@ -27,12 +27,12 @@ public sealed record ModelRowState(
     bool CanDelete);
 
 /// <summary>
-/// The local models of Settings › Transcription (macOS ModelsSettingsView.swift and AppModel's model functions): the
-/// catalog's speech and speaker models by tier, their state, Download, Cancel, Delete and Set default, and the size of
-/// every installed model. Downloads run in <see cref="AppViewModel.DownloadModel"/> (off the UI thread, progress
-/// posted back). The cloud engines' rows read <see cref="AppViewModel.CloudEngineConfigs"/> and set their default with
-/// <see cref="SetDefault(string, bool)"/>. Lives as long as the app
-/// (<see cref="AppViewModel.ModelsModel"/>); on the UI thread.
+/// The local models of AI Providers › Local AI and Settings › Transcription (macOS ModelsSettingsView.swift and
+/// AppModel's model functions): the catalog's speech and speaker models by tier, their state, Download, Cancel, Delete
+/// and Set default, and the size of every installed model. Downloads run in <see cref="AppViewModel.DownloadModel"/>
+/// (off the UI thread, progress posted back). The cloud engines' rows read
+/// <see cref="AppViewModel.CloudEngineConfigs"/> and set their default with <see cref="SetDefault(string, bool)"/>.
+/// Lives as long as the app (<see cref="AppViewModel.ModelsModel"/>); on the UI thread.
 /// </summary>
 public sealed partial class ModelsViewModel : ObservableObject
 {

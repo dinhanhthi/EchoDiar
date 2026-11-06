@@ -11,9 +11,10 @@ public sealed record SettingsSubTab(string Id, string Title);
 
 /// <summary>
 /// A Settings row or group the search can find (macOS <c>SettingsSearchItem</c>): its label as the page shows it (macOS
-/// text), the words users may type instead, and the inner tab it is on (null for a section without tabs).
+/// text), the words users may type instead, the inner tab it is on (null for a section without tabs), and the group of
+/// AI Providers › Local AI it is in (macOS <c>localAIGroup</c>, a <c>ProvidersSettingsPage.*Group</c> id; null elsewhere).
 /// </summary>
-public sealed record SettingsEntry(string Title, IReadOnlyList<string> Keywords, string? SubTab = null);
+public sealed record SettingsEntry(string Title, IReadOnlyList<string> Keywords, string? SubTab = null, string? LocalAIGroup = null);
 
 /// <summary>
 /// A sidebar section of Settings (macOS <c>SettingsTab</c>): its id, its macOS title, its Segoe Fluent Icons glyph, its
@@ -44,30 +45,36 @@ public static class SettingsSearch
 {
     public const string General = "general";
     public const string Recording = "recording";
+    public const string Calendar = "calendar";
     public const string Transcription = "transcription";
     public const string Providers = "providers";
-    public const string ApiKeys = "apiKeys";
-    public const string Rag = "rag";
+    public const string AISettings = "aiSettings";
     public const string Storage = "storage";
     public const string Shortcuts = "shortcuts";
     public const string About = "about";
     public const string Acknowledgements = "acknowledgements";
 
-    /// <summary>Every section, in sidebar order (macOS: General, Recording, Transcription, AI, API Keys, RAG, Storage, Shortcuts, About, Acknowledgements).</summary>
+    /// <summary>
+    /// Every section, in sidebar order (macOS: General, Recording, Calendar, Transcription, AI Providers, AI Settings,
+    /// Storage, Shortcuts, About, Acknowledgements). AI Settings' glyph is the app's stand-in for macOS "sparkles" (the
+    /// conversation card's Summarizing badge).
+    /// </summary>
     public static IReadOnlyList<SettingsSection> Sections { get; } =
     [
         new(General, "General", "\uE713", [], GeneralSettingsPage.SearchEntries, (model, _) => new GeneralSettingsPage(model)),
         new(
             Recording, "Recording", "\uE7C8", RecordingSettingsPage.SubTabs, RecordingSettingsPage.SearchEntries,
             (model, _) => new RecordingSettingsPage(model)),
+        new(Calendar, "Calendar", "\uE787", [], CalendarSettingsPage.SearchEntries, (model, _) => new CalendarSettingsPage(model)),
         new(
-            Transcription, "Transcription", "\uE8D6", TranscriptionSettingsPage.SubTabs, TranscriptionSettingsPage.SearchEntries,
+            Transcription, "Transcription", "\uE8D6", [], TranscriptionSettingsPage.SearchEntries,
             (model, showDialog) => new TranscriptionSettingsPage(model) { ShowDialog = showDialog }),
         new(
-            Providers, "AI", "\uE99A", ProvidersSettingsPage.SubTabs, ProvidersSettingsPage.SearchEntries,
+            Providers, "AI Providers", "\uE99A", ProvidersSettingsPage.SubTabs, ProvidersSettingsPage.SearchEntries,
             (model, _) => new ProvidersSettingsPage(model)),
-        new(ApiKeys, "API Keys", "\uE8D7", [], ApiKeysSettingsPage.SearchEntries, (model, _) => new ApiKeysSettingsPage(model)),
-        new(Rag, "RAG", "\uE773", [], RAGSettingsPage.SearchEntries, (model, _) => new RAGSettingsPage(model)),
+        new(
+            AISettings, "AI Settings", "\uE945", AISettingsPage.SubTabs, AISettingsPage.SearchEntries,
+            (model, _) => new AISettingsPage(model)),
         new(Storage, "Storage", "\uEDA2", StorageSettingsPage.SubTabs, StorageSettingsPage.SearchEntries, (model, _) => new StorageSettingsPage(model)),
         new(Shortcuts, "Shortcuts", "\uE765", [], ShortcutsSettingsPage.SearchEntries, (model, _) => new ShortcutsSettingsPage(model)),
         new(About, "About", "\uE946", [], AboutSettingsPage.SearchEntries, (model, _) => new AboutSettingsPage(model)),
@@ -77,7 +84,8 @@ public static class SettingsSearch
     private static readonly Lazy<IReadOnlyList<SettingsSearchItem>> AllItems = new(() =>
     [
         .. Sections.SelectMany(section => section.Entries.Select(entry => new SettingsSearchItem(
-            Loc.T(entry.Title), entry.Keywords, section.Id, Loc.T(section.Title), entry.SubTab, section.SubTabTitle(entry.SubTab)))),
+            Loc.T(entry.Title), entry.Keywords, section.Id, Loc.T(section.Title), entry.SubTab, section.SubTabTitle(entry.SubTab),
+            entry.LocalAIGroup))),
     ]);
 
     /// <summary>Every searchable row, in sidebar order and each section's order.</summary>

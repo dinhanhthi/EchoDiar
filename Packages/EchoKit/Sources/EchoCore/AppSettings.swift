@@ -40,6 +40,14 @@ public struct AppSettings: Codable, Equatable, Sendable {
     public var defaultAIProviderID: String?
     /// Model for `defaultAIProviderID`; nil = that config's `defaultModel`.
     public var defaultAIModel: String?
+    /// Summary provider: a `ProviderConfig` id or an LLM catalog entry id (Foundation Models, MLX); nil = Automatic.
+    public var summaryAIProviderID: String?
+    /// Model for `summaryAIProviderID`; nil = that config's `defaultModel`.
+    public var summaryAIModel: String?
+    /// Chat provider: a `ProviderConfig` id or an LLM catalog entry id (Foundation Models, MLX); nil = Automatic.
+    public var chatAIProviderID: String?
+    /// Model for `chatAIProviderID`; nil = that config's `defaultModel`.
+    public var chatAIModel: String?
     /// Catch-up provider while recording: a `ProviderConfig` id outside the app (never an in-app model); empty =
     /// automatic (the AI tab provider when it is not in-app, else the first configured one).
     public var catchUpProviderID: String
@@ -119,6 +127,9 @@ public struct AppSettings: Codable, Equatable, Sendable {
     /// `migratingProviderAvailability()` ran. A fresh install (the init's default) has nothing to migrate, so new
     /// users get automatic picks once they save a key; a file from an older build (key missing) decodes as false.
     public var providerAvailabilityMigrated: Bool
+    /// `migratingAISettings()` ran. A fresh install (the init's default) has nothing to migrate; a file from an older
+    /// build (key missing) decodes as false.
+    public var aiSettingsMigrated: Bool
     /// What the live transcript shows while recording when the default transcription engine is a cloud one.
     public var cloudLiveSource: CloudLiveSource
     /// Catalog id of the local model for `cloudLiveSource == .local` (display only); nil = the catalog default.
@@ -145,6 +156,10 @@ public struct AppSettings: Codable, Equatable, Sendable {
         cloudSTTConfirmed: [String] = [],
         defaultAIProviderID: String? = nil,
         defaultAIModel: String? = nil,
+        summaryAIProviderID: String? = nil,
+        summaryAIModel: String? = nil,
+        chatAIProviderID: String? = nil,
+        chatAIModel: String? = nil,
         catchUpProviderID: String = "",
         catchUpModel: String = "",
         catchUpFromStart: Bool = false,
@@ -184,6 +199,7 @@ public struct AppSettings: Codable, Equatable, Sendable {
         globalPauseHotKeyEnabled: Bool = true,
         autoExcludedProviderIDs: Set<String> = [],
         providerAvailabilityMigrated: Bool = true,
+        aiSettingsMigrated: Bool = true,
         cloudLiveSource: CloudLiveSource = .off,
         cloudLiveModelID: String? = nil,
         realtimeAsFinal: Bool = false
@@ -204,6 +220,10 @@ public struct AppSettings: Codable, Equatable, Sendable {
         self.cloudSTTConfirmed = cloudSTTConfirmed
         self.defaultAIProviderID = defaultAIProviderID
         self.defaultAIModel = defaultAIModel
+        self.summaryAIProviderID = summaryAIProviderID
+        self.summaryAIModel = summaryAIModel
+        self.chatAIProviderID = chatAIProviderID
+        self.chatAIModel = chatAIModel
         self.catchUpProviderID = catchUpProviderID
         self.catchUpModel = catchUpModel
         self.catchUpFromStart = catchUpFromStart
@@ -243,6 +263,7 @@ public struct AppSettings: Codable, Equatable, Sendable {
         self.globalPauseHotKeyEnabled = globalPauseHotKeyEnabled
         self.autoExcludedProviderIDs = autoExcludedProviderIDs
         self.providerAvailabilityMigrated = providerAvailabilityMigrated
+        self.aiSettingsMigrated = aiSettingsMigrated
         self.cloudLiveSource = cloudLiveSource
         self.cloudLiveModelID = cloudLiveModelID
         self.realtimeAsFinal = realtimeAsFinal
@@ -262,6 +283,7 @@ public struct AppSettings: Codable, Equatable, Sendable {
         case playbackChannels, onboardingCompleted, modelIdleMinutes
         case defaultASRModelID, defaultDiarizerModelID, providers
         case cloudSTTConfirmed, defaultAIProviderID, defaultAIModel, summaryLanguage, chatContextMessages
+        case summaryAIProviderID, summaryAIModel, chatAIProviderID, chatAIModel
         case catchUpProviderID, catchUpModel, catchUpFromStart
         case ragEnabled, embeddingModelID, embeddingAPIModel, cloudEmbeddingConfirmed
         case micDeviceUID, meetingDetection, perAppBehavior, pillPositions, showPill, hidePillWhenAppActive
@@ -270,7 +292,7 @@ public struct AppSettings: Codable, Equatable, Sendable {
         case autoTranscribe, transcribeWhileRecording, speakerCountHint, diarization, deferTranscriptionWhenConstrained
         case autoDeleteEnabled, autoDeleteAfterDays, autoDeleteMode, deleteAudioAfterTranscription
         case deleteWithoutConfirmation, globalHotKey, globalHotKeyEnabled, globalPauseHotKey, globalPauseHotKeyEnabled
-        case autoExcludedProviderIDs, providerAvailabilityMigrated
+        case autoExcludedProviderIDs, providerAvailabilityMigrated, aiSettingsMigrated
         case cloudLiveSource, cloudLiveModelID, realtimeAsFinal
     }
 
@@ -295,6 +317,10 @@ public struct AppSettings: Codable, Equatable, Sendable {
         cloudSTTConfirmed = try container.decodeIfPresent([String].self, forKey: .cloudSTTConfirmed) ?? []
         defaultAIProviderID = try container.decodeIfPresent(String.self, forKey: .defaultAIProviderID)
         defaultAIModel = try container.decodeIfPresent(String.self, forKey: .defaultAIModel)
+        summaryAIProviderID = try container.decodeIfPresent(String.self, forKey: .summaryAIProviderID)
+        summaryAIModel = try container.decodeIfPresent(String.self, forKey: .summaryAIModel)
+        chatAIProviderID = try container.decodeIfPresent(String.self, forKey: .chatAIProviderID)
+        chatAIModel = try container.decodeIfPresent(String.self, forKey: .chatAIModel)
         catchUpProviderID = try container.decodeIfPresent(String.self, forKey: .catchUpProviderID) ?? ""
         catchUpModel = try container.decodeIfPresent(String.self, forKey: .catchUpModel) ?? ""
         catchUpFromStart = try container.decodeIfPresent(Bool.self, forKey: .catchUpFromStart) ?? false
@@ -346,6 +372,7 @@ public struct AppSettings: Codable, Equatable, Sendable {
             Set<String>.self, forKey: .autoExcludedProviderIDs) ?? []
         providerAvailabilityMigrated = try container.decodeIfPresent(
             Bool.self, forKey: .providerAvailabilityMigrated) ?? false
+        aiSettingsMigrated = try container.decodeIfPresent(Bool.self, forKey: .aiSettingsMigrated) ?? false
         cloudLiveSource = try container.decodeIfPresent(CloudLiveSource.self, forKey: .cloudLiveSource) ?? .off
         cloudLiveModelID = try container.decodeIfPresent(String.self, forKey: .cloudLiveModelID)
         realtimeAsFinal = try container.decodeIfPresent(Bool.self, forKey: .realtimeAsFinal) ?? false
@@ -374,6 +401,37 @@ public struct AppSettings: Codable, Equatable, Sendable {
             settings.autoExcludedProviderIDs.insert(id)
         }
         settings.providerAvailabilityMigrated = true
+        return settings
+    }
+
+    /// One-time move to the per-purpose AI picks and the per-provider embedding model. `defaultAIProviderID` /
+    /// `defaultAIModel` fill both the summary and the chat pair (each only while it is unset), and an API embedder's
+    /// `embeddingAPIModel` moves to its provider's `embeddingModel`, adding the preset's config when the provider has
+    /// none saved. The old keys stay as they are. Unchanged once `aiSettingsMigrated`.
+    public func migratingAISettings() -> AppSettings {
+        guard !aiSettingsMigrated else { return self }
+        var settings = self
+        if summaryAIProviderID == nil && summaryAIModel == nil {
+            settings.summaryAIProviderID = defaultAIProviderID
+            settings.summaryAIModel = defaultAIModel
+        }
+        if chatAIProviderID == nil && chatAIModel == nil {
+            settings.chatAIProviderID = defaultAIProviderID
+            settings.chatAIModel = defaultAIModel
+        }
+        // "api:" is the app's `AppModel.apiEmbedderPrefix`; a local embedder's leftover `embeddingAPIModel` is ignored.
+        let model = embeddingAPIModel.trimmingCharacters(in: .whitespacesAndNewlines)
+        if embeddingModelID.hasPrefix("api:"), !model.isEmpty {
+            let id = String(embeddingModelID.dropFirst("api:".count))
+            if !settings.providers.contains(where: { $0.id == id }),
+               let preset = ProviderConfig.presets.first(where: { $0.id == id }) {
+                settings.providers.append(preset)
+            }
+            if let index = settings.providers.firstIndex(where: { $0.id == id }) {
+                settings.providers[index].embeddingModel = model
+            }
+        }
+        settings.aiSettingsMigrated = true
         return settings
     }
 

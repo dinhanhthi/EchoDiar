@@ -19,9 +19,10 @@ public sealed record RAGStatus(
 /// <summary>
 /// A cloud embedder's one-time confirmation waiting for the window's dialog (macOS RAGSettingsView "Send transcripts to
 /// …?"): its provider, the destination key it is remembered under, the host shown, and how many conversations would go.
-/// <paramref name="PickProviderId"/>: a provider picked in Settings › RAG and not saved yet, which Understood makes the
-/// embedder with <paramref name="PickModel"/> (macOS <c>pendingCloud</c>: the setting changes only on Understood); null
-/// for the embedder in use.
+/// <paramref name="PickProviderId"/>: a provider picked in Settings › AI Settings › Library chat and not saved yet,
+/// which Understood makes the embedder, its preset's suggested <paramref name="PickModel"/> filling an empty
+/// <c>EmbeddingModel</c> (macOS <c>pendingCloud</c>: the setting changes only on Understood); null for the embedder in
+/// use.
 /// </summary>
 public sealed record PendingEmbeddingConsent(
     string ProviderName, string Destination, string Host, int Conversations, string? PickProviderId = null, string PickModel = "");
@@ -167,7 +168,7 @@ public sealed partial class AppViewModel
     private static bool RagChanged(AppSettings old, AppSettings updated) =>
         updated.RagEnabled != old.RagEnabled
         || updated.EmbeddingModelID != old.EmbeddingModelID
-        || updated.EmbeddingAPIModel != old.EmbeddingAPIModel
+        // An edit of the API embedder's EmbeddingModel changes Providers.
         || (updated.EmbeddingModelID.StartsWith(ModelCatalog.ApiEmbedderPrefix, StringComparison.Ordinal)
             && !updated.Providers.SequenceEqual(old.Providers));
 
@@ -420,8 +421,8 @@ public sealed partial class AppViewModel
         && (LibraryChat.EmbeddingDestination(config) is not { } destination || !settings.CloudEmbeddingConfirmed.Contains(destination));
 
     /// <summary>
-    /// Asks the window to confirm the current API embedder's destination (Settings › RAG's Confirm…); nothing when it
-    /// needs no confirmation.
+    /// Asks the window to confirm the current API embedder's destination (AI Settings › Library chat's Confirm…);
+    /// nothing when it needs no confirmation.
     /// </summary>
     public void RequestCloudEmbeddingConsent()
     {
@@ -432,10 +433,12 @@ public sealed partial class AppViewModel
     }
 
     /// <summary>
-    /// Makes <paramref name="config"/> the embedder with <paramref name="model"/> (Settings › RAG's pick of an API
-    /// embedder, macOS <c>selectAPI</c>): a destination off this PC not confirmed yet asks the window first, and the
-    /// setting changes only on Understood. A base URL with no destination is picked without asking: nothing can be sent
-    /// to it, and the index says why. Nothing when it is the embedder already.
+    /// Makes <paramref name="config"/> the embedder (AI Settings › Library chat's pick of an API embedder, macOS
+    /// <c>selectAPI</c>); <paramref name="model"/> is the preset's suggested model, which fills its
+    /// <see cref="ProviderConfig.EmbeddingModel"/> only when empty (<see cref="FillEmbeddingModel"/>). A destination
+    /// off this PC not confirmed yet asks the window first, and the setting changes only on Understood. A base URL with
+    /// no destination is picked without asking: nothing can be sent to it, and the index says why. Nothing when it is
+    /// the embedder already.
     /// </summary>
     public void PickAPIEmbedder(ProviderConfig config, string model)
     {
@@ -446,7 +449,19 @@ public sealed partial class AppViewModel
             PendingEmbeddingConsent = EmbeddingConsent(config, destination) with { PickProviderId = config.Id, PickModel = model };
             return;
         }
-        ApplySettings(Settings with { EmbeddingModelID = id, EmbeddingAPIModel = model });
+        FillEmbeddingModel(config.Id, model);
+        ApplySettings(Settings with { EmbeddingModelID = id });
+    }
+
+    /// <summary>
+    /// A provider with no embedding model yet gets <paramref name="suggested"/>; a model typed before stays (macOS
+    /// <c>selectAPIEmbedder</c>). Filled before the provider is picked, so the index never restarts with it and no model.
+    /// </summary>
+    private void FillEmbeddingModel(string providerId, string suggested)
+    {
+        if (suggested.Length == 0 || ProvidersModel.Config(providerId) is not { } config
+            || config.EmbeddingModel.Trim().Length > 0) return;
+        ProvidersModel.UpdateProvider(providerId, c => c.EmbeddingModel = suggested);
     }
 
     private PendingEmbeddingConsent EmbeddingConsent(ProviderConfig config, string destination)
@@ -457,8 +472,8 @@ public sealed partial class AppViewModel
 
     /// <summary>
     /// The window's answer: Understood makes a picked provider the embedder, remembers the destination in
-    /// <c>cloudEmbeddingConfirmed</c> and indexes (macOS <c>confirm</c> and <c>confirmCloudEmbedding</c>), in one change;
-    /// Cancel changes nothing and sends nothing.
+    /// <c>cloudEmbeddingConfirmed</c> and indexes (macOS <c>confirm</c> and <c>confirmCloudEmbedding</c>), in one change
+    /// once an empty embedding model is filled (<see cref="FillEmbeddingModel"/>); Cancel changes nothing and sends nothing.
     /// </summary>
     public void ResolveCloudEmbeddingConsent(bool allowed)
     {
@@ -467,7 +482,10 @@ public sealed partial class AppViewModel
         if (!allowed || _closing) return;
         var settings = Settings;
         if (pending.PickProviderId is { } pick)
-            settings = settings with { EmbeddingModelID = ModelCatalog.ApiEmbedderPrefix + pick, EmbeddingAPIModel = pending.PickModel };
+        {
+            FillEmbeddingModel(pick, pending.PickModel);
+            settings = Settings with { EmbeddingModelID = ModelCatalog.ApiEmbedderPrefix + pick };
+        }
         if (!settings.CloudEmbeddingConfirmed.Contains(pending.Destination))
             settings = settings with { CloudEmbeddingConfirmed = [.. settings.CloudEmbeddingConfirmed, pending.Destination] };
         ApplySettings(settings);
@@ -478,7 +496,7 @@ public sealed partial class AppViewModel
 
     /// <summary>
     /// Asks <paramref name="question"/> across the library as the AI job of the null key, beside the conversations' jobs,
-    /// with the current AI provider and model (macOS <c>askLibrary</c>): searches the index, then streams the answer,
+    /// with the chat AI provider and model (macOS <c>askLibrary</c>): searches the index, then streams the answer,
     /// saved with its references in <see cref="GlobalChatFolder"/>'s <c>chat.json</c>. The job is set before the search
     /// so indexing yields. With no source found the question is still asked: the prompt has the model say the sources
     /// hold no answer.
@@ -487,14 +505,14 @@ public sealed partial class AppViewModel
     {
         question = question.Trim();
         if (_closing || AIJobs.EntryFor(null) is not null || ChatChanging || question.Length == 0 || !Settings.RagEnabled
-            || ProvidersModel.CurrentAIProvider is not { } provider) return;
+            || ProvidersModel.CurrentAIProvider(AIPurpose.Chat) is not { } provider) return;
         if (Updater.IsInstalling)
         {
             // Windows closes the app once the update is downloaded: the answer would be cut off.
             AIError = new AIErrorInfo(null, InstallingNotice);
             return;
         }
-        var model = ProvidersModel.AIModelFor(provider).Trim();
+        var model = ProvidersModel.AIModelFor(provider, AIPurpose.Chat).Trim();
         AIError = null;
         var job = new AIJob(AIJobKind.Question, question) { Status = Loc.T("Searching your conversations…") };
         // In the table before the job's task starts: its first steps look it up there.

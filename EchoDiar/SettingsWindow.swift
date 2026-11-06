@@ -4,7 +4,7 @@ import SwiftUI
 
 /// A sidebar section. Adding one: a case, its row in `label`, its view in `SettingsView.content`.
 enum SettingsTab: CaseIterable, Identifiable {
-    case general, recording, transcription, providers, apiKeys, rag, storage, shortcuts, about, acknowledgements
+    case general, recording, calendar, transcription, providers, aiSettings, storage, shortcuts, about, acknowledgements
 
     var id: Self { self }
 
@@ -13,10 +13,10 @@ enum SettingsTab: CaseIterable, Identifiable {
         switch self {
         case .general: return ("General", "gearshape")
         case .recording: return ("Recording", "record.circle")
+        case .calendar: return ("Calendar", "calendar")
         case .transcription: return ("Transcription", "waveform")
-        case .providers: return ("AI", "sparkles")
-        case .apiKeys: return ("API Keys", "key")
-        case .rag: return ("RAG", "sparkle.magnifyingglass")
+        case .providers: return ("AI Providers", "cpu")
+        case .aiSettings: return ("AI Settings", "sparkles")
         case .storage: return ("Storage", "internaldrive")
         case .shortcuts: return ("Shortcuts", "keyboard")
         case .about: return ("About", "info.circle")
@@ -30,18 +30,18 @@ enum SettingsTab: CaseIterable, Identifiable {
         switch self {
         case .recording:
             [.init(id: "microphone", title: "Microphone"), .init(id: "meetings", title: "Meetings"),
-             .init(id: "calendar", title: "Calendar"), .init(id: "autoStop", title: "Auto-stop"),
-             .init(id: "afterRecording", title: "After recording")]
-        case .transcription:
-            [.init(id: "general", title: "General"), .init(id: "transcriptionModels", title: "Transcription model"),
-             .init(id: "diarizationModels", title: "Diarization model")]
+             .init(id: "autoStop", title: "Auto-stop"), .init(id: "afterRecording", title: "After recording")]
         case .providers:
-            [.init(id: "onThisMac", title: "On this Mac"), .init(id: "cloud", title: "Cloud"),
+            [.init(id: "localAI", title: "Local AI"), .init(id: "cloud", title: "Cloud"),
              .init(id: "cli", title: "CLIs")]
+        case .aiSettings:
+            [.init(id: "chat", title: "Chat"), .init(id: "summary", title: "Summary"),
+             .init(id: "catchUp", title: "Catch-up"), .init(id: "transcription", title: "Transcription"),
+             .init(id: "library", title: "Library chat")]
         case .storage:
             [.init(id: "usage", title: "Usage"), .init(id: "audio", title: "Audio"),
              .init(id: "autoDelete", title: "Auto-delete")]
-        case .general, .apiKeys, .rag, .shortcuts, .about, .acknowledgements:
+        case .general, .calendar, .transcription, .shortcuts, .about, .acknowledgements:
             []
         }
     }
@@ -84,15 +84,21 @@ struct SettingsView: View {
 
     var body: some View {
         HStack(spacing: 0) {
-            List(selection: selection) {
-                ForEach(visibleTabs) { tab in
-                    Label { Text(tab.label.title) } icon: { Image(systemName: tab.label.icon) }.tag(tab)
+            // Custom rows, not a sidebar `List`: no public API hides its rounded-rect selection highlight, and the
+            // selected row is an accent capsule like the toolbar's tabs.
+            ScrollView {
+                VStack(spacing: 4) {
+                    ForEach(visibleTabs) { tab in
+                        SidebarRow(tab: tab, selected: tab == model.settingsTab && !searching) { select(tab) }
+                    }
                 }
+                .padding(8)
             }
-            .listStyle(.sidebar)
-            // On the card, not a sidebar material of its own.
-            .scrollContentBackground(.hidden)
+            // `.edit`: focusable on click and on appear even with the system's Keyboard Navigation off, as a List is.
+            .focusable(interactions: .edit)
+            .focusEffectDisabled()
             .focused($sidebarFocused)
+            .onMoveCommand(perform: move)
             .frame(width: 200)
             // A raised card like the toolbar's capsules, instead of a divider beside the sections.
             .modifier(GlassCard(cornerRadius: 20, raised: true))
@@ -126,14 +132,19 @@ struct SettingsView: View {
         return SettingsTab.allCases.filter(hits.contains)
     }
 
-    /// Ignores deselection (a click in the empty sidebar): a section is always shown. While searching nothing is
-    /// highlighted, and picking a section clears the search and opens it.
-    private var selection: Binding<SettingsTab?> {
-        Binding(get: { searching ? nil : model.settingsTab }, set: {
-            guard let tab = $0 else { return }
-            query = ""
-            model.settingsTab = tab
-        })
+    /// While searching nothing is highlighted, and picking a section clears the search and opens it.
+    private func select(_ tab: SettingsTab) {
+        query = ""
+        model.settingsTab = tab
+        sidebarFocused = true
+    }
+
+    /// Up/down arrows: the previous/next section, stopping at the ends. While searching, the first hit.
+    private func move(_ direction: MoveCommandDirection) {
+        let tabs = visibleTabs
+        guard !tabs.isEmpty, direction == .up || direction == .down else { return }
+        guard !searching, let index = tabs.firstIndex(of: model.settingsTab) else { return select(tabs[0]) }
+        select(tabs[direction == .up ? max(index - 1, 0) : min(index + 1, tabs.count - 1)])
     }
 
     @ViewBuilder
@@ -141,15 +152,51 @@ struct SettingsView: View {
         switch tab {
         case .general: GeneralSettingsView(model: model)
         case .recording: RecordingSettingsView(model: model)
+        case .calendar: CalendarSettingsView(model: model)
         case .transcription: ModelsSettingsView(model: model)
         case .providers: ProvidersSettingsView(model: model)
-        case .apiKeys: APIKeysSettingsView(model: model)
-        case .rag: RAGSettingsView(model: model)
+        case .aiSettings: AISettingsView(model: model)
         case .storage: StorageSettingsView(model: model)
         case .shortcuts: ShortcutsSettingsView(model: model)
         case .about: AboutSettingsView()
         case .acknowledgements: AcknowledgementsSettingsView()
         }
+    }
+}
+
+/// A sidebar section's row: icon and title, on an accent capsule while selected, a faint capsule on hover.
+private struct SidebarRow: View {
+    let tab: SettingsTab
+    let selected: Bool
+    let action: () -> Void
+    @State private var hovered = false
+
+    var body: some View {
+        Button(action: action) {
+            Label {
+                Text(tab.label.title).foregroundStyle(selected ? Color.white : Color.primary)
+            } icon: {
+                Image(systemName: tab.label.icon)
+                    .foregroundStyle(selected ? Color.white : Color.accentColor)
+                    // One column, so the titles line up whatever the symbol's width.
+                    .frame(width: 18)
+            }
+            .lineLimit(1)
+            .padding(.horizontal, 10)
+            .frame(maxWidth: .infinity, minHeight: 32, alignment: .leading)
+            .background {
+                if selected {
+                    Capsule().fill(Color.accentColor)
+                } else if hovered {
+                    Capsule().fill(Palette.hoverFill)
+                }
+            }
+            .contentShape(Capsule())
+        }
+        .buttonStyle(.plain)
+        .onHover { hovered = $0 }
+        .animation(Motion.hover, value: hovered)
+        .accessibilityAddTraits(selected ? .isSelected : [])
     }
 }
 

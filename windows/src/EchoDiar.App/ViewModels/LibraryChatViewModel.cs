@@ -53,14 +53,15 @@ public sealed class LibraryChatViewModel(AppViewModel model)
     /// As <see cref="AppViewModel.AskLibrary"/>'s guard: one library question at a time; the conversations' jobs do not
     /// block it (macOS <c>canAsk</c>).
     /// </summary>
-    public bool CanAsk => RunningJob is null && !model.ChatChanging && RagEnabled && Providers.CurrentAIProvider is not null
-        && !model.Updater.IsInstalling;
+    public bool CanAsk => RunningJob is null && !model.ChatChanging && RagEnabled
+        && Providers.CurrentAIProvider(AIPurpose.Chat) is not null && !model.Updater.IsInstalling;
 
     /// <summary>Why the last library question or library chat change failed; null when none did.</summary>
     public string? Error => model.AIError is { ConversationId: null } error ? error.Message : null;
 
-    /// <summary>The current provider's picked model ("" = a CLI's own default).</summary>
-    public string? CurrentModel => Providers.CurrentAIProvider is { } provider ? Providers.AIModelFor(provider) : null;
+    /// <summary>The chat provider's picked model ("" = a CLI's own default).</summary>
+    public string? CurrentModel =>
+        Providers.CurrentAIProvider(AIPurpose.Chat) is { } provider ? Providers.AIModelFor(provider, AIPurpose.Chat) : null;
 
     /// <summary>The conversation of a source, while it is in the library.</summary>
     public Conversation? Conversation(Guid id) => model.Conversations.FirstOrDefault(c => c.Id == id);

@@ -422,7 +422,7 @@ public sealed partial class StorageSettingsPage : UserControl
 
     /// <summary>
     /// Models are removed only while nothing records and no model is in use (<see cref="AppViewModel.ModelsInUse"/>, as
-    /// the Delete of Settings › AI's model rows): an in-app AI job's GGUF file cannot be deleted.
+    /// the Delete of AI Providers › Local AI's model rows): an in-app AI job's GGUF file cannot be deleted.
     /// </summary>
     private bool CanDeleteModels() =>
         _model.DeletableModels.Count > 0 && !_model.IsRecording && !_model.ModelsInUse;
@@ -476,7 +476,7 @@ public sealed partial class StorageSettingsPage : UserControl
                 var count = _model.DeletableModels.Count;
                 if (count == 0) return;
                 title = Loc.Plural("Delete %lld downloaded models?", count);
-                message = Loc.T("The transcription, speaker and AI models are removed from this PC (not moved to the Recycle Bin). Download them again in Settings › Transcription and Settings › AI.");
+                message = Loc.T("The transcription, speaker and AI models are removed from this PC (not moved to the Recycle Bin). Download them again in Settings › AI Providers › Local AI.");
                 break;
             }
         }

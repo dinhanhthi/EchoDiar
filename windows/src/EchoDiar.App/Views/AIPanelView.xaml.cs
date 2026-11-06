@@ -21,8 +21,8 @@ namespace EchoDiar.App.Views;
 /// tab shows it as busy, with Stop. Answers are Markdown rendered by <see cref="MarkdownView"/> (at most every 120 ms
 /// while streaming, as the model batches the text, and once more when saved); <c>[mm:ss]</c> citations call the seek
 /// action <see cref="ConversationView"/> passes, web links open once their destination is confirmed. Under the
-/// summary, the catch-ups written while recording (<see cref="CatchUpCard"/>, read-only). Attach when the page shows,
-/// Detach when it goes.
+/// summary, the Catch-ups bar with the catch-ups written while recording (<see cref="CatchUpCard"/>, read-only).
+/// Attach when the page shows, Detach when it goes.
 /// </summary>
 public sealed partial class AIPanelView : UserControl
 {
@@ -264,11 +264,27 @@ public sealed partial class AIPanelView : UserControl
             _summaryRendered = text;
             MarkdownView.Render(SummaryText, text, Links());
         }
+        UpdateRowHeights();
     }
 
     /// <summary>
-    /// The Catch-ups section (macOS <c>catchUpsSection</c>), shown while there are some: its header with the count, then,
-    /// open, the cards newest first, the newest open and the others collapsed unless clicked otherwise; each kept by id.
+    /// The heights of the summary and the catch-up cards (macOS <c>summaryPane</c>): the summary takes all the height
+    /// above the Catch-ups bar while it is collapsed or absent; open, the cards share it 1:1 with a summary (shown or
+    /// being written), else take all of it, the summary area hidden.
+    /// </summary>
+    private void UpdateRowHeights()
+    {
+        if (_panel is null) return;
+        var open = _showingCatchUps && _panel.CatchUps.Count > 0;
+        var hasSummary = _panel.SummaryJob is not null || _panel.ShownSummary is not null;
+        SummaryRow.Height = open && !hasSummary ? new GridLength(0) : new GridLength(1, GridUnitType.Star);
+        CatchUpsCardsRow.Height = open ? new GridLength(1, GridUnitType.Star) : new GridLength(0);
+    }
+
+    /// <summary>
+    /// The Catch-ups bar (macOS <c>catchUpsSection</c>), pinned under the summary while there are some: its header with
+    /// the count, then, open, the cards newest first in their own scroller, the newest open and the others collapsed
+    /// unless clicked otherwise; each kept by id.
     /// </summary>
     private void UpdateCatchUps()
     {
@@ -281,6 +297,7 @@ public sealed partial class AIPanelView : UserControl
         AutomationProperties.SetItemStatus(CatchUpsHeader, Loc.T(_showingCatchUps ? "Expanded" : "Collapsed"));
         CatchUpsChevron.Glyph = _showingCatchUps ? "\uE70D" : "\uE76C";
         CatchUpCards.Visibility = Shown(_showingCatchUps);
+        UpdateRowHeights();
         // Built only while open, as macOS.
         if (!_showingCatchUps) return;
         var providers = _panel.Providers.AIProviders;
@@ -600,13 +617,19 @@ public sealed partial class AIPanelView : UserControl
 
     // Bottom bar
 
-    /// <summary>The model and language labels, the "i", the setup hints and the busy line.</summary>
+    /// <summary>
+    /// The bottom bar's tab (macOS <c>purpose</c>): Chat's questions use the chat default, the Summary tab the summary
+    /// default.
+    /// </summary>
+    private AIPurpose Purpose => _tab == DetailTab.Chat ? AIPurpose.Chat : AIPurpose.Summary;
+
+    /// <summary>The model (of the tab's purpose) and language labels, the "i", the setup hints and the busy line.</summary>
     private void UpdateMenus()
     {
         if (_panel is null || _model is null) return;
         var providers = _panel.Providers;
-        var current = providers.CurrentAIProvider;
-        var title = AIMenus.ModelTitle(providers);
+        var current = providers.CurrentAIProvider(Purpose);
+        var title = AIMenus.ModelTitle(providers, Purpose);
         ModelText.Text = title;
         AutomationProperties.SetName(ModelButton, title);
         var language = _model.Settings.SummaryLanguage;
@@ -638,19 +661,18 @@ public sealed partial class AIPanelView : UserControl
     private void UpdateActions()
     {
         if (_panel is null || _model is null) return;
-        var canRun = _panel.CanRun;
         var summaryRunning = _panel.RunningSummary is not null;
         SummaryStopButton.Visibility = Shown(summaryRunning);
         SummarizeButton.Visibility = Shown(!summaryRunning);
         SummarizeButton.Content = Loc.T(_panel.Summaries.Count == 0 ? "Summarize" : "Re-summarize");
         ToolTipService.SetToolTip(SummarizeButton,
             _panel.Summaries.Count == 0 ? null : Loc.T("Make a new summary; the earlier ones stay in the version menu"));
-        SummarizeButton.IsEnabled = canRun;
+        SummarizeButton.IsEnabled = _panel.CanRun(AIPurpose.Summary);
 
         var questionRunning = _panel.RunningQuestion is not null;
         AskStopButton.Visibility = Shown(questionRunning);
         SendButton.Visibility = Shown(!questionRunning);
-        SendButton.IsEnabled = canRun && QuestionBox.Text.Trim().Length > 0;
+        SendButton.IsEnabled = _panel.CanRun(AIPurpose.Chat) && QuestionBox.Text.Trim().Length > 0;
         FreshChatButton.IsEnabled = _panel.Chat.Count > 0 && !questionRunning && !_model.ChatChanging;
 
         var hasTranscript = _panel.Transcript is not null;
@@ -658,7 +680,10 @@ public sealed partial class AIPanelView : UserControl
         ChatCopyButton.IsEnabled = hasTranscript;
     }
 
-    /// <summary>The providers and their models (<see cref="AIMenus.FillModelMenu"/>), then "Choose Models…" (Settings › AI).</summary>
+    /// <summary>
+    /// The providers and their models for the tab's purpose (<see cref="AIMenus.FillModelMenu"/>), then "Choose Models…"
+    /// (Settings › AI Providers › Cloud, macOS <c>openSettings(tab: .providers, subTab: "cloud")</c>).
+    /// </summary>
     private void BuildModelMenu()
     {
         if (_panel is null || _model is null)
@@ -666,7 +691,8 @@ public sealed partial class AIPanelView : UserControl
             ModelMenu.Items.Clear();
             return;
         }
-        AIMenus.FillModelMenu(ModelMenu, _panel.Providers, () => _model?.OpenSettings(Services.SettingsSearch.Providers));
+        AIMenus.FillModelMenu(ModelMenu, _panel.Providers, Purpose,
+            () => _model?.OpenSettings(Services.SettingsSearch.Providers, ProvidersSettingsPage.CloudTab));
     }
 
     /// <summary>The summary and answer languages (<see cref="AIMenus.FillLanguageMenu"/>).</summary>
@@ -681,13 +707,13 @@ public sealed partial class AIPanelView : UserControl
     }
 
     /// <summary>
-    /// Where the data goes with the current provider (macOS <c>dataNotes</c>): off this PC, and how far a CLI agent is
+    /// Where the data goes with the tab's provider (macOS <c>dataNotes</c>): off this PC, and how far a CLI agent is
     /// contained. Empty when there is nothing to say (the "i" is then hidden).
     /// </summary>
     private List<(string Glyph, string Text)> DataNotes()
     {
         List<(string, string)> notes = [];
-        if (_panel?.Providers.CurrentAIProvider is not { } provider) return notes;
+        if (_panel?.Providers.CurrentAIProvider(Purpose) is not { } provider) return notes;
         if (provider.LeavesPC) notes.Add(("", Loc.Format("Data sent to %@ leaves this PC.", provider.Name)));
         if (provider.CliPreset is { } preset && CLIRunner.ContainmentNote(preset) is { } note) notes.Add(("", Loc.T(note)));
         return notes;

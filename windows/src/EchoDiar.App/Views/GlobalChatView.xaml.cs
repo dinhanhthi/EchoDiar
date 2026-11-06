@@ -126,8 +126,11 @@ public sealed partial class GlobalChatView : UserControl
         UpdateActions();
     }
 
-    /// <summary>Settings › RAG (Phase 27.3), which turns RAG on and picks the embedder.</summary>
-    private void OpenRagSettings() => _model.OpenSettings("rag");
+    /// <summary>
+    /// Settings › AI Settings › Library chat (macOS <c>openSettings(tab: .aiSettings, subTab: "library")</c>), which turns
+    /// RAG on and picks the embedder.
+    /// </summary>
+    private void OpenRagSettings() => _model.OpenSettings(Services.SettingsSearch.AISettings, AISettingsPage.LibraryTab);
 
     // Chat
 
@@ -470,11 +473,11 @@ public sealed partial class GlobalChatView : UserControl
     {
         if (_chat is null) return;
         var providers = _chat.Providers;
-        var title = AIMenus.ModelTitle(providers);
+        var title = AIMenus.ModelTitle(providers, AIPurpose.Chat);
         ModelText.Text = title;
         AutomationProperties.SetName(ModelButton, title);
         LanguageText.Text = LanguageOptions.ShortCode(_model.Settings.SummaryLanguage);
-        var current = providers.CurrentAIProvider;
+        var current = providers.CurrentAIProvider(AIPurpose.Chat);
         SetupHints.Visibility = Shown(current is null);
         var windowsAI = AIMenus.WindowsAIHint(providers);
         WindowsAIHint.Text = windowsAI ?? "";
@@ -501,7 +504,7 @@ public sealed partial class GlobalChatView : UserControl
                 ? Loc.Format("Indexing paused at %lld of %lld", status.Indexed, status.Total)
                 : Loc.Format("Indexing %lld of %lld…", status.Indexed, status.Total)
             : status.NeedsConsent
-                ? Loc.T("Confirm the embedding provider in Settings › RAG.")
+                ? Loc.T("Confirm the embedding provider in Settings › AI Settings › Library chat.")
                 : status.Message ?? Loc.T("Your conversations are not indexed yet.");
         IndexingText.MaxLines = status.Running ? 1 : 2;
         ToolTipService.SetToolTip(IndexingText, IndexingText.Text);
@@ -536,7 +539,8 @@ public sealed partial class GlobalChatView : UserControl
             ModelMenu.Items.Clear();
             return;
         }
-        AIMenus.FillModelMenu(ModelMenu, _chat.Providers, () => _model.OpenSettings(Services.SettingsSearch.Providers));
+        AIMenus.FillModelMenu(ModelMenu, _chat.Providers, AIPurpose.Chat,
+            () => _model.OpenSettings(Services.SettingsSearch.Providers, ProvidersSettingsPage.CloudTab));
     }
 
     private void BuildLanguageMenu()

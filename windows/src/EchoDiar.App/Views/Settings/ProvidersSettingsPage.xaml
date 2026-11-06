@@ -1,16 +1,19 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!--
-    Settings › AI (macOS ProvidersSettingsView.swift), one panel per inner tab picked in the title bar:
-    - On this PC: the AI models for summaries and chat (Windows AI's state, hidden when this PC can never run it; the
-      GGUF models with Download, progress and Cancel, Installed and Delete; the default model and the language of
-      summaries and answers), the chat context, the catch-up (its provider outside the app, its model, from the start
-      or not), and the local hosts (a scan finds them, Foundry Local included; a host is added, or typed by URL).
-    - Cloud: the models of the API presets, then of the custom OpenAI-compatible endpoints (their keys and endpoints
-      are set in Settings › API Keys).
+    Settings › AI Providers (macOS ProvidersSettingsView.swift), one panel per inner tab picked in the title bar:
+    - Local AI: five groups, one shown at a time, picked in the tabs pinned above the page (macOS LocalAIGroup and its
+      CapsuleTabs):
+      - Language models: the models that run on this PC (Windows AI's state, hidden when this PC can never run it; the
+        GGUF models with Download, progress and Cancel, Installed and Delete). The models used for chat, summaries and
+        catch-up are picked in AI Settings.
+      - Transcription, Diarization: the local speech and speaker models by tier (LocalModelRows).
+      - Embedding: the catalog's embedding models' downloads (the one in use is picked in AI Settings › Library chat).
+      - Local hosts: a scan finds them, Foundry Local included; a host is added, or typed by URL.
+    - Cloud: the cloud provider cards (ProviderCardList): keys, base URLs and default models.
     - CLIs: the subscription CLIs found on this PC.
-    The provider rows are made in code (ProvidersSettingsPage.*Row): an expander with the Enabled switch (local hosts
-    and CLIs) or the key status (cloud APIs), and its fields below. Each searchable element's Tag is its search entry's
-    title (SearchEntries), so a search result can bring it into view.
+    The local host and CLI rows are made in code (ProvidersSettingsPage.*Row): an expander with the Enabled switch, and
+    its fields below in a label column and an input column (FieldGrid, as the cards). Each searchable element's Tag is
+    its search entry's title (SearchEntries), so a search result can bring it into view.
 -->
 <UserControl
     x:Class="EchoDiar.App.Views.ProvidersSettingsPage"
@@ -26,6 +29,12 @@
             <Setter Property="Spacing" Value="2" />
         </Style>
         <Style x:Key="SectionDescriptionStyle" TargetType="TextBlock">
+            <Setter Property="Foreground" Value="{ThemeResource TextFillColorSecondaryBrush}" />
+            <Setter Property="TextWrapping" Value="Wrap" />
+        </Style>
+        <!-- What a group's models do, above their sections (as Settings › Transcription). -->
+        <Style x:Key="IntroStyle" TargetType="TextBlock">
+            <Setter Property="Margin" Value="1,4,0,0" />
             <Setter Property="Foreground" Value="{ThemeResource TextFillColorSecondaryBrush}" />
             <Setter Property="TextWrapping" Value="Wrap" />
         </Style>
@@ -83,260 +92,209 @@
             <Setter Property="VerticalAlignment" Value="Center" />
             <Setter Property="Foreground" Value="{ThemeResource TextFillColorSecondaryBrush}" />
         </Style>
+        <!-- A transcription model's approximate price on the Cloud cards (macOS CloudPriceBadge): neutral, so only Default stands out. -->
+        <Style x:Key="PriceBadgeStyle" TargetType="Border">
+            <Setter Property="Padding" Value="6,1,6,2" />
+            <Setter Property="HorizontalAlignment" Value="Left" />
+            <Setter Property="CornerRadius" Value="{ThemeResource ControlCornerRadius}" />
+            <Setter Property="Background" Value="{ThemeResource ControlFillColorSecondaryBrush}" />
+            <Setter Property="BorderBrush" Value="{ThemeResource CardStrokeColorDefaultBrush}" />
+            <Setter Property="BorderThickness" Value="1" />
+        </Style>
     </UserControl.Resources>
 
-    <ScrollViewer>
-        <Grid MaxWidth="1000" Margin="24,12,24,24">
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+        </Grid.RowDefinitions>
 
-            <!-- On this PC -->
-            <StackPanel x:Name="OnThisPCPanel" Spacing="4">
-                <StackPanel Margin="1,4,0,4" Tag="AI models (summaries and chat)">
-                    <TextBlock Style="{StaticResource BodyStrongTextBlockStyle}" Text="{local:T Text='AI models (summaries and chat)'}" />
-                </StackPanel>
+        <!--
+            Local AI's groups (macOS localAITabs: CapsuleTabs centered and pinned above the form), shown on Local AI only;
+            items made in code (LocalAIGroups).
+        -->
+        <SelectorBar
+            x:Name="LocalAIGroupsBar"
+            Margin="24,8,24,0"
+            HorizontalAlignment="Center"
+            Visibility="Collapsed" />
 
-                <!-- Hidden when this PC can never run Windows AI; else why it cannot run now, or Available. -->
-                <controls:SettingsCard
-                    x:Name="WindowsAICard"
-                    Header="{local:T Text='Windows AI (system)'}"
-                    Visibility="Collapsed">
-                    <StackPanel Orientation="Horizontal" Spacing="8">
-                        <FontIcon
-                            x:Name="WindowsAIIcon"
-                            Glyph="&#xE73E;"
-                            Style="{StaticResource SuccessIconStyle}" />
-                        <TextBlock
-                            x:Name="WindowsAIText"
-                            MaxWidth="420"
-                            VerticalAlignment="Center"
-                            TextWrapping="Wrap" />
-                        <Button x:Name="WindowsAICheckButton" Content="{local:T Text='Check Again'}" />
+        <ScrollViewer Grid.Row="1">
+            <Grid MaxWidth="1000" Margin="24,12,24,24">
+
+                <!-- Local AI: one group shown at a time. -->
+                <Grid x:Name="LocalAIPanel">
+                    <!-- Language models -->
+                    <StackPanel x:Name="LanguageModelsPanel" Spacing="4">
+                        <StackPanel
+                            Margin="1,4,0,4"
+                            Spacing="2"
+                            Tag="Language models">
+                            <TextBlock Style="{StaticResource BodyStrongTextBlockStyle}" Text="{local:T Text='Language models'}" />
+                            <TextBlock Style="{StaticResource SectionDescriptionStyle}" Text="{local:T Text='Models that run on this PC, for summaries and chat.'}" />
+                        </StackPanel>
+
+                        <!-- Hidden when this PC can never run Windows AI; else why it cannot run now, or Available. -->
+                        <controls:SettingsCard
+                            x:Name="WindowsAICard"
+                            Header="{local:T Text='Windows AI (system)'}"
+                            Visibility="Collapsed">
+                            <StackPanel Orientation="Horizontal" Spacing="8">
+                                <FontIcon
+                                    x:Name="WindowsAIIcon"
+                                    Glyph="&#xE73E;"
+                                    Style="{StaticResource SuccessIconStyle}" />
+                                <TextBlock
+                                    x:Name="WindowsAIText"
+                                    MaxWidth="420"
+                                    VerticalAlignment="Center"
+                                    TextWrapping="Wrap" />
+                                <Button x:Name="WindowsAICheckButton" Content="{local:T Text='Check Again'}" />
+                            </StackPanel>
+                        </controls:SettingsCard>
+
+                        <!-- The GGUF models (macOS mlxEntries' ModelRow), made in code. -->
+                        <StackPanel x:Name="LocalModelsList" Spacing="4" />
                     </StackPanel>
-                </controls:SettingsCard>
 
-                <!-- The GGUF models (macOS mlxEntries' ModelRow), made in code. -->
-                <StackPanel x:Name="LocalModelsList" Spacing="4" />
-
-                <!-- The AI pane's model menu and language menu, also here (Windows: the task puts them in Settings). -->
-                <controls:SettingsCard
-                    x:Name="ModelCard"
-                    Description="{local:T Text='Used for summaries and questions. The model of each enabled provider below, as checked in its row.'}"
-                    Header="{local:T Text='Model for summaries and questions'}">
-                    <ComboBox
-                        x:Name="ModelCombo"
-                        MinWidth="260"
-                        MaxWidth="420"
-                        AutomationProperties.Name="{local:T Text='Model for summaries and questions'}"
-                        PlaceholderText="{local:T Text='No AI model'}" />
-                </controls:SettingsCard>
-
-                <!-- The description has apostrophes: set in code. -->
-                <controls:SettingsCard x:Name="LanguageCard" Header="{local:T Text='Language of summaries and answers'}">
-                    <ComboBox
-                        x:Name="LanguageCombo"
-                        MinWidth="160"
-                        AutomationProperties.Name="{local:T Text='Language of summaries and answers'}" />
-                </controls:SettingsCard>
-
-                <StackPanel Style="{StaticResource SectionHeaderStyle}">
-                    <TextBlock Style="{StaticResource BodyStrongTextBlockStyle}" Text="{local:T Text='Chat'}" />
-                    <TextBlock Style="{StaticResource SectionDescriptionStyle}" Text="{local:T Text='Earlier messages sent with each question.'}" />
-                </StackPanel>
-                <controls:SettingsCard Header="{local:T Text='Chat context'}" Tag="Chat context">
-                    <ComboBox
-                        x:Name="ChatContextCombo"
-                        MinWidth="160"
-                        AutomationProperties.Name="{local:T Text='Chat context'}" />
-                </controls:SettingsCard>
-
-                <!-- Catch-up (macOS catchUpSection): where "Catch up" runs while recording; pickers filled in code. -->
-                <StackPanel Style="{StaticResource SectionHeaderStyle}" Tag="Catch-up">
-                    <TextBlock Style="{StaticResource BodyStrongTextBlockStyle}" Text="{local:T Text='Catch-up'}" />
-                    <TextBlock Style="{StaticResource SectionDescriptionStyle}" Text="{local:T Text='Quick summaries of the meeting so far, asked for while recording.'}" />
-                </StackPanel>
-                <controls:SettingsCard Header="{local:T Text='Catch-up provider'}" Tag="Catch-up provider">
-                    <ComboBox
-                        x:Name="CatchUpProviderCombo"
-                        MinWidth="260"
-                        MaxWidth="420"
-                        AutomationProperties.Name="{local:T Text='Catch-up provider'}" />
-                </controls:SettingsCard>
-                <!-- The picker when a provider is picked; with Automatic, the AI tab's model as text (description set in code). -->
-                <controls:SettingsCard
-                    x:Name="CatchUpModelCard"
-                    Header="{local:T Text='Catch-up model'}"
-                    Tag="Catch-up model">
-                    <Grid>
-                        <ComboBox
-                            x:Name="CatchUpModelCombo"
-                            MinWidth="260"
-                            MaxWidth="420"
-                            AutomationProperties.Name="{local:T Text='Catch-up model'}"
-                            Visibility="Collapsed" />
+                    <!-- Transcription: what the models do, then a header per tier and its rows (made in code). -->
+                    <StackPanel
+                        x:Name="TranscriptionPanel"
+                        Spacing="4"
+                        Visibility="Collapsed">
                         <TextBlock
-                            x:Name="CatchUpModelAutoText"
-                            VerticalAlignment="Center"
-                            Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
-                    </Grid>
-                </controls:SettingsCard>
-                <!-- A picked cloud API: its key status (header and content set in code). -->
-                <controls:SettingsCard x:Name="CatchUpKeyCard" Visibility="Collapsed" />
-                <!-- As the AI pane's data notes, for the provider a catch-up runs on. -->
-                <Grid
-                    x:Name="CatchUpLeavesRow"
-                    Margin="1,4,0,0"
-                    ColumnSpacing="8"
-                    Visibility="Collapsed">
-                    <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="Auto" />
-                        <ColumnDefinition Width="*" />
-                    </Grid.ColumnDefinitions>
-                    <FontIcon Glyph="&#xE946;" Style="{StaticResource NoticeIconStyle}" />
-                    <TextBlock
-                        x:Name="CatchUpLeavesText"
-                        Grid.Column="1"
-                        Style="{StaticResource NoteStyle}" />
-                </Grid>
-                <Grid
-                    x:Name="CatchUpContainmentRow"
-                    Margin="1,4,0,0"
-                    ColumnSpacing="8"
-                    Visibility="Collapsed">
-                    <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="Auto" />
-                        <ColumnDefinition Width="*" />
-                    </Grid.ColumnDefinitions>
-                    <FontIcon Glyph="&#xEA18;" Style="{StaticResource NoticeIconStyle}" />
-                    <TextBlock
-                        x:Name="CatchUpContainmentText"
-                        Grid.Column="1"
-                        Style="{StaticResource NoteStyle}" />
-                </Grid>
-                <TextBlock
-                    x:Name="CatchUpNoProviderText"
-                    Margin="1,4,0,0"
-                    Style="{StaticResource NoteStyle}"
-                    Text="{local:T Text='Catch up needs an AI provider outside the app: a cloud API, a local server or a command-line tool. Add one in Settings › AI.'}"
-                    Visibility="Collapsed" />
-                <controls:SettingsCard
-                    Description="{local:T Text='Off: each catch-up adds what was said since the previous one. On: each one reads the whole recording again.'}"
-                    Header="{local:T Text='Re-summarize from the start each time'}"
-                    Tag="Re-summarize from the start each time">
-                    <ToggleSwitch x:Name="CatchUpFromStartToggle" AutomationProperties.Name="{local:T Text='Re-summarize from the start each time'}" />
-                </controls:SettingsCard>
-                <Grid Margin="1,4,0,0" ColumnSpacing="8">
-                    <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="Auto" />
-                        <ColumnDefinition Width="*" />
-                    </Grid.ColumnDefinitions>
-                    <FontIcon Glyph="&#xE946;" Style="{StaticResource NoticeIconStyle}" />
-                    <TextBlock
-                        Grid.Column="1"
-                        Style="{StaticResource NoteStyle}"
-                        Text="{local:T Text='In-app models are not offered: the live transcript holds the model during a recording.'}" />
-                </Grid>
+                            Style="{StaticResource IntroStyle}"
+                            Tag="Transcription models"
+                            Text="{local:T Text='Transcription turns speech into text. The transcription model listens to the recording and writes what was said, with timestamps.'}" />
+                        <StackPanel x:Name="TranscriptionList" Spacing="4" />
+                    </StackPanel>
 
-                <!-- Scan sits on the header's line, at its trailing edge (macOS). -->
-                <Grid
-                    Margin="1,24,0,4"
-                    ColumnSpacing="8"
-                    Tag="Local hosts">
-                    <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="*" />
-                        <ColumnDefinition Width="Auto" />
-                        <ColumnDefinition Width="Auto" />
-                    </Grid.ColumnDefinitions>
-                    <TextBlock
-                        VerticalAlignment="Center"
-                        Style="{StaticResource BodyStrongTextBlockStyle}"
-                        Text="{local:T Text='Local hosts'}" />
-                    <ProgressRing
-                        x:Name="ScanRing"
-                        Grid.Column="1"
-                        Width="16"
-                        Height="16"
-                        IsActive="False"
-                        Visibility="Collapsed" />
-                    <TextBlock
-                        x:Name="NoneFoundText"
-                        Grid.Column="1"
-                        VerticalAlignment="Center"
-                        Foreground="{ThemeResource TextFillColorSecondaryBrush}"
-                        Text="{local:T Text='None found'}"
-                        Visibility="Collapsed" />
-                    <Button
-                        x:Name="ScanButton"
-                        Grid.Column="2"
-                        Content="{local:T Text='Scan'}" />
+                    <!-- Diarization -->
+                    <StackPanel
+                        x:Name="DiarizationPanel"
+                        Spacing="4"
+                        Visibility="Collapsed">
+                        <TextBlock
+                            Style="{StaticResource IntroStyle}"
+                            Tag="Diarization models"
+                            Text="{local:T Text='Diarization finds who spoke when. The diarization model tells the voices apart and labels each part of the transcript with its speaker.'}" />
+                        <StackPanel x:Name="DiarizationList" Spacing="4" />
+                    </StackPanel>
+
+                    <!-- Embedding: the catalog's embedding models' downloads (macOS embeddingSection), made in code. -->
+                    <StackPanel
+                        x:Name="EmbeddingPanel"
+                        Spacing="4"
+                        Visibility="Collapsed">
+                        <StackPanel
+                            Margin="1,4,0,4"
+                            Spacing="2"
+                            Tag="Embedding models">
+                            <TextBlock Style="{StaticResource BodyStrongTextBlockStyle}" Text="{local:T Text='Embedding models'}" />
+                            <TextBlock Style="{StaticResource SectionDescriptionStyle}" Text="{local:T Text='The embedding model lets a question find passages with the same meaning, in any language. Models are downloaded only when you click Download.'}" />
+                        </StackPanel>
+                        <StackPanel x:Name="EmbeddingList" Spacing="4" />
+                    </StackPanel>
+
+                    <!-- Local hosts -->
+                    <StackPanel
+                        x:Name="LocalHostsPanel"
+                        Spacing="4"
+                        Visibility="Collapsed">
+                        <!-- Scan sits on the header's line, at its trailing edge (macOS). -->
+                        <Grid
+                            Margin="1,4,0,4"
+                            ColumnSpacing="8"
+                            Tag="Local hosts">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+                            <TextBlock
+                                VerticalAlignment="Center"
+                                Style="{StaticResource BodyStrongTextBlockStyle}"
+                                Text="{local:T Text='Local hosts'}" />
+                            <ProgressRing
+                                x:Name="ScanRing"
+                                Grid.Column="1"
+                                Width="16"
+                                Height="16"
+                                IsActive="False"
+                                Visibility="Collapsed" />
+                            <TextBlock
+                                x:Name="NoneFoundText"
+                                Grid.Column="1"
+                                VerticalAlignment="Center"
+                                Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                                Text="{local:T Text='None found'}"
+                                Visibility="Collapsed" />
+                            <Button
+                                x:Name="ScanButton"
+                                Grid.Column="2"
+                                Content="{local:T Text='Scan'}" />
+                        </Grid>
+
+                        <!-- The hosts the scan found, then the saved local hosts (rows made in code). -->
+                        <StackPanel x:Name="FoundHostsList" Spacing="4" />
+                        <StackPanel x:Name="LocalHostsList" Spacing="4" />
+
+                        <controls:SettingsCard Header="{local:T Text='Custom URL'}">
+                            <!-- The box narrows (then Add wraps) in a narrow window instead of being clipped. -->
+                            <views:FieldPanel InputWidth="260">
+                                <TextBox
+                                    x:Name="CustomUrlBox"
+                                    AutomationProperties.Name="{local:T Text='Custom URL'}"
+                                    PlaceholderText="http://127.0.0.1:8080/v1" />
+                                <Button
+                                    x:Name="AddCustomButton"
+                                    Content="{local:T Text='Add'}"
+                                    IsEnabled="False" />
+                            </views:FieldPanel>
+                        </controls:SettingsCard>
+                    </StackPanel>
                 </Grid>
 
-                <!-- The hosts the scan found, then the saved local hosts (rows made in code). -->
-                <StackPanel x:Name="FoundHostsList" Spacing="4" />
-                <StackPanel x:Name="LocalHostsList" Spacing="4" />
-
-                <controls:SettingsCard Header="{local:T Text='Custom URL'}">
-                    <!-- The box narrows (then Add wraps) in a narrow window instead of being clipped. -->
-                    <views:FieldPanel InputWidth="260">
-                        <TextBox
-                            x:Name="CustomUrlBox"
-                            AutomationProperties.Name="{local:T Text='Custom URL'}"
-                            PlaceholderText="http://127.0.0.1:8080/v1" />
-                        <Button
-                            x:Name="AddCustomButton"
-                            Content="{local:T Text='Add'}"
-                            IsEnabled="False" />
-                    </views:FieldPanel>
-                </controls:SettingsCard>
-            </StackPanel>
-
-            <!-- Cloud -->
-            <StackPanel
-                x:Name="CloudPanel"
-                Spacing="4"
-                Visibility="Collapsed">
+                <!-- Cloud -->
                 <StackPanel
-                    Margin="1,4,0,8"
-                    Orientation="Horizontal"
-                    Spacing="8"
-                    Tag="Cloud APIs">
-                    <FontIcon Glyph="&#xE946;" Style="{StaticResource NoticeIconStyle}" />
-                    <TextBlock
-                        Foreground="{ThemeResource TextFillColorSecondaryBrush}"
-                        Text="{local:T Text='Data sent to cloud providers or CLIs leaves this PC.'}"
-                        TextWrapping="Wrap" />
+                    x:Name="CloudPanel"
+                    Spacing="4"
+                    Visibility="Collapsed">
+                    <StackPanel
+                        Margin="1,4,0,8"
+                        Orientation="Horizontal"
+                        Spacing="8">
+                        <FontIcon Glyph="&#xE946;" Style="{StaticResource NoticeIconStyle}" />
+                        <TextBlock
+                            Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                            Text="{local:T Text='Data sent to cloud providers or CLIs leaves this PC.'}"
+                            TextWrapping="Wrap" />
+                    </StackPanel>
+
+                    <!-- The provider cards' group titles, cards and Add Endpoint (macOS ProviderCardSections), made in code. -->
+                    <StackPanel x:Name="CloudCardsPanel" Spacing="4" />
                 </StackPanel>
 
-                <StackPanel x:Name="CloudPresetsList" Spacing="4" />
-
-                <!-- Only when there is one (they are added in Settings › API Keys). -->
+                <!-- CLIs -->
                 <StackPanel
-                    x:Name="CustomHeader"
-                    Style="{StaticResource SectionHeaderStyle}"
-                    Tag="Custom OpenAI-compatible endpoints"
+                    x:Name="CliPanel"
+                    Spacing="4"
                     Visibility="Collapsed">
-                    <TextBlock Style="{StaticResource BodyStrongTextBlockStyle}" Text="{local:T Text='Custom OpenAI-compatible endpoints'}" />
-                </StackPanel>
-                <StackPanel x:Name="CustomList" Spacing="4" />
-            </StackPanel>
+                    <StackPanel
+                        Margin="1,4,0,8"
+                        Orientation="Horizontal"
+                        Spacing="8"
+                        Tag="CLIs">
+                        <FontIcon Glyph="&#xE946;" Style="{StaticResource NoticeIconStyle}" />
+                        <TextBlock
+                            Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                            Text="{local:T Text='Data sent to cloud providers or CLIs leaves this PC.'}"
+                            TextWrapping="Wrap" />
+                    </StackPanel>
 
-            <!-- CLIs -->
-            <StackPanel
-                x:Name="CliPanel"
-                Spacing="4"
-                Visibility="Collapsed">
-                <StackPanel
-                    Margin="1,4,0,8"
-                    Orientation="Horizontal"
-                    Spacing="8"
-                    Tag="CLIs">
-                    <FontIcon Glyph="&#xE946;" Style="{StaticResource NoticeIconStyle}" />
-                    <TextBlock
-                        Foreground="{ThemeResource TextFillColorSecondaryBrush}"
-                        Text="{local:T Text='Data sent to cloud providers or CLIs leaves this PC.'}"
-                        TextWrapping="Wrap" />
+                    <StackPanel x:Name="CliList" Spacing="4" />
                 </StackPanel>
-
-                <StackPanel x:Name="CliList" Spacing="4" />
-            </StackPanel>
-        </Grid>
-    </ScrollViewer>
+            </Grid>
+        </ScrollViewer>
+    </Grid>
 </UserControl>

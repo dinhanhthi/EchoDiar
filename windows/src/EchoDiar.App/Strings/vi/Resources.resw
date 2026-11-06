@@ -74,9 +74,21 @@
     <value>AI</value>
     <comment>AI</comment>
   </data>
+  <data name="AIAnswerLanguage" xml:space="preserve">
+    <value>Ngôn ngữ trả lời của AI</value>
+    <comment>AI answer language</comment>
+  </data>
   <data name="AIModelsSummariesAndChat" xml:space="preserve">
     <value>Mô hình AI (tóm tắt và trò chuyện)</value>
     <comment>AI models (summaries and chat)</comment>
+  </data>
+  <data name="AIProviders" xml:space="preserve">
+    <value>Nhà cung cấp AI</value>
+    <comment>AI Providers</comment>
+  </data>
+  <data name="AISettings" xml:space="preserve">
+    <value>Cài đặt AI</value>
+    <comment>AI Settings</comment>
   </data>
   <data name="APIKey" xml:space="preserve">
     <value>Khoá API</value>
@@ -483,6 +495,10 @@
     <comment>Catch-up model</comment>
   </data>
   <data name="CatchUpNeedsAnAIProviderOutsideTheAppACloudAPIALocalServerOr" xml:space="preserve">
+    <value>Tóm tắt nhanh cần một nhà cung cấp AI bên ngoài ứng dụng: API đám mây, máy chủ cục bộ hoặc công cụ dòng lệnh. Hãy thêm một nhà cung cấp trong Cài đặt › Nhà cung cấp AI.</value>
+    <comment>Catch up needs an AI provider outside the app: a cloud API, a local server or a command-line tool. Add one in Settings › AI Providers.</comment>
+  </data>
+  <data name="CatchUpNeedsAnAIProviderOutsideTheAppACloudAPIALocalServerOr_2" xml:space="preserve">
     <value>Tóm tắt nhanh cần một nhà cung cấp AI bên ngoài ứng dụng: API đám mây, máy chủ cục bộ hoặc công cụ dòng lệnh. Hãy thêm một nhà cung cấp trong Cài đặt › AI.</value>
     <comment>Catch up needs an AI provider outside the app: a cloud API, a local server or a command-line tool. Add one in Settings › AI.</comment>
   </data>
@@ -509,6 +525,10 @@
   <data name="ChatContext" xml:space="preserve">
     <value>Ngữ cảnh trò chuyện</value>
     <comment>Chat context</comment>
+  </data>
+  <data name="ChatModel" xml:space="preserve">
+    <value>Mô hình trò chuyện</value>
+    <comment>Chat model</comment>
   </data>
   <data name="ChatTemplatesOfLocalModels" xml:space="preserve">
     <value>Mẫu trò chuyện của mô hình cục bộ</value>
@@ -637,6 +657,10 @@
   <data name="Confirm" xml:space="preserve">
     <value>Xác nhận…</value>
     <comment>Confirm…</comment>
+  </data>
+  <data name="ConfirmTheEmbeddingProviderInSettingsAISettingsLibraryChat" xml:space="preserve">
+    <value>Hãy xác nhận nhà cung cấp mô hình nhúng trong Cài đặt › Cài đặt AI › Trò chuyện thư viện.</value>
+    <comment>Confirm the embedding provider in Settings › AI Settings › Library chat.</comment>
   </data>
   <data name="ConfirmTheEmbeddingProviderInSettingsRAG" xml:space="preserve">
     <value>Hãy xác nhận nhà cung cấp mô hình nhúng trong Cài đặt › RAG.</value>
@@ -778,9 +802,17 @@
     <value>{0} (mặc định)</value>
     <comment>%@ (default)</comment>
   </data>
+  <data name="DefaultDiarizationModel" xml:space="preserve">
+    <value>Mô hình phân biệt người nói mặc định</value>
+    <comment>Default diarization model</comment>
+  </data>
   <data name="DefaultLanguage" xml:space="preserve">
     <value>Ngôn ngữ mặc định</value>
     <comment>Default language</comment>
+  </data>
+  <data name="DefaultTranscriptionModel" xml:space="preserve">
+    <value>Mô hình chép lời mặc định</value>
+    <comment>Default transcription model</comment>
   </data>
   <data name="Default_2" xml:space="preserve">
     <value>Mặc định</value>
@@ -922,6 +954,10 @@
     <value>Đã phát hiện: {0}</value>
     <comment>Detected: %@</comment>
   </data>
+  <data name="Diarization" xml:space="preserve">
+    <value>Phân biệt người nói</value>
+    <comment>Diarization</comment>
+  </data>
   <data name="DiarizationFindsWhoSpokeWhenTheDiarizationModelTellsTheVoice" xml:space="preserve">
     <value>Phân biệt người nói cho biết ai nói khi nào. Mô hình phân biệt người nói tách các giọng nói và gắn nhãn người nói cho từng phần của bản chép lời.</value>
     <comment>Diarization finds who spoke when. The diarization model tells the voices apart and labels each part of the transcript with its speaker.</comment>
@@ -965,6 +1001,14 @@
   <data name="DownloadATranscriptionModelInSettings" xml:space="preserve">
     <value>Tải về mô hình chép lời trong Cài đặt</value>
     <comment>Download a transcription model in Settings</comment>
+  </data>
+  <data name="DownloadInAIProvidersLocalAI" xml:space="preserve">
+    <value>Tải về trong Nhà cung cấp AI › AI cục bộ</value>
+    <comment>Download in AI Providers › Local AI</comment>
+  </data>
+  <data name="DownloadTheEmbeddingModelInSettingsAIProvidersLocalAI" xml:space="preserve">
+    <value>Tải về mô hình nhúng trong Cài đặt › Nhà cung cấp AI › AI cục bộ</value>
+    <comment>Download the embedding model in Settings › AI Providers › Local AI</comment>
   </data>
   <data name="DownloadTheEmbeddingModelInSettingsRAG" xml:space="preserve">
     <value>Tải về mô hình nhúng trong Cài đặt › RAG</value>
@@ -1086,6 +1130,10 @@
     <value>Sửa…</value>
     <comment>Edit…</comment>
   </data>
+  <data name="Embedding" xml:space="preserve">
+    <value>Nhúng</value>
+    <comment>Embedding</comment>
+  </data>
   <data name="EmbeddingModel" xml:space="preserve">
     <value>Mô hình nhúng</value>
     <comment>Embedding model</comment>
@@ -1093,6 +1141,10 @@
   <data name="EmbeddingModelId" xml:space="preserve">
     <value>ID mô hình nhúng</value>
     <comment>Embedding model id</comment>
+  </data>
+  <data name="EmbeddingModels" xml:space="preserve">
+    <value>Mô hình nhúng</value>
+    <comment>Embedding models</comment>
   </data>
   <data name="EmptyTheCLISDefault" xml:space="preserve">
     <value>Để trống = mặc định của CLI</value>
@@ -1117,6 +1169,10 @@
   <data name="EnterANewKeyToReplaceIt" xml:space="preserve">
     <value>Nhập khoá mới để thay thế</value>
     <comment>Enter a new key to replace it</comment>
+  </data>
+  <data name="EnterTheEmbeddingModelOfInItsCardInSettingsAIProviders" xml:space="preserve">
+    <value>Nhập mô hình nhúng của {0} trong thẻ của nhà cung cấp này ở Cài đặt › Nhà cung cấp AI</value>
+    <comment>Enter the embedding model of %@ in its card in Settings › AI Providers</comment>
   </data>
   <data name="EnterTheEmbeddingModelOfInSettingsRAG" xml:space="preserve">
     <value>Nhập mô hình nhúng của {0} trong Cài đặt › RAG</value>
@@ -1490,6 +1546,10 @@
     <value>Thư viện</value>
     <comment>Library</comment>
   </data>
+  <data name="LibraryChat" xml:space="preserve">
+    <value>Trò chuyện thư viện</value>
+    <comment>Library chat</comment>
+  </data>
   <data name="LicensedUnderAGPL30" xml:space="preserve">
     <value>Cấp phép theo AGPL-3.0</value>
     <comment>Licensed under AGPL-3.0</comment>
@@ -1606,6 +1666,10 @@
     <value>Đang tải mô hình…</value>
     <comment>Loading the model…</comment>
   </data>
+  <data name="LocalAI" xml:space="preserve">
+    <value>AI cục bộ</value>
+    <comment>Local AI</comment>
+  </data>
   <data name="LocalHosts" xml:space="preserve">
     <value>Máy chủ cục bộ</value>
     <comment>Local hosts</comment>
@@ -1718,6 +1782,14 @@
     <value>Mô hình</value>
     <comment>Model</comment>
   </data>
+  <data name="ModelForQuestions" xml:space="preserve">
+    <value>Mô hình cho câu hỏi</value>
+    <comment>Model for questions</comment>
+  </data>
+  <data name="ModelForSummaries" xml:space="preserve">
+    <value>Mô hình cho bản tóm tắt</value>
+    <comment>Model for summaries</comment>
+  </data>
   <data name="ModelForSummariesAndQuestions" xml:space="preserve">
     <value>Mô hình cho bản tóm tắt và câu hỏi</value>
     <comment>Model for summaries and questions</comment>
@@ -1737,6 +1809,14 @@
   <data name="ModelsEchoDiarDownloadsWhenYouChooseThemChooseOneToReadItsLi" xml:space="preserve">
     <value>Các mô hình EchoDiar tải về khi bạn chọn. Hãy chọn một mục để đọc giấy phép.</value>
     <comment>Models EchoDiar downloads when you choose them. Choose one to read its license.</comment>
+  </data>
+  <data name="ModelsThatRunOnThisMacForSummariesAndChat" xml:space="preserve">
+    <value>Các mô hình chạy trên máy Mac này, dùng cho bản tóm tắt và trò chuyện.</value>
+    <comment>Models that run on this Mac, for summaries and chat.</comment>
+  </data>
+  <data name="ModelsThatRunOnThisPCForSummariesAndChat" xml:space="preserve">
+    <value>Các mô hình chạy trên máy tính này, dùng cho bản tóm tắt và trò chuyện.</value>
+    <comment>Models that run on this PC, for summaries and chat.</comment>
   </data>
   <data name="Monthly" xml:space="preserve">
     <value>Hàng tháng</value>
@@ -1802,6 +1882,10 @@
     <value>Cần hơn một nửa bộ nhớ của máy tính này.</value>
     <comment>Needs more than half of this PC's memory.</comment>
   </data>
+  <data name="NeedsTheSpeakerModelDownloadItInSettingsAIProvidersLocalAI" xml:space="preserve">
+    <value>Cần mô hình người nói: hãy tải về trong Cài đặt › Nhà cung cấp AI › AI cục bộ.</value>
+    <comment>Needs the speaker model: download it in Settings › AI Providers › Local AI.</comment>
+  </data>
   <data name="NeedsTheSpeakerModelDownloadItInTranscriptionDiarizationMode" xml:space="preserve">
     <value>Cần mô hình người nói: hãy tải về trong Chép lời › Mô hình phân biệt người nói.</value>
     <comment>Needs the speaker model: download it in Transcription › Diarization model.</comment>
@@ -1846,6 +1930,10 @@
     <value>Không có mô hình AI: hãy thiết lập một nhà cung cấp hoặc tải về một mô hình trong Cài đặt › AI.</value>
     <comment>No AI model: set up a provider or download a model in Settings › AI.</comment>
   </data>
+  <data name="NoAIModelSetUpAProviderOrDownloadAModelInSettingsAIProviders" xml:space="preserve">
+    <value>Không có mô hình AI: hãy thiết lập một nhà cung cấp hoặc tải về một mô hình trong Cài đặt › Nhà cung cấp AI.</value>
+    <comment>No AI model: set up a provider or download a model in Settings › AI Providers.</comment>
+  </data>
   <data name="NoCalendarAccountCanHoldEchoDiarSCalendar" xml:space="preserve">
     <value>Không có tài khoản lịch nào có thể chứa lịch của EchoDiar.</value>
     <comment>No calendar account can hold EchoDiar's calendar.</comment>
@@ -1875,6 +1963,10 @@
     <comment>No embedding models listed; type the model id.</comment>
   </data>
   <data name="NoInstalledLiveModelSupportsThisRecordingSLanguageDownloadOn" xml:space="preserve">
+    <value>Không có mô hình chép lời trực tiếp nào đã cài hỗ trợ ngôn ngữ của bản ghi âm này. Hãy tải về một mô hình trong Cài đặt › Nhà cung cấp AI › AI cục bộ.</value>
+    <comment>No installed live model supports this recording's language. Download one in Settings › AI Providers › Local AI.</comment>
+  </data>
+  <data name="NoInstalledLiveModelSupportsThisRecordingSLanguageDownloadOn_2" xml:space="preserve">
     <value>Không có mô hình chép lời trực tiếp nào đã cài hỗ trợ ngôn ngữ của bản ghi âm này. Hãy tải về một mô hình trong Cài đặt › Chép lời.</value>
     <comment>No installed live model supports this recording's language. Download one in Settings › Transcription.</comment>
   </data>
@@ -1882,9 +1974,13 @@
     <value>Chưa cài mô hình chép lời trực tiếp nào. Hãy tải về một mô hình WhisperKit hoặc Parakeet ở trên.</value>
     <comment>No live model installed. Download a WhisperKit or Parakeet model above.</comment>
   </data>
-  <data name="NoLiveModelInstalledDownloadAWhisperOrParakeetModelAbove" xml:space="preserve">
-    <value>Chưa cài mô hình chép lời trực tiếp nào. Hãy tải về một mô hình Whisper hoặc Parakeet ở trên.</value>
-    <comment>No live model installed. Download a Whisper or Parakeet model above.</comment>
+  <data name="NoLiveModelInstalledDownloadAWhisperKitOrParakeetModelInAIPr" xml:space="preserve">
+    <value>Chưa cài mô hình chép lời trực tiếp nào. Hãy tải về một mô hình WhisperKit hoặc Parakeet trong Nhà cung cấp AI › AI cục bộ.</value>
+    <comment>No live model installed. Download a WhisperKit or Parakeet model in AI Providers › Local AI.</comment>
+  </data>
+  <data name="NoLiveModelInstalledDownloadAWhisperOrParakeetModelInAIProvi" xml:space="preserve">
+    <value>Chưa cài mô hình chép lời trực tiếp nào. Hãy tải về một mô hình Whisper hoặc Parakeet trong Nhà cung cấp AI › AI cục bộ.</value>
+    <comment>No live model installed. Download a Whisper or Parakeet model in AI Providers › Local AI.</comment>
   </data>
   <data name="NoModelChooseOneInSettings" xml:space="preserve">
     <value>Không có mô hình: hãy chọn một mô hình trong Cài đặt</value>
@@ -1965,6 +2061,10 @@
   <data name="NotSavedPutTheKeyInTheAPIKeyFieldWhichKeepsItInCredentialMan" xml:space="preserve">
     <value>{0} chưa được lưu: hãy nhập khoá vào ô Khoá API, nơi khoá được giữ trong Trình quản lý thông tin xác thực.</value>
     <comment>%@ not saved: put the key in the API key field, which keeps it in Credential Manager.</comment>
+  </data>
+  <data name="NotSetForEnterItInItsCardInAIProviders" xml:space="preserve">
+    <value>Chưa được đặt cho {0}. Hãy nhập trong thẻ của nhà cung cấp này ở Nhà cung cấp AI.</value>
+    <comment>Not set for %@. Enter it in its card in AI Providers.</comment>
   </data>
   <data name="NotTranscribed" xml:space="preserve">
     <value>Chưa chép lời</value>
@@ -2222,9 +2322,17 @@
     <value>Hãy chọn một cuộc hội thoại trong thanh bên.</value>
     <comment>Pick a conversation in the sidebar.</comment>
   </data>
+  <data name="PickAProviderInSettingsAISettingsLibraryChat" xml:space="preserve">
+    <value>Hãy chọn một nhà cung cấp trong Cài đặt › Cài đặt AI › Trò chuyện thư viện</value>
+    <comment>Pick a provider in Settings › AI Settings › Library chat</comment>
+  </data>
   <data name="PickAProviderInSettingsRAG" xml:space="preserve">
     <value>Hãy chọn một nhà cung cấp trong Cài đặt › RAG</value>
     <comment>Pick a provider in Settings › RAG</comment>
+  </data>
+  <data name="PickAnEmbeddingModelInSettingsAISettingsLibraryChat" xml:space="preserve">
+    <value>Hãy chọn một mô hình nhúng trong Cài đặt › Cài đặt AI › Trò chuyện thư viện</value>
+    <comment>Pick an embedding model in Settings › AI Settings › Library chat</comment>
   </data>
   <data name="PickAnEmbeddingModelInSettingsRAG" xml:space="preserve">
     <value>Hãy chọn một mô hình nhúng trong Cài đặt › RAG</value>
@@ -2490,6 +2598,10 @@
     <value>Làm lại</value>
     <comment>Redo</comment>
   </data>
+  <data name="RejectedTheAPIKeyCheckItInSettingsAIProvidersCloud" xml:space="preserve">
+    <value>{0} đã từ chối khoá API. Hãy kiểm tra trong Cài đặt › Nhà cung cấp AI › Đám mây.</value>
+    <comment>%@ rejected the API key. Check it in Settings › AI Providers › Cloud.</comment>
+  </data>
   <data name="RejectedTheAPIKeyCheckItInSettingsAPIKeys" xml:space="preserve">
     <value>{0} đã từ chối khoá API. Hãy kiểm tra trong Cài đặt › Khoá API.</value>
     <comment>%@ rejected the API key. Check it in Settings › API Keys.</comment>
@@ -2593,6 +2705,10 @@
   <data name="SaveAKeyFirst" xml:space="preserve">
     <value>Hãy lưu khoá trước.</value>
     <comment>Save a key first.</comment>
+  </data>
+  <data name="SaveAKeyForInSettingsAIProvidersCloud" xml:space="preserve">
+    <value>Lưu khoá cho {0} trong Cài đặt › Nhà cung cấp AI › Đám mây</value>
+    <comment>Save a key for %@ in Settings › AI Providers › Cloud</comment>
   </data>
   <data name="SaveAKeyForInSettingsAPIKeys" xml:space="preserve">
     <value>Lưu khoá cho {0} trong Cài đặt › Khoá API</value>
@@ -2727,14 +2843,22 @@
     <comment>Showing meetings in the next 7 days. The list updates automatically.</comment>
   </data>
   <data name="ShowsTheTranscriptDuringTheRecordingWhisperAndParakeetModels" xml:space="preserve">
+    <value>Hiển thị bản chép lời trong khi ghi âm. Mô hình Whisper và Parakeet giữ lại bản này, nhờ đó bản chép lời sẵn sàng trong vài giây sau khi bấm Dừng. Dùng nhiều CPU và bộ nhớ hơn khi ghi âm. Công cụ đám mây có thể hiển thị bản này bằng một mô hình cục bộ hoặc luồng thời gian thực của nó: xem Mô hình chép lời ở bên dưới.</value>
+    <comment>Shows the transcript during the recording. Whisper and Parakeet models keep it, so it is ready within seconds of Stop. Uses more CPU and memory while recording. A cloud engine can show it with a local model or its realtime stream: see Transcription model below.</comment>
+  </data>
+  <data name="ShowsTheTranscriptDuringTheRecordingWhisperAndParakeetModels_2" xml:space="preserve">
     <value>Hiển thị bản chép lời trong khi ghi âm. Mô hình Whisper và Parakeet giữ lại bản này, nhờ đó bản chép lời sẵn sàng trong vài giây sau khi bấm Dừng. Dùng nhiều CPU và bộ nhớ hơn khi ghi âm. Công cụ đám mây có thể hiển thị bản này bằng một mô hình cục bộ hoặc luồng thời gian thực của nó: xem Mô hình chép lời › Đám mây.</value>
     <comment>Shows the transcript during the recording. Whisper and Parakeet models keep it, so it is ready within seconds of Stop. Uses more CPU and memory while recording. A cloud engine can show it with a local model or its realtime stream: see Transcription model › Cloud.</comment>
   </data>
   <data name="ShowsTheTranscriptDuringTheRecordingWhisperKitAndParakeetMod" xml:space="preserve">
+    <value>Hiển thị bản chép lời trong khi ghi âm. Mô hình WhisperKit và Parakeet giữ lại bản này, nhờ đó bản chép lời sẵn sàng trong vài giây sau khi bấm Dừng; Apple Speech (macOS 26+) chỉ hiển thị và chép lời sau khi bấm Dừng. Dùng nhiều CPU và bộ nhớ hơn khi ghi âm. Công cụ đám mây có thể hiển thị bản này bằng một mô hình cục bộ hoặc luồng thời gian thực của nó: xem Mô hình chép lời ở bên dưới.</value>
+    <comment>Shows the transcript during the recording. WhisperKit and Parakeet models keep it, so it is ready within seconds of Stop; Apple Speech (macOS 26+) only shows it and transcribes after Stop. Uses more CPU and memory while recording. A cloud engine can show it with a local model or its realtime stream: see Transcription model below.</comment>
+  </data>
+  <data name="ShowsTheTranscriptDuringTheRecordingWhisperKitAndParakeetMod_2" xml:space="preserve">
     <value>Hiển thị bản chép lời trong khi ghi âm. Mô hình WhisperKit và Parakeet giữ lại bản này, nhờ đó bản chép lời sẵn sàng trong vài giây sau khi bấm Dừng; Apple Speech (macOS 26+) chỉ hiển thị và chép lời sau khi bấm Dừng. Dùng nhiều CPU và bộ nhớ hơn khi ghi âm. Công cụ đám mây có thể hiển thị bản này bằng một mô hình cục bộ hoặc luồng thời gian thực của nó: xem Mô hình chép lời › Đám mây.</value>
     <comment>Shows the transcript during the recording. WhisperKit and Parakeet models keep it, so it is ready within seconds of Stop; Apple Speech (macOS 26+) only shows it and transcribes after Stop. Uses more CPU and memory while recording. A cloud engine can show it with a local model or its realtime stream: see Transcription model › Cloud.</comment>
   </data>
-  <data name="ShowsTheTranscriptDuringTheRecordingWhisperKitAndParakeetMod_2" xml:space="preserve">
+  <data name="ShowsTheTranscriptDuringTheRecordingWhisperKitAndParakeetMod_3" xml:space="preserve">
     <value>Hiển thị bản chép lời trong khi ghi âm. Mô hình WhisperKit và Parakeet giữ lại bản này, nhờ đó bản chép lời sẵn sàng trong vài giây sau khi bấm Dừng; Apple Speech (macOS 26+) chỉ hiển thị và chép lời sau khi bấm Dừng. Dùng nhiều CPU và bộ nhớ hơn khi ghi âm. Các công cụ khác chép lời sau khi bấm Dừng.</value>
     <comment>Shows the transcript during the recording. WhisperKit and Parakeet models keep it, so it is ready within seconds of Stop; Apple Speech (macOS 26+) only shows it and transcribes after Stop. Uses more CPU and memory while recording. Other engines transcribe after Stop.</comment>
   </data>
@@ -2789,6 +2913,10 @@
   <data name="SpeakersWereNotToldApartTheSpeakerModelIsInstalledNowReTrans" xml:space="preserve">
     <value>Người nói chưa được phân biệt. Mô hình người nói hiện đã được cài: hãy chép lời lại.</value>
     <comment>Speakers were not told apart. The speaker model is installed now: re-transcribe.</comment>
+  </data>
+  <data name="SpeakersWereNotToldApartTheSpeakerModelIsNotInstalledSetting" xml:space="preserve">
+    <value>Người nói chưa được phân biệt: chưa cài mô hình người nói (Cài đặt › Nhà cung cấp AI › AI cục bộ).</value>
+    <comment>Speakers were not told apart: the speaker model is not installed (Settings › AI Providers › Local AI).</comment>
   </data>
   <data name="SpeakersWereNotToldApartTheSpeakerModelIsNotInstalledTranscr" xml:space="preserve">
     <value>Người nói chưa được phân biệt: chưa cài mô hình người nói (Chép lời › Mô hình phân biệt người nói).</value>
@@ -2950,6 +3078,10 @@
     <value>Bản tóm tắt</value>
     <comment>Summary</comment>
   </data>
+  <data name="SummaryModel" xml:space="preserve">
+    <value>Mô hình tóm tắt</value>
+    <comment>Summary model</comment>
+  </data>
   <data name="SureToQuit" xml:space="preserve">
     <value>Chắc chắn thoát</value>
     <comment>Sure to quit</comment>
@@ -3009,6 +3141,10 @@
   <data name="TestUsesYourSubscription" xml:space="preserve">
     <value>Kiểm tra (dùng gói đăng ký của bạn)</value>
     <comment>Test (uses your subscription)</comment>
+  </data>
+  <data name="TextGenerationModel" xml:space="preserve">
+    <value>Mô hình tạo văn bản</value>
+    <comment>Text generation model</comment>
   </data>
   <data name="TheAITabSModelPickAProviderAboveToChooseAnother" xml:space="preserve">
     <value>Mô hình của tab AI. Chọn một nhà cung cấp ở trên để chọn mô hình khác.</value>
@@ -3198,6 +3334,10 @@
     <value>Không thể thiết lập phím tắt (lỗi {0}).</value>
     <comment>The shortcut could not be set up (error %d).</comment>
   </data>
+  <data name="TheSummaryModelPickAProviderAboveToChooseAnother" xml:space="preserve">
+    <value>Mô hình tóm tắt. Chọn một nhà cung cấp ở trên để chọn mô hình khác.</value>
+    <comment>The Summary model. Pick a provider above to choose another.</comment>
+  </data>
   <data name="TheSystemAudioFormatIsNotSupported" xml:space="preserve">
     <value>Định dạng âm thanh hệ thống không được hỗ trợ.</value>
     <comment>The system audio format is not supported.</comment>
@@ -3215,12 +3355,16 @@
     <comment>The transcript is made after Stop.</comment>
   </data>
   <data name="TheTranscriptionSpeakerAndAIModelsAreRemovedFromThisMacNotMo" xml:space="preserve">
+    <value>Các mô hình chép lời, người nói và AI bị xoá khỏi máy Mac này (không chuyển vào Thùng rác). Hãy tải về lại trong Cài đặt › Nhà cung cấp AI › AI cục bộ.</value>
+    <comment>The transcription, speaker and AI models are removed from this Mac (not moved to the Trash). Download them again in Settings › AI Providers › Local AI.</comment>
+  </data>
+  <data name="TheTranscriptionSpeakerAndAIModelsAreRemovedFromThisMacNotMo_2" xml:space="preserve">
     <value>Các mô hình chép lời, người nói và AI bị xoá khỏi máy Mac này (không chuyển vào Thùng rác). Hãy tải về lại trong Cài đặt › Chép lời và Cài đặt › AI.</value>
     <comment>The transcription, speaker and AI models are removed from this Mac (not moved to the Trash). Download them again in Settings › Transcription and Settings › AI.</comment>
   </data>
   <data name="TheTranscriptionSpeakerAndAIModelsAreRemovedFromThisPCNotMov" xml:space="preserve">
-    <value>Các mô hình chép lời, người nói và AI bị xoá khỏi máy tính này (không chuyển vào Thùng rác). Hãy tải về lại trong Cài đặt › Chép lời và Cài đặt › AI.</value>
-    <comment>The transcription, speaker and AI models are removed from this PC (not moved to the Recycle Bin). Download them again in Settings › Transcription and Settings › AI.</comment>
+    <value>Các mô hình chép lời, người nói và AI bị xoá khỏi máy tính này (không chuyển vào Thùng rác). Hãy tải về lại trong Cài đặt › Nhà cung cấp AI › AI cục bộ.</value>
+    <comment>The transcription, speaker and AI models are removed from this PC (not moved to the Recycle Bin). Download them again in Settings › AI Providers › Local AI.</comment>
   </data>
   <data name="ThereIsNotEnoughFreeDiskSpaceToRecord" xml:space="preserve">
     <value>Không đủ dung lượng ổ đĩa trống để ghi âm.</value>
@@ -3482,6 +3626,14 @@
     <value>Bật {0} trong Cài đặt › AI</value>
     <comment>Turn on %@ in Settings › AI</comment>
   </data>
+  <data name="TurnOnInSettingsAIProvidersLocalAI" xml:space="preserve">
+    <value>Bật {0} trong Cài đặt › Nhà cung cấp AI › AI cục bộ</value>
+    <comment>Turn on %@ in Settings › AI Providers › Local AI</comment>
+  </data>
+  <data name="TurnOnInSettingsAISettingsLibraryChat" xml:space="preserve">
+    <value>Bật trong Cài đặt › Cài đặt AI › Trò chuyện thư viện</value>
+    <comment>Turn on in Settings › AI Settings › Library chat</comment>
+  </data>
   <data name="TurnOnInSettingsRAG" xml:space="preserve">
     <value>Bật trong Cài đặt › RAG</value>
     <comment>Turn on in Settings › RAG</comment>
@@ -3614,9 +3766,13 @@
     <value>Được Whisper.net sử dụng</value>
     <comment>Used by Whisper.net</comment>
   </data>
-  <data name="UsedForSummariesAndQuestionsTheModelOfEachEnabledProviderBel" xml:space="preserve">
-    <value>Dùng cho bản tóm tắt và câu hỏi. Là mô hình của từng nhà cung cấp đã bật bên dưới, theo lựa chọn ở hàng của nhà cung cấp đó.</value>
-    <comment>Used for summaries and questions. The model of each enabled provider below, as checked in its row.</comment>
+  <data name="UsedForNewSummariesTheModelMenuInTheSummaryTabChangesItToo" xml:space="preserve">
+    <value>Dùng cho các bản tóm tắt mới. Menu mô hình trong tab Bản tóm tắt cũng thay đổi được mô hình này.</value>
+    <comment>Used for new summaries. The model menu in the Summary tab changes it too.</comment>
+  </data>
+  <data name="UsedForQuestionsInTheChatTabAndLibraryChatTheModelMenuInTheC" xml:space="preserve">
+    <value>Dùng cho câu hỏi trong tab Trò chuyện và Trò chuyện thư viện. Menu mô hình trong tab Trò chuyện cũng thay đổi được mô hình này.</value>
+    <comment>Used for questions in the Chat tab and Library chat. The model menu in the Chat tab changes it too.</comment>
   </data>
   <data name="UsesTheLanguagePickedInTheRecordMenuForTheNextRecordingsInst" xml:space="preserve">
     <value>Dùng ngôn ngữ đã chọn trong menu Ghi âm cho các lần ghi âm tiếp theo thay vì ngôn ngữ mặc định. Ngôn ngữ đổi trong lúc ghi âm không được tính.</value>

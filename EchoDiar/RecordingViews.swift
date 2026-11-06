@@ -226,7 +226,7 @@ struct RecordingDetailView: View {
         let name = config.displayName
         switch model.cloudLiveBlock {
         case .noLiveModel:
-            return String(localized: "No installed live model supports this recording's language. Download one in Settings › Transcription.")
+            return String(localized: "No installed live model supports this recording's language. Download one in Settings › AI Providers › Local AI.")
         case .realtimeUnsupported:
             return String(localized: "\(name) has no realtime transcription. You can show a live transcript with a local model in Settings.")
         case .cloudConsentPending:
@@ -255,9 +255,9 @@ struct RecordingDetailView: View {
         if !model.settings.autoTranscribe {
             model.openSettings(tab: .recording, subTab: "afterRecording")
         } else if !model.settings.transcribeWhileRecording {
-            model.openSettings(tab: .transcription, subTab: "general")
+            model.openSettings(tab: .transcription)
         } else {
-            model.openSettings(tab: .transcription, subTab: "transcriptionModels")
+            model.openLocalAI(.transcription)
         }
     }
 }

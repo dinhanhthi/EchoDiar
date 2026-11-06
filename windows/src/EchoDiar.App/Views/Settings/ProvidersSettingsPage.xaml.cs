@@ -15,81 +15,104 @@ using Windows.System;
 namespace EchoDiar.App.Views;
 
 /// <summary>
-/// Settings › AI (macOS ProvidersSettingsView.swift), the On this PC, Cloud and CLIs inner tabs; the title bar picks the
-/// tab (<see cref="AppViewModel.SubTabOf"/>). Cloud holds the models of the cloud API presets and custom endpoints; their
-/// keys and endpoints are set in Settings › API Keys (<see cref="ApiKeysSettingsPage"/>). Every change goes through
-/// <see cref="ProvidersViewModel"/> and is saved after the settings delay. The provider rows are made in code and updated
-/// in place, so typing in a field never rebuilds the row it is in; so are the GGUF model rows, whose state a download
-/// changes often. The local
-/// hosts are scanned and the CLIs looked up once, when the page first shows (macOS: once per window), then on Scan or
-/// on a new path override.
+/// Settings › AI Providers (macOS ProvidersSettingsView.swift), the Local AI, Cloud and CLIs inner tabs; the title bar
+/// picks the tab (<see cref="AppViewModel.SubTabOf"/>). Local AI shows one group at a time (macOS <c>LocalAIGroup</c>),
+/// picked in the tabs pinned above the page and kept in <see cref="AppViewModel.SettingsLocalAIGroup"/>: the in-app
+/// language models (the models each feature uses are picked in <see cref="AISettingsPage"/>), the local transcription, diarization and embedding model downloads, and the local hosts. Cloud holds
+/// the cloud provider cards (<see cref="ProviderCardList"/>: keys, base URLs and default models). Every change goes
+/// through <see cref="ProvidersViewModel"/> and is saved after the settings delay. The provider rows are made in code and
+/// updated in place, so typing in a field never rebuilds the row it is in; so are the model rows, whose state a download
+/// changes often. The local hosts are scanned and the CLIs looked up once, when the page first shows (macOS: once per
+/// window), then on Scan or on a new path override.
 /// </summary>
 public sealed partial class ProvidersSettingsPage : UserControl
 {
-    // macOS ids (deep links and search entries stay the same); "On this PC" is the Windows title.
-    public const string OnThisPCTab = "onThisMac";
+    // macOS ids (deep links and search entries stay the same).
+    public const string LocalAITab = "localAI";
     public const string CloudTab = "cloud";
     public const string CliTab = "cli";
+
+    // The groups of Local AI (macOS LocalAIGroup's raw values), kept in AppViewModel.SettingsLocalAIGroup.
+    public const string LanguageModelsGroup = "languageModels";
+    public const string TranscriptionGroup = "transcription";
+    public const string DiarizationGroup = "diarization";
+    public const string EmbeddingGroup = "embedding";
+    public const string LocalHostsGroup = "localHosts";
 
     /// <summary>macOS <c>SettingsTab.providers.subTabs</c>.</summary>
     public static IReadOnlyList<SettingsSubTab> SubTabs { get; } =
     [
-        new(OnThisPCTab, "On this PC"),
+        new(LocalAITab, "Local AI"),
         new(CloudTab, "Cloud"),
         new(CliTab, "CLIs"),
     ];
 
-    /// <summary>The searchable rows (macOS SettingsSearch.swift, AI), each the Tag of its element.</summary>
+    /// <summary>Local AI's groups in tab order, with their macOS titles (macOS <c>LocalAIGroup.allCases</c>, <c>title</c>).</summary>
+    private static readonly (string Id, string Title)[] LocalAIGroups =
+    [
+        (LanguageModelsGroup, "Language models"),
+        (TranscriptionGroup, "Transcription"),
+        (DiarizationGroup, "Diarization"),
+        (EmbeddingGroup, "Embedding"),
+        (LocalHostsGroup, "Local hosts"),
+    ];
+
+    /// <summary>
+    /// The searchable rows (macOS SettingsSearch.swift, AI Providers), each the Tag of its element. The Cloud ones are
+    /// macOS APIKeysSettingsView's, whose cards Cloud now shows.
+    /// </summary>
     public static IReadOnlyList<SettingsEntry> SearchEntries { get; } =
     [
-        new("AI models (summaries and chat)",
-            ["LLM", "Windows AI", "Phi Silica", "local", "summary", "chat", "default model", "language", "download",
-             "GGUF", "Qwen", "Gemma", "offline"], OnThisPCTab),
-        new("Chat context", ["chat", "history", "context", "messages", "memory"], OnThisPCTab),
-        new("Catch-up", ["catch up", "live summary", "recording", "meeting so far"], OnThisPCTab),
-        new("Catch-up provider", ["catch up", "live summary", "cloud", "CLI", "local server"], OnThisPCTab),
-        new("Catch-up model", ["catch up", "live summary", "LLM"], OnThisPCTab),
-        new("Re-summarize from the start each time", ["catch up", "incremental", "whole recording", "from start"], OnThisPCTab),
-        new("Local hosts", ["scan", "custom URL", "server", .. PresetNames(ProviderKind.Local)], OnThisPCTab),
-        new("Cloud APIs",
-            ["provider", "LLM", "model", .. PresetNames(ProviderKind.OpenAICompatible), .. PresetNames(ProviderKind.Anthropic)],
+        new("Language models",
+            ["LLM", "Windows AI", "Phi Silica", "local", "summary", "chat", "download", "GGUF", "Qwen", "Gemma", "offline"],
+            LocalAITab, LanguageModelsGroup),
+        new("Transcription models",
+            ["download", "Whisper", "Parakeet", "speech to text", "local", "fast", "balanced", "quality"], LocalAITab,
+            TranscriptionGroup),
+        new("Diarization models", ["speaker model", "speakers", "pyannote", "download"], LocalAITab, DiarizationGroup),
+        // macOS also lists its other embedders (E5, BGE-M3); the Windows catalog has Qwen3 in GGUF.
+        new("Embedding models", ["embedder", "Qwen3", "GGUF", "RAG", "download"], LocalAITab, EmbeddingGroup),
+        new("Local hosts", ["scan", "custom URL", "server", .. PresetNames(ProviderKind.Local)], LocalAITab, LocalHostsGroup),
+        new("Language models",
+            ["API key", "key", "Credential Manager", "cloud", "provider", "LLM", "model",
+             .. PresetNames(ProviderKind.OpenAICompatible), .. PresetNames(ProviderKind.Anthropic)], CloudTab),
+        new("Speech-to-text APIs",
+            ["API key", "key", "Credential Manager", "cloud transcription", .. PresetNames(ProviderKind.SpeechToText)], CloudTab),
+        // The speech-to-text cards, with their transcription and diarization models (ProviderCardList's Tags).
+        new("Cloud transcription engines", ["upload", "API", "default engine", "xAI", .. PresetNames(ProviderKind.SpeechToText)], CloudTab),
+        new("Cloud diarization",
+            ["OpenAI", "ElevenLabs", "Deepgram", "AssemblyAI", "Gemini", "xAI", "Speechmatics", "Soniox", "Gladia", "speakers", "cloud"],
             CloudTab),
-        new("Custom OpenAI-compatible endpoints", ["custom endpoint", "model"], CloudTab),
+        new("Custom OpenAI-compatible endpoints",
+            ["API key", "key", "custom endpoint", "add endpoint", "base URL", "authentication", "headers", "model"], CloudTab),
         new("CLIs", ["subscription", "command line", "terminal", .. PresetNames(ProviderKind.Cli)], CliTab),
     ];
 
     private static IEnumerable<string> PresetNames(ProviderKind kind) =>
         ProviderConfig.Presets().Where(p => p.Kind == kind).Select(p => p.DisplayName);
 
-    /// <summary>The summary languages offered (macOS <c>AILanguageMenu</c>), plus a hand-edited one.</summary>
-    private static readonly (string Code, string Name)[] Languages =
-        [("auto", "Auto"), ("en", "English"), ("fr", "French"), ("vi", "Vietnamese")];
-
     private readonly AppViewModel _model;
     private readonly ProvidersViewModel _providers;
+    private readonly ModelsViewModel _models;
 
     private readonly Dictionary<string, ApiRow> _apiRows = new(StringComparer.OrdinalIgnoreCase);
-    private readonly Dictionary<string, CloudRow> _cloudRows = new(StringComparer.OrdinalIgnoreCase);
-    /// <summary>A picked cloud catch-up provider's key status.</summary>
-    private readonly ApiKeyStatus _catchUpKeyStatus;
     private readonly Dictionary<CLIPreset, CliRow> _cliRows = [];
 
-    /// <summary>One row per GGUF model, made once and updated in place.</summary>
+    /// <summary>The Cloud tab's provider cards (macOS <c>ProviderCardSections</c>).</summary>
+    private readonly ProviderCardList _cards;
+
+    /// <summary>One row per GGUF chat model and per embedding model, made once and updated in place.</summary>
     private readonly List<LocalModelRow> _modelRows = [];
+
+    /// <summary>The local transcription and diarization model rows (macOS <c>ModelTierSections</c>), made once and updated in place.</summary>
+    private readonly LocalModelRows _localRows;
 
     /// <summary>The controls are being set from the settings: their change events are not the user's.</summary>
     private bool _syncing;
 
-    private List<(AIProviderInfo Provider, string Model)> _modelChoices = [];
-    /// <summary>Each model choice's title and why it cannot run, as listed.</summary>
-    private List<string> _modelKeys = [];
-    private List<string> _languageCodes = [];
-    private List<int> _chatContextValues = [];
+    /// <summary>The group tabs are being set from the model: their selection change is not the user's.</summary>
+    private bool _syncingGroups;
 
-    /// <summary>The catch-up pickers' values as listed ("" = Automatic) and their titles, rebuilt only when these change.</summary>
-    private List<string> _catchUpProviderIds = [];
-    private List<string> _catchUpProviderTitles = [];
-    private List<string> _catchUpModels = [];
     private string _foundHostsKey = "";
     private bool _scanned;
 
@@ -97,45 +120,23 @@ public sealed partial class ProvidersSettingsPage : UserControl
     {
         _model = model;
         _providers = model.ProvidersModel;
+        _models = model.ModelsModel;
         InitializeComponent();
-        LanguageCard.Description = Loc.T("Auto = the transcript's language for summaries, the question's for answers.");
-        _catchUpKeyStatus = new ApiKeyStatus(model, (Style)Resources["SuccessIconStyle"]);
-        CatchUpKeyCard.Content = _catchUpKeyStatus.Element;
         foreach (var entry in ProvidersViewModel.LocalModelEntries) LocalModelsList.Children.Add(CreateModelRow(entry));
+        // Their downloads only (macOS embeddingSection): the one in use is picked in AI Settings › Library chat.
+        foreach (var entry in ModelCatalog.Embedding) EmbeddingList.Children.Add(CreateModelRow(entry));
+        _localRows = new LocalModelRows(_models, Resources);
+        _localRows.AddSections(TranscriptionList, ModelKind.Asr);
+        _localRows.AddSections(DiarizationList, ModelKind.Diarization);
+        _cards = new ProviderCardList(model, Resources, CloudCardsPanel,
+            () => _model.SettingsSection == SettingsSearch.Providers && _model.SubTabOf(SettingsSearch.Providers) == CloudTab);
+        foreach (var (id, title) in LocalAIGroups) LocalAIGroupsBar.Items.Add(new SelectorBarItem { Text = Loc.T(title), Tag = id });
+        // The model's group selected first, so the bar never picks one of its own.
+        ShowGroup();
+        // Instant (click first): the group's panel shows in the same frame.
+        LocalAIGroupsBar.SelectionChanged += (_, _) => OnGroupSelected();
 
         WindowsAICheckButton.Click += (_, _) => _ = _providers.RefreshWindowsAIAsync();
-        ModelCombo.SelectionChanged += (_, _) => OnModelPicked();
-        LanguageCombo.SelectionChanged += (_, _) =>
-        {
-            var index = LanguageCombo.SelectedIndex;
-            if (_syncing || index < 0 || index >= _languageCodes.Count || _languageCodes[index] == _providers.SummaryLanguage) return;
-            _providers.SummaryLanguage = _languageCodes[index];
-        };
-        ChatContextCombo.SelectionChanged += (_, _) =>
-        {
-            var index = ChatContextCombo.SelectedIndex;
-            if (_syncing || index < 0 || index >= _chatContextValues.Count
-                || _chatContextValues[index] == _providers.ChatContextMessages) return;
-            _providers.ChatContextMessages = _chatContextValues[index];
-        };
-        CatchUpProviderCombo.SelectionChanged += (_, _) =>
-        {
-            var index = CatchUpProviderCombo.SelectedIndex;
-            if (_syncing || index < 0 || index >= _catchUpProviderIds.Count
-                || _catchUpProviderIds[index] == ShownCatchUpProviderId(CatchUpProviders())) return;
-            _providers.SetCatchUpProvider(_catchUpProviderIds[index]);
-        };
-        CatchUpModelCombo.SelectionChanged += (_, _) =>
-        {
-            var index = CatchUpModelCombo.SelectedIndex;
-            if (_syncing || index < 0 || index >= _catchUpModels.Count || _catchUpModels[index] == _providers.CatchUpModel) return;
-            _providers.CatchUpModel = _catchUpModels[index];
-        };
-        CatchUpFromStartToggle.Toggled += (_, _) =>
-        {
-            if (_syncing || CatchUpFromStartToggle.IsOn == _providers.CatchUpFromStart) return;
-            _providers.CatchUpFromStart = CatchUpFromStartToggle.IsOn;
-        };
         ScanButton.Click += (_, _) => _ = _providers.ScanAsync();
         CustomUrlBox.TextChanged += (_, _) => AddCustomButton.IsEnabled = ProviderInput.HostAndPort(CustomUrlBox.Text) is not null;
         CustomUrlBox.KeyDown += (_, e) =>
@@ -153,13 +154,17 @@ public sealed partial class ProvidersSettingsPage : UserControl
             _providers.Changed += Refresh;
             _providers.CliStatusChanged += UpdateCliStatus;
             _providers.LocalModelStatesChanged += UpdateModelRows;
+            _models.StatesChanged += _localRows.Update;
+            // It also reads the saved keys again.
+            _cards.Attach();
             Refresh();
             ShowTab();
             UpdateScan();
             UpdateCliStatus();
             UpdateModelRows();
-            _ = _providers.RefreshKeysAsync();
-            _ = _providers.RefreshLocalModelsAsync();
+            _localRows.Update();
+            // The installed models read again (every model row's state), then their size.
+            _ = _models.LoadAsync();
             if (!_scanned)
             {
                 _scanned = true;
@@ -174,9 +179,10 @@ public sealed partial class ProvidersSettingsPage : UserControl
             _providers.Changed -= Refresh;
             _providers.CliStatusChanged -= UpdateCliStatus;
             _providers.LocalModelStatesChanged -= UpdateModelRows;
+            _models.StatesChanged -= _localRows.Update;
+            _cards.Detach();
             // macOS: a test or a model list stops when its row goes away.
             foreach (var row in _apiRows.Values) row.Cancel();
-            foreach (var row in _cloudRows.Values) row.Cancel();
             foreach (var row in _cliRows.Values) row.Cancel();
         };
     }
@@ -185,7 +191,8 @@ public sealed partial class ProvidersSettingsPage : UserControl
 
     private void OnModelChanged(object? sender, PropertyChangedEventArgs e)
     {
-        if (e.PropertyName is nameof(AppViewModel.SettingsSubTab) or nameof(AppViewModel.SettingsExpandedProvider)) ShowTab();
+        if (e.PropertyName is nameof(AppViewModel.SettingsSubTab) or nameof(AppViewModel.SettingsExpandedProvider)
+            or nameof(AppViewModel.SettingsLocalAIGroup)) ShowTab();
     }
 
     private void OnProvidersPropertyChanged(object? sender, PropertyChangedEventArgs e)
@@ -202,33 +209,59 @@ public sealed partial class ProvidersSettingsPage : UserControl
         }
     }
 
-    /// <summary>The picked tab's panel.</summary>
+    /// <summary>The picked tab's panel, with Local AI's group tabs above it and its picked group.</summary>
     private void ShowTab()
     {
         var tab = _model.SubTabOf(SettingsSearch.Providers);
-        OnThisPCPanel.Visibility = Show(tab == OnThisPCTab);
+        LocalAIPanel.Visibility = LocalAIGroupsBar.Visibility = Show(tab == LocalAITab);
         CloudPanel.Visibility = Show(tab == CloudTab);
         CliPanel.Visibility = Show(tab == CliTab);
         ExpandRequestedProvider(tab);
+        ShowGroup();
+    }
+
+    /// <summary>Local AI's picked group (macOS <c>settingsLocalAIGroup</c>): its panel shows and its tab is selected.</summary>
+    private void ShowGroup()
+    {
+        var group = _model.SettingsLocalAIGroup;
+        LanguageModelsPanel.Visibility = Show(group == LanguageModelsGroup);
+        TranscriptionPanel.Visibility = Show(group == TranscriptionGroup);
+        DiarizationPanel.Visibility = Show(group == DiarizationGroup);
+        EmbeddingPanel.Visibility = Show(group == EmbeddingGroup);
+        LocalHostsPanel.Visibility = Show(group == LocalHostsGroup);
+        var selected = LocalAIGroupsBar.Items.FirstOrDefault(i => i.Tag as string == group);
+        if (LocalAIGroupsBar.SelectedItem == selected) return;
+        _syncingGroups = true;
+        try
+        {
+            LocalAIGroupsBar.SelectedItem = selected;
+        }
+        finally
+        {
+            _syncingGroups = false;
+        }
+    }
+
+    /// <summary>A picked group tab shows its group.</summary>
+    private void OnGroupSelected()
+    {
+        if (_syncingGroups || Closing || LocalAIGroupsBar.SelectedItem is not { Tag: string id }) return;
+        _model.SettingsLocalAIGroup = id;
     }
 
     /// <summary>
-    /// A Set Up in Settings › Transcription or RAG (macOS <c>settingsExpandedProvider</c>): its model row on Cloud, or
-    /// its saved local host's row on On this PC, expands and comes into view, and the request is cleared.
+    /// A Set Up in Settings › AI Settings › Library chat (macOS <c>settingsExpandedProvider</c>): its saved local host's row in Local AI › Local
+    /// hosts (picked first, as macOS does) expands and comes into view, and the request is cleared. A cloud provider's
+    /// request is the Cloud cards' (<see cref="ProviderCardList"/>).
     /// </summary>
     private void ExpandRequestedProvider(string? tab)
     {
-        // Only while this section shows: a page just left may still hear a request meant for API Keys.
+        // Only while this section shows: a page just left may still hear a request meant for another.
         if (Closing || _model.SettingsSection != SettingsSearch.Providers || _model.SettingsExpandedProvider is not { } id) return;
         // Only on the tab its row is on.
-        SettingsExpander? expander = tab switch
-        {
-            OnThisPCTab => _apiRows.GetValueOrDefault(id)?.Expander,
-            CloudTab => _cloudRows.GetValueOrDefault(id)?.Expander,
-            _ => null,
-        };
-        if (expander is null) return;
+        if (tab != LocalAITab || _apiRows.GetValueOrDefault(id)?.Expander is not { } expander) return;
         _model.SettingsExpandedProvider = null;
+        _model.SettingsLocalAIGroup = LocalHostsGroup;
         expander.IsExpanded = true;
         // After the panel's layout: a row of a tab just shown has no position yet.
         DispatcherQueue.TryEnqueue(() =>
@@ -245,10 +278,6 @@ public sealed partial class ProvidersSettingsPage : UserControl
         try
         {
             UpdateWindowsAI();
-            RefreshModelChoices();
-            RefreshLanguages();
-            RefreshChatContext();
-            RefreshCatchUp();
             UpdateFoundHosts();
             RefreshRows();
         }
@@ -258,7 +287,7 @@ public sealed partial class ProvidersSettingsPage : UserControl
         }
     }
 
-    // On this PC
+    // Local AI
 
     /// <summary>Windows AI (macOS Apple Foundation Models' box): hidden when this PC can never run it.</summary>
     private void UpdateWindowsAI()
@@ -275,54 +304,6 @@ public sealed partial class ProvidersSettingsPage : UserControl
         WindowsAIText.Style = state.Reason is null ? (Style)Resources["SuccessNoteStyle"] : (Style)Resources["NoteStyle"];
     }
 
-    /// <summary>
-    /// Every provider with the models it offers (macOS <c>AIModelMenu</c>): on this PC first, then the ones whose data
-    /// leaves it; a provider that cannot run now is shown off, with why.
-    /// </summary>
-    private void RefreshModelChoices()
-    {
-        var providers = _providers.AIProviders;
-        var ordered = providers.Where(p => p.Kind == AIProviderKind.InApp)
-            .Concat(providers.Where(p => p.Kind != AIProviderKind.InApp && !p.LeavesPC))
-            .Concat(providers.Where(p => p.LeavesPC));
-        List<(AIProviderInfo Provider, string Model)> choices = [];
-        List<string> titles = [];
-        foreach (var provider in ordered)
-        {
-            if (provider.Kind == AIProviderKind.InApp)
-            {
-                choices.Add((provider, provider.DefaultModel));
-                titles.Add(provider.Name);
-                continue;
-            }
-            var name = provider.LeavesPC ? Loc.Format("%@ (leaves this PC)", provider.Name) : provider.Name;
-            foreach (var id in provider.Models)
-            {
-                choices.Add((provider, id));
-                titles.Add($"{name} · {(id.Length == 0 ? Loc.T("Default") : id)}");
-            }
-        }
-        // Rebuilt only when the choices change: rebuilding closes an open list.
-        List<string> keys = [.. titles.Select((title, i) => $"{title}\u0001{choices[i].Provider.UnavailableReason}")];
-        if (!keys.SequenceEqual(_modelKeys))
-        {
-            _modelKeys = keys;
-            ModelCombo.Items.Clear();
-            for (var i = 0; i < choices.Count; i++)
-            {
-                var reason = choices[i].Provider.UnavailableReason;
-                var item = new ComboBoxItem { Content = titles[i], IsEnabled = reason is null };
-                if (reason is not null) ToolTipService.SetToolTip(item, reason);
-                ModelCombo.Items.Add(item);
-            }
-        }
-        _modelChoices = choices;
-        ModelCombo.IsEnabled = choices.Count > 0;
-        var current = _providers.CurrentAIProvider;
-        var model = current is null ? null : _providers.AIModelFor(current);
-        ModelCombo.SelectedIndex = current is null ? -1 : choices.FindIndex(c => c.Provider.Id == current.Id && c.Model == model);
-    }
-
     /// <summary>The parts of a GGUF model's row that change with its state.</summary>
     private sealed record LocalModelRow(
         ModelEntry Entry,
@@ -336,8 +317,8 @@ public sealed partial class ProvidersSettingsPage : UserControl
         Button DownloadButton);
 
     /// <summary>
-    /// A GGUF model's card (macOS <c>ModelRow</c> of an LLM): its name and Default badge (the catalog default; the model
-    /// menu below picks the one used); its details, quality, memory warning and last error below; its actions on the
+    /// A GGUF model's card (macOS <c>ModelRow</c> of an LLM): its name and Default badge (the catalog default; AI Settings
+    /// picks the one used); its details, quality, memory warning and last error below; its actions on the
     /// right. No Set default: macOS offers it for speech and speaker models only.
     /// </summary>
     private SettingsCard CreateModelRow(ModelEntry entry)
@@ -434,141 +415,6 @@ public sealed partial class ProvidersSettingsPage : UserControl
         }
     }
 
-    private void OnModelPicked()
-    {
-        var index = ModelCombo.SelectedIndex;
-        if (_syncing || index < 0 || index >= _modelChoices.Count) return;
-        var (provider, model) = _modelChoices[index];
-        var current = _providers.CurrentAIProvider;
-        if (current?.Id == provider.Id && _providers.AIModelFor(current) == model) return;
-        _providers.SetAIModel(model, provider);
-    }
-
-    private void RefreshLanguages()
-    {
-        var selection = _providers.SummaryLanguage;
-        List<string> codes = [.. Languages.Select(l => l.Code)];
-        if (!codes.Contains(selection)) codes.Add(selection);
-        if (!codes.SequenceEqual(_languageCodes))
-        {
-            _languageCodes = codes;
-            LanguageCombo.Items.Clear();
-            foreach (var code in codes)
-            {
-                LanguageCombo.Items.Add(Languages.FirstOrDefault(l => l.Code == code).Name is { } name ? Loc.T(name) : code);
-            }
-        }
-        LanguageCombo.SelectedIndex = _languageCodes.IndexOf(selection);
-    }
-
-    /// <summary>The offered sizes, the whole chat, plus a hand-edited value (macOS <c>chatSection</c>).</summary>
-    private void RefreshChatContext()
-    {
-        var current = _providers.ChatContextMessages;
-        List<int> values = [.. AppSettings.ChatContextOptions, 0];
-        if (!values.Contains(current)) values.Add(current);
-        if (!values.SequenceEqual(_chatContextValues))
-        {
-            _chatContextValues = values;
-            ChatContextCombo.Items.Clear();
-            foreach (var value in values)
-            {
-                ChatContextCombo.Items.Add(value == 0 ? Loc.T("Whole chat") : Loc.Plural("%lld messages", value));
-            }
-        }
-        ChatContextCombo.SelectedIndex = _chatContextValues.IndexOf(current);
-    }
-
-    /// <summary>
-    /// The Catch-up group (macOS <c>catchUpSection</c>): the provider a catch-up runs on, among the usable ones outside
-    /// the app ("Automatic" names what it runs, <see cref="AppViewModel.AutomaticCatchUpProvider"/>); the model of a
-    /// picked one, and the key status of a picked cloud API; the notes of the provider it runs on; why none can; from the
-    /// start or not.
-    /// </summary>
-    private void RefreshCatchUp()
-    {
-        var external = CatchUpProviders();
-        List<string> ids = [""];
-        List<string> titles = [_model.AutomaticCatchUpProvider is { } automatic
-            ? WithLeavesPC(Loc.Format("Automatic (%@)", automatic.Name), automatic)
-            : Loc.T("Automatic")];
-        foreach (var provider in external)
-        {
-            ids.Add(provider.Id);
-            titles.Add(WithLeavesPC(provider.Name, provider));
-        }
-        // Rebuilt only when the choices change: rebuilding closes an open list.
-        if (!titles.SequenceEqual(_catchUpProviderTitles) || !ids.SequenceEqual(_catchUpProviderIds))
-        {
-            _catchUpProviderIds = ids;
-            _catchUpProviderTitles = titles;
-            CatchUpProviderCombo.Items.Clear();
-            foreach (var title in titles) CatchUpProviderCombo.Items.Add(title);
-        }
-        CatchUpProviderCombo.IsEnabled = external.Count > 0;
-        var pickedId = ShownCatchUpProviderId(external);
-        CatchUpProviderCombo.SelectedIndex = _catchUpProviderIds.IndexOf(pickedId);
-
-        var picked = external.FirstOrDefault(p => p.Id == pickedId);
-        CatchUpModelCombo.Visibility = Show(picked is not null);
-        CatchUpModelAutoText.Visibility = Show(picked is null);
-        CatchUpModelCard.Description = picked is null
-            ? Loc.T("The AI tab's model. Pick a provider above to choose another.")
-            : null!; // null hides it
-        if (picked is null)
-        {
-            // Automatic runs the AI tab's model: shown, not picked (macOS automaticCatchUpModelLabel).
-            var automaticModel = _model.CatchUpProvider is { } runs ? _model.CatchUpModel(runs) : "";
-            CatchUpModelAutoText.Text = automaticModel.Length == 0
-                ? Loc.T("Automatic")
-                : Loc.Format("Automatic (%@)", automaticModel);
-        }
-        else
-        {
-            // Its models without a CLI's own default ("Automatic" covers it), then the saved pick when no longer listed.
-            var saved = _providers.CatchUpModel;
-            List<string> models = ["", .. picked.Models.Where(m => m.Length > 0)];
-            if (!models.Contains(saved)) models.Add(saved);
-            if (!models.SequenceEqual(_catchUpModels))
-            {
-                _catchUpModels = models;
-                CatchUpModelCombo.Items.Clear();
-                foreach (var model in models) CatchUpModelCombo.Items.Add(model.Length == 0 ? Loc.T("Automatic") : model);
-            }
-            CatchUpModelCombo.SelectedIndex = _catchUpModels.IndexOf(saved);
-        }
-        var pickedCloud = picked is { Kind: AIProviderKind.Cloud } ? _providers.Config(picked.Id) : null;
-        CatchUpKeyCard.Visibility = Show(pickedCloud is not null);
-        if (pickedCloud is not null)
-        {
-            CatchUpKeyCard.Header = picked!.Name;
-            _catchUpKeyStatus.Update(pickedCloud);
-        }
-
-        var runsOn = _model.CatchUpProvider;
-        CatchUpLeavesText.Text = runsOn?.LeavesPCNote ?? "";
-        CatchUpLeavesRow.Visibility = Show(runsOn?.LeavesPCNote is not null);
-        CatchUpContainmentText.Text = runsOn?.ContainmentNote ?? "";
-        CatchUpContainmentRow.Visibility = Show(runsOn?.ContainmentNote is not null);
-        CatchUpNoProviderText.Visibility = Show(external.Count == 0);
-        CatchUpFromStartToggle.IsOn = _providers.CatchUpFromStart;
-    }
-
-    /// <summary>The usable providers outside the app, as <see cref="AppViewModel.CatchUpProvider"/> filters them.</summary>
-    private List<AIProviderInfo> CatchUpProviders() =>
-        [.. _providers.AIProviders.Where(p => p.Kind != AIProviderKind.InApp && p.UnavailableReason is null)];
-
-    /// <summary>The picked provider, "" (Automatic) when it is not usable now, as a catch-up then runs on Automatic's.</summary>
-    private string ShownCatchUpProviderId(List<AIProviderInfo> external)
-    {
-        var id = _model.Settings.CatchUpProviderID;
-        return external.Any(p => p.Id == id) ? id : "";
-    }
-
-    /// <summary>The model menu's "(leaves this PC)" after <paramref name="title"/> when <paramref name="provider"/>'s data does.</summary>
-    private static string WithLeavesPC(string title, AIProviderInfo provider) =>
-        provider.LeavesPC ? Loc.Format("%@ (leaves this PC)", title) : title;
-
     /// <summary>The scan's state in the Local hosts header: its ring, "None found", Scan off while it runs.</summary>
     private void UpdateScan()
     {
@@ -623,21 +469,14 @@ public sealed partial class ProvidersSettingsPage : UserControl
     // Rows
 
     /// <summary>
-    /// The API presets, the custom endpoints, the saved local hosts and the CLIs, each a row made once per provider and
-    /// updated in place; a list is rebuilt only when its providers change.
+    /// The saved local hosts and the CLIs, each a row made once per provider and updated in place; a list is rebuilt only
+    /// when its providers change. The cloud providers are the cards' (<see cref="ProviderCardList"/>).
     /// </summary>
     private void RefreshRows()
     {
         var configs = _providers.ProviderConfigs;
-        var cloud = configs.Where(c => c.Preset is not null && c.Kind is ProviderKind.OpenAICompatible or ProviderKind.Anthropic).ToList();
-        var custom = configs.Where(c => c.Preset is null && c.Kind == ProviderKind.OpenAICompatible).ToList();
-        var cloudShown = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-        SyncList(CloudPresetsList, cloud, _cloudRows, id => new CloudRow(this, id), cloudShown);
-        SyncList(CustomList, custom, _cloudRows, id => new CloudRow(this, id), cloudShown);
-        CustomHeader.Visibility = Show(custom.Count > 0);
         var localShown = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         SyncList(LocalHostsList, _providers.SavedLocalHosts, _apiRows, id => new ApiRow(this, id), localShown);
-        DropRows(_cloudRows, cloudShown);
         DropRows(_apiRows, localShown);
 
         List<CliRow> cliRows = [];
@@ -703,19 +542,30 @@ public sealed partial class ProvidersSettingsPage : UserControl
 
     private TextBlock Note(string style, string text = "") => new() { Style = (Style)Resources[style], Text = text };
 
-    /// <summary>
-    /// A field of an expanded row: its label on the left, its input on the right (macOS <c>FieldRow</c>). Below
-    /// <see cref="FieldWrapWidth"/> the card puts the input under its label (the toolkit's default is 476), so the widest
-    /// field line (the model id, its models menu and Load models) keeps its buttons in view in a narrow window.
-    /// </summary>
-    private static SettingsCard Field(string label, object content)
-    {
-        var card = new SettingsCard { Header = Loc.T(label), Content = content };
-        card.Resources["SettingsCardWrapThreshold"] = FieldWrapWidth;
-        return card;
-    }
+    /// <summary>A provider's <see cref="ModelField"/>, with this page's view model, sync and closing state and styles.</summary>
+    private ModelField NewModelField(string id, string prompt, string? browseUrl) =>
+        new(_providers, () => _syncing, () => Closing, Resources, id, prompt, browseUrl);
 
-    private const double FieldWrapWidth = 640;
+    /// <summary>
+    /// An expanded row's fields in one item, so their inputs line up past the labels (macOS <c>fieldLabelColumn()</c>,
+    /// as the Cloud cards).
+    /// </summary>
+    private static SettingsCard FieldsCard(FieldGrid fields) => new()
+    {
+        ContentAlignment = ContentAlignment.Vertical,
+        HorizontalContentAlignment = HorizontalAlignment.Stretch,
+        Content = fields.Element,
+    };
+
+    /// <summary>
+    /// A row's model id with its notes, then the checklist of the models the AI pane's model menu offers, in the input
+    /// column (macOS <c>ModelField</c> in a row's <c>fieldLabelColumn()</c>).
+    /// </summary>
+    private void AddModelRows(FieldGrid fields, ModelField field)
+    {
+        fields.Add(Loc.T("Model"), field.Input, field.Notes);
+        fields.Add(null, Note("NoteStyle", Loc.T("In the AI pane's model menu")), field.ShownPanel);
+    }
 
     /// <summary>Sets a text box's text unless it already shows it (the caret stays where the user types).</summary>
     private static void SetText(TextBox box, string text)
@@ -727,8 +577,6 @@ public sealed partial class ProvidersSettingsPage : UserControl
     {
         Width = 16, Height = 16, IsActive = false, Visibility = Visibility.Collapsed, VerticalAlignment = VerticalAlignment.Center,
     };
-
-    private static HyperlinkButton Link(string text, string url) => new() { Content = Loc.T(text), NavigateUri = new Uri(url), Padding = new Thickness(0) };
 
     private static bool IsEnter(KeyRoutedEventArgs e) => e.Key == VirtualKey.Enter;
 
@@ -748,43 +596,8 @@ public sealed partial class ProvidersSettingsPage : UserControl
     }
 
     /// <summary>
-    /// A cloud LLM preset or custom endpoint on the Cloud tab (macOS <c>CloudModelRow</c>): its key status ("API key"
-    /// opens its card in Settings › API Keys); expanded, its model and the models shown in the AI pane's menu. A missing
-    /// base URL (Azure, a custom endpoint) is said under its name.
-    /// </summary>
-    private sealed class CloudRow : IProviderRow
-    {
-        private readonly ApiKeyStatus _status;
-        private readonly ModelField _modelField;
-
-        public CloudRow(ProvidersSettingsPage page, string id)
-        {
-            _status = new ApiKeyStatus(page._model, (Style)page.Resources["SuccessIconStyle"]);
-            _modelField = new ModelField(page, id, id == "azure" ? "Deployment name" : "Model id",
-                ApiKeysSettingsPage.ProviderLinks.TryGetValue(id, out var links) ? links.Models : null);
-            Expander = new SettingsExpander { Content = _status.Element };
-            Expander.Items.Add(_modelField.ModelCard);
-            Expander.Items.Add(_modelField.ShownCard);
-        }
-
-        public SettingsExpander Expander { get; }
-
-        public void Update(ProviderConfig config)
-        {
-            Expander.Header = config.DisplayName.Length == 0 ? Loc.T("Untitled") : config.DisplayName;
-            if (config.BaseURL.Trim().Length == 0) Expander.Description = Loc.T("Base URL not set");
-            else if (config.Preset is null) Expander.Description = config.BaseURL;
-            else Expander.ClearValue(SettingsExpander.DescriptionProperty);
-            _status.Update(config);
-            _modelField.Update(config);
-        }
-
-        public void Cancel() => _modelField.Cancel();
-    }
-
-    /// <summary>
     /// A saved local host (macOS <c>APIProviderRow</c>): the Enabled switch; expanded, its base URL, model, the models
-    /// shown in the AI pane's menu, Test and Remove.
+    /// shown in the AI pane's menu and its embedding model in a label column and an input column; below, Test and Remove.
     /// </summary>
     private sealed class ApiRow : IProviderRow
     {
@@ -792,7 +605,9 @@ public sealed partial class ProvidersSettingsPage : UserControl
         private readonly string _id;
         private readonly ToggleSwitch _enabled = new();
         private readonly TextBox _baseBox = new();
+        private readonly FieldGrid _fields = new();
         private readonly ModelField _modelField;
+        private readonly EmbeddingModelField _embeddingField;
         private readonly TestField _test;
 
         public ApiRow(ProvidersSettingsPage page, string id)
@@ -804,17 +619,20 @@ public sealed partial class ProvidersSettingsPage : UserControl
 
             AutomationProperties.SetName(_baseBox, Loc.T("Base URL"));
             _baseBox.TextChanged += (_, _) => Change(c => c.BaseURL != _baseBox.Text, c => c.BaseURL = _baseBox.Text);
-            var baseCard = Field("Base URL", new FieldPanel { InputWidth = 320, Children = { _baseBox } });
+            _fields.Add(Loc.T("Base URL"), new FieldPanel { InputWidth = 320, Children = { _baseBox } });
 
-            _modelField = new ModelField(page, id, "Model id", null);
+            _modelField = page.NewModelField(id, "Model id", null);
+            page.AddModelRows(_fields, _modelField);
+
+            // Every local host can embed (macOS RAGSettingsView.embeddingConfigs).
+            _embeddingField = new EmbeddingModelField(page._providers, () => page._syncing, () => page.Closing, page.Resources, id);
+            _fields.Add(Loc.T("Embedding model"), _embeddingField.Input, _embeddingField.Notes);
 
             var remove = new Button { Content = Loc.T("Remove") };
             remove.Click += (_, _) => _ = _page._providers.RemoveProviderAsync(_id);
             _test = new TestField(page, id, "Test", remove);
 
-            Expander.Items.Add(baseCard);
-            Expander.Items.Add(_modelField.ModelCard);
-            Expander.Items.Add(_modelField.ShownCard);
+            Expander.Items.Add(FieldsCard(_fields));
             Expander.Items.Add(_test.Card);
         }
 
@@ -830,12 +648,14 @@ public sealed partial class ProvidersSettingsPage : UserControl
             _enabled.IsOn = config.Enabled;
             SetText(_baseBox, config.BaseURL);
             _modelField.Update(config);
+            _embeddingField.Update(config);
         }
 
         public void Cancel()
         {
             _test.Cancel();
             _modelField.Cancel();
+            _embeddingField.Cancel();
         }
 
         /// <summary>Applies <paramref name="change"/> when <paramref name="differs"/>: a control showing the saved value is not a change.</summary>
@@ -848,7 +668,8 @@ public sealed partial class ProvidersSettingsPage : UserControl
 
     /// <summary>
     /// A subscription CLI (macOS <c>CLIProviderRow</c>): its found path and version, the Enabled switch; expanded, the path
-    /// override, its model and shown models, what it can still do despite its flags, and Test.
+    /// override, its model and shown models in a label column and an input column; below, what it can still do despite
+    /// its flags, and Test.
     /// </summary>
     private sealed class CliRow
     {
@@ -860,6 +681,7 @@ public sealed partial class ProvidersSettingsPage : UserControl
         private readonly ProgressRing _checkingRing = SmallRing();
         private readonly TextBox _pathBox = new();
         private readonly TextBlock _pathNote;
+        private readonly FieldGrid _fields = new();
         private readonly ModelField _modelField;
         private readonly TestField _test;
         private string _detectedOverride = "";
@@ -889,20 +711,18 @@ public sealed partial class ProvidersSettingsPage : UserControl
             _pathBox.LostFocus += (_, _) => Redetect();
             _pathNote = page.Note("CautionNoteStyle", Loc.T("Not found: give the full path to a .exe, or to an npm .cmd shim."));
             _pathNote.Visibility = Visibility.Collapsed;
-            var pathCard = Field("Path override", new FieldPanel { InputWidth = 320, Children = { _pathBox } });
-            pathCard.Description = _pathNote;
+            _fields.Add(Loc.T("Path override"), new FieldPanel { InputWidth = 320, Children = { _pathBox } }, _pathNote);
 
-            _modelField = new ModelField(page, _id, preset switch
+            _modelField = page.NewModelField(_id, preset switch
             {
                 CLIPreset.OpenCode => "provider/model",
                 CLIPreset.Claude => "sonnet, opus or haiku (empty = default)",
                 _ => "Empty = the CLI's default",
             }, null);
+            page.AddModelRows(_fields, _modelField);
             _test = new TestField(page, _id, "Test (uses your subscription)", null, CLIRunner.ContainmentNote(preset));
 
-            Expander.Items.Add(pathCard);
-            Expander.Items.Add(_modelField.ModelCard);
-            Expander.Items.Add(_modelField.ShownCard);
+            Expander.Items.Add(FieldsCard(_fields));
             Expander.Items.Add(_test.Card);
         }
 
@@ -954,210 +774,6 @@ public sealed partial class ProvidersSettingsPage : UserControl
         {
             if (_page._syncing || _page.Closing || _page._providers.Config(_id) is not { } config || !differs(config)) return;
             _page._providers.UpdateProvider(_id, change);
-        }
-    }
-
-    /// <summary>
-    /// The model id, "Load models" with the loaded models' menu, and the checklist of the models the AI pane's model menu
-    /// offers besides it (macOS <c>ModelField</c>, <c>ProviderConfig.shownModels</c>).
-    /// </summary>
-    private sealed class ModelField
-    {
-        /// <summary>Above this many models the checklist scrolls and gets a filter field.</summary>
-        private const int LongList = 8;
-
-        private readonly ProvidersSettingsPage _page;
-        private readonly string _id;
-        private readonly TextBox _modelBox = new();
-        private readonly DropDownButton _modelsButton = new() { Visibility = Visibility.Collapsed };
-        private readonly MenuFlyout _modelsMenu = new();
-        private readonly Button _loadButton = new();
-        private readonly ProgressRing _loadRing = SmallRing();
-        private readonly TextBlock _error;
-        private readonly TextBlock _noModels;
-        private readonly TextBox _filterBox = new() { Visibility = Visibility.Collapsed };
-        private readonly ScrollViewer _scroller = new();
-        private readonly StackPanel _checklist = new() { Spacing = 2 };
-        private readonly TextBox _addBox = new() { MaxWidth = 260, HorizontalAlignment = HorizontalAlignment.Left };
-        private readonly TextBlock _hint;
-        private List<string>? _models;
-        private List<string> _shownIds = [];
-        private CancellationTokenSource? _loading;
-        private ProviderConfig? _config;
-
-        public ModelField(ProvidersSettingsPage page, string id, string prompt, string? browseUrl)
-        {
-            _page = page;
-            _id = id;
-            _modelBox.PlaceholderText = Loc.T(prompt);
-            AutomationProperties.SetName(_modelBox, Loc.T("Model"));
-            _modelBox.TextChanged += (_, _) => Change(c => c.DefaultModel != _modelBox.Text, c => c.DefaultModel = _modelBox.Text);
-            _modelsButton.Flyout = _modelsMenu;
-            _loadButton.Content = Loc.T("Load models");
-            _loadButton.Click += (_, _) => _ = LoadAsync();
-            var inputs = new FieldPanel { InputWidth = 220 };
-            inputs.Children.Add(_modelBox);
-            inputs.Children.Add(_modelsButton);
-            inputs.Children.Add(_loadButton);
-            inputs.Children.Add(_loadRing);
-
-            var notes = new StackPanel { Spacing = 2 };
-            if (browseUrl is not null) notes.Children.Add(Link("Browse models", browseUrl));
-            _error = page.Note("CriticalNoteStyle");
-            _error.Visibility = Visibility.Collapsed;
-            _error.MaxLines = 2;
-            _noModels = page.Note("NoteStyle", Loc.T("No models listed; type the model id."));
-            _noModels.Visibility = Visibility.Collapsed;
-            notes.Children.Add(_error);
-            notes.Children.Add(_noModels);
-            ModelCard = Field("Model", inputs);
-            ModelCard.Description = notes;
-
-            _filterBox.PlaceholderText = Loc.T("Filter models");
-            AutomationProperties.SetName(_filterBox, Loc.T("Filter"));
-            _filterBox.TextChanged += (_, _) => UpdateChecklist();
-            _scroller.Content = _checklist;
-            _addBox.PlaceholderText = Loc.T("Add a model id");
-            AutomationProperties.SetName(_addBox, Loc.T("Add a model"));
-            _addBox.KeyDown += (_, e) =>
-            {
-                if (!IsEnter(e)) return;
-                e.Handled = true;
-                AddModel();
-            };
-            _hint = page.Note("NoteStyle", Loc.T("Type a model id and press Return, or load the models to pick from."));
-            var shown = new StackPanel { Spacing = 8 };
-            shown.Children.Add(_filterBox);
-            shown.Children.Add(_scroller);
-            shown.Children.Add(_addBox);
-            shown.Children.Add(_hint);
-            ShownCard = new SettingsCard
-            {
-                Header = Loc.T("In the AI pane's model menu"),
-                ContentAlignment = ContentAlignment.Vertical,
-                HorizontalContentAlignment = HorizontalAlignment.Stretch,
-                Content = shown,
-            };
-        }
-
-        public SettingsCard ModelCard { get; }
-        public SettingsCard ShownCard { get; }
-
-        public void Update(ProviderConfig config)
-        {
-            _config = config;
-            SetText(_modelBox, config.DefaultModel);
-            UpdateChecklist();
-        }
-
-        public void Cancel() => _loading?.Cancel();
-
-        private void Change(Func<ProviderConfig, bool> differs, Action<ProviderConfig> change)
-        {
-            if (_page._syncing || _page.Closing || _page._providers.Config(_id) is not { } config || !differs(config)) return;
-            _page._providers.UpdateProvider(_id, change);
-        }
-
-        /// <summary>Fills the menu from the provider's model list, off the UI thread (macOS <c>loadModels</c>).</summary>
-        private async Task LoadAsync()
-        {
-            if (_loading is not null || _page._providers.Config(_id) is not { } config) return;
-            using var loading = _loading = new CancellationTokenSource();
-            _loadButton.IsEnabled = false;
-            _loadRing.IsActive = true;
-            _loadRing.Visibility = Visibility.Visible;
-            string? error = null;
-            try
-            {
-                _models = [.. await _page._providers.ListModelsAsync(config, loading.Token)];
-            }
-            catch (Exception e) when (!loading.IsCancellationRequested)
-            {
-                error = ErrorMessage(e, config);
-            }
-            catch (Exception)
-            {
-                // Cancelled: no result.
-            }
-            _loading = null;
-            if (_page.Closing) return;
-            _loadButton.IsEnabled = true;
-            _loadRing.IsActive = false;
-            _loadRing.Visibility = Visibility.Collapsed;
-            _error.Text = error ?? "";
-            _error.Visibility = Show(error is not null);
-            _noModels.Visibility = Show(error is null && _models is { Count: 0 });
-            _modelsMenu.Items.Clear();
-            foreach (var id in _models ?? [])
-            {
-                var item = new MenuFlyoutItem { Text = id };
-                item.Click += (_, _) => Change(c => c.DefaultModel != id, c => c.DefaultModel = id);
-                _modelsMenu.Items.Add(item);
-            }
-            var count = _models?.Count ?? 0;
-            _modelsButton.Content = Loc.Plural("%lld models", count);
-            _modelsButton.Visibility = Show(count > 0);
-            UpdateChecklist();
-        }
-
-        private void AddModel()
-        {
-            var id = _addBox.Text.Trim();
-            _addBox.Text = "";
-            if (id.Length == 0) return;
-            Change(c => !c.ShownModels.Contains(id), c => c.ShownModels.Add(id));
-        }
-
-        /// <summary>The default model (always offered), the shown ones and the loaded ones, each with its checkbox.</summary>
-        private void UpdateChecklist()
-        {
-            if (_config is not { } config) return;
-            var defaultId = config.DefaultModel.Trim();
-            List<string> choices = [];
-            foreach (var id in config.ShownModels.Prepend(defaultId).Concat(_models ?? []))
-            {
-                if (id.Length > 0 && !choices.Contains(id)) choices.Add(id);
-            }
-            var isLong = choices.Count > LongList;
-            _filterBox.Visibility = Show(isLong);
-            _scroller.MaxHeight = isLong ? 160 : double.PositiveInfinity;
-            // Only while its field shows: a filter left over from a longer list would hide checkboxes for good.
-            var term = isLong ? _filterBox.Text.Trim() : "";
-            List<string> shown = term.Length == 0 ? choices : [.. choices.Where(c => c.Contains(term, StringComparison.CurrentCultureIgnoreCase))];
-            if (!shown.SequenceEqual(_shownIds))
-            {
-                _shownIds = shown;
-                _checklist.Children.Clear();
-                foreach (var id in shown) _checklist.Children.Add(CreateCheckBox(id));
-            }
-            foreach (var box in _checklist.Children.OfType<CheckBox>())
-            {
-                var id = (string)box.Tag;
-                var isDefault = id == defaultId;
-                box.Content = isDefault ? Loc.Format("%@ (default)", id) : id;
-                box.IsChecked = isDefault || config.ShownModels.Contains(id);
-                box.IsEnabled = !isDefault;
-            }
-            _hint.Visibility = Show(_models is null);
-        }
-
-        private CheckBox CreateCheckBox(string id)
-        {
-            var box = new CheckBox { Tag = id, Content = id };
-            void Toggle()
-            {
-                var on = box.IsChecked == true;
-                Change(
-                    c => id != c.DefaultModel.Trim() && c.ShownModels.Contains(id) != on,
-                    c =>
-                    {
-                        c.ShownModels.RemoveAll(m => m == id);
-                        if (on) c.ShownModels.Add(id);
-                    });
-            }
-            box.Checked += (_, _) => Toggle();
-            box.Unchecked += (_, _) => Toggle();
-            return box;
         }
     }
 

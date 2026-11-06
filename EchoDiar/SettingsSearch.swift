@@ -8,6 +8,8 @@ struct SettingsSearchItem: Identifiable {
     var keywords: [String] = []
     let tab: SettingsTab
     var subTab: String?
+    /// The group of AI Providers › Local AI the row is in.
+    var localAIGroup: LocalAIGroup?
 
     var id: String { "\(tab)/\(subTab ?? "-")/\(title.key)" }
 
@@ -19,11 +21,14 @@ struct SettingsSearchItem: Identifiable {
         return texts.contains { $0.localizedStandardContains(term) }
     }
 
-    /// "Transcription › General › Default language", with the inner tab in between when there is one and it is not the title itself.
+    /// "Recording › Auto-stop › Stop when the app is quiet for", with the inner tab in between when there is one and it
+    /// is not the title itself; the section alone ("Calendar") when the title is the section's, in a section without tabs.
     var path: String {
+        let tabTitle = String(localized: tab.label.title)
         let title = String(localized: title)
         let subTab = subTabTitle == title ? nil : subTabTitle
-        return [String(localized: tab.label.title), subTab, title].compactMap { $0 }.joined(separator: " › ")
+        let shown = subTabTitle == nil && title == tabTitle ? nil : title
+        return [tabTitle, subTab, shown].compactMap { $0 }.joined(separator: " › ")
     }
 
     /// The title of the inner tab `subTab`, as the toolbar shows it.
@@ -54,19 +59,6 @@ struct SettingsSearchItem: Identifiable {
               tab: .recording, subTab: "meetings"),
         .init(title: "Attach the indicator to the meeting window", keywords: ["pill", "anchor", "accessibility"],
               tab: .recording, subTab: "meetings"),
-        .init(title: "Calendar", keywords: ["calendar access", "iCloud", "Google", "Outlook", "Exchange", "events",
-                                            "schedule", "privacy"],
-              tab: .recording, subTab: "calendar"),
-        .init(title: "When a meeting starts",
-              keywords: ["calendar", "auto record", "event", "schedule", "wait for the call", "record at start"],
-              tab: .recording, subTab: "calendar"),
-        .init(title: "Watched calendars", keywords: ["calendar", "iCloud", "Google", "Outlook", "Exchange", "account"],
-              tab: .recording, subTab: "calendar"),
-        .init(title: "Only events with a meeting link",
-              keywords: ["calendar", "event", "Zoom", "Google Meet", "Microsoft Teams", "Webex", "link"],
-              tab: .recording, subTab: "calendar"),
-        .init(title: "Stop when the event ends", keywords: ["calendar", "auto-stop", "event end", "meeting end"],
-              tab: .recording, subTab: "calendar"),
         .init(title: "Stop when the app is quiet for", keywords: ["auto-stop", "inactive", "idle"],
               tab: .recording, subTab: "autoStop"),
         .init(title: "Stop when the call seems over for", keywords: ["auto-stop", "call ended", "hang up"],
@@ -87,88 +79,120 @@ struct SettingsSearchItem: Identifiable {
         .init(title: "Wait when the Mac is hot or in Low Power Mode", keywords: ["battery", "thermal", "defer"],
               tab: .recording, subTab: "afterRecording"),
 
+        // Calendar
+        .init(title: "Calendar", keywords: ["calendar access", "iCloud", "Google", "Outlook", "Exchange", "events",
+                                            "schedule", "privacy"],
+              tab: .calendar),
+        .init(title: "When a meeting starts",
+              keywords: ["calendar", "auto record", "event", "schedule", "wait for the call", "record at start"],
+              tab: .calendar),
+        .init(title: "Watched calendars", keywords: ["calendar", "iCloud", "Google", "Outlook", "Exchange", "account"],
+              tab: .calendar),
+        .init(title: "Only events with a meeting link",
+              keywords: ["calendar", "event", "Zoom", "Google Meet", "Microsoft Teams", "Webex", "link"],
+              tab: .calendar),
+        .init(title: "Stop when the event ends", keywords: ["calendar", "auto-stop", "event end", "meeting end"],
+              tab: .calendar),
+
         // Transcription
         .init(title: "Default language", keywords: ["language", "English", "French", "Vietnamese"],
-              tab: .transcription, subTab: "general"),
+              tab: .transcription),
         .init(title: "Remember last record language",
               keywords: ["language", "remember", "last", "record", "chevron", "menu"],
-              tab: .transcription, subTab: "general"),
+              tab: .transcription),
         .init(title: "Transcribe while recording",
               keywords: ["live transcript", "captions", "real-time", "subtitles", "WhisperKit", "Parakeet", "Apple Speech"],
-              tab: .transcription, subTab: "general"),
+              tab: .transcription),
         .init(title: "Free unused models after", keywords: ["memory", "RAM", "idle", "unload", "pause"],
-              tab: .transcription, subTab: "general"),
+              tab: .transcription),
         .init(title: "Delete audio after transcription", keywords: ["remove audio", "trash", "save space"],
-              tab: .transcription, subTab: "general"),
-        .init(title: "Transcription models", keywords: ["download", "Whisper", "fast", "balanced", "quality"],
-              tab: .transcription, subTab: "transcriptionModels"),
-        .init(title: "Cloud transcription engines", keywords: ["upload", "API", "default engine", "xAI"]
-              + speechToTextNames, tab: .transcription, subTab: "transcriptionModels"),
+              tab: .transcription),
+        .init(title: "Default transcription model",
+              keywords: ["default engine", "Whisper", "Parakeet", "Apple Speech", "cloud", "speech to text"]
+              + speechToTextNames, tab: .transcription),
         .init(title: "While recording",
               keywords: ["live transcript", "cloud live", "realtime", "real-time", "streaming", "captions"]
-              + realtimeNames, tab: .transcription, subTab: "transcriptionModels"),
+              + realtimeNames, tab: .transcription),
         .init(title: "Live with a local model",
               keywords: ["live transcript", "cloud live", "while recording", "WhisperKit", "Parakeet", "live model"],
-              tab: .transcription, subTab: "transcriptionModels"),
+              tab: .transcription),
         .init(title: "Live with \("…") realtime",
               keywords: ["live transcript", "cloud live", "realtime", "real-time", "streaming", "while recording",
                          "WebSocket"] + realtimeNames,
-              tab: .transcription, subTab: "transcriptionModels"),
+              tab: .transcription),
         .init(title: "Realtime model", keywords: ["realtime", "streaming", "live model", "while recording"]
-              + realtimeNames, tab: .transcription, subTab: "transcriptionModels"),
+              + realtimeNames, tab: .transcription),
         .init(title: "Use the realtime result as the transcript",
               keywords: ["use as final", "realtime", "streaming", "live transcript", "gap fill", "no upload"]
-              + realtimeNames, tab: .transcription, subTab: "transcriptionModels"),
+              + realtimeNames, tab: .transcription),
+        .init(title: "Tell speakers apart", keywords: ["diarization", "speakers", "who spoke"], tab: .transcription),
+        .init(title: "Number of other speakers", keywords: ["speaker count", "diarization", "people"],
+              tab: .transcription),
+        .init(title: "Default diarization model",
+              keywords: ["diarization", "speakers", "speaker model", "pyannote", "Nemotron", "cloud"],
+              tab: .transcription),
+
+        // AI Providers
+        .init(title: "Language models",
+              keywords: ["LLM", "MLX", "Apple Foundation Models", "local", "summary", "chat"],
+              tab: .providers, subTab: "localAI", localAIGroup: .languageModels),
+        .init(title: "Transcription models",
+              keywords: ["download", "Whisper", "speech to text", "local", "fast", "balanced", "quality"],
+              tab: .providers, subTab: "localAI", localAIGroup: .transcription),
         .init(title: "Diarization models", keywords: ["speaker model", "speakers", "pyannote", "Nemotron", "download"],
-              tab: .transcription, subTab: "diarizationModels"),
+              tab: .providers, subTab: "localAI", localAIGroup: .diarization),
+        .init(title: "Embedding models", keywords: ["embedder", "Qwen3", "E5", "BGE-M3", "RAG", "download"],
+              tab: .providers, subTab: "localAI", localAIGroup: .embedding),
+        .init(title: "Local hosts", keywords: ["scan", "custom URL", "server"] + presetNames(.local),
+              tab: .providers, subTab: "localAI", localAIGroup: .localHosts),
+        .init(title: "Language models", keywords: ["API key", "key", "Keychain", "cloud", "provider", "LLM", "model"]
+              + presetNames(.openAICompatible) + presetNames(.anthropic), tab: .providers, subTab: "cloud"),
+        .init(title: "Speech-to-text APIs", keywords: ["API key", "key", "Keychain", "cloud transcription"]
+              + speechToTextNames, tab: .providers, subTab: "cloud"),
+        .init(title: "Cloud transcription engines", keywords: ["upload", "API", "default engine", "xAI"]
+              + speechToTextNames, tab: .providers, subTab: "cloud"),
         .init(title: "Cloud diarization",
               keywords: ["OpenAI", "ElevenLabs", "Deepgram", "AssemblyAI", "Gemini", "xAI", "Speechmatics", "Soniox",
                          "Gladia", "speakers", "cloud"],
-              tab: .transcription, subTab: "diarizationModels"),
-        .init(title: "Tell speakers apart", keywords: ["diarization", "speakers", "who spoke"],
-              tab: .transcription, subTab: "diarizationModels"),
-        .init(title: "Number of other speakers", keywords: ["speaker count", "diarization", "people"],
-              tab: .transcription, subTab: "diarizationModels"),
-
-        // AI
-        .init(title: "AI models (summaries and chat)",
-              keywords: ["LLM", "MLX", "Apple Foundation Models", "local", "summary", "chat"],
-              tab: .providers, subTab: "onThisMac"),
-        .init(title: "Chat context", keywords: ["chat", "history", "context", "messages", "memory"],
-              tab: .providers, subTab: "onThisMac"),
-        .init(title: "Catch-up", keywords: ["catch up", "live summary", "recording", "meeting so far"],
-              tab: .providers, subTab: "onThisMac"),
-        .init(title: "Catch-up provider", keywords: ["catch up", "live summary", "cloud", "CLI", "local server"],
-              tab: .providers, subTab: "onThisMac"),
-        .init(title: "Catch-up model", keywords: ["catch up", "live summary", "LLM"],
-              tab: .providers, subTab: "onThisMac"),
-        .init(title: "Re-summarize from the start each time",
-              keywords: ["catch up", "incremental", "whole recording", "from start"],
-              tab: .providers, subTab: "onThisMac"),
-        .init(title: "Local hosts", keywords: ["scan", "custom URL", "server"] + presetNames(.local),
-              tab: .providers, subTab: "onThisMac"),
-        .init(title: "Cloud APIs", keywords: ["provider", "LLM", "model"] + presetNames(.openAICompatible)
-              + presetNames(.anthropic), tab: .providers, subTab: "cloud"),
-        .init(title: "Custom OpenAI-compatible endpoints", keywords: ["custom endpoint", "model"],
+              tab: .providers, subTab: "cloud"),
+        .init(title: "Custom OpenAI-compatible endpoints",
+              keywords: ["API key", "key", "custom endpoint", "add endpoint", "base URL", "authentication", "model"],
               tab: .providers, subTab: "cloud"),
         .init(title: "CLIs", keywords: ["subscription", "command line", "terminal"] + presetNames(.cli),
               tab: .providers, subTab: "cli"),
 
-        // API Keys
-        .init(title: "Language models", keywords: ["API key", "key", "Keychain", "cloud", "LLM"]
-              + presetNames(.openAICompatible) + presetNames(.anthropic), tab: .apiKeys),
-        .init(title: "Speech-to-text APIs", keywords: ["API key", "key", "Keychain", "cloud transcription"]
-              + speechToTextNames, tab: .apiKeys),
-        .init(title: "Custom OpenAI-compatible endpoints",
-              keywords: ["API key", "key", "custom endpoint", "add endpoint", "base URL", "authentication"],
-              tab: .apiKeys),
-
-        // RAG
+        // AI Settings
+        .init(title: "Chat model", keywords: ["chat", "questions", "LLM", "default model", "library chat"],
+              tab: .aiSettings, subTab: "chat"),
+        .init(title: "Chat context", keywords: ["chat", "history", "context", "messages", "memory"],
+              tab: .aiSettings, subTab: "chat"),
+        .init(title: "AI answer language", keywords: ["language", "output language", "answers", "summaries"],
+              tab: .aiSettings, subTab: "chat"),
+        .init(title: "Summary model", keywords: ["summary", "summaries", "LLM", "default model"],
+              tab: .aiSettings, subTab: "summary"),
+        .init(title: "AI answer language", keywords: ["language", "output language", "answers", "summaries"],
+              tab: .aiSettings, subTab: "summary"),
+        .init(title: "Catch-up", keywords: ["catch up", "live summary", "recording", "meeting so far"],
+              tab: .aiSettings, subTab: "catchUp"),
+        .init(title: "Catch-up provider", keywords: ["catch up", "live summary", "cloud", "CLI", "local server"],
+              tab: .aiSettings, subTab: "catchUp"),
+        .init(title: "Catch-up model", keywords: ["catch up", "live summary", "LLM"],
+              tab: .aiSettings, subTab: "catchUp"),
+        .init(title: "Re-summarize from the start each time",
+              keywords: ["catch up", "incremental", "whole recording", "from start"],
+              tab: .aiSettings, subTab: "catchUp"),
+        .init(title: "Default transcription model",
+              keywords: ["default engine", "Whisper", "Parakeet", "Apple Speech", "cloud", "speech to text"]
+              + speechToTextNames, tab: .aiSettings, subTab: "transcription"),
+        .init(title: "Default diarization model",
+              keywords: ["diarization", "speakers", "speaker model", "pyannote", "Nemotron", "cloud"],
+              tab: .aiSettings, subTab: "transcription"),
         .init(title: "Ask across conversations", keywords: ["RAG", "global chat", "library", "search", "index"],
-              tab: .rag),
-        .init(title: "Embedding model", keywords: ["embedder", "Qwen3", "E5", "BGE-M3", "Apple", "API", "download"],
-              tab: .rag),
-        .init(title: "Rebuild index", keywords: ["reindex", "index status", "indexed conversations"], tab: .rag),
+              tab: .aiSettings, subTab: "library"),
+        .init(title: "Embedding model", keywords: ["embedder", "Qwen3", "E5", "BGE-M3", "Apple", "API", "RAG"],
+              tab: .aiSettings, subTab: "library"),
+        .init(title: "Rebuild index", keywords: ["reindex", "index status", "indexed conversations", "RAG"],
+              tab: .aiSettings, subTab: "library"),
 
         // Storage
         .init(title: "Total", keywords: ["disk space", "usage", "size", "storage used"], tab: .storage, subTab: "usage"),
@@ -268,6 +292,7 @@ struct SettingsSearchResults: View {
 
     private func open(_ item: SettingsSearchItem) {
         model.openSettings(tab: item.tab, subTab: item.subTab)
+        if let group = item.localAIGroup { model.settingsLocalAIGroup = group }
         query = ""
     }
 }

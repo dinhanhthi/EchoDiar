@@ -18,8 +18,8 @@ struct SettingsStoreTests {
     func fileMissingNewerKeysDecodesWithDefaults(json: String) throws {
         try withTemporaryStore { store in
             try Data(json.utf8).write(to: store.fileURL)
-            // A file from an older build still has the availability migration to run; a fresh install does not.
-            #expect(store.load() == AppSettings(providerAvailabilityMigrated: false))
+            // A file from an older build still has the availability and AI migrations to run; a fresh install does not.
+            #expect(store.load() == AppSettings(providerAvailabilityMigrated: false, aiSettingsMigrated: false))
             #expect(store.load().chatContextMessages == 10)
             #expect(store.load().ragEnabled == false)
             #expect(store.load().embeddingModelID == "mlx-qwen3-embedding-0.6b")
@@ -33,6 +33,60 @@ struct SettingsStoreTests {
             #expect(store.load().rememberRecordingLanguage == false)
             #expect(store.load().lastRecordingLanguage == nil)
             #expect(FileManager.default.fileExists(atPath: store.fileURL.path))
+        }
+    }
+
+    /// An upgraded file keeps its AI model for summaries and chat, and its API embedder's model on that provider (the
+    /// preset's config is added when the provider was never saved); the migration runs once. Same file and keys as the
+    /// Windows `SettingsTests.OldAISettingsMigrateOnce`.
+    @Test(arguments: [true, false])
+    func oldAISettingsMigrateOnce(providerSaved: Bool) throws {
+        let saved = #"""
+            {"id":"openai","kind":"openAICompatible","preset":"openai","displayName":"Work OpenAI",
+             "baseURL":"https://api.openai.com/v1","authStyle":"bearer","defaultModel":"gpt-x"}
+            """#
+        let json = #"""
+            {"version":1,"defaultAIProviderID":"anthropic","defaultAIModel":"claude-opus-5",
+             "embeddingModelID":"api:openai","embeddingAPIModel":" text-embedding-3-small\n",
+             "providers":[\#(providerSaved ? saved : "")]}
+            """#
+        try withTemporaryStore { store in
+            try Data(json.utf8).write(to: store.fileURL)
+            let old = store.load()
+            #expect(!old.aiSettingsMigrated)
+
+            let migrated = old.migratingAISettings()
+
+            #expect(migrated.summaryAIProviderID == "anthropic")
+            #expect(migrated.summaryAIModel == "claude-opus-5")
+            #expect(migrated.chatAIProviderID == "anthropic")
+            #expect(migrated.chatAIModel == "claude-opus-5")
+            var provider = try #require(providerSaved ? old.providers.first : ProviderConfig.presets.first { $0.id == "openai" })
+            provider.embeddingModel = "text-embedding-3-small"
+            #expect(migrated.providers == [provider])
+            #expect(migrated.aiSettingsMigrated)
+            // The old keys stay as they were.
+            #expect(migrated.defaultAIProviderID == "anthropic")
+            #expect(migrated.defaultAIModel == "claude-opus-5")
+            #expect(migrated.embeddingAPIModel == old.embeddingAPIModel)
+
+            try store.save(migrated)
+            let written = try #require(
+                JSONSerialization.jsonObject(with: Data(contentsOf: store.fileURL)) as? [String: Any])
+            #expect(written["summaryAIProviderID"] as? String == "anthropic")
+            #expect(written["summaryAIModel"] as? String == "claude-opus-5")
+            #expect(written["chatAIProviderID"] as? String == "anthropic")
+            #expect(written["chatAIModel"] as? String == "claude-opus-5")
+            #expect(written["aiSettingsMigrated"] as? Bool == true)
+            let providers = try #require(written["providers"] as? [[String: Any]])
+            #expect(providers.first?["embeddingModel"] as? String == "text-embedding-3-small")
+
+            var read = store.load()
+            #expect(read == migrated)
+            // Runs once: a pick changed afterwards (back to Automatic) is not filled again.
+            read.summaryAIProviderID = nil
+            read.summaryAIModel = nil
+            #expect(read.migratingAISettings() == read)
         }
     }
 

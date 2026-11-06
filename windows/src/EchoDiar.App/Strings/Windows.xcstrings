@@ -2131,6 +2131,36 @@
         }
       }
     },
+    "Models that run on this PC, for summaries and chat." : {
+      "comment" : "Windows only: Views/Settings/ProvidersSettingsPage.xaml.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Modelos que se ejecutan en este PC, para resúmenes y chat."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Modèles qui s’exécutent sur ce PC, pour les résumés et la discussion."
+          }
+        },
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Các mô hình chạy trên máy tính này, dùng cho bản tóm tắt và trò chuyện."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "在这台电脑上运行的模型，用于摘要和聊天。"
+          }
+        }
+      }
+    },
     "Move to Recycle Bin" : {
       "comment" : "Windows only: Views/Settings/StorageSettingsPage.xaml.cs.",
       "extractionState" : "manual",
@@ -2251,32 +2281,32 @@
         }
       }
     },
-    "No live model installed. Download a Whisper or Parakeet model above." : {
+    "No live model installed. Download a Whisper or Parakeet model in AI Providers › Local AI." : {
       "comment" : "Windows only: Views/Settings/TranscriptionSettingsPage.xaml.cs.",
       "extractionState" : "manual",
       "localizations" : {
         "es" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "No hay ningún modelo en directo instalado. Descarga arriba un modelo Whisper o Parakeet."
+            "value" : "No hay ningún modelo en directo instalado. Descarga un modelo Whisper o Parakeet en Proveedores de IA › IA local."
           }
         },
         "fr" : {
           "stringUnit" : {
             "state" : "needs_review",
-            "value" : "Aucun modèle en direct installé. Téléchargez un modèle Whisper ou Parakeet ci-dessus."
+            "value" : "Aucun modèle en direct installé. Téléchargez un modèle Whisper ou Parakeet dans Fournisseurs d’IA › IA locale."
           }
         },
         "vi" : {
           "stringUnit" : {
             "state" : "needs_review",
-            "value" : "Chưa cài mô hình chép lời trực tiếp nào. Hãy tải về một mô hình Whisper hoặc Parakeet ở trên."
+            "value" : "Chưa cài mô hình chép lời trực tiếp nào. Hãy tải về một mô hình Whisper hoặc Parakeet trong Nhà cung cấp AI › AI cục bộ."
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "未安装实时转写模型。请在上方下载 Whisper 或 Parakeet 模型。"
+            "value" : "未安装实时转写模型。请在“AI 提供商 › 本地 AI”中下载 Whisper 或 Parakeet 模型。"
           }
         }
       }
@@ -2907,6 +2937,36 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "设置卡片"
+          }
+        }
+      }
+    },
+    "Shows the transcript during the recording. Whisper and Parakeet models keep it, so it is ready within seconds of Stop. Uses more CPU and memory while recording. A cloud engine can show it with a local model or its realtime stream: see Transcription model below." : {
+      "comment" : "Windows only: Views/Settings/TranscriptionSettingsPage.xaml.cs.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Muestra la transcripción durante la grabación. Los modelos Whisper y Parakeet la conservan, para que esté lista segundos después de Detener. Usa más CPU y memoria al grabar. Un motor en la nube puede mostrarla con un modelo local o con su transmisión en tiempo real: consulta Modelo de transcripción abajo."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Affiche la transcription pendant l’enregistrement. Les modèles Whisper et Parakeet la conservent, pour qu’elle soit prête quelques secondes après l’arrêt. Utilise plus de processeur et de mémoire pendant l’enregistrement. Un moteur cloud peut l’afficher avec un modèle local ou son flux temps réel : voir Modèle de transcription ci-dessous."
+          }
+        },
+        "vi" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Hiển thị bản chép lời trong khi ghi âm. Mô hình Whisper và Parakeet giữ lại bản này, nhờ đó bản chép lời sẵn sàng trong vài giây sau khi bấm Dừng. Dùng nhiều CPU và bộ nhớ hơn khi ghi âm. Công cụ đám mây có thể hiển thị bản này bằng một mô hình cục bộ hoặc luồng thời gian thực của nó: xem Mô hình chép lời ở bên dưới."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "在录音期间显示转写文本。Whisper 和 Parakeet 模型会保留下来，因此停止后几秒内即可就绪。录音时会占用更多 CPU 和内存。云端引擎可以通过本地模型或其实时流显示转写文本：请参阅下方的“转写模型”。"
           }
         }
       }
@@ -3625,32 +3685,32 @@
         }
       }
     },
-    "The transcription, speaker and AI models are removed from this PC (not moved to the Recycle Bin). Download them again in Settings › Transcription and Settings › AI." : {
+    "The transcription, speaker and AI models are removed from this PC (not moved to the Recycle Bin). Download them again in Settings › AI Providers › Local AI." : {
       "comment" : "Windows only: Views/Settings/StorageSettingsPage.xaml.cs.",
       "extractionState" : "manual",
       "localizations" : {
         "es" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Los modelos de transcripción, de hablantes y de IA se eliminan de este PC (no se trasladan a la Papelera de reciclaje). Vuelve a descargarlos en Ajustes › Transcripción y Ajustes › IA."
+            "value" : "Los modelos de transcripción, de hablantes y de IA se eliminan de este PC (no se trasladan a la Papelera de reciclaje). Vuelve a descargarlos en Ajustes › Proveedores de IA › IA local."
           }
         },
         "fr" : {
           "stringUnit" : {
             "state" : "needs_review",
-            "value" : "Les modèles de transcription, d’intervenants et d’IA sont supprimés de ce PC (pas placés dans la Corbeille). Téléchargez-les à nouveau dans Réglages › Transcription et Réglages › IA."
+            "value" : "Les modèles de transcription, d’intervenants et d’IA sont supprimés de ce PC (pas placés dans la Corbeille). Téléchargez-les à nouveau dans Réglages › Fournisseurs d’IA › IA locale."
           }
         },
         "vi" : {
           "stringUnit" : {
             "state" : "needs_review",
-            "value" : "Các mô hình chép lời, người nói và AI bị xoá khỏi máy tính này (không chuyển vào Thùng rác). Hãy tải về lại trong Cài đặt › Chép lời và Cài đặt › AI."
+            "value" : "Các mô hình chép lời, người nói và AI bị xoá khỏi máy tính này (không chuyển vào Thùng rác). Hãy tải về lại trong Cài đặt › Nhà cung cấp AI › AI cục bộ."
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "转写模型、说话人模型和 AI 模型会从这台电脑上移除（不会移到回收站）。可在“设置 › 转写”和“设置 › AI”中重新下载。"
+            "value" : "转写模型、说话人模型和 AI 模型会从这台电脑上移除（不会移到回收站）。可在“设置 › AI 提供商 › 本地 AI”中重新下载。"
           }
         }
       }
@@ -4581,36 +4641,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "由 sherpa-onnx 使用"
-          }
-        }
-      }
-    },
-    "Used for summaries and questions. The model of each enabled provider below, as checked in its row." : {
-      "comment" : "Windows only: Views/Settings/ProvidersSettingsPage.xaml.",
-      "extractionState" : "manual",
-      "localizations" : {
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Se usa para resúmenes y preguntas. El modelo de cada proveedor activado de abajo, según lo marcado en su fila."
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "needs_review",
-            "value" : "Utilisé pour les résumés et les questions. Le modèle de chaque fournisseur activé ci-dessous, tel que coché dans sa ligne."
-          }
-        },
-        "vi" : {
-          "stringUnit" : {
-            "state" : "needs_review",
-            "value" : "Dùng cho bản tóm tắt và câu hỏi. Là mô hình của từng nhà cung cấp đã bật bên dưới, theo lựa chọn ở hàng của nhà cung cấp đó."
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "用于摘要和提问。即下方每个已启用提供商的模型，以其所在行中勾选的为准。"
           }
         }
       }

@@ -2,55 +2,39 @@ import EchoAI
 import EchoCore
 import SwiftUI
 
-/// The API Keys section: one card per cloud provider that takes a key (the LLM presets, the speech-to-text APIs and the
-/// custom OpenAI-compatible endpoints), with its key, Test and where to get a key; Azure and custom endpoints also set
-/// their base URL. Models are picked in the feature tabs. Keys go to the Keychain only.
-struct APIKeysSettingsView: View {
+/// The cloud provider cards in sections, for a `Form` around them (AI Providers › Cloud): the LLM presets, the
+/// speech-to-text APIs, then the custom OpenAI-compatible endpoints with "Add Endpoint". One card per cloud provider
+/// that takes a key, with its key, Test and where to get a key, and its default models; Azure and custom endpoints also
+/// set their base URL. Keys go to the Keychain only.
+struct ProviderCardSections: View {
     let model: AppModel
 
     var body: some View {
-        ScrollViewReader { proxy in
-            form
-                // A model card's "API key" button: the provider's card (which expands itself) comes into view.
-                .onChange(of: model.settingsExpandedProvider, initial: true) { _, id in
-                    guard let id else { return }
-                    Task {
-                        await Task.yield()
-                        withAnimation { proxy.scrollTo(id, anchor: .top) }
-                    }
-                }
+        Section {
+            ForEach(configs { $0.preset != nil && [.openAICompatible, .anthropic].contains($0.kind) }) { config in
+                APIKeyCard(config: config, model: model)
+            }
+        } header: {
+            Text("Language models")
         }
-    }
-
-    private var form: some View {
-        Form {
-            Section {
-                ForEach(configs { $0.preset != nil && [.openAICompatible, .anthropic].contains($0.kind) }) { config in
-                    APIKeyCard(config: config, model: model)
-                }
-            } header: {
-                Text("Language models")
+        Section {
+            ForEach(configs { $0.kind == .speechToText }) { config in
+                APIKeyCard(config: config, model: model)
             }
-            Section {
-                ForEach(configs { $0.kind == .speechToText }) { config in
-                    APIKeyCard(config: config, model: model)
-                }
-            } header: {
-                Text("Speech-to-text APIs")
-            }
-            Section {
-                ForEach(configs { $0.preset == nil && $0.kind == .openAICompatible }) { config in
-                    APIKeyCard(config: config, model: model)
-                }
-                Button("Add Endpoint") {
-                    model.updateSettings { $0.providers.append(.custom()) }
-                }
-                .controlSize(.small)
-            } header: {
-                Text("Custom OpenAI-compatible endpoints")
-            }
+        } header: {
+            Text("Speech-to-text APIs")
         }
-        .formStyle(.grouped)
+        Section {
+            ForEach(configs { $0.preset == nil && $0.kind == .openAICompatible }) { config in
+                APIKeyCard(config: config, model: model)
+            }
+            Button("Add Endpoint") {
+                model.updateSettings { $0.providers.append(.custom()) }
+            }
+            .controlSize(.small)
+        } header: {
+            Text("Custom OpenAI-compatible endpoints")
+        }
     }
 
     private func configs(_ isIncluded: (ProviderConfig) -> Bool) -> [ProviderConfig] {
@@ -58,10 +42,12 @@ struct APIKeysSettingsView: View {
     }
 }
 
-/// A cloud provider's card: collapsed, its name; expanded, its key and Test, plus the base URL for Azure and custom
-/// endpoints, and a custom endpoint's name, authentication and Remove. No model fields and no enabled toggle: a cloud
-/// API is available once its key is saved.
-private struct APIKeyCard: View {
+/// A cloud provider's card: collapsed, its name, a checkmark once it is available, and "Base URL not set" for Azure or a
+/// custom endpoint without one (else a custom endpoint's base URL); expanded, its key and Test, plus the base URL for
+/// Azure and custom endpoints, and a custom endpoint's name, authentication and Remove; then its default model for each
+/// kind of work it can do (text generation, transcription, diarization, embedding). No enabled toggle: a cloud API is
+/// available once its key is saved.
+struct APIKeyCard: View {
     let config: ProviderConfig
     let model: AppModel
 
@@ -70,6 +56,13 @@ private struct APIKeyCard: View {
 
     private var isCustom: Bool { config.preset == nil }
     private var takesKey: Bool { CloudTranscription.needsKey(config) }
+    private var generatesText: Bool { [.openAICompatible, .anthropic].contains(config.kind) }
+    private var diarizes: Bool { CloudTranscription.diarizationPresets.contains(config.preset ?? "") }
+    /// The rule of `RAGSettingsView.embeddingConfigs` without the local hosts: OpenAI-compatible APIs with an
+    /// embeddings endpoint, custom endpoints included.
+    private var embeds: Bool {
+        config.kind == .openAICompatible && (config.preset.map(["openai", "gemini", "mistral", "azure"].contains) ?? true)
+    }
 
     var body: some View {
         disclosure
@@ -113,6 +106,8 @@ private struct APIKeyCard: View {
                         .inputColumn()
                 }
                 Divider()
+                models
+                Divider()
                 HStack(alignment: .top) {
                     testButton
                     Spacer()
@@ -122,18 +117,79 @@ private struct APIKeyCard: View {
                 }
                 .inputColumn()
             }
+            .fieldLabelColumn()
             .padding(.top, 6)
             .padding(.bottom, 4)
             .padding(.leading, TitleChevronDisclosureStyle.indent)
         } label: {
-            VStack(alignment: .leading, spacing: 2) {
-                Text(config.displayName.isEmpty ? String(localized: "Untitled") : config.displayName)
-                if isCustom && !config.baseURL.isEmpty {
-                    Text(config.baseURL).font(.caption).foregroundStyle(.secondary)
+            // Collapsed, it still says whether the provider is set up: its checkmark, or its missing base URL.
+            HStack {
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(config.displayName.isEmpty ? String(localized: "Untitled") : config.displayName)
+                    if (isCustom || config.id == "azure"),
+                       config.baseURL.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                        Text("Base URL not set").font(.caption).foregroundStyle(.secondary)
+                    } else if isCustom {
+                        Text(config.baseURL).font(.caption).foregroundStyle(.secondary)
+                    }
                 }
+                Spacer()
+                AvailabilityCheckmark(config: config, model: model)
             }
         }
         .disclosureGroupStyle(TitleChevronDisclosureStyle())
+    }
+
+    @ViewBuilder private var models: some View {
+        if generatesText {
+            ModelField(config: config, model: model, label: "Text generation model",
+                       prompt: config.id == "azure" ? "Deployment name" : "Model id") {
+                try await model.makeProvider(for: config)?.listModels() ?? []
+            }
+        }
+        if CloudTranscription.supports(config) {
+            VStack(alignment: .leading, spacing: 4) {
+                CloudModelField(config: config, model: model, label: "Transcription model")
+                CloudPriceBadge(config: config).inputColumn()
+                Text("Prices are approximate list prices per audio hour; the mic and system channels are sent and billed separately.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .inputColumn()
+                if config.preset == "gemini" {
+                    Text("LLM transcription — timestamps approximate.")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .inputColumn()
+                }
+                // A custom endpoint transcribes once its base URL and its model are set.
+                if isCustom, config.baseURL.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                    Text("Base URL not set")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .inputColumn()
+                }
+            }
+        }
+        if diarizes {
+            VStack(alignment: .leading, spacing: 4) {
+                CloudModelField(config: config, model: model, diarization: true, label: "Diarization model")
+                Text("Only the system channel is uploaded, as one extra transcription billed by the provider; only the speaker labels are kept. Not used when the transcription model already labels speakers. Prices are approximate list prices per audio hour.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .inputColumn()
+                if config.preset == "gemini" {
+                    Text("LLM diarization — timestamps approximate, speakers can be mislabeled.")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .inputColumn()
+                }
+            }
+        }
+        if embeds {
+            EmbeddingModelField(config: config, model: model)
+        }
     }
 
     /// A speech-to-text API, or an LLM without a model yet, checks its key with a free GET (no audio is uploaded, no
@@ -151,7 +207,7 @@ private struct APIKeyCard: View {
                 }
             }
         } else if config.defaultModel.trimmingCharacters(in: .whitespaces).isEmpty {
-            // No model yet (Azure, OpenRouter, a new custom endpoint; it is picked in AI › Cloud): the ping would fail
+            // No model yet (Azure, OpenRouter, a new custom endpoint; it is picked above): the ping would fail
             // on the missing model, so the key is checked with the model list instead, a free GET.
             TestButton(title: "Test", config: config, model: model, pendingKey: takesKey ? $pendingKey : nil) {
                 _ = try await model.makeProvider(for: config)?.listModels()
@@ -167,21 +223,106 @@ private struct APIKeyCard: View {
     }
 }
 
+/// A provider's embedding model for Library chat (`ProviderConfig.embeddingModel`), saved on Return, on leaving the
+/// field, or when the field goes away (its card collapsed, another tab or page shown: on macOS a click there does not
+/// take the focus first), so a typed model is not lost without Return. Not on each keystroke: each change restarts
+/// the index while the provider embeds it. "Load models" lists the ones that embed.
+struct EmbeddingModelField: View {
+    let config: ProviderConfig
+    let model: AppModel
+
+    @State private var text = ""
+    @State private var loaded: [String]?
+    @State private var loading = false
+    @State private var error: String?
+    @FocusState private var focused: Bool
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            FieldRow("Embedding model") {
+                TextField("Embedding model", text: $text, prompt: Text(
+                    RAGSettingsView.suggestedModels[config.preset ?? ""] ?? String(localized: "Embedding model id")))
+                    .labelsHidden()
+                    .focused($focused)
+                    .onSubmit(save)
+                    .onChange(of: focused) { _, focused in if !focused { save() } }
+                if let loaded, !loaded.isEmpty {
+                    Menu("\(loaded.count) models") {
+                        ForEach(loaded, id: \.self) { id in
+                            Button(id) {
+                                text = id
+                                save()
+                            }
+                        }
+                    }
+                    .fixedSize()
+                }
+                Button("Load models") { Task { await load() } }
+                    .disabled(loading)
+                if loading { ProgressView().controlSize(.small) }
+            }
+            if let error {
+                Text(error).font(.caption).foregroundStyle(.red).lineLimit(2).inputColumn()
+            } else if loaded?.isEmpty == true {
+                Text("No embedding models listed; type the model id.")
+                    .font(.caption).foregroundStyle(.secondary).inputColumn()
+            }
+        }
+        .onChange(of: config.embeddingModel, initial: true) { _, saved in text = saved }
+        .onDisappear {
+            // A removed local host is not brought back by its preset (`updateProvider`).
+            guard config.isCloud || model.settings.providers.contains(where: { $0.id == config.id }) else { return }
+            save()
+        }
+    }
+
+    private func save() {
+        let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        text = trimmed
+        guard trimmed != config.embeddingModel else { return }
+        model.updateProvider(id: config.id) { $0.embeddingModel = trimmed }
+    }
+
+    /// The provider's models that embed, by name: its chat models can't.
+    private func load() async {
+        loading = true
+        defer { loading = false }
+        do {
+            let all = try await model.makeProvider(for: config)?.listModels() ?? []
+            loaded = all.filter(RAGSettingsView.isEmbeddingModel).sorted()
+            error = nil
+        } catch {
+            self.error = shortMessage(error)
+        }
+    }
+}
+
 /// A cloud model card's key status, for the feature tabs: a checkmark once the provider is available (its key saved,
-/// or a custom endpoint without auth with its base URL set), and "API key", which opens its card in API Keys.
+/// or a custom endpoint without auth with its base URL set), and "API key", which opens its card in AI Providers › Cloud.
 struct APIKeyStatus: View {
     let config: ProviderConfig
     let model: AppModel
 
     var body: some View {
         HStack(spacing: 8) {
-            if isAvailable {
-                Label("Saved", systemImage: "checkmark.circle.fill")
-                    .labelStyle(.iconOnly)
-                    .foregroundStyle(.green)
-            }
+            AvailabilityCheckmark(config: config, model: model)
             Button("API key") { model.showAPIKey(for: config.id) }
                 .controlSize(.small)
+        }
+    }
+}
+
+/// A green checkmark once the provider is available: its key saved, or a custom endpoint without auth with its base
+/// URL set. Nothing otherwise.
+struct AvailabilityCheckmark: View {
+    let config: ProviderConfig
+    let model: AppModel
+
+    var body: some View {
+        if isAvailable {
+            Label("Saved", systemImage: "checkmark.circle.fill")
+                .labelStyle(.iconOnly)
+                .foregroundStyle(.green)
         }
     }
 
@@ -194,9 +335,23 @@ struct APIKeyStatus: View {
 
 // MARK: - Fields
 
-/// Width of the label column of an expanded row: every input starts at the same x.
-let fieldLabelWidth: CGFloat = 136
+/// Space between the label column of an expanded row and its inputs.
 let fieldGap: CGFloat = 12
+
+extension EnvironmentValues {
+    /// Width of the label column of an expanded row: every input starts at the same x. A card sets it to its widest
+    /// label (`fieldLabelColumn()`); elsewhere it stays 136.
+    @Entry var fieldLabelWidth: CGFloat = 136
+}
+
+/// The widest `FieldRow` label inside a `fieldLabelColumn()` container, at its ideal (untruncated) width.
+private struct FieldLabelWidthKey: PreferenceKey {
+    static let defaultValue: CGFloat = 0
+
+    static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) {
+        value = max(value, nextValue())
+    }
+}
 
 /// Where to get a preset's API key and look up its model ids; custom endpoints, local hosts and CLIs have none.
 let providerLinks: [String: (keys: URL, models: URL)] = [
@@ -231,7 +386,31 @@ let providerLinks: [String: (keys: URL, models: URL)] = [
 extension View {
     /// Lines a note, error or button row up with the inputs, past the label column.
     func inputColumn() -> some View {
-        padding(.leading, fieldLabelWidth + fieldGap)
+        modifier(InputColumn())
+    }
+
+    /// Sizes the label column of the `FieldRow`s inside to their widest label, so a card's inputs start just past its
+    /// own labels; `inputColumn()` follows it.
+    func fieldLabelColumn() -> some View {
+        modifier(FieldLabelColumn())
+    }
+}
+
+private struct InputColumn: ViewModifier {
+    @Environment(\.fieldLabelWidth) private var labelWidth
+
+    func body(content: Content) -> some View {
+        content.padding(.leading, labelWidth + fieldGap)
+    }
+}
+
+private struct FieldLabelColumn: ViewModifier {
+    @State private var width: CGFloat = 0
+
+    func body(content: Content) -> some View {
+        content
+            .environment(\.fieldLabelWidth, width)
+            .onPreferenceChange(FieldLabelWidthKey.self) { width = $0 }
     }
 }
 
@@ -257,11 +436,14 @@ struct ExternalLink: View {
     }
 }
 
-/// A secondary label in a fixed-width column, then the input stretched over the rest of the row, followed by its
-/// buttons. Plain labeled fields in the grouped form right-align their text or butt against the label.
+/// A secondary label in the label column (`fieldLabelWidth`, never truncated), then the input stretched over the rest
+/// of the row, followed by its buttons. Plain labeled fields in the grouped form right-align their text or butt
+/// against the label. The label reports its width to the enclosing `fieldLabelColumn()`.
 struct FieldRow<Input: View>: View {
     let label: LocalizedStringKey
     @ViewBuilder let input: Input
+
+    @Environment(\.fieldLabelWidth) private var labelWidth
 
     init(_ label: LocalizedStringKey, @ViewBuilder input: () -> Input) {
         self.label = label
@@ -272,7 +454,12 @@ struct FieldRow<Input: View>: View {
         HStack(alignment: .firstTextBaseline, spacing: fieldGap) {
             Text(label)
                 .foregroundStyle(.secondary)
-                .frame(width: fieldLabelWidth, alignment: .leading)
+                // Measured at its ideal width, so the column it sets does not feed back into it.
+                .fixedSize(horizontal: true, vertical: false)
+                .background(GeometryReader { proxy in
+                    Color.clear.preference(key: FieldLabelWidthKey.self, value: proxy.size.width)
+                })
+                .frame(minWidth: labelWidth, alignment: .leading)
             input.textFieldStyle(.roundedBorder)
         }
     }

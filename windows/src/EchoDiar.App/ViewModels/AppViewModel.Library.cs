@@ -378,7 +378,7 @@ public sealed partial class AppViewModel
     }
 
     /// <summary>
-    /// Removes one downloaded model (macOS <c>deleteModel</c>, Settings › Transcription's Delete); a model still
+    /// Removes one downloaded model (macOS <c>deleteModel</c>, AI Providers › Local AI's Delete); a model still
     /// downloading is left alone. A default model removed is no longer the default. Does nothing while an in-app AI job
     /// runs or waits: it may be using the model.
     /// </summary>
@@ -426,7 +426,9 @@ public sealed partial class AppViewModel
 
     private ModelsViewModel? _modelsModel;
 
-    /// <summary>What Settings › Transcription binds to; one for the app's lifetime.</summary>
+    /// <summary>
+    /// What Settings › Transcription and AI Providers › Local AI's model rows bind to; one for the app's lifetime.
+    /// </summary>
     public ModelsViewModel ModelsModel =>
         _modelsModel ??= new ModelsViewModel(this, _services.Models, _services.Engines.Keys.ToHashSet());
 }

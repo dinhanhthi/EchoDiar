@@ -174,7 +174,7 @@ public sealed partial class LiveTranscriptView : UserControl
     /// </summary>
     private static string RealtimeFailureText(string? kind, string name) => kind switch
     {
-        "auth" => Loc.Format("%@ rejected the API key. Check it in Settings › API Keys.", name),
+        "auth" => Loc.Format("%@ rejected the API key. Check it in Settings › AI Providers › Cloud.", name),
         "payment" => Loc.Format("%@ needs billing or credits on your account.", name),
         "plan_limit" => Loc.Format("Your %@ plan's limit on live sessions was reached.", name),
         "config" => Loc.Format("%@ doesn't support these settings or this language live.", name),

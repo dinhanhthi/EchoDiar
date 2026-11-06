@@ -15,6 +15,12 @@ namespace EchoDiar.App.ViewModels;
 public enum AIProviderKind { InApp, LocalHost, Cloud, Cli }
 
 /// <summary>
+/// Which AI default a job or menu uses (macOS <c>AppModel.AIPurpose</c>): summaries (and catch-ups) or chat (questions,
+/// library chat, chat titles).
+/// </summary>
+public enum AIPurpose { Summary, Chat }
+
+/// <summary>
 /// A provider the AI pickers offer (macOS <c>AppModel.AIProvider</c>): an in-app model (its catalog id) or a configured
 /// <see cref="ProviderConfig"/>. <see cref="Models"/> is what the model menu offers: the config's default model, then its
 /// shown models ("" is a CLI's own default). <see cref="UnavailableReason"/> says why it cannot run now (Windows AI).
@@ -49,10 +55,10 @@ public enum CLIState { Checking, NotInstalled, Found }
 public sealed record CLIStatus(CLIState State, string? Path = null, string? Version = null, bool InvalidOverride = false);
 
 /// <summary>
-/// The AI providers of Settings › AI and the AI pickers (macOS ProvidersSettingsView.swift state and AppModel's provider
-/// functions): the provider configs, their API keys (Credential Manager), Windows AI's availability, the local hosts
-/// found by a scan, the subscription CLIs found on PATH, the GGUF models of "On this PC" (macOS <c>mlxEntries</c>: download,
-/// cancel, delete), the providers the pickers offer and the default one. Registry,
+/// The AI providers of Settings › AI Providers, AI Settings and the AI pickers (macOS ProvidersSettingsView.swift state
+/// and AppModel's provider functions): the provider configs, their API keys (Credential Manager), Windows AI's
+/// availability, the local hosts found by a scan, the subscription CLIs found on PATH, the GGUF models of "On this PC"
+/// (macOS <c>mlxEntries</c>: download, cancel, delete), the providers the pickers offer and the default one. Registry,
 /// disk, process, credential and HTTP work runs off the UI thread; results come back on it. Lives as long as the app
 /// (<see cref="AppViewModel.ProvidersModel"/>); on the UI thread.
 /// </summary>
@@ -128,7 +134,6 @@ public sealed partial class ProvidersViewModel : ObservableObject
     {
         if (_app.IsClosing) return;
         OnPropertyChanged(nameof(AIProviders));
-        OnPropertyChanged(nameof(CurrentAIProvider));
         Changed?.Invoke();
     }
 
@@ -597,9 +602,12 @@ public sealed partial class ProvidersViewModel : ObservableObject
                     if (id.Length > 0 && !models.Contains(id)) models.Add(id);
                 }
                 if (kind == AIProviderKind.Cli && config.DefaultModel.Trim().Length == 0) models.Insert(0, "");
-                // The picked model stays listed, also once it is unchecked in Settings.
-                if (config.Id == Settings.DefaultAIProviderID && Settings.DefaultAIModel is { Length: > 0 } picked
-                    && !models.Contains(picked)) models.Add(picked);
+                // The picked models stay listed, also once unchecked in Settings.
+                foreach (var purpose in new[] { AIPurpose.Summary, AIPurpose.Chat })
+                {
+                    var (providerID, picked) = AIDefault(purpose);
+                    if (config.Id == providerID && picked is { Length: > 0 } && !models.Contains(picked)) models.Add(picked);
+                }
                 providers.Add(new AIProviderInfo(
                     config.Id, config.DisplayName, kind, config.DefaultModel, models,
                     CliPreset: kind == AIProviderKind.Cli ? CLIPresets.FromSlug(config.Preset) : null,
@@ -609,30 +617,43 @@ public sealed partial class ProvidersViewModel : ObservableObject
         }
     }
 
-    /// <summary>
-    /// The default provider when it can run, else the first one that can and is not in
-    /// <see cref="AppSettings.AutoExcludedProviderIDs"/> (macOS <c>currentAIProvider</c>).
-    /// </summary>
-    public AIProviderInfo? CurrentAIProvider
+    /// <summary>The settings pair (provider id, model) holding <paramref name="purpose"/>'s default (macOS <c>aiDefault</c>).</summary>
+    private (string? ProviderID, string? Model) AIDefault(AIPurpose purpose) => purpose switch
     {
-        get
-        {
-            var usable = AIProviders.Where(p => p.UnavailableReason is null).ToList();
-            return usable.FirstOrDefault(p => p.Id == Settings.DefaultAIProviderID)
-                ?? usable.FirstOrDefault(p => !Settings.AutoExcludedProviderIDs.Contains(p.Id));
-        }
+        AIPurpose.Chat => (Settings.ChatAIProviderID, Settings.ChatAIModel),
+        _ => (Settings.SummaryAIProviderID, Settings.SummaryAIModel),
+    };
+
+    /// <summary>
+    /// <paramref name="purpose"/>'s default provider when it can run, else the first one that can and is not in
+    /// <see cref="AppSettings.AutoExcludedProviderIDs"/> (macOS <c>currentAIProvider(for:)</c>).
+    /// </summary>
+    public AIProviderInfo? CurrentAIProvider(AIPurpose purpose)
+    {
+        var usable = AIProviders.Where(p => p.UnavailableReason is null).ToList();
+        var providerID = AIDefault(purpose).ProviderID;
+        return usable.FirstOrDefault(p => p.Id == providerID)
+            ?? usable.FirstOrDefault(p => !Settings.AutoExcludedProviderIDs.Contains(p.Id));
     }
 
-    /// <summary>The saved model for the default provider, else the provider's own (macOS <c>aiModel(for:)</c>).</summary>
-    public string AIModelFor(AIProviderInfo provider) =>
-        provider.Id == Settings.DefaultAIProviderID && Settings.DefaultAIModel is { Length: > 0 } model ? model : provider.DefaultModel;
-
-    /// <summary>The model picked for the next summaries and questions (macOS <c>setAIModel</c>).</summary>
-    public void SetAIModel(string model, AIProviderInfo provider) => _app.ApplySettings(Settings with
+    /// <summary>
+    /// The saved model of <paramref name="purpose"/>'s default provider, else the provider's own (macOS
+    /// <c>aiModel(for:purpose:)</c>).
+    /// </summary>
+    public string AIModelFor(AIProviderInfo provider, AIPurpose purpose)
     {
-        DefaultAIProviderID = provider.Id,
-        DefaultAIModel = model == provider.DefaultModel ? null : model,
-    });
+        var (providerID, model) = AIDefault(purpose);
+        return provider.Id == providerID && model is { Length: > 0 } ? model : provider.DefaultModel;
+    }
+
+    /// <summary>The model picked for the next jobs of <paramref name="purpose"/> (macOS <c>setAIModel(_:of:purpose:)</c>).</summary>
+    public void SetAIModel(string model, AIProviderInfo provider, AIPurpose purpose)
+    {
+        var saved = model == provider.DefaultModel ? null : model;
+        _app.ApplySettings(purpose == AIPurpose.Chat
+            ? Settings with { ChatAIProviderID = provider.Id, ChatAIModel = saved }
+            : Settings with { SummaryAIProviderID = provider.Id, SummaryAIModel = saved });
+    }
 
     /// <summary>The language of summaries and answers: "auto" or a language code.</summary>
     public string SummaryLanguage

@@ -329,8 +329,9 @@ struct AIPanelView: View {
 
     // MARK: - Summary
 
-    /// The summary with the version menu pinned above it, then the catch-ups if any; a note in the middle while there
-    /// are neither.
+    /// The summary with the version menu pinned above it, then the Catch-ups bar pinned at the bottom if there are
+    /// catch-ups; a note in the middle while there are neither. The open catch-ups take half the tab beside a summary
+    /// (shown or being written), else the whole of it.
     private var summaryPane: some View {
         Group {
             if summaryJob == nil && summaries.isEmpty && catchUps.isEmpty {
@@ -340,43 +341,48 @@ struct AIPanelView: View {
                     .padding(20)
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
             } else {
+                let hasSummary = summaryJob != nil || shownSummary != nil
                 VStack(alignment: .leading, spacing: 0) {
-                    if summaryJob == nil, let shown = shownSummary {
-                        versionMenu(shown)
-                            .padding(.horizontal, 14)
-                            .padding(.top, 16)
-                    }
-                    ScrollView {
-                        VStack(alignment: .leading, spacing: 8) {
-                            if summaryJob != nil {
-                                // Until the first text: a remote provider sends no status before it.
-                                if let text = jobText {
-                                    MarkdownText(text: text)
-                                } else {
-                                    HStack(spacing: 6) {
-                                        ProgressView().controlSize(.small)
-                                        Text(jobStatus ?? String(localized: "Writing the summary…"))
-                                            .foregroundStyle(.secondary)
-                                    }
-                                }
-                            } else if let shown = shownSummary {
-                                MarkdownText(text: shown.text)
-                            } else {
-                                Text(emptyNote ?? "No summary yet.")
-                                    .foregroundStyle(.secondary)
-                            }
-                            if !catchUps.isEmpty {
-                                catchUpsSection
-                                    .padding(.top, 12)
-                            }
+                    if !(showingCatchUps && !catchUps.isEmpty && !hasSummary) {
+                        if summaryJob == nil, let shown = shownSummary {
+                            versionMenu(shown)
+                                .padding(.horizontal, 14)
+                                .padding(.top, 16)
                         }
-                        .padding(.horizontal, 14)
-                        // Below the version menu (shown while no summary is being written), its gap stays as it was.
-                        .padding(.top, summaryJob == nil ? 10 : 16)
-                        .padding(.bottom, 16)
-                        .frame(maxWidth: .infinity, alignment: .leading)
+                        ScrollView {
+                            VStack(alignment: .leading, spacing: 8) {
+                                if summaryJob != nil {
+                                    // Until the first text: a remote provider sends no status before it.
+                                    if let text = jobText {
+                                        MarkdownText(text: text)
+                                    } else {
+                                        HStack(spacing: 6) {
+                                            ProgressView().controlSize(.small)
+                                            Text(jobStatus ?? String(localized: "Writing the summary…"))
+                                                .foregroundStyle(.secondary)
+                                        }
+                                    }
+                                } else if let shown = shownSummary {
+                                    MarkdownText(text: shown.text)
+                                } else {
+                                    Text(emptyNote ?? "No summary yet.")
+                                        .foregroundStyle(.secondary)
+                                }
+                            }
+                            .padding(.horizontal, 14)
+                            // Below the version menu (shown while no summary is being written), its gap stays as
+                            // it was.
+                            .padding(.top, summaryJob == nil ? 10 : 16)
+                            .padding(.bottom, 16)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                        }
+                        .frame(maxHeight: .infinity)
+                    }
+                    if !catchUps.isEmpty {
+                        catchUpsSection
                     }
                 }
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
@@ -422,41 +428,54 @@ struct AIPanelView: View {
             .joined(separator: " · ")
     }
 
-    /// The catch-ups written while recording, read-only and collapsed until its header is clicked: newest first, the
-    /// newest open and the others collapsed, each opening or closing with a click on its header, each with Copy.
-    private var catchUpsSection: some View {
-        VStack(alignment: .leading, spacing: 6) {
-            Button {
-                withAnimation(reduceMotion ? nil : Motion.standard) { showingCatchUps.toggle() }
-            } label: {
-                HStack(spacing: 6) {
-                    Image(systemName: showingCatchUps ? "chevron.down" : "chevron.right")
-                        .font(.system(size: 10, weight: .bold))
-                        .frame(width: 12)
-                        .foregroundStyle(.secondary)
-                    Text("Catch-ups").font(.headline)
-                    Text(catchUps.count, format: .number)
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                    Spacer(minLength: 0)
-                }
-                .contentShape(Rectangle())
+    /// The catch-ups written while recording, read-only and collapsed until the bar is clicked: newest first, the
+    /// newest open and the others collapsed, each opening or closing with a click on its header, each with Copy. The
+    /// open list scrolls on its own. No stack of its own: the bar and the list sit in the tab's stack, so beside a
+    /// summary the two scrollers share the height equally (as Windows' star rows), else the list takes it all.
+    @ViewBuilder private var catchUpsSection: some View {
+        Divider()
+        Button {
+            withAnimation(reduceMotion ? nil : Motion.standard) { showingCatchUps.toggle() }
+        } label: {
+            HStack(spacing: 6) {
+                Image(systemName: showingCatchUps ? "chevron.down" : "chevron.right")
+                    .font(.system(size: 10, weight: .bold))
+                    .frame(width: 12)
+                    .foregroundStyle(.secondary)
+                Text("Catch-ups").font(.headline)
+                Text(catchUps.count, format: .number)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                Spacer(minLength: 0)
             }
-            .buttonStyle(.plain)
-            .accessibilityValue(showingCatchUps ? Text("Expanded") : Text("Collapsed"))
-            if showingCatchUps {
-                let providers = model.aiProviders
-                ForEach(Array(catchUps.reversed().enumerated()), id: \.element.id) { index, catchUp in
-                    let open = catchUpOpenStates[catchUp.id] ?? (index == 0)
-                    CatchUpCardView(
-                        card: CatchUpCard(catchUp, providers: providers),
-                        open: open,
-                        toggle: {
-                            withAnimation(reduceMotion ? nil : Motion.standard) { catchUpOpenStates[catchUp.id] = !open }
-                        },
-                        stop: {})
+            .padding(.horizontal, 14)
+            .padding(.vertical, 10)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .accessibilityValue(showingCatchUps ? Text("Expanded") : Text("Collapsed"))
+        if showingCatchUps {
+            ScrollView {
+                VStack(alignment: .leading, spacing: 6) {
+                    let providers = model.aiProviders
+                    ForEach(Array(catchUps.reversed().enumerated()), id: \.element.id) { index, catchUp in
+                        let open = catchUpOpenStates[catchUp.id] ?? (index == 0)
+                        CatchUpCardView(
+                            card: CatchUpCard(catchUp, providers: providers),
+                            open: open,
+                            toggle: {
+                                withAnimation(reduceMotion ? nil : Motion.standard) {
+                                    catchUpOpenStates[catchUp.id] = !open
+                                }
+                            },
+                            stop: {})
+                    }
                 }
+                .padding(.horizontal, 14)
+                .padding(.bottom, 16)
+                .frame(maxWidth: .infinity, alignment: .leading)
             }
+            .frame(maxHeight: .infinity)
         }
     }
 
@@ -485,7 +504,7 @@ struct AIPanelView: View {
             busyElsewhere
             if model.detailTab == .chat {
                 HStack(spacing: 8) {
-                    AIModelMenu(model: model, height: Self.chatMenuHeight)
+                    AIModelMenu(model: model, purpose: .chat, height: Self.chatMenuHeight)
                     AILanguageMenu(model: model, height: Self.chatMenuHeight)
                     dataNotesButton(height: Self.chatMenuHeight)
                     freshChatButton
@@ -501,7 +520,7 @@ struct AIPanelView: View {
                 questionRow
             } else {
                 HStack(spacing: 8) {
-                    AIModelMenu(model: model, height: Self.inputHeight)
+                    AIModelMenu(model: model, purpose: .summary, height: Self.inputHeight)
                     dataNotesButton(height: Self.inputHeight)
                     AILanguageMenu(model: model, height: Self.inputHeight)
                     Spacer(minLength: 0)
@@ -524,7 +543,7 @@ struct AIPanelView: View {
                     }
                 }
             }
-            AISetupHints(model: model)
+            AISetupHints(model: model, purpose: purpose)
                 .font(.caption)
                 .foregroundStyle(.secondary)
         }
@@ -626,9 +645,9 @@ struct AIPanelView: View {
                   : "Copy the transcript as a summary prompt for any chat app")
     }
 
-    /// Where the data goes with the current provider: off this Mac, and how far a CLI agent is contained.
+    /// Where the data goes with the tab's provider: off this Mac, and how far a CLI agent is contained.
     @ViewBuilder private var dataNotes: some View {
-        let provider = model.currentAIProvider
+        let provider = model.currentAIProvider(for: purpose)
         if let note = provider?.leavesMacNote {
             Label(note, systemImage: "info.circle")
         }
@@ -638,11 +657,11 @@ struct AIPanelView: View {
     }
 
     private var containmentNote: String? {
-        model.currentAIProvider?.containmentNote
+        model.currentAIProvider(for: purpose)?.containmentNote
     }
 
     private var hasDataNotes: Bool {
-        model.currentAIProvider?.leavesMac == true || containmentNote != nil
+        model.currentAIProvider(for: purpose)?.leavesMac == true || containmentNote != nil
     }
 
     @ViewBuilder private var toastView: some View {
@@ -658,9 +677,14 @@ struct AIPanelView: View {
 
     // MARK: - State
 
-    /// The current provider's picked model ("" = a CLI's own default).
+    /// The bottom bar's tab: Chat's questions use the chat default, the Summary tab the summary default.
+    private var purpose: AppModel.AIPurpose {
+        model.detailTab == .chat ? .chat : .summary
+    }
+
+    /// The chat provider's picked model ("" = a CLI's own default), shown on the streaming answer.
     private var currentModel: String? {
-        model.currentAIProvider.map(model.aiModel(for:))
+        model.currentAIProvider(for: .chat).map { model.aiModel(for: $0, purpose: .chat) }
     }
 
     private var summaryJob: AppModel.AIJobs.Entry? {
@@ -685,7 +709,8 @@ struct AIPanelView: View {
 
     /// As `startAIJob`'s guard: one job per conversation; other conversations' jobs do not block it.
     private var canRun: Bool {
-        model.aiJobs.entry(for: conversation.id) == nil && transcript != nil && model.currentAIProvider != nil
+        model.aiJobs.entry(for: conversation.id) == nil && transcript != nil
+            && model.currentAIProvider(for: purpose) != nil
     }
 
     private func load() async {
@@ -720,10 +745,11 @@ struct AIPanelView: View {
     }
 
     private func start(_ kind: AppModel.AIJob.Kind) {
-        guard let transcript, let provider = model.currentAIProvider else { return }
+        let purpose: AppModel.AIPurpose = kind == .summary ? .summary : .chat
+        guard let transcript, let provider = model.currentAIProvider(for: purpose) else { return }
         model.startAIJob(
             kind, conversation: conversation, transcript: transcript, summary: summary, history: chat,
-            provider: provider, model: model.aiModel(for: provider))
+            provider: provider, model: model.aiModel(for: provider, purpose: purpose))
     }
 
     private func ask() {
@@ -783,9 +809,10 @@ struct AIPanelView: View {
 }
 
 /// Every provider with the models it offers, on this Mac first; Foundation Models shows why it cannot run (the AI
-/// pane's bottom bar and the global chat's).
+/// pane's bottom bar and the global chat's). Shows and edits `purpose`'s default.
 struct AIModelMenu: View {
     let model: AppModel
+    let purpose: AppModel.AIPurpose
     let height: CGFloat
 
     var body: some View {
@@ -815,13 +842,13 @@ struct AIModelMenu: View {
         }
         .modifier(CompactMenu(maxWidth: 180, height: height))
         .layoutPriority(1)
-        .help("Model for summaries and questions")
+        .help(purpose == .summary ? Text("Model for summaries") : Text("Model for questions"))
     }
 
     private func modelItem(_ provider: AppModel.AIProvider, _ id: String, title: String) -> some View {
         Toggle(isOn: Binding(
-            get: { model.currentAIProvider?.id == provider.id && currentModel == id },
-            set: { if $0 { model.setAIModel(id, of: provider) } }
+            get: { model.currentAIProvider(for: purpose)?.id == provider.id && currentModel == id },
+            set: { if $0 { model.setAIModel(id, of: provider, purpose: purpose) } }
         )) {
             Text(title)
             if let reason = provider.unavailableReason { Text(reason) }
@@ -830,15 +857,15 @@ struct AIModelMenu: View {
     }
 
     private var modelTitle: String {
-        guard let provider = model.currentAIProvider else { return String(localized: "No AI model") }
+        guard let provider = model.currentAIProvider(for: purpose) else { return String(localized: "No AI model") }
         guard provider.kind != .inApp else { return provider.name }
         let id = currentModel ?? ""
         return id.isEmpty ? provider.name : id
     }
 
-    /// The current provider's picked model ("" = a CLI's own default).
+    /// `purpose`'s provider's picked model ("" = a CLI's own default).
     private var currentModel: String? {
-        model.currentAIProvider.map(model.aiModel(for:))
+        model.currentAIProvider(for: purpose).map { model.aiModel(for: $0, purpose: purpose) }
     }
 }
 
@@ -849,14 +876,8 @@ struct AILanguageMenu: View {
 
     var body: some View {
         Menu {
-            Picker("Language", selection: languageBinding) {
-                Text("Auto").tag("auto")
-                Text("English").tag("en")
-                Text("French").tag("fr")
-                Text("Vietnamese").tag("vi")
-                if !["auto", "en", "fr", "vi"].contains(model.settings.summaryLanguage) {
-                    Text(model.settings.summaryLanguage).tag(model.settings.summaryLanguage)
-                }
+            Picker("Language", selection: Self.languageBinding(model)) {
+                Self.options(model.settings.summaryLanguage)
             }
             .pickerStyle(.inline)
             .labelsHidden()
@@ -867,7 +888,20 @@ struct AILanguageMenu: View {
         .help("Language of summaries and answers (Auto = the transcript's language for summaries, the question's for answers)")
     }
 
-    private var languageBinding: Binding<String> {
+    /// The languages offered, then `current` when it is none of them (also Settings › AI Settings' "AI answer
+    /// language").
+    @ViewBuilder
+    static func options(_ current: String) -> some View {
+        Text("Auto").tag("auto")
+        Text("English").tag("en")
+        Text("French").tag("fr")
+        Text("Vietnamese").tag("vi")
+        if !["auto", "en", "fr", "vi"].contains(current) {
+            Text(current).tag(current)
+        }
+    }
+
+    static func languageBinding(_ model: AppModel) -> Binding<String> {
         Binding(get: { model.settings.summaryLanguage }, set: { value in model.updateSettings { $0.summaryLanguage = value } })
     }
 }
@@ -889,13 +923,14 @@ struct AIMenuLabel: View {
     }
 }
 
-/// Why no model can run: no provider set up, and why Foundation Models is unavailable.
+/// Why no model can run for `purpose`: no provider set up, and why Foundation Models is unavailable.
 struct AISetupHints: View {
     let model: AppModel
+    let purpose: AppModel.AIPurpose
 
     var body: some View {
-        if model.currentAIProvider == nil {
-            Label("No AI model: set up a provider or download a model in Settings › AI.",
+        if model.currentAIProvider(for: purpose) == nil {
+            Label("No AI model: set up a provider or download a model in Settings › AI Providers.",
                   systemImage: "exclamationmark.triangle")
             if let reason = AppModel.foundationModelsUnavailableReason {
                 Label(reason, systemImage: "info.circle")

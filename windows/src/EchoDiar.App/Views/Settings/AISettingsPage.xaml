@@ -1,0 +1,236 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    Settings › AI Settings (macOS AISettingsView.swift), one panel per inner tab picked in the title bar:
+    - Chat: the chat model (macOS AIModelPicker, purpose chat), the chat context and the AI answer language.
+    - Summary: the summary model (purpose summary) and the AI answer language (the same setting as Chat's).
+    - Catch-up (macOS catchUpSection): where "Catch up" runs while recording; pickers filled in code.
+    - Transcription (macOS AISettingsView transcription): the default transcription model and the default diarization
+      model (DefaultEnginePicker, made in code), the same settings as Settings › Transcription's.
+    - Library chat: RAGSettingsPage (macOS RAGSettingsView), placed in code.
+    The providers themselves are set up in AI Providers. Each searchable element's Tag is its search entry's title
+    (SearchEntries), so a search result can bring it into view; the Summary tab's language card is found as Chat's is,
+    as the search looks among the shown rows only.
+-->
+<UserControl
+    x:Class="EchoDiar.App.Views.AISettingsPage"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:controls="using:CommunityToolkit.WinUI.Controls"
+    xmlns:local="using:EchoDiar.App">
+
+    <UserControl.Resources>
+        <Style x:Key="SectionDescriptionStyle" TargetType="TextBlock">
+            <Setter Property="Foreground" Value="{ThemeResource TextFillColorSecondaryBrush}" />
+            <Setter Property="TextWrapping" Value="Wrap" />
+        </Style>
+        <Style
+            x:Key="NoteStyle"
+            BasedOn="{StaticResource CaptionTextBlockStyle}"
+            TargetType="TextBlock">
+            <Setter Property="Foreground" Value="{ThemeResource TextFillColorSecondaryBrush}" />
+            <Setter Property="TextWrapping" Value="Wrap" />
+        </Style>
+        <!-- The default engine pickers' cloud caution (DefaultEnginePicker), as in TranscriptionSettingsPage.xaml. -->
+        <Style
+            x:Key="CautionNoteStyle"
+            BasedOn="{StaticResource NoteStyle}"
+            TargetType="TextBlock">
+            <Setter Property="Foreground" Value="{ThemeResource SystemFillColorCautionBrush}" />
+        </Style>
+        <Style x:Key="CautionIconStyle" TargetType="FontIcon">
+            <Setter Property="FontSize" Value="12" />
+            <Setter Property="Foreground" Value="{ThemeResource SystemFillColorCautionBrush}" />
+        </Style>
+        <Style x:Key="SuccessIconStyle" TargetType="FontIcon">
+            <Setter Property="FontSize" Value="14" />
+            <Setter Property="VerticalAlignment" Value="Center" />
+            <Setter Property="Foreground" Value="{ThemeResource SystemFillColorSuccessBrush}" />
+        </Style>
+        <Style x:Key="NoticeIconStyle" TargetType="FontIcon">
+            <Setter Property="FontSize" Value="14" />
+            <Setter Property="VerticalAlignment" Value="Center" />
+            <Setter Property="Foreground" Value="{ThemeResource TextFillColorSecondaryBrush}" />
+        </Style>
+    </UserControl.Resources>
+
+    <Grid>
+        <ScrollViewer x:Name="FormScroller">
+            <Grid MaxWidth="1000" Margin="24,12,24,24">
+
+                <!-- Chat (macOS chatSection) -->
+                <StackPanel x:Name="ChatPanel" Spacing="4">
+                    <controls:SettingsCard
+                        Description="{local:T Text='Used for questions in the Chat tab and Library chat. The model menu in the Chat tab changes it too.'}"
+                        Header="{local:T Text='Chat model'}"
+                        Tag="Chat model">
+                        <ComboBox
+                            x:Name="ChatModelCombo"
+                            MinWidth="260"
+                            MaxWidth="420"
+                            AutomationProperties.Name="{local:T Text='Chat model'}"
+                            PlaceholderText="{local:T Text='No AI model'}" />
+                    </controls:SettingsCard>
+                    <controls:SettingsCard
+                        Description="{local:T Text='Earlier messages sent with each question.'}"
+                        Header="{local:T Text='Chat context'}"
+                        Tag="Chat context">
+                        <ComboBox
+                            x:Name="ChatContextCombo"
+                            MinWidth="160"
+                            AutomationProperties.Name="{local:T Text='Chat context'}" />
+                    </controls:SettingsCard>
+                    <!-- The description has apostrophes: set in code. -->
+                    <controls:SettingsCard
+                        x:Name="ChatLanguageCard"
+                        Header="{local:T Text='AI answer language'}"
+                        Tag="AI answer language">
+                        <ComboBox
+                            x:Name="ChatLanguageCombo"
+                            MinWidth="160"
+                            AutomationProperties.Name="{local:T Text='AI answer language'}" />
+                    </controls:SettingsCard>
+                </StackPanel>
+
+                <!-- Summary (macOS summarySection) -->
+                <StackPanel
+                    x:Name="SummaryPanel"
+                    Spacing="4"
+                    Visibility="Collapsed">
+                    <controls:SettingsCard
+                        Description="{local:T Text='Used for new summaries. The model menu in the Summary tab changes it too.'}"
+                        Header="{local:T Text='Summary model'}"
+                        Tag="Summary model">
+                        <ComboBox
+                            x:Name="SummaryModelCombo"
+                            MinWidth="260"
+                            MaxWidth="420"
+                            AutomationProperties.Name="{local:T Text='Summary model'}"
+                            PlaceholderText="{local:T Text='No AI model'}" />
+                    </controls:SettingsCard>
+                    <!-- The description has apostrophes: set in code. -->
+                    <controls:SettingsCard
+                        x:Name="SummaryLanguageCard"
+                        Header="{local:T Text='AI answer language'}"
+                        Tag="AI answer language">
+                        <ComboBox
+                            x:Name="SummaryLanguageCombo"
+                            MinWidth="160"
+                            AutomationProperties.Name="{local:T Text='AI answer language'}" />
+                    </controls:SettingsCard>
+                </StackPanel>
+
+                <!-- Catch-up (macOS catchUpSection): where "Catch up" runs while recording; pickers filled in code. -->
+                <StackPanel
+                    x:Name="CatchUpPanel"
+                    Spacing="4"
+                    Visibility="Collapsed">
+                    <StackPanel Margin="1,4,0,4" Spacing="2" Tag="Catch-up">
+                        <TextBlock Style="{StaticResource BodyStrongTextBlockStyle}" Text="{local:T Text='Catch-up'}" />
+                        <TextBlock Style="{StaticResource SectionDescriptionStyle}" Text="{local:T Text='Quick summaries of the meeting so far, asked for while recording.'}" />
+                    </StackPanel>
+                    <controls:SettingsCard Header="{local:T Text='Catch-up provider'}" Tag="Catch-up provider">
+                        <ComboBox
+                            x:Name="CatchUpProviderCombo"
+                            MinWidth="260"
+                            MaxWidth="420"
+                            AutomationProperties.Name="{local:T Text='Catch-up provider'}" />
+                    </controls:SettingsCard>
+                    <!-- The picker when a provider is picked; with Automatic, the Summary model as text (description set in code). -->
+                    <controls:SettingsCard
+                        x:Name="CatchUpModelCard"
+                        Header="{local:T Text='Catch-up model'}"
+                        Tag="Catch-up model">
+                        <Grid>
+                            <ComboBox
+                                x:Name="CatchUpModelCombo"
+                                MinWidth="260"
+                                MaxWidth="420"
+                                AutomationProperties.Name="{local:T Text='Catch-up model'}"
+                                Visibility="Collapsed" />
+                            <TextBlock
+                                x:Name="CatchUpModelAutoText"
+                                VerticalAlignment="Center"
+                                Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                        </Grid>
+                    </controls:SettingsCard>
+                    <!-- A picked cloud API: its key status (header and content set in code). -->
+                    <controls:SettingsCard x:Name="CatchUpKeyCard" Visibility="Collapsed" />
+                    <!-- As the AI pane's data notes, for the provider a catch-up runs on. -->
+                    <Grid
+                        x:Name="CatchUpLeavesRow"
+                        Margin="1,4,0,0"
+                        ColumnSpacing="8"
+                        Visibility="Collapsed">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="*" />
+                        </Grid.ColumnDefinitions>
+                        <FontIcon Glyph="&#xE946;" Style="{StaticResource NoticeIconStyle}" />
+                        <TextBlock
+                            x:Name="CatchUpLeavesText"
+                            Grid.Column="1"
+                            Style="{StaticResource NoteStyle}" />
+                    </Grid>
+                    <Grid
+                        x:Name="CatchUpContainmentRow"
+                        Margin="1,4,0,0"
+                        ColumnSpacing="8"
+                        Visibility="Collapsed">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="*" />
+                        </Grid.ColumnDefinitions>
+                        <FontIcon Glyph="&#xEA18;" Style="{StaticResource NoticeIconStyle}" />
+                        <TextBlock
+                            x:Name="CatchUpContainmentText"
+                            Grid.Column="1"
+                            Style="{StaticResource NoteStyle}" />
+                    </Grid>
+                    <TextBlock
+                        x:Name="CatchUpNoProviderText"
+                        Margin="1,4,0,0"
+                        Style="{StaticResource NoteStyle}"
+                        Text="{local:T Text='Catch up needs an AI provider outside the app: a cloud API, a local server or a command-line tool. Add one in Settings › AI Providers.'}"
+                        Visibility="Collapsed" />
+                    <controls:SettingsCard
+                        Description="{local:T Text='Off: each catch-up adds what was said since the previous one. On: each one reads the whole recording again.'}"
+                        Header="{local:T Text='Re-summarize from the start each time'}"
+                        Tag="Re-summarize from the start each time">
+                        <ToggleSwitch x:Name="CatchUpFromStartToggle" AutomationProperties.Name="{local:T Text='Re-summarize from the start each time'}" />
+                    </controls:SettingsCard>
+                    <Grid Margin="1,4,0,0" ColumnSpacing="8">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="*" />
+                        </Grid.ColumnDefinitions>
+                        <FontIcon Glyph="&#xE946;" Style="{StaticResource NoticeIconStyle}" />
+                        <TextBlock
+                            Grid.Column="1"
+                            Style="{StaticResource NoteStyle}"
+                            Text="{local:T Text='In-app models are not offered: the live transcript holds the model during a recording.'}" />
+                    </Grid>
+                </StackPanel>
+
+                <!-- Transcription (macOS AISettingsView transcription): the default engine pickers, made in code. -->
+                <StackPanel
+                    x:Name="TranscriptionPanel"
+                    Spacing="4"
+                    Visibility="Collapsed">
+                    <TextBlock
+                        Margin="1,4,0,4"
+                        Style="{StaticResource BodyStrongTextBlockStyle}"
+                        Text="{local:T Text='Transcription model'}" />
+                    <StackPanel x:Name="TranscriptionModelHost" />
+                    <TextBlock
+                        Margin="1,24,0,4"
+                        Style="{StaticResource BodyStrongTextBlockStyle}"
+                        Text="{local:T Text='Speakers'}" />
+                    <StackPanel x:Name="DiarizationModelHost" />
+                </StackPanel>
+            </Grid>
+        </ScrollViewer>
+
+        <!-- Library chat: the RAG page (it scrolls on its own), placed in code. -->
+        <Grid x:Name="LibraryHost" Visibility="Collapsed" />
+    </Grid>
+</UserControl>

@@ -5,7 +5,8 @@
     has a term, the sidebar lists only the sections with a matching row, none selected, and the right side lists the
     matching rows (macOS SettingsSearchResults); a row opens its section and inner tab and clears the search.
     A NavigationView in Left mode, pane always open: it sits below the custom title bar, so it never draws its own. Its
-    content area draws no layer of its own: it sits on the window body's layer, like the other pages.
+    content area draws no layer of its own: it sits on the window body's layer, like the other pages. The selected
+    section is an accent capsule, like macOS.
 -->
 <UserControl
     x:Class="EchoDiar.App.Views.SettingsPage"
@@ -25,8 +26,54 @@
         PaneDisplayMode="Left">
 
         <NavigationView.Resources>
-            <SolidColorBrush x:Key="NavigationViewContentBackground" Color="Transparent" />
-            <Thickness x:Key="NavigationViewContentGridBorderThickness">0</Thickness>
+            <ResourceDictionary>
+                <!--
+                    The selected section is an accent capsule (macOS: accent capsule, white icon and title): the item
+                    brushes of WinUI's NavigationView theme resources, in the accent, with no left pill bar. The text on
+                    the accent follows Fluent (TextOnAccentFillColor*). High contrast keeps WinUI's own values.
+                -->
+                <ResourceDictionary.ThemeDictionaries>
+                    <ResourceDictionary x:Key="Default">
+                        <SolidColorBrush x:Key="NavigationViewItemBackgroundSelected" Color="{ThemeResource SystemAccentColorLight2}" />
+                        <SolidColorBrush x:Key="NavigationViewItemBackgroundSelectedPointerOver" Opacity="0.9" Color="{ThemeResource SystemAccentColorLight2}" />
+                        <SolidColorBrush x:Key="NavigationViewItemBackgroundSelectedPressed" Opacity="0.8" Color="{ThemeResource SystemAccentColorLight2}" />
+                        <SolidColorBrush x:Key="NavigationViewItemForegroundSelected" Color="{ThemeResource TextOnAccentFillColorPrimary}" />
+                        <SolidColorBrush x:Key="NavigationViewItemForegroundSelectedPointerOver" Color="{ThemeResource TextOnAccentFillColorPrimary}" />
+                        <SolidColorBrush x:Key="NavigationViewItemForegroundSelectedPressed" Color="{ThemeResource TextOnAccentFillColorSecondary}" />
+                        <SolidColorBrush x:Key="NavigationViewSelectionIndicatorForeground" Color="Transparent" />
+                    </ResourceDictionary>
+                    <ResourceDictionary x:Key="Light">
+                        <SolidColorBrush x:Key="NavigationViewItemBackgroundSelected" Color="{ThemeResource SystemAccentColorDark1}" />
+                        <SolidColorBrush x:Key="NavigationViewItemBackgroundSelectedPointerOver" Opacity="0.9" Color="{ThemeResource SystemAccentColorDark1}" />
+                        <SolidColorBrush x:Key="NavigationViewItemBackgroundSelectedPressed" Opacity="0.8" Color="{ThemeResource SystemAccentColorDark1}" />
+                        <SolidColorBrush x:Key="NavigationViewItemForegroundSelected" Color="{ThemeResource TextOnAccentFillColorPrimary}" />
+                        <SolidColorBrush x:Key="NavigationViewItemForegroundSelectedPointerOver" Color="{ThemeResource TextOnAccentFillColorPrimary}" />
+                        <SolidColorBrush x:Key="NavigationViewItemForegroundSelectedPressed" Color="{ThemeResource TextOnAccentFillColorSecondary}" />
+                        <SolidColorBrush x:Key="NavigationViewSelectionIndicatorForeground" Color="Transparent" />
+                    </ResourceDictionary>
+                    <ResourceDictionary x:Key="HighContrast">
+                        <SolidColorBrush x:Key="NavigationViewItemBackgroundSelected" Color="{ThemeResource SystemColorHighlightColor}" />
+                        <SolidColorBrush x:Key="NavigationViewItemBackgroundSelectedPointerOver" Color="{ThemeResource SystemColorHighlightColor}" />
+                        <SolidColorBrush x:Key="NavigationViewItemBackgroundSelectedPressed" Color="{ThemeResource SystemColorHighlightColor}" />
+                        <SolidColorBrush x:Key="NavigationViewItemForegroundSelected" Color="{ThemeResource SystemColorHighlightTextColor}" />
+                        <SolidColorBrush x:Key="NavigationViewItemForegroundSelectedPointerOver" Color="{ThemeResource SystemColorHighlightTextColor}" />
+                        <SolidColorBrush x:Key="NavigationViewItemForegroundSelectedPressed" Color="{ThemeResource SystemColorHighlightTextColor}" />
+                        <SolidColorBrush x:Key="NavigationViewSelectionIndicatorForeground" Color="{ThemeResource SystemColorHighlightTextColor}" />
+                    </ResourceDictionary>
+                </ResourceDictionary.ThemeDictionaries>
+
+                <SolidColorBrush x:Key="NavigationViewContentBackground" Color="Transparent" />
+                <Thickness x:Key="NavigationViewContentGridBorderThickness">0</Thickness>
+
+                <!--
+                    A capsule: half the 36 px item height (NavigationViewItemOnLeftMinHeight). The item hands its
+                    CornerRadius to the presenter's root, which draws the selected, hover and pressed fills and the
+                    focus rectangle, so they all take this shape. Only the sidebar's items: the pages have none.
+                -->
+                <Style TargetType="NavigationViewItem">
+                    <Setter Property="CornerRadius" Value="18" />
+                </Style>
+            </ResourceDictionary>
         </NavigationView.Resources>
 
         <Grid>

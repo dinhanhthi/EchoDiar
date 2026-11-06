@@ -9,32 +9,35 @@ using EchoDiar.Core.Settings;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Automation;
 using Microsoft.UI.Xaml.Controls;
-using Windows.System;
 
 namespace EchoDiar.App.Views;
 
 /// <summary>
-/// Settings › RAG (macOS RAGSettingsView.swift): the opt-in switch of the library chat, the index's status with Rebuild,
-/// then the embedder of the index: the catalog's GGUF embedding models with their downloads, or an enabled
-/// OpenAI-compatible or local-host provider with its model. Picking a provider whose destination leaves this PC asks
-/// once per provider and destination (<see cref="AppViewModel.PickAPIEmbedder"/>, <c>cloudEmbeddingConfirmed</c>); the
-/// window shows the question. The Apple NL embedder is not built on Windows: a settings file holding <c>apple-nl</c>
+/// Settings › AI Settings › Library chat (macOS RAGSettingsView.swift), shown by <see cref="AISettingsPage"/> on its tab:
+/// the opt-in switch of the library chat, the index's status with Rebuild, then the embedder of the index: the catalog's
+/// GGUF embedding models (downloaded in AI Providers › Local AI › Embedding), or an enabled OpenAI-compatible or
+/// local-host provider, whose model is set in its card in AI Providers. Picking a provider whose destination leaves this
+/// PC asks once per provider and destination (<see cref="AppViewModel.PickAPIEmbedder"/>, <c>cloudEmbeddingConfirmed</c>);
+/// the window shows the question. The Apple NL embedder is not built on Windows: a settings file holding <c>apple-nl</c>
 /// shows no embedder picked, and the index says to pick one. A macOS id of a catalog model
 /// (<c>mlx-qwen3-embedding-0.6b</c>) shows its GGUF counterpart picked, and stays as it is until another is picked.
 /// </summary>
 public sealed partial class RAGSettingsPage : UserControl
 {
-    /// <summary>The searchable rows (macOS SettingsSearch.swift, RAG), each the Tag of its element.</summary>
+    /// <summary>
+    /// The searchable rows (macOS SettingsSearch.swift, AI Settings › Library chat), each the Tag of its element; listed
+    /// in <see cref="AISettingsPage.SearchEntries"/>.
+    /// </summary>
     public static IReadOnlyList<SettingsEntry> SearchEntries { get; } =
     [
-        new("Ask across conversations", ["RAG", "global chat", "library", "search", "index"]),
+        new("Ask across conversations", ["RAG", "global chat", "library", "search", "index"], AISettingsPage.LibraryTab),
         // macOS also lists its other embedders (E5, BGE-M3, Apple); the Windows catalog has Qwen3 in GGUF.
-        new("Embedding model", ["embedder", "Qwen3", "GGUF", "API", "download"]),
-        new("Rebuild index", ["reindex", "index status", "indexed conversations"]),
+        new("Embedding model", ["embedder", "Qwen3", "GGUF", "API", "RAG"], AISettingsPage.LibraryTab),
+        new("Rebuild index", ["reindex", "index status", "indexed conversations", "RAG"], AISettingsPage.LibraryTab),
     ];
 
     /// <summary>The model filled in when a provider is picked, by preset (macOS <c>suggestedModels</c>).</summary>
-    private static readonly Dictionary<string, string> SuggestedModels = new()
+    internal static readonly Dictionary<string, string> SuggestedModels = new()
     {
         ["openai"] = "text-embedding-3-small",
         ["gemini"] = "gemini-embedding-001",
@@ -43,7 +46,7 @@ public sealed partial class RAGSettingsPage : UserControl
     };
 
     /// <summary>The OpenAI-compatible presets with an embeddings endpoint (macOS <c>embeddingConfigs</c>).</summary>
-    private static readonly HashSet<string> EmbeddingPresets = ["openai", "gemini", "mistral", "azure"];
+    internal static readonly HashSet<string> EmbeddingPresets = ["openai", "gemini", "mistral", "azure"];
 
     private readonly AppViewModel _model;
     private readonly ProvidersViewModel _providers;
@@ -57,17 +60,6 @@ public sealed partial class RAGSettingsPage : UserControl
 
     /// <summary>The controls are being set from the settings: their change events are not the user's.</summary>
     private bool _syncing;
-
-    /// <summary>The saved API model the field shows; typing is kept until the saved value itself changes.</summary>
-    private string? _shownAPIModel;
-
-    /// <summary>The embedder the loaded models belong to (macOS: they are dropped when the embedder changes).</summary>
-    private string? _embeddingID;
-
-    /// <summary>The API embedder's embedding models from Load models; null until loaded for the provider in use.</summary>
-    private List<string>? _loadedModels;
-    private string? _loadError;
-    private CancellationTokenSource? _loading;
 
     public RAGSettingsPage(AppViewModel model)
     {
@@ -86,17 +78,9 @@ public sealed partial class RAGSettingsPage : UserControl
         EnableToggle.Toggled += (_, _) => OnEnableToggled();
         RebuildButton.Click += (_, _) => _model.RebuildLibraryIndex();
         ConfirmButton.Click += (_, _) => _model.RequestCloudEmbeddingConsent();
-        APIModelBox.KeyDown += (_, e) =>
+        MissingModelSetUpButton.Click += (_, _) =>
         {
-            if (e.Key != VirtualKey.Enter) return;
-            e.Handled = true;
-            SaveAPIModel();
-        };
-        // Leaving the field saves too, so a typed model is not lost without Enter (macOS).
-        APIModelBox.LostFocus += (_, _) => SaveAPIModel();
-        LoadModelsButton.Click += (_, _) =>
-        {
-            if (CurrentAPIConfig is { } config) _ = LoadModelsAsync(config);
+            if (CurrentAPIConfig is { } config) SetUp(config);
         };
 
         Loaded += (_, _) =>
@@ -106,17 +90,27 @@ public sealed partial class RAGSettingsPage : UserControl
             _providers.LocalModelStatesChanged += UpdateEmbedderRows;
             Refresh();
             UpdateEmbedderRows();
-            _ = _providers.RefreshLocalModelsAsync();
-            // Each time the page shows, provider, key and model changes made elsewhere are picked up (macOS).
-            _model.SyncLibraryIndex();
         };
         Unloaded += (_, _) =>
         {
             _model.PropertyChanged -= OnModelChanged;
             _providers.Changed -= Refresh;
             _providers.LocalModelStatesChanged -= UpdateEmbedderRows;
-            _loading?.Cancel();
         };
+    }
+
+    /// <summary>
+    /// Library chat became shown (its inner tab picked, or the Settings page and AI Settings shown again; macOS
+    /// <c>onChange(of: shown)</c>): the installed models are read again, and provider, key and model changes made elsewhere
+    /// are picked up.
+    /// </summary>
+    internal void Shown()
+    {
+        if (Closing) return;
+        Refresh();
+        UpdateEmbedderRows();
+        _ = _providers.RefreshLocalModelsAsync();
+        _model.SyncLibraryIndex();
     }
 
     private bool Closing => _model.IsClosing;
@@ -136,16 +130,9 @@ public sealed partial class RAGSettingsPage : UserControl
         try
         {
             EnableToggle.IsOn = Settings.RagEnabled;
-            if (Settings.EmbeddingModelID != _embeddingID)
-            {
-                // Loaded models belong to the provider they came from.
-                _embeddingID = Settings.EmbeddingModelID;
-                _loadedModels = null;
-                _loadError = null;
-            }
             UpdateStatus();
             foreach (var row in _embedderRows) row.UpdateSelection(IsSelected(row.Entry));
-            UpdateModelField();
+            UpdateMissingModel();
             UpdateProviderRows();
         }
         finally
@@ -272,7 +259,10 @@ public sealed partial class RAGSettingsPage : UserControl
         foreach (var id in ids) ProviderList.Children.Add(_providerRows[id].Card);
     }
 
-    /// <summary>A pick of a provider (macOS <c>selectAPI</c>): its preset's suggested model replaces the previous one.</summary>
+    /// <summary>
+    /// A pick of a provider (macOS <c>selectAPI</c>): its preset's suggested model fills its embedding model only when
+    /// empty; a model typed before stays.
+    /// </summary>
     private void SelectAPI(ProviderConfig config)
     {
         _model.PickAPIEmbedder(config, SuggestedModels.GetValueOrDefault(config.Preset ?? "", ""));
@@ -280,89 +270,35 @@ public sealed partial class RAGSettingsPage : UserControl
     }
 
     /// <summary>
-    /// The API embedder's model (macOS <c>apiModelField</c>), shown while one is in use: the model id, a menu of the
-    /// provider's embedding models once loaded, and Load models.
+    /// The API embedder in use has no embedding model: "Not set for …" with Set Up…, which opens its card (macOS
+    /// <c>apiSection</c>).
     /// </summary>
-    private void UpdateModelField()
+    private void UpdateMissingModel()
     {
         var config = CurrentAPIConfig;
-        APIModelCard.Visibility = Show(config is not null);
-        if (config is null) return;
-        APIModelBox.PlaceholderText = SuggestedModels.GetValueOrDefault(config.Preset ?? "") ?? Loc.T("Embedding model id");
-        if (Settings.EmbeddingAPIModel != _shownAPIModel)
-        {
-            _shownAPIModel = Settings.EmbeddingAPIModel;
-            if (APIModelBox.Text != _shownAPIModel) APIModelBox.Text = _shownAPIModel;
-        }
-        var count = _loadedModels?.Count ?? 0;
-        if (_loadedModels is not null && !ModelsMenu.Items.Select(i => (i as MenuFlyoutItem)?.Text).SequenceEqual(_loadedModels))
-        {
-            ModelsMenu.Items.Clear();
-            foreach (var id in _loadedModels)
-            {
-                var item = new MenuFlyoutItem { Text = id };
-                item.Click += (_, _) =>
-                {
-                    APIModelBox.Text = id;
-                    SaveAPIModel();
-                };
-                ModelsMenu.Items.Add(item);
-            }
-        }
-        ModelsButton.Content = Loc.Plural("%lld models", count);
-        ModelsButton.Visibility = Show(count > 0);
-        LoadErrorText.Text = _loadError ?? "";
-        LoadErrorText.Visibility = Show(_loadError is not null);
-        NoModelsText.Visibility = Show(_loadError is null && _loadedModels is { Count: 0 });
+        var missing = config is not null && config.EmbeddingModel.Trim().Length == 0;
+        MissingModelCard.Visibility = Show(missing);
+        if (!missing) return;
+        var name = config!.DisplayName;
+        MissingModelCard.Description = Loc.Format("Not set for %@. Enter it in its card in AI Providers.", name);
+        AutomationProperties.SetName(MissingModelSetUpButton, $"{Loc.T("Set Up…")}, {name}");
     }
 
-    /// <summary>Saves the typed model, trimmed, when it differs (macOS <c>saveAPIModel</c>).</summary>
-    private void SaveAPIModel()
+    /// <summary>
+    /// AI Providers on <paramref name="config"/>'s row, expanded (macOS <c>setUp</c>): Local AI › Local hosts for a local
+    /// host (which has a row only once added, by a scan or by URL), Cloud for an API.
+    /// </summary>
+    private void SetUp(ProviderConfig config)
     {
-        if (_syncing || Closing || CurrentAPIConfig is null) return;
-        var trimmed = APIModelBox.Text.Trim();
-        if (APIModelBox.Text != trimmed) APIModelBox.Text = trimmed;
-        if (trimmed != Settings.EmbeddingAPIModel) _model.ApplySettings(Settings with { EmbeddingAPIModel = trimmed });
-    }
-
-    /// <summary>The provider's models that embed, by name, off the UI thread (macOS <c>loadModels</c>).</summary>
-    private async Task LoadModelsAsync(ProviderConfig config)
-    {
-        if (_loading is not null) return;
-        var embeddingID = Settings.EmbeddingModelID;
-        using var loading = _loading = new CancellationTokenSource();
-        LoadModelsButton.IsEnabled = false;
-        LoadRing.IsActive = true;
-        LoadRing.Visibility = Visibility.Visible;
-        List<string>? models = null;
-        string? error = null;
-        try
-        {
-            var all = await _providers.ListModelsAsync(config, loading.Token);
-            models = [.. all.Where(IsEmbeddingModel).Order(StringComparer.Ordinal)];
-        }
-        catch (Exception e) when (!loading.IsCancellationRequested)
-        {
-            error = ProvidersViewModel.ShortMessage(e);
-        }
-        catch (Exception)
-        {
-            // Cancelled: the page went away.
-        }
-        _loading = null;
-        if (Closing) return;
-        LoadModelsButton.IsEnabled = true;
-        LoadRing.IsActive = false;
-        LoadRing.Visibility = Visibility.Collapsed;
-        // Another embedder was picked meanwhile: the models are not its.
-        if (loading.IsCancellationRequested || Settings.EmbeddingModelID != embeddingID) return;
-        if (models is not null) _loadedModels = models;
-        _loadError = error;
-        UpdateModelField();
+        var local = config.Kind == ProviderKind.Local;
+        if (!local || _providers.SavedLocalHosts.Any(h => ProvidersViewModel.SameId(h.Id, config.Id)))
+            _model.SettingsExpandedProvider = config.Id;
+        if (local) _model.OpenLocalAI(ProvidersSettingsPage.LocalHostsGroup);
+        else _model.OpenSettings(SettingsSearch.Providers, ProvidersSettingsPage.CloudTab);
     }
 
     /// <summary>Embedding models are named after it (text-embedding-3-small, mistral-embed, nomic-embed-text) or their family.</summary>
-    private static bool IsEmbeddingModel(string id)
+    internal static bool IsEmbeddingModel(string id)
     {
         var lower = id.ToLowerInvariant();
         return new[] { "embed", "bge", "e5-", "gte-", "minilm", "arctic" }.Any(lower.Contains);
@@ -402,20 +338,16 @@ public sealed partial class RAGSettingsPage : UserControl
     }
 
     /// <summary>
-    /// A catalog embedding model (macOS: its radio button and <c>ModelRow</c>): picked or not, its name and Default badge
-    /// (the catalog default), its details, quality, memory warning and last error; Download, the download's progress with
-    /// Cancel, or Installed with Delete, off while a model may be loaded (<see cref="AppViewModel.ModelsInUse"/>).
+    /// A catalog embedding model (macOS <c>localSection</c>'s row: its radio button and <c>localState</c>): picked or not,
+    /// its name; Installed, the download's progress, or the way to its download in AI Providers › Local AI › Embedding,
+    /// where it is downloaded and deleted.
     /// </summary>
     private sealed class EmbedderRow
     {
         private readonly RadioButton _radio;
-        private readonly Border _badge;
-        private readonly TextBlock _error;
         private readonly ProgressBar _progress = new() { Width = 90, Maximum = 1, VerticalAlignment = VerticalAlignment.Center };
         private readonly TextBlock _percent;
-        private readonly Button _cancel;
         private readonly StackPanel _installed = new() { Orientation = Orientation.Horizontal, Spacing = 4 };
-        private readonly Button _delete;
         private readonly Button _download;
 
         public EmbedderRow(RAGSettingsPage page, ModelEntry entry)
@@ -423,30 +355,6 @@ public sealed partial class RAGSettingsPage : UserControl
             Entry = entry;
             _radio = Radio(entry.DisplayName);
             _radio.Click += (_, _) => page.Select(entry);
-            _badge = new Border
-            {
-                Style = (Style)page.Resources["DefaultBadgeStyle"],
-                Child = new TextBlock { Style = (Style)page.Resources["DefaultBadgeTextStyle"], Text = Loc.T("Default") },
-                Visibility = Visibility.Collapsed,
-            };
-            var header = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 8 };
-            header.Children.Add(_radio);
-            header.Children.Add(_badge);
-
-            var description = new StackPanel { Spacing = 2 };
-            description.Children.Add(page.Note("NoteStyle", ModelsViewModel.Details(entry)));
-            if (ModelsViewModel.QualityNote(entry) is { } quality) description.Children.Add(page.Note("NoteStyle", quality));
-            if (ModelsViewModel.NeedsMuchMemory(entry))
-            {
-                // A warning only, as on macOS: the model still downloads and runs.
-                var warning = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 4 };
-                warning.Children.Add(new FontIcon { Style = (Style)page.Resources["CautionIconStyle"], Glyph = "" });
-                warning.Children.Add(page.Note("CautionNoteStyle", Loc.T("Needs more than half of this PC's memory.")));
-                description.Children.Add(warning);
-            }
-            _error = page.Note("CriticalNoteStyle");
-            _error.Visibility = Visibility.Collapsed;
-            description.Children.Add(_error);
 
             AutomationProperties.SetName(_progress, entry.DisplayName);
             _percent = new TextBlock
@@ -456,18 +364,17 @@ public sealed partial class RAGSettingsPage : UserControl
                 MinWidth = 32,
                 TextAlignment = TextAlignment.Right,
             };
-            _cancel = ModelButton("Cancel", entry, () => page._providers.CancelLocalModelDownload(entry));
-            _installed.Children.Add(new FontIcon { Style = (Style)page.Resources["SuccessIconStyle"], Glyph = "" });
+            _installed.Children.Add(new FontIcon { Style = (Style)page.Resources["SuccessIconStyle"], Glyph = "\uE930" });
             _installed.Children.Add(new TextBlock { Style = (Style)page.Resources["SuccessNoteStyle"], Text = Loc.T("Installed") });
-            _delete = ModelButton("Delete", entry, () => _ = page._providers.DeleteLocalModelAsync(entry));
-            _download = ModelButton("Download", entry, () => page._providers.DownloadLocalModel(entry));
+            _download = ModelButton("Download in AI Providers › Local AI", entry,
+                () => page._model.OpenLocalAI(ProvidersSettingsPage.EmbeddingGroup));
             var actions = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 8 };
-            foreach (var part in new UIElement[] { _progress, _percent, _cancel, _installed, _delete, _download })
+            foreach (var part in new UIElement[] { _progress, _percent, _installed, _download })
             {
                 part.Visibility = Visibility.Collapsed;
                 actions.Children.Add(part);
             }
-            Card = new SettingsCard { Header = header, Description = description, Content = actions };
+            Card = new SettingsCard { Header = _radio, Content = actions };
         }
 
         public ModelEntry Entry { get; }
@@ -479,30 +386,25 @@ public sealed partial class RAGSettingsPage : UserControl
             if (_radio.IsChecked != selected) _radio.IsChecked = selected;
         }
 
-        /// <summary>The row shows its model's state (macOS <c>ModelRow.actions</c>).</summary>
+        /// <summary>The row shows its model's state (macOS <c>localState</c>).</summary>
         public void Update(ModelRowState state)
         {
             var downloading = state.Download is not null;
-            var installed = !downloading && state.IsInstalled;
-            _badge.Visibility = Show(state.IsDefault);
-            _progress.Visibility = _percent.Visibility = _cancel.Visibility = Show(downloading);
+            _progress.Visibility = _percent.Visibility = Show(downloading);
             if (state.Download is { } fraction)
             {
                 _progress.Value = fraction;
                 _percent.Text = fraction.ToString("P0", CultureInfo.CurrentCulture);
             }
-            _installed.Visibility = _delete.Visibility = Show(installed);
-            _delete.IsEnabled = state.CanDelete;
+            _installed.Visibility = Show(!downloading && state.IsInstalled);
             _download.Visibility = Show(!downloading && !state.IsInstalled);
-            _error.Text = state.Error ?? "";
-            _error.Visibility = Show(state.Error is not null);
         }
     }
 
     /// <summary>
     /// A provider that can embed (macOS <c>providersSection</c>'s row): picked or not (off while the provider is), its
     /// name and host, then whether its data stays on this PC, or for a local host Set Up…, which opens where it is turned
-    /// on; a cloud API's key status ("API key" opens its card in Settings › API Keys).
+    /// on; a cloud API's key status ("API key" opens its card in Settings › AI Providers › Cloud).
     /// </summary>
     private sealed class ProviderRow
     {
@@ -557,21 +459,15 @@ public sealed partial class RAGSettingsPage : UserControl
             _where.Visibility = Show(available);
             _setUp.Visibility = Show(!available && local);
             AutomationProperties.SetName(_setUp, $"{Loc.T("Set Up…")}, {name}");
-            ToolTipService.SetToolTip(_setUp, Loc.Format("Turn on %@ in Settings › AI", name));
+            ToolTipService.SetToolTip(_setUp, Loc.Format("Turn on %@ in Settings › AI Providers › Local AI", name));
             _status.Element.Visibility = Show(!local);
             if (!local) _status.Update(config);
         }
 
-        /// <summary>
-        /// Opens Settings › AI › On this PC where the local host is turned on, its row expanded (it has a row only once
-        /// added, by a scan or by URL).
-        /// </summary>
+        /// <summary>Opens Settings › AI Providers › Local AI › Local hosts where the local host is turned on (macOS <c>setUp</c>).</summary>
         private void SetUp()
         {
-            if (_config is not { } config) return;
-            if (_page._providers.SavedLocalHosts.Any(h => ProvidersViewModel.SameId(h.Id, config.Id)))
-                _page._model.SettingsExpandedProvider = config.Id;
-            _page._model.OpenSettings(SettingsSearch.Providers, ProvidersSettingsPage.OnThisPCTab);
+            if (_config is { } config) _page.SetUp(config);
         }
     }
 }

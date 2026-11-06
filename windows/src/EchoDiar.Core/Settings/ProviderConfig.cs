@@ -68,6 +68,8 @@ public sealed record ProviderConfig
     /// <see cref="TranscriptionModel"/>, so a streaming-only batch check never applies to it.
     /// </summary>
     public string RealtimeModel { get; set; } = "";
+    /// <summary>Embedding model id when this is the API embedder (<c>api:&lt;id&gt;</c>); empty = pick one.</summary>
+    public string EmbeddingModel { get; set; } = "";
 
     /// <summary>
     /// A cloud API (every kind but <see cref="ProviderKind.Local"/> servers and <see cref="ProviderKind.Cli"/> tools,
@@ -182,6 +184,7 @@ public sealed class ProviderConfigConverter : JsonConverter<ProviderConfig>
             DiarizationModel = Value(obj, "diarizationModel", "", options),
             Enabled = Value(obj, "enabled", false, options),
             RealtimeModel = Value(obj, "realtimeModel", "", options),
+            EmbeddingModel = Value(obj, "embeddingModel", "", options),
         };
     }
 
@@ -224,6 +227,7 @@ public sealed class ProviderConfigConverter : JsonConverter<ProviderConfig>
         writer.WriteString("diarizationModel", value.DiarizationModel);
         writer.WriteBoolean("enabled", value.Enabled);
         writer.WriteString("realtimeModel", value.RealtimeModel);
+        writer.WriteString("embeddingModel", value.EmbeddingModel);
         writer.WriteEndObject();
     }
 }

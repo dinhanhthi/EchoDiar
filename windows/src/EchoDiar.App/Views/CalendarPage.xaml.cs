@@ -52,7 +52,7 @@ public sealed partial class CalendarPage : UserControl
         _model = model;
         InitializeComponent();
         NewEventButton.Click += (_, _) => _ = OpenEditorAsync(null);
-        CalendarSettingsButton.Click += (_, _) => _model.OpenSettings(SettingsSearch.Recording, RecordingSettingsPage.CalendarTab);
+        CalendarSettingsButton.Click += (_, _) => _model.OpenSettings(SettingsSearch.Calendar);
         GrantAccessButton.Click += (_, _) => _model.RefreshCalendar();
         PrivacySettingsButton.Click += (_, _) =>
             _ = Windows.System.Launcher.LaunchUriAsync(new Uri("ms-settings:privacy-calendar"));
