@@ -70,12 +70,28 @@ struct MeetingEndMonitorTests {
     @Test func scheduledEndPromptsEventEndedAndKeepRecordingSnoozesIt() {
         var monitor = monitor()
         monitor.record(.scheduledEnd(at(1_800)), at: start)
+        monitor.record(.audible(false), at: at(1_700))
         #expect(monitor.evaluate(now: at(1_799)) == MeetingEndMonitor.Action.none)
         #expect(monitor.evaluate(now: at(1_800)) == .promptStop(reason: .eventEnded, countdown: 15))
 
         monitor.keepRecording(.eventEnded, now: at(1_810))
+        monitor.record(.audible(true), at: at(1_810))
+        monitor.record(.audible(false), at: at(2_300))
         #expect(monitor.evaluate(now: at(1_810 + 599)) == MeetingEndMonitor.Action.none)
         #expect(monitor.evaluate(now: at(1_810 + 600)) == .promptStop(reason: .eventEnded, countdown: 15))
+    }
+
+    @Test func eventEndedWaitsUntilTheMeetingIsQuiet() {
+        var monitor = monitor()
+        monitor.record(.scheduledEnd(at(1_800)), at: start)
+        #expect(monitor.evaluate(now: at(1_900)) == MeetingEndMonitor.Action.none)
+
+        monitor.record(.audible(false), at: at(1_900))
+        #expect(monitor.evaluate(now: at(1_959)) == MeetingEndMonitor.Action.none)
+        #expect(monitor.evaluate(now: at(1_960)) == .promptStop(reason: .eventEnded, countdown: 15))
+
+        monitor.record(.audible(true), at: at(1_965))
+        #expect(monitor.evaluate(now: at(1_965)) == MeetingEndMonitor.Action.none)
     }
 
     @Test func sleepStopsNow() {

@@ -14,7 +14,8 @@ import Foundation
 /// - Call ended: the system channel went silent after it had been audible while the meeting app's mic is off, both
 ///   for `callEndedSeconds`. Either alone is normal mid-call (others quiet, a muted web client); also ignored once
 ///   the source app quit. Paused time does not count: a pause measures nothing.
-/// - Event ended: the calendar event's scheduled end has passed; prompts like the others.
+/// - Event ended: the calendar event's scheduled end has passed and both channels have been silent for
+///   `eventEndedQuietSeconds`; a meeting that runs over keeps recording while anyone speaks.
 /// - The recording starts as silent: the silence prompt fires unless `audible(true)` arrives within the threshold.
 /// - `evaluate` returns the same prompt on every call while its condition holds; the caller dedupes, and dismisses
 ///   the prompt when the result drops back to `.none`.
@@ -106,6 +107,7 @@ public struct MeetingEndMonitor: Sendable {
 
     public static let promptCountdown = 15
     public static let snoozeDuration: TimeInterval = 10 * 60
+    public static let eventEndedQuietSeconds: TimeInterval = 60
 
     public let configuration: Configuration
     public let startedAt: Date
@@ -171,7 +173,8 @@ public struct MeetingEndMonitor: Sendable {
             (.sourceInactive, !sourceExited && Self.held(since: sourceInactiveSince, for: inactiveThreshold, at: now)),
             (.callEnded, !sourceExited && !paused && Self.held(since: callEndedSince, for: callEndedThreshold, at: now)),
             (.silence, Self.held(since: silentSince, for: silenceThreshold, at: now)),
-            (.eventEnded, Self.held(since: scheduledEnd, for: 0, at: now)),
+            (.eventEnded, Self.held(since: scheduledEnd, for: 0, at: now)
+                && Self.held(since: silentSince, for: Self.eventEndedQuietSeconds, at: now)),
         ]
         for (reason, fired) in triggers where fired && !isSnoozed(reason, at: now) {
             return .promptStop(reason: reason, countdown: Self.promptCountdown)

@@ -15,6 +15,8 @@ namespace EchoDiar.Core;
 /// <item>Source app quit, source input and output inactive, both channels silent, screen locked, input route lost and
 /// the calendar event's scheduled end reached prompt with a countdown (default action Stop). "Keep recording" snoozes
 /// that trigger for <see cref="SnoozeDuration"/>; a condition that still holds afterwards prompts again.</item>
+/// <item>Event ended also needs both channels silent for <see cref="EventEndedQuiet"/>: a meeting that runs over keeps
+/// recording while anyone speaks.</item>
 /// <item>Source inactivity is ignored once the source app quit (its own prompt covers it).</item>
 /// <item>Call ended: the system channel went silent after it had been audible while the meeting app's mic is off,
 /// both for <c>callEndedSeconds</c>. Either alone is normal mid-call (others quiet, a muted web client); also ignored
@@ -29,6 +31,7 @@ public sealed class MeetingEndMonitor
 {
     public const int PromptCountdown = 15;
     public static readonly TimeSpan SnoozeDuration = TimeSpan.FromMinutes(10);
+    public static readonly TimeSpan EventEndedQuiet = TimeSpan.FromSeconds(60);
 
     public abstract record Input
     {
@@ -152,7 +155,7 @@ public sealed class MeetingEndMonitor
             (Reason.SourceInactive, !_sourceExited && Held(_sourceInactiveSince, inactiveThreshold, now)),
             (Reason.CallEnded, !_sourceExited && !_paused && Held(CallEndedSince, callEndedThreshold, now)),
             (Reason.Silence, Held(_silentSince, silenceThreshold, now)),
-            (Reason.EventEnded, Held(_scheduledEnd, TimeSpan.Zero, now)),
+            (Reason.EventEnded, Held(_scheduledEnd, TimeSpan.Zero, now) && Held(_silentSince, EventEndedQuiet, now)),
         ];
         foreach (var (reason, fired) in triggers)
         {

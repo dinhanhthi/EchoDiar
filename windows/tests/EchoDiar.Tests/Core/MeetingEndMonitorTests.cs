@@ -132,15 +132,33 @@ public sealed class MeetingEndMonitorTests
     {
         var monitor = Monitor();
         monitor.Record(new Input.ScheduledEnd(At(1_800)), Start);
+        monitor.Record(new Input.Audible(false), At(1_700));
         Assert.Equal(Decision.None, monitor.Evaluate(At(1_799)));
         Assert.Equal(Prompt(Reason.EventEnded), monitor.Evaluate(At(1_800)));
 
         monitor.KeepRecording(Reason.EventEnded, At(1_810));
+        monitor.Record(new Input.Audible(true), At(1_810));
+        monitor.Record(new Input.Audible(false), At(2_300));
         Assert.Equal(Decision.None, monitor.Evaluate(At(1_810 + 599)));
         Assert.Equal(Prompt(Reason.EventEnded), monitor.Evaluate(At(1_810 + 600)));
 
         monitor.Record(new Input.ScheduledEnd(null), At(1_810 + 600));
         Assert.Equal(Decision.None, monitor.Evaluate(At(1_810 + 600)));
+    }
+
+    [Fact]
+    public void EventEndedWaitsUntilTheMeetingIsQuiet()
+    {
+        var monitor = Monitor();
+        monitor.Record(new Input.ScheduledEnd(At(1_800)), Start);
+        Assert.Equal(Decision.None, monitor.Evaluate(At(1_900)));
+
+        monitor.Record(new Input.Audible(false), At(1_900));
+        Assert.Equal(Decision.None, monitor.Evaluate(At(1_959)));
+        Assert.Equal(Prompt(Reason.EventEnded), monitor.Evaluate(At(1_960)));
+
+        monitor.Record(new Input.Audible(true), At(1_965));
+        Assert.Equal(Decision.None, monitor.Evaluate(At(1_965)));
     }
 
     [Fact]
