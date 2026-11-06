@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.5.2] - 2026-11-06
+
+### Changed
+
+- The library's list of conversations sits on a panel with the same background as the detail's, and the entries on it are a step lighter so they stand out.
+- macOS: the sidebar's scrollbar is thin and shows only while scrolling, instead of the wide always-visible one that mice bring.
+- macOS: less empty space between the toolbar and the panels, in the library and in Settings.
+
 ## [1.5.1] - 2026-11-06
 
 ### Changed
