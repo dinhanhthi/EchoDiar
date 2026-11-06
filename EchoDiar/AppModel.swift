@@ -24,6 +24,9 @@ final class AppModel {
     /// The open conversation's tab.
     enum DetailTab { case transcript, summary, chat }
 
+    /// Which AI default a job or menu uses: summaries (and catch-ups) or chat (questions, library chat, chat titles).
+    enum AIPurpose { case summary, chat }
+
     /// DEBUG harness launch args handled here; they skip onboarding and auto-queued work.
     static let harnessArguments: Set<String> = [
         "--transcribe", "--download-model", "--delete-model", "--measure",
@@ -387,7 +390,7 @@ final class AppModel {
     func start() {
         settings = store.load()
         // Before any launch-time automatic path (library indexing, retried transcriptions) reads the providers.
-        updateSettings { $0 = $0.migratingProviderAvailability() }
+        updateSettings { $0 = $0.migratingProviderAvailability().migratingAISettings() }
         recovery = (NSApp.delegate as? AppDelegate)?.recovery
         observeSnapshots()
         terminateObserver = NotificationCenter.default.addObserver(
@@ -1773,7 +1776,8 @@ final class AppModel {
             if updated.defaultDiarizerModelID != settings.defaultDiarizerModelID {
                 picked.append(CloudTranscription.providerID(engineID: updated.defaultDiarizerModelID))
             }
-            if updated.defaultAIProviderID != settings.defaultAIProviderID { picked.append(updated.defaultAIProviderID) }
+            if updated.summaryAIProviderID != settings.summaryAIProviderID { picked.append(updated.summaryAIProviderID) }
+            if updated.chatAIProviderID != settings.chatAIProviderID { picked.append(updated.chatAIProviderID) }
             if updated.catchUpProviderID != settings.catchUpProviderID { picked.append(updated.catchUpProviderID) }
             if updated.embeddingModelID != settings.embeddingModelID,
                updated.embeddingModelID.hasPrefix(Self.apiEmbedderPrefix) {
@@ -1797,7 +1801,7 @@ final class AppModel {
         let notificationTurnedOff = !updated.endPromptNotification && settings.endPromptNotification
         let ragChanged = updated.ragEnabled != settings.ragEnabled
             || updated.embeddingModelID != settings.embeddingModelID
-            || updated.embeddingAPIModel != settings.embeddingAPIModel
+            // An edit of the API embedder's `embeddingModel` changes `providers`.
             || (updated.embeddingModelID.hasPrefix(Self.apiEmbedderPrefix) && updated.providers != settings.providers)
         settings = updated
         do {
@@ -1990,10 +1994,13 @@ extension AppModel {
                 if !id.isEmpty && !models.contains(id) { models.append(id) }
             }
             if kind == .cli && config.defaultModel.trimmingCharacters(in: .whitespaces).isEmpty { models.insert("", at: 0) }
-            // The picked model stays listed, also once it is unchecked in Settings or was typed before the menu existed.
-            if config.id == settings.defaultAIProviderID, let saved = settings.defaultAIModel, !saved.isEmpty,
-               !models.contains(saved) {
-                models.append(saved)
+            // The picked models stay listed, also once unchecked in Settings or typed before the menu existed.
+            for purpose in [AIPurpose.summary, .chat] {
+                let (providerID, model) = Self.aiDefault(purpose)
+                if config.id == settings[keyPath: providerID], let saved = settings[keyPath: model], !saved.isEmpty,
+                   !models.contains(saved) {
+                    models.append(saved)
+                }
             }
             providers.append(AIProvider(
                 id: config.id, name: config.displayName, kind: kind, defaultModel: config.defaultModel, models: models,
@@ -2008,24 +2015,39 @@ extension AppModel {
         return String(localized: "Apple Foundation Models need macOS 26.")
     }
 
-    /// The default provider when it can run, else the first one that can and is not in `autoExcludedProviderIDs`.
-    var currentAIProvider: AIProvider? {
+    /// The settings pair (provider id, model) holding `purpose`'s default.
+    private static func aiDefault(
+        _ purpose: AIPurpose
+    ) -> (provider: WritableKeyPath<AppSettings, String?>, model: WritableKeyPath<AppSettings, String?>) {
+        switch purpose {
+        case .summary: (\.summaryAIProviderID, \.summaryAIModel)
+        case .chat: (\.chatAIProviderID, \.chatAIModel)
+        }
+    }
+
+    /// `purpose`'s default provider when it can run, else the first one that can and is not in
+    /// `autoExcludedProviderIDs`.
+    func currentAIProvider(for purpose: AIPurpose) -> AIProvider? {
         let usable = aiProviders.filter { $0.unavailableReason == nil }
-        return usable.first { $0.id == settings.defaultAIProviderID }
+        return usable.first { $0.id == settings[keyPath: Self.aiDefault(purpose).provider] }
             ?? usable.first { !settings.autoExcludedProviderIDs.contains($0.id) }
     }
 
-    /// The saved model for the default provider, else the provider's own.
-    func aiModel(for provider: AIProvider) -> String {
-        if provider.id == settings.defaultAIProviderID, let model = settings.defaultAIModel, !model.isEmpty { return model }
+    /// The saved model of `purpose`'s default provider, else the provider's own.
+    func aiModel(for provider: AIProvider, purpose: AIPurpose) -> String {
+        let (providerID, saved) = Self.aiDefault(purpose)
+        if provider.id == settings[keyPath: providerID], let model = settings[keyPath: saved], !model.isEmpty {
+            return model
+        }
         return provider.defaultModel
     }
 
-    /// The model menu's pick: `model` of `provider` for the next summaries and questions.
-    func setAIModel(_ model: String, of provider: AIProvider) {
+    /// The model menu's pick: `model` of `provider` for the next jobs of `purpose`.
+    func setAIModel(_ model: String, of provider: AIProvider, purpose: AIPurpose) {
+        let (providerID, saved) = Self.aiDefault(purpose)
         updateSettings {
-            $0.defaultAIProviderID = provider.id
-            $0.defaultAIModel = model == provider.defaultModel ? nil : model
+            $0[keyPath: providerID] = provider.id
+            $0[keyPath: saved] = model == provider.defaultModel ? nil : model
         }
     }
 
@@ -2036,9 +2058,9 @@ extension AppModel {
         route = .conversation(conversationID)
     }
 
-    /// Starts a summary or a question with `provider` and `model` (saved as the AI tab default), beside the jobs of
-    /// the other conversations; does nothing while the conversation has a job or is being deleted. `summary` and
-    /// `history` are the conversation's saved summary and chat, sent with a question.
+    /// Starts a summary or a question with `provider` and `model` (saved as the summary or chat default), beside the
+    /// jobs of the other conversations; does nothing while the conversation has a job or is being deleted. `summary`
+    /// and `history` are the conversation's saved summary and chat, sent with a question.
     func startAIJob(
         _ kind: AIJob.Kind, conversation: Conversation, transcript: Transcript, summary: String?,
         history: [ChatLog.Message], provider: AIProvider, model: String
@@ -2049,10 +2071,7 @@ extension AppModel {
             return
         }
         let model = model.trimmingCharacters(in: .whitespacesAndNewlines)
-        updateSettings {
-            $0.defaultAIProviderID = provider.id
-            $0.defaultAIModel = model == provider.defaultModel ? nil : model
-        }
+        setAIModel(model, of: provider, purpose: kind == .summary ? .summary : .chat)
         aiError = nil
         let client: (any LLMProvider)?
         do {
@@ -2191,21 +2210,21 @@ extension AppModel {
         if let archived, archived.needsTitle { requestTitle(for: archived.entry, in: folder) }
     }
 
-    /// Names the archived chat `entry` with the current AI provider and model, outside `aiJobs`. Without a provider,
+    /// Names the archived chat `entry` with the chat provider and model, outside `aiJobs`. Without a provider,
     /// when another one gave any of the chat's answers, with an in-app model, or on error its fallback title (the first
     /// question) stays.
     private func requestTitle(for entry: ChatArchive.Entry, in folder: URL) {
         Task { [weak self] in
             // Only with the provider that gave every answer of the chat, so its questions reach no provider that never
             // saw them, and never an in-app model, whose gate a hidden job would hold while the next question waits.
-            guard let self, let provider = currentAIProvider, provider.kind != .inApp,
+            guard let self, let provider = currentAIProvider(for: .chat), provider.kind != .inApp,
                   let chat = ChatArchive.log(entry.id, in: folder),
                   chat.messages.allSatisfy({ $0.role != .assistant || $0.provider == provider.id }),
                   let client = try? llmClient(for: provider) else { return }
             var title = ""
             do {
                 for try await update in aiService.title(
-                    chat: chat.messages, provider: client, model: aiModel(for: provider)) {
+                    chat: chat.messages, provider: client, model: aiModel(for: provider, purpose: .chat)) {
                     if case .text(let text) = update { title += text }
                 }
             } catch { return }
@@ -2227,7 +2246,7 @@ extension AppModel {
 
 extension AppModel {
     /// Where a catch-up runs: the "Catch-up provider" setting when it is a usable provider outside the app, else the
-    /// AI tab's provider when it is not in-app, else the first usable provider outside the app; nil when there is
+    /// summary provider when it is not in-app, else the first usable provider outside the app; nil when there is
     /// none. Never an in-app model: the live transcriber holds the model gate for the whole recording.
     var catchUpProvider: AIProvider? {
         let external = aiProviders.filter { $0.kind != .inApp && $0.unavailableReason == nil }
@@ -2235,21 +2254,22 @@ extension AppModel {
         return automaticCatchUpProvider
     }
 
-    /// What `catchUpProvider` runs with no usable provider picked: the AI tab's provider when it is not in-app, else
-    /// the first usable provider outside the app not in `autoExcludedProviderIDs`. `currentAIProvider` is never an
-    /// excluded one by accident: the migration clears `defaultAIProviderID` for those, and picking one un-excludes it.
+    /// What `catchUpProvider` runs with no usable provider picked: the summary provider when it is not in-app, else
+    /// the first usable provider outside the app not in `autoExcludedProviderIDs`. The summary provider is never an
+    /// excluded one by accident: the migrations clear the old default for those (copied into the summary pair after),
+    /// and picking one un-excludes it.
     var automaticCatchUpProvider: AIProvider? {
-        if let main = currentAIProvider, main.kind != .inApp { return main }
+        if let main = currentAIProvider(for: .summary), main.kind != .inApp { return main }
         return aiProviders.first {
             $0.kind != .inApp && $0.unavailableReason == nil && !settings.autoExcludedProviderIDs.contains($0.id)
         }
     }
 
-    /// The "Catch-up model" setting when `provider` is the picked catch-up provider, else its AI tab model.
+    /// The "Catch-up model" setting when `provider` is the picked catch-up provider, else its summary model.
     func catchUpModel(for provider: AIProvider) -> String {
         let picked = settings.catchUpModel.trimmingCharacters(in: .whitespacesAndNewlines)
         if !picked.isEmpty, provider.id == settings.catchUpProviderID { return picked }
-        return aiModel(for: provider)
+        return aiModel(for: provider, purpose: .summary)
     }
 
     /// Why "Catch up" cannot run now; nil when it can. "Nothing new" follows `CatchUpPlan.make`: no live line after

@@ -44,6 +44,8 @@ public struct ProviderConfig: Codable, Equatable, Sendable, Identifiable {
     /// Realtime (WebSocket) model for the live transcript; empty = the provider default. Separate from
     /// `transcriptionModel`, so a streaming-only batch check never applies to it.
     public var realtimeModel: String
+    /// The model this provider's embedder uses for the library chat (RAG) index; empty = none set.
+    public var embeddingModel: String
 
     public init(
         id: String,
@@ -58,7 +60,8 @@ public struct ProviderConfig: Codable, Equatable, Sendable, Identifiable {
         transcriptionModel: String = "",
         diarizationModel: String = "",
         enabled: Bool = false,
-        realtimeModel: String = ""
+        realtimeModel: String = "",
+        embeddingModel: String = ""
     ) {
         self.id = id
         self.kind = kind
@@ -73,6 +76,7 @@ public struct ProviderConfig: Codable, Equatable, Sendable, Identifiable {
         self.diarizationModel = diarizationModel
         self.enabled = enabled
         self.realtimeModel = realtimeModel
+        self.embeddingModel = embeddingModel
     }
 
     /// Tolerant: a missing, malformed or unknown (newer) value falls back to a default instead of failing, so one bad
@@ -94,6 +98,7 @@ public struct ProviderConfig: Codable, Equatable, Sendable, Identifiable {
         diarizationModel = value(.diarizationModel) ?? ""
         enabled = value(.enabled) ?? false
         realtimeModel = value(.realtimeModel) ?? ""
+        embeddingModel = value(.embeddingModel) ?? ""
     }
 
     /// A cloud API (every kind but `.local` servers and `.cli` tools): usable once its key is saved, whatever `enabled`

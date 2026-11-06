@@ -12,8 +12,9 @@ struct RAGSettingsView: View {
     /// A cloud API embedder picked (or in use and not confirmed) waiting for its confirmation; the setting changes
     /// only on Understood.
     @State private var pendingCloud: ProviderConfig?
-    /// The API embedder's model as typed; saved on Return or on leaving the field.
+    /// The API embedder's model as typed, and the provider it belongs to; saved on Return or on leaving the field.
     @State private var apiModel = ""
+    @State private var apiModelProviderID: String?
     @FocusState private var apiModelFocused: Bool
     /// The picked catalog embedder, not installed when RAG was turned on: asks to download it.
     @State private var pendingDownload: ModelEntry?
@@ -50,7 +51,11 @@ struct RAGSettingsView: View {
         // The tab stays alive once opened: each time it is shown, provider, key and model changes made elsewhere are
         // picked up.
         .onChange(of: shown, initial: true) { _, shown in if shown { model.syncLibraryIndex() } }
-        .onChange(of: model.settings.embeddingAPIModel, initial: true) { _, saved in apiModel = saved }
+        // Keyed by the provider too: two providers with the same model must still move the field to the new one.
+        .onChange(of: currentAPIConfig.map { [$0.id, $0.embeddingModel] }, initial: true) { _, saved in
+            apiModelProviderID = saved?[0]
+            apiModel = saved?[1] ?? ""
+        }
         // Loaded models belong to the provider they came from.
         .onChange(of: model.settings.embeddingModelID) {
             loadedModels = nil
@@ -298,12 +303,15 @@ struct RAGSettingsView: View {
         }
     }
 
-    /// The previous provider's model name rarely exists on this one: the preset's suggestion replaces it.
+    /// A provider with no embedding model yet gets the preset's suggestion; a model typed before stays. Filled first,
+    /// so the index never restarts with the provider picked and no model.
     private func selectAPIEmbedder(_ config: ProviderConfig) {
-        model.updateSettings {
-            $0.embeddingModelID = AppModel.apiEmbedderPrefix + config.id
-            $0.embeddingAPIModel = Self.suggestedModels[config.preset ?? ""] ?? ""
+        let saved = model.providerConfigs.first { $0.id == config.id }?.embeddingModel ?? ""
+        if let suggested = Self.suggestedModels[config.preset ?? ""],
+           saved.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            model.updateProvider(id: config.id) { $0.embeddingModel = suggested }
         }
+        model.updateSettings { $0.embeddingModelID = AppModel.apiEmbedderPrefix + config.id }
     }
 
     private func needsConsent(_ config: ProviderConfig) -> Bool {
@@ -323,10 +331,11 @@ struct RAGSettingsView: View {
     }
 
     private func saveAPIModel() {
+        guard let id = apiModelProviderID else { return }
         let trimmed = apiModel.trimmingCharacters(in: .whitespacesAndNewlines)
         apiModel = trimmed
-        guard trimmed != model.settings.embeddingAPIModel else { return }
-        model.updateSettings { $0.embeddingAPIModel = trimmed }
+        guard trimmed != model.providerConfigs.first(where: { $0.id == id })?.embeddingModel else { return }
+        model.updateProvider(id: id) { $0.embeddingModel = trimmed }
     }
 
     private static func host(_ config: ProviderConfig) -> String {

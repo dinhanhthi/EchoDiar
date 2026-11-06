@@ -222,13 +222,14 @@ public sealed class SettingsTests : IDisposable
         Assert.True(JsonNode.DeepEquals(JsonNode.Parse("""
             [
               {"id":"x","kind":"openAICompatible","displayName":"x","baseURL":"","authStyle":"none","extraHeaders":{},
-               "defaultModel":"","shownModels":[],"transcriptionModel":"","diarizationModel":"","enabled":false,"realtimeModel":""},
+               "defaultModel":"","shownModels":[],"transcriptionModel":"","diarizationModel":"","enabled":false,"realtimeModel":"",
+               "embeddingModel":""},
               {"id":"future","kind":"openAICompatible","displayName":"future","baseURL":"https://h/v1","authStyle":"none",
                "extraHeaders":{},"defaultModel":"m","shownModels":[],"transcriptionModel":"","diarizationModel":"",
-               "enabled":false,"realtimeModel":""},
+               "enabled":false,"realtimeModel":"","embeddingModel":""},
               {"id":"anthropic","kind":"anthropic","preset":"anthropic","displayName":"A","baseURL":"https://a",
                "authStyle":"xApiKey","extraHeaders":{"h":"v"},"defaultModel":"m","shownModels":[],
-               "transcriptionModel":"","diarizationModel":"","enabled":true,"realtimeModel":""}
+               "transcriptionModel":"","diarizationModel":"","enabled":true,"realtimeModel":"","embeddingModel":""}
             ]
             """), JsonNode.Parse(Json(settings))!["providers"]));
     }
@@ -366,10 +367,64 @@ public sealed class SettingsTests : IDisposable
             SwiftJson.Deserialize<AppSettings>("""{"autoExcludedProviderIDs":["DeepGram"]}"""u8).AutoExcludedProviderIDs);
     }
 
+    // An upgraded file keeps its AI model for summaries and chat, and its API embedder's model on that provider (the
+    // preset's config is added when the provider was never saved); the migration runs once. Same file and keys as macOS
+    // SettingsStoreTests.oldAISettingsMigrateOnce.
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public void OldAISettingsMigrateOnce(bool providerSaved)
+    {
+        const string saved = """
+            {"id":"openai","kind":"openAICompatible","preset":"openai","displayName":"Work OpenAI",
+             "baseURL":"https://api.openai.com/v1","authStyle":"bearer","defaultModel":"gpt-x"}
+            """;
+        File.WriteAllText(_store.FilePath, $$"""
+            {"version":1,"defaultAIProviderID":"anthropic","defaultAIModel":"claude-opus-5",
+             "embeddingModelID":"api:openai","embeddingAPIModel":" text-embedding-3-small\n",
+             "providers":[{{(providerSaved ? saved : "")}}]}
+            """);
+        var old = _store.Load();
+        Assert.False(old.AISettingsMigrated);
+
+        var migrated = old.MigratingAISettings();
+
+        Assert.Equal("anthropic", migrated.SummaryAIProviderID);
+        Assert.Equal("claude-opus-5", migrated.SummaryAIModel);
+        Assert.Equal("anthropic", migrated.ChatAIProviderID);
+        Assert.Equal("claude-opus-5", migrated.ChatAIModel);
+        var provider = providerSaved ? old.Providers[0] : ProviderConfig.Presets().First(p => p.Id == "openai");
+        Assert.Equal(Json(new List<ProviderConfig> { provider with { EmbeddingModel = "text-embedding-3-small" } }),
+            Json(migrated.Providers));
+        Assert.True(migrated.AISettingsMigrated);
+        // The old keys stay as they were.
+        Assert.Equal("anthropic", migrated.DefaultAIProviderID);
+        Assert.Equal("claude-opus-5", migrated.DefaultAIModel);
+        Assert.Equal(old.EmbeddingAPIModel, migrated.EmbeddingAPIModel);
+
+        _store.Save(migrated);
+        var written = JsonNode.Parse(File.ReadAllBytes(_store.FilePath))!.AsObject();
+        Assert.Equal("anthropic", written["summaryAIProviderID"]!.GetValue<string>());
+        Assert.Equal("claude-opus-5", written["summaryAIModel"]!.GetValue<string>());
+        Assert.Equal("anthropic", written["chatAIProviderID"]!.GetValue<string>());
+        Assert.Equal("claude-opus-5", written["chatAIModel"]!.GetValue<string>());
+        Assert.True(written["aiSettingsMigrated"]!.GetValue<bool>());
+        Assert.Equal("text-embedding-3-small", written["providers"]![0]!["embeddingModel"]!.GetValue<string>());
+
+        var read = _store.Load();
+        Assert.Equal(Json(migrated), Json(read));
+        // Runs once: a pick changed afterwards (back to Automatic) is not filled again.
+        read.SummaryAIProviderID = null;
+        read.SummaryAIModel = null;
+        Assert.Same(read, read.MigratingAISettings());
+        Assert.Null(read.SummaryAIProviderID);
+    }
+
     private static string Json<T>(T value) => Encoding.UTF8.GetString(SwiftJson.Serialize(value));
 
     // Every key Windows writes, with the macOS read defaults (Carbon shortcuts excluded, see AppSettings) except
-    // embeddingModelID, the Windows catalog id. A file from an older build still has the availability migration to run.
+    // embeddingModelID, the Windows catalog id. A file from an older build still has the availability and AI migrations to
+    // run.
     private const string DefaultsJson = """
         {
           "version": 1, "launchAtLogin": false, "defaultLanguage": "auto", "recentLanguages": [],
@@ -391,7 +446,7 @@ public sealed class SettingsTests : IDisposable
           "autoDeleteMode": "audioOnly", "deleteAudioAfterTranscription": false, "deleteWithoutConfirmation": false,
           "globalHotKeyWindows": {"virtualKey": 82, "modifiers": 3}, "globalHotKeyEnabled": true,
           "globalPauseHotKeyWindows": {"virtualKey": 80, "modifiers": 3}, "globalPauseHotKeyEnabled": true,
-          "autoExcludedProviderIDs": [], "providerAvailabilityMigrated": false,
+          "autoExcludedProviderIDs": [], "providerAvailabilityMigrated": false, "aiSettingsMigrated": false,
           "cloudLiveSource": "off", "realtimeAsFinal": false
         }
         """;

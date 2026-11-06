@@ -58,6 +58,14 @@ public sealed record AppSettings : IJsonOnDeserializing, IJsonOnDeserialized
     [JsonPropertyName("defaultAIProviderID")] public string? DefaultAIProviderID { get; set; }
     /// <summary>Model for <see cref="DefaultAIProviderID"/>; null = that config's default model.</summary>
     [JsonPropertyName("defaultAIModel")] public string? DefaultAIModel { get; set; }
+    /// <summary>Provider config id for summaries (and automatic catch-ups); null = Automatic.</summary>
+    [JsonPropertyName("summaryAIProviderID")] public string? SummaryAIProviderID { get; set; }
+    /// <summary>Model for <see cref="SummaryAIProviderID"/>; null = that config's default model.</summary>
+    [JsonPropertyName("summaryAIModel")] public string? SummaryAIModel { get; set; }
+    /// <summary>Provider config id for chat, library chat and chat titles; null = Automatic.</summary>
+    [JsonPropertyName("chatAIProviderID")] public string? ChatAIProviderID { get; set; }
+    /// <summary>Model for <see cref="ChatAIProviderID"/>; null = that config's default model.</summary>
+    [JsonPropertyName("chatAIModel")] public string? ChatAIModel { get; set; }
     /// <summary>Catch-up provider while recording: a provider config id outside the app (never an in-app model); empty =
     /// automatic (the AI tab provider when it is not in-app, else the first configured one).</summary>
     [JsonPropertyName("catchUpProviderID")] public string CatchUpProviderID { get; set; } = "";
@@ -123,6 +131,11 @@ public sealed record AppSettings : IJsonOnDeserializing, IJsonOnDeserialized
     /// so new users get automatic picks once they save a key; a file from an older build (key missing) reads as false.
     /// </summary>
     [JsonPropertyName("providerAvailabilityMigrated")] public bool ProviderAvailabilityMigrated { get; set; } = true;
+    /// <summary>
+    /// <see cref="MigratingAISettings"/> ran. True for a fresh install (<c>new AppSettings()</c>); a file from an older
+    /// build (key missing) reads as false.
+    /// </summary>
+    [JsonPropertyName("aiSettingsMigrated")] public bool AISettingsMigrated { get; set; } = true;
     /// <summary>What the live transcript shows while recording when the default transcription engine is a cloud one.</summary>
     [JsonPropertyName("cloudLiveSource")] public CloudLiveSource CloudLiveSource { get; set; } = CloudLiveSource.Off;
     /// <summary>Catalog id of the local model for <see cref="CloudLiveSource.Local"/> (display only); null = the catalog default.</summary>
@@ -134,7 +147,11 @@ public sealed record AppSettings : IJsonOnDeserializing, IJsonOnDeserialized
     [JsonExtensionData] public Dictionary<string, JsonElement> Extra { get; set; } = [];
 
     // Before the keys are read: a file without the key has the migration to run (Swift's decodeIfPresent ?? false).
-    void IJsonOnDeserializing.OnDeserializing() => ProviderAvailabilityMigrated = false;
+    void IJsonOnDeserializing.OnDeserializing()
+    {
+        ProviderAvailabilityMigrated = false;
+        AISettingsMigrated = false;
+    }
 
     /// <summary>
     /// One-time move to "key saved = available" for cloud providers (macOS <c>migratingProviderAvailability()</c>;
@@ -165,6 +182,40 @@ public sealed record AppSettings : IJsonOnDeserializing, IJsonOnDeserialized
             settings.AutoExcludedProviderIDs.Add(id);
         }
         settings.ProviderAvailabilityMigrated = true;
+        return settings;
+    }
+
+    /// <summary>
+    /// One-time split of the AI settings (macOS <c>migratingAISettings()</c>): <see cref="DefaultAIProviderID"/> and
+    /// <see cref="DefaultAIModel"/> fill the Summary pair and the Chat pair, each as a pair and only when both of its
+    /// values are null, and an API embedder's <see cref="EmbeddingAPIModel"/> moves to its provider's
+    /// <see cref="ProviderConfig.EmbeddingModel"/> (a preset without a saved config gets the preset's config first). A
+    /// local embedder's leftover model is dropped. The old keys stay as read. Unchanged (this same value) once
+    /// <see cref="AISettingsMigrated"/>.
+    /// </summary>
+    public AppSettings MigratingAISettings()
+    {
+        if (AISettingsMigrated) return this;
+        var fillSummary = SummaryAIProviderID is null && SummaryAIModel is null;
+        var fillChat = ChatAIProviderID is null && ChatAIModel is null;
+        var settings = this with
+        {
+            SummaryAIProviderID = fillSummary ? DefaultAIProviderID : SummaryAIProviderID,
+            SummaryAIModel = fillSummary ? DefaultAIModel : SummaryAIModel,
+            ChatAIProviderID = fillChat ? DefaultAIProviderID : ChatAIProviderID,
+            ChatAIModel = fillChat ? DefaultAIModel : ChatAIModel,
+            AISettingsMigrated = true,
+        };
+        var model = EmbeddingAPIModel.Trim();
+        if (EmbeddingModelID.StartsWith(ModelCatalog.ApiEmbedderPrefix, StringComparison.Ordinal) && model.Length > 0)
+        {
+            var id = EmbeddingModelID[ModelCatalog.ApiEmbedderPrefix.Length..];
+            // A new list and a copy of the changed config: the list and its configs are shared with this value.
+            var providers = Providers.ToList();
+            if (!providers.Any(p => Same(p.Id, id)) && ProviderConfig.Presets().FirstOrDefault(p => Same(p.Id, id)) is { } preset)
+                providers.Add(preset);
+            settings.Providers = providers.Select(p => Same(p.Id, id) ? p with { EmbeddingModel = model } : p).ToList();
+        }
         return settings;
     }
 

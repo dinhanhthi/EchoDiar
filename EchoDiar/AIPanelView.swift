@@ -504,7 +504,7 @@ struct AIPanelView: View {
             busyElsewhere
             if model.detailTab == .chat {
                 HStack(spacing: 8) {
-                    AIModelMenu(model: model, height: Self.chatMenuHeight)
+                    AIModelMenu(model: model, purpose: .chat, height: Self.chatMenuHeight)
                     AILanguageMenu(model: model, height: Self.chatMenuHeight)
                     dataNotesButton(height: Self.chatMenuHeight)
                     freshChatButton
@@ -520,7 +520,7 @@ struct AIPanelView: View {
                 questionRow
             } else {
                 HStack(spacing: 8) {
-                    AIModelMenu(model: model, height: Self.inputHeight)
+                    AIModelMenu(model: model, purpose: .summary, height: Self.inputHeight)
                     dataNotesButton(height: Self.inputHeight)
                     AILanguageMenu(model: model, height: Self.inputHeight)
                     Spacer(minLength: 0)
@@ -543,7 +543,7 @@ struct AIPanelView: View {
                     }
                 }
             }
-            AISetupHints(model: model)
+            AISetupHints(model: model, purpose: purpose)
                 .font(.caption)
                 .foregroundStyle(.secondary)
         }
@@ -645,9 +645,9 @@ struct AIPanelView: View {
                   : "Copy the transcript as a summary prompt for any chat app")
     }
 
-    /// Where the data goes with the current provider: off this Mac, and how far a CLI agent is contained.
+    /// Where the data goes with the tab's provider: off this Mac, and how far a CLI agent is contained.
     @ViewBuilder private var dataNotes: some View {
-        let provider = model.currentAIProvider
+        let provider = model.currentAIProvider(for: purpose)
         if let note = provider?.leavesMacNote {
             Label(note, systemImage: "info.circle")
         }
@@ -657,11 +657,11 @@ struct AIPanelView: View {
     }
 
     private var containmentNote: String? {
-        model.currentAIProvider?.containmentNote
+        model.currentAIProvider(for: purpose)?.containmentNote
     }
 
     private var hasDataNotes: Bool {
-        model.currentAIProvider?.leavesMac == true || containmentNote != nil
+        model.currentAIProvider(for: purpose)?.leavesMac == true || containmentNote != nil
     }
 
     @ViewBuilder private var toastView: some View {
@@ -677,9 +677,14 @@ struct AIPanelView: View {
 
     // MARK: - State
 
-    /// The current provider's picked model ("" = a CLI's own default).
+    /// The bottom bar's tab: Chat's questions use the chat default, the Summary tab the summary default.
+    private var purpose: AppModel.AIPurpose {
+        model.detailTab == .chat ? .chat : .summary
+    }
+
+    /// The chat provider's picked model ("" = a CLI's own default), shown on the streaming answer.
     private var currentModel: String? {
-        model.currentAIProvider.map(model.aiModel(for:))
+        model.currentAIProvider(for: .chat).map { model.aiModel(for: $0, purpose: .chat) }
     }
 
     private var summaryJob: AppModel.AIJobs.Entry? {
@@ -704,7 +709,8 @@ struct AIPanelView: View {
 
     /// As `startAIJob`'s guard: one job per conversation; other conversations' jobs do not block it.
     private var canRun: Bool {
-        model.aiJobs.entry(for: conversation.id) == nil && transcript != nil && model.currentAIProvider != nil
+        model.aiJobs.entry(for: conversation.id) == nil && transcript != nil
+            && model.currentAIProvider(for: purpose) != nil
     }
 
     private func load() async {
@@ -739,10 +745,11 @@ struct AIPanelView: View {
     }
 
     private func start(_ kind: AppModel.AIJob.Kind) {
-        guard let transcript, let provider = model.currentAIProvider else { return }
+        let purpose: AppModel.AIPurpose = kind == .summary ? .summary : .chat
+        guard let transcript, let provider = model.currentAIProvider(for: purpose) else { return }
         model.startAIJob(
             kind, conversation: conversation, transcript: transcript, summary: summary, history: chat,
-            provider: provider, model: model.aiModel(for: provider))
+            provider: provider, model: model.aiModel(for: provider, purpose: purpose))
     }
 
     private func ask() {
@@ -802,9 +809,10 @@ struct AIPanelView: View {
 }
 
 /// Every provider with the models it offers, on this Mac first; Foundation Models shows why it cannot run (the AI
-/// pane's bottom bar and the global chat's).
+/// pane's bottom bar and the global chat's). Shows and edits `purpose`'s default.
 struct AIModelMenu: View {
     let model: AppModel
+    let purpose: AppModel.AIPurpose
     let height: CGFloat
 
     var body: some View {
@@ -839,8 +847,8 @@ struct AIModelMenu: View {
 
     private func modelItem(_ provider: AppModel.AIProvider, _ id: String, title: String) -> some View {
         Toggle(isOn: Binding(
-            get: { model.currentAIProvider?.id == provider.id && currentModel == id },
-            set: { if $0 { model.setAIModel(id, of: provider) } }
+            get: { model.currentAIProvider(for: purpose)?.id == provider.id && currentModel == id },
+            set: { if $0 { model.setAIModel(id, of: provider, purpose: purpose) } }
         )) {
             Text(title)
             if let reason = provider.unavailableReason { Text(reason) }
@@ -849,15 +857,15 @@ struct AIModelMenu: View {
     }
 
     private var modelTitle: String {
-        guard let provider = model.currentAIProvider else { return String(localized: "No AI model") }
+        guard let provider = model.currentAIProvider(for: purpose) else { return String(localized: "No AI model") }
         guard provider.kind != .inApp else { return provider.name }
         let id = currentModel ?? ""
         return id.isEmpty ? provider.name : id
     }
 
-    /// The current provider's picked model ("" = a CLI's own default).
+    /// `purpose`'s provider's picked model ("" = a CLI's own default).
     private var currentModel: String? {
-        model.currentAIProvider.map(model.aiModel(for:))
+        model.currentAIProvider(for: purpose).map { model.aiModel(for: $0, purpose: purpose) }
     }
 }
 
@@ -908,12 +916,13 @@ struct AIMenuLabel: View {
     }
 }
 
-/// Why no model can run: no provider set up, and why Foundation Models is unavailable.
+/// Why no model can run for `purpose`: no provider set up, and why Foundation Models is unavailable.
 struct AISetupHints: View {
     let model: AppModel
+    let purpose: AppModel.AIPurpose
 
     var body: some View {
-        if model.currentAIProvider == nil {
+        if model.currentAIProvider(for: purpose) == nil {
             Label("No AI model: set up a provider or download a model in Settings › AI.",
                   systemImage: "exclamationmark.triangle")
             if let reason = AppModel.foundationModelsUnavailableReason {

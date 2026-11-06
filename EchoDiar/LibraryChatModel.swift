@@ -30,7 +30,7 @@ extension AppModel {
                 problem(String(localized: "Pick a provider in Settings › RAG"))
                 return nil
             }
-            let model = settings.embeddingAPIModel.trimmingCharacters(in: .whitespacesAndNewlines)
+            let model = config.embeddingModel.trimmingCharacters(in: .whitespacesAndNewlines)
             guard !model.isEmpty else {
                 problem(String(localized: "Enter the embedding model of \(config.displayName) in Settings › RAG"))
                 return nil
@@ -236,13 +236,15 @@ extension AppModel {
 // MARK: - Library chat
 
 extension AppModel {
-    /// Asks `question` across the library as the AI job of the nil key, beside the conversations' jobs, with the current
+    /// Asks `question` across the library as the AI job of the nil key, beside the conversations' jobs, with the chat
     /// AI provider and model: searches the index, then streams the answer, saved with its references in
     /// `globalChatFolder`'s `chat.json`. The job is set before the search so indexing yields. With no source found the
     /// question is still asked: the prompt has the model say the sources hold no answer.
     func askLibrary(_ question: String) {
-        guard aiJobs.entry(for: nil) == nil, settings.ragEnabled, let provider = currentAIProvider else { return }
-        let model = aiModel(for: provider).trimmingCharacters(in: .whitespacesAndNewlines)
+        guard aiJobs.entry(for: nil) == nil, settings.ragEnabled, let provider = currentAIProvider(for: .chat) else {
+            return
+        }
+        let model = aiModel(for: provider, purpose: .chat).trimmingCharacters(in: .whitespacesAndNewlines)
         aiError = nil
         let client: (any LLMProvider)?
         do {

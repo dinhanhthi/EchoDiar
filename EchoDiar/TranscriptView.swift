@@ -280,10 +280,12 @@ struct TranscriptView: View {
     /// `startAIJob` does nothing while this conversation has a job (other conversations' jobs do not block it).
     private func summarize() {
         model.detailTab = .summary
-        guard !conversation.hasSummary, let transcript, let provider = model.currentAIProvider else { return }
+        guard !conversation.hasSummary, let transcript, let provider = model.currentAIProvider(for: .summary) else {
+            return
+        }
         model.startAIJob(
             .summary, conversation: conversation, transcript: transcript, summary: nil, history: [],
-            provider: provider, model: model.aiModel(for: provider))
+            provider: provider, model: model.aiModel(for: provider, purpose: .summary))
     }
 
     /// Installed batch ASR models and configured cloud engines; picking one transcribes the conversation again with

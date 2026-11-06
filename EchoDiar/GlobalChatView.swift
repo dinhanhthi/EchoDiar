@@ -374,7 +374,7 @@ struct GlobalChatView: View {
             indexingLine
             // One row at any width: only the model menu shrinks (its name truncates), the rest keep their size.
             HStack(spacing: 8) {
-                AIModelMenu(model: model, height: Self.chatMenuHeight)
+                AIModelMenu(model: model, purpose: .chat, height: Self.chatMenuHeight)
                 AILanguageMenu(model: model, height: Self.chatMenuHeight)
                     .fixedSize()
                 chatButtons
@@ -382,7 +382,7 @@ struct GlobalChatView: View {
                 Spacer(minLength: 0)
             }
             questionRow
-            AISetupHints(model: model)
+            AISetupHints(model: model, purpose: .chat)
                 .font(.caption)
                 .foregroundStyle(.secondary)
         }
@@ -493,9 +493,9 @@ struct GlobalChatView: View {
 
     // MARK: - State
 
-    /// The current provider's picked model ("" = a CLI's own default).
+    /// The chat provider's picked model ("" = a CLI's own default).
     private var currentModel: String? {
-        model.currentAIProvider.map(model.aiModel(for:))
+        model.currentAIProvider(for: .chat).map { model.aiModel(for: $0, purpose: .chat) }
     }
 
     /// The library question running now (the nil key).
@@ -510,7 +510,7 @@ struct GlobalChatView: View {
 
     /// As `askLibrary`'s guard: one library question at a time; the conversations' jobs do not block it.
     private var canAsk: Bool {
-        model.aiJobs.entry(for: nil) == nil && model.settings.ragEnabled && model.currentAIProvider != nil
+        model.aiJobs.entry(for: nil) == nil && model.settings.ragEnabled && model.currentAIProvider(for: .chat) != nil
     }
 
     private func loadChat() async {
