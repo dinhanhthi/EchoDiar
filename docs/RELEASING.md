@@ -516,7 +516,7 @@ Partner Center > Apps and games > EchoDiar > Start your submission:
 5. **Store listings**: en-US, description from the website, screenshots.
 6. **Submission options** > restricted capabilities, the justifications:
    - `runFullTrust`: "WinUI 3 / Windows App SDK desktop app"
-   - `unvirtualizedResources`: the text in [unvirtualizedResources justification](#unvirtualizedresources-justification). A one-line justification was denied on 2026-11-06 (policy 10.6.3, v1.5.0).
+   - `unvirtualizedResources`: the text in [unvirtualizedResources justification](#unvirtualizedresources-justification). A one-line justification was denied on 2026-11-06 (policy 10.6.3, v1.3.0).
 
    Certification notes: the text under [unvirtualizedResources justification](#unvirtualizedresources-justification).
 7. Submit. Partner Center shows "In certification", then "Published".
