@@ -476,7 +476,7 @@ public sealed partial class StorageSettingsPage : UserControl
                 var count = _model.DeletableModels.Count;
                 if (count == 0) return;
                 title = Loc.Plural("Delete %lld downloaded models?", count);
-                message = Loc.T("The transcription, speaker and AI models are removed from this PC (not moved to the Recycle Bin). Download them again in Settings › Transcription and Settings › AI.");
+                message = Loc.T("The transcription, speaker and AI models are removed from this PC (not moved to the Recycle Bin). Download them again in Settings › AI Providers › Local AI.");
                 break;
             }
         }

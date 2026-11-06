@@ -74,9 +74,21 @@
     <value>IA</value>
     <comment>AI</comment>
   </data>
+  <data name="AIAnswerLanguage" xml:space="preserve">
+    <value>Idioma de las respuestas de la IA</value>
+    <comment>AI answer language</comment>
+  </data>
   <data name="AIModelsSummariesAndChat" xml:space="preserve">
     <value>Modelos de IA (resúmenes y chat)</value>
     <comment>AI models (summaries and chat)</comment>
+  </data>
+  <data name="AIProviders" xml:space="preserve">
+    <value>Proveedores de IA</value>
+    <comment>AI Providers</comment>
+  </data>
+  <data name="AISettings" xml:space="preserve">
+    <value>Ajustes de IA</value>
+    <comment>AI Settings</comment>
   </data>
   <data name="APIKey" xml:space="preserve">
     <value>Clave de API</value>
@@ -507,6 +519,10 @@
     <comment>Catch-up model</comment>
   </data>
   <data name="CatchUpNeedsAnAIProviderOutsideTheAppACloudAPIALocalServerOr" xml:space="preserve">
+    <value>Ponerse al día necesita un proveedor de IA fuera de la app: una API en la nube, un servidor local o una herramienta de línea de comandos. Añade uno en Ajustes › Proveedores de IA.</value>
+    <comment>Catch up needs an AI provider outside the app: a cloud API, a local server or a command-line tool. Add one in Settings › AI Providers.</comment>
+  </data>
+  <data name="CatchUpNeedsAnAIProviderOutsideTheAppACloudAPIALocalServerOr_2" xml:space="preserve">
     <value>Ponerse al día necesita un proveedor de IA fuera de la app: una API en la nube, un servidor local o una herramienta de línea de comandos. Añade uno en Ajustes › IA.</value>
     <comment>Catch up needs an AI provider outside the app: a cloud API, a local server or a command-line tool. Add one in Settings › AI.</comment>
   </data>
@@ -533,6 +549,10 @@
   <data name="ChatContext" xml:space="preserve">
     <value>Contexto del chat</value>
     <comment>Chat context</comment>
+  </data>
+  <data name="ChatModel" xml:space="preserve">
+    <value>Modelo de chat</value>
+    <comment>Chat model</comment>
   </data>
   <data name="ChatTemplatesOfLocalModels" xml:space="preserve">
     <value>Plantillas de chat de los modelos locales</value>
@@ -661,6 +681,10 @@
   <data name="Confirm" xml:space="preserve">
     <value>Confirmar…</value>
     <comment>Confirm…</comment>
+  </data>
+  <data name="ConfirmTheEmbeddingProviderInSettingsAISettingsLibraryChat" xml:space="preserve">
+    <value>Confirma el proveedor de embeddings en Ajustes › Ajustes de IA › Chat de la biblioteca.</value>
+    <comment>Confirm the embedding provider in Settings › AI Settings › Library chat.</comment>
   </data>
   <data name="ConfirmTheEmbeddingProviderInSettingsRAG" xml:space="preserve">
     <value>Confirma el proveedor de embeddings en Ajustes › RAG.</value>
@@ -806,9 +830,17 @@
     <value>{0} (predeterminado)</value>
     <comment>%@ (default)</comment>
   </data>
+  <data name="DefaultDiarizationModel" xml:space="preserve">
+    <value>Modelo de diarización predeterminado</value>
+    <comment>Default diarization model</comment>
+  </data>
   <data name="DefaultLanguage" xml:space="preserve">
     <value>Idioma predeterminado</value>
     <comment>Default language</comment>
+  </data>
+  <data name="DefaultTranscriptionModel" xml:space="preserve">
+    <value>Modelo de transcripción predeterminado</value>
+    <comment>Default transcription model</comment>
   </data>
   <data name="Default_2" xml:space="preserve">
     <value>Predeterminado</value>
@@ -1014,6 +1046,14 @@
     <value>Descargar un modelo de transcripción en Ajustes</value>
     <comment>Download a transcription model in Settings</comment>
   </data>
+  <data name="DownloadInAIProvidersLocalAI" xml:space="preserve">
+    <value>Descargar en Proveedores de IA › IA local</value>
+    <comment>Download in AI Providers › Local AI</comment>
+  </data>
+  <data name="DownloadTheEmbeddingModelInSettingsAIProvidersLocalAI" xml:space="preserve">
+    <value>Descarga el modelo de embeddings en Ajustes › Proveedores de IA › IA local</value>
+    <comment>Download the embedding model in Settings › AI Providers › Local AI</comment>
+  </data>
   <data name="DownloadTheEmbeddingModelInSettingsRAG" xml:space="preserve">
     <value>Descarga el modelo de embeddings en Ajustes › RAG</value>
     <comment>Download the embedding model in Settings › RAG</comment>
@@ -1142,6 +1182,10 @@
     <value>ID del modelo de embeddings</value>
     <comment>Embedding model id</comment>
   </data>
+  <data name="EmbeddingModels" xml:space="preserve">
+    <value>Modelos de embeddings</value>
+    <comment>Embedding models</comment>
+  </data>
   <data name="EmptyTheCLISDefault" xml:space="preserve">
     <value>Vacío = el predeterminado de la CLI</value>
     <comment>Empty = the CLI's default</comment>
@@ -1165,6 +1209,10 @@
   <data name="EnterANewKeyToReplaceIt" xml:space="preserve">
     <value>Introduce una clave nueva para reemplazarla</value>
     <comment>Enter a new key to replace it</comment>
+  </data>
+  <data name="EnterTheEmbeddingModelOfInItsCardInSettingsAIProviders" xml:space="preserve">
+    <value>Introduce el modelo de embeddings de {0} en su tarjeta, en Ajustes › Proveedores de IA</value>
+    <comment>Enter the embedding model of %@ in its card in Settings › AI Providers</comment>
   </data>
   <data name="EnterTheEmbeddingModelOfInSettingsRAG" xml:space="preserve">
     <value>Introduce el modelo de embeddings de {0} en Ajustes › RAG</value>
@@ -1542,6 +1590,10 @@
     <value>Biblioteca</value>
     <comment>Library</comment>
   </data>
+  <data name="LibraryChat" xml:space="preserve">
+    <value>Chat de la biblioteca</value>
+    <comment>Library chat</comment>
+  </data>
   <data name="LicensedUnderAGPL30" xml:space="preserve">
     <value>Con licencia AGPL-3.0</value>
     <comment>Licensed under AGPL-3.0</comment>
@@ -1694,6 +1746,10 @@
     <value>Cargando el modelo…</value>
     <comment>Loading the model…</comment>
   </data>
+  <data name="LocalAI" xml:space="preserve">
+    <value>IA local</value>
+    <comment>Local AI</comment>
+  </data>
   <data name="LocalHosts" xml:space="preserve">
     <value>Hosts locales</value>
     <comment>Local hosts</comment>
@@ -1806,6 +1862,14 @@
     <value>Modelo</value>
     <comment>Model</comment>
   </data>
+  <data name="ModelForQuestions" xml:space="preserve">
+    <value>Modelo para preguntas</value>
+    <comment>Model for questions</comment>
+  </data>
+  <data name="ModelForSummaries" xml:space="preserve">
+    <value>Modelo para resúmenes</value>
+    <comment>Model for summaries</comment>
+  </data>
   <data name="ModelForSummariesAndQuestions" xml:space="preserve">
     <value>Modelo para resúmenes y preguntas</value>
     <comment>Model for summaries and questions</comment>
@@ -1825,6 +1889,10 @@
   <data name="ModelsEchoDiarDownloadsWhenYouChooseThemChooseOneToReadItsLi" xml:space="preserve">
     <value>Modelos que EchoDiar descarga cuando los eliges. Elige uno para leer su licencia.</value>
     <comment>Models EchoDiar downloads when you choose them. Choose one to read its license.</comment>
+  </data>
+  <data name="ModelsThatRunOnThisMacForSummariesAndChat" xml:space="preserve">
+    <value>Modelos que se ejecutan en este Mac, para resúmenes y chat.</value>
+    <comment>Models that run on this Mac, for summaries and chat.</comment>
   </data>
   <data name="Monthly" xml:space="preserve">
     <value>Cada mes</value>
@@ -1890,6 +1958,10 @@
     <value>Requiere más de la mitad de la memoria de este PC.</value>
     <comment>Needs more than half of this PC's memory.</comment>
   </data>
+  <data name="NeedsTheSpeakerModelDownloadItInSettingsAIProvidersLocalAI" xml:space="preserve">
+    <value>Requiere el modelo de hablantes: descárgalo en Ajustes › Proveedores de IA › IA local.</value>
+    <comment>Needs the speaker model: download it in Settings › AI Providers › Local AI.</comment>
+  </data>
   <data name="NeedsTheSpeakerModelDownloadItInTranscriptionDiarizationMode" xml:space="preserve">
     <value>Requiere el modelo de hablantes: descárgalo en Transcripción › Modelo de diarización.</value>
     <comment>Needs the speaker model: download it in Transcription › Diarization model.</comment>
@@ -1938,6 +2010,10 @@
     <value>Sin modelo de IA: configura un proveedor o descarga un modelo en Ajustes › IA.</value>
     <comment>No AI model: set up a provider or download a model in Settings › AI.</comment>
   </data>
+  <data name="NoAIModelSetUpAProviderOrDownloadAModelInSettingsAIProviders" xml:space="preserve">
+    <value>Sin modelo de IA: configura un proveedor o descarga un modelo en Ajustes › Proveedores de IA.</value>
+    <comment>No AI model: set up a provider or download a model in Settings › AI Providers.</comment>
+  </data>
   <data name="NoCalendarAccountCanHoldEchoDiarSCalendar" xml:space="preserve">
     <value>Ninguna cuenta de calendario puede alojar el calendario de EchoDiar.</value>
     <comment>No calendar account can hold EchoDiar's calendar.</comment>
@@ -1967,12 +2043,20 @@
     <comment>No embedding models listed; type the model id.</comment>
   </data>
   <data name="NoInstalledLiveModelSupportsThisRecordingSLanguageDownloadOn" xml:space="preserve">
+    <value>Ningún modelo en directo instalado admite el idioma de esta grabación. Descarga uno en Ajustes › Proveedores de IA › IA local.</value>
+    <comment>No installed live model supports this recording's language. Download one in Settings › AI Providers › Local AI.</comment>
+  </data>
+  <data name="NoInstalledLiveModelSupportsThisRecordingSLanguageDownloadOn_2" xml:space="preserve">
     <value>Ningún modelo en directo instalado admite el idioma de esta grabación. Descarga uno en Ajustes › Transcripción.</value>
     <comment>No installed live model supports this recording's language. Download one in Settings › Transcription.</comment>
   </data>
   <data name="NoLiveModelInstalledDownloadAWhisperKitOrParakeetModelAbove" xml:space="preserve">
     <value>No hay ningún modelo en directo instalado. Descarga arriba un modelo WhisperKit o Parakeet.</value>
     <comment>No live model installed. Download a WhisperKit or Parakeet model above.</comment>
+  </data>
+  <data name="NoLiveModelInstalledDownloadAWhisperKitOrParakeetModelInAIPr" xml:space="preserve">
+    <value>No hay ningún modelo en directo instalado. Descarga un modelo WhisperKit o Parakeet en Proveedores de IA › IA local.</value>
+    <comment>No live model installed. Download a WhisperKit or Parakeet model in AI Providers › Local AI.</comment>
   </data>
   <data name="NoLiveModelInstalledDownloadAWhisperOrParakeetModelAbove" xml:space="preserve">
     <value>No hay ningún modelo en directo instalado. Descarga arriba un modelo Whisper o Parakeet.</value>
@@ -2057,6 +2141,10 @@
   <data name="NotSavedPutTheKeyInTheAPIKeyFieldWhichKeepsItInCredentialMan" xml:space="preserve">
     <value>{0} no se ha guardado: pon la clave en el campo Clave de API, que la guarda en el Administrador de credenciales.</value>
     <comment>%@ not saved: put the key in the API key field, which keeps it in Credential Manager.</comment>
+  </data>
+  <data name="NotSetForEnterItInItsCardInAIProviders" xml:space="preserve">
+    <value>No configurado para {0}. Introdúcelo en su tarjeta, en Proveedores de IA.</value>
+    <comment>Not set for %@. Enter it in its card in AI Providers.</comment>
   </data>
   <data name="NotTranscribed" xml:space="preserve">
     <value>Sin transcribir</value>
@@ -2314,9 +2402,17 @@
     <value>Elige una conversación en la barra lateral.</value>
     <comment>Pick a conversation in the sidebar.</comment>
   </data>
+  <data name="PickAProviderInSettingsAISettingsLibraryChat" xml:space="preserve">
+    <value>Elige un proveedor en Ajustes › Ajustes de IA › Chat de la biblioteca</value>
+    <comment>Pick a provider in Settings › AI Settings › Library chat</comment>
+  </data>
   <data name="PickAProviderInSettingsRAG" xml:space="preserve">
     <value>Elige un proveedor en Ajustes › RAG</value>
     <comment>Pick a provider in Settings › RAG</comment>
+  </data>
+  <data name="PickAnEmbeddingModelInSettingsAISettingsLibraryChat" xml:space="preserve">
+    <value>Elige un modelo de embeddings en Ajustes › Ajustes de IA › Chat de la biblioteca</value>
+    <comment>Pick an embedding model in Settings › AI Settings › Library chat</comment>
   </data>
   <data name="PickAnEmbeddingModelInSettingsRAG" xml:space="preserve">
     <value>Elige un modelo de embeddings en Ajustes › RAG</value>
@@ -2582,6 +2678,10 @@
     <value>Rehacer</value>
     <comment>Redo</comment>
   </data>
+  <data name="RejectedTheAPIKeyCheckItInSettingsAIProvidersCloud" xml:space="preserve">
+    <value>{0} rechazó la clave de API. Revísala en Ajustes › Proveedores de IA › Nube.</value>
+    <comment>%@ rejected the API key. Check it in Settings › AI Providers › Cloud.</comment>
+  </data>
   <data name="RejectedTheAPIKeyCheckItInSettingsAPIKeys" xml:space="preserve">
     <value>{0} rechazó la clave de API. Revísala en Ajustes › Claves de API.</value>
     <comment>%@ rejected the API key. Check it in Settings › API Keys.</comment>
@@ -2685,6 +2785,10 @@
   <data name="SaveAKeyFirst" xml:space="preserve">
     <value>Primero guarda una clave.</value>
     <comment>Save a key first.</comment>
+  </data>
+  <data name="SaveAKeyForInSettingsAIProvidersCloud" xml:space="preserve">
+    <value>Guarda una clave para {0} en Ajustes › Proveedores de IA › Nube</value>
+    <comment>Save a key for %@ in Settings › AI Providers › Cloud</comment>
   </data>
   <data name="SaveAKeyForInSettingsAPIKeys" xml:space="preserve">
     <value>Guarda una clave para {0} en Ajustes › Claves de API</value>
@@ -2819,14 +2923,22 @@
     <comment>Showing meetings in the next 7 days. The list updates automatically.</comment>
   </data>
   <data name="ShowsTheTranscriptDuringTheRecordingWhisperAndParakeetModels" xml:space="preserve">
+    <value>Muestra la transcripción durante la grabación. Los modelos Whisper y Parakeet la conservan, para que esté lista segundos después de Detener. Usa más CPU y memoria al grabar. Un motor en la nube puede mostrarla con un modelo local o con su transmisión en tiempo real: consulta Modelo de transcripción abajo.</value>
+    <comment>Shows the transcript during the recording. Whisper and Parakeet models keep it, so it is ready within seconds of Stop. Uses more CPU and memory while recording. A cloud engine can show it with a local model or its realtime stream: see Transcription model below.</comment>
+  </data>
+  <data name="ShowsTheTranscriptDuringTheRecordingWhisperAndParakeetModels_2" xml:space="preserve">
     <value>Muestra la transcripción durante la grabación. Los modelos Whisper y Parakeet la conservan, para que esté lista segundos después de Detener. Usa más CPU y memoria al grabar. Un motor en la nube puede mostrarla con un modelo local o con su transmisión en tiempo real: consulta Modelo de transcripción › Nube.</value>
     <comment>Shows the transcript during the recording. Whisper and Parakeet models keep it, so it is ready within seconds of Stop. Uses more CPU and memory while recording. A cloud engine can show it with a local model or its realtime stream: see Transcription model › Cloud.</comment>
   </data>
   <data name="ShowsTheTranscriptDuringTheRecordingWhisperKitAndParakeetMod" xml:space="preserve">
+    <value>Muestra la transcripción durante la grabación. Los modelos WhisperKit y Parakeet la conservan, para que esté lista segundos después de Detener; Apple Speech (macOS 26+) solo la muestra y transcribe después de Detener. Usa más CPU y memoria al grabar. Un motor en la nube puede mostrarla con un modelo local o con su transmisión en tiempo real: consulta Modelo de transcripción abajo.</value>
+    <comment>Shows the transcript during the recording. WhisperKit and Parakeet models keep it, so it is ready within seconds of Stop; Apple Speech (macOS 26+) only shows it and transcribes after Stop. Uses more CPU and memory while recording. A cloud engine can show it with a local model or its realtime stream: see Transcription model below.</comment>
+  </data>
+  <data name="ShowsTheTranscriptDuringTheRecordingWhisperKitAndParakeetMod_2" xml:space="preserve">
     <value>Muestra la transcripción durante la grabación. Los modelos WhisperKit y Parakeet la conservan, para que esté lista segundos después de Detener; Apple Speech (macOS 26+) solo la muestra y transcribe después de Detener. Usa más CPU y memoria al grabar. Un motor en la nube puede mostrarla con un modelo local o con su transmisión en tiempo real: consulta Modelo de transcripción › Nube.</value>
     <comment>Shows the transcript during the recording. WhisperKit and Parakeet models keep it, so it is ready within seconds of Stop; Apple Speech (macOS 26+) only shows it and transcribes after Stop. Uses more CPU and memory while recording. A cloud engine can show it with a local model or its realtime stream: see Transcription model › Cloud.</comment>
   </data>
-  <data name="ShowsTheTranscriptDuringTheRecordingWhisperKitAndParakeetMod_2" xml:space="preserve">
+  <data name="ShowsTheTranscriptDuringTheRecordingWhisperKitAndParakeetMod_3" xml:space="preserve">
     <value>Muestra la transcripción durante la grabación. Los modelos WhisperKit y Parakeet la conservan, para que esté lista segundos después de Detener; Apple Speech (macOS 26+) solo la muestra y transcribe después de Detener. Usa más CPU y memoria al grabar. Los demás motores transcriben después de Detener.</value>
     <comment>Shows the transcript during the recording. WhisperKit and Parakeet models keep it, so it is ready within seconds of Stop; Apple Speech (macOS 26+) only shows it and transcribes after Stop. Uses more CPU and memory while recording. Other engines transcribe after Stop.</comment>
   </data>
@@ -2881,6 +2993,10 @@
   <data name="SpeakersWereNotToldApartTheSpeakerModelIsInstalledNowReTrans" xml:space="preserve">
     <value>No se han distinguido los hablantes. El modelo de hablantes ya está instalado: vuelve a transcribir.</value>
     <comment>Speakers were not told apart. The speaker model is installed now: re-transcribe.</comment>
+  </data>
+  <data name="SpeakersWereNotToldApartTheSpeakerModelIsNotInstalledSetting" xml:space="preserve">
+    <value>No se han distinguido los hablantes: el modelo de hablantes no está instalado (Ajustes › Proveedores de IA › IA local).</value>
+    <comment>Speakers were not told apart: the speaker model is not installed (Settings › AI Providers › Local AI).</comment>
   </data>
   <data name="SpeakersWereNotToldApartTheSpeakerModelIsNotInstalledTranscr" xml:space="preserve">
     <value>No se han distinguido los hablantes: el modelo de hablantes no está instalado (Transcripción › Modelo de diarización).</value>
@@ -3042,6 +3158,10 @@
     <value>Resumen</value>
     <comment>Summary</comment>
   </data>
+  <data name="SummaryModel" xml:space="preserve">
+    <value>Modelo de resumen</value>
+    <comment>Summary model</comment>
+  </data>
   <data name="SureToQuit" xml:space="preserve">
     <value>Sí, salir</value>
     <comment>Sure to quit</comment>
@@ -3101,6 +3221,10 @@
   <data name="TestUsesYourSubscription" xml:space="preserve">
     <value>Probar (usa tu suscripción)</value>
     <comment>Test (uses your subscription)</comment>
+  </data>
+  <data name="TextGenerationModel" xml:space="preserve">
+    <value>Modelo de generación de texto</value>
+    <comment>Text generation model</comment>
   </data>
   <data name="TheAITabSModelPickAProviderAboveToChooseAnother" xml:space="preserve">
     <value>El modelo de la pestaña IA. Elige un proveedor arriba para elegir otro.</value>
@@ -3314,6 +3438,10 @@
     <value>No se ha podido configurar el atajo (error {0}).</value>
     <comment>The shortcut could not be set up (error %d).</comment>
   </data>
+  <data name="TheSummaryModelPickAProviderAboveToChooseAnother" xml:space="preserve">
+    <value>El modelo de resumen. Elige un proveedor arriba para elegir otro.</value>
+    <comment>The Summary model. Pick a provider above to choose another.</comment>
+  </data>
   <data name="TheSystemAudioFormatIsNotSupported" xml:space="preserve">
     <value>El formato del audio del sistema no es compatible.</value>
     <comment>The system audio format is not supported.</comment>
@@ -3331,12 +3459,16 @@
     <comment>The transcript is made after Stop.</comment>
   </data>
   <data name="TheTranscriptionSpeakerAndAIModelsAreRemovedFromThisMacNotMo" xml:space="preserve">
+    <value>Los modelos de transcripción, de hablantes y de IA se eliminan de este Mac (no se trasladan a la Papelera). Vuelve a descargarlos en Ajustes › Proveedores de IA › IA local.</value>
+    <comment>The transcription, speaker and AI models are removed from this Mac (not moved to the Trash). Download them again in Settings › AI Providers › Local AI.</comment>
+  </data>
+  <data name="TheTranscriptionSpeakerAndAIModelsAreRemovedFromThisMacNotMo_2" xml:space="preserve">
     <value>Los modelos de transcripción, de hablantes y de IA se eliminan de este Mac (no se trasladan a la Papelera). Vuelve a descargarlos en Ajustes › Transcripción y Ajustes › IA.</value>
     <comment>The transcription, speaker and AI models are removed from this Mac (not moved to the Trash). Download them again in Settings › Transcription and Settings › AI.</comment>
   </data>
   <data name="TheTranscriptionSpeakerAndAIModelsAreRemovedFromThisPCNotMov" xml:space="preserve">
-    <value>Los modelos de transcripción, de hablantes y de IA se eliminan de este PC (no se trasladan a la Papelera de reciclaje). Vuelve a descargarlos en Ajustes › Transcripción y Ajustes › IA.</value>
-    <comment>The transcription, speaker and AI models are removed from this PC (not moved to the Recycle Bin). Download them again in Settings › Transcription and Settings › AI.</comment>
+    <value>Los modelos de transcripción, de hablantes y de IA se eliminan de este PC (no se trasladan a la Papelera de reciclaje). Vuelve a descargarlos en Ajustes › Proveedores de IA › IA local.</value>
+    <comment>The transcription, speaker and AI models are removed from this PC (not moved to the Recycle Bin). Download them again in Settings › AI Providers › Local AI.</comment>
   </data>
   <data name="ThereIsNotEnoughFreeDiskSpaceToRecord" xml:space="preserve">
     <value>No hay suficiente espacio libre en el disco para grabar.</value>
@@ -3602,6 +3734,14 @@
     <value>Activa {0} en Ajustes › IA</value>
     <comment>Turn on %@ in Settings › AI</comment>
   </data>
+  <data name="TurnOnInSettingsAIProvidersLocalAI" xml:space="preserve">
+    <value>Activa {0} en Ajustes › Proveedores de IA › IA local</value>
+    <comment>Turn on %@ in Settings › AI Providers › Local AI</comment>
+  </data>
+  <data name="TurnOnInSettingsAISettingsLibraryChat" xml:space="preserve">
+    <value>Activar en Ajustes › Ajustes de IA › Chat de la biblioteca</value>
+    <comment>Turn on in Settings › AI Settings › Library chat</comment>
+  </data>
   <data name="TurnOnInSettingsRAG" xml:space="preserve">
     <value>Activar en Ajustes › RAG</value>
     <comment>Turn on in Settings › RAG</comment>
@@ -3733,6 +3873,14 @@
   <data name="UsedByWhisperNet" xml:space="preserve">
     <value>Usado por Whisper.net</value>
     <comment>Used by Whisper.net</comment>
+  </data>
+  <data name="UsedForNewSummariesTheModelMenuInTheSummaryTabChangesItToo" xml:space="preserve">
+    <value>Se usa para los resúmenes nuevos. El menú de modelos de la pestaña Resumen también lo cambia.</value>
+    <comment>Used for new summaries. The model menu in the Summary tab changes it too.</comment>
+  </data>
+  <data name="UsedForQuestionsInTheChatTabAndLibraryChatTheModelMenuInTheC" xml:space="preserve">
+    <value>Se usa para las preguntas de la pestaña Chat y del Chat de la biblioteca. El menú de modelos de la pestaña Chat también lo cambia.</value>
+    <comment>Used for questions in the Chat tab and Library chat. The model menu in the Chat tab changes it too.</comment>
   </data>
   <data name="UsedForSummariesAndQuestionsTheModelOfEachEnabledProviderBel" xml:space="preserve">
     <value>Se usa para resúmenes y preguntas. El modelo de cada proveedor activado de abajo, según lo marcado en su fila.</value>

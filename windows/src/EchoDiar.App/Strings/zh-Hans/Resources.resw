@@ -74,9 +74,21 @@
     <value>AI</value>
     <comment>AI</comment>
   </data>
+  <data name="AIAnswerLanguage" xml:space="preserve">
+    <value>AI 回答语言</value>
+    <comment>AI answer language</comment>
+  </data>
   <data name="AIModelsSummariesAndChat" xml:space="preserve">
     <value>AI 模型（摘要和聊天）</value>
     <comment>AI models (summaries and chat)</comment>
+  </data>
+  <data name="AIProviders" xml:space="preserve">
+    <value>AI 提供商</value>
+    <comment>AI Providers</comment>
+  </data>
+  <data name="AISettings" xml:space="preserve">
+    <value>AI 设置</value>
+    <comment>AI Settings</comment>
   </data>
   <data name="APIKey" xml:space="preserve">
     <value>API 密钥</value>
@@ -483,6 +495,10 @@
     <comment>Catch-up model</comment>
   </data>
   <data name="CatchUpNeedsAnAIProviderOutsideTheAppACloudAPIALocalServerOr" xml:space="preserve">
+    <value>快速回顾需要应用之外的 AI 提供商：云端 API、本地服务器或命令行工具。请在“设置 › AI 提供商”中添加一个。</value>
+    <comment>Catch up needs an AI provider outside the app: a cloud API, a local server or a command-line tool. Add one in Settings › AI Providers.</comment>
+  </data>
+  <data name="CatchUpNeedsAnAIProviderOutsideTheAppACloudAPIALocalServerOr_2" xml:space="preserve">
     <value>快速回顾需要应用之外的 AI 提供商：云端 API、本地服务器或命令行工具。请在“设置 › AI”中添加一个。</value>
     <comment>Catch up needs an AI provider outside the app: a cloud API, a local server or a command-line tool. Add one in Settings › AI.</comment>
   </data>
@@ -509,6 +525,10 @@
   <data name="ChatContext" xml:space="preserve">
     <value>聊天上下文</value>
     <comment>Chat context</comment>
+  </data>
+  <data name="ChatModel" xml:space="preserve">
+    <value>聊天模型</value>
+    <comment>Chat model</comment>
   </data>
   <data name="ChatTemplatesOfLocalModels" xml:space="preserve">
     <value>本地模型的聊天模板</value>
@@ -637,6 +657,10 @@
   <data name="Confirm" xml:space="preserve">
     <value>确认…</value>
     <comment>Confirm…</comment>
+  </data>
+  <data name="ConfirmTheEmbeddingProviderInSettingsAISettingsLibraryChat" xml:space="preserve">
+    <value>请在“设置 › AI 设置 › 资料库聊天”中确认嵌入提供商。</value>
+    <comment>Confirm the embedding provider in Settings › AI Settings › Library chat.</comment>
   </data>
   <data name="ConfirmTheEmbeddingProviderInSettingsRAG" xml:space="preserve">
     <value>请在“设置 › RAG”中确认嵌入提供商。</value>
@@ -778,9 +802,17 @@
     <value>{0}（默认）</value>
     <comment>%@ (default)</comment>
   </data>
+  <data name="DefaultDiarizationModel" xml:space="preserve">
+    <value>默认说话人分离模型</value>
+    <comment>Default diarization model</comment>
+  </data>
   <data name="DefaultLanguage" xml:space="preserve">
     <value>默认语言</value>
     <comment>Default language</comment>
+  </data>
+  <data name="DefaultTranscriptionModel" xml:space="preserve">
+    <value>默认转写模型</value>
+    <comment>Default transcription model</comment>
   </data>
   <data name="Default_2" xml:space="preserve">
     <value>默认</value>
@@ -966,6 +998,14 @@
     <value>在设置中下载转写模型</value>
     <comment>Download a transcription model in Settings</comment>
   </data>
+  <data name="DownloadInAIProvidersLocalAI" xml:space="preserve">
+    <value>在“AI 提供商 › 本地 AI”中下载</value>
+    <comment>Download in AI Providers › Local AI</comment>
+  </data>
+  <data name="DownloadTheEmbeddingModelInSettingsAIProvidersLocalAI" xml:space="preserve">
+    <value>在“设置 › AI 提供商 › 本地 AI”中下载嵌入模型</value>
+    <comment>Download the embedding model in Settings › AI Providers › Local AI</comment>
+  </data>
   <data name="DownloadTheEmbeddingModelInSettingsRAG" xml:space="preserve">
     <value>在“设置 › RAG”中下载嵌入模型</value>
     <comment>Download the embedding model in Settings › RAG</comment>
@@ -1094,6 +1134,10 @@
     <value>嵌入模型 ID</value>
     <comment>Embedding model id</comment>
   </data>
+  <data name="EmbeddingModels" xml:space="preserve">
+    <value>嵌入模型</value>
+    <comment>Embedding models</comment>
+  </data>
   <data name="EmptyTheCLISDefault" xml:space="preserve">
     <value>留空 = CLI 的默认值</value>
     <comment>Empty = the CLI's default</comment>
@@ -1117,6 +1161,10 @@
   <data name="EnterANewKeyToReplaceIt" xml:space="preserve">
     <value>输入新密钥以替换</value>
     <comment>Enter a new key to replace it</comment>
+  </data>
+  <data name="EnterTheEmbeddingModelOfInItsCardInSettingsAIProviders" xml:space="preserve">
+    <value>在“设置 › AI 提供商”中 {0} 的卡片里输入其嵌入模型</value>
+    <comment>Enter the embedding model of %@ in its card in Settings › AI Providers</comment>
   </data>
   <data name="EnterTheEmbeddingModelOfInSettingsRAG" xml:space="preserve">
     <value>在“设置 › RAG”中输入 {0} 的嵌入模型</value>
@@ -1490,6 +1538,10 @@
     <value>资料库</value>
     <comment>Library</comment>
   </data>
+  <data name="LibraryChat" xml:space="preserve">
+    <value>资料库聊天</value>
+    <comment>Library chat</comment>
+  </data>
   <data name="LicensedUnderAGPL30" xml:space="preserve">
     <value>依据 AGPL-3.0 授权</value>
     <comment>Licensed under AGPL-3.0</comment>
@@ -1606,6 +1658,10 @@
     <value>正在载入模型…</value>
     <comment>Loading the model…</comment>
   </data>
+  <data name="LocalAI" xml:space="preserve">
+    <value>本地 AI</value>
+    <comment>Local AI</comment>
+  </data>
   <data name="LocalHosts" xml:space="preserve">
     <value>本地主机</value>
     <comment>Local hosts</comment>
@@ -1718,6 +1774,14 @@
     <value>模型</value>
     <comment>Model</comment>
   </data>
+  <data name="ModelForQuestions" xml:space="preserve">
+    <value>用于提问的模型</value>
+    <comment>Model for questions</comment>
+  </data>
+  <data name="ModelForSummaries" xml:space="preserve">
+    <value>用于摘要的模型</value>
+    <comment>Model for summaries</comment>
+  </data>
   <data name="ModelForSummariesAndQuestions" xml:space="preserve">
     <value>用于摘要和提问的模型</value>
     <comment>Model for summaries and questions</comment>
@@ -1737,6 +1801,10 @@
   <data name="ModelsEchoDiarDownloadsWhenYouChooseThemChooseOneToReadItsLi" xml:space="preserve">
     <value>你选择后由 EchoDiar 下载的模型。选择一项以阅读其许可证。</value>
     <comment>Models EchoDiar downloads when you choose them. Choose one to read its license.</comment>
+  </data>
+  <data name="ModelsThatRunOnThisMacForSummariesAndChat" xml:space="preserve">
+    <value>在这台 Mac 上运行的模型，用于摘要和聊天。</value>
+    <comment>Models that run on this Mac, for summaries and chat.</comment>
   </data>
   <data name="Monthly" xml:space="preserve">
     <value>每月</value>
@@ -1802,6 +1870,10 @@
     <value>需要这台电脑一半以上的内存。</value>
     <comment>Needs more than half of this PC's memory.</comment>
   </data>
+  <data name="NeedsTheSpeakerModelDownloadItInSettingsAIProvidersLocalAI" xml:space="preserve">
+    <value>需要说话人模型：请在“设置 › AI 提供商 › 本地 AI”中下载。</value>
+    <comment>Needs the speaker model: download it in Settings › AI Providers › Local AI.</comment>
+  </data>
   <data name="NeedsTheSpeakerModelDownloadItInTranscriptionDiarizationMode" xml:space="preserve">
     <value>需要说话人模型：请在“转写 › 说话人分离模型”中下载。</value>
     <comment>Needs the speaker model: download it in Transcription › Diarization model.</comment>
@@ -1846,6 +1918,10 @@
     <value>没有 AI 模型：请在“设置 › AI”中设置提供商或下载模型。</value>
     <comment>No AI model: set up a provider or download a model in Settings › AI.</comment>
   </data>
+  <data name="NoAIModelSetUpAProviderOrDownloadAModelInSettingsAIProviders" xml:space="preserve">
+    <value>没有 AI 模型：请在“设置 › AI 提供商”中设置提供商或下载模型。</value>
+    <comment>No AI model: set up a provider or download a model in Settings › AI Providers.</comment>
+  </data>
   <data name="NoCalendarAccountCanHoldEchoDiarSCalendar" xml:space="preserve">
     <value>没有日历账户可以存放 EchoDiar 的日历。</value>
     <comment>No calendar account can hold EchoDiar's calendar.</comment>
@@ -1875,12 +1951,20 @@
     <comment>No embedding models listed; type the model id.</comment>
   </data>
   <data name="NoInstalledLiveModelSupportsThisRecordingSLanguageDownloadOn" xml:space="preserve">
+    <value>已安装的实时转写模型都不支持此录音的语言。请在“设置 › AI 提供商 › 本地 AI”中下载一个。</value>
+    <comment>No installed live model supports this recording's language. Download one in Settings › AI Providers › Local AI.</comment>
+  </data>
+  <data name="NoInstalledLiveModelSupportsThisRecordingSLanguageDownloadOn_2" xml:space="preserve">
     <value>已安装的实时转写模型都不支持此录音的语言。请在“设置 › 转写”中下载一个。</value>
     <comment>No installed live model supports this recording's language. Download one in Settings › Transcription.</comment>
   </data>
   <data name="NoLiveModelInstalledDownloadAWhisperKitOrParakeetModelAbove" xml:space="preserve">
     <value>未安装实时转写模型。请在上方下载 WhisperKit 或 Parakeet 模型。</value>
     <comment>No live model installed. Download a WhisperKit or Parakeet model above.</comment>
+  </data>
+  <data name="NoLiveModelInstalledDownloadAWhisperKitOrParakeetModelInAIPr" xml:space="preserve">
+    <value>未安装实时转写模型。请在“AI 提供商 › 本地 AI”中下载 WhisperKit 或 Parakeet 模型。</value>
+    <comment>No live model installed. Download a WhisperKit or Parakeet model in AI Providers › Local AI.</comment>
   </data>
   <data name="NoLiveModelInstalledDownloadAWhisperOrParakeetModelAbove" xml:space="preserve">
     <value>未安装实时转写模型。请在上方下载 Whisper 或 Parakeet 模型。</value>
@@ -1965,6 +2049,10 @@
   <data name="NotSavedPutTheKeyInTheAPIKeyFieldWhichKeepsItInCredentialMan" xml:space="preserve">
     <value>未保存 {0}：请将密钥填入“API 密钥”栏，它会保存在凭据管理器中。</value>
     <comment>%@ not saved: put the key in the API key field, which keeps it in Credential Manager.</comment>
+  </data>
+  <data name="NotSetForEnterItInItsCardInAIProviders" xml:space="preserve">
+    <value>尚未为 {0} 设置。请在“AI 提供商”中它的卡片里输入。</value>
+    <comment>Not set for %@. Enter it in its card in AI Providers.</comment>
   </data>
   <data name="NotTranscribed" xml:space="preserve">
     <value>未转写</value>
@@ -2222,9 +2310,17 @@
     <value>在边栏中选择一个对话。</value>
     <comment>Pick a conversation in the sidebar.</comment>
   </data>
+  <data name="PickAProviderInSettingsAISettingsLibraryChat" xml:space="preserve">
+    <value>在“设置 › AI 设置 › 资料库聊天”中选择提供商</value>
+    <comment>Pick a provider in Settings › AI Settings › Library chat</comment>
+  </data>
   <data name="PickAProviderInSettingsRAG" xml:space="preserve">
     <value>在“设置 › RAG”中选择提供商</value>
     <comment>Pick a provider in Settings › RAG</comment>
+  </data>
+  <data name="PickAnEmbeddingModelInSettingsAISettingsLibraryChat" xml:space="preserve">
+    <value>在“设置 › AI 设置 › 资料库聊天”中选择嵌入模型</value>
+    <comment>Pick an embedding model in Settings › AI Settings › Library chat</comment>
   </data>
   <data name="PickAnEmbeddingModelInSettingsRAG" xml:space="preserve">
     <value>在“设置 › RAG”中选择嵌入模型</value>
@@ -2490,6 +2586,10 @@
     <value>重做</value>
     <comment>Redo</comment>
   </data>
+  <data name="RejectedTheAPIKeyCheckItInSettingsAIProvidersCloud" xml:space="preserve">
+    <value>{0} 拒绝了 API 密钥。请在“设置 › AI 提供商 › 云端”中检查。</value>
+    <comment>%@ rejected the API key. Check it in Settings › AI Providers › Cloud.</comment>
+  </data>
   <data name="RejectedTheAPIKeyCheckItInSettingsAPIKeys" xml:space="preserve">
     <value>{0} 拒绝了 API 密钥。请在“设置 › API 密钥”中检查。</value>
     <comment>%@ rejected the API key. Check it in Settings › API Keys.</comment>
@@ -2593,6 +2693,10 @@
   <data name="SaveAKeyFirst" xml:space="preserve">
     <value>请先存储密钥。</value>
     <comment>Save a key first.</comment>
+  </data>
+  <data name="SaveAKeyForInSettingsAIProvidersCloud" xml:space="preserve">
+    <value>在“设置 › AI 提供商 › 云端”中存储 {0} 的密钥</value>
+    <comment>Save a key for %@ in Settings › AI Providers › Cloud</comment>
   </data>
   <data name="SaveAKeyForInSettingsAPIKeys" xml:space="preserve">
     <value>在“设置 › API 密钥”中存储 {0} 的密钥</value>
@@ -2727,14 +2831,22 @@
     <comment>Showing meetings in the next 7 days. The list updates automatically.</comment>
   </data>
   <data name="ShowsTheTranscriptDuringTheRecordingWhisperAndParakeetModels" xml:space="preserve">
+    <value>在录音期间显示转写文本。Whisper 和 Parakeet 模型会保留下来，因此停止后几秒内即可就绪。录音时会占用更多 CPU 和内存。云端引擎可以通过本地模型或其实时流显示转写文本：请参阅下方的“转写模型”。</value>
+    <comment>Shows the transcript during the recording. Whisper and Parakeet models keep it, so it is ready within seconds of Stop. Uses more CPU and memory while recording. A cloud engine can show it with a local model or its realtime stream: see Transcription model below.</comment>
+  </data>
+  <data name="ShowsTheTranscriptDuringTheRecordingWhisperAndParakeetModels_2" xml:space="preserve">
     <value>在录音期间显示转写文本。Whisper 和 Parakeet 模型会保留下来，因此停止后几秒内即可就绪。录音时会占用更多 CPU 和内存。云端引擎可以通过本地模型或其实时流显示转写文本：请参阅“转写模型 › 云端”。</value>
     <comment>Shows the transcript during the recording. Whisper and Parakeet models keep it, so it is ready within seconds of Stop. Uses more CPU and memory while recording. A cloud engine can show it with a local model or its realtime stream: see Transcription model › Cloud.</comment>
   </data>
   <data name="ShowsTheTranscriptDuringTheRecordingWhisperKitAndParakeetMod" xml:space="preserve">
+    <value>在录音期间显示转写文本。WhisperKit 和 Parakeet 模型会保留下来，因此停止后几秒内即可就绪；Apple Speech（macOS 26+）仅显示，停止后再转写。录音时会占用更多 CPU 和内存。云端引擎可以通过本地模型或其实时流显示转写文本：请参阅下方的“转写模型”。</value>
+    <comment>Shows the transcript during the recording. WhisperKit and Parakeet models keep it, so it is ready within seconds of Stop; Apple Speech (macOS 26+) only shows it and transcribes after Stop. Uses more CPU and memory while recording. A cloud engine can show it with a local model or its realtime stream: see Transcription model below.</comment>
+  </data>
+  <data name="ShowsTheTranscriptDuringTheRecordingWhisperKitAndParakeetMod_2" xml:space="preserve">
     <value>在录音期间显示转写文本。WhisperKit 和 Parakeet 模型会保留下来，因此停止后几秒内即可就绪；Apple Speech（macOS 26+）仅显示，停止后再转写。录音时会占用更多 CPU 和内存。云端引擎可以通过本地模型或其实时流显示转写文本：请参阅“转写模型 › 云端”。</value>
     <comment>Shows the transcript during the recording. WhisperKit and Parakeet models keep it, so it is ready within seconds of Stop; Apple Speech (macOS 26+) only shows it and transcribes after Stop. Uses more CPU and memory while recording. A cloud engine can show it with a local model or its realtime stream: see Transcription model › Cloud.</comment>
   </data>
-  <data name="ShowsTheTranscriptDuringTheRecordingWhisperKitAndParakeetMod_2" xml:space="preserve">
+  <data name="ShowsTheTranscriptDuringTheRecordingWhisperKitAndParakeetMod_3" xml:space="preserve">
     <value>在录音期间显示转写文本。WhisperKit 和 Parakeet 模型会保留下来，因此停止后几秒内即可就绪；Apple Speech（macOS 26+）仅显示，停止后再转写。录音时会占用更多 CPU 和内存。其他引擎会在停止后转写。</value>
     <comment>Shows the transcript during the recording. WhisperKit and Parakeet models keep it, so it is ready within seconds of Stop; Apple Speech (macOS 26+) only shows it and transcribes after Stop. Uses more CPU and memory while recording. Other engines transcribe after Stop.</comment>
   </data>
@@ -2789,6 +2901,10 @@
   <data name="SpeakersWereNotToldApartTheSpeakerModelIsInstalledNowReTrans" xml:space="preserve">
     <value>未区分说话人。说话人模型现已安装：请重新转写。</value>
     <comment>Speakers were not told apart. The speaker model is installed now: re-transcribe.</comment>
+  </data>
+  <data name="SpeakersWereNotToldApartTheSpeakerModelIsNotInstalledSetting" xml:space="preserve">
+    <value>未区分说话人：未安装说话人模型（设置 › AI 提供商 › 本地 AI）。</value>
+    <comment>Speakers were not told apart: the speaker model is not installed (Settings › AI Providers › Local AI).</comment>
   </data>
   <data name="SpeakersWereNotToldApartTheSpeakerModelIsNotInstalledTranscr" xml:space="preserve">
     <value>未区分说话人：未安装说话人模型（转写 › 说话人分离模型）。</value>
@@ -2950,6 +3066,10 @@
     <value>摘要</value>
     <comment>Summary</comment>
   </data>
+  <data name="SummaryModel" xml:space="preserve">
+    <value>摘要模型</value>
+    <comment>Summary model</comment>
+  </data>
   <data name="SureToQuit" xml:space="preserve">
     <value>确定退出</value>
     <comment>Sure to quit</comment>
@@ -3009,6 +3129,10 @@
   <data name="TestUsesYourSubscription" xml:space="preserve">
     <value>测试（使用你的订阅）</value>
     <comment>Test (uses your subscription)</comment>
+  </data>
+  <data name="TextGenerationModel" xml:space="preserve">
+    <value>文本生成模型</value>
+    <comment>Text generation model</comment>
   </data>
   <data name="TheAITabSModelPickAProviderAboveToChooseAnother" xml:space="preserve">
     <value>AI 标签页的模型。在上方选择一个提供商即可选择其他模型。</value>
@@ -3198,6 +3322,10 @@
     <value>无法设置快捷键（错误 {0}）。</value>
     <comment>The shortcut could not be set up (error %d).</comment>
   </data>
+  <data name="TheSummaryModelPickAProviderAboveToChooseAnother" xml:space="preserve">
+    <value>摘要模型。在上方选择一个提供商即可选择其他模型。</value>
+    <comment>The Summary model. Pick a provider above to choose another.</comment>
+  </data>
   <data name="TheSystemAudioFormatIsNotSupported" xml:space="preserve">
     <value>不支持该系统音频格式。</value>
     <comment>The system audio format is not supported.</comment>
@@ -3215,12 +3343,16 @@
     <comment>The transcript is made after Stop.</comment>
   </data>
   <data name="TheTranscriptionSpeakerAndAIModelsAreRemovedFromThisMacNotMo" xml:space="preserve">
+    <value>转写模型、说话人模型和 AI 模型会从这台 Mac 上移除（不会移到废纸篓）。可在“设置 › AI 提供商 › 本地 AI”中重新下载。</value>
+    <comment>The transcription, speaker and AI models are removed from this Mac (not moved to the Trash). Download them again in Settings › AI Providers › Local AI.</comment>
+  </data>
+  <data name="TheTranscriptionSpeakerAndAIModelsAreRemovedFromThisMacNotMo_2" xml:space="preserve">
     <value>转写模型、说话人模型和 AI 模型会从这台 Mac 上移除（不会移到废纸篓）。可在“设置 › 转写”和“设置 › AI”中重新下载。</value>
     <comment>The transcription, speaker and AI models are removed from this Mac (not moved to the Trash). Download them again in Settings › Transcription and Settings › AI.</comment>
   </data>
   <data name="TheTranscriptionSpeakerAndAIModelsAreRemovedFromThisPCNotMov" xml:space="preserve">
-    <value>转写模型、说话人模型和 AI 模型会从这台电脑上移除（不会移到回收站）。可在“设置 › 转写”和“设置 › AI”中重新下载。</value>
-    <comment>The transcription, speaker and AI models are removed from this PC (not moved to the Recycle Bin). Download them again in Settings › Transcription and Settings › AI.</comment>
+    <value>转写模型、说话人模型和 AI 模型会从这台电脑上移除（不会移到回收站）。可在“设置 › AI 提供商 › 本地 AI”中重新下载。</value>
+    <comment>The transcription, speaker and AI models are removed from this PC (not moved to the Recycle Bin). Download them again in Settings › AI Providers › Local AI.</comment>
   </data>
   <data name="ThereIsNotEnoughFreeDiskSpaceToRecord" xml:space="preserve">
     <value>没有足够的可用磁盘空间来录音。</value>
@@ -3482,6 +3614,14 @@
     <value>在“设置 › AI”中打开 {0}</value>
     <comment>Turn on %@ in Settings › AI</comment>
   </data>
+  <data name="TurnOnInSettingsAIProvidersLocalAI" xml:space="preserve">
+    <value>在“设置 › AI 提供商 › 本地 AI”中打开 {0}</value>
+    <comment>Turn on %@ in Settings › AI Providers › Local AI</comment>
+  </data>
+  <data name="TurnOnInSettingsAISettingsLibraryChat" xml:space="preserve">
+    <value>在“设置 › AI 设置 › 资料库聊天”中打开</value>
+    <comment>Turn on in Settings › AI Settings › Library chat</comment>
+  </data>
   <data name="TurnOnInSettingsRAG" xml:space="preserve">
     <value>在“设置 › RAG”中打开</value>
     <comment>Turn on in Settings › RAG</comment>
@@ -3613,6 +3753,14 @@
   <data name="UsedByWhisperNet" xml:space="preserve">
     <value>由 Whisper.net 使用</value>
     <comment>Used by Whisper.net</comment>
+  </data>
+  <data name="UsedForNewSummariesTheModelMenuInTheSummaryTabChangesItToo" xml:space="preserve">
+    <value>用于新的摘要。“摘要”标签页中的模型菜单也可以更改它。</value>
+    <comment>Used for new summaries. The model menu in the Summary tab changes it too.</comment>
+  </data>
+  <data name="UsedForQuestionsInTheChatTabAndLibraryChatTheModelMenuInTheC" xml:space="preserve">
+    <value>用于“聊天”标签页和“资料库聊天”中的提问。“聊天”标签页中的模型菜单也可以更改它。</value>
+    <comment>Used for questions in the Chat tab and Library chat. The model menu in the Chat tab changes it too.</comment>
   </data>
   <data name="UsedForSummariesAndQuestionsTheModelOfEachEnabledProviderBel" xml:space="preserve">
     <value>用于摘要和提问。即下方每个已启用提供商的模型，以其所在行中勾选的为准。</value>
