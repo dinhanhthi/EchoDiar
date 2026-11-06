@@ -9,6 +9,8 @@ enum Palette {
     static let switchOffFill = Color.white.opacity(0.22)
     /// Cards and panels, a step above the window. #2C2C2E
     static let surface = Color(red: 44 / 255, green: 44 / 255, blue: 46 / 255)
+    /// Cards on a `surface` panel (the library sidebar's entries), a step above it. #3A3A3C
+    static let raisedSurface = Color(red: 58 / 255, green: 58 / 255, blue: 60 / 255)
     /// Text fields and input bars, a step above the cards. #3A3A3C
     static let inputSurface = Color(red: 58 / 255, green: 58 / 255, blue: 60 / 255)
     /// The 1 pt edge of cards and panels.
@@ -126,13 +128,14 @@ struct WindowGlass: NSViewRepresentable {
 struct GlassCard: ViewModifier {
     var cornerRadius: CGFloat = 14
     var raised = false
+    var fill = Palette.surface
 
     func body(content: Content) -> some View {
         let shape = RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
         if raised {
             content
                 .background {
-                    shape.fill(Palette.surface)
+                    shape.fill(fill)
                         .overlay(shape.fill(LinearGradient(
                             colors: [.white.opacity(0.05), .clear], startPoint: .top, endPoint: .center)))
                         .shadow(color: .black.opacity(0.35), radius: 6, y: 3)
@@ -140,7 +143,7 @@ struct GlassCard: ViewModifier {
                 .overlay(shape.strokeBorder(Palette.raisedRim, lineWidth: 1).allowsHitTesting(false))
         } else {
             content
-                .background(shape.fill(Palette.surface))
+                .background(shape.fill(fill))
                 .overlay(shape.strokeBorder(Palette.surfaceBorder, lineWidth: 1).allowsHitTesting(false))
         }
     }

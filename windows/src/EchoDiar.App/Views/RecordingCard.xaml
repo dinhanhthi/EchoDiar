@@ -20,8 +20,9 @@
             </MenuFlyout>
         </Grid.ContextFlyout>
 
+        <!-- On the sidebar's card panel: a subtle fill sets it apart (lighter in Dark, greyer in Light). -->
         <Border
-            Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
+            Background="{ThemeResource SubtleFillColorSecondaryBrush}"
             BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
             BorderThickness="1"
             CornerRadius="{StaticResource OverlayCornerRadius}" />

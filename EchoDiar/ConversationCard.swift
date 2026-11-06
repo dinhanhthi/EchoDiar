@@ -51,7 +51,7 @@ struct ConversationCard: View {
         .background {
             if selected { Self.shape.fill(Color.accentColor.opacity(0.18)) }
         }
-        .modifier(GlassCard(cornerRadius: 20, raised: true))
+        .modifier(GlassCard(cornerRadius: 20, raised: true, fill: Palette.raisedSurface))
         .overlay {
             if selected { Self.shape.strokeBorder(Color.accentColor, lineWidth: 1.5).allowsHitTesting(false) }
         }
@@ -521,7 +521,7 @@ private struct ActivityBadge: View {
             .modifier(RecordingBlink(isActive: blinks))
             .frame(width: 14, height: 14)
             .background(Circle().fill(activity.color.opacity(0.18)))
-            .background(Circle().fill(Palette.surface))
+            .background(Circle().fill(Palette.raisedSurface))
             .accessibilityElement()
             .accessibilityLabel(activity.text)
     }
@@ -561,7 +561,7 @@ private struct RowTextButtonStyle: ButtonStyle {
                 .padding(.vertical, 3)
                 .background(
                     Capsule()
-                        .fill(Palette.inputSurface)
+                        .fill(Palette.hoverFill)
                         .overlay(Capsule().fill(
                             configuration.isPressed ? Color.black.opacity(0.2) : hovered ? Palette.hoverFill : .clear)))
                 .contentShape(Capsule())

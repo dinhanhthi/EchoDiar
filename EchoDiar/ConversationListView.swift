@@ -43,6 +43,7 @@ struct ConversationListView: View {
                     }
                 }
                 .padding(12)
+                .background(OverlayScrollers())
                 .animation(reduceMotion ? nil : Motion.standard, value: groups)
                 .animation(reduceMotion ? nil : Motion.standard, value: model.isRecording)
             }
@@ -54,7 +55,7 @@ struct ConversationListView: View {
                         .padding(.horizontal, 12)
                         .padding(.top, 12)
                         // Cards scrolling under the bar do not show through around it.
-                        .background(WindowGlass())
+                        .background(Palette.surface)
                         .transition(cardTransition)
                 }
             }
@@ -140,11 +141,11 @@ private struct SelectionBar: View {
         }
         .padding(.horizontal, 14)
         .padding(.vertical, 10)
-        .modifier(GlassCard(cornerRadius: 20, raised: true))
+        .modifier(GlassCard(cornerRadius: 20, raised: true, fill: Palette.raisedSurface))
     }
 }
 
-/// "Today", "Yesterday", or the date as muted text, centered. On the window's glass, so cards scrolling under the
+/// "Today", "Yesterday", or the date as muted text, centered. On the sidebar's panel, so cards scrolling under the
 /// pinned header do not show through.
 private struct DayHeader: View {
     let day: Date
@@ -157,7 +158,7 @@ private struct DayHeader: View {
             .frame(maxWidth: .infinity)
             .padding(.vertical, 6)
             // The list's 12 pt padding, so the background reaches the column edges.
-            .background(WindowGlass().padding(.horizontal, -12))
+            .background(Palette.surface.padding(.horizontal, -12))
     }
 
     private var title: String {
@@ -165,5 +166,39 @@ private struct DayHeader: View {
         if calendar.isDateInToday(day) { return String(localized: "Today") }
         if calendar.isDateInYesterday(day) { return String(localized: "Yesterday") }
         return day.formatted(date: .long, time: .omitted)
+    }
+}
+
+/// Thin scrollers that show only while scrolling, as with a trackpad, even when a mouse makes macOS show the wide
+/// always-visible ones: those look too heavy on the sidebar's panel. Placed in the scroll content, to reach its
+/// `NSScrollView`; AppKit resets the style when the system preference changes, so it is set again then.
+private struct OverlayScrollers: NSViewRepresentable {
+    func makeNSView(context: Context) -> NSView { Bridge() }
+    func updateNSView(_ view: NSView, context: Context) {}
+
+    private final class Bridge: NSView {
+        private var observer: NSObjectProtocol?
+
+        override func viewDidMoveToWindow() {
+            super.viewDidMoveToWindow()
+            apply()
+            guard observer == nil else { return }
+            observer = NotificationCenter.default.addObserver(
+                forName: NSScroller.preferredScrollerStyleDidChangeNotification, object: nil, queue: .main
+            ) { [weak self] _ in
+                // After the scroll view's own handler, which sets the preferred style.
+                DispatchQueue.main.async { self?.apply() }
+            }
+        }
+
+        deinit {
+            if let observer { NotificationCenter.default.removeObserver(observer) }
+        }
+
+        private func apply() {
+            // The scroller keeps its own style once made: set both.
+            enclosingScrollView?.scrollerStyle = .overlay
+            enclosingScrollView?.verticalScroller?.scrollerStyle = .overlay
+        }
     }
 }

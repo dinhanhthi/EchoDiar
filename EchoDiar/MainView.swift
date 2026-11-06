@@ -539,10 +539,12 @@ struct MainView: View {
     private var libraryPage: some View {
         // Both panes pad 12 pt on every side; overlapping those paddings by 6 pt leaves an 18 pt gap between them.
         HStack(spacing: -6) {
-            chatOr(libraryPane(selectedID: selectedID))
+            chatOr(libraryWell(libraryPane(selectedID: selectedID)))
                 .frame(width: 360)
             detail
         }
+        // The toolbar's safe area already leaves room above the panes: 4 pt of their 12 pt top padding is enough.
+        .padding(.top, -8)
     }
 
     /// The library chat in place of `list` while it is open; the two cross-fade, whoever toggles it (toolbar, Back,
@@ -556,6 +558,16 @@ struct MainView: View {
             }
         }
         .animation(reduceMotion ? nil : Self.paneAnimation, value: model.globalChatOpen)
+    }
+
+    /// The sidebar's cards (or why there are none) on a panel like the detail's, the cards a step lighter.
+    private func libraryWell(_ pane: some View) -> some View {
+        let shape = RoundedRectangle(cornerRadius: 20, style: .continuous)
+        return pane
+            .background(Palette.surface)
+            .clipShape(shape)
+            .overlay(shape.strokeBorder(Palette.surfaceBorder, lineWidth: 1).allowsHitTesting(false))
+            .padding(12)
     }
 
     /// The sidebar's selected card: the shown conversation.

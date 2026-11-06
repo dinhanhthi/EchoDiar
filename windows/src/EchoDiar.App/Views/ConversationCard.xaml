@@ -3,8 +3,8 @@
     One conversation of the library (macOS ConversationCard.swift): the source icon with its activity badge, the title (double-click to rename),
     the source app's name, the date, duration, size, status pill and "Audio has been removed" marker, the reason of a
     failed transcription, then a row with the transcription progress or its action. The actions are in the context
-    menu and the detail. A Fluent card (card fill and stroke, overlay corners) in theme resources (Light and Dark), in
-    the sidebar. Selected adds the accent fill and edge.
+    menu and the detail. A Fluent card (subtle fill, card stroke, overlay corners) in theme resources (Light and Dark),
+    on the sidebar's card panel. Selected adds the accent fill and edge.
 -->
 <UserControl
     x:Class="EchoDiar.App.Views.ConversationCard"
@@ -23,8 +23,9 @@
             </MenuFlyout>
         </Grid.ContextFlyout>
 
+        <!-- On the sidebar's card panel: a subtle fill sets it apart (lighter in Dark, greyer in Light). -->
         <Border
-            Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
+            Background="{ThemeResource SubtleFillColorSecondaryBrush}"
             BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
             BorderThickness="1"
             CornerRadius="{StaticResource OverlayCornerRadius}" />
