@@ -6,7 +6,7 @@
     - Catch-up (macOS catchUpSection): where "Catch up" runs while recording; pickers filled in code.
     - Transcription (macOS AISettingsView transcription): the default transcription model and the default diarization
       model (DefaultEnginePicker, made in code), the same settings as Settings › Transcription's.
-    - Library chat: Settings › RAG's page (RAGSettingsPage, macOS RAGSettingsView), placed in code.
+    - Library chat: RAGSettingsPage (macOS RAGSettingsView), placed in code.
     The providers themselves are set up in AI Providers. Each searchable element's Tag is its search entry's title
     (SearchEntries), so a search result can bring it into view; the Summary tab's language card is found as Chat's is,
     as the search looks among the shown rows only.

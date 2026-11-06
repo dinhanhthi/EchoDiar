@@ -58,6 +58,7 @@ public sealed partial class ConversationCard : UserControl
         MenuDeleteConversationItem.Click += (_, _) => _ = _list.DeleteAsync([Conversation], audioOnly: false);
         RetryButton.Click += (_, _) => _ = _model.TranscribeAsync(Conversation.Id);
         TranscribeButton.Click += (_, _) => _ = _model.TranscribeAsync(Conversation.Id);
+        NeedsModelBadge.Click += (_, _) => _model.OpenLocalAI(ProvidersSettingsPage.TranscriptionGroup);
         TranscribeNowButton.Click += (_, _) =>
         {
             if (!_model.IsClosing) _model.TranscribeNow(Conversation.Id);
@@ -265,8 +266,10 @@ public sealed partial class ConversationCard : UserControl
     };
 
     /// <summary>
-    /// macOS EngineMenuItems: the installed local engines under "Retry with another engine" (cloud engines come with
-    /// Phase 25), or "Download a model…" (Settings, Phase 13) when there is none.
+    /// macOS EngineMenuItems: the installed local and configured cloud engines under "Retry with another engine", the
+    /// default one first, marked "(default)" (<see cref="AppViewModel.InstalledBatchEngines"/>), or, when there is
+    /// none, "Download a model…", which opens AI Providers › Local AI › Transcription (macOS
+    /// <c>openLocalAI(.transcription)</c>).
     /// </summary>
     private void BuildEngineMenu()
     {
@@ -274,13 +277,15 @@ public sealed partial class ConversationCard : UserControl
         var engines = _model.InstalledBatchEngines;
         if (engines.Count == 0)
         {
-            EngineMenu.Items.Add(new MenuFlyoutItem { Text = Loc.T("Download a model…"), IsEnabled = false });
+            var download = new MenuFlyoutItem { Text = Loc.T("Download a model…") };
+            download.Click += (_, _) => _model.OpenLocalAI(ProvidersSettingsPage.TranscriptionGroup);
+            EngineMenu.Items.Add(download);
             return;
         }
         EngineMenu.Items.Add(new MenuFlyoutItem { Text = Loc.T("Retry with another engine"), IsEnabled = false });
         foreach (var engine in engines)
         {
-            var item = new MenuFlyoutItem { Text = engine.DisplayName };
+            var item = new MenuFlyoutItem { Text = engine.MenuText };
             var id = engine.Id;
             item.Click += (_, _) => _ = _model.TranscribeAsync(Conversation.Id, id);
             EngineMenu.Items.Add(item);

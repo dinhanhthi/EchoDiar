@@ -186,7 +186,10 @@ public sealed partial class TranscriptViewModel : ObservableObject
         _conversation is { HasAudio: true } c && !IsTranscribing
         && c.Status is not (ConversationStatus.Recording or ConversationStatus.Compressing or ConversationStatus.Failed);
 
-    /// <summary>The engines of "Transcribe again with": the installed local speech engines in catalog order, then the configured cloud ones.</summary>
+    /// <summary>
+    /// The engines of "Transcribe again with" (<see cref="AppViewModel.InstalledBatchEngines"/>): the default one
+    /// first, then the installed local speech engines in catalog order, then the configured cloud ones.
+    /// </summary>
     public IReadOnlyList<EngineChoice> RetranscribeEngines => _model.InstalledBatchEngines;
 
     /// <summary>The language of the next Re-transcribe; "" keeps the recording's language markers.</summary>

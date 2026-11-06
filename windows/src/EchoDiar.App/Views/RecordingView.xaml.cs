@@ -281,7 +281,7 @@ public sealed partial class RecordingView : UserControl
         return model.CurrentCloudLiveBlock switch
         {
             CloudLiveBlock.NoLiveModel =>
-                Loc.T("No installed live model supports this recording's language. Download one in Settings › Transcription."),
+                Loc.T("No installed live model supports this recording's language. Download one in Settings › AI Providers › Local AI."),
             CloudLiveBlock.RealtimeUnsupported =>
                 Loc.Format("%@ has no realtime transcription. You can show a live transcript with a local model in Settings.", name),
             CloudLiveBlock.CloudConsentPending =>

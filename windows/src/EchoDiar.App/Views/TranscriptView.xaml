@@ -190,12 +190,15 @@
                                 Style="{StaticResource CaptionTextBlockStyle}"
                                 Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
                         </StackPanel>
-                        <!-- macOS opens Settings > Transcription; Settings comes with a later phase. -->
-                        <Border
+                        <!-- Opens AI Providers › Local AI › Transcription (macOS openLocalAI(.transcription)). -->
+                        <Button
                             x:Name="NeedsModelBadge"
+                            MinWidth="0"
+                            MinHeight="0"
                             Padding="8,1"
                             VerticalAlignment="Center"
                             Background="{ThemeResource SystemFillColorCautionBackgroundBrush}"
+                            BorderThickness="0"
                             CornerRadius="9"
                             ToolTipService.ToolTip="{local:T Text='Download a transcription model in Settings'}"
                             Visibility="Collapsed">
@@ -205,7 +208,7 @@
                                 FontWeight="SemiBold"
                                 Foreground="{ThemeResource SystemFillColorCautionBrush}"
                                 Text="{local:T Text='Needs model'}" />
-                        </Border>
+                        </Button>
                         <SplitButton
                             x:Name="RetryButton"
                             VerticalAlignment="Center"
@@ -236,14 +239,13 @@
                         VerticalAlignment="Center"
                         Style="{StaticResource CaptionTextBlockStyle}"
                         Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
-                    <!-- macOS opens Settings > Transcription; Settings comes with a later phase. -->
+                    <!-- Opens AI Providers › Local AI › Diarization (macOS openLocalAI(.diarization)). -->
                     <HyperlinkButton
                         x:Name="NoticeDownloadButton"
                         Padding="0"
                         VerticalAlignment="Center"
                         Content="{local:T Text='Download…'}"
-                        FontSize="12"
-                        IsEnabled="False" />
+                        FontSize="12" />
                 </StackPanel>
 
                 <views:PlaybackBar x:Name="Player" />

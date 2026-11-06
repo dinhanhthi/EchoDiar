@@ -144,7 +144,7 @@ public sealed partial class AppViewModel
             if (CatchUpRun is { IsRunning: true }) return Loc.T("A catch-up is being written.");
             if (CatchUpProvider is null)
             {
-                return Loc.T("Catch up needs an AI provider outside the app: a cloud API, a local server or a command-line tool. Add one in Settings › AI.");
+                return Loc.T("Catch up needs an AI provider outside the app: a cloud API, a local server or a command-line tool. Add one in Settings › AI Providers.");
             }
             var @base = RecordingCatchUps.LastOrDefault(c => !c.Stopped);
             var newest = captions.Lines.Count > 0 ? captions.Lines[captions.Lines.Count - 1].Id : -1;

@@ -242,7 +242,7 @@ public sealed partial class RecordingSettingsPage : UserControl
             SpeakerCountCombo.SelectedIndex = settings.SpeakerCountHint is { } hint ? hint - min + 1 : 0;
             SpeakerCountCard.Description = Loc.T(_models.DiarizerAvailable
                 ? "A hint for telling the system audio's speakers apart."
-                : "Needs the speaker model: download it in Transcription › Diarization model.");
+                : "Needs the speaker model: download it in Settings › AI Providers › Local AI.");
             DeferToggle.IsOn = settings.DeferTranscriptionWhenConstrained;
         }
         finally

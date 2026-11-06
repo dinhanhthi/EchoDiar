@@ -6,7 +6,7 @@
       (rows made in code).
     - Auto-stop: the end monitor's thresholds, each clamped to its range, and the end prompt's notification.
     - After recording: transcribe automatically, tell speakers apart and the number of other speakers (also in
-      Transcription › Diarization model, as on macOS), and waiting while energy saver is on.
+      Transcription › Speakers, as on macOS), and waiting while energy saver is on.
     The floating indicator's other options stay in General, as on macOS. Each searchable element's Tag is its search
     entry's title (SearchEntries), so a search result can bring it into view.
 -->

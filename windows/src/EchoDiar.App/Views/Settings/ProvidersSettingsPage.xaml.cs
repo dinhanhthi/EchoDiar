@@ -58,8 +58,8 @@ public sealed partial class ProvidersSettingsPage : UserControl
     ];
 
     /// <summary>
-    /// The searchable rows (macOS SettingsSearch.swift, AI Providers), each the Tag of its element. The Cloud ones were
-    /// Settings › API Keys' (macOS APIKeysSettingsView), whose cards Cloud now shows.
+    /// The searchable rows (macOS SettingsSearch.swift, AI Providers), each the Tag of its element. The Cloud ones are
+    /// macOS APIKeysSettingsView's, whose cards Cloud now shows.
     /// </summary>
     public static IReadOnlyList<SettingsEntry> SearchEntries { get; } =
     [

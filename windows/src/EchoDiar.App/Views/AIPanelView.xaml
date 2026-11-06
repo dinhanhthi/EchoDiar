@@ -393,7 +393,7 @@
                 <StackPanel x:Name="SetupHints" Spacing="4" Visibility="Collapsed">
                     <TextBlock
                         Style="{StaticResource CaptionStyle}"
-                        Text="{local:T Text='No AI model: set up a provider or download a model in Settings › AI.'}"
+                        Text="{local:T Text='No AI model: set up a provider or download a model in Settings › AI Providers.'}"
                         TextWrapping="Wrap" />
                     <TextBlock
                         x:Name="WindowsAIHint"

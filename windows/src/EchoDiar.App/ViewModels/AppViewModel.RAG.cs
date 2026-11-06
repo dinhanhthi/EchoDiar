@@ -19,9 +19,10 @@ public sealed record RAGStatus(
 /// <summary>
 /// A cloud embedder's one-time confirmation waiting for the window's dialog (macOS RAGSettingsView "Send transcripts to
 /// …?"): its provider, the destination key it is remembered under, the host shown, and how many conversations would go.
-/// <paramref name="PickProviderId"/>: a provider picked in Settings › RAG and not saved yet, which Understood makes the
-/// embedder, its preset's suggested <paramref name="PickModel"/> filling an empty <c>EmbeddingModel</c> (macOS
-/// <c>pendingCloud</c>: the setting changes only on Understood); null for the embedder in use.
+/// <paramref name="PickProviderId"/>: a provider picked in Settings › AI Settings › Library chat and not saved yet,
+/// which Understood makes the embedder, its preset's suggested <paramref name="PickModel"/> filling an empty
+/// <c>EmbeddingModel</c> (macOS <c>pendingCloud</c>: the setting changes only on Understood); null for the embedder in
+/// use.
 /// </summary>
 public sealed record PendingEmbeddingConsent(
     string ProviderName, string Destination, string Host, int Conversations, string? PickProviderId = null, string PickModel = "");
@@ -420,8 +421,8 @@ public sealed partial class AppViewModel
         && (LibraryChat.EmbeddingDestination(config) is not { } destination || !settings.CloudEmbeddingConfirmed.Contains(destination));
 
     /// <summary>
-    /// Asks the window to confirm the current API embedder's destination (Settings › RAG's Confirm…); nothing when it
-    /// needs no confirmation.
+    /// Asks the window to confirm the current API embedder's destination (AI Settings › Library chat's Confirm…);
+    /// nothing when it needs no confirmation.
     /// </summary>
     public void RequestCloudEmbeddingConsent()
     {
@@ -432,11 +433,12 @@ public sealed partial class AppViewModel
     }
 
     /// <summary>
-    /// Makes <paramref name="config"/> the embedder (Settings › RAG's pick of an API embedder, macOS <c>selectAPI</c>);
-    /// <paramref name="model"/> is the preset's suggested model, which fills its <see cref="ProviderConfig.EmbeddingModel"/>
-    /// only when empty (<see cref="FillEmbeddingModel"/>). A destination off this PC not confirmed yet asks the window
-    /// first, and the setting changes only on Understood. A base URL with no destination is picked without asking:
-    /// nothing can be sent to it, and the index says why. Nothing when it is the embedder already.
+    /// Makes <paramref name="config"/> the embedder (AI Settings › Library chat's pick of an API embedder, macOS
+    /// <c>selectAPI</c>); <paramref name="model"/> is the preset's suggested model, which fills its
+    /// <see cref="ProviderConfig.EmbeddingModel"/> only when empty (<see cref="FillEmbeddingModel"/>). A destination
+    /// off this PC not confirmed yet asks the window first, and the setting changes only on Understood. A base URL with
+    /// no destination is picked without asking: nothing can be sent to it, and the index says why. Nothing when it is
+    /// the embedder already.
     /// </summary>
     public void PickAPIEmbedder(ProviderConfig config, string model)
     {

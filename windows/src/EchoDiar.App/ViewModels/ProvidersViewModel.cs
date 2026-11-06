@@ -55,10 +55,10 @@ public enum CLIState { Checking, NotInstalled, Found }
 public sealed record CLIStatus(CLIState State, string? Path = null, string? Version = null, bool InvalidOverride = false);
 
 /// <summary>
-/// The AI providers of Settings › AI and the AI pickers (macOS ProvidersSettingsView.swift state and AppModel's provider
-/// functions): the provider configs, their API keys (Credential Manager), Windows AI's availability, the local hosts
-/// found by a scan, the subscription CLIs found on PATH, the GGUF models of "On this PC" (macOS <c>mlxEntries</c>: download,
-/// cancel, delete), the providers the pickers offer and the default one. Registry,
+/// The AI providers of Settings › AI Providers, AI Settings and the AI pickers (macOS ProvidersSettingsView.swift state
+/// and AppModel's provider functions): the provider configs, their API keys (Credential Manager), Windows AI's
+/// availability, the local hosts found by a scan, the subscription CLIs found on PATH, the GGUF models of "On this PC"
+/// (macOS <c>mlxEntries</c>: download, cancel, delete), the providers the pickers offer and the default one. Registry,
 /// disk, process, credential and HTTP work runs off the UI thread; results come back on it. Lives as long as the app
 /// (<see cref="AppViewModel.ProvidersModel"/>); on the UI thread.
 /// </summary>

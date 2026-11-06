@@ -3,8 +3,9 @@
     The chat across the library (macOS GlobalChatView.swift), in place of the cards on the list or of the sidebar beside a
     conversation: the questions with their streamed answers and numbered sources, the History panel at the trailing
     edge, then a bar with a job running elsewhere, the index's progress, the model and language menus, "Start a fresh
-    chat" and History in one row, and the question. With RAG off, an intro and the way to Settings › RAG. Fluent cards in
-    theme resources (Light and Dark); the messages, sources and history rows are built in code.
+    chat" and History in one row, and the question. With RAG off, an intro and the way to Settings › AI Settings ›
+    Library chat. Fluent cards in theme resources (Light and Dark); the messages, sources and history rows are built in
+    code.
 -->
 <UserControl
     x:Class="EchoDiar.App.Views.GlobalChatView"
@@ -83,7 +84,7 @@
                     Margin="0,4,0,0"
                     HorizontalAlignment="Center"
                     Style="{StaticResource AccentButtonStyle}"
-                    Content="{local:T Text='Turn on in Settings › RAG'}" />
+                    Content="{local:T Text='Turn on in Settings › AI Settings › Library chat'}" />
             </StackPanel>
         </Border>
 
@@ -307,7 +308,7 @@
                     <StackPanel x:Name="SetupHints" Spacing="4" Visibility="Collapsed">
                         <TextBlock
                             Style="{StaticResource CaptionStyle}"
-                            Text="{local:T Text='No AI model: set up a provider or download a model in Settings › AI.'}"
+                            Text="{local:T Text='No AI model: set up a provider or download a model in Settings › AI Providers.'}"
                             TextWrapping="Wrap" />
                         <TextBlock
                             x:Name="WindowsAIHint"

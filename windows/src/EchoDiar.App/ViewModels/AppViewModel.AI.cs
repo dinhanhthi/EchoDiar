@@ -52,10 +52,10 @@ public sealed class AIJob(AIJobKind kind, string? question)
 public sealed record AIErrorInfo(Guid? ConversationId, string Message);
 
 /// <summary>
-/// The AI state of the app (macOS AppModel's AI tab): the providers model Settings › AI and the AI pickers share, the
-/// running summaries and questions (one per conversation, the library chat beside them; started off the UI thread, their
-/// updates applied on it), the error per conversation, the chat history changes (archive, resume, delete, titles) and
-/// the cards' AI and Summary buttons.
+/// The AI state of the app (macOS AppModel's AI tab): the providers model Settings › AI Providers, AI Settings and the
+/// AI pickers share, the running summaries and questions (one per conversation, the library chat beside them; started
+/// off the UI thread, their updates applied on it), the error per conversation, the chat history changes (archive,
+/// resume, delete, titles) and the cards' AI and Summary buttons.
 /// </summary>
 public sealed partial class AppViewModel
 {
@@ -89,7 +89,9 @@ public sealed partial class AppViewModel
     /// <summary>One change of a conversation's archived chats at a time, titles included (they rewrite <c>chats.json</c>).</summary>
     private readonly SemaphoreSlim _chatFiles = new(1, 1);
 
-    /// <summary>What Settings › AI binds to, and the AI pickers' providers; one for the app's lifetime.</summary>
+    /// <summary>
+    /// What Settings › AI Providers and AI Settings bind to, and the AI pickers' providers; one for the app's lifetime.
+    /// </summary>
     public ProvidersViewModel ProvidersModel => _providersModel ??= new ProvidersViewModel(this, _services);
 
     /// <summary>

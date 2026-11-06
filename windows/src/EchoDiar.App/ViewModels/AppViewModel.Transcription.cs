@@ -9,8 +9,15 @@ using EchoDiar.Transcribe;
 
 namespace EchoDiar.App.ViewModels;
 
-/// <summary>An engine of the Retry and Re-transcribe menus: a catalog id or <c>cloud:&lt;provider id&gt;</c>, and its name.</summary>
-public sealed record EngineChoice(string Id, string DisplayName);
+/// <summary>
+/// An engine of the Retry and Re-transcribe menus: a catalog id or <c>cloud:&lt;provider id&gt;</c>, its name, and
+/// whether it is the default engine.
+/// </summary>
+public sealed record EngineChoice(string Id, string DisplayName, bool IsDefault = false)
+{
+    /// <summary>The menu item's text: the name, with "(default)" for the default engine (macOS).</summary>
+    public string MenuText => IsDefault ? Loc.Format("%@ (default)", DisplayName) : DisplayName;
+}
 
 /// <summary>
 /// A transcription waiting for its destination's one-time "audio leaves this PC" confirmation (macOS
@@ -402,13 +409,31 @@ public sealed partial class AppViewModel
 
     /// <summary>
     /// The engines of "Retry with another engine" and "Transcribe again with" (macOS <c>EngineMenuItems</c>): the
-    /// installed local speech engines in catalog order, then the configured cloud engines.
+    /// default engine (the settings' <c>DefaultASRModelID</c>, else the catalog default, as macOS
+    /// <c>defaultASRModelID</c>) first, marked <see cref="EngineChoice.IsDefault"/>, when it is installed or
+    /// configured; then the other installed local speech engines in catalog order, then the other configured cloud
+    /// engines.
     /// </summary>
-    public IReadOnlyList<EngineChoice> InstalledBatchEngines =>
-    [
-        .. ModelCatalog.Asr.Where(e => InstalledModelIds.Contains(e.Id)).Select(e => new EngineChoice(e.Id, e.DisplayName)),
-        .. CloudEngineConfigs.Select(c => new EngineChoice(CloudTranscription.EngineId(c.Id), CloudEngineName(c))),
-    ];
+    public IReadOnlyList<EngineChoice> InstalledBatchEngines
+    {
+        get
+        {
+            List<EngineChoice> engines =
+            [
+                .. ModelCatalog.Asr.Where(e => InstalledModelIds.Contains(e.Id))
+                    .Select(e => new EngineChoice(e.Id, e.DisplayName)),
+                .. CloudEngineConfigs
+                    .Select(c => new EngineChoice(CloudTranscription.EngineId(c.Id), CloudEngineName(c))),
+            ];
+            var defaultId = Settings.DefaultASRModelID ?? ModelCatalog.DefaultASR.Id;
+            var index = engines.FindIndex(e => ProvidersViewModel.SameId(e.Id, defaultId));
+            if (index < 0) return engines;
+            var first = engines[index] with { IsDefault = true };
+            engines.RemoveAt(index);
+            engines.Insert(0, first);
+            return engines;
+        }
+    }
 
     /// <summary>
     /// The main window's answer to the first pending run's confirmation (macOS <c>resolvePendingCloudRuns</c>): every

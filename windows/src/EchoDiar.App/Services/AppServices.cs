@@ -194,10 +194,11 @@ internal sealed class AppServices : IDisposable
         {
             var providerId = id[ModelCatalog.ApiEmbedderPrefix.Length..];
             if (EmbeddingConfig(settings, configs, HasStoredKey) is not { } config)
-                return (null, Loc.T("Pick a provider in Settings › RAG"));
+                return (null, Loc.T("Pick a provider in Settings › AI Settings › Library chat"));
             var model = config.EmbeddingModel.Trim();
             if (model.Length == 0)
-                return (null, Loc.Format("Enter the embedding model of %@ in Settings › RAG", config.DisplayName));
+                return (null, Loc.Format(
+                    "Enter the embedding model of %@ in its card in Settings › AI Providers", config.DisplayName));
             string? apiKey = null;
             if (config.AuthStyle != AuthStyle.None)
             {
@@ -213,17 +214,18 @@ internal sealed class AppServices : IDisposable
             }
             // As MakeProvider: sent without a key, a preset only answers HTTP 401.
             if (config.Preset is not null && config.AuthStyle != AuthStyle.None && string.IsNullOrEmpty(apiKey))
-                return (null, Loc.Format("Save a key for %@ in Settings › API Keys", config.DisplayName));
+                return (null, Loc.Format("Save a key for %@ in Settings › AI Providers › Cloud", config.DisplayName));
             var copy = config with { ExtraHeaders = new(config.ExtraHeaders), ShownModels = [.. config.ShownModels] };
             return (new APITextEmbedder(copy, apiKey, model), null);
         }
         if (ModelCatalog.EmbeddingEntry(id) is not { Runtime: ModelRuntime.Gguf, Files: [var file] } entry)
-            return (null, Loc.T("Pick an embedding model in Settings › RAG"));
-        if (!Models.IsInstalled(entry)) return (null, Loc.T("Download the embedding model in Settings › RAG"));
+            return (null, Loc.T("Pick an embedding model in Settings › AI Settings › Library chat"));
+        if (!Models.IsInstalled(entry))
+            return (null, Loc.T("Download the embedding model in Settings › AI Providers › Local AI"));
         if (Models.VerifiedFolder(entry) is { } folder) return (new LlamaEmbedder(entry.Id, Path.Combine(folder, file)), null);
         // The check failed and the install was deleted (InstallRemoved refreshes its row).
         return (null, Models.IsInstalled(entry)
-            ? Loc.T("Download the embedding model in Settings › RAG")
+            ? Loc.T("Download the embedding model in Settings › AI Providers › Local AI")
             : Loc.Format("%@ failed its integrity check. Download it again.", entry.DisplayName));
     }
 
