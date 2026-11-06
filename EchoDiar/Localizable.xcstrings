@@ -19238,6 +19238,34 @@
         }
       }
     },
+    "The AI tab's model. Pick a provider above to choose another." : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "El modelo de la pestaña IA. Elige un proveedor arriba para elegir otro."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Le modèle de l'onglet IA. Choisissez un fournisseur ci-dessus pour en choisir un autre."
+          }
+        },
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Mô hình của tab AI. Chọn một nhà cung cấp ở trên để chọn mô hình khác."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "AI 标签页的模型。在上方选择一个提供商即可选择其他模型。"
+          }
+        }
+      }
+    },
     "The app quit — stop recording?" : {
       "localizations" : {
         "es" : {

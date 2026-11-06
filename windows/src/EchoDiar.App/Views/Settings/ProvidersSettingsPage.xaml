@@ -160,17 +160,23 @@
                         MaxWidth="420"
                         AutomationProperties.Name="{local:T Text='Catch-up provider'}" />
                 </controls:SettingsCard>
-                <!-- Only when a provider is picked. -->
+                <!-- The picker when a provider is picked; with Automatic, the AI tab's model as text (description set in code). -->
                 <controls:SettingsCard
                     x:Name="CatchUpModelCard"
                     Header="{local:T Text='Catch-up model'}"
-                    Tag="Catch-up model"
-                    Visibility="Collapsed">
-                    <ComboBox
-                        x:Name="CatchUpModelCombo"
-                        MinWidth="260"
-                        MaxWidth="420"
-                        AutomationProperties.Name="{local:T Text='Catch-up model'}" />
+                    Tag="Catch-up model">
+                    <Grid>
+                        <ComboBox
+                            x:Name="CatchUpModelCombo"
+                            MinWidth="260"
+                            MaxWidth="420"
+                            AutomationProperties.Name="{local:T Text='Catch-up model'}"
+                            Visibility="Collapsed" />
+                        <TextBlock
+                            x:Name="CatchUpModelAutoText"
+                            VerticalAlignment="Center"
+                            Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                    </Grid>
                 </controls:SettingsCard>
                 <!-- A picked cloud API: its key status (header and content set in code). -->
                 <controls:SettingsCard x:Name="CatchUpKeyCard" Visibility="Collapsed" />

@@ -510,8 +510,20 @@ public sealed partial class ProvidersSettingsPage : UserControl
         CatchUpProviderCombo.SelectedIndex = _catchUpProviderIds.IndexOf(pickedId);
 
         var picked = external.FirstOrDefault(p => p.Id == pickedId);
-        CatchUpModelCard.Visibility = Show(picked is not null);
-        if (picked is not null)
+        CatchUpModelCombo.Visibility = Show(picked is not null);
+        CatchUpModelAutoText.Visibility = Show(picked is null);
+        CatchUpModelCard.Description = picked is null
+            ? Loc.T("The AI tab's model. Pick a provider above to choose another.")
+            : null!; // null hides it
+        if (picked is null)
+        {
+            // Automatic runs the AI tab's model: shown, not picked (macOS automaticCatchUpModelLabel).
+            var automaticModel = _model.CatchUpProvider is { } runs ? _model.CatchUpModel(runs) : "";
+            CatchUpModelAutoText.Text = automaticModel.Length == 0
+                ? Loc.T("Automatic")
+                : Loc.Format("Automatic (%@)", automaticModel);
+        }
+        else
         {
             // Its models without a CLI's own default ("Automatic" covers it), then the saved pick when no longer listed.
             var saved = _providers.CatchUpModel;

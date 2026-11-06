@@ -3102,6 +3102,10 @@
     <value>Tester (utilise votre abonnement)</value>
     <comment>Test (uses your subscription)</comment>
   </data>
+  <data name="TheAITabSModelPickAProviderAboveToChooseAnother" xml:space="preserve">
+    <value>Le modèle de l'onglet IA. Choisissez un fournisseur ci-dessus pour en choisir un autre.</value>
+    <comment>The AI tab's model. Pick a provider above to choose another.</comment>
+  </data>
   <data name="TheAPIKeyIsLongerThanLldBytesTheMostCredentialManagerKeeps" xml:space="preserve">
     <value>La clé API dépasse {0} octets, le maximum que conserve le Gestionnaire d’identification.</value>
     <comment>The API key is longer than %lld bytes, the most Credential Manager keeps.</comment>

@@ -3010,6 +3010,10 @@
     <value>测试（使用你的订阅）</value>
     <comment>Test (uses your subscription)</comment>
   </data>
+  <data name="TheAITabSModelPickAProviderAboveToChooseAnother" xml:space="preserve">
+    <value>AI 标签页的模型。在上方选择一个提供商即可选择其他模型。</value>
+    <comment>The AI tab's model. Pick a provider above to choose another.</comment>
+  </data>
   <data name="TheAPIKeyIsLongerThanLldBytesTheMostCredentialManagerKeeps" xml:space="preserve">
     <value>API 密钥超过 {0} 字节，这是凭据管理器可保存的上限。</value>
     <comment>The API key is longer than %lld bytes, the most Credential Manager keeps.</comment>

@@ -739,6 +739,7 @@ public static partial class Loc
         "Test (uses your subscription)",
         "Test Again",
         "Test System Audio",
+        "The AI tab's model. Pick a provider above to choose another.",
         "The API key is longer than %lld bytes, the most Credential Manager keeps.",
         "The API key is sent unencrypted over http to %@. Use https, or a host on this PC.",
         "The app",

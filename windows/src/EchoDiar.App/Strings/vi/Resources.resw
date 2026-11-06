@@ -3010,6 +3010,10 @@
     <value>Kiểm tra (dùng gói đăng ký của bạn)</value>
     <comment>Test (uses your subscription)</comment>
   </data>
+  <data name="TheAITabSModelPickAProviderAboveToChooseAnother" xml:space="preserve">
+    <value>Mô hình của tab AI. Chọn một nhà cung cấp ở trên để chọn mô hình khác.</value>
+    <comment>The AI tab's model. Pick a provider above to choose another.</comment>
+  </data>
   <data name="TheAPIKeyIsLongerThanLldBytesTheMostCredentialManagerKeeps" xml:space="preserve">
     <value>Khoá API dài hơn {0} byte, mức tối đa mà Trình quản lý thông tin xác thực lưu được.</value>
     <comment>The API key is longer than %lld bytes, the most Credential Manager keeps.</comment>

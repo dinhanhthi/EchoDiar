@@ -165,6 +165,14 @@ struct ProvidersSettingsView: View {
                 if picked.kind == .cloud, let config = model.providerConfigs.first(where: { $0.id == picked.id }) {
                     LabeledContent(picked.name) { APIKeyStatus(config: config, model: model) }
                 }
+            } else {
+                // Automatic runs the AI tab's model: shown, not picked, so the row (and its search entry) is always here.
+                LabeledContent {
+                    Text(automaticCatchUpModelLabel)
+                } label: {
+                    Text("Catch-up model")
+                    Text("The AI tab's model. Pick a provider above to choose another.")
+                }
             }
             // As the AI pane's data notes, for the provider a catch-up runs on.
             if let note = model.catchUpProvider?.leavesMacNote {
@@ -210,6 +218,13 @@ struct ProvidersSettingsView: View {
                     $0.catchUpModel = ""
                 }
             })
+    }
+
+    /// What an Automatic catch-up runs with: "Automatic (model)", or "Automatic" with no provider or a CLI's own default.
+    private var automaticCatchUpModelLabel: String {
+        guard let provider = model.catchUpProvider else { return String(localized: "Automatic") }
+        let id = model.catchUpModel(for: provider)
+        return id.isEmpty ? String(localized: "Automatic") : String(localized: "Automatic (\(id))")
     }
 
     private var catchUpModelBinding: Binding<String> {
