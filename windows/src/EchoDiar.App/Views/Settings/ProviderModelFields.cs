@@ -744,7 +744,7 @@ internal sealed class DefaultEnginePicker
             _syncing = false;
         }
         // Set or cleared (not collapsed), so a local default leaves no empty description line.
-        Card.Description = CloudTranscription.ProviderId(selection) is not null ? _caution : null;
+        Card.Description = CloudTranscription.ProviderId(selection) is not null ? _caution : null!; // null hides it
     }
 
     /// <summary>
