@@ -21850,6 +21850,34 @@
         }
       }
     },
+    "Uninstalling EchoDiar keeps this folder and the rest of its data. To remove everything, delete the EchoDiar folder that contains it." : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Desinstalar EchoDiar conserva esta carpeta y el resto de sus datos. Para borrarlo todo, elimina la carpeta EchoDiar que la contiene."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Désinstaller EchoDiar conserve ce dossier et le reste de ses données. Pour tout effacer, supprimez le dossier EchoDiar qui le contient."
+          }
+        },
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Gỡ cài đặt EchoDiar vẫn giữ thư mục này và các dữ liệu khác của app. Để xoá hết, hãy xoá thư mục EchoDiar chứa thư mục này."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "卸载 EchoDiar 后，此文件夹及其他数据仍会保留。要全部移除，请删除包含它的 EchoDiar 文件夹。"
+          }
+        }
+      }
+    },
     "Unmute Microphone" : {
       "localizations" : {
         "es" : {

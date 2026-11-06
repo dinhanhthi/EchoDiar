@@ -6,7 +6,7 @@ namespace EchoDiar.Core;
 /// </summary>
 public sealed class AppPaths(string root)
 {
-    /// <summary>The real <c>%LOCALAPPDATA%\EchoDiar</c> (the package manifest turns write virtualization off).</summary>
+    /// <summary>The real <c>%LOCALAPPDATA%\EchoDiar</c> (the package manifest excludes this one folder from write virtualization).</summary>
     public static string DefaultRoot =>
         Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "EchoDiar");
 

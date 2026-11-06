@@ -516,12 +516,40 @@ Partner Center > Apps and games > EchoDiar > Start your submission:
 5. **Store listings**: en-US, description from the website, screenshots.
 6. **Submission options** > restricted capabilities, the justifications:
    - `runFullTrust`: "WinUI 3 / Windows App SDK desktop app"
-   - `unvirtualizedResources`: "The user's recordings library lives at %LOCALAPPDATA%\EchoDiar. Users open, back up and move it in File Explorer; it can hold several GB of audio and models; it must survive uninstall and reinstall and is shared with existing installs. Virtualizing it would hide it and delete it at uninstall."
+   - `unvirtualizedResources`: the text in [unvirtualizedResources justification](#unvirtualizedresources-justification). A one-line justification was denied on 2026-11-06 (policy 10.6.3, v1.5.0).
 
-   Certification notes: no account needed; the microphone records meetings.
+   Certification notes: the text under [unvirtualizedResources justification](#unvirtualizedresources-justification).
 7. Submit. Partner Center shows "In certification", then "Published".
 
 To see Partner Center's validation before a real release, upload a dev run's artifact (`EchoDiar-store-windows-v0.0.N-dev`, from `release.sh --dev`) to a draft submission, read the result, then delete that package: a `0.0.N.0` version is never submitted.
+
+#### unvirtualizedResources justification
+
+On 2026-11-06 certification denied `unvirtualizedResources` (policy 10.6.3) for a one-line justification and asked five questions: was MSIX flexible virtualization evaluated, why other storage can't keep recordings and stay compatible with existing installs, what uninstall does and how users remove everything, whether users are told, and whether the capability is used only for EchoDiar's storage. Since v1.5.1 the manifest uses flexible virtualization: one `virtualization:ExcludedDirectory` (`$(KnownFolder:LocalAppData)\EchoDiar`), nothing else unvirtualized, guarded by `PackageManifestTests`. Paste this text, in English, into Submission options > Restricted capabilities. Keep it true: change it with the manifest, the Settings > Storage note, the privacy page or the Store listing.
+
+```text
+EchoDiar is a local-first meeting recorder. unvirtualizedResources is used for one folder only: %LOCALAPPDATA%\EchoDiar, the user's recordings library.
+
+1. Flexible virtualization: evaluated and now used. Since version 1.5.1 the package no longer turns file system virtualization off (the desktop6:FileSystemWriteVirtualization "disabled" setting is removed). It declares flexible virtualization with a single virtualization:ExcludedDirectory, $(KnownFolder:LocalAppData)\EchoDiar, and no registry exclusion. The package's MinVersion is 10.0.22000.0 (Windows 11), so this flexible virtualization syntax applies on every supported Windows version, with no fallback to the old all-or-nothing switch. Every other AppData write and every HKCU write stay virtualized and are removed at uninstall. We request unvirtualizedResources only because ExcludedDirectory requires it.
+
+2. Why the library cannot be virtualized or moved:
+- The folder holds the user's own recordings, transcripts, summaries and chats, plus downloaded speech and AI models (often several GB). With default virtualization, uninstalling, for example to reinstall after a problem, would delete every recording with no way back.
+- Users work with these files outside the app: Settings > Storage > Open in File Explorer and "Reveal in Explorer" on each recording open the real folder to back up, copy or share audio and transcripts. New files under virtualization are visible only to the app, not to File Explorer or backup tools.
+- Existing installations: before the Store, EchoDiar for Windows shipped as a self-signed MSIX through App Installer, with the library at the real %LOCALAPPDATA%\EchoDiar. Our move guide (https://ed.dinhanhthi.com/docs.html#windows-warnings) tells those users to uninstall that copy and install from the Store, which opens the same library. A virtualized or different location would make their existing recordings disappear after the move.
+- The layout matches the macOS app (~/Library/Application Support/EchoDiar), so a library can be copied between Mac and PC.
+- Documents, Music or Videos were rejected: OneDrive often syncs them (Known Folder Move), which would upload private meeting audio and gigabytes of models without the user asking, against EchoDiar's local-first privacy promise. ApplicationData.LocalFolder is per-package and deleted at uninstall, the same problem as virtualization.
+
+3. Uninstall behavior: Windows removes the package, its virtualized AppData and HKCU data, and its LocalSettings (window positions, last update check). Two things stay: the %LOCALAPPDATA%\EchoDiar folder (Conversations, Models, RAG, GlobalChat, Logs, settings.json) and API keys the user saved for cloud providers, in Windows Credential Manager under names starting with dinh.thi.EchoDiar.provider. To remove everything: in Settings > API Keys, click Remove for each key; Settings > Storage also has Delete buttons for all audio, all transcripts and AI results, and all models. Then quit EchoDiar and delete the %LOCALAPPDATA%\EchoDiar folder. Keys left after an uninstall can be deleted in Control Panel > Credential Manager > Windows Credentials.
+
+4. Users are told, in three places:
+- In the app, Settings > Storage, under the data folder path: "Uninstalling EchoDiar keeps this folder and the rest of its data. To remove everything, delete the EchoDiar folder that contains it." (English, French, Spanish, Vietnamese, Chinese).
+- The Store listing description, section "YOUR DATA STAYS AFTER UNINSTALL", with removal steps.
+- The privacy policy, https://ed.dinhanhthi.com/privacy.html, "Uninstalling keeps your data", with step-by-step removal for the folder and the API keys.
+
+5. We confirm that unvirtualizedResources is used exclusively for the %LOCALAPPDATA%\EchoDiar storage folder described above: it is the only ExcludedDirectory, no registry key is excluded, and an automated test in our build fails if the manifest ever excludes another location or turns virtualization off.
+```
+
+Certification notes (Submission options > Notes for certification): "No account needed. The microphone records meetings. unvirtualizedResources is scoped by flexible virtualization to %LOCALAPPDATA%\EchoDiar only; see the restricted capability justification. Settings > Storage shows the folder and says it stays after uninstall."
 
 #### Per release
 

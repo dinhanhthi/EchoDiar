@@ -24,5 +24,6 @@
 
   <ItemGroup>
     <None Include="Fixtures\**" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="..\..\src\EchoDiar.App\Package.appxmanifest" Link="Fixtures\Package.appxmanifest" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 </Project>

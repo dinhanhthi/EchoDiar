@@ -860,6 +860,7 @@ public static partial class Loc
         "Unavailable device",
         "Understood",
         "Undo",
+        "Uninstalling EchoDiar keeps this folder and the rest of its data. To remove everything, delete the EchoDiar folder that contains it.",
         "Unmute Microphone",
         "Unmute microphone",
         "Untitled",

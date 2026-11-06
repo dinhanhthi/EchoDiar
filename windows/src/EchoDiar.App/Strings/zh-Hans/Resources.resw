@@ -3514,6 +3514,10 @@
     <value>撤销</value>
     <comment>Undo</comment>
   </data>
+  <data name="UninstallingEchoDiarKeepsThisFolderAndTheRestOfItsDataToRemo" xml:space="preserve">
+    <value>卸载 EchoDiar 后，此文件夹及其他数据仍会保留。要全部移除，请删除包含它的 EchoDiar 文件夹。</value>
+    <comment>Uninstalling EchoDiar keeps this folder and the rest of its data. To remove everything, delete the EchoDiar folder that contains it.</comment>
+  </data>
   <data name="UnmuteMicrophone" xml:space="preserve">
     <value>取消麦克风静音</value>
     <comment>Unmute Microphone</comment>

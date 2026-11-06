@@ -14,7 +14,7 @@ namespace EchoDiar.App;
 
 public partial class App : Application
 {
-    /// <summary>The library layout under the real %LOCALAPPDATA%\EchoDiar (manifest turns write virtualization off).</summary>
+    /// <summary>The library layout under the real %LOCALAPPDATA%\EchoDiar (the manifest excludes it from write virtualization).</summary>
     internal static AppPaths Paths { get; } = new();
 
     /// <summary>The library root (<see cref="Paths"/>), for the DEBUG harnesses.</summary>

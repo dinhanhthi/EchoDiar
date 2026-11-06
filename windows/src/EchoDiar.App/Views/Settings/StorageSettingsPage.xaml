@@ -183,10 +183,13 @@
                         <FontIcon FontFamily="{ThemeResource SymbolThemeFontFamily}" Glyph="&#xE8B7;" />
                     </controls:SettingsCard.HeaderIcon>
                     <controls:SettingsCard.Description>
-                        <TextBlock
-                            x:Name="DataFolderText"
-                            IsTextSelectionEnabled="True"
-                            TextWrapping="Wrap" />
+                        <StackPanel Spacing="4">
+                            <TextBlock
+                                x:Name="DataFolderText"
+                                IsTextSelectionEnabled="True"
+                                TextWrapping="Wrap" />
+                            <TextBlock Text="{local:T Text='Uninstalling EchoDiar keeps this folder and the rest of its data. To remove everything, delete the EchoDiar folder that contains it.'}" TextWrapping="Wrap" />
+                        </StackPanel>
                     </controls:SettingsCard.Description>
                     <Button x:Name="OpenFolderButton" Content="{local:T Text='Open in File Explorer'}" />
                 </controls:SettingsCard>

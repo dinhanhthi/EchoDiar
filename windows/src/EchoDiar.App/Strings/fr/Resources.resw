@@ -3634,6 +3634,10 @@
     <value>Annuler</value>
     <comment>Undo</comment>
   </data>
+  <data name="UninstallingEchoDiarKeepsThisFolderAndTheRestOfItsDataToRemo" xml:space="preserve">
+    <value>Désinstaller EchoDiar conserve ce dossier et le reste de ses données. Pour tout effacer, supprimez le dossier EchoDiar qui le contient.</value>
+    <comment>Uninstalling EchoDiar keeps this folder and the rest of its data. To remove everything, delete the EchoDiar folder that contains it.</comment>
+  </data>
   <data name="UnmuteMicrophone" xml:space="preserve">
     <value>Réactiver le micro</value>
     <comment>Unmute Microphone</comment>

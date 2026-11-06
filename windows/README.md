@@ -146,7 +146,7 @@ echodiar.exe --native-probe Z:\Downloads\EchoDiarQA\models
 
 ## Data root
 
-The library lives at the real `%LOCALAPPDATA%\EchoDiar`, with the same layout and JSON as macOS `~/Library/Application Support/EchoDiar` (`settings.json`, `Conversations\`, `Models\`, `RAG\`, `GlobalChat\`, plus `Probes\` in Debug). [Package.appxmanifest](src/EchoDiar.App/Package.appxmanifest) turns file write virtualization off (`desktop6:FileSystemWriteVirtualization` disabled, `rescap:unvirtualizedResources`), so the library survives uninstalling the app and other processes (Explorer, the Recycle Bin) see the real files.
+The library lives at the real `%LOCALAPPDATA%\EchoDiar`, with the same layout and JSON as macOS `~/Library/Application Support/EchoDiar` (`settings.json`, `Conversations\`, `Models\`, `RAG\`, `GlobalChat\`, plus `Probes\` in Debug). [Package.appxmanifest](src/EchoDiar.App/Package.appxmanifest) excludes that one folder from file write virtualization (flexible virtualization: `virtualization:ExcludedDirectory` `$(KnownFolder:LocalAppData)\EchoDiar`, which needs `rescap:unvirtualizedResources`), so the library survives uninstalling the app and other processes (Explorer, the Recycle Bin) see the real files. Every other AppData and HKCU write stays virtualized and goes away at uninstall; `PackageManifestTests` guards this, since the Store justification of the capability names that folder only.
 
 ## Dev signing certificate (one-time)
 

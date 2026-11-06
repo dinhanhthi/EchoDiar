@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- Settings > Storage says that uninstalling EchoDiar keeps its data folder, and how to remove everything.
+- Windows: only the EchoDiar data folder (%LOCALAPPDATA%\EchoDiar) is written outside the app package; other app data is removed at uninstall, as for any Store app.
+
 ### Fixed
 
 - "Stop when the event ends" no longer stops a meeting that runs over while people are still talking: it asks only once the event is over and the recording has been silent for 1 min.

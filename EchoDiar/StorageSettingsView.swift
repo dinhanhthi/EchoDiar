@@ -186,6 +186,9 @@ struct StorageSettingsView: View {
                     }
                 }
             }
+            Text("Uninstalling EchoDiar keeps this folder and the rest of its data. To remove everything, delete the EchoDiar folder that contains it.")
+                .font(.caption)
+                .foregroundStyle(.secondary)
         }
     }
 
