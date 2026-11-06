@@ -87,7 +87,7 @@ struct SettingsView: View {
             // Custom rows, not a sidebar `List`: no public API hides its rounded-rect selection highlight, and the
             // selected row is an accent capsule like the toolbar's tabs.
             ScrollView {
-                VStack(spacing: 2) {
+                VStack(spacing: 4) {
                     ForEach(visibleTabs) { tab in
                         SidebarRow(tab: tab, selected: tab == model.settingsTab && !searching) { select(tab) }
                     }
@@ -183,7 +183,7 @@ private struct SidebarRow: View {
             }
             .lineLimit(1)
             .padding(.horizontal, 10)
-            .frame(maxWidth: .infinity, minHeight: 28, alignment: .leading)
+            .frame(maxWidth: .infinity, minHeight: 32, alignment: .leading)
             .background {
                 if selected {
                     Capsule().fill(Color.accentColor)
