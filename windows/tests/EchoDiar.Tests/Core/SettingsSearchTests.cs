@@ -4,7 +4,8 @@ namespace EchoDiar.Tests.Core;
 
 // Guards the Settings search (Swift SettingsSearchItem.matches): a row is found by its title, a keyword, its section's
 // title or its inner tab's title, ignoring case and accents, with the conversation search's "đ" rule; a blank term finds
-// nothing.
+// nothing. Its path (Swift SettingsSearchItem.path) skips an inner tab named like the row, and a row named like its
+// section shows the section alone in a section without tabs.
 public sealed class SettingsSearchTests
 {
     private static readonly SettingsSearchItem Item = new(
@@ -35,5 +36,13 @@ public sealed class SettingsSearchTests
         Assert.Equal("Transcription › General › Default language", Item.Path);
         Assert.Equal("Storage › Playback", (Item with { Title = "Playback", SectionTitle = "Storage", SubTabTitle = "Playback" }).Path);
         Assert.Equal("About › Version", new SettingsSearchItem("Version", [], "about", "About").Path);
+    }
+
+    [Fact]
+    public void PathShowsTheSectionAloneForItsOwnTitleWithoutTabs()
+    {
+        Assert.Equal("Calendar", new SettingsSearchItem("Calendar", [], "calendar", "Calendar").Path);
+        Assert.Equal("Recording › Microphone › Recording",
+            new SettingsSearchItem("Recording", [], "recording", "Recording", "microphone", "Microphone").Path);
     }
 }

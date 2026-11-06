@@ -214,16 +214,15 @@ public sealed partial class MainWindow : Window
     }
 
     /// <summary>
-    /// The window comes back to the front on the Calendar page or Settings › Recording › Calendar (from Windows' privacy
-    /// settings): the calendar syncs, so access granted or turned off there shows at once (macOS CalendarView and
-    /// RecordingSettingsView didBecomeActive).
+    /// The window comes back to the front on the Calendar page or Settings › Calendar (from Windows' privacy settings):
+    /// the calendar syncs, so access granted or turned off there shows at once (macOS CalendarView and
+    /// CalendarSettingsView didBecomeActive).
     /// </summary>
     private void OnActivated(object sender, WindowActivatedEventArgs args)
     {
         if (_closing || args.WindowActivationState == WindowActivationState.Deactivated) return;
         var showsCalendar = _model.Route.Kind == RouteKind.Calendar
-            || (_model.Route.Kind == RouteKind.Settings && _model.SettingsSection == SettingsSearch.Recording
-                && _model.SettingsSubTab == RecordingSettingsPage.CalendarTab);
+            || (_model.Route.Kind == RouteKind.Settings && _model.SettingsSection == SettingsSearch.Calendar);
         if (showsCalendar) _model.RefreshCalendar();
     }
 

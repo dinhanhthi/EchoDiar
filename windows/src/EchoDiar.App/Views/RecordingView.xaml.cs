@@ -310,8 +310,8 @@ public sealed partial class RecordingView : UserControl
     {
         var settings = _model.Settings;
         if (!settings.AutoTranscribe) _model.OpenSettings(SettingsSearch.Recording, RecordingSettingsPage.AfterRecordingTab);
-        else if (!settings.TranscribeWhileRecording) _model.OpenSettings(SettingsSearch.Transcription, TranscriptionSettingsPage.GeneralTab);
-        else _model.OpenSettings(SettingsSearch.Transcription, TranscriptionSettingsPage.TranscriptionModelsTab);
+        else if (!settings.TranscribeWhileRecording) _model.OpenSettings(SettingsSearch.Transcription);
+        else _model.OpenLocalAI(ProvidersSettingsPage.TranscriptionGroup);
     }
 
     private void OnTick()

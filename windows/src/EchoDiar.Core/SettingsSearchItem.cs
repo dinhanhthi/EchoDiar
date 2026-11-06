@@ -35,13 +35,18 @@ public sealed record SettingsSearchItem(
         return texts.Concat(Keywords).Any(text => SearchText.ContainsFolded(text, key));
     }
 
-    /// <summary>"Transcription › General › Default language", with the inner tab in between when it is not the title itself.</summary>
+    /// <summary>
+    /// "Recording › Auto-stop › Stop when the app is quiet for", with the inner tab in between when there is one and it
+    /// is not the title itself; the section alone ("Calendar") when the title is the section's, in a section without tabs
+    /// (Swift <c>path</c>).
+    /// </summary>
     public string Path
     {
         get
         {
             var subTab = SubTabTitle == Title ? null : SubTabTitle;
-            return string.Join(" › ", new[] { SectionTitle, subTab, Title }.OfType<string>());
+            var shown = SubTabTitle is null && Title == SectionTitle ? null : Title;
+            return string.Join(" › ", new[] { SectionTitle, subTab, shown }.OfType<string>());
         }
     }
 }

@@ -493,7 +493,7 @@ public static partial class Loc
         "No embedding models listed; type the model id.",
         "No installed live model supports this recording's language. Download one in Settings › AI Providers › Local AI.",
         "No installed live model supports this recording's language. Download one in Settings › Transcription.",
-        "No live model installed. Download a Whisper or Parakeet model above.",
+        "No live model installed. Download a Whisper or Parakeet model in AI Providers › Local AI.",
         "No live model installed. Download a WhisperKit or Parakeet model above.",
         "No live model installed. Download a WhisperKit or Parakeet model in AI Providers › Local AI.",
         "No model: choose one in Settings",

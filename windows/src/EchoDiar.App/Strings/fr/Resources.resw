@@ -2070,9 +2070,9 @@
     <value>Aucun modèle en direct installé. Téléchargez un modèle WhisperKit ou Parakeet dans Fournisseurs d’IA › IA locale.</value>
     <comment>No live model installed. Download a WhisperKit or Parakeet model in AI Providers › Local AI.</comment>
   </data>
-  <data name="NoLiveModelInstalledDownloadAWhisperOrParakeetModelAbove" xml:space="preserve">
-    <value>Aucun modèle en direct installé. Téléchargez un modèle Whisper ou Parakeet ci-dessus.</value>
-    <comment>No live model installed. Download a Whisper or Parakeet model above.</comment>
+  <data name="NoLiveModelInstalledDownloadAWhisperOrParakeetModelInAIProvi" xml:space="preserve">
+    <value>Aucun modèle en direct installé. Téléchargez un modèle Whisper ou Parakeet dans Fournisseurs d’IA › IA locale.</value>
+    <comment>No live model installed. Download a Whisper or Parakeet model in AI Providers › Local AI.</comment>
   </data>
   <data name="NoModelChooseOneInSettings" xml:space="preserve">
     <value>Aucun modèle : choisissez-en un dans Réglages</value>

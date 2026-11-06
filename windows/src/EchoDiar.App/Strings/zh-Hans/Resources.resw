@@ -1978,9 +1978,9 @@
     <value>未安装实时转写模型。请在“AI 提供商 › 本地 AI”中下载 WhisperKit 或 Parakeet 模型。</value>
     <comment>No live model installed. Download a WhisperKit or Parakeet model in AI Providers › Local AI.</comment>
   </data>
-  <data name="NoLiveModelInstalledDownloadAWhisperOrParakeetModelAbove" xml:space="preserve">
-    <value>未安装实时转写模型。请在上方下载 Whisper 或 Parakeet 模型。</value>
-    <comment>No live model installed. Download a Whisper or Parakeet model above.</comment>
+  <data name="NoLiveModelInstalledDownloadAWhisperOrParakeetModelInAIProvi" xml:space="preserve">
+    <value>未安装实时转写模型。请在“AI 提供商 › 本地 AI”中下载 Whisper 或 Parakeet 模型。</value>
+    <comment>No live model installed. Download a Whisper or Parakeet model in AI Providers › Local AI.</comment>
   </data>
   <data name="NoModelChooseOneInSettings" xml:space="preserve">
     <value>没有模型：请在设置中选择一个</value>

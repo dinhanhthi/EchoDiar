@@ -45,6 +45,7 @@ public static class SettingsSearch
 {
     public const string General = "general";
     public const string Recording = "recording";
+    public const string Calendar = "calendar";
     public const string Transcription = "transcription";
     public const string Providers = "providers";
     public const string AISettings = "aiSettings";
@@ -55,8 +56,8 @@ public static class SettingsSearch
 
     /// <summary>
     /// Every section, in sidebar order (macOS: General, Recording, Calendar, Transcription, AI Providers, AI Settings,
-    /// Storage, Shortcuts, About, Acknowledgements; Calendar is still Recording's tab here). AI Settings' glyph is the
-    /// app's stand-in for macOS "sparkles" (the conversation card's Summarizing badge).
+    /// Storage, Shortcuts, About, Acknowledgements). AI Settings' glyph is the app's stand-in for macOS "sparkles" (the
+    /// conversation card's Summarizing badge).
     /// </summary>
     public static IReadOnlyList<SettingsSection> Sections { get; } =
     [
@@ -64,8 +65,9 @@ public static class SettingsSearch
         new(
             Recording, "Recording", "\uE7C8", RecordingSettingsPage.SubTabs, RecordingSettingsPage.SearchEntries,
             (model, _) => new RecordingSettingsPage(model)),
+        new(Calendar, "Calendar", "\uE787", [], CalendarSettingsPage.SearchEntries, (model, _) => new CalendarSettingsPage(model)),
         new(
-            Transcription, "Transcription", "\uE8D6", TranscriptionSettingsPage.SubTabs, TranscriptionSettingsPage.SearchEntries,
+            Transcription, "Transcription", "\uE8D6", [], TranscriptionSettingsPage.SearchEntries,
             (model, showDialog) => new TranscriptionSettingsPage(model) { ShowDialog = showDialog }),
         new(
             Providers, "AI Providers", "\uE99A", ProvidersSettingsPage.SubTabs, ProvidersSettingsPage.SearchEntries,

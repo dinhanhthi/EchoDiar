@@ -4,6 +4,8 @@
     - Chat: the chat model (macOS AIModelPicker, purpose chat), the chat context and the AI answer language.
     - Summary: the summary model (purpose summary) and the AI answer language (the same setting as Chat's).
     - Catch-up (macOS catchUpSection): where "Catch up" runs while recording; pickers filled in code.
+    - Transcription (macOS AISettingsView transcription): the default transcription model and the default diarization
+      model (DefaultEnginePicker, made in code), the same settings as Settings › Transcription's.
     - Library chat: Settings › RAG's page (RAGSettingsPage, macOS RAGSettingsView), placed in code.
     The providers themselves are set up in AI Providers. Each searchable element's Tag is its search entry's title
     (SearchEntries), so a search result can bring it into view; the Summary tab's language card is found as Chat's is,
@@ -27,6 +29,17 @@
             TargetType="TextBlock">
             <Setter Property="Foreground" Value="{ThemeResource TextFillColorSecondaryBrush}" />
             <Setter Property="TextWrapping" Value="Wrap" />
+        </Style>
+        <!-- The default engine pickers' cloud caution (DefaultEnginePicker), as in TranscriptionSettingsPage.xaml. -->
+        <Style
+            x:Key="CautionNoteStyle"
+            BasedOn="{StaticResource NoteStyle}"
+            TargetType="TextBlock">
+            <Setter Property="Foreground" Value="{ThemeResource SystemFillColorCautionBrush}" />
+        </Style>
+        <Style x:Key="CautionIconStyle" TargetType="FontIcon">
+            <Setter Property="FontSize" Value="12" />
+            <Setter Property="Foreground" Value="{ThemeResource SystemFillColorCautionBrush}" />
         </Style>
         <Style x:Key="SuccessIconStyle" TargetType="FontIcon">
             <Setter Property="FontSize" Value="14" />
@@ -196,6 +209,23 @@
                             Style="{StaticResource NoteStyle}"
                             Text="{local:T Text='In-app models are not offered: the live transcript holds the model during a recording.'}" />
                     </Grid>
+                </StackPanel>
+
+                <!-- Transcription (macOS AISettingsView transcription): the default engine pickers, made in code. -->
+                <StackPanel
+                    x:Name="TranscriptionPanel"
+                    Spacing="4"
+                    Visibility="Collapsed">
+                    <TextBlock
+                        Margin="1,4,0,4"
+                        Style="{StaticResource BodyStrongTextBlockStyle}"
+                        Text="{local:T Text='Transcription model'}" />
+                    <StackPanel x:Name="TranscriptionModelHost" />
+                    <TextBlock
+                        Margin="1,24,0,4"
+                        Style="{StaticResource BodyStrongTextBlockStyle}"
+                        Text="{local:T Text='Speakers'}" />
+                    <StackPanel x:Name="DiarizationModelHost" />
                 </StackPanel>
             </Grid>
         </ScrollViewer>

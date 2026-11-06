@@ -2078,9 +2078,9 @@
     <value>No live model installed. Download a WhisperKit or Parakeet model in AI Providers › Local AI.</value>
     <comment>No live model installed. Download a WhisperKit or Parakeet model in AI Providers › Local AI.</comment>
   </data>
-  <data name="NoLiveModelInstalledDownloadAWhisperOrParakeetModelAbove" xml:space="preserve">
-    <value>No live model installed. Download a Whisper or Parakeet model above.</value>
-    <comment>No live model installed. Download a Whisper or Parakeet model above.</comment>
+  <data name="NoLiveModelInstalledDownloadAWhisperOrParakeetModelInAIProvi" xml:space="preserve">
+    <value>No live model installed. Download a Whisper or Parakeet model in AI Providers › Local AI.</value>
+    <comment>No live model installed. Download a Whisper or Parakeet model in AI Providers › Local AI.</comment>
   </data>
   <data name="NoModelChooseOneInSettings" xml:space="preserve">
     <value>No model: choose one in Settings</value>

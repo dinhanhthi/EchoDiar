@@ -78,6 +78,11 @@ public sealed partial class ProvidersSettingsPage : UserControl
              .. PresetNames(ProviderKind.OpenAICompatible), .. PresetNames(ProviderKind.Anthropic)], CloudTab),
         new("Speech-to-text APIs",
             ["API key", "key", "Credential Manager", "cloud transcription", .. PresetNames(ProviderKind.SpeechToText)], CloudTab),
+        // The speech-to-text cards, with their transcription and diarization models (ProviderCardList's Tags).
+        new("Cloud transcription engines", ["upload", "API", "default engine", "xAI", .. PresetNames(ProviderKind.SpeechToText)], CloudTab),
+        new("Cloud diarization",
+            ["OpenAI", "ElevenLabs", "Deepgram", "AssemblyAI", "Gemini", "xAI", "Speechmatics", "Soniox", "Gladia", "speakers", "cloud"],
+            CloudTab),
         new("Custom OpenAI-compatible endpoints",
             ["API key", "key", "custom endpoint", "add endpoint", "base URL", "authentication", "headers", "model"], CloudTab),
         new("CLIs", ["subscription", "command line", "terminal", .. PresetNames(ProviderKind.Cli)], CliTab),

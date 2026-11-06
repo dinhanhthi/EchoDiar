@@ -8,19 +8,22 @@ using Microsoft.UI.Xaml.Controls;
 namespace EchoDiar.App.Views;
 
 /// <summary>
-/// Settings › AI Settings (macOS AISettingsView.swift), the Chat, Summary, Catch-up and Library chat inner tabs; the title
-/// bar picks the tab (<see cref="AppViewModel.SubTabOf"/>). Chat and Summary each pick their own default model (macOS
-/// <c>AIModelPicker</c>, <see cref="AIPurpose"/>) and share the AI answer language; Chat also has the chat context.
-/// Catch-up is where "Catch up" runs while recording. Library chat is the RAG page (<see cref="RAGSettingsPage"/>), whose
+/// Settings › AI Settings (macOS AISettingsView.swift), the Chat, Summary, Catch-up, Transcription and Library chat inner
+/// tabs; the title bar picks the tab (<see cref="AppViewModel.SubTabOf"/>). Chat and Summary each pick their own default
+/// model (macOS <c>AIModelPicker</c>, <see cref="AIPurpose"/>) and share the AI answer language; Chat also has the chat
+/// context. Catch-up is where "Catch up" runs while recording. Transcription (macOS <c>transcription</c>) has the default
+/// transcription and diarization models' pickers (<see cref="DefaultEnginePicker"/>), the same settings as Settings ›
+/// Transcription's. Library chat is the RAG page (<see cref="RAGSettingsPage"/>), whose
 /// providers and keys changed elsewhere are picked up each time it is shown (macOS RAGSettingsView <c>shown</c>). Every
 /// change goes through <see cref="ProvidersViewModel"/> and is saved after the settings delay.
 /// </summary>
 public sealed partial class AISettingsPage : UserControl
 {
-    // macOS ids (SettingsTab.aiSettings.subTabs); the Transcription tab comes later.
+    // macOS ids (SettingsTab.aiSettings.subTabs).
     public const string ChatTab = "chat";
     public const string SummaryTab = "summary";
     public const string CatchUpTab = "catchUp";
+    public const string TranscriptionTab = "transcription";
     public const string LibraryTab = "library";
 
     /// <summary>macOS <c>SettingsTab.aiSettings.subTabs</c>.</summary>
@@ -29,6 +32,7 @@ public sealed partial class AISettingsPage : UserControl
         new(ChatTab, "Chat"),
         new(SummaryTab, "Summary"),
         new(CatchUpTab, "Catch-up"),
+        new(TranscriptionTab, "Transcription"),
         new(LibraryTab, "Library chat"),
     ];
 
@@ -44,6 +48,10 @@ public sealed partial class AISettingsPage : UserControl
         new("Catch-up provider", ["catch up", "live summary", "cloud", "CLI", "local server"], CatchUpTab),
         new("Catch-up model", ["catch up", "live summary", "LLM"], CatchUpTab),
         new("Re-summarize from the start each time", ["catch up", "incremental", "whole recording", "from start"], CatchUpTab),
+        new("Default transcription model",
+            ["default engine", "Whisper", "Parakeet", "cloud", "speech to text", .. TranscriptionSettingsPage.SpeechToTextNames()],
+            TranscriptionTab),
+        new("Default diarization model", ["diarization", "speakers", "speaker model", "pyannote", "cloud"], TranscriptionTab),
         .. RAGSettingsPage.SearchEntries,
     ];
 
@@ -53,12 +61,17 @@ public sealed partial class AISettingsPage : UserControl
 
     private readonly AppViewModel _model;
     private readonly ProvidersViewModel _providers;
+    private readonly ModelsViewModel _models;
 
     /// <summary>Library chat's page, shown on its tab.</summary>
     private readonly RAGSettingsPage _library;
 
     private readonly ModelPicker _chatModel;
     private readonly ModelPicker _summaryModel;
+
+    /// <summary>The Transcription tab's default transcription model and diarizer (macOS <c>DefaultEnginePicker</c>).</summary>
+    private readonly DefaultEnginePicker _asrPicker;
+    private readonly DefaultEnginePicker _diarizationPicker;
 
     /// <summary>A picked cloud catch-up provider's key status.</summary>
     private readonly ApiKeyStatus _catchUpKeyStatus;
@@ -82,6 +95,7 @@ public sealed partial class AISettingsPage : UserControl
     {
         _model = model;
         _providers = model.ProvidersModel;
+        _models = model.ModelsModel;
         InitializeComponent();
         _library = new RAGSettingsPage(model);
         LibraryHost.Children.Add(_library);
@@ -92,6 +106,10 @@ public sealed partial class AISettingsPage : UserControl
         _summaryModel = new ModelPicker(SummaryModelCombo, _providers, AIPurpose.Summary, () => _syncing);
         _catchUpKeyStatus = new ApiKeyStatus(model, (Style)Resources["SuccessIconStyle"]);
         CatchUpKeyCard.Content = _catchUpKeyStatus.Element;
+        _asrPicker = new DefaultEnginePicker(model, diarization: false, Resources);
+        _diarizationPicker = new DefaultEnginePicker(model, diarization: true, Resources);
+        TranscriptionModelHost.Children.Add(_asrPicker.Card);
+        DiarizationModelHost.Children.Add(_diarizationPicker.Card);
 
         ChatLanguageCombo.SelectionChanged += (_, _) => OnLanguagePicked(ChatLanguageCombo);
         SummaryLanguageCombo.SelectionChanged += (_, _) => OnLanguagePicked(SummaryLanguageCombo);
@@ -125,15 +143,20 @@ public sealed partial class AISettingsPage : UserControl
         {
             _model.PropertyChanged += OnModelChanged;
             _providers.Changed += Refresh;
+            _models.StatesChanged += UpdatePickers;
             Refresh();
+            UpdatePickers();
             ShowTab();
-            // The saved keys read again, for the catch-up key status (Changed follows).
+            // The saved keys read again, for the catch-up key status and the cloud engines (Changed follows).
             _ = _providers.RefreshKeysAsync();
+            // The pickers offer the installed models (macOS refreshInstalledModels).
+            _ = _model.RefreshModelsAsync();
         };
         Unloaded += (_, _) =>
         {
             _model.PropertyChanged -= OnModelChanged;
             _providers.Changed -= Refresh;
+            _models.StatesChanged -= UpdatePickers;
             _libraryShown = false;
         };
     }
@@ -161,6 +184,7 @@ public sealed partial class AISettingsPage : UserControl
         ChatPanel.Visibility = Show(tab == ChatTab);
         SummaryPanel.Visibility = Show(tab == SummaryTab);
         CatchUpPanel.Visibility = Show(tab == CatchUpTab);
+        TranscriptionPanel.Visibility = Show(tab == TranscriptionTab);
 
         // Called while the page is loaded only (Loaded, then the model's changes until Unloaded).
         var shown = library && _model.SettingsSection == SettingsSearch.AISettings;
@@ -186,6 +210,13 @@ public sealed partial class AISettingsPage : UserControl
         {
             _syncing = false;
         }
+    }
+
+    /// <summary>The Transcription tab's pickers show the installed models, the cloud engines and the defaults.</summary>
+    private void UpdatePickers()
+    {
+        _asrPicker.Update();
+        _diarizationPicker.Update();
     }
 
     // Chat and summary

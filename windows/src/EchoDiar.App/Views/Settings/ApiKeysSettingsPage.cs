@@ -97,7 +97,12 @@ internal sealed class ProviderCardList
         _isShowing = isShowing;
         host.Children.Add(Header(Loc.T("Language models"), "Language models", first: true));
         host.Children.Add(_languageModels);
-        host.Children.Add(Header(Loc.T("Speech-to-text APIs"), "Speech-to-text APIs"));
+        // The speech-to-text group is also where the search's "Cloud transcription engines" and "Cloud diarization"
+        // (macOS SettingsSearch.swift) land: its cards hold both models.
+        var speechToTextHeader = Header(Loc.T("Speech-to-text APIs"), "Speech-to-text APIs");
+        ((FrameworkElement)speechToTextHeader.Children[0]).Tag = "Cloud diarization";
+        host.Children.Add(speechToTextHeader);
+        _speechToText.Tag = "Cloud transcription engines";
         host.Children.Add(_speechToText);
         host.Children.Add(Header(Loc.T("Custom OpenAI-compatible endpoints"), "Custom OpenAI-compatible endpoints"));
         host.Children.Add(_custom);

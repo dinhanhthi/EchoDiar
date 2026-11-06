@@ -10,33 +10,18 @@ using EchoDiar.Core.Settings;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Automation;
 using Microsoft.UI.Xaml.Controls;
-using Microsoft.UI.Xaml.Input;
 
 namespace EchoDiar.App.Views;
 
 /// <summary>
-/// Settings › Transcription (macOS ModelsSettingsView.swift), the General, Transcription model and Diarization model
-/// inner tabs; the title bar picks the tab (<see cref="AppViewModel.SubTabOf"/>). Every setting shows
-/// <see cref="SettingsViewModel"/> and changes it; the change is saved after its delay. The model rows show
-/// <see cref="ModelsViewModel"/>'s state, kept up to date in place (a download's progress changes them often). The cloud
-/// rows (macOS <c>cloudSection</c>) show <see cref="ProvidersViewModel"/>'s configs with their model and key status, and
-/// <see cref="AppViewModel.CloudEngineConfigs"/>, made once per provider and updated in place; keys are saved in
-/// Settings › API Keys, which a row's "API key" button opens.
+/// Settings › Transcription (macOS ModelsSettingsView.swift), one page without inner tabs: General, Transcription model
+/// (the default engine's <see cref="DefaultEnginePicker"/> and, for a cloud engine, its "While recording" group) and
+/// Speakers (with the default diarizer's picker). Every setting shows <see cref="SettingsViewModel"/> and changes it;
+/// the change is saved after its delay. The local models are downloaded in AI Providers › Local AI and the cloud engines
+/// set up in AI Providers › Cloud (macOS: the same).
 /// </summary>
 public sealed partial class TranscriptionSettingsPage : UserControl
 {
-    public const string GeneralTab = "general";
-    public const string TranscriptionModelsTab = "transcriptionModels";
-    public const string DiarizationModelsTab = "diarizationModels";
-
-    /// <summary>macOS <c>SettingsTab.transcription.subTabs</c>.</summary>
-    public static IReadOnlyList<SettingsSubTab> SubTabs { get; } =
-    [
-        new(GeneralTab, "General"),
-        new(TranscriptionModelsTab, "Transcription model"),
-        new(DiarizationModelsTab, "Diarization model"),
-    ];
-
     /// <summary>
     /// The cloud engines with a realtime stream ("Live with &lt;Provider&gt; realtime", macOS <c>realtimeNames</c>); before
     /// <see cref="SearchEntries"/>, which reads it.
@@ -44,34 +29,29 @@ public sealed partial class TranscriptionSettingsPage : UserControl
     private static readonly string[] RealtimeNames =
         ["ElevenLabs", "Deepgram", "AssemblyAI", "OpenAI", "xAI", "Speechmatics", "Soniox", "Gladia"];
 
-    /// <summary>The searchable rows (macOS SettingsSearch.swift, Transcription), each the Tag of its element.</summary>
+    /// <summary>
+    /// The searchable rows (macOS SettingsSearch.swift, Transcription), each the Tag of its element. The model rows are
+    /// AI Providers › Local AI's, the cloud engines AI Providers › Cloud's.
+    /// </summary>
     public static IReadOnlyList<SettingsEntry> SearchEntries { get; } =
     [
-        new("Default language", ["language", "English", "French", "Vietnamese"], GeneralTab),
-        new("Remember last record language", ["language", "remember", "last", "record", "chevron", "menu"], GeneralTab),
-        new("Transcribe while recording", ["live transcript", "captions", "real-time", "subtitles", "Whisper", "Parakeet"], GeneralTab),
-        new("Free unused models after", ["memory", "RAM", "idle", "unload", "pause"], GeneralTab),
-        new("Delete audio after transcription", ["remove audio", "Recycle Bin", "trash", "save space"], GeneralTab),
-        new("Transcription models", ["download", "Whisper", "Parakeet", "fast", "balanced", "quality"], TranscriptionModelsTab),
-        new("Cloud transcription engines", ["upload", "API", "default engine", "xAI", .. SpeechToTextNames()], TranscriptionModelsTab),
-        new("While recording",
-            ["live transcript", "cloud live", "realtime", "real-time", "streaming", "captions", .. RealtimeNames],
-            TranscriptionModelsTab),
-        new("Live with a local model",
-            ["live transcript", "cloud live", "while recording", "Whisper", "Parakeet", "live model"], TranscriptionModelsTab),
+        new("Default language", ["language", "English", "French", "Vietnamese"]),
+        new("Remember last record language", ["language", "remember", "last", "record", "chevron", "menu"]),
+        new("Transcribe while recording", ["live transcript", "captions", "real-time", "subtitles", "Whisper", "Parakeet"]),
+        new("Free unused models after", ["memory", "RAM", "idle", "unload", "pause"]),
+        new("Delete audio after transcription", ["remove audio", "Recycle Bin", "trash", "save space"]),
+        new("Default transcription model",
+            ["default engine", "Whisper", "Parakeet", "cloud", "speech to text", .. SpeechToTextNames()]),
+        new("While recording", ["live transcript", "cloud live", "realtime", "real-time", "streaming", "captions", .. RealtimeNames]),
+        new("Live with a local model", ["live transcript", "cloud live", "while recording", "Whisper", "Parakeet", "live model"]),
         new(RealtimeSearchTitle,
-            ["live transcript", "cloud live", "realtime", "real-time", "streaming", "while recording", "WebSocket", .. RealtimeNames],
-            TranscriptionModelsTab),
-        new("Realtime model", ["realtime", "streaming", "live model", "while recording", .. RealtimeNames], TranscriptionModelsTab),
+            ["live transcript", "cloud live", "realtime", "real-time", "streaming", "while recording", "WebSocket", .. RealtimeNames]),
+        new("Realtime model", ["realtime", "streaming", "live model", "while recording", .. RealtimeNames]),
         new("Use the realtime result as the transcript",
-            ["use as final", "realtime", "streaming", "live transcript", "gap fill", "no upload", .. RealtimeNames],
-            TranscriptionModelsTab),
-        new("Diarization models", ["speaker model", "speakers", "pyannote", "download"], DiarizationModelsTab),
-        new("Cloud diarization",
-            ["OpenAI", "ElevenLabs", "Deepgram", "AssemblyAI", "Gemini", "xAI", "Speechmatics", "Soniox", "Gladia", "speakers", "cloud"],
-            DiarizationModelsTab),
-        new("Tell speakers apart", ["diarization", "speakers", "who spoke"], DiarizationModelsTab),
-        new("Number of other speakers", ["speaker count", "diarization", "people"], DiarizationModelsTab),
+            ["use as final", "realtime", "streaming", "live transcript", "gap fill", "no upload", .. RealtimeNames]),
+        new("Tell speakers apart", ["diarization", "speakers", "who spoke"]),
+        new("Number of other speakers", ["speaker count", "diarization", "people"]),
+        new("Default diarization model", ["diarization", "speakers", "speaker model", "pyannote", "cloud"]),
     ];
 
     /// <summary>
@@ -86,17 +66,19 @@ public sealed partial class TranscriptionSettingsPage : UserControl
     private const string LiveDescription =
         "Shows the transcript during the recording. Whisper and Parakeet models keep it, so it is ready within seconds of "
         + "Stop. Uses more CPU and memory while recording. A cloud engine can show it with a local model or its realtime "
-        + "stream: see Transcription model › Cloud.";
+        + "stream: see Transcription model below.";
 
     private readonly AppViewModel _model;
     private readonly SettingsViewModel _settings;
     private readonly ModelsViewModel _models;
     private readonly ProvidersViewModel _providers;
-    private readonly CloudSection _transcriptionCloud;
-    private readonly CloudSection _diarizationCloud;
 
-    /// <summary>The local transcription and diarization model rows (macOS <c>ModelRow</c>), made once and updated in place.</summary>
-    private readonly LocalModelRows _localRows;
+    /// <summary>The default transcription model and diarizer (macOS <c>DefaultEnginePicker</c>), made once and updated in place.</summary>
+    private readonly DefaultEnginePicker _asrPicker;
+    private readonly DefaultEnginePicker _diarizationPicker;
+
+    /// <summary>The default cloud engine's "While recording" group, below the transcription model's picker.</summary>
+    private readonly CloudLiveOptions _live;
 
     /// <summary>The controls are being set from the settings: their change events are not the user's.</summary>
     private bool _syncing;
@@ -117,17 +99,16 @@ public sealed partial class TranscriptionSettingsPage : UserControl
         _models = model.ModelsModel;
         _providers = model.ProvidersModel;
         InitializeComponent();
-        _transcriptionCloud = new CloudSection(this, TranscriptionCloudList, diarization: false);
-        _diarizationCloud = new CloudSection(this, DiarizationCloudList, diarization: true);
+        _asrPicker = new DefaultEnginePicker(model, diarization: false, Resources);
+        _diarizationPicker = new DefaultEnginePicker(model, diarization: true, Resources);
+        _live = new CloudLiveOptions(this);
+        DiarizationModelList.Children.Add(_diarizationPicker.Card);
         RememberLanguageCard.Description = Loc.T(
             "Uses the language picked in the Record menu for the next recordings instead of the default language. Languages changed during a recording don't count.");
         LiveCard.Description = Loc.T(LiveDescription);
         SpeakerCountCombo.Items.Add(Loc.T("Auto"));
         var (min, max) = AppSettings.SpeakerCountHintRange;
         for (var count = min; count <= max; count++) SpeakerCountCombo.Items.Add(count.ToString(CultureInfo.CurrentCulture));
-        _localRows = new LocalModelRows(_models, Resources);
-        _localRows.AddSections(TranscriptionList, ModelKind.Asr);
-        _localRows.AddSections(DiarizationList, ModelKind.Diarization);
 
         LanguageCombo.SelectionChanged += (_, _) =>
         {
@@ -156,13 +137,12 @@ public sealed partial class TranscriptionSettingsPage : UserControl
             _model.PropertyChanged += OnModelChanged;
             _settings.PropertyChanged += OnSettingsChanged;
             _models.PropertyChanged += OnModelsChanged;
-            _models.StatesChanged += _localRows.Update;
+            _models.StatesChanged += UpdatePickers;
             _providers.Changed += RefreshCloud;
             Refresh();
-            _localRows.Update();
+            UpdatePickers();
             RefreshCloud();
-            ShowTab();
-            InstalledText.Text = _models.InstalledText;
+            // The pickers offer the installed models (macOS refreshInstalledModels).
             _ = _models.LoadAsync();
             _ = _providers.RefreshKeysAsync();
         };
@@ -171,57 +151,27 @@ public sealed partial class TranscriptionSettingsPage : UserControl
             _model.PropertyChanged -= OnModelChanged;
             _settings.PropertyChanged -= OnSettingsChanged;
             _models.PropertyChanged -= OnModelsChanged;
-            _models.StatesChanged -= _localRows.Update;
+            _models.StatesChanged -= UpdatePickers;
             _providers.Changed -= RefreshCloud;
-            // macOS: a model list stops when its row goes away.
-            _transcriptionCloud.Cancel();
-            _diarizationCloud.Cancel();
         };
     }
 
-    private string? Tab => _model.SubTabOf(SettingsSearch.Transcription);
-
     private void OnModelChanged(object? sender, PropertyChangedEventArgs e)
     {
-        switch (e.PropertyName)
-        {
-            case nameof(AppViewModel.SettingsSubTab):
-                ShowTab();
-                break;
-            // The default cloud engine's "While recording" group follows it (settings and models: _providers.Changed).
-            case nameof(AppViewModel.CloudEngineConfigs):
-                RefreshCloud();
-                break;
-        }
+        // The default cloud engine's "While recording" group follows it (settings and models: _providers.Changed).
+        if (e.PropertyName == nameof(AppViewModel.CloudEngineConfigs)) RefreshCloud();
     }
 
     private void OnSettingsChanged(object? sender, PropertyChangedEventArgs e) => Refresh();
 
     private void OnModelsChanged(object? sender, PropertyChangedEventArgs e)
     {
-        switch (e.PropertyName)
-        {
-            case nameof(ModelsViewModel.InstalledText):
-                InstalledText.Text = _models.InstalledText;
-                break;
-            case nameof(ModelsViewModel.DiarizerAvailable):
-                Refresh();
-                break;
-        }
+        if (e.PropertyName == nameof(ModelsViewModel.DiarizerAvailable)) Refresh();
     }
 
     private void Set(Action change)
     {
         if (!_syncing) change();
-    }
-
-    /// <summary>The picked tab's panel.</summary>
-    private void ShowTab()
-    {
-        var tab = Tab;
-        GeneralPanel.Visibility = tab == GeneralTab ? Visibility.Visible : Visibility.Collapsed;
-        TranscriptionPanel.Visibility = tab == TranscriptionModelsTab ? Visibility.Visible : Visibility.Collapsed;
-        DiarizationPanel.Visibility = tab == DiarizationModelsTab ? Visibility.Visible : Visibility.Collapsed;
     }
 
     /// <summary>Every setting control shows the current settings.</summary>
@@ -241,7 +191,7 @@ public sealed partial class TranscriptionSettingsPage : UserControl
             var (min, _) = AppSettings.SpeakerCountHintRange;
             SpeakerCountCombo.SelectedIndex = _settings.SpeakerCountHint is { } hint ? hint - min + 1 : 0;
             SpeakerCountCard.Description = !_models.DiarizerAvailable
-                ? Loc.T("Needs the speaker model: download it in Transcription › Diarization model.")
+                ? Loc.T("Needs the speaker model: download it in Settings › AI Providers › Local AI.")
                 : _model.DefaultCloudDiarizer() is not null
                     ? $"{Loc.T("A hint for telling the system audio's speakers apart.")} {Loc.T("Cloud diarization does not take this number.")}"
                     : Loc.T("A hint for telling the system audio's speakers apart.");
@@ -288,11 +238,9 @@ public sealed partial class TranscriptionSettingsPage : UserControl
 
     private static Visibility Show(bool visible) => visible ? Visibility.Visible : Visibility.Collapsed;
 
-    // Cloud (macOS cloudSection, CloudEngineRow, CloudModelField)
-
     /// <summary>
-    /// Approximate pay-as-you-go prices per audio hour (macOS <c>CloudEngineRow.prices</c>, 2026-10-18; xAI, Speechmatics
-    /// Enhanced, Soniox and Gladia solaria-1 2026-11-04).
+    /// Approximate pay-as-you-go prices per audio hour (macOS <c>CloudPriceBadge.prices</c>, 2026-10-18; xAI, Speechmatics
+    /// Enhanced, Soniox and Gladia solaria-1 2026-11-04), shown on AI Providers › Cloud's cards.
     /// </summary>
     internal static readonly Dictionary<string, string> Prices = new()
     {
@@ -301,7 +249,8 @@ public sealed partial class TranscriptionSettingsPage : UserControl
         ["xai"] = "~$0.10/h", ["speechmatics"] = "~$0.38/h", ["soniox"] = "~$0.10/h", ["gladia"] = "~€0.27/h",
     };
 
-    private static IEnumerable<string> SpeechToTextNames() =>
+    /// <summary>The speech-to-text APIs' names (macOS <c>speechToTextNames</c>), also AI Settings › Transcription's keywords.</summary>
+    internal static IEnumerable<string> SpeechToTextNames() =>
         ProviderConfig.Presets().Where(p => p.Kind == ProviderKind.SpeechToText).Select(p => p.DisplayName);
 
     private bool Closing => _model.IsClosing;
@@ -310,202 +259,37 @@ public sealed partial class TranscriptionSettingsPage : UserControl
     private CloudModelField NewCloudModelField(bool diarization, bool realtime = false) =>
         new(_providers, () => _syncing, () => Closing, Resources, diarization, realtime);
 
-    /// <summary>Both cloud sections show the current configs, keys and defaults.</summary>
+    /// <summary>Both default engine pickers show the current choices and defaults.</summary>
+    private void UpdatePickers()
+    {
+        _asrPicker.Update();
+        _diarizationPicker.Update();
+    }
+
+    /// <summary>
+    /// "Transcription model" (macOS <c>Section("Transcription model")</c>): the default engine's picker, then the default
+    /// cloud engine's "While recording" group when the default is an available cloud engine.
+    /// </summary>
     private void RefreshCloud()
     {
         if (Closing) return;
-        _transcriptionCloud.Update();
-        _diarizationCloud.Update();
-    }
-
-    /// <summary>A section title with its description (macOS <c>SectionHeader</c>); <paramref name="tag"/> is its search entry.</summary>
-    private StackPanel SectionHeader(string title, string description, string tag)
-    {
-        var header = new StackPanel { Style = (Style)Resources["SectionHeaderStyle"], Tag = tag };
-        header.Children.Add(new TextBlock { Style = (Style)Application.Current.Resources["BodyStrongTextBlockStyle"], Text = Loc.T(title) });
-        header.Children.Add(Note(description, "NoteStyle"));
-        return header;
-    }
-
-    /// <summary>
-    /// "Cloud" on one tab (macOS <c>cloudSection(diarization:)</c>): the header, the "audio leaves this PC" note, then
-    /// every provider that transcribes (with <c>diarization</c>: that labels speakers), each with its model, its key
-    /// status and Set default once configured; without <c>diarization</c>, the default engine's "While recording" group
-    /// right below its row.
-    /// </summary>
-    private sealed class CloudSection
-    {
-        private readonly TranscriptionSettingsPage _page;
-        private readonly StackPanel _list;
-        private readonly bool _diarization;
-        private readonly UIElement _header;
-        private readonly UIElement _caution;
-        private readonly Dictionary<string, CloudEngineRow> _rows = new(StringComparer.OrdinalIgnoreCase);
-        private readonly CloudLiveOptions? _live;
-
-        public CloudSection(TranscriptionSettingsPage page, StackPanel list, bool diarization)
+        List<UIElement> children = [_asrPicker.Card];
+        if (_model.DefaultCloudConfig is { } config)
         {
-            _page = page;
-            _list = list;
-            _diarization = diarization;
-            if (!diarization) _live = new CloudLiveOptions(page);
-            _header = page.SectionHeader(
-                "Cloud",
-                diarization
-                    ? "Only the system channel is uploaded, as one extra transcription billed by the provider; only the speaker labels are kept. Not used when the transcription model already labels speakers. Prices are approximate list prices per audio hour."
-                    : "Prices are approximate list prices per audio hour; the mic and system channels are sent and billed separately.",
-                diarization ? "Cloud diarization" : "Cloud transcription engines");
-            var caution = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 6, Margin = new Thickness(1, 4, 0, 4) };
-            caution.Children.Add(new FontIcon { Style = (Style)page.Resources["CautionIconStyle"], Glyph = "\uE753" });
-            caution.Children.Add(new TextBlock
-            {
-                Style = (Style)page.Resources["CautionNoteStyle"],
-                // The macOS text, with "this PC" for "this Mac".
-                Text = Loc.T(diarization
-                    ? "Audio leaves this PC: the cloud diarizer uploads the system channel to the provider."
-                    : "Audio leaves this PC: cloud engines upload the recording to the provider."),
-            });
-            _caution = caution;
+            _live.Update(config);
+            children.AddRange(_live.Elements);
         }
-
-        public void Cancel()
-        {
-            foreach (var row in _rows.Values) row.Cancel();
-        }
-
-        public void Update()
-        {
-            var app = _page._model;
-            var configured = (_diarization ? app.CloudDiarizerConfigs : app.CloudEngineConfigs)
-                .Select(c => c.Id).ToHashSet(StringComparer.OrdinalIgnoreCase);
-            var defaultId = _diarization ? _page._models.DefaultDiarizerModelID : _page._models.DefaultASRModelID;
-            var liveConfig = _live is null ? null : app.DefaultCloudConfig;
-
-            List<UIElement> children = [_header, _caution];
-            foreach (var config in _page._providers.ProviderConfigs.Where(c =>
-                         CloudTranscription.Supports(c)
-                         && (!_diarization || CloudTranscription.DiarizationPresets.Contains(c.Preset ?? ""))))
-            {
-                if (!_rows.TryGetValue(config.Id, out var row)) _rows[config.Id] = row = new CloudEngineRow(_page, _diarization);
-                row.Update(config, configured.Contains(config.Id), defaultId);
-                children.Add(row.Expander);
-                if (_live is not null && liveConfig is not null && ProvidersViewModel.SameId(liveConfig.Id, config.Id))
-                {
-                    _live.Update(liveConfig);
-                    children.AddRange(_live.Elements);
-                }
-            }
-            if (_list.Children.SequenceEqual(children)) return;
-            _list.Children.Clear();
-            foreach (var child in children) _list.Children.Add(child);
-        }
+        if (TranscriptionModelList.Children.SequenceEqual(children)) return;
+        TranscriptionModelList.Children.Clear();
+        foreach (var child in children) TranscriptionModelList.Children.Add(child);
     }
 
     /// <summary>
-    /// A cloud engine (macOS <c>CloudEngineRow</c>): its name with the model it runs once configured, the Default badge,
-    /// Cloud and its approximate price, Gemini's note, "Base URL not set" for a custom endpoint without one; Set default
-    /// once configured (available, with a model; available alone with <c>diarization</c>) and its key status ("API key"
-    /// opens its card in Settings › API Keys); expanded, its model.
-    /// </summary>
-    private sealed class CloudEngineRow
-    {
-        private readonly TranscriptionSettingsPage _page;
-        private readonly bool _diarization;
-        private readonly TextBlock _name = new()
-        {
-            TextTrimming = TextTrimming.CharacterEllipsis, TextWrapping = TextWrapping.NoWrap, VerticalAlignment = VerticalAlignment.Center,
-        };
-        private readonly Border _badge;
-        private readonly TextBlock _details;
-        private readonly TextBlock _geminiNote;
-        private readonly TextBlock _noBaseURL;
-        private readonly Button _setDefault = new();
-        private readonly ApiKeyStatus _status;
-        private readonly CloudModelField _modelField;
-        private ProviderConfig? _config;
-        private bool _warned;
-
-        public CloudEngineRow(TranscriptionSettingsPage page, bool diarization)
-        {
-            _page = page;
-            _diarization = diarization;
-            _badge = new Border
-            {
-                Style = (Style)page.Resources["DefaultBadgeStyle"],
-                Child = new TextBlock { Style = (Style)page.Resources["DefaultBadgeTextStyle"], Text = Loc.T("Default") },
-                Visibility = Visibility.Collapsed,
-            };
-            var header = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 8 };
-            header.Children.Add(_name);
-            header.Children.Add(_badge);
-            _details = page.Note("", "NoteStyle");
-            _geminiNote = page.Note(diarization
-                ? "LLM diarization — timestamps approximate, speakers can be mislabeled."
-                : "LLM transcription — timestamps approximate.", "NoteStyle");
-            // A custom endpoint transcribes once its base URL (set in API Keys) and its model are set.
-            _noBaseURL = page.Note("Base URL not set", "NoteStyle");
-            var description = new StackPanel { Spacing = 2 };
-            description.Children.Add(_details);
-            description.Children.Add(_geminiNote);
-            description.Children.Add(_noBaseURL);
-            _setDefault.Content = Loc.T("Set default");
-            _setDefault.Click += (_, _) =>
-            {
-                if (_config is { } config) _page._models.SetDefault(CloudTranscription.EngineId(config.Id), _diarization);
-            };
-            _status = new ApiKeyStatus(page._model, (Style)page.Resources["SuccessIconStyle"]);
-            var actions = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 8 };
-            actions.Children.Add(_setDefault);
-            actions.Children.Add(_status.Element);
-            _modelField = page.NewCloudModelField(diarization);
-            Expander = new SettingsExpander { Header = header, Description = description, Content = actions };
-            Expander.Items.Add(_modelField.Card);
-        }
-
-        public SettingsExpander Expander { get; }
-
-        public void Cancel() => _modelField.Cancel();
-
-        public void Update(ProviderConfig config, bool configured, string defaultId)
-        {
-            _config = config;
-            var engineId = CloudTranscription.EngineId(config.Id);
-            var name = configured ? Name(config) : config.DisplayName;
-            _name.Text = name;
-            ToolTipService.SetToolTip(_name, name);
-            var isDefault = configured && ProvidersViewModel.SameId(defaultId, engineId);
-            _badge.Visibility = Show(isDefault);
-            _setDefault.Visibility = Show(configured && !isDefault);
-            AutomationProperties.SetName(_setDefault, $"{Loc.T("Set default")}, {config.DisplayName}");
-            _status.Update(config);
-            List<string> details = [Loc.T("Cloud")];
-            if (config.Preset is { } preset && Prices.TryGetValue(preset, out var price))
-            {
-                details.Add(Loc.Format(preset == "gemini" ? "%@ + output (approx.)" : "%@ (approx.)", price));
-            }
-            _details.Text = string.Join(" · ", details);
-            _geminiNote.Visibility = Show(config.Preset == "gemini");
-            _noBaseURL.Visibility = Show(config.Preset is null && config.BaseURL.Trim().Length == 0);
-            _modelField.Update(config);
-            // Its model's warning shows without a click: the row opens when one appears (the user can close it again).
-            if (_modelField.Warns && !_warned) Expander.IsExpanded = true;
-            _warned = _modelField.Warns;
-        }
-
-        /// <summary>"Deepgram (nova-3)" with the model it runs; the provider name alone when it picks the model.</summary>
-        private string Name(ProviderConfig config)
-        {
-            if (!_diarization) return AppViewModel.CloudEngineName(config);
-            var model = CloudTranscription.DiarizationModel(config);
-            return model.Length == 0 ? config.DisplayName : $"{config.DisplayName} ({model})";
-        }
-    }
-
-    /// <summary>
-    /// "While recording" below the default cloud engine's row (macOS <c>CloudLiveOptions</c>): one live source at a time
-    /// (off, a local model, or the provider's realtime stream; <see cref="AppViewModel.SetCloudLiveSource"/>), the
-    /// realtime model and host, and "Use the realtime result as the transcript", each with what it costs. Greyed with the
-    /// reason while "Transcribe automatically" or "Transcribe while recording" is off.
+    /// "While recording" below the default engine picker when the default is a cloud engine (macOS
+    /// <c>CloudLiveOptions</c>): one live source at a time (off, a local model, or the provider's realtime stream;
+    /// <see cref="AppViewModel.SetCloudLiveSource"/>), the realtime model and host, and "Use the realtime result as the
+    /// transcript", each with what it costs. Greyed with the reason while "Transcribe automatically" or "Transcribe while
+    /// recording" is off.
     /// </summary>
     private sealed class CloudLiveOptions
     {
@@ -577,7 +361,7 @@ public sealed partial class TranscriptionSettingsPage : UserControl
             _noLiveModel = new TextBlock
             {
                 Style = (Style)page.Resources["CautionNoteStyle"],
-                Text = Loc.T("No live model installed. Download a Whisper or Parakeet model above."),
+                Text = Loc.T("No live model installed. Download a Whisper or Parakeet model in AI Providers › Local AI."),
             };
             var localDescription = new StackPanel { Spacing = 2 };
             localDescription.Children.Add(_localCopy);
@@ -621,7 +405,7 @@ public sealed partial class TranscriptionSettingsPage : UserControl
             Elements = [header, _localCard, _liveModelCard, _realtimeCard, _realtimeModel.Card, _finalCard];
         }
 
-        /// <summary>The group's elements, in order, placed right below the default engine's row; the same instances each time.</summary>
+        /// <summary>The group's elements, in order, placed right below the default engine picker; the same instances each time.</summary>
         public IReadOnlyList<UIElement> Elements { get; }
 
         /// <summary>Shows <paramref name="config"/>'s options from the current settings; the switches' events are not the user's.</summary>

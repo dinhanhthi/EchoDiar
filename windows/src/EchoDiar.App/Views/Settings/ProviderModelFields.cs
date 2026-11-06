@@ -660,6 +660,126 @@ internal sealed class CloudModelField
 }
 
 /// <summary>
+/// The default transcription model, or with <c>diarization</c> the default diarizer, of new recordings (macOS
+/// <c>DefaultEnginePicker</c>): the installed local models of that kind that can transcribe the next recording's language
+/// (the rule of a local row's Set default, <see cref="ModelRowState.CanSetDefault"/>), then the configured cloud engines
+/// (<see cref="AppViewModel.CloudEngineConfigs"/>, <see cref="AppViewModel.CloudDiarizerConfigs"/>). A default that is
+/// not offered (no longer installed or configured, or not for that language) stays listed, so the menu is never blank.
+/// A cloud default shows the "Audio leaves this PC" caution below the label. The host places <see cref="Card"/> and calls
+/// <see cref="Update"/> when it shows and on <see cref="ModelsViewModel.StatesChanged"/> (installs, the defaults, the
+/// cloud configs and keys, the next recording's language). Used by Settings › Transcription and AI Settings ›
+/// Transcription.
+/// </summary>
+internal sealed class DefaultEnginePicker
+{
+    private readonly AppViewModel _model;
+    private readonly ModelsViewModel _models;
+    private readonly bool _diarization;
+    private readonly ComboBox _combo = new() { MinWidth = 260, MaxWidth = 420 };
+    private readonly StackPanel _caution;
+
+    /// <summary>The menu's engine ids and names, in item order; rebuilt when they change.</summary>
+    private List<(string Id, string Name)> _choices = [];
+
+    /// <summary>The menu is being set from the settings: its change events are not the user's.</summary>
+    private bool _syncing;
+
+    /// <param name="resources">The host page's resources, with its <c>CautionNoteStyle</c> and <c>CautionIconStyle</c>.</param>
+    public DefaultEnginePicker(AppViewModel model, bool diarization, ResourceDictionary resources)
+    {
+        _model = model;
+        _models = model.ModelsModel;
+        _diarization = diarization;
+        var title = diarization ? "Default diarization model" : "Default transcription model";
+        AutomationProperties.SetName(_combo, Loc.T(title));
+        _combo.SelectionChanged += (_, _) =>
+        {
+            var index = _combo.SelectedIndex;
+            if (!_syncing && !_model.IsClosing && index >= 0 && index < _choices.Count) SetDefault(_choices[index].Id);
+        };
+        _caution = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 6 };
+        _caution.Children.Add(new FontIcon { Style = (Style)resources["CautionIconStyle"], Glyph = "\uE753" });
+        _caution.Children.Add(new TextBlock
+        {
+            Style = (Style)resources["CautionNoteStyle"],
+            // The macOS text, with "this PC" for "this Mac".
+            Text = Loc.T(diarization
+                ? "Audio leaves this PC: the cloud diarizer uploads the system channel to the provider."
+                : "Audio leaves this PC: cloud engines upload the recording to the provider."),
+        });
+        Card = new SettingsCard { Header = Loc.T(title), Content = _combo, Tag = title };
+    }
+
+    /// <summary>The label, the caution below it and the menu; its Tag is its search entry's title.</summary>
+    public SettingsCard Card { get; }
+
+    /// <summary>The menu shows the current choices and default; the caution shows for a cloud default.</summary>
+    public void Update()
+    {
+        if (_model.IsClosing) return;
+        var selection = _diarization ? _models.DefaultDiarizerModelID : _models.DefaultASRModelID;
+        var kind = _diarization ? ModelKind.Diarization : ModelKind.Asr;
+        List<(string Id, string Name)> choices =
+        [
+            .. _models.Entries
+                .Where(e => e.Kind == kind && _models.State(e) is { IsInstalled: true, CanSetDefault: true })
+                .Select(e => (e.Id, e.DisplayName)),
+            .. (_diarization ? _model.CloudDiarizerConfigs : _model.CloudEngineConfigs)
+                .Select(c => (CloudTranscription.EngineId(c.Id), CloudName(c))),
+        ];
+        if (!choices.Any(c => ProvidersViewModel.SameId(c.Id, selection))) choices.Add((selection, FallbackName(selection)));
+        _syncing = true;
+        try
+        {
+            if (!choices.SequenceEqual(_choices))
+            {
+                _choices = choices;
+                _combo.Items.Clear();
+                foreach (var (_, name) in choices) _combo.Items.Add(name);
+            }
+            _combo.SelectedIndex = _choices.FindIndex(c => ProvidersViewModel.SameId(c.Id, selection));
+        }
+        finally
+        {
+            _syncing = false;
+        }
+        // Set or cleared (not collapsed), so a local default leaves no empty description line.
+        Card.Description = CloudTranscription.ProviderId(selection) is not null ? _caution : null;
+    }
+
+    /// <summary>
+    /// A cloud engine through <see cref="ModelsViewModel.SetDefault(string, bool)"/>; a local model through
+    /// <see cref="ModelsViewModel.SetDefault(ModelEntry)"/>, which stores the catalog default as none (macOS
+    /// <c>setDefaultASRModel</c>, <c>setDefaultDiarizer</c>).
+    /// </summary>
+    private void SetDefault(string id)
+    {
+        var current = _diarization ? _models.DefaultDiarizerModelID : _models.DefaultASRModelID;
+        if (ProvidersViewModel.SameId(id, current)) return;
+        if (CloudTranscription.ProviderId(id) is not null) _models.SetDefault(id, _diarization);
+        else if (_models.Entries.FirstOrDefault(e => e.Id == id) is { } entry) _models.SetDefault(entry);
+    }
+
+    /// <summary>"Deepgram (nova-3)" with the model it runs; the provider name alone when it picks the model.</summary>
+    private string CloudName(ProviderConfig config)
+    {
+        if (!_diarization) return AppViewModel.CloudEngineName(config);
+        var model = CloudTranscription.DiarizationModel(config);
+        return model.Length == 0 ? config.DisplayName : $"{config.DisplayName} ({model})";
+    }
+
+    /// <summary>The catalog or provider name of a default that is not offered; the raw id when it is gone.</summary>
+    private string FallbackName(string id)
+    {
+        if (CloudTranscription.ProviderId(id) is { } providerId)
+        {
+            return _model.ProvidersModel.Config(providerId)?.DisplayName ?? providerId;
+        }
+        return ModelCatalog.Entry(id)?.DisplayName ?? id;
+    }
+}
+
+/// <summary>
 /// A provider's embedding model for Library chat (macOS <c>EmbeddingModelField</c>, <see cref="ProviderConfig.EmbeddingModel"/>),
 /// saved on Enter, on leaving the field and when the field unloads (its page left), so a typed model is not lost without
 /// Enter. Not on each keystroke: each change restarts the index while the provider embeds it. The preset's suggested

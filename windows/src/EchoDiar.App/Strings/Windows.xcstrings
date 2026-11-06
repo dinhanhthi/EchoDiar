@@ -2281,32 +2281,32 @@
         }
       }
     },
-    "No live model installed. Download a Whisper or Parakeet model above." : {
+    "No live model installed. Download a Whisper or Parakeet model in AI Providers › Local AI." : {
       "comment" : "Windows only: Views/Settings/TranscriptionSettingsPage.xaml.cs.",
       "extractionState" : "manual",
       "localizations" : {
         "es" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "No hay ningún modelo en directo instalado. Descarga arriba un modelo Whisper o Parakeet."
+            "value" : "No hay ningún modelo en directo instalado. Descarga un modelo Whisper o Parakeet en Proveedores de IA › IA local."
           }
         },
         "fr" : {
           "stringUnit" : {
             "state" : "needs_review",
-            "value" : "Aucun modèle en direct installé. Téléchargez un modèle Whisper ou Parakeet ci-dessus."
+            "value" : "Aucun modèle en direct installé. Téléchargez un modèle Whisper ou Parakeet dans Fournisseurs d’IA › IA locale."
           }
         },
         "vi" : {
           "stringUnit" : {
             "state" : "needs_review",
-            "value" : "Chưa cài mô hình chép lời trực tiếp nào. Hãy tải về một mô hình Whisper hoặc Parakeet ở trên."
+            "value" : "Chưa cài mô hình chép lời trực tiếp nào. Hãy tải về một mô hình Whisper hoặc Parakeet trong Nhà cung cấp AI › AI cục bộ."
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "未安装实时转写模型。请在上方下载 Whisper 或 Parakeet 模型。"
+            "value" : "未安装实时转写模型。请在“AI 提供商 › 本地 AI”中下载 Whisper 或 Parakeet 模型。"
           }
         }
       }
