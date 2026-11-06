@@ -4,7 +4,7 @@ import SwiftUI
 
 /// A sidebar section. Adding one: a case, its row in `label`, its view in `SettingsView.content`.
 enum SettingsTab: CaseIterable, Identifiable {
-    case general, recording, transcription, providers, apiKeys, rag, storage, shortcuts, about, acknowledgements
+    case general, recording, transcription, providers, aiSettings, storage, shortcuts, about, acknowledgements
 
     var id: Self { self }
 
@@ -14,9 +14,8 @@ enum SettingsTab: CaseIterable, Identifiable {
         case .general: return ("General", "gearshape")
         case .recording: return ("Recording", "record.circle")
         case .transcription: return ("Transcription", "waveform")
-        case .providers: return ("AI", "sparkles")
-        case .apiKeys: return ("API Keys", "key")
-        case .rag: return ("RAG", "sparkle.magnifyingglass")
+        case .providers: return ("AI Providers", "cpu")
+        case .aiSettings: return ("AI Settings", "sparkles")
         case .storage: return ("Storage", "internaldrive")
         case .shortcuts: return ("Shortcuts", "keyboard")
         case .about: return ("About", "info.circle")
@@ -36,12 +35,15 @@ enum SettingsTab: CaseIterable, Identifiable {
             [.init(id: "general", title: "General"), .init(id: "transcriptionModels", title: "Transcription model"),
              .init(id: "diarizationModels", title: "Diarization model")]
         case .providers:
-            [.init(id: "onThisMac", title: "On this Mac"), .init(id: "cloud", title: "Cloud"),
+            [.init(id: "localAI", title: "Local AI"), .init(id: "cloud", title: "Cloud"),
              .init(id: "cli", title: "CLIs")]
+        case .aiSettings:
+            [.init(id: "chat", title: "Chat"), .init(id: "summary", title: "Summary"),
+             .init(id: "catchUp", title: "Catch-up"), .init(id: "library", title: "Library chat")]
         case .storage:
             [.init(id: "usage", title: "Usage"), .init(id: "audio", title: "Audio"),
              .init(id: "autoDelete", title: "Auto-delete")]
-        case .general, .apiKeys, .rag, .shortcuts, .about, .acknowledgements:
+        case .general, .shortcuts, .about, .acknowledgements:
             []
         }
     }
@@ -143,8 +145,7 @@ struct SettingsView: View {
         case .recording: RecordingSettingsView(model: model)
         case .transcription: ModelsSettingsView(model: model)
         case .providers: ProvidersSettingsView(model: model)
-        case .apiKeys: APIKeysSettingsView(model: model)
-        case .rag: RAGSettingsView(model: model)
+        case .aiSettings: AISettingsView(model: model)
         case .storage: StorageSettingsView(model: model)
         case .shortcuts: ShortcutsSettingsView(model: model)
         case .about: AboutSettingsView()

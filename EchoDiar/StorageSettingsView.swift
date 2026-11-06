@@ -272,7 +272,7 @@ struct StorageSettingsView: View {
                 : "\n\n" + String(localized: "\(withoutAudio) conversations without audio would be left empty: they are moved to the Trash entirely.")
             return String(localized: "They are moved to the Trash. The audio stays, so the conversations can be transcribed again.") + note
         case .models:
-            return String(localized: "The transcription, speaker and AI models are removed from this Mac (not moved to the Trash). Download them again in Settings › Transcription and Settings › AI.")
+            return String(localized: "The transcription, speaker and AI models are removed from this Mac (not moved to the Trash). Download them again in Settings › Transcription and Settings › AI Providers › Local AI.")
         }
     }
 

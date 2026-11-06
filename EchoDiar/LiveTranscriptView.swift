@@ -83,7 +83,7 @@ struct LiveTranscriptView: View {
     /// A short message for `Snapshot.realtimeFailure`'s kind; other kinds (network, HTTP codes) are a lost connection.
     private func realtimeFailureText(_ name: String) -> String {
         switch snapshot.realtimeFailure {
-        case "auth": String(localized: "\(name) rejected the API key. Check it in Settings › API Keys.")
+        case "auth": String(localized: "\(name) rejected the API key. Check it in Settings › AI Providers › Cloud.")
         case "payment": String(localized: "\(name) needs billing or credits on your account.")
         case "plan_limit": String(localized: "Your \(name) plan's limit on live sessions was reached.")
         case "config": String(localized: "\(name) doesn't support these settings or this language live.")

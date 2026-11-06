@@ -15,7 +15,7 @@ extension AppModel {
             .appendingPathComponent("GlobalChat", isDirectory: true)
     }
 
-    /// The embedder picked in Settings › RAG; nil (with `ragStatus.message` saying why) when its model is not
+    /// The embedder picked in Settings › AI Settings › Library chat; nil (with `ragStatus.message` saying why) when its model is not
     /// downloaded, or its provider is not available or misses a model or key.
     func makeEmbedder() -> (any TextEmbedder)? {
         resolveEmbedder { ragStatus.message = $0 }
@@ -27,28 +27,28 @@ extension AppModel {
         if id == "apple-nl" { return AppleTextEmbedder() }
         if id.hasPrefix(Self.apiEmbedderPrefix) {
             guard let config = embeddingProviderConfig else {
-                problem(String(localized: "Pick a provider in Settings › RAG"))
+                problem(String(localized: "Pick a provider in Settings › AI Settings › Library chat"))
                 return nil
             }
             let model = config.embeddingModel.trimmingCharacters(in: .whitespacesAndNewlines)
             guard !model.isEmpty else {
-                problem(String(localized: "Enter the embedding model of \(config.displayName) in Settings › RAG"))
+                problem(String(localized: "Enter the embedding model of \(config.displayName) in its card in Settings › AI Providers"))
                 return nil
             }
             let apiKey = config.authStyle == .none ? nil : try? KeychainStore.apiKey(forProvider: config.id)
             // As `makeProvider(for:)`: sent without a key, a preset only answers HTTP 401.
             if config.preset != nil, config.authStyle != .none, apiKey?.isEmpty ?? true {
-                problem(String(localized: "Save a key for \(config.displayName) in Settings › API Keys"))
+                problem(String(localized: "Save a key for \(config.displayName) in Settings › AI Providers › Cloud"))
                 return nil
             }
             return APITextEmbedder(config: config, apiKey: apiKey, model: model)
         }
         guard let entry = ModelCatalog.entry(id: id), entry.kind == .embedding, entry.runtime == .mlx else {
-            problem(String(localized: "Pick an embedding model in Settings › RAG"))
+            problem(String(localized: "Pick an embedding model in Settings › AI Settings › Library chat"))
             return nil
         }
         guard modelStore.isInstalled(id), let folder = modelStore.folder(for: id) else {
-            problem(String(localized: "Download the embedding model in Settings › RAG"))
+            problem(String(localized: "Download the embedding model in Settings › AI Providers › Local AI"))
             return nil
         }
         return MLXEmbedder(entryID: id, folder: folder)

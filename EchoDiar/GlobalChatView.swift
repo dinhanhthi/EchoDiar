@@ -7,7 +7,7 @@ import SwiftUI
 /// answer with its numbered sources under it. `[n mm:ss]` / `[n]` citations and the sources open the conversation at
 /// that moment or its summary, the chat staying beside it. Laid out like the Chat tab (`AIPanelView`): the messages in
 /// a card, then a bar with the menus, "Start a fresh chat" and History in one row, and the question; in a narrow pane
-/// (the 360 pt sidebar of the wide layout) the model name truncates. With RAG off, an intro and the way to Settings › RAG.
+/// (the 360 pt sidebar of the wide layout) the model name truncates. With RAG off, an intro and the way to Settings › AI Settings › Library chat.
 /// Padded like `TranscriptView`'s panes, so it fills its slot as it is.
 struct GlobalChatView: View {
     let model: AppModel
@@ -84,7 +84,7 @@ struct GlobalChatView: View {
             Text("It needs an index of your transcripts, built on this Mac by default.")
                 .font(.callout)
                 .foregroundStyle(.secondary)
-            Button("Turn on in Settings › RAG") { model.openSettings(tab: .rag) }
+            Button("Turn on in Settings › AI Settings › Library chat") { model.openSettings(tab: .aiSettings, subTab: "library") }
                 .buttonStyle(BottomBarButtonStyle(prominent: true))
                 .padding(.top, 4)
         }
@@ -466,12 +466,12 @@ struct GlobalChatView: View {
                          : "Indexing \(status.indexed) of \(status.total)…")
                         .lineLimit(1)
                 } else {
-                    Label(status.needsConsent ? String(localized: "Confirm the embedding provider in Settings › RAG.")
+                    Label(status.needsConsent ? String(localized: "Confirm the embedding provider in Settings › AI Settings › Library chat.")
                           : status.message ?? String(localized: "Your conversations are not indexed yet."),
                           systemImage: "exclamationmark.triangle")
                         .lineLimit(2)
                     Spacer(minLength: 0)
-                    Button("Settings") { model.openSettings(tab: .rag) }
+                    Button("Settings") { model.openSettings(tab: .aiSettings, subTab: "library") }
                         .modifier(CapsuleButton())
                 }
             }

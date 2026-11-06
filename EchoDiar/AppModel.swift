@@ -78,7 +78,7 @@ final class AppModel {
     /// The inner tab (its id in `SettingsTab.subTabs`) each Settings section shows; a section missing here shows its
     /// first.
     var settingsSubTabs: [SettingsTab: String] = [:]
-    /// A provider whose row Settings › AI or API Keys opens and scrolls to (RAG's Set Up, `showAPIKey(for:)`); its row
+    /// A provider whose row Settings › AI Providers opens and scrolls to (RAG's Set Up, `showAPIKey(for:)`); its row
     /// clears it once expanded.
     var settingsExpandedProvider: String?
     /// Running model downloads, by catalog id.
@@ -156,7 +156,7 @@ final class AppModel {
     var renamingConversation: UUID?
     /// The library chat is shown: in place of the cards on the list, or of the sidebar beside a conversation.
     var globalChatOpen = false
-    /// What the library index (RAG) is doing, for Settings › RAG.
+    /// What the library index (RAG) is doing, for Settings › AI Settings › Library chat.
     var ragStatus = RAGStatus()
 
     enum PillPrompt: Equatable {
@@ -1752,9 +1752,10 @@ final class AppModel {
         if let subTab { settingsSubTabs[settingsTab] = subTab }
     }
 
-    /// Settings › API Keys with provider `id`'s card expanded and scrolled to (a model card's "API key" button).
+    /// Settings › AI Providers › Cloud with provider `id`'s card expanded and scrolled to (a model card's "API key"
+    /// button).
     func showAPIKey(for id: String) {
-        openSettings(tab: .apiKeys)
+        openSettings(tab: .providers, subTab: "cloud")
         settingsExpandedProvider = id
     }
 
@@ -2280,7 +2281,7 @@ extension AppModel {
         }
         if catchUpRun?.isRunning == true { return String(localized: "A catch-up is being written.") }
         if catchUpProvider == nil {
-            return String(localized: "Catch up needs an AI provider outside the app: a cloud API, a local server or a command-line tool. Add one in Settings › AI.")
+            return String(localized: "Catch up needs an AI provider outside the app: a cloud API, a local server or a command-line tool. Add one in Settings › AI Providers.")
         }
         let base = recordingCatchUps.last { !$0.stopped }
         if (captions.lines.last?.id ?? -1) <= (base?.throughLineID ?? -1) {

@@ -2,68 +2,42 @@ import EchoAI
 import EchoCore
 import SwiftUI
 
-/// The RAG tab: the opt-in switch of the library chat, the index's status with Rebuild, then the embedder of the index
-/// (the catalog's MLX models with their downloads, Apple's built-in one, or an available OpenAI-compatible or local-host
-/// provider with its model). Picking a cloud embedder asks once per provider and destination
-/// (`AppSettings.cloudEmbeddingConfirmed`).
+/// AI Settings › Library chat: the opt-in switch of the library chat, the index's status with Rebuild, then the
+/// embedder of the index (the catalog's MLX models, downloaded in AI Providers › Local AI, Apple's built-in one, or an
+/// available OpenAI-compatible or local-host provider, whose model is set in its card). Picking a cloud embedder asks
+/// once per provider and destination (`AppSettings.cloudEmbeddingConfirmed`).
 struct RAGSettingsView: View {
     let model: AppModel
 
     /// A cloud API embedder picked (or in use and not confirmed) waiting for its confirmation; the setting changes
     /// only on Understood.
     @State private var pendingCloud: ProviderConfig?
-    /// The API embedder's model as typed, and the provider it belongs to; saved on Return or on leaving the field.
-    @State private var apiModel = ""
-    @State private var apiModelProviderID: String?
-    @FocusState private var apiModelFocused: Bool
     /// The picked catalog embedder, not installed when RAG was turned on: asks to download it.
     @State private var pendingDownload: ModelEntry?
-    /// The API embedder's embedding models from "Load models"; nil until loaded for the provider in use.
-    @State private var loadedModels: [String]?
-    @State private var loadingModels = false
-    @State private var loadError: String?
 
     var body: some View {
-        ScrollViewReader { proxy in
-            Form {
-                enableSection
-                statusSection
-                localSection
-                apiSection
-            }
-            .formStyle(.grouped)
-            .alert(
-                "Download \(pendingDownload?.displayName ?? "")?",
-                isPresented: Binding(get: { pendingDownload != nil }, set: { if !$0 { pendingDownload = nil } }),
-                presenting: pendingDownload
-            ) { entry in
-                Button("Download") {
-                    model.downloadModel(entry.id)
-                    // The download's progress shows in the model's row, below the index.
-                    withAnimation { proxy.scrollTo(entry.id, anchor: .top) }
-                }
-                Button("Not Now", role: .cancel) {}
-            } message: { entry in
-                Text("Indexing your conversations on this Mac needs this embedding model (\(ModelRow.sizeText(entry.diskMB))). You can also pick another model below.")
-            }
+        Form {
+            enableSection
+            statusSection
+            localSection
+            apiSection
+        }
+        .formStyle(.grouped)
+        .alert(
+            "Download \(pendingDownload?.displayName ?? "")?",
+            isPresented: Binding(get: { pendingDownload != nil }, set: { if !$0 { pendingDownload = nil } }),
+            presenting: pendingDownload
+        ) { entry in
+            // The download's progress shows in the model's row here and in AI Providers › Local AI.
+            Button("Download") { model.downloadModel(entry.id) }
+            Button("Not Now", role: .cancel) {}
+        } message: { entry in
+            Text("Indexing your conversations on this Mac needs this embedding model (\(ModelRow.sizeText(entry.diskMB))). You can also pick another model below.")
         }
         .task { model.refreshInstalledModels() }
-        // The tab stays alive once opened: each time it is shown, provider, key and model changes made elsewhere are
-        // picked up.
+        // Each time it is shown (its inner tab picked, or the Settings page and AI Settings shown again), provider, key
+        // and model changes made elsewhere are picked up.
         .onChange(of: shown, initial: true) { _, shown in if shown { model.syncLibraryIndex() } }
-        // Keyed by the provider too: two providers with the same model must still move the field to the new one.
-        .onChange(of: currentAPIConfig.map { [$0.id, $0.embeddingModel] }, initial: true) { _, saved in
-            apiModelProviderID = saved?[0]
-            apiModel = saved?[1] ?? ""
-        }
-        // Loaded models belong to the provider they came from.
-        .onChange(of: model.settings.embeddingModelID) {
-            loadedModels = nil
-            loadError = nil
-        }
-        // Leaving the field saves too, so a typed model is not lost without Return; on the form, as picking another
-        // embedder removes the field.
-        .onChange(of: apiModelFocused) { _, focused in if !focused { saveAPIModel() } }
         .alert(
             "Send transcripts to \(pendingCloud?.displayName ?? "")?",
             isPresented: Binding(get: { pendingCloud != nil }, set: { if !$0 { pendingCloud = nil } }),
@@ -76,8 +50,10 @@ struct RAGSettingsView: View {
         }
     }
 
-    /// The RAG tab is selected on the Settings page.
-    private var shown: Bool { model.route == .settings && model.settingsTab == .rag }
+    /// AI Settings › Library chat is selected on the Settings page.
+    private var shown: Bool {
+        model.route == .settings && model.settingsTab == .aiSettings && model.settingsSubTab(.aiSettings) == "library"
+    }
 
     private var enableSection: some View {
         Section {
@@ -98,9 +74,12 @@ struct RAGSettingsView: View {
             ForEach(ModelCatalog.embedding) { entry in
                 HStack(alignment: .firstTextBaseline, spacing: 8) {
                     radio(entry.id, name: entry.displayName)
-                    ModelRow(entry: entry, model: model)
+                    Text(entry.displayName)
+                        .lineLimit(1)
+                        .truncationMode(.tail)
+                    Spacer(minLength: 8)
+                    localState(entry)
                 }
-                .id(entry.id)
             }
             HStack(alignment: .firstTextBaseline, spacing: 8) {
                 radio("apple-nl", name: String(localized: "Apple (Basic, built-in)"))
@@ -122,11 +101,39 @@ struct RAGSettingsView: View {
         }
     }
 
-    /// "Via API": the model of the provider in use (its own box, as it follows the pick), then the providers.
+    /// Installed, the download's progress, or the way to the download in AI Providers › Local AI.
+    @ViewBuilder
+    private func localState(_ entry: ModelEntry) -> some View {
+        if let download = model.downloads[entry.id] {
+            ProgressView(value: download.fraction)
+                .frame(width: 90)
+            Text(download.fraction.formatted(.percent.precision(.fractionLength(0))))
+                .font(.caption)
+                .monospacedDigit()
+                .foregroundStyle(.secondary)
+        } else if model.installedModelIDs.contains(entry.id) {
+            Label("Installed", systemImage: "checkmark.circle.fill")
+                .font(.caption)
+                .foregroundStyle(.green)
+        } else {
+            Button("Download in AI Providers › Local AI") { model.openSettings(tab: .providers, subTab: "localAI") }
+                .controlSize(.small)
+        }
+    }
+
+    /// "Via API": a note when the provider in use has no embedding model (its own box, as it follows the pick), then
+    /// the providers.
     @ViewBuilder private var apiSection: some View {
-        if let config = currentAPIConfig {
+        if let config = currentAPIConfig,
+           config.embeddingModel.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
             Section {
-                apiModelField(config)
+                LabeledContent {
+                    Button("Set Up…") { setUp(config) }
+                        .controlSize(.small)
+                } label: {
+                    Text("Embedding model")
+                    Text("Not set for \(config.displayName). Enter it in its card in AI Providers.")
+                }
             } header: {
                 apiHeader
             }
@@ -134,6 +141,15 @@ struct RAGSettingsView: View {
         } else {
             providersSection(header: true)
         }
+    }
+
+    /// AI Providers on `config`'s row, expanded: Local AI for a local host (which has a row only once added), Cloud
+    /// for an API.
+    private func setUp(_ config: ProviderConfig) {
+        if config.kind != .local || model.settings.providers.contains(where: { $0.id == config.id }) {
+            model.settingsExpandedProvider = config.id
+        }
+        model.openSettings(tab: .providers, subTab: config.kind == .local ? "localAI" : "cloud")
     }
 
     private func providersSection(header: Bool) -> some View {
@@ -155,15 +171,9 @@ struct RAGSettingsView: View {
                             .font(.caption)
                             .foregroundStyle(.secondary)
                     } else if config.kind == .local {
-                        Button("Set Up…") {
-                            // Local hosts have a row only once added (scanned or by URL).
-                            if model.settings.providers.contains(where: { $0.id == config.id }) {
-                                model.settingsExpandedProvider = config.id
-                            }
-                            model.openSettings(tab: .providers, subTab: "onThisMac")
-                        }
+                        Button("Set Up…") { setUp(config) }
                         .controlSize(.small)
-                        .help("Turn on \(config.displayName) in Settings › AI")
+                        .help("Turn on \(config.displayName) in Settings › AI Providers › Local AI")
                     }
                     if config.kind != .local { APIKeyStatus(config: config, model: model) }
                 }
@@ -194,58 +204,14 @@ struct RAGSettingsView: View {
         .accessibilityAddTraits(selected ? .isSelected : [])
     }
 
-    /// The model id with "Load models": a menu of the provider's embedding models once loaded.
-    private func apiModelField(_ config: ProviderConfig) -> some View {
-        VStack(alignment: .leading, spacing: 4) {
-            HStack(spacing: 8) {
-                TextField("Model", text: $apiModel,
-                          prompt: Text(Self.suggestedModels[config.preset ?? ""] ?? String(localized: "Embedding model id")))
-                    .focused($apiModelFocused)
-                    .onSubmit(saveAPIModel)
-                if let loadedModels, !loadedModels.isEmpty {
-                    Menu("\(loadedModels.count) models") {
-                        ForEach(loadedModels, id: \.self) { id in
-                            Button(id) {
-                                apiModel = id
-                                saveAPIModel()
-                            }
-                        }
-                    }
-                    .fixedSize()
-                }
-                Button("Load models") { Task { await loadModels(config) } }
-                    .disabled(loadingModels)
-                if loadingModels { ProgressView().controlSize(.small) }
-            }
-            if let loadError {
-                Text(loadError).font(.caption).foregroundStyle(.red).lineLimit(2)
-            } else if loadedModels?.isEmpty == true {
-                Text("No embedding models listed; type the model id.").font(.caption).foregroundStyle(.secondary)
-            }
-        }
-    }
-
-    /// The provider's models that embed, by name: its chat models can't.
-    private func loadModels(_ config: ProviderConfig) async {
-        loadingModels = true
-        defer { loadingModels = false }
-        do {
-            let all = try await model.makeProvider(for: config)?.listModels() ?? []
-            loadedModels = all.filter(Self.isEmbeddingModel).sorted()
-            loadError = nil
-        } catch {
-            loadError = error.localizedDescription.split(whereSeparator: \.isNewline).first.map(String.init)
-        }
-    }
-
     /// Embedding models are named after it (text-embedding-3-small, mistral-embed, nomic-embed-text) or their family.
-    private static func isEmbeddingModel(_ id: String) -> Bool {
+    static func isEmbeddingModel(_ id: String) -> Bool {
         let id = id.lowercased()
         return ["embed", "bge", "e5-", "gte-", "minilm", "arctic"].contains { id.contains($0) }
     }
 
     /// The model filled in when a provider is picked, by preset.
-    private static let suggestedModels = [
+    static let suggestedModels = [
         "openai": "text-embedding-3-small", "gemini": "gemini-embedding-001", "mistral": "mistral-embed",
         "ollama": "nomic-embed-text",
     ]
@@ -328,14 +294,6 @@ struct RAGSettingsView: View {
     private func consentMessage(_ config: ProviderConfig) -> String {
         let count = model.conversations.filter(\.hasTranscript).count
         return String(localized: "Transcripts and summaries of \(count) conversations, and your questions, will be sent to \(Self.host(config)) to build and search the index, and billed by \(config.displayName). The provider may keep them under its own retention policy. You are asked once per provider and destination.")
-    }
-
-    private func saveAPIModel() {
-        guard let id = apiModelProviderID else { return }
-        let trimmed = apiModel.trimmingCharacters(in: .whitespacesAndNewlines)
-        apiModel = trimmed
-        guard trimmed != model.providerConfigs.first(where: { $0.id == id })?.embeddingModel else { return }
-        model.updateProvider(id: id) { $0.embeddingModel = trimmed }
     }
 
     private static func host(_ config: ProviderConfig) -> String {

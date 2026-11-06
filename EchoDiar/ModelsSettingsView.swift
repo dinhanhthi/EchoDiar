@@ -17,10 +17,6 @@ struct ModelsSettingsView: View {
 
     private var tab: Tab { model.settingsSubTab(.transcription).flatMap(Tab.init) ?? .general }
 
-    private static let entries = ModelCatalog.visibleEntries(
-        registeredEngineRuntimes: TranscriptionPipeline.registeredRuntimes
-    ).filter { $0.kind == .asr || $0.kind == .diarization }
-
     var body: some View {
         VStack(spacing: 0) {
             Form {
@@ -28,7 +24,7 @@ struct ModelsSettingsView: View {
                 case .general: generalSection
                 case .transcriptionModels:
                     intro("Transcription turns speech into text. The transcription model listens to the recording and writes what was said, with timestamps.")
-                    tierSections(.asr)
+                    ModelTierSections(kind: .asr, model: model)
                     cloudSection(diarization: false)
                 case .diarizationModels:
                     Section {
@@ -36,7 +32,7 @@ struct ModelsSettingsView: View {
                         if model.settings.diarization { SpeakerCountPicker(model: model) }
                     }
                     intro("Diarization finds who spoke when. The diarization model tells the voices apart and labels each part of the transcript with its speaker.")
-                    tierSections(.diarization)
+                    ModelTierSections(kind: .diarization, model: model)
                     cloudSection(diarization: true)
                 }
             }
@@ -86,18 +82,6 @@ struct ModelsSettingsView: View {
         }
     }
 
-    /// One section per tier that has `kind` entries, titled with the tier.
-    private func tierSections(_ kind: ModelEntry.Kind) -> some View {
-        ForEach(ModelEntry.Tier.allCases, id: \.self) { tier in
-            let entries = Self.entries.filter { $0.kind == kind && $0.tier == tier }
-            if !entries.isEmpty {
-                Section(ModelRow.tierTitle(tier)) {
-                    ForEach(entries) { ModelRow(entry: $0, model: model) }
-                }
-            }
-        }
-    }
-
     /// "Cloud": every provider that transcribes, with its model, its key status and Set default once configured
     /// (available, with a model). With `diarization`, the providers that label speakers, with their diarization model
     /// (configured: available).
@@ -142,6 +126,27 @@ struct ModelsSettingsView: View {
     private var defaultLanguage: Binding<String> {
         Binding(get: { model.settings.defaultLanguage },
                 set: { code in model.updateSettings { $0.defaultLanguage = code } })
+    }
+}
+
+/// One section per tier that has `kind` entries, titled with the tier, each with its local models' `ModelRow`s.
+struct ModelTierSections: View {
+    let kind: ModelEntry.Kind
+    let model: AppModel
+
+    private static let entries = ModelCatalog.visibleEntries(
+        registeredEngineRuntimes: TranscriptionPipeline.registeredRuntimes
+    ).filter { $0.kind == .asr || $0.kind == .diarization }
+
+    var body: some View {
+        ForEach(ModelEntry.Tier.allCases, id: \.self) { tier in
+            let entries = Self.entries.filter { $0.kind == kind && $0.tier == tier }
+            if !entries.isEmpty {
+                Section(ModelRow.tierTitle(tier)) {
+                    ForEach(entries) { ModelRow(entry: $0, model: model) }
+                }
+            }
+        }
     }
 }
 
@@ -363,14 +368,6 @@ private struct CloudEngineRow: View {
     /// A cloud diarizer (Diarization models): its diarization model, Default and Set default of the default diarizer.
     var diarization = false
 
-    /// Approximate pay-as-you-go prices per audio hour (docs/research/asr-diarization-models.md F, 2026-10-18; xAI,
-    /// Speechmatics Enhanced, Soniox and Gladia solaria-1 2026-11-04).
-    private static let prices: [String: String] = [
-        "openai": "~$0.36/h", "groq": "~$0.04/h", "mistral": "~$0.18/h", "gemini": "~$0.23/h",
-        "elevenlabs": "~$0.22/h", "deepgram": "~$0.26/h", "assemblyai": "~$0.23/h",
-        "xai": "~$0.10/h", "speechmatics": "~$0.38/h", "soniox": "~$0.10/h", "gladia": "~€0.27/h",
-    ]
-
     private var engineID: String { CloudTranscription.engineID(providerID: config.id) }
 
     /// The default transcription model, or the default diarizer.
@@ -401,11 +398,7 @@ private struct CloudEngineRow: View {
             }
             HStack(spacing: 4) {
                 Badge(text: String(localized: "Cloud"))
-                if let price = config.preset.flatMap({ Self.prices[$0] }) {
-                    // Gemini also bills its output.
-                    Badge(text: config.preset == "gemini" ? String(localized: "\(price) + output (approx.)")
-                          : String(localized: "\(price) (approx.)"))
-                }
+                CloudPriceBadge(config: config)
             }
             if config.preset == "gemini" {
                 Text(diarization
@@ -415,7 +408,7 @@ private struct CloudEngineRow: View {
                     .foregroundStyle(.secondary)
             }
             CloudModelField(config: config, model: model, diarization: diarization)
-            // A custom endpoint transcribes once its base URL (set in API Keys) and its model are set.
+            // A custom endpoint transcribes once its base URL (set in AI Providers › Cloud) and its model are set.
             if config.preset == nil, config.baseURL.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
                 Text("Base URL not set")
                     .font(.caption)
@@ -423,11 +416,33 @@ private struct CloudEngineRow: View {
                     .inputColumn()
             }
         }
+        .fieldLabelColumn()
         .padding(.vertical, 2)
     }
 
     private func setDefault() {
         if diarization { model.setDefaultDiarizer(engineID) } else { model.setDefaultASRModel(engineID) }
+    }
+}
+
+/// A cloud engine's approximate price per audio hour; nothing for a provider without a listed price.
+struct CloudPriceBadge: View {
+    let config: ProviderConfig
+
+    /// Approximate pay-as-you-go prices per audio hour (docs/research/asr-diarization-models.md F, 2026-10-18; xAI,
+    /// Speechmatics Enhanced, Soniox and Gladia solaria-1 2026-11-04).
+    private static let prices: [String: String] = [
+        "openai": "~$0.36/h", "groq": "~$0.04/h", "mistral": "~$0.18/h", "gemini": "~$0.23/h",
+        "elevenlabs": "~$0.22/h", "deepgram": "~$0.26/h", "assemblyai": "~$0.23/h",
+        "xai": "~$0.10/h", "speechmatics": "~$0.38/h", "soniox": "~$0.10/h", "gladia": "~€0.27/h",
+    ]
+
+    var body: some View {
+        if let price = config.preset.flatMap({ Self.prices[$0] }) {
+            // Gemini also bills its output.
+            Badge(text: config.preset == "gemini" ? String(localized: "\(price) + output (approx.)")
+                  : String(localized: "\(price) (approx.)"))
+        }
     }
 }
 
@@ -533,6 +548,7 @@ private struct CloudLiveOptions: View {
                         .inputColumn()
                 }
             }
+            .fieldLabelColumn()
         }
         Toggle(isOn: Binding(get: { model.settings.realtimeAsFinal }, set: { model.setRealtimeAsFinal($0) })) {
             Text("Use the realtime result as the transcript")
@@ -590,13 +606,15 @@ private struct CloudLiveOptions: View {
 /// models, "Load models" (only the ones that transcribe). With `diarization`, the cloud diarizer's diarization model:
 /// only models that label speakers are listed, and a note says when the typed one does not. With `realtime`, the
 /// realtime model streamed while recording: its known models only.
-private struct CloudModelField: View {
+struct CloudModelField: View {
     let config: ProviderConfig
     let model: AppModel
     /// Edits `diarizationModel` (Diarization models) instead of `transcriptionModel`.
     var diarization = false
     /// Edits `realtimeModel` ("Live with <Provider> realtime") instead of `transcriptionModel`.
     var realtime = false
+    /// The field's label; "Model" ("Realtime model" with `realtime`) when nil.
+    var label: LocalizedStringKey?
 
     @State private var loaded: [String]?
     @State private var loading = false
@@ -613,13 +631,13 @@ private struct CloudModelField: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 4) {
             if config.preset == "assemblyai", !realtime {
-                FieldRow("Model") {
+                FieldRow(label ?? "Model") {
                     Text(diarization
                          ? "Picked by AssemblyAI (Universal, speaker labels)"
                          : "Picked by AssemblyAI for the language (Universal)")
                 }
             } else {
-                FieldRow(realtime ? "Realtime model" : "Model") {
+                FieldRow(label ?? (realtime ? "Realtime model" : "Model")) {
                     TextField("Model", text: Binding(
                         get: {
                             realtime ? config.realtimeModel
@@ -721,7 +739,7 @@ private struct CloudModelField: View {
     }
 }
 
-private struct Badge: View {
+struct Badge: View {
     let text: String
     var color: Color = .secondary
     /// White on a solid fill, for the one badge that must stand out ("Default"); else tinted text on a light fill.

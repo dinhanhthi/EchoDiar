@@ -842,7 +842,7 @@ struct AIModelMenu: View {
         }
         .modifier(CompactMenu(maxWidth: 180, height: height))
         .layoutPriority(1)
-        .help("Model for summaries and questions")
+        .help(purpose == .summary ? Text("Model for summaries") : Text("Model for questions"))
     }
 
     private func modelItem(_ provider: AppModel.AIProvider, _ id: String, title: String) -> some View {
@@ -876,14 +876,8 @@ struct AILanguageMenu: View {
 
     var body: some View {
         Menu {
-            Picker("Language", selection: languageBinding) {
-                Text("Auto").tag("auto")
-                Text("English").tag("en")
-                Text("French").tag("fr")
-                Text("Vietnamese").tag("vi")
-                if !["auto", "en", "fr", "vi"].contains(model.settings.summaryLanguage) {
-                    Text(model.settings.summaryLanguage).tag(model.settings.summaryLanguage)
-                }
+            Picker("Language", selection: Self.languageBinding(model)) {
+                Self.options(model.settings.summaryLanguage)
             }
             .pickerStyle(.inline)
             .labelsHidden()
@@ -894,7 +888,20 @@ struct AILanguageMenu: View {
         .help("Language of summaries and answers (Auto = the transcript's language for summaries, the question's for answers)")
     }
 
-    private var languageBinding: Binding<String> {
+    /// The languages offered, then `current` when it is none of them (also Settings › AI Settings' "AI answer
+    /// language").
+    @ViewBuilder
+    static func options(_ current: String) -> some View {
+        Text("Auto").tag("auto")
+        Text("English").tag("en")
+        Text("French").tag("fr")
+        Text("Vietnamese").tag("vi")
+        if !["auto", "en", "fr", "vi"].contains(current) {
+            Text(current).tag(current)
+        }
+    }
+
+    static func languageBinding(_ model: AppModel) -> Binding<String> {
         Binding(get: { model.settings.summaryLanguage }, set: { value in model.updateSettings { $0.summaryLanguage = value } })
     }
 }
@@ -923,7 +930,7 @@ struct AISetupHints: View {
 
     var body: some View {
         if model.currentAIProvider(for: purpose) == nil {
-            Label("No AI model: set up a provider or download a model in Settings › AI.",
+            Label("No AI model: set up a provider or download a model in Settings › AI Providers.",
                   systemImage: "exclamationmark.triangle")
             if let reason = AppModel.foundationModelsUnavailableReason {
                 Label(reason, systemImage: "info.circle")

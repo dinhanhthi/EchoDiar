@@ -2,9 +2,9 @@ import EchoAI
 import EchoCore
 import SwiftUI
 
-/// The AI tab, in inner tabs: on this Mac (the AI models for summaries and chat, local hosts scanned on demand), the
-/// models of the cloud API presets and custom OpenAI-compatible endpoints (their keys and endpoints are in API Keys),
-/// and subscription CLIs (the speech-to-text APIs' models are in Transcription). Saved in `AppSettings.providers`.
+/// The AI Providers tab, in inner tabs: local AI (the in-app language models, the local transcription, diarization and
+/// embedding model downloads, and local hosts scanned on demand), the cloud provider cards (keys and models) and
+/// subscription CLIs. Saved in `AppSettings.providers`.
 struct ProvidersSettingsView: View {
     let model: AppModel
 
@@ -17,17 +17,18 @@ struct ProvidersSettingsView: View {
 
     /// Ids in `SettingsTab.providers.subTabs`; picked in the toolbar.
     private enum Tab: String {
-        case onThisMac, cloud, cli
+        case localAI, cloud, cli
     }
 
-    private var tab: Tab { model.settingsSubTab(.providers).flatMap(Tab.init) ?? .onThisMac }
+    private var tab: Tab { model.settingsSubTab(.providers).flatMap(Tab.init) ?? .localAI }
 
     private static let mlxEntries = ModelCatalog.llm.filter { $0.runtime == .mlx }
 
     var body: some View {
         ScrollViewReader { proxy in
             form
-                // RAG's Set Up: once the inner tab shows, its local host's row (which expands itself) comes into view.
+                // RAG's Set Up or a model card's "API key": once the inner tab shows, the local host's row or the
+                // provider's card (which expands itself) comes into view.
                 .onChange(of: model.settingsExpandedProvider, initial: true) { _, id in
                     guard let id else { return }
                     Task {
@@ -41,28 +42,14 @@ struct ProvidersSettingsView: View {
     private var form: some View {
         Form {
             switch tab {
-            case .onThisMac:
+            case .localAI:
                 llmSection
-                chatSection
-                catchUpSection
+                speechModelSections
+                embeddingSection
                 localHosts
             case .cloud:
                 dataLeavesNotice
-                Section {
-                    ForEach(configs { $0.preset != nil && [.openAICompatible, .anthropic].contains($0.kind) }) { config in
-                        CloudModelRow(config: config, model: model)
-                    }
-                }
-                let custom = configs { $0.preset == nil && $0.kind == .openAICompatible }
-                if !custom.isEmpty {
-                    Section {
-                        ForEach(custom) { config in
-                            CloudModelRow(config: config, model: model)
-                        }
-                    } header: {
-                        Text("Custom OpenAI-compatible endpoints")
-                    }
-                }
+                ProviderCardSections(model: model)
             case .cli:
                 dataLeavesNotice
                 Section {
@@ -120,126 +107,40 @@ struct ProvidersSettingsView: View {
         Section {
             ForEach(Self.mlxEntries) { ModelRow(entry: $0, model: model) }
         } header: {
-            Text("AI models (summaries and chat)")
+            SectionHeader(title: "Language models", description: "Models that run on this Mac, for summaries and chat.")
         }
     }
 
-    /// How many earlier messages each chat question carries, for every provider.
-    private var chatSection: some View {
+    // MARK: - Speech and embedding models
+
+    /// The local transcription and diarization models by tier, with Download, Delete and Set default.
+    @ViewBuilder
+    private var speechModelSections: some View {
         Section {
-            Picker("Chat context", selection: model.setting(\.chatContextMessages)) {
-                ForEach(AppSettings.chatContextOptions, id: \.self) { Text("\($0) messages").tag($0) }
-                Text("Whole chat").tag(0)
-            }
-        } header: {
-            SectionHeader(title: "Chat", description: "Earlier messages sent with each question.")
-        }
-    }
-
-    // MARK: - Catch-up
-
-    /// Where "Catch up" runs while recording: a provider outside the app (as `AppModel.catchUpProvider` resolves it),
-    /// its model, and whether each catch-up reads the recording from the start.
-    private var catchUpSection: some View {
-        let external = catchUpProviders
-        let picked = external.first { $0.id == model.settings.catchUpProviderID }
-        return Section {
-            Picker("Catch-up provider", selection: catchUpProviderBinding(external)) {
-                if let automatic = model.automaticCatchUpProvider {
-                    let label = String(localized: "Automatic (\(automatic.name))")
-                    Text(automatic.leavesMac ? String(localized: "\(label) (leaves this Mac)") : label).tag("")
-                } else {
-                    Text("Automatic").tag("")
-                }
-                ForEach(external) { provider in
-                    Text(provider.leavesMac ? String(localized: "\(provider.name) (leaves this Mac)") : provider.name)
-                        .tag(provider.id)
-                }
-            }
-            .disabled(external.isEmpty)
-            if let picked {
-                Picker("Catch-up model", selection: catchUpModelBinding) {
-                    Text("Automatic").tag("")
-                    ForEach(catchUpModels(picked), id: \.self) { id in Text(id).tag(id) }
-                }
-                if picked.kind == .cloud, let config = model.providerConfigs.first(where: { $0.id == picked.id }) {
-                    LabeledContent(picked.name) { APIKeyStatus(config: config, model: model) }
-                }
-            } else {
-                // Automatic runs the AI tab's model: shown, not picked, so the row (and its search entry) is always here.
-                LabeledContent {
-                    Text(automaticCatchUpModelLabel)
-                } label: {
-                    Text("Catch-up model")
-                    Text("The AI tab's model. Pick a provider above to choose another.")
-                }
-            }
-            // As the AI pane's data notes, for the provider a catch-up runs on.
-            if let note = model.catchUpProvider?.leavesMacNote {
-                Label(note, systemImage: "info.circle")
-                    .foregroundStyle(.secondary)
-            }
-            if let note = model.catchUpProvider?.containmentNote {
-                Label(note, systemImage: "exclamationmark.shield")
-                    .foregroundStyle(.secondary)
-            }
-            if external.isEmpty {
-                Text("Catch up needs an AI provider outside the app: a cloud API, a local server or a command-line tool. Add one in Settings › AI.")
-                    .foregroundStyle(.secondary)
-            }
-            Toggle(isOn: model.setting(\.catchUpFromStart)) {
-                Text("Re-summarize from the start each time")
-                Text("Off: each catch-up adds what was said since the previous one. On: each one reads the whole recording again.")
-            }
-            Label("In-app models are not offered: the live transcript holds the model during a recording.",
-                  systemImage: "info.circle")
+            Text("Transcription turns speech into text. The transcription model listens to the recording and writes what was said, with timestamps.")
                 .foregroundStyle(.secondary)
         } header: {
-            SectionHeader(title: "Catch-up", description: "Quick summaries of the meeting so far, asked for while recording.")
+            Text("Transcription models")
         }
+        ModelTierSections(kind: .asr, model: model)
+        Section {
+            Text("Diarization finds who spoke when. The diarization model tells the voices apart and labels each part of the transcript with its speaker.")
+                .foregroundStyle(.secondary)
+        } header: {
+            Text("Diarization models")
+        }
+        ModelTierSections(kind: .diarization, model: model)
     }
 
-    /// The usable providers outside the app, as `AppModel.catchUpProvider` filters them.
-    private var catchUpProviders: [AppModel.AIProvider] {
-        model.aiProviders.filter { $0.kind != .inApp && $0.unavailableReason == nil }
-    }
-
-    /// The picked provider, "Automatic" when it is not usable now (as `catchUpProvider` then runs); picking one
-    /// clears the model picked for the previous one.
-    private func catchUpProviderBinding(_ external: [AppModel.AIProvider]) -> Binding<String> {
-        Binding(
-            get: {
-                let id = model.settings.catchUpProviderID
-                return external.contains { $0.id == id } ? id : ""
-            },
-            set: { id in
-                model.updateSettings {
-                    $0.catchUpProviderID = id
-                    $0.catchUpModel = ""
-                }
-            })
-    }
-
-    /// What an Automatic catch-up runs with: "Automatic (model)", or "Automatic" with no provider or a CLI's own default.
-    private var automaticCatchUpModelLabel: String {
-        guard let provider = model.catchUpProvider else { return String(localized: "Automatic") }
-        let id = model.catchUpModel(for: provider)
-        return id.isEmpty ? String(localized: "Automatic") : String(localized: "Automatic (\(id))")
-    }
-
-    private var catchUpModelBinding: Binding<String> {
-        Binding(
-            get: { model.settings.catchUpModel.trimmingCharacters(in: .whitespacesAndNewlines) },
-            set: { id in model.updateSettings { $0.catchUpModel = id } })
-    }
-
-    /// `provider`'s models without a CLI's own default ("Automatic" covers it), then the saved pick when it is no
-    /// longer listed, so the picker shows what runs.
-    private func catchUpModels(_ provider: AppModel.AIProvider) -> [String] {
-        var ids = provider.models.filter { !$0.isEmpty }
-        let saved = model.settings.catchUpModel.trimmingCharacters(in: .whitespacesAndNewlines)
-        if !saved.isEmpty && !ids.contains(saved) { ids.append(saved) }
-        return ids
+    /// The local embedding models' downloads; the one in use is picked in Library chat.
+    private var embeddingSection: some View {
+        Section {
+            ForEach(ModelCatalog.embedding) { ModelRow(entry: $0, model: model) }
+        } header: {
+            SectionHeader(
+                title: "Embedding models",
+                description: "The embedding model lets a question find passages with the same meaning, in any language. Models are downloaded only when you click Download.")
+        }
     }
 
     // MARK: - Local hosts
@@ -344,42 +245,7 @@ private enum CLIStatus: Equatable {
 
 // MARK: - Rows
 
-/// A cloud LLM preset or custom endpoint on the Cloud tab: its key status ("API key" opens its card in API Keys);
-/// expanded, its model. A missing base URL (Azure, a custom endpoint) is said under its name.
-private struct CloudModelRow: View {
-    let config: ProviderConfig
-    let model: AppModel
-
-    @State private var expanded = false
-
-    var body: some View {
-        DisclosureGroup(isExpanded: $expanded) {
-            ModelField(config: config, model: model, prompt: config.id == "azure" ? "Deployment name" : "Model id") {
-                try await model.makeProvider(for: config)?.listModels() ?? []
-            }
-            .padding(.top, 6)
-            .padding(.bottom, 4)
-            .padding(.leading, disclosureIndent)
-        } label: {
-            HStack {
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(config.displayName.isEmpty ? String(localized: "Untitled") : config.displayName)
-                    if config.baseURL.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-                        Text("Base URL not set").font(.caption).foregroundStyle(.secondary)
-                    } else if config.preset == nil {
-                        Text(config.baseURL).font(.caption).foregroundStyle(.secondary)
-                    }
-                }
-                Spacer()
-                APIKeyStatus(config: config, model: model)
-            }
-        }
-        .disclosureGroupStyle(TitleChevronDisclosureStyle())
-        .id(config.id)
-    }
-}
-
-/// A local host: enable toggle; expanded, its base URL, model, Test and Remove.
+/// A local host: enable toggle; expanded, its base URL, model, embedding model, Test and Remove.
 private struct APIProviderRow: View {
     let config: ProviderConfig
     let model: AppModel
@@ -406,6 +272,8 @@ private struct APIProviderRow: View {
                 ModelField(config: config, model: model, prompt: "Model id") {
                     try await model.makeProvider(for: config)?.listModels() ?? []
                 }
+                // Every local host can embed (`RAGSettingsView.embeddingConfigs`).
+                EmbeddingModelField(config: config, model: model)
                 Divider()
                 HStack(alignment: .top) {
                     TestButton(title: "Test", config: config, model: model)
@@ -414,6 +282,7 @@ private struct APIProviderRow: View {
                 }
                 .inputColumn()
             }
+            .fieldLabelColumn()
             .padding(.top, 6)
             .padding(.bottom, 4)
             .padding(.leading, disclosureIndent)
@@ -464,6 +333,7 @@ private struct CLIProviderRow: View {
                     .disabled(!isInstalled)
                     .inputColumn()
             }
+            .fieldLabelColumn()
             .padding(.top, 6)
             .padding(.bottom, 4)
             .padding(.leading, disclosureIndent)
@@ -513,9 +383,10 @@ private let disclosureIndent = TitleChevronDisclosureStyle.indent
 
 /// Free-text model id; "Load models" fills a menu from the provider's `listModels()` and a checklist of the models the
 /// AI pane's model menu offers besides this one (`ProviderConfig.shownModels`).
-private struct ModelField: View {
+struct ModelField: View {
     let config: ProviderConfig
     let model: AppModel
+    var label: LocalizedStringKey = "Model"
     let prompt: LocalizedStringKey
     let load: () async throws -> [String]
 
@@ -530,7 +401,7 @@ private struct ModelField: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
-            FieldRow("Model") {
+            FieldRow(label) {
                 TextField("Model", text: modelBinding, prompt: Text(prompt)).labelsHidden()
                 if let models, !models.isEmpty {
                     Menu("\(models.count) models") {
