@@ -19,9 +19,8 @@ release/
 xcuserdata/
 .build/
 
-# Local docs (plans, context, memory, reviews, research), except the published guide
+# Local docs (plans, context, memory, reviews, research, the release guide)
 docs/*
-!docs/RELEASING.md
 
 # coding-friend: only the cf-ship custom guide is tracked; config.json stays local
 !.coding-friend/
