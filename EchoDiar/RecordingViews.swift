@@ -257,7 +257,7 @@ struct RecordingDetailView: View {
         } else if !model.settings.transcribeWhileRecording {
             model.openSettings(tab: .transcription)
         } else {
-            model.openSettings(tab: .providers, subTab: "localAI")
+            model.openLocalAI(.transcription)
         }
     }
 }

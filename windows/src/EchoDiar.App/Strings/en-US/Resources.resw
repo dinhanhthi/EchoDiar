@@ -1002,6 +1002,10 @@
     <value>Detected: {0}</value>
     <comment>Detected: %@</comment>
   </data>
+  <data name="Diarization" xml:space="preserve">
+    <value>Diarization</value>
+    <comment>Diarization</comment>
+  </data>
   <data name="DiarizationFindsWhoSpokeWhenTheDiarizationModelTellsTheVoice" xml:space="preserve">
     <value>Diarization finds who spoke when. The diarization model tells the voices apart and labels each part of the transcript with its speaker.</value>
     <comment>Diarization finds who spoke when. The diarization model tells the voices apart and labels each part of the transcript with its speaker.</comment>
@@ -1173,6 +1177,10 @@
   <data name="Edit_2" xml:space="preserve">
     <value>Edit…</value>
     <comment>Edit…</comment>
+  </data>
+  <data name="Embedding" xml:space="preserve">
+    <value>Embedding</value>
+    <comment>Embedding</comment>
   </data>
   <data name="EmbeddingModel" xml:space="preserve">
     <value>Embedding model</value>
@@ -1901,6 +1909,10 @@
   <data name="ModelsThatRunOnThisMacForSummariesAndChat" xml:space="preserve">
     <value>Models that run on this Mac, for summaries and chat.</value>
     <comment>Models that run on this Mac, for summaries and chat.</comment>
+  </data>
+  <data name="ModelsThatRunOnThisPCForSummariesAndChat" xml:space="preserve">
+    <value>Models that run on this PC, for summaries and chat.</value>
+    <comment>Models that run on this PC, for summaries and chat.</comment>
   </data>
   <data name="Monthly" xml:space="preserve">
     <value>Monthly</value>
@@ -3901,10 +3913,6 @@
   <data name="UsedForQuestionsInTheChatTabAndLibraryChatTheModelMenuInTheC" xml:space="preserve">
     <value>Used for questions in the Chat tab and Library chat. The model menu in the Chat tab changes it too.</value>
     <comment>Used for questions in the Chat tab and Library chat. The model menu in the Chat tab changes it too.</comment>
-  </data>
-  <data name="UsedForSummariesAndQuestionsTheModelOfEachEnabledProviderBel" xml:space="preserve">
-    <value>Used for summaries and questions. The model of each enabled provider below, as checked in its row.</value>
-    <comment>Used for summaries and questions. The model of each enabled provider below, as checked in its row.</comment>
   </data>
   <data name="UsesTheLanguagePickedInTheRecordMenuForTheNextRecordingsInst" xml:space="preserve">
     <value>Uses the language picked in the Record menu for the next recordings instead of the default language. Languages changed during a recording don't count.</value>

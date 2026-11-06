@@ -7312,6 +7312,34 @@
         }
       }
     },
+    "Diarization" : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Diarización"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Diarisation"
+          }
+        },
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Phân biệt người nói"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "说话人分离"
+          }
+        }
+      }
+    },
     "Diarization finds who spoke when. The diarization model tells the voices apart and labels each part of the transcript with its speaker." : {
       "localizations" : {
         "es" : {
@@ -8310,6 +8338,34 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "编辑…"
+          }
+        }
+      }
+    },
+    "Embedding" : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Embeddings"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Embedding"
+          }
+        },
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Nhúng"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "嵌入"
           }
         }
       }

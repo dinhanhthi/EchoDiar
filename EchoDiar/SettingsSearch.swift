@@ -8,6 +8,8 @@ struct SettingsSearchItem: Identifiable {
     var keywords: [String] = []
     let tab: SettingsTab
     var subTab: String?
+    /// The group of AI Providers › Local AI the row is in.
+    var localAIGroup: LocalAIGroup?
 
     var id: String { "\(tab)/\(subTab ?? "-")/\(title.key)" }
 
@@ -133,16 +135,16 @@ struct SettingsSearchItem: Identifiable {
         // AI Providers
         .init(title: "Language models",
               keywords: ["LLM", "MLX", "Apple Foundation Models", "local", "summary", "chat"],
-              tab: .providers, subTab: "localAI"),
+              tab: .providers, subTab: "localAI", localAIGroup: .languageModels),
         .init(title: "Transcription models",
               keywords: ["download", "Whisper", "speech to text", "local", "fast", "balanced", "quality"],
-              tab: .providers, subTab: "localAI"),
+              tab: .providers, subTab: "localAI", localAIGroup: .transcription),
         .init(title: "Diarization models", keywords: ["speaker model", "speakers", "pyannote", "Nemotron", "download"],
-              tab: .providers, subTab: "localAI"),
+              tab: .providers, subTab: "localAI", localAIGroup: .diarization),
         .init(title: "Embedding models", keywords: ["embedder", "Qwen3", "E5", "BGE-M3", "RAG", "download"],
-              tab: .providers, subTab: "localAI"),
+              tab: .providers, subTab: "localAI", localAIGroup: .embedding),
         .init(title: "Local hosts", keywords: ["scan", "custom URL", "server"] + presetNames(.local),
-              tab: .providers, subTab: "localAI"),
+              tab: .providers, subTab: "localAI", localAIGroup: .localHosts),
         .init(title: "Language models", keywords: ["API key", "key", "Keychain", "cloud", "provider", "LLM", "model"]
               + presetNames(.openAICompatible) + presetNames(.anthropic), tab: .providers, subTab: "cloud"),
         .init(title: "Speech-to-text APIs", keywords: ["API key", "key", "Keychain", "cloud transcription"]
@@ -290,6 +292,7 @@ struct SettingsSearchResults: View {
 
     private func open(_ item: SettingsSearchItem) {
         model.openSettings(tab: item.tab, subTab: item.subTab)
+        if let group = item.localAIGroup { model.settingsLocalAIGroup = group }
         query = ""
     }
 }

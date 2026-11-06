@@ -78,6 +78,8 @@ final class AppModel {
     /// The inner tab (its id in `SettingsTab.subTabs`) each Settings section shows; a section missing here shows its
     /// first.
     var settingsSubTabs: [SettingsTab: String] = [:]
+    /// The group AI Providers › Local AI shows; in memory only.
+    var settingsLocalAIGroup: LocalAIGroup = .languageModels
     /// A provider whose row Settings › AI Providers opens and scrolls to (RAG's Set Up, `showAPIKey(for:)`); its row
     /// clears it once expanded.
     var settingsExpandedProvider: String?
@@ -1750,6 +1752,12 @@ final class AppModel {
     func openSettings(tab: SettingsTab?, subTab: String?) {
         openSettings(tab: tab)
         if let subTab { settingsSubTabs[settingsTab] = subTab }
+    }
+
+    /// Settings › AI Providers › Local AI on `group` (a "Download" link, RAG's Set Up for a local host).
+    func openLocalAI(_ group: LocalAIGroup) {
+        openSettings(tab: .providers, subTab: "localAI")
+        settingsLocalAIGroup = group
     }
 
     /// Settings › AI Providers › Cloud with provider `id`'s card expanded and scrolled to (a model card's "API key"

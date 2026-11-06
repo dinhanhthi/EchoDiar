@@ -95,8 +95,8 @@ public sealed partial class TranscriptionSettingsPage : UserControl
     private readonly CloudSection _transcriptionCloud;
     private readonly CloudSection _diarizationCloud;
 
-    /// <summary>One row per listed model, made once and updated in place.</summary>
-    private readonly List<ModelRow> _rows = [];
+    /// <summary>The local transcription and diarization model rows (macOS <c>ModelRow</c>), made once and updated in place.</summary>
+    private readonly LocalModelRows _localRows;
 
     /// <summary>The controls are being set from the settings: their change events are not the user's.</summary>
     private bool _syncing;
@@ -125,8 +125,9 @@ public sealed partial class TranscriptionSettingsPage : UserControl
         SpeakerCountCombo.Items.Add(Loc.T("Auto"));
         var (min, max) = AppSettings.SpeakerCountHintRange;
         for (var count = min; count <= max; count++) SpeakerCountCombo.Items.Add(count.ToString(CultureInfo.CurrentCulture));
-        AddSections(TranscriptionList, ModelKind.Asr);
-        AddSections(DiarizationList, ModelKind.Diarization);
+        _localRows = new LocalModelRows(_models, Resources);
+        _localRows.AddSections(TranscriptionList, ModelKind.Asr);
+        _localRows.AddSections(DiarizationList, ModelKind.Diarization);
 
         LanguageCombo.SelectionChanged += (_, _) =>
         {
@@ -155,10 +156,10 @@ public sealed partial class TranscriptionSettingsPage : UserControl
             _model.PropertyChanged += OnModelChanged;
             _settings.PropertyChanged += OnSettingsChanged;
             _models.PropertyChanged += OnModelsChanged;
-            _models.StatesChanged += UpdateRows;
+            _models.StatesChanged += _localRows.Update;
             _providers.Changed += RefreshCloud;
             Refresh();
-            UpdateRows();
+            _localRows.Update();
             RefreshCloud();
             ShowTab();
             InstalledText.Text = _models.InstalledText;
@@ -170,7 +171,7 @@ public sealed partial class TranscriptionSettingsPage : UserControl
             _model.PropertyChanged -= OnModelChanged;
             _settings.PropertyChanged -= OnSettingsChanged;
             _models.PropertyChanged -= OnModelsChanged;
-            _models.StatesChanged -= UpdateRows;
+            _models.StatesChanged -= _localRows.Update;
             _providers.Changed -= RefreshCloud;
             // macOS: a model list stops when its row goes away.
             _transcriptionCloud.Cancel();
@@ -282,158 +283,18 @@ public sealed partial class TranscriptionSettingsPage : UserControl
         IdleCombo.SelectedIndex = _idleMinutes.ToList().IndexOf(current);
     }
 
-    // Model rows
-
-    /// <summary>The parts of a model's row that change with its state.</summary>
-    private sealed record ModelRow(
-        ModelEntry Entry,
-        Border DefaultBadge,
-        TextBlock UnsupportedText,
-        TextBlock ErrorText,
-        Button SetDefaultButton,
-        ProgressBar Progress,
-        TextBlock PercentText,
-        Button CancelButton,
-        StackPanel InstalledLabel,
-        Button DeleteButton,
-        Button DownloadButton);
-
-    /// <summary>A header per tier that has <paramref name="kind"/> models, each followed by its rows.</summary>
-    private void AddSections(StackPanel list, ModelKind kind)
-    {
-        foreach (var (tier, entries) in _models.Sections(kind))
-        {
-            var header = new StackPanel { Style = (Style)Resources["SectionHeaderStyle"] };
-            header.Children.Add(new TextBlock
-            {
-                Style = (Style)Application.Current.Resources["BodyStrongTextBlockStyle"],
-                Text = ModelsViewModel.TierName(tier),
-            });
-            list.Children.Add(header);
-            foreach (var entry in entries) list.Children.Add(CreateRow(entry));
-        }
-    }
-
-    /// <summary>
-    /// A model's card (macOS <c>ModelRow</c>): its name and Default badge; its details, quality, unsupported language,
-    /// memory warning and last error below; its actions on the right.
-    /// </summary>
-    private SettingsCard CreateRow(ModelEntry entry)
-    {
-        var name = new TextBlock
-        {
-            Text = entry.DisplayName,
-            TextTrimming = TextTrimming.CharacterEllipsis,
-            TextWrapping = TextWrapping.NoWrap,
-            VerticalAlignment = VerticalAlignment.Center,
-        };
-        ToolTipService.SetToolTip(name, entry.DisplayName);
-        var badge = new Border
-        {
-            Style = (Style)Resources["DefaultBadgeStyle"],
-            Child = new TextBlock { Style = (Style)Resources["DefaultBadgeTextStyle"], Text = Loc.T("Default") },
-            Visibility = Visibility.Collapsed,
-        };
-        var header = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 8 };
-        header.Children.Add(name);
-        header.Children.Add(badge);
-
-        var description = new StackPanel { Spacing = 2 };
-        description.Children.Add(Note(ModelsViewModel.Details(entry), "NoteStyle"));
-        if (ModelsViewModel.QualityNote(entry) is { } quality) description.Children.Add(Note(quality, "NoteStyle"));
-        var unsupported = Note("", "CautionNoteStyle");
-        unsupported.Visibility = Visibility.Collapsed;
-        description.Children.Add(unsupported);
-        if (ModelsViewModel.NeedsMuchMemory(entry))
-        {
-            var warning = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 4 };
-            warning.Children.Add(new FontIcon { Style = (Style)Resources["CautionIconStyle"], Glyph = "" });
-            warning.Children.Add(Note("Needs more than half of this PC's memory.", "CautionNoteStyle"));
-            description.Children.Add(warning);
-        }
-        var error = Note("", "CriticalNoteStyle");
-        error.Visibility = Visibility.Collapsed;
-        description.Children.Add(error);
-
-        var setDefault = ActionButton("Set default", entry, () => _models.SetDefault(entry));
-        var progress = new ProgressBar { Width = 90, Maximum = 1, VerticalAlignment = VerticalAlignment.Center };
-        AutomationProperties.SetName(progress, entry.DisplayName);
-        var percent = new TextBlock
-        {
-            Style = (Style)Resources["NoteStyle"],
-            VerticalAlignment = VerticalAlignment.Center,
-            MinWidth = 32,
-            TextAlignment = TextAlignment.Right,
-        };
-        var cancel = ActionButton("Cancel", entry, () => _models.CancelDownload(entry));
-        var installed = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 4 };
-        installed.Children.Add(new FontIcon { Style = (Style)Resources["SuccessIconStyle"], Glyph = "" });
-        installed.Children.Add(new TextBlock { Style = (Style)Resources["SuccessNoteStyle"], Text = Loc.T("Installed") });
-        var delete = ActionButton("Delete", entry, () => _ = _models.DeleteAsync(entry));
-        var download = ActionButton("Download", entry, () => _models.Download(entry));
-        var actions = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 8 };
-        foreach (var part in new UIElement[] { setDefault, progress, percent, cancel, installed, delete, download })
-        {
-            part.Visibility = Visibility.Collapsed;
-            actions.Children.Add(part);
-        }
-
-        _rows.Add(new ModelRow(entry, badge, unsupported, error, setDefault, progress, percent, cancel, installed, delete, download));
-        return new SettingsCard { Header = header, Description = description, Content = actions };
-    }
-
-    /// <summary>A row's button, named with its model for screen readers ("Download, Whisper Base (141 MB)").</summary>
-    private static Button ActionButton(string text, ModelEntry entry, Action click)
-    {
-        var button = new Button { Content = Loc.T(text) };
-        AutomationProperties.SetName(button, $"{Loc.T(text)}, {entry.DisplayName}");
-        button.Click += (_, _) => click();
-        return button;
-    }
-
     private TextBlock Note(string text, string style) =>
         new() { Style = (Style)Resources[style], Text = text.Length > 0 ? Loc.T(text) : "" };
-
-    /// <summary>Every row shows its model's state (macOS <c>ModelRow.actions</c>).</summary>
-    private void UpdateRows()
-    {
-        foreach (var row in _rows)
-        {
-            var state = _models.State(row.Entry);
-            var downloading = state.Download is not null;
-            var installed = !downloading && state.IsInstalled;
-            row.DefaultBadge.Visibility = Show(state.IsDefault);
-            row.SetDefaultButton.Visibility = Show(state.ShowSetDefault);
-            row.SetDefaultButton.IsEnabled = state.CanSetDefault;
-            row.Progress.Visibility = row.PercentText.Visibility = row.CancelButton.Visibility = Show(downloading);
-            if (state.Download is { } fraction)
-            {
-                row.Progress.Value = fraction;
-                row.PercentText.Text = fraction.ToString("P0", CultureInfo.CurrentCulture);
-            }
-            row.InstalledLabel.Visibility = row.DeleteButton.Visibility = Show(installed);
-            row.DeleteButton.IsEnabled = state.CanDelete;
-            row.DownloadButton.Visibility = Show(!downloading && !state.IsInstalled);
-            row.DownloadButton.IsEnabled = state.CanDownload;
-            row.UnsupportedText.Text = state.UnsupportedNote ?? "";
-            row.UnsupportedText.Visibility = Show(state.UnsupportedNote is not null);
-            row.ErrorText.Text = state.Error ?? "";
-            row.ErrorText.Visibility = Show(state.Error is not null);
-        }
-    }
 
     private static Visibility Show(bool visible) => visible ? Visibility.Visible : Visibility.Collapsed;
 
     // Cloud (macOS cloudSection, CloudEngineRow, CloudModelField)
 
-    /// <summary>Below this width a field's card puts its input under its label, as the provider rows of Settings › AI.</summary>
-    private const double FieldWrapWidth = 640;
-
     /// <summary>
     /// Approximate pay-as-you-go prices per audio hour (macOS <c>CloudEngineRow.prices</c>, 2026-10-18; xAI, Speechmatics
     /// Enhanced, Soniox and Gladia solaria-1 2026-11-04).
     /// </summary>
-    private static readonly Dictionary<string, string> Prices = new()
+    internal static readonly Dictionary<string, string> Prices = new()
     {
         ["openai"] = "~$0.36/h", ["groq"] = "~$0.04/h", ["mistral"] = "~$0.18/h", ["gemini"] = "~$0.23/h",
         ["elevenlabs"] = "~$0.22/h", ["deepgram"] = "~$0.26/h", ["assemblyai"] = "~$0.23/h",
@@ -444,6 +305,10 @@ public sealed partial class TranscriptionSettingsPage : UserControl
         ProviderConfig.Presets().Where(p => p.Kind == ProviderKind.SpeechToText).Select(p => p.DisplayName);
 
     private bool Closing => _model.IsClosing;
+
+    /// <summary>A cloud engine's <see cref="CloudModelField"/>, with this page's view model, sync and closing state and styles.</summary>
+    private CloudModelField NewCloudModelField(bool diarization, bool realtime = false) =>
+        new(_providers, () => _syncing, () => Closing, Resources, diarization, realtime);
 
     /// <summary>Both cloud sections show the current configs, keys and defaults.</summary>
     private void RefreshCloud()
@@ -461,19 +326,6 @@ public sealed partial class TranscriptionSettingsPage : UserControl
         header.Children.Add(Note(description, "NoteStyle"));
         return header;
     }
-
-    /// <summary>A field of a row: its label on the left, its input on the right; below <see cref="FieldWrapWidth"/>, under it.</summary>
-    private static SettingsCard Field(string label, object content)
-    {
-        var card = new SettingsCard { Header = Loc.T(label), Content = content };
-        card.Resources["SettingsCardWrapThreshold"] = FieldWrapWidth;
-        return card;
-    }
-
-    private static ProgressRing SmallRing() => new()
-    {
-        Width = 16, Height = 16, IsActive = false, Visibility = Visibility.Collapsed, VerticalAlignment = VerticalAlignment.Center,
-    };
 
     /// <summary>
     /// "Cloud" on one tab (macOS <c>cloudSection(diarization:)</c>): the header, the "audio leaves this PC" note, then
@@ -605,7 +457,7 @@ public sealed partial class TranscriptionSettingsPage : UserControl
             var actions = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 8 };
             actions.Children.Add(_setDefault);
             actions.Children.Add(_status.Element);
-            _modelField = new CloudModelField(page, diarization);
+            _modelField = page.NewCloudModelField(diarization);
             Expander = new SettingsExpander { Header = header, Description = description, Content = actions };
             Expander.Items.Add(_modelField.Card);
         }
@@ -755,7 +607,7 @@ public sealed partial class TranscriptionSettingsPage : UserControl
 
             _realtimeCard = new SettingsCard { Content = _realtimeToggle, Tag = RealtimeSearchTitle };
             _realtimeToggle.Toggled += (_, _) => page.Set(() => SetRealtime(_realtimeToggle.IsOn));
-            _realtimeModel = new CloudModelField(page, diarization: false, realtime: true);
+            _realtimeModel = page.NewCloudModelField(diarization: false, realtime: true);
 
             AutomationProperties.SetName(_finalToggle, Loc.T("Use the realtime result as the transcript"));
             _finalCard = new SettingsCard
@@ -946,232 +798,6 @@ public sealed partial class TranscriptionSettingsPage : UserControl
             var streamsSpeakers = adapter?.StreamsSpeakers ?? false;
             if (!settings.Diarization || streamsSpeakers || !CloudTranscription.Diarizes(config, CloudTranscription.Model(config))) return copy;
             return $"{copy} {Loc.T("This realtime model labels no speakers, so the diarizer runs on the recording after Stop; a cloud diarizer asks for its own consent.")}";
-        }
-    }
-
-    /// <summary>
-    /// A cloud engine's transcription model (macOS <c>CloudModelField</c>): free text, a menu of the known models and, for
-    /// the APIs that list their models, Load models (only the ones that transcribe). With <c>diarization</c>, the cloud
-    /// diarizer's diarization model: only models that label speakers are listed, and a note says when the typed one does
-    /// not. AssemblyAI picks its model. With <c>realtime</c>, the realtime model streamed while recording ("Realtime
-    /// model"): its known models only, and the host it streams to below.
-    /// </summary>
-    private sealed class CloudModelField
-    {
-        /// <summary>The speech-to-text APIs have no model list; their known models are offered.</summary>
-        private static readonly Dictionary<string, string[]> KnownModels = new(OpenAICompatibleTranscriber.PresetModels)
-        {
-            ["elevenlabs"] = [ElevenLabsTranscriber.DefaultModel],
-            ["deepgram"] = [DeepgramTranscriber.DefaultModel],
-            ["gemini"] = OpenAICompatibleTranscriber.PresetModels.TryGetValue("gemini", out var gemini) ? gemini : [GeminiAudioTranscriber.DefaultModel],
-            ["xai"] = [XAITranscriber.DefaultModel],
-            ["speechmatics"] = [SpeechmaticsTranscriber.DefaultModel, "standard", "melia-1"],
-            ["soniox"] = [SonioxTranscriber.DefaultModel],
-            ["gladia"] = [GladiaTranscriber.DefaultModel],
-        };
-
-        private readonly TranscriptionSettingsPage _page;
-        private readonly bool _diarization;
-        /// <summary>Edits <see cref="ProviderConfig.RealtimeModel"/> instead of the transcription model.</summary>
-        private readonly bool _realtime;
-        private readonly TextBlock? _host;
-        private readonly TextBox _box = new();
-        private readonly TextBlock _picked;
-        private readonly DropDownButton _modelsButton = new() { Visibility = Visibility.Collapsed };
-        private readonly MenuFlyout _modelsMenu = new();
-        private readonly Button _loadButton = new();
-        private readonly ProgressRing _ring = SmallRing();
-        private readonly TextBlock _error;
-        private readonly TextBlock _empty;
-        private readonly TextBlock _noSpeakers;
-        private readonly TextBlock _streamingOnly;
-        private readonly FieldPanel _input;
-        private ProviderConfig? _config;
-        private List<string>? _loaded;
-        private string? _loadError;
-        private List<string> _choices = [];
-        private CancellationTokenSource? _loading;
-
-        public CloudModelField(TranscriptionSettingsPage page, bool diarization, bool realtime = false)
-        {
-            _page = page;
-            _diarization = diarization;
-            _realtime = realtime;
-            AutomationProperties.SetName(_box, realtime ? Loc.T("Realtime model") : Loc.T("Model"));
-            _box.TextChanged += (_, _) => SetModel(_box.Text);
-            _modelsButton.Flyout = _modelsMenu;
-            _loadButton.Content = Loc.T("Load models");
-            _loadButton.Click += (_, _) => _ = LoadAsync();
-            _input = new FieldPanel { InputWidth = 260, Children = { _box, _modelsButton, _loadButton, _ring } };
-            _picked = page.Note("", "NoteStyle");
-            _error = page.Note("", "CriticalNoteStyle");
-            _error.MaxLines = 2;
-            _empty = page.Note(diarization
-                ? "No diarization models listed; type the model id."
-                : "No transcription models listed; type the model id.", "NoteStyle");
-            // The macOS text, with "this PC" for "this Mac".
-            _noSpeakers = new TextBlock
-            {
-                Style = (Style)page.Resources["CautionNoteStyle"],
-                Text = Loc.T("This model does not label speakers; a model on this PC is used instead."),
-            };
-            _streamingOnly = page.Note(
-                "This model only streams live audio and can't transcribe a recording. Pick another model.", "CriticalNoteStyle");
-            var notes = new StackPanel { Spacing = 2 };
-            notes.Children.Add(_error);
-            notes.Children.Add(_streamingOnly);
-            notes.Children.Add(_empty);
-            notes.Children.Add(_noSpeakers);
-            Card = Field(realtime ? "Realtime model" : "Model", _input);
-            Card.Description = notes;
-            if (realtime)
-            {
-                // Its search entry; the host in place of the notes, which are about the transcription model.
-                Card.Tag = "Realtime model";
-                _host = page.Note("", "NoteStyle");
-                Card.Description = _host;
-            }
-        }
-
-        public SettingsCard Card { get; }
-
-        /// <summary>The streaming-only or "does not label speakers" warning shows.</summary>
-        public bool Warns { get; private set; }
-
-        public void Cancel() => _loading?.Cancel();
-
-        /// <summary>Shows its engine's <paramref name="config"/>; the text the user is typing stays as it is.</summary>
-        public void Update(ProviderConfig config)
-        {
-            _config = config;
-            if (_host is not null)
-            {
-                UpdateRealtime(config, _host);
-                return;
-            }
-            if (config.Preset == "assemblyai")
-            {
-                _picked.Text = Loc.T(_diarization
-                    ? "Picked by AssemblyAI (Universal, speaker labels)"
-                    : "Picked by AssemblyAI for the language (Universal)");
-                Card.Content = _picked;
-                ((StackPanel)Card.Description).Visibility = Visibility.Collapsed;
-                Warns = false;
-                return;
-            }
-            Card.Content = _input;
-            ((StackPanel)Card.Description).Visibility = Visibility.Visible;
-            var model = _diarization ? config.DiarizationModel : config.TranscriptionModel;
-            if (_box.Text != model) _box.Text = model;
-            var fallback = _diarization ? CloudTranscription.DefaultDiarizationModel(config) : CloudTranscription.DefaultModel(config);
-            _box.PlaceholderText = fallback.Length > 0
-                ? fallback
-                : Loc.T(_diarization ? "Diarization model id" : "Transcription model id, e.g. whisper-1");
-            IEnumerable<string> known = _diarization
-                ? [CloudTranscription.DefaultDiarizationModel(config)]
-                : KnownModels.TryGetValue(config.Preset ?? "", out var models) ? models : [];
-            var choices = known.Concat(_loaded ?? []).Where(id => id.Length > 0).Distinct(StringComparer.Ordinal).ToList();
-            ShowChoices(choices);
-            _loadButton.Visibility = Show(config.Kind == ProviderKind.OpenAICompatible);
-            _error.Text = _loadError ?? "";
-            _error.Visibility = Show(_loadError is not null);
-            _empty.Visibility = Show(_loadError is null && _loaded is { Count: 0 });
-            // A streaming-only diarization model falls back to this PC's diarizer: _noSpeakers says so.
-            _streamingOnly.Visibility = Show(!_diarization && CloudTranscription.IsStreamingOnly(CloudTranscription.Model(config)));
-            _noSpeakers.Visibility = Show(_diarization && !CloudTranscription.Diarizes(config, CloudTranscription.DiarizationModel(config)));
-            Warns = _streamingOnly.Visibility == Visibility.Visible || _noSpeakers.Visibility == Visibility.Visible;
-        }
-
-        /// <summary>
-        /// The realtime model (macOS <c>CloudModelField(realtime: true)</c>): the default as the placeholder and the known
-        /// models in the menu; no AssemblyAI note, no Load models, no streaming-only warning; "Streams to" the host.
-        /// </summary>
-        private void UpdateRealtime(ProviderConfig config, TextBlock host)
-        {
-            if (_box.Text != config.RealtimeModel) _box.Text = config.RealtimeModel;
-            _box.PlaceholderText = AppViewModel.RealtimeDefaultModel(config);
-            List<string> choices = [.. AppViewModel.RealtimeModels(config).Where(id => id.Length > 0).Distinct(StringComparer.Ordinal)];
-            ShowChoices(choices);
-            _loadButton.Visibility = Visibility.Collapsed;
-            var hostName = AppViewModel.RealtimeHost(config);
-            host.Text = hostName is null ? "" : Loc.Format("Streams to %@", hostName);
-            host.Visibility = Show(hostName is not null);
-            Warns = false;
-        }
-
-        /// <summary>The models menu offers <paramref name="choices"/>, rebuilt only when they change.</summary>
-        private void ShowChoices(List<string> choices)
-        {
-            if (!choices.SequenceEqual(_choices))
-            {
-                _choices = choices;
-                _modelsMenu.Items.Clear();
-                foreach (var id in choices)
-                {
-                    var item = new MenuFlyoutItem { Text = id };
-                    item.Click += (_, _) => SetModel(id);
-                    _modelsMenu.Items.Add(item);
-                }
-            }
-            _modelsButton.Content = Loc.Plural("%lld models", choices.Count);
-            _modelsButton.Visibility = Show(choices.Count > 0);
-        }
-
-        private void SetModel(string id)
-        {
-            if (_page._syncing || _page.Closing || _config is not { } shown || _page._providers.Config(shown.Id) is not { } config) return;
-            if ((_realtime ? config.RealtimeModel : _diarization ? config.DiarizationModel : config.TranscriptionModel) == id) return;
-            _page._providers.UpdateProvider(config.Id, c =>
-            {
-                if (_realtime) c.RealtimeModel = id;
-                else if (_diarization) c.DiarizationModel = id;
-                else c.TranscriptionModel = id;
-            });
-        }
-
-        /// <summary>The provider's models that transcribe (with <c>diarization</c>: that label speakers), sorted; off the UI thread.</summary>
-        private async Task LoadAsync()
-        {
-            if (_config is not { } config || _loading is not null) return;
-            using var cancellation = _loading = new CancellationTokenSource();
-            _loadButton.IsEnabled = false;
-            _ring.IsActive = true;
-            _ring.Visibility = Visibility.Visible;
-            try
-            {
-                var all = await _page._providers.ListModelsAsync(config, cancellation.Token);
-                _loaded = [.. all.Where(id => Transcribes(id, config.Preset) && !CloudTranscription.IsStreamingOnly(id) && (!_diarization || CloudTranscription.Diarizes(config, id)))
-                    .Order(StringComparer.Ordinal)];
-                _loadError = null;
-            }
-            catch (Exception e) when (!cancellation.IsCancellationRequested)
-            {
-                _loadError = ProvidersViewModel.ShortMessage(e);
-            }
-            catch (Exception)
-            {
-                // Cancelled (the page closed or the default changed): no result.
-            }
-            finally
-            {
-                _loading = null;
-            }
-            if (_page.Closing) return;
-            _loadButton.IsEnabled = true;
-            _ring.IsActive = false;
-            _ring.Visibility = Visibility.Collapsed;
-            if (_page._providers.Config(config.Id) is { } current) Update(current);
-        }
-
-        /// <summary>
-        /// Transcription models are named after it (whisper-1, gpt-4o-transcribe, voxtral-mini); Gemini transcribes with
-        /// its own models through the native audio API.
-        /// </summary>
-        private static bool Transcribes(string id, string? preset)
-        {
-            id = id.ToLowerInvariant();
-            if (preset == "gemini") return id.Contains("gemini", StringComparison.Ordinal);
-            return new[] { "whisper", "transcribe", "voxtral", "scribe", "nova", "speech" }.Any(part => id.Contains(part, StringComparison.Ordinal));
         }
     }
 }

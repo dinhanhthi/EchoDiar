@@ -2,9 +2,25 @@ import EchoAI
 import EchoCore
 import SwiftUI
 
+/// The groups of AI Providers › Local AI, picked in the tabs at the top of its body; kept in
+/// `AppModel.settingsLocalAIGroup`.
+enum LocalAIGroup: String, CaseIterable {
+    case languageModels, transcription, diarization, embedding, localHosts
+
+    var title: LocalizedStringKey {
+        switch self {
+        case .languageModels: "Language models"
+        case .transcription: "Transcription"
+        case .diarization: "Diarization"
+        case .embedding: "Embedding"
+        case .localHosts: "Local hosts"
+        }
+    }
+}
+
 /// The AI Providers tab, in inner tabs: local AI (the in-app language models, the local transcription, diarization and
-/// embedding model downloads, and local hosts scanned on demand), the cloud provider cards (keys and models) and
-/// subscription CLIs. Saved in `AppSettings.providers`.
+/// embedding model downloads, and local hosts scanned on demand, one group at a time), the cloud provider cards (keys
+/// and models) and subscription CLIs. Saved in `AppSettings.providers`.
 struct ProvidersSettingsView: View {
     let model: AppModel
 
@@ -25,28 +41,48 @@ struct ProvidersSettingsView: View {
     private static let mlxEntries = ModelCatalog.llm.filter { $0.runtime == .mlx }
 
     var body: some View {
-        ScrollViewReader { proxy in
-            form
-                // RAG's Set Up or a model card's "API key": once the inner tab shows, the local host's row or the
-                // provider's card (which expands itself) comes into view.
-                .onChange(of: model.settingsExpandedProvider, initial: true) { _, id in
-                    guard let id else { return }
-                    Task {
-                        await Task.yield()
-                        withAnimation { proxy.scrollTo(id, anchor: .top) }
+        VStack(spacing: 0) {
+            if tab == .localAI { localAITabs }
+            ScrollViewReader { proxy in
+                form
+                    // RAG's Set Up or a model card's "API key": once the inner tab shows, the local host's row (in
+                    // Local hosts, picked first) or the provider's card (which expands itself) comes into view.
+                    .onChange(of: model.settingsExpandedProvider, initial: true) { _, id in
+                        guard let id else { return }
+                        if model.settings.providers.contains(where: { $0.id == id && $0.kind == .local }) {
+                            model.settingsLocalAIGroup = .localHosts
+                        }
+                        Task {
+                            await Task.yield()
+                            withAnimation { proxy.scrollTo(id, anchor: .top) }
+                        }
                     }
-                }
+            }
         }
+    }
+
+    /// Local AI's groups, centered above its form.
+    private var localAITabs: some View {
+        CapsuleTabs(
+            selection: Binding(get: { model.settingsLocalAIGroup }, set: { model.settingsLocalAIGroup = $0 }),
+            tabs: LocalAIGroup.allCases, title: { Text($0.title) }, drawsTrack: true
+        )
+        .fixedSize()
+        .frame(maxWidth: .infinity)
+        .padding(.top, 12)
     }
 
     private var form: some View {
         Form {
             switch tab {
             case .localAI:
-                llmSection
-                speechModelSections
-                embeddingSection
-                localHosts
+                switch model.settingsLocalAIGroup {
+                case .languageModels: llmSection
+                case .transcription: transcriptionSections
+                case .diarization: diarizationSections
+                case .embedding: embeddingSection
+                case .localHosts: localHosts
+                }
             case .cloud:
                 dataLeavesNotice
                 ProviderCardSections(model: model)
@@ -113,9 +149,9 @@ struct ProvidersSettingsView: View {
 
     // MARK: - Speech and embedding models
 
-    /// The local transcription and diarization models by tier, with Download, Delete and Set default.
+    /// The local transcription models by tier, with Download, Delete and Set default.
     @ViewBuilder
-    private var speechModelSections: some View {
+    private var transcriptionSections: some View {
         Section {
             Text("Transcription turns speech into text. The transcription model listens to the recording and writes what was said, with timestamps.")
                 .foregroundStyle(.secondary)
@@ -123,6 +159,11 @@ struct ProvidersSettingsView: View {
             Text("Transcription models")
         }
         ModelTierSections(kind: .asr, model: model)
+    }
+
+    /// The local diarization models by tier, with Download, Delete and Set default.
+    @ViewBuilder
+    private var diarizationSections: some View {
         Section {
             Text("Diarization finds who spoke when. The diarization model tells the voices apart and labels each part of the transcript with its speaker.")
                 .foregroundStyle(.secondary)

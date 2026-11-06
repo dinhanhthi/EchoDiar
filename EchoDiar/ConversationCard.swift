@@ -265,7 +265,7 @@ struct TranscriptionStatus: View {
         if let progress, progress.step != .needsModel {
             ProgressLabel(progress: progress, conversationID: conversation.id, model: model)
         } else if progress != nil {
-            Button("Needs model") { model.openSettings(tab: .providers, subTab: "localAI") }
+            Button("Needs model") { model.openLocalAI(.transcription) }
                 .buttonStyle(RowTextButtonStyle())
                 .fixedSize()
                 .foregroundStyle(.orange)
@@ -387,7 +387,7 @@ struct EngineMenuItems: View {
         let local = model.installedBatchEngines
         let cloud = model.cloudEngineConfigs
         if local.isEmpty && cloud.isEmpty {
-            Button("Download a model…") { model.openSettings(tab: .providers, subTab: "localAI") }
+            Button("Download a model…") { model.openLocalAI(.transcription) }
         } else {
             let defaultID = model.defaultASRModelID
             let defaultCloud = cloud.first { Self.engineID($0) == defaultID }

@@ -1,6 +1,7 @@
 using System.Diagnostics;
 using EchoDiar.AI.Cloud;
 using EchoDiar.App.Services;
+using EchoDiar.App.Views;
 using EchoDiar.Core;
 using EchoDiar.Core.Models;
 using EchoDiar.Core.Settings;
@@ -25,6 +26,8 @@ public sealed partial class AppViewModel
 
     /// <summary>The page Settings was opened from.</summary>
     private Route _settingsReturnRoute = Route.List;
+
+    private string _settingsLocalAIGroup = ProvidersSettingsPage.LanguageModelsGroup;
 
     private DispatcherQueueTimer? _settingsSaveTimer;
     private SettingsViewModel? _settingsModel;
@@ -65,6 +68,26 @@ public sealed partial class AppViewModel
         if (SubTabOf(section) == subTab) return;
         _settingsSubTabs[section] = subTab;
         if (section == SettingsSection) OnPropertyChanged(nameof(SettingsSubTab));
+    }
+
+    /// <summary>
+    /// The group AI Providers › Local AI shows (macOS <c>settingsLocalAIGroup</c>, a <c>ProvidersSettingsPage.*Group</c>
+    /// id): picked in its tabs, kept in memory for the app's lifetime, Language models at first.
+    /// </summary>
+    public string SettingsLocalAIGroup
+    {
+        get => _settingsLocalAIGroup;
+        set => SetProperty(ref _settingsLocalAIGroup, value);
+    }
+
+    /// <summary>
+    /// Settings › AI Providers › Local AI on <paramref name="group"/> (macOS <c>openLocalAI</c>: a "Download" link, RAG's
+    /// Set Up for a local host).
+    /// </summary>
+    public void OpenLocalAI(string group)
+    {
+        OpenSettings(SettingsSearch.Providers, ProvidersSettingsPage.LocalAITab);
+        SettingsLocalAIGroup = group;
     }
 
     /// <summary>

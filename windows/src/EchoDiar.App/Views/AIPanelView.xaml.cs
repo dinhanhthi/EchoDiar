@@ -682,7 +682,7 @@ public sealed partial class AIPanelView : UserControl
 
     /// <summary>
     /// The providers and their models for the tab's purpose (<see cref="AIMenus.FillModelMenu"/>), then "Choose Models…"
-    /// (Settings › AI).
+    /// (Settings › AI Providers › Cloud, macOS <c>openSettings(tab: .providers, subTab: "cloud")</c>).
     /// </summary>
     private void BuildModelMenu()
     {
@@ -691,7 +691,8 @@ public sealed partial class AIPanelView : UserControl
             ModelMenu.Items.Clear();
             return;
         }
-        AIMenus.FillModelMenu(ModelMenu, _panel.Providers, Purpose, () => _model?.OpenSettings(Services.SettingsSearch.Providers));
+        AIMenus.FillModelMenu(ModelMenu, _panel.Providers, Purpose,
+            () => _model?.OpenSettings(Services.SettingsSearch.Providers, ProvidersSettingsPage.CloudTab));
     }
 
     /// <summary>The summary and answer languages (<see cref="AIMenus.FillLanguageMenu"/>).</summary>

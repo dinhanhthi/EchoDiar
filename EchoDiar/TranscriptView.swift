@@ -179,7 +179,7 @@ struct TranscriptView: View {
             }
             .foregroundStyle(.secondary)
             if !installed {
-                Button("Download…") { model.openSettings(tab: .providers, subTab: "localAI") }
+                Button("Download…") { model.openLocalAI(.diarization) }
                     .buttonStyle(.link)
             }
         }
@@ -198,7 +198,7 @@ struct TranscriptView: View {
             }
             .foregroundStyle(.secondary)
             if localMissing {
-                Button("Download…") { model.openSettings(tab: .providers, subTab: "localAI") }
+                Button("Download…") { model.openLocalAI(.diarization) }
                     .buttonStyle(.link)
             }
         }

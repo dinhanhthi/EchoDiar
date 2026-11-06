@@ -116,7 +116,7 @@ struct RAGSettingsView: View {
                 .font(.caption)
                 .foregroundStyle(.green)
         } else {
-            Button("Download in AI Providers › Local AI") { model.openSettings(tab: .providers, subTab: "localAI") }
+            Button("Download in AI Providers › Local AI") { model.openLocalAI(.embedding) }
                 .controlSize(.small)
         }
     }
@@ -143,13 +143,17 @@ struct RAGSettingsView: View {
         }
     }
 
-    /// AI Providers on `config`'s row, expanded: Local AI for a local host (which has a row only once added), Cloud
-    /// for an API.
+    /// AI Providers on `config`'s row, expanded: Local AI › Local hosts for a local host (which has a row only once
+    /// added), Cloud for an API.
     private func setUp(_ config: ProviderConfig) {
         if config.kind != .local || model.settings.providers.contains(where: { $0.id == config.id }) {
             model.settingsExpandedProvider = config.id
         }
-        model.openSettings(tab: .providers, subTab: config.kind == .local ? "localAI" : "cloud")
+        if config.kind == .local {
+            model.openLocalAI(.localHosts)
+        } else {
+            model.openSettings(tab: .providers, subTab: "cloud")
+        }
     }
 
     private func providersSection(header: Bool) -> some View {

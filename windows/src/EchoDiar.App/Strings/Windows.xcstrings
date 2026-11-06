@@ -2131,6 +2131,36 @@
         }
       }
     },
+    "Models that run on this PC, for summaries and chat." : {
+      "comment" : "Windows only: Views/Settings/ProvidersSettingsPage.xaml.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Modelos que se ejecutan en este PC, para resúmenes y chat."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Modèles qui s’exécutent sur ce PC, pour les résumés et la discussion."
+          }
+        },
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Các mô hình chạy trên máy tính này, dùng cho bản tóm tắt và trò chuyện."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "在这台电脑上运行的模型，用于摘要和聊天。"
+          }
+        }
+      }
+    },
     "Move to Recycle Bin" : {
       "comment" : "Windows only: Views/Settings/StorageSettingsPage.xaml.cs.",
       "extractionState" : "manual",
@@ -4611,36 +4641,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "由 sherpa-onnx 使用"
-          }
-        }
-      }
-    },
-    "Used for summaries and questions. The model of each enabled provider below, as checked in its row." : {
-      "comment" : "Windows only: Views/Settings/ProvidersSettingsPage.xaml.",
-      "extractionState" : "manual",
-      "localizations" : {
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Se usa para resúmenes y preguntas. El modelo de cada proveedor activado de abajo, según lo marcado en su fila."
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "needs_review",
-            "value" : "Utilisé pour les résumés et les questions. Le modèle de chaque fournisseur activé ci-dessous, tel que coché dans sa ligne."
-          }
-        },
-        "vi" : {
-          "stringUnit" : {
-            "state" : "needs_review",
-            "value" : "Dùng cho bản tóm tắt và câu hỏi. Là mô hình của từng nhà cung cấp đã bật bên dưới, theo lựa chọn ở hàng của nhà cung cấp đó."
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "用于摘要和提问。即下方每个已启用提供商的模型，以其所在行中勾选的为准。"
           }
         }
       }

@@ -954,6 +954,10 @@
     <value>已检测到：{0}</value>
     <comment>Detected: %@</comment>
   </data>
+  <data name="Diarization" xml:space="preserve">
+    <value>说话人分离</value>
+    <comment>Diarization</comment>
+  </data>
   <data name="DiarizationFindsWhoSpokeWhenTheDiarizationModelTellsTheVoice" xml:space="preserve">
     <value>说话人分离会找出谁在何时说话。说话人分离模型会区分不同的声音，并为转写文本的每个部分标注说话人。</value>
     <comment>Diarization finds who spoke when. The diarization model tells the voices apart and labels each part of the transcript with its speaker.</comment>
@@ -1125,6 +1129,10 @@
   <data name="Edit_2" xml:space="preserve">
     <value>编辑…</value>
     <comment>Edit…</comment>
+  </data>
+  <data name="Embedding" xml:space="preserve">
+    <value>嵌入</value>
+    <comment>Embedding</comment>
   </data>
   <data name="EmbeddingModel" xml:space="preserve">
     <value>嵌入模型</value>
@@ -1805,6 +1813,10 @@
   <data name="ModelsThatRunOnThisMacForSummariesAndChat" xml:space="preserve">
     <value>在这台 Mac 上运行的模型，用于摘要和聊天。</value>
     <comment>Models that run on this Mac, for summaries and chat.</comment>
+  </data>
+  <data name="ModelsThatRunOnThisPCForSummariesAndChat" xml:space="preserve">
+    <value>在这台电脑上运行的模型，用于摘要和聊天。</value>
+    <comment>Models that run on this PC, for summaries and chat.</comment>
   </data>
   <data name="Monthly" xml:space="preserve">
     <value>每月</value>
@@ -3761,10 +3773,6 @@
   <data name="UsedForQuestionsInTheChatTabAndLibraryChatTheModelMenuInTheC" xml:space="preserve">
     <value>用于“聊天”标签页和“资料库聊天”中的提问。“聊天”标签页中的模型菜单也可以更改它。</value>
     <comment>Used for questions in the Chat tab and Library chat. The model menu in the Chat tab changes it too.</comment>
-  </data>
-  <data name="UsedForSummariesAndQuestionsTheModelOfEachEnabledProviderBel" xml:space="preserve">
-    <value>用于摘要和提问。即下方每个已启用提供商的模型，以其所在行中勾选的为准。</value>
-    <comment>Used for summaries and questions. The model of each enabled provider below, as checked in its row.</comment>
   </data>
   <data name="UsesTheLanguagePickedInTheRecordMenuForTheNextRecordingsInst" xml:space="preserve">
     <value>后续录制使用在“录制”菜单中选择的语言，而不是默认语言。录制过程中更改的语言不计入。</value>

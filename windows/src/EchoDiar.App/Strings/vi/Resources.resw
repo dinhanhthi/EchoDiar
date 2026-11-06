@@ -954,6 +954,10 @@
     <value>Đã phát hiện: {0}</value>
     <comment>Detected: %@</comment>
   </data>
+  <data name="Diarization" xml:space="preserve">
+    <value>Phân biệt người nói</value>
+    <comment>Diarization</comment>
+  </data>
   <data name="DiarizationFindsWhoSpokeWhenTheDiarizationModelTellsTheVoice" xml:space="preserve">
     <value>Phân biệt người nói cho biết ai nói khi nào. Mô hình phân biệt người nói tách các giọng nói và gắn nhãn người nói cho từng phần của bản chép lời.</value>
     <comment>Diarization finds who spoke when. The diarization model tells the voices apart and labels each part of the transcript with its speaker.</comment>
@@ -1125,6 +1129,10 @@
   <data name="Edit_2" xml:space="preserve">
     <value>Sửa…</value>
     <comment>Edit…</comment>
+  </data>
+  <data name="Embedding" xml:space="preserve">
+    <value>Nhúng</value>
+    <comment>Embedding</comment>
   </data>
   <data name="EmbeddingModel" xml:space="preserve">
     <value>Mô hình nhúng</value>
@@ -1805,6 +1813,10 @@
   <data name="ModelsThatRunOnThisMacForSummariesAndChat" xml:space="preserve">
     <value>Các mô hình chạy trên máy Mac này, dùng cho bản tóm tắt và trò chuyện.</value>
     <comment>Models that run on this Mac, for summaries and chat.</comment>
+  </data>
+  <data name="ModelsThatRunOnThisPCForSummariesAndChat" xml:space="preserve">
+    <value>Các mô hình chạy trên máy tính này, dùng cho bản tóm tắt và trò chuyện.</value>
+    <comment>Models that run on this PC, for summaries and chat.</comment>
   </data>
   <data name="Monthly" xml:space="preserve">
     <value>Hàng tháng</value>
@@ -3761,10 +3773,6 @@
   <data name="UsedForQuestionsInTheChatTabAndLibraryChatTheModelMenuInTheC" xml:space="preserve">
     <value>Dùng cho câu hỏi trong tab Trò chuyện và Trò chuyện thư viện. Menu mô hình trong tab Trò chuyện cũng thay đổi được mô hình này.</value>
     <comment>Used for questions in the Chat tab and Library chat. The model menu in the Chat tab changes it too.</comment>
-  </data>
-  <data name="UsedForSummariesAndQuestionsTheModelOfEachEnabledProviderBel" xml:space="preserve">
-    <value>Dùng cho bản tóm tắt và câu hỏi. Là mô hình của từng nhà cung cấp đã bật bên dưới, theo lựa chọn ở hàng của nhà cung cấp đó.</value>
-    <comment>Used for summaries and questions. The model of each enabled provider below, as checked in its row.</comment>
   </data>
   <data name="UsesTheLanguagePickedInTheRecordMenuForTheNextRecordingsInst" xml:space="preserve">
     <value>Dùng ngôn ngữ đã chọn trong menu Ghi âm cho các lần ghi âm tiếp theo thay vì ngôn ngữ mặc định. Ngôn ngữ đổi trong lúc ghi âm không được tính.</value>

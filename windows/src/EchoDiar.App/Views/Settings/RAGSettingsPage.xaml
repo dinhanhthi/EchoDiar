@@ -1,18 +1,18 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!--
-    Settings › RAG (macOS RAGSettingsView.swift): the opt-in switch of the library chat; the index's status with
-    Rebuild; then the embedder of the index: the catalog's GGUF embedding models with Download, progress and Cancel,
-    Installed and Delete ("On this PC"), or an enabled OpenAI-compatible or local-host provider with its model ("Via
-    API"). The embedder rows are made in code (RAGSettingsPage.EmbedderRow, ProviderRow) and updated in place. Each
-    searchable element's Tag is its search entry's title (SearchEntries), so a search result can bring it into view.
+    Settings › AI Settings › Library chat (macOS RAGSettingsView.swift), shown by AISettingsPage on its tab: the opt-in
+    switch of the library chat; the index's status with Rebuild; then the embedder of the index: the catalog's GGUF
+    embedding models, Installed, downloading, or with the way to their download in AI Providers › Local AI ("On this
+    PC"), or an enabled OpenAI-compatible or local-host provider, whose model is set in its card ("Via API"). The embedder
+    rows are made in code (RAGSettingsPage.EmbedderRow, ProviderRow) and updated in place. Each searchable element's Tag
+    is its search entry's title (SearchEntries), so a search result can bring it into view.
 -->
 <UserControl
     x:Class="EchoDiar.App.Views.RAGSettingsPage"
     xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
     xmlns:controls="using:CommunityToolkit.WinUI.Controls"
-    xmlns:local="using:EchoDiar.App"
-    xmlns:views="using:EchoDiar.App.Views">
+    xmlns:local="using:EchoDiar.App">
 
     <UserControl.Resources>
         <Style x:Key="SectionHeaderStyle" TargetType="StackPanel">
@@ -32,12 +32,6 @@
             <Setter Property="TextWrapping" Value="Wrap" />
         </Style>
         <Style
-            x:Key="CautionNoteStyle"
-            BasedOn="{StaticResource NoteStyle}"
-            TargetType="TextBlock">
-            <Setter Property="Foreground" Value="{ThemeResource SystemFillColorCautionBrush}" />
-        </Style>
-        <Style
             x:Key="CriticalNoteStyle"
             BasedOn="{StaticResource NoteStyle}"
             TargetType="TextBlock">
@@ -54,23 +48,6 @@
             <Setter Property="FontSize" Value="14" />
             <Setter Property="VerticalAlignment" Value="Center" />
             <Setter Property="Foreground" Value="{ThemeResource SystemFillColorSuccessBrush}" />
-        </Style>
-        <Style x:Key="CautionIconStyle" TargetType="FontIcon">
-            <Setter Property="FontSize" Value="12" />
-            <Setter Property="Foreground" Value="{ThemeResource SystemFillColorCautionBrush}" />
-        </Style>
-        <!-- The one badge that must stand out: Default, in the accent colour. -->
-        <Style x:Key="DefaultBadgeStyle" TargetType="Border">
-            <Setter Property="Padding" Value="6,1,6,2" />
-            <Setter Property="VerticalAlignment" Value="Center" />
-            <Setter Property="CornerRadius" Value="{ThemeResource ControlCornerRadius}" />
-            <Setter Property="Background" Value="{ThemeResource AccentFillColorDefaultBrush}" />
-        </Style>
-        <Style
-            x:Key="DefaultBadgeTextStyle"
-            BasedOn="{StaticResource CaptionTextBlockStyle}"
-            TargetType="TextBlock">
-            <Setter Property="Foreground" Value="{ThemeResource TextOnAccentFillColorPrimaryBrush}" />
         </Style>
     </UserControl.Resources>
 
@@ -141,46 +118,18 @@
 
             <StackPanel x:Name="EmbedderList" Spacing="4" />
 
-            <!-- Via API: the model of the provider in use, then the providers that can embed. -->
+            <!-- Via API: the provider in use without an embedding model, then the providers that can embed. -->
             <StackPanel Style="{StaticResource SectionHeaderStyle}">
                 <TextBlock Style="{StaticResource BodyStrongTextBlockStyle}" Text="{local:T Text='Via API'}" />
                 <TextBlock Style="{StaticResource SectionDescriptionStyle}" Text="{local:T Text='A cloud provider receives the transcripts and summaries to index, and each question.'}" />
             </StackPanel>
 
+            <!-- The provider in use has no embedding model (macOS apiSection): its card in AI Providers sets it. -->
             <controls:SettingsCard
-                x:Name="APIModelCard"
-                Header="{local:T Text='Model'}"
+                x:Name="MissingModelCard"
+                Header="{local:T Text='Embedding model'}"
                 Visibility="Collapsed">
-                <controls:SettingsCard.Description>
-                    <StackPanel Spacing="2">
-                        <TextBlock
-                            x:Name="LoadErrorText"
-                            MaxLines="2"
-                            Style="{StaticResource CriticalNoteStyle}"
-                            Visibility="Collapsed" />
-                        <TextBlock
-                            x:Name="NoModelsText"
-                            Style="{StaticResource NoteStyle}"
-                            Text="{local:T Text='No embedding models listed; type the model id.'}"
-                            Visibility="Collapsed" />
-                    </StackPanel>
-                </controls:SettingsCard.Description>
-                <views:FieldPanel InputWidth="260">
-                    <TextBox x:Name="APIModelBox" AutomationProperties.Name="{local:T Text='Model'}" />
-                    <DropDownButton x:Name="ModelsButton" Visibility="Collapsed">
-                        <DropDownButton.Flyout>
-                            <MenuFlyout x:Name="ModelsMenu" />
-                        </DropDownButton.Flyout>
-                    </DropDownButton>
-                    <Button x:Name="LoadModelsButton" Content="{local:T Text='Load models'}" />
-                    <ProgressRing
-                        x:Name="LoadRing"
-                        Width="16"
-                        Height="16"
-                        VerticalAlignment="Center"
-                        IsActive="False"
-                        Visibility="Collapsed" />
-                </views:FieldPanel>
+                <Button x:Name="MissingModelSetUpButton" Content="{local:T Text='Set Up…'}" />
             </controls:SettingsCard>
 
             <StackPanel x:Name="ProviderList" Spacing="4" />

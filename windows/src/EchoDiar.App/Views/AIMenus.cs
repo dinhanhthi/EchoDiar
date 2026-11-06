@@ -34,8 +34,8 @@ internal static class AIMenus
     /// <summary>
     /// Every provider with the models it offers (macOS <c>AIModelMenu</c>): on this PC first, then the hosts, then the
     /// ones whose data leaves this PC; a provider without a model says to choose one in Settings, one that cannot run now
-    /// is off with why; then "Choose Models…" (<paramref name="chooseModels"/>: Settings › AI). Checks and picks
-    /// <paramref name="purpose"/>'s default.
+    /// is off with why; then "Choose Models…" (<paramref name="chooseModels"/>: Settings › AI Providers › Cloud). Checks
+    /// and picks <paramref name="purpose"/>'s default.
     /// </summary>
     public static void FillModelMenu(MenuFlyout menu, ProvidersViewModel providers, AIPurpose purpose, Action chooseModels)
     {
