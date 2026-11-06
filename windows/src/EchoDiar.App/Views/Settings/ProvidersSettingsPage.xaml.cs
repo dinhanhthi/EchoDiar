@@ -318,8 +318,9 @@ public sealed partial class ProvidersSettingsPage : UserControl
         }
         _modelChoices = choices;
         ModelCombo.IsEnabled = choices.Count > 0;
-        var current = _providers.CurrentAIProvider;
-        var model = current is null ? null : _providers.AIModelFor(current);
+        // The summary pair for now; the AI Settings page splits the picker per purpose.
+        var current = _providers.CurrentAIProvider(AIPurpose.Summary);
+        var model = current is null ? null : _providers.AIModelFor(current, AIPurpose.Summary);
         ModelCombo.SelectedIndex = current is null ? -1 : choices.FindIndex(c => c.Provider.Id == current.Id && c.Model == model);
     }
 
@@ -439,9 +440,9 @@ public sealed partial class ProvidersSettingsPage : UserControl
         var index = ModelCombo.SelectedIndex;
         if (_syncing || index < 0 || index >= _modelChoices.Count) return;
         var (provider, model) = _modelChoices[index];
-        var current = _providers.CurrentAIProvider;
-        if (current?.Id == provider.Id && _providers.AIModelFor(current) == model) return;
-        _providers.SetAIModel(model, provider);
+        var current = _providers.CurrentAIProvider(AIPurpose.Summary);
+        if (current?.Id == provider.Id && _providers.AIModelFor(current, AIPurpose.Summary) == model) return;
+        _providers.SetAIModel(model, provider, AIPurpose.Summary);
     }
 
     private void RefreshLanguages()

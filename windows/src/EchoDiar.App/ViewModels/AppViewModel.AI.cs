@@ -157,7 +157,7 @@ public sealed partial class AppViewModel
 
     /// <summary>
     /// Starts a summary or the question <paramref name="question"/> about <paramref name="conversation"/> with
-    /// <paramref name="provider"/> and <paramref name="model"/>, saved as the AI tab's default (macOS <c>startAIJob</c>),
+    /// <paramref name="provider"/> and <paramref name="model"/>, saved as the summary or chat default (macOS <c>startAIJob</c>),
     /// beside the jobs of the other conversations; does nothing while the conversation has a job or is being deleted
     /// (its answer would recreate the folder going to the Recycle Bin).
     /// <paramref name="summary"/> and <paramref name="history"/> are the saved summary and chat, sent with a question.
@@ -177,7 +177,7 @@ public sealed partial class AppViewModel
             return;
         }
         model = model.Trim();
-        ProvidersModel.SetAIModel(model, provider);
+        ProvidersModel.SetAIModel(model, provider, kind == AIJobKind.Summary ? AIPurpose.Summary : AIPurpose.Chat);
         AIError = null;
         var job = new AIJob(kind, question);
         // In the table before the job's task starts: its first steps look it up there.
@@ -488,15 +488,15 @@ public sealed partial class AppViewModel
     }
 
     /// <summary>
-    /// Names the archived chat <paramref name="entry"/> with the current provider and model, outside <see cref="AIJobs"/>
+    /// Names the archived chat <paramref name="entry"/> with the chat provider and model, outside <see cref="AIJobs"/>
     /// (macOS <c>requestTitle</c>). Only with the provider that gave every answer of the chat, so its questions reach no
     /// provider that never saw them, and never with an in-app model, whose gate a hidden job would hold. Without one, or
     /// on error, its fallback title (the first question) stays.
     /// </summary>
     private async Task RequestTitleAsync(ChatArchive.Entry entry, string folder)
     {
-        if (ProvidersModel.CurrentAIProvider is not { Kind: not AIProviderKind.InApp } provider) return;
-        var model = ProvidersModel.AIModelFor(provider);
+        if (ProvidersModel.CurrentAIProvider(AIPurpose.Chat) is not { Kind: not AIProviderKind.InApp } provider) return;
+        var model = ProvidersModel.AIModelFor(provider, AIPurpose.Chat);
         var config = ProvidersModel.Config(provider.Id);
         var token = _aiLifetime.Token;
         bool titled;

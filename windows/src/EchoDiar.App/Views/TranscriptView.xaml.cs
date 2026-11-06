@@ -934,10 +934,10 @@ public sealed partial class TranscriptView : UserControl
         if (_model is not { } model || _transcript is not { } pane) return;
         model.DetailTab = DetailTab.Summary;
         if (pane.Conversation is not { HasSummary: false } conversation || pane.Transcript is not { } transcript
-            || model.ProvidersModel.CurrentAIProvider is not { } provider
+            || model.ProvidersModel.CurrentAIProvider(AIPurpose.Summary) is not { } provider
             || model.AIJobs.EntryFor(conversation.Id) is not null || model.ChatChanging || model.Updater.IsInstalling) return;
         model.StartAIJob(AIJobKind.Summary, null, conversation, transcript, null, [], provider,
-            model.ProvidersModel.AIModelFor(provider));
+            model.ProvidersModel.AIModelFor(provider, AIPurpose.Summary));
     }
 
     /// <summary>One "Name [mm:ss]: text" line per segment of the shown version.</summary>

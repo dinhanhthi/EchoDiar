@@ -107,26 +107,26 @@ public sealed partial class AppViewModel
 
     /// <summary>
     /// What <see cref="CatchUpProvider"/> runs with no usable provider picked (macOS <c>automaticCatchUpProvider</c>): the
-    /// AI tab's provider when it is not in-app, else the first usable provider outside the app not in
-    /// <see cref="AppSettings.AutoExcludedProviderIDs"/>. <see cref="ProvidersViewModel.CurrentAIProvider"/> is never an
-    /// excluded one by accident: the migration clears <c>DefaultAIProviderID</c> for those, and picking one un-excludes it.
+    /// summary provider when it is not in-app, else the first usable provider outside the app not in
+    /// <see cref="AppSettings.AutoExcludedProviderIDs"/>. The summary provider is never an excluded one by accident: the
+    /// migrations clear the old default for those (copied into the summary pair after), and picking one un-excludes it.
     /// </summary>
     public AIProviderInfo? AutomaticCatchUpProvider
     {
         get
         {
-            if (ProvidersModel.CurrentAIProvider is { Kind: not AIProviderKind.InApp } main) return main;
+            if (ProvidersModel.CurrentAIProvider(AIPurpose.Summary) is { Kind: not AIProviderKind.InApp } main) return main;
             return ProvidersModel.AIProviders.FirstOrDefault(p => p.Kind != AIProviderKind.InApp
                 && p.UnavailableReason is null && !Settings.AutoExcludedProviderIDs.Contains(p.Id));
         }
     }
 
-    /// <summary>The "Catch-up model" setting when <paramref name="provider"/> is the picked catch-up provider, else its AI tab model.</summary>
+    /// <summary>The "Catch-up model" setting when <paramref name="provider"/> is the picked catch-up provider, else its summary model.</summary>
     public string CatchUpModel(AIProviderInfo provider)
     {
         var picked = Settings.CatchUpModel.Trim();
         if (picked.Length > 0 && provider.Id == Settings.CatchUpProviderID) return picked;
-        return ProvidersModel.AIModelFor(provider);
+        return ProvidersModel.AIModelFor(provider, AIPurpose.Summary);
     }
 
     /// <summary>

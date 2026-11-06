@@ -617,13 +617,19 @@ public sealed partial class AIPanelView : UserControl
 
     // Bottom bar
 
-    /// <summary>The model and language labels, the "i", the setup hints and the busy line.</summary>
+    /// <summary>
+    /// The bottom bar's tab (macOS <c>purpose</c>): Chat's questions use the chat default, the Summary tab the summary
+    /// default.
+    /// </summary>
+    private AIPurpose Purpose => _tab == DetailTab.Chat ? AIPurpose.Chat : AIPurpose.Summary;
+
+    /// <summary>The model (of the tab's purpose) and language labels, the "i", the setup hints and the busy line.</summary>
     private void UpdateMenus()
     {
         if (_panel is null || _model is null) return;
         var providers = _panel.Providers;
-        var current = providers.CurrentAIProvider;
-        var title = AIMenus.ModelTitle(providers);
+        var current = providers.CurrentAIProvider(Purpose);
+        var title = AIMenus.ModelTitle(providers, Purpose);
         ModelText.Text = title;
         AutomationProperties.SetName(ModelButton, title);
         var language = _model.Settings.SummaryLanguage;
@@ -655,19 +661,18 @@ public sealed partial class AIPanelView : UserControl
     private void UpdateActions()
     {
         if (_panel is null || _model is null) return;
-        var canRun = _panel.CanRun;
         var summaryRunning = _panel.RunningSummary is not null;
         SummaryStopButton.Visibility = Shown(summaryRunning);
         SummarizeButton.Visibility = Shown(!summaryRunning);
         SummarizeButton.Content = Loc.T(_panel.Summaries.Count == 0 ? "Summarize" : "Re-summarize");
         ToolTipService.SetToolTip(SummarizeButton,
             _panel.Summaries.Count == 0 ? null : Loc.T("Make a new summary; the earlier ones stay in the version menu"));
-        SummarizeButton.IsEnabled = canRun;
+        SummarizeButton.IsEnabled = _panel.CanRun(AIPurpose.Summary);
 
         var questionRunning = _panel.RunningQuestion is not null;
         AskStopButton.Visibility = Shown(questionRunning);
         SendButton.Visibility = Shown(!questionRunning);
-        SendButton.IsEnabled = canRun && QuestionBox.Text.Trim().Length > 0;
+        SendButton.IsEnabled = _panel.CanRun(AIPurpose.Chat) && QuestionBox.Text.Trim().Length > 0;
         FreshChatButton.IsEnabled = _panel.Chat.Count > 0 && !questionRunning && !_model.ChatChanging;
 
         var hasTranscript = _panel.Transcript is not null;
@@ -675,7 +680,10 @@ public sealed partial class AIPanelView : UserControl
         ChatCopyButton.IsEnabled = hasTranscript;
     }
 
-    /// <summary>The providers and their models (<see cref="AIMenus.FillModelMenu"/>), then "Choose Models…" (Settings › AI).</summary>
+    /// <summary>
+    /// The providers and their models for the tab's purpose (<see cref="AIMenus.FillModelMenu"/>), then "Choose Models…"
+    /// (Settings › AI).
+    /// </summary>
     private void BuildModelMenu()
     {
         if (_panel is null || _model is null)
@@ -683,7 +691,7 @@ public sealed partial class AIPanelView : UserControl
             ModelMenu.Items.Clear();
             return;
         }
-        AIMenus.FillModelMenu(ModelMenu, _panel.Providers, () => _model?.OpenSettings(Services.SettingsSearch.Providers));
+        AIMenus.FillModelMenu(ModelMenu, _panel.Providers, Purpose, () => _model?.OpenSettings(Services.SettingsSearch.Providers));
     }
 
     /// <summary>The summary and answer languages (<see cref="AIMenus.FillLanguageMenu"/>).</summary>
@@ -698,13 +706,13 @@ public sealed partial class AIPanelView : UserControl
     }
 
     /// <summary>
-    /// Where the data goes with the current provider (macOS <c>dataNotes</c>): off this PC, and how far a CLI agent is
+    /// Where the data goes with the tab's provider (macOS <c>dataNotes</c>): off this PC, and how far a CLI agent is
     /// contained. Empty when there is nothing to say (the "i" is then hidden).
     /// </summary>
     private List<(string Glyph, string Text)> DataNotes()
     {
         List<(string, string)> notes = [];
-        if (_panel?.Providers.CurrentAIProvider is not { } provider) return notes;
+        if (_panel?.Providers.CurrentAIProvider(Purpose) is not { } provider) return notes;
         if (provider.LeavesPC) notes.Add(("", Loc.Format("Data sent to %@ leaves this PC.", provider.Name)));
         if (provider.CliPreset is { } preset && CLIRunner.ContainmentNote(preset) is { } note) notes.Add(("", Loc.T(note)));
         return notes;

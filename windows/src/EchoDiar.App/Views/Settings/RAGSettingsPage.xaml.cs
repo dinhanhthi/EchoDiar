@@ -58,8 +58,11 @@ public sealed partial class RAGSettingsPage : UserControl
     /// <summary>The controls are being set from the settings: their change events are not the user's.</summary>
     private bool _syncing;
 
-    /// <summary>The saved API model the field shows; typing is kept until the saved value itself changes.</summary>
-    private string? _shownAPIModel;
+    /// <summary>
+    /// The provider whose saved API model the field shows, and that model (macOS <c>apiModelProviderID</c>): typing is
+    /// kept until either changes; keyed by the provider too, so two providers with the same model still move the field.
+    /// </summary>
+    private (string ProviderID, string Model)? _shownAPIModel;
 
     /// <summary>The embedder the loaded models belong to (macOS: they are dropped when the embedder changes).</summary>
     private string? _embeddingID;
@@ -272,7 +275,10 @@ public sealed partial class RAGSettingsPage : UserControl
         foreach (var id in ids) ProviderList.Children.Add(_providerRows[id].Card);
     }
 
-    /// <summary>A pick of a provider (macOS <c>selectAPI</c>): its preset's suggested model replaces the previous one.</summary>
+    /// <summary>
+    /// A pick of a provider (macOS <c>selectAPI</c>): its preset's suggested model fills its embedding model only when
+    /// empty; a model typed before stays.
+    /// </summary>
     private void SelectAPI(ProviderConfig config)
     {
         _model.PickAPIEmbedder(config, SuggestedModels.GetValueOrDefault(config.Preset ?? "", ""));
@@ -289,10 +295,10 @@ public sealed partial class RAGSettingsPage : UserControl
         APIModelCard.Visibility = Show(config is not null);
         if (config is null) return;
         APIModelBox.PlaceholderText = SuggestedModels.GetValueOrDefault(config.Preset ?? "") ?? Loc.T("Embedding model id");
-        if (Settings.EmbeddingAPIModel != _shownAPIModel)
+        if (_shownAPIModel is not { } shown || shown.ProviderID != config.Id || shown.Model != config.EmbeddingModel)
         {
-            _shownAPIModel = Settings.EmbeddingAPIModel;
-            if (APIModelBox.Text != _shownAPIModel) APIModelBox.Text = _shownAPIModel;
+            _shownAPIModel = (ProviderID: config.Id, Model: config.EmbeddingModel);
+            if (APIModelBox.Text != config.EmbeddingModel) APIModelBox.Text = config.EmbeddingModel;
         }
         var count = _loadedModels?.Count ?? 0;
         if (_loadedModels is not null && !ModelsMenu.Items.Select(i => (i as MenuFlyoutItem)?.Text).SequenceEqual(_loadedModels))
@@ -316,13 +322,16 @@ public sealed partial class RAGSettingsPage : UserControl
         NoModelsText.Visibility = Show(_loadError is null && _loadedModels is { Count: 0 });
     }
 
-    /// <summary>Saves the typed model, trimmed, when it differs (macOS <c>saveAPIModel</c>).</summary>
+    /// <summary>
+    /// Saves the typed model, trimmed, to the provider it was typed for when it differs (macOS <c>saveAPIModel</c>).
+    /// </summary>
     private void SaveAPIModel()
     {
-        if (_syncing || Closing || CurrentAPIConfig is null) return;
+        if (_syncing || Closing || CurrentAPIConfig is null || _shownAPIModel is not { } shown) return;
         var trimmed = APIModelBox.Text.Trim();
         if (APIModelBox.Text != trimmed) APIModelBox.Text = trimmed;
-        if (trimmed != Settings.EmbeddingAPIModel) _model.ApplySettings(Settings with { EmbeddingAPIModel = trimmed });
+        if (trimmed != _providers.Config(shown.ProviderID)?.EmbeddingModel)
+            _providers.UpdateProvider(shown.ProviderID, c => c.EmbeddingModel = trimmed);
     }
 
     /// <summary>The provider's models that embed, by name, off the UI thread (macOS <c>loadModels</c>).</summary>

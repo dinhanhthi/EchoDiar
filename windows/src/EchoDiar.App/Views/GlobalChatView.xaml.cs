@@ -470,11 +470,11 @@ public sealed partial class GlobalChatView : UserControl
     {
         if (_chat is null) return;
         var providers = _chat.Providers;
-        var title = AIMenus.ModelTitle(providers);
+        var title = AIMenus.ModelTitle(providers, AIPurpose.Chat);
         ModelText.Text = title;
         AutomationProperties.SetName(ModelButton, title);
         LanguageText.Text = LanguageOptions.ShortCode(_model.Settings.SummaryLanguage);
-        var current = providers.CurrentAIProvider;
+        var current = providers.CurrentAIProvider(AIPurpose.Chat);
         SetupHints.Visibility = Shown(current is null);
         var windowsAI = AIMenus.WindowsAIHint(providers);
         WindowsAIHint.Text = windowsAI ?? "";
@@ -536,7 +536,7 @@ public sealed partial class GlobalChatView : UserControl
             ModelMenu.Items.Clear();
             return;
         }
-        AIMenus.FillModelMenu(ModelMenu, _chat.Providers, () => _model.OpenSettings(Services.SettingsSearch.Providers));
+        AIMenus.FillModelMenu(ModelMenu, _chat.Providers, AIPurpose.Chat, () => _model.OpenSettings(Services.SettingsSearch.Providers));
     }
 
     private void BuildLanguageMenu()

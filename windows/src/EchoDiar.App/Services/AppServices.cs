@@ -181,7 +181,7 @@ internal sealed class AppServices : IDisposable
     /// <summary>
     /// The embedder picked by <paramref name="settings"/>' <c>embeddingModelID</c> (macOS <c>AppModel.resolveEmbedder</c>):
     /// <c>api:&lt;provider id&gt;</c> is the available OpenAI-compatible or local-host config of <paramref name="configs"/>
-    /// with <c>embeddingAPIModel</c> and its saved key; anything else is an embedding catalog entry (a macOS MLX id maps to
+    /// with its <c>embeddingModel</c> and its saved key; anything else is an embedding catalog entry (a macOS MLX id maps to
     /// its GGUF entry), downloaded and checked against its catalog SHA-256 (<see cref="ModelStore.VerifiedFolder"/>), run
     /// with llama.cpp. Null with why when there is none. An in-app embedder loads nothing here: its caller holds
     /// <see cref="Gate"/> (owner Embedder) around <see cref="ITextEmbedder.WithLoadedAsync{T}"/>. Reads Credential Manager
@@ -195,7 +195,7 @@ internal sealed class AppServices : IDisposable
             var providerId = id[ModelCatalog.ApiEmbedderPrefix.Length..];
             if (EmbeddingConfig(settings, configs, HasStoredKey) is not { } config)
                 return (null, Loc.T("Pick a provider in Settings › RAG"));
-            var model = settings.EmbeddingAPIModel.Trim();
+            var model = config.EmbeddingModel.Trim();
             if (model.Length == 0)
                 return (null, Loc.Format("Enter the embedding model of %@ in Settings › RAG", config.DisplayName));
             string? apiKey = null;
