@@ -384,9 +384,14 @@ struct RecordingHeader: View {
             }
             Text(paused ? "Paused" : "Recording")
                 .foregroundStyle(.secondary)
-            Spacer(minLength: 8)
             if live && !paused {
+                // The only flexible item, so the meters get all the room the others leave (a Spacer beside them would
+                // take half of it, and the meters would stack while one row fits); 18: the Spacer's 8 and its spacing.
                 ChannelMeters(feed: model.levels)
+                    .padding(.leading, 18)
+                    .frame(maxWidth: .infinity, alignment: .trailing)
+            } else {
+                Spacer(minLength: 8)
             }
             CatchUpButton(model: model)
             languageMenu
@@ -419,32 +424,98 @@ struct RecordingHeader: View {
     }
 }
 
-/// Mic and system peak bars, from the shared `LevelFeed` (15 Hz while shown).
+/// Mic and system peak bars, from the shared `LevelFeed` (15 Hz while shown): side by side where they fit, else mic
+/// over system. One `LevelBar` per channel in both layouts (no hidden copies listening to the feed).
 struct ChannelMeters: View {
     let feed: LevelFeed
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 3) {
-            bar("Mic", accessibilityLabel: String(localized: "Mic level"), .mic)
+        ChannelMetersLayout {
+            label("Mic")
+            LevelBar(feed: feed, source: .mic, accessibilityLabel: String(localized: "Mic level"))
             // Shares the "System" key with the App language picker: the word translates the same in every language.
-            bar("System", accessibilityLabel: String(localized: "System audio level"), .system)
+            label("System")
+            LevelBar(feed: feed, source: .system, accessibilityLabel: String(localized: "System audio level"))
         }
-        .frame(width: 110)
         .task { await feed.attach() }
     }
 
-    private func bar(_ name: LocalizedStringKey, accessibilityLabel: String, _ source: LevelBar.Source) -> some View {
-        HStack(spacing: 6) {
-            Text(name)
-                .font(.caption2)
-                .foregroundStyle(.secondary)
-                .lineLimit(1)
-                .minimumScaleFactor(0.75)
-                .frame(width: 38, alignment: .leading)
-                .accessibilityHidden(true)
-            LevelBar(feed: feed, source: source, accessibilityLabel: accessibilityLabel)
-                .frame(height: 5)
+    private func label(_ name: LocalizedStringKey) -> some View {
+        Text(name)
+            .font(.caption2)
+            .foregroundStyle(.secondary)
+            .lineLimit(1)
+            .minimumScaleFactor(0.75)
+            .accessibilityHidden(true)
+    }
+}
+
+/// Mic label, mic bar, system label, system bar: on one row (each label at its text's width, each bar 72 pt) where the
+/// proposed width holds it, else mic over system in 110 pt (38 pt labels, the bars the rest).
+private struct ChannelMetersLayout: Layout {
+    private let labelGap: CGFloat = 6
+    private let barHeight: CGFloat = 5
+    private let rowBarWidth: CGFloat = 72
+    private let rowGap: CGFloat = 12
+    private let stackedWidth: CGFloat = 110
+    private let stackedLabelWidth: CGFloat = 38
+    private let stackedSpacing: CGFloat = 3
+
+    func sizeThatFits(proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) -> CGSize {
+        guard subviews.count == 4 else { return .zero }
+        let lineHeight = lineHeight(subviews)
+        return if inRow(width: proposal.width, subviews) {
+            CGSize(width: rowWidth(subviews), height: lineHeight)
+        } else {
+            CGSize(width: stackedWidth, height: lineHeight * 2 + stackedSpacing)
         }
+    }
+
+    func placeSubviews(in bounds: CGRect, proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) {
+        guard subviews.count == 4 else { return }
+        // The proposal the reported size came from, so the layout matches that size (bounds may be pixel-rounded).
+        if inRow(width: proposal.width, subviews) {
+            var x = bounds.minX
+            for index in [0, 2] {
+                let labelWidth = subviews[index].sizeThatFits(.unspecified).width
+                subviews[index].place(
+                    at: CGPoint(x: x, y: bounds.midY), anchor: .leading,
+                    proposal: ProposedViewSize(width: labelWidth, height: nil))
+                x += labelWidth + labelGap
+                subviews[index + 1].place(
+                    at: CGPoint(x: x, y: bounds.midY), anchor: .leading,
+                    proposal: ProposedViewSize(width: rowBarWidth, height: barHeight))
+                x += rowBarWidth + rowGap
+            }
+        } else {
+            let lineHeight = lineHeight(subviews)
+            let barWidth = stackedWidth - stackedLabelWidth - labelGap
+            for (line, index) in [0, 2].enumerated() {
+                let y = bounds.minY + CGFloat(line) * (lineHeight + stackedSpacing) + lineHeight / 2
+                subviews[index].place(
+                    at: CGPoint(x: bounds.minX, y: y), anchor: .leading,
+                    proposal: ProposedViewSize(width: stackedLabelWidth, height: nil))
+                subviews[index + 1].place(
+                    at: CGPoint(x: bounds.minX + stackedLabelWidth + labelGap, y: y), anchor: .leading,
+                    proposal: ProposedViewSize(width: barWidth, height: barHeight))
+            }
+        }
+    }
+
+    /// One row for an unspecified width (the ideal size) or one that holds it.
+    private func inRow(width: CGFloat?, _ subviews: Subviews) -> Bool {
+        guard let width else { return true }
+        return width >= rowWidth(subviews)
+    }
+
+    private func rowWidth(_ subviews: Subviews) -> CGFloat {
+        let labels = subviews[0].sizeThatFits(.unspecified).width + subviews[2].sizeThatFits(.unspecified).width
+        return labels + 2 * (labelGap + rowBarWidth) + rowGap
+    }
+
+    /// A label's height, at least a bar's.
+    private func lineHeight(_ subviews: Subviews) -> CGFloat {
+        max(subviews[0].sizeThatFits(.unspecified).height, subviews[2].sizeThatFits(.unspecified).height, barHeight)
     }
 }
 

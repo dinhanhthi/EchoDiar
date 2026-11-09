@@ -23,6 +23,15 @@ public sealed partial class RecordingView : UserControl
     private const int BarCount = 24;
     private const double WaveHeight = 64;
 
+    /// <summary>The meters side by side: each bar's width, and the gap between mic and system.</summary>
+    private const double RowBarWidth = 72;
+    private const double RowMetersSpacing = 12;
+
+    /// <summary>The meters mic over system (the XAML's layout): their width, the gap, the labels' minimum width.</summary>
+    private const double StackedMetersWidth = 120;
+    private const double StackedMetersSpacing = 3;
+    private const double StackedLabelMinWidth = 44;
+
     private static readonly UISettings UISettings = new();
 
     private readonly AppViewModel _model;
@@ -32,6 +41,9 @@ public sealed partial class RecordingView : UserControl
     private int _micPercent = -1;
     private int _systemPercent = -1;
     private RecordingEngine.State? _shownState;
+
+    /// <summary>The meters' layout as last applied: side by side, mic over system, or none yet (the XAML's).</summary>
+    private bool? _metersInRow;
 
     /// <summary>The catch-up cards by id, kept while shown, so a saved catch-up's Markdown is not rendered again.</summary>
     private readonly Dictionary<Guid, CatchUpCard> _catchUpCards = [];
@@ -60,6 +72,11 @@ public sealed partial class RecordingView : UserControl
         GlobalTapWarning.Message = Loc.T("This app's audio cannot be isolated, so all system audio is being recorded.");
         AutomationProperties.SetName(MicMeter, Loc.T("Mic level"));
         AutomationProperties.SetName(SystemMeter, Loc.T("System audio level"));
+        // Again whenever the row or one of its columns changes width (the clock, the state, "Catch up", the language).
+        foreach (var element in new FrameworkElement[] { StatusRow, ElapsedText, StateText, ChannelMeters, CatchUpButtonHost, LanguageHost })
+        {
+            element.SizeChanged += (_, _) => UpdateMetersLayout();
+        }
         OpenSettingsLink.Click += (_, _) => OpenReasonSettings();
         // Each change renames the recording; the model keeps it trimmed, so the box is not bound to it.
         TitleBox.TextChanged += (_, _) => _model.SetRecordingTitle(TitleBox.Text);
@@ -312,6 +329,42 @@ public sealed partial class RecordingView : UserControl
         if (!settings.AutoTranscribe) _model.OpenSettings(SettingsSearch.Recording, RecordingSettingsPage.AfterRecordingTab);
         else if (!settings.TranscribeWhileRecording) _model.OpenSettings(SettingsSearch.Transcription);
         else _model.OpenLocalAI(ProvidersSettingsPage.TranscriptionGroup);
+    }
+
+    /// <summary>
+    /// The meters side by side where the room the other columns leave holds them at their full width (macOS
+    /// <c>ChannelMeters</c>' ViewThatFits), else mic over system, so "Catch up" and the language are never squeezed. The
+    /// labels are measured at their text's width in both layouts, so the choice does not depend on the current one.
+    /// </summary>
+    private void UpdateMetersLayout()
+    {
+        if (ChannelMeters.Visibility != Visibility.Visible || StatusRow.ActualWidth <= 0) return;
+        var columns = StatusRow.ColumnDefinitions;
+        var metersColumn = Grid.GetColumn(ChannelMeters);
+        var others = 0.0;
+        for (var i = 0; i < columns.Count; i++)
+        {
+            if (i != metersColumn && columns[i].Width.IsAuto) others += columns[i].ActualWidth;
+        }
+        var room = StatusRow.ActualWidth - others - (columns.Count - 1) * StatusRow.ColumnSpacing;
+        var rowWidth = MicLabel.DesiredSize.Width + SystemLabel.DesiredSize.Width
+            + 2 * (MicMeter.ColumnSpacing + RowBarWidth) + RowMetersSpacing;
+        ApplyMetersLayout(room >= rowWidth);
+    }
+
+    private void ApplyMetersLayout(bool inRow)
+    {
+        if (inRow == _metersInRow) return;
+        _metersInRow = inRow;
+        ChannelMeters.Orientation = inRow ? Orientation.Horizontal : Orientation.Vertical;
+        ChannelMeters.Spacing = inRow ? RowMetersSpacing : StackedMetersSpacing;
+        ChannelMeters.Width = inRow ? double.NaN : StackedMetersWidth;
+        var labelMinWidth = inRow ? 0 : StackedLabelMinWidth;
+        MicLabelColumn.MinWidth = labelMinWidth;
+        SystemLabelColumn.MinWidth = labelMinWidth;
+        var barWidth = inRow ? new GridLength(RowBarWidth) : new GridLength(1, GridUnitType.Star);
+        MicBarColumn.Width = barWidth;
+        SystemBarColumn.Width = barWidth;
     }
 
     private void OnTick()

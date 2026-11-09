@@ -45,7 +45,7 @@
                     x:Name="TitleBox"
                     AutomationProperties.Name="{local:T Text='Title'}"
                     PlaceholderText="{local:T Text='Add a title'}" />
-                <Grid ColumnSpacing="12">
+                <Grid x:Name="StatusRow" ColumnSpacing="12">
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="Auto" />
                         <ColumnDefinition Width="Auto" />
@@ -82,7 +82,10 @@
                         Style="{StaticResource BodyTextBlockStyle}"
                         Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
 
-                    <!-- ChannelMeters: mic over system, 120 px wide. -->
+                    <!--
+                        ChannelMeters: mic over system, 120 px wide, the labels at least 44 px; side by side, the bars
+                        72 px wide, where the row has room (set in code: ApplyMetersLayout).
+                    -->
                     <StackPanel
                         x:Name="ChannelMeters"
                         Grid.Column="4"
@@ -91,10 +94,11 @@
                         Spacing="3">
                         <Grid x:Name="MicMeter" ColumnSpacing="6">
                             <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="44" />
-                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition x:Name="MicLabelColumn" Width="Auto" MinWidth="44" />
+                                <ColumnDefinition x:Name="MicBarColumn" Width="*" />
                             </Grid.ColumnDefinitions>
                             <TextBlock
+                                x:Name="MicLabel"
                                 VerticalAlignment="Center"
                                 Style="{StaticResource CaptionTextBlockStyle}"
                                 Foreground="{ThemeResource TextFillColorSecondaryBrush}"
@@ -117,10 +121,11 @@
                         </Grid>
                         <Grid x:Name="SystemMeter" ColumnSpacing="6">
                             <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="44" />
-                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition x:Name="SystemLabelColumn" Width="Auto" MinWidth="44" />
+                                <ColumnDefinition x:Name="SystemBarColumn" Width="*" />
                             </Grid.ColumnDefinitions>
                             <TextBlock
+                                x:Name="SystemLabel"
                                 VerticalAlignment="Center"
                                 Style="{StaticResource CaptionTextBlockStyle}"
                                 Foreground="{ThemeResource TextFillColorSecondaryBrush}"
