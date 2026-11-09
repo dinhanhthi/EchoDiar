@@ -38,6 +38,9 @@ final class Updater: NSObject {
         #if DEBUG
         // VM check of the Update button.
         if ProcessInfo.processInfo.arguments.contains("--fake-update") { updateAvailable = true }
+        // Off unless asked: a Debug build left running downloads the release and keeps Sparkle's installer, which is
+        // per bundle id, waiting for it to quit, so every other EchoDiar's update fails until then.
+        guard ProcessInfo.processInfo.arguments.contains("--sparkle") else { return }
         #endif
         let key = (Bundle.main.object(forInfoDictionaryKey: "SUPublicEDKey") as? String ?? "")
             .trimmingCharacters(in: .whitespacesAndNewlines)
