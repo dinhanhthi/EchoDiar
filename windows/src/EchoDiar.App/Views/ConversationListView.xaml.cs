@@ -474,6 +474,7 @@ internal static class ConversationText
     {
         if (model.TranscriptionProgress.TryGetValue(conversation.Id, out var progress))
         {
+            if (model.IsStopping(conversation.Id)) return Loc.T("Stopping…");
             return progress.Step switch
             {
                 JobStep.NeedsModel => Loc.T("Needs model"),

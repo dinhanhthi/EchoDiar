@@ -18,6 +18,10 @@
                 <MenuFlyoutItem x:Name="RenameItem" Text="{local:T Text='Rename'}" />
                 <MenuFlyoutItem x:Name="RevealItem" />
                 <MenuFlyoutSeparator />
+                <MenuFlyoutItem
+                    x:Name="StopTranscriptionItem"
+                    Text="{local:T Text='Stop transcription'}"
+                    Visibility="Collapsed" />
                 <MenuFlyoutItem x:Name="MenuDeleteAudioItem" />
                 <MenuFlyoutItem x:Name="MenuDeleteConversationItem" />
             </MenuFlyout>

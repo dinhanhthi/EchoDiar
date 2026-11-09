@@ -47,7 +47,12 @@ public sealed partial class ConversationCard : UserControl
         RevealItem.Text = Loc.T("Reveal in Explorer");
         RevealItem.Click += (_, _) => AppViewModel.RevealInExplorer(Conversation);
         RenameItem.Click += (_, _) => _renameAfterMenu = true;
-        CardMenu.Opening += (_, _) => UpdateDeleteItems();
+        CardMenu.Opening += (_, _) =>
+        {
+            StopTranscriptionItem.Visibility = Shown(_model.CanStopTranscription(Conversation.Id));
+            UpdateDeleteItems();
+        };
+        StopTranscriptionItem.Click += (_, _) => _model.StopTranscription(Conversation.Id);
         CardMenu.Closed += (_, _) =>
         {
             if (!_renameAfterMenu) return;
@@ -167,10 +172,12 @@ public sealed partial class ConversationCard : UserControl
             var queued = progress!.Step is JobStep.Queued or JobStep.Deferred;
             JobRing.IsIndeterminate = queued;
             JobRing.Value = queued ? 0 : progress.Fraction;
-            RecordingCard.SetText(StepText, StepTitle(progress.Step));
+            // "Stopping…" from the Stop click until the job ends (macOS ProgressLabel).
+            var title = _model.IsStopping(c.Id) ? Loc.T("Stopping…") : StepTitle(progress.Step);
+            RecordingCard.SetText(StepText, title);
             // Waiting has no percent: the step says why.
             SetTip(ProgressPanel, progress.Step == JobStep.Deferred
-                ? StepTitle(progress.Step)
+                ? title
                 : progress.Fraction.ToString("P0", CultureInfo.CurrentCulture), ref _stepTip);
         }
         else if (waiting is { } activity)

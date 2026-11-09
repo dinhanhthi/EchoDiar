@@ -295,7 +295,7 @@
                             ToolTipService.ToolTip="{local:T Text='Copy transcript'}">
                             <FontIcon FontFamily="{ThemeResource SymbolThemeFontFamily}" FontSize="16" Glyph="&#xE8C8;" />
                         </Button>
-                        <!-- In place of Re-transcribe while a job is queued or runs. -->
+                        <!-- In place of Re-transcribe while a job is queued or runs, with Stop ("Stopping…" once clicked). -->
                         <StackPanel
                             x:Name="TranscribingPanel"
                             Orientation="Horizontal"
@@ -306,7 +306,21 @@
                                 Width="16"
                                 Height="16"
                                 IsActive="True" />
-                            <TextBlock VerticalAlignment="Center" Text="{local:T Text='Transcribing…'}" />
+                            <TextBlock
+                                x:Name="TranscribingText"
+                                VerticalAlignment="Center"
+                                Text="{local:T Text='Transcribing…'}" />
+                            <Button
+                                x:Name="StopTranscriptionButton"
+                                Width="32"
+                                Height="32"
+                                Padding="0"
+                                Style="{StaticResource SubtleButtonStyle}"
+                                AutomationProperties.Name="{local:T Text='Stop transcription'}"
+                                ToolTipService.ToolTip="{local:T Text='Stop transcription'}"
+                                Visibility="Collapsed">
+                                <FontIcon FontFamily="{ThemeResource SymbolThemeFontFamily}" FontSize="16" Glyph="&#xE71A;" />
+                            </Button>
                         </StackPanel>
                         <DropDownButton
                             x:Name="RetranscribeButton"
