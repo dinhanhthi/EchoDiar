@@ -3122,6 +3122,10 @@
     <value>Stop the summary and keep what is written so far</value>
     <comment>Stop the summary and keep what is written so far</comment>
   </data>
+  <data name="StopTranscription" xml:space="preserve">
+    <value>Stop transcription</value>
+    <comment>Stop transcription</comment>
+  </data>
   <data name="StopWhenTheAppIsQuietFor" xml:space="preserve">
     <value>Stop when the app is quiet for</value>
     <comment>Stop when the app is quiet for</comment>
@@ -3141,6 +3145,10 @@
   <data name="StoppedUsingAudioStopRecording" xml:space="preserve">
     <value>{0} stopped using audio — stop recording?</value>
     <comment>%@ stopped using audio — stop recording?</comment>
+  </data>
+  <data name="Stopping" xml:space="preserve">
+    <value>Stopping…</value>
+    <comment>Stopping…</comment>
   </data>
   <data name="StoppingInLldS" xml:space="preserve">
     <value>Stopping in {0} s</value>

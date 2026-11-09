@@ -184,6 +184,9 @@ public struct JobProgress: Codable, Equatable, Sendable {
     public enum Step: String, Codable, Sendable {
         case queued, deferred, extracting, transcribingMic, transcribingSystem, diarizing, merging
         case finished, needsModel, failed
+        /// Stopped by the caller before its transcript was written: the conversation is back to its state before
+        /// the job.
+        case cancelled
     }
 
     public var conversationID: UUID

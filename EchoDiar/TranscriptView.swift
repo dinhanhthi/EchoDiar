@@ -228,7 +228,7 @@ struct TranscriptView: View {
     private static let maxSpeakerChips = 3
 
     /// Copy (round), Re-transcribe and Summarize, in the accent color like Send; a spinner and "Transcribing…" in
-    /// Re-transcribe's place while a job is queued or runs.
+    /// Re-transcribe's place while a job is queued or runs, with Stop (round) beside it ("Stopping…" once clicked).
     private var actions: some View {
         HStack(spacing: 6) {
             Button(action: copyTranscript) {
@@ -239,15 +239,25 @@ struct TranscriptView: View {
             .help("Copy transcript")
             .disabled(shownTranscript?.segments.isEmpty ?? true)
             if model.isTranscribing(conversation.id) {
+                let stopping = model.stoppingTranscriptions.contains(conversation.id)
                 Button {} label: {
                     HStack(spacing: 8) {
                         ProgressView().controlSize(.small)
-                        Text("Transcribing…")
+                        if stopping { Text("Stopping…") } else { Text("Transcribing…") }
                     }
                 }
                 .buttonStyle(BottomBarButtonStyle(prominent: true))
                 .allowsHitTesting(false)
                 .fixedSize()
+                if stopping || model.canStopTranscription(conversation.id) {
+                    Button { model.stopTranscription(conversation.id) } label: {
+                        Label("Stop transcription", systemImage: "stop.fill")
+                            .labelStyle(.iconOnly)
+                    }
+                    .buttonStyle(BottomBarButtonStyle(horizontalPadding: 0))
+                    .help("Stop transcription")
+                    .disabled(stopping)
+                }
             } else {
                 retranscribeMenu
             }

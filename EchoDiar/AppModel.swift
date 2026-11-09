@@ -68,6 +68,12 @@ final class AppModel {
     /// Short reason of each conversation's last failed transcription ("Deepgram: invalid API key"), in memory only;
     /// cleared when the conversation is submitted again.
     private(set) var transcriptionErrors: [UUID: String] = [:]
+    /// Each submitted job's task, by conversation id, so Stop can cancel it. The token tells a job's own entry from a
+    /// later job's for the same conversation, which its task must not remove when it ends.
+    private var transcriptionTasks: [UUID: (token: UUID, task: Task<Bool, Never>)] = [:]
+    /// Jobs Stop cancelled that have not ended yet: their card shows "Stopping…" from the click on, while the job
+    /// unwinds (its progress stays until `.cancelled`, so no second job starts beside it).
+    private(set) var stoppingTranscriptions: Set<UUID> = []
     /// Cloud runs (ASR or diarizer) waiting for their destination's one-time "audio leaves this Mac" confirmation,
     /// oldest first.
     private(set) var pendingCloudRuns: [PendingCloudRun] = []
@@ -1217,6 +1223,22 @@ final class AppModel {
         return step != .needsModel
     }
 
+    /// A submitted job is queued, deferred or running and not already stopping; `finishingIDs` alone (between the
+    /// transcription and the compression of `finishRecording`) has no job to stop.
+    func canStopTranscription(_ id: UUID) -> Bool {
+        guard transcriptionTasks[id] != nil, let step = transcriptionProgress[id]?.step else { return false }
+        return step != .needsModel && !stoppingTranscriptions.contains(id)
+    }
+
+    /// Stop: cancels the conversation's job, which ends as `.cancelled` (the conversation back to its state before
+    /// the job, its audio kept) unless its transcript was already written. Checked again here: a context menu is a
+    /// snapshot, and the job may have ended while it was open.
+    func stopTranscription(_ id: UUID) {
+        guard canStopTranscription(id), let task = transcriptionTasks[id]?.task else { return }
+        stoppingTranscriptions.insert(id)
+        task.cancel()
+    }
+
     /// A failed recording is never transcribed: its audio is missing or empty. `engineID` nil = the default set in
     /// the Models tab when usable for the recording's first language, else the pipeline's default resolution. A cloud
     /// engine (picked or default) runs only while its provider is configured, else the local resolution applies; the
@@ -1227,8 +1249,8 @@ final class AppModel {
     /// the job succeeds. `processNow` runs it now even when "wait" would defer it on a constrained Mac. `prior` goes
     /// to the job (see `TranscriptionJob.prior`). With a cloud realtime prior of the cloud ASR (the transcript, only
     /// its gaps uploaded), whether the ASR labels speakers follows the realtime model's streaming labels, and its gaps
-    /// may go to the diarization model (`gapModel`). Returns the job (true when it succeeded), nil when none was
-    /// submitted.
+    /// may go to the diarization model (`gapModel`). Returns the job (true when it succeeded and was not stopped), nil
+    /// when none was submitted.
     @discardableResult
     private func submitTranscription(
         folder: URL, engineID: String? = nil, language: String? = nil, deleteAudioAfter: Bool? = nil,
@@ -1284,12 +1306,19 @@ final class AppModel {
         transcriptionProgress[session.id] = JobProgress(conversationID: session.id, step: .queued, fraction: 0)
         transcriptionFractions[session.id] = nil
         transcriptionJobs += 1
-        return Task {
+        let token = UUID()
+        let task = Task {
             var succeeded = false
             do {
                 _ = try await pipeline.transcribe(job, cloud: cloud, cloudDiarizer: cloudDiarizer)
                 succeeded = true
-                if deleteAudioAfter ?? settings.deleteAudioAfterTranscription { await deleteAudio(of: session.id) }
+                // A Stop that lands after the transcript was written keeps the audio.
+                if !Task.isCancelled, !stoppingTranscriptions.contains(session.id),
+                   deleteAudioAfter ?? settings.deleteAudioAfterTranscription {
+                    await deleteAudio(of: session.id)
+                }
+            } catch let error where error is CancellationError || Task.isCancelled {
+                NSLog("EchoDiar: transcription cancelled for \(folder.lastPathComponent)")
             } catch TranscriptionError.cloud(let provider, let reason) {
                 // The kind only ("HTTP 400", "invalid API key"): the reason can quote the provider's error body.
                 let kind = reason.prefix { $0 != ":" }
@@ -1299,8 +1328,20 @@ final class AppModel {
             }
             transcriptionJobs -= 1
             await library.reload(id: session.id)
-            return succeeded
+            // Before the mark is cleared below: a stopped job's caller must not trash its audio either.
+            let stopped = Task.isCancelled || stoppingTranscriptions.contains(session.id)
+            if transcriptionTasks[session.id]?.token == token {
+                transcriptionTasks[session.id] = nil
+                // No terminal event cleared the mark (e.g. the job's task ended first): no id stays "Stopping…".
+                if stoppingTranscriptions.remove(session.id) != nil, transcriptionProgress[session.id] != nil {
+                    transcriptionProgress[session.id] = nil
+                    transcriptionFractions[session.id] = nil
+                }
+            }
+            return succeeded && !stopped
         }
+        transcriptionTasks[session.id] = (token, task)
+        return task
     }
 
     /// The batch model of a cloud realtime prior's gap uploads: `config`'s diarization model when "Tell speakers
@@ -1351,11 +1392,20 @@ final class AppModel {
                 case .finished:
                     transcriptionProgress[id] = nil
                     transcriptionFractions[id] = nil
+                    stoppingTranscriptions.remove(id)
                 case .failed:
                     transcriptionProgress[id] = nil
                     transcriptionFractions[id] = nil
                     transcriptionErrors[id] = progress.detail
+                    stoppingTranscriptions.remove(id)
+                case .cancelled:
+                    // Stopped: the card goes back to its state before the job, with no failure reason.
+                    transcriptionProgress[id] = nil
+                    transcriptionFractions[id] = nil
+                    stoppingTranscriptions.remove(id)
                 default:
+                    // A `needsModel` job has ended too.
+                    if progress.step == .needsModel { stoppingTranscriptions.remove(id) }
                     // Within a step only the ring moves, by whole percent: the cards redraw at step changes alone.
                     if previous?.step != progress.step || previous?.detail != progress.detail {
                         transcriptionProgress[id] = progress

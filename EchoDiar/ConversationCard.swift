@@ -67,6 +67,9 @@ struct ConversationCard: View {
             Button("Rename", action: beginEditing)
             Button("Reveal in Finder", action: revealInFinder)
             Divider()
+            if model.canStopTranscription(conversation.id) {
+                Button("Stop transcription") { model.stopTranscription(conversation.id) }
+            }
             DeleteMenuItems(conversation: conversation, model: model)
                 .disabled(!DeleteMenuItems.canDelete(conversation, model))
         }
@@ -315,8 +318,8 @@ struct TranscriptionStatus: View {
         }
     }
 
-    /// A job's ring (or spinner), step and percent. The only reader of `transcriptionFractions`, so a new percent
-    /// redraws this label alone, not every card.
+    /// A job's ring (or spinner), step and percent; "Stopping…" for the step once Stop was clicked. The only reader of
+    /// `transcriptionFractions`, so a new percent redraws this label alone, not every card.
     private struct ProgressLabel: View {
         let progress: JobProgress
         let conversationID: UUID
@@ -330,7 +333,11 @@ struct TranscriptionStatus: View {
                 } else {
                     ProgressRing(fraction: fraction)
                 }
-                Text(TranscriptionStatus.stepText(progress.step))
+                if model.stoppingTranscriptions.contains(conversationID) {
+                    Text("Stopping…")
+                } else {
+                    Text(TranscriptionStatus.stepText(progress.step))
+                }
             }
             .lineLimit(1)
             .fixedSize()
@@ -350,7 +357,7 @@ struct TranscriptionStatus: View {
         case .transcribingMic, .transcribingSystem: String(localized: "Transcribing…")
         case .diarizing: String(localized: "Identifying speakers…")
         case .merging, .finished: String(localized: "Finishing…")
-        case .needsModel, .failed: ""
+        case .needsModel, .failed, .cancelled: ""
         }
     }
 }
