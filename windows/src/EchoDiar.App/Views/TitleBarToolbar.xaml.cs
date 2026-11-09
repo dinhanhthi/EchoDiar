@@ -142,7 +142,7 @@ public sealed partial class TitleBarToolbar : UserControl
         model.Updater.PropertyChanged += OnUpdaterChanged;
         // Settings pages ask through here too, so the window never has two dialogs.
         model.Confirm = ConfirmAsync;
-        model.DeleteFlow = DeleteAsync;
+        model.DeleteFlow = (conversations, audioOnly) => DeleteAsync(conversations, audioOnly);
         _blinkTimer = DispatcherQueue.CreateTimer();
         _blinkTimer.Interval = BlinkInterval;
         _blinkTimer.Tick += (_, _) => Blink();
