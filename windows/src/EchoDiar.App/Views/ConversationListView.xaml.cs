@@ -7,6 +7,7 @@ using EchoDiar.Core;
 using EchoDiar.Core.Model;
 using EchoDiar.Core.Models;
 using EchoDiar.Transcribe;
+using Microsoft.UI.Dispatching;
 using Microsoft.UI.Input;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Automation;
@@ -24,8 +25,9 @@ namespace EchoDiar.App.Views;
 /// recording, the recording's card sits above them and the recording's own entry is left out. Ctrl-click and
 /// Shift-click select cards (from the open entry in the sidebar, as in Mail); the selection bar then shows above the
 /// list, which moves down, with Delete and Cancel (Esc, the window's: <see cref="MainWindow"/>). Delete deletes the selection (the
-/// window's key too), else the focused card. The ListView itself never selects: the cards draw the open conversation and the selection, so the
-/// arrow keys only move the focus.
+/// window's key too), else the focused card, else the open conversation (the window's key); when the open conversation goes,
+/// the next card opens. The ListView itself never selects: the cards draw the open conversation and the selection. The
+/// window's ↑/↓ open the previous or next card (<see cref="Move"/>), before the ListView moves the focus itself.
 /// </summary>
 public sealed partial class ConversationListView : UserControl
 {
@@ -82,10 +84,10 @@ public sealed partial class ConversationListView : UserControl
     }
 
     /// <summary>
-    /// The window's delete flow (<see cref="TitleBarToolbar.DeleteAsync"/>: eligibility, the confirmation, the delete);
-    /// true when something was deleted.
+    /// The window's delete flow (<see cref="TitleBarToolbar.DeleteAsync"/>: eligibility, the confirmation, the delete,
+    /// the conversation that opens in place of the open one when it goes); true when something was deleted.
     /// </summary>
-    internal Func<IReadOnlyList<Conversation>, bool, Task<bool>>? Delete { get; set; }
+    internal Func<IReadOnlyList<Conversation>, bool, Guid?, Task<bool>>? Delete { get; set; }
 
     private void OnModelChanged(object? sender, PropertyChangedEventArgs e)
     {
@@ -298,7 +300,111 @@ public sealed partial class ConversationListView : UserControl
     }
 
     /// <summary>Deletes the selection, asking first: the Delete key (<see cref="MainWindow"/>, wherever the focus is).</summary>
-    internal void DeleteSelection() => _ = DeleteSelectionAsync(audioOnly: false);
+    internal void DeleteSelection() => _ = DeleteFromKeyboardAsync(SelectedConversations(), selection: true);
+
+    /// <summary>
+    /// The window's Delete with no card selected, the focus neither in the cards, nor in a text field or another list: the
+    /// open conversation, asking first. False when none is open or it cannot be deleted now (the key goes on).
+    /// </summary>
+    internal bool DeleteOpen()
+    {
+        if (_model.Route is not { Kind: RouteKind.Conversation, ConversationId: { } id }
+            || _model.Conversations.FirstOrDefault(c => c.Id == id) is not { } conversation
+            || !_model.CanDelete(conversation))
+        {
+            return false;
+        }
+        _ = DeleteFromKeyboardAsync([conversation], selection: false);
+        return true;
+    }
+
+    /// <summary>
+    /// A delete from the keyboard (macOS <c>deleteFromKeyboard</c>): when the open conversation goes, the next card that
+    /// is not deleted opens in its place on the same tab and takes the focus, else the nearest one before it. Picked
+    /// before the delete, which opens it instead of going back to the list, so the list never shows in between.
+    /// </summary>
+    private async Task DeleteFromKeyboardAsync(IReadOnlyList<Conversation> conversations, bool selection)
+    {
+        var deleting = conversations.Where(_model.CanDelete).Select(c => c.Id).ToHashSet();
+        var next = _model.Route.ConversationId is { } open && deleting.Contains(open) ? Neighbour(open, deleting) : null;
+        if (!await DeleteAsync(conversations, audioOnly: false, next)) return;
+        if (selection) ClearSelection();
+        // The open conversation went and its neighbour opened; a job may have kept it, or the page changed.
+        if (next is { } id && _model.Route.ConversationId == id) FocusCard(id);
+    }
+
+    /// <summary>The first card after <paramref name="id"/> in list order that is not being deleted, else the nearest one before it.</summary>
+    private Guid? Neighbour(Guid id, HashSet<Guid> deleting)
+    {
+        var ids = _shown.Select(c => c.Id).ToList();
+        var index = ids.IndexOf(id);
+        if (index < 0) return null;
+        for (var i = index + 1; i < ids.Count; i++)
+        {
+            if (!deleting.Contains(ids[i])) return ids[i];
+        }
+        for (var i = index - 1; i >= 0; i--)
+        {
+            if (!deleting.Contains(ids[i])) return ids[i];
+        }
+        return null;
+    }
+
+    /// <summary>
+    /// The window's ↑/↓ (<paramref name="delta"/> -1 or 1) with no card selected: the previous or next entry (the
+    /// recording's card first while recording), opened as a click on its card opens it; the first or the last when none
+    /// is open. Stops at the ends. False while cards are selected (the key goes on).
+    /// </summary>
+    internal bool Move(int delta)
+    {
+        if (!_selection.IsEmpty) return false;
+        // Null: the recording's card.
+        var entries = new List<Guid?>();
+        if (_model.IsRecording) entries.Add(null);
+        foreach (var conversation in _shown) entries.Add(conversation.Id);
+        var route = _model.Route;
+        var current = route.Kind == RouteKind.Recording ? entries.IndexOf(null)
+            : route.ConversationId is { } open ? entries.IndexOf(open)
+            : -1;
+        var target = current >= 0 ? current + delta : delta > 0 ? 0 : entries.Count - 1;
+        if (target < 0 || target >= entries.Count) return true;
+        if (entries[target] is { } id)
+        {
+            OpenAndFocus(id);
+            return true;
+        }
+        // As a click on the recording's card; its card is the list's header.
+        _model.ShowRecording();
+        _card.StartBringIntoView();
+        _card.Focus(FocusState.Programmatic);
+        return true;
+    }
+
+    /// <summary>Opens the card as a click does, and gives it the focus.</summary>
+    private void OpenAndFocus(Guid id)
+    {
+        if (!_cards.TryGetValue(id, out var row)) return;
+        Open(row.Card);
+        FocusCard(id);
+    }
+
+    /// <summary>
+    /// Scrolls the card into view and gives its item the focus. The items are their own containers: one scrolled far away
+    /// is realized by the next layout. WinUI can report a programmatic focus as the last input's (Keyboard after ↑/↓ or
+    /// Delete), so Space plays the opened conversation, as on macOS, because its card is the open one
+    /// (<see cref="IsOpenCard"/>), not because of its focus state; Enter and Delete still act on it.
+    /// </summary>
+    private void FocusCard(Guid id)
+    {
+        if (!_cards.TryGetValue(id, out var row)) return;
+        var item = row.Item;
+        ConversationList.ScrollIntoView(item);
+        ConversationList.UpdateLayout();
+        if (!item.Focus(FocusState.Programmatic))
+        {
+            DispatcherQueue.TryEnqueue(DispatcherQueuePriority.Low, () => item.Focus(FocusState.Programmatic));
+        }
+    }
 
     /// <summary>Ends the selection: the bar's Cancel, and Esc (<see cref="MainWindow"/>, wherever the focus is).</summary>
     internal void ClearSelection()
@@ -338,15 +444,18 @@ public sealed partial class ConversationListView : UserControl
     }
 
     /// <summary>Through the window's delete flow, which asks first unless "Delete conversations without confirmation" is on.</summary>
-    internal Task<bool> DeleteAsync(IReadOnlyList<Conversation> conversations, bool audioOnly) =>
-        Delete is { } delete && conversations.Count > 0 ? delete(conversations, audioOnly) : Task.FromResult(false);
+    internal Task<bool> DeleteAsync(IReadOnlyList<Conversation> conversations, bool audioOnly, Guid? replacement = null) =>
+        Delete is { } delete && conversations.Count > 0 ? delete(conversations, audioOnly, replacement) : Task.FromResult(false);
 
     // Keys
 
     /// <summary>
     /// Enter opens the focused card, Space only one reached with the keyboard (a clicked card leaves Space to the
     /// window: <see cref="MainWindow"/> plays); Delete deletes the focused card when no card is selected (the window
-    /// deletes a selection). Not from a text field (the title being renamed) or a button.
+    /// deletes a selection), once while held: its repeats never delete the card that opens next. Not from a text field
+    /// (the title being renamed) or a button. No Delete on the recording page: the recording's card is the open entry there
+    /// (macOS does nothing for Delete on it), and a card that kept the focus is not the one shown. ↑/↓ are the window's
+    /// (<see cref="Move"/>).
     /// </summary>
     private void OnKeyDown(object sender, KeyRoutedEventArgs e)
     {
@@ -354,18 +463,31 @@ public sealed partial class ConversationListView : UserControl
         switch (e.Key)
         {
             case VirtualKey.Enter:
-            case VirtualKey.Space when e.OriginalSource is ListViewItem { FocusState: FocusState.Keyboard }:
+            // Not the open conversation's card: Space plays it (the window's).
+            case VirtualKey.Space when e.OriginalSource is ListViewItem { FocusState: FocusState.Keyboard } && !IsOpenCard(e.OriginalSource):
                 if (FocusedCard(e) is not { } card) return;
                 e.Handled = true;
                 Open(card);
                 break;
             case VirtualKey.Delete:
-                if (!_selection.IsEmpty || FocusedCard(e) is not { } focused) return;
+                if (e.KeyStatus.WasKeyDown || !_selection.IsEmpty || _model.Route.Kind == RouteKind.Recording
+                    || FocusedCard(e) is not { } focused)
+                {
+                    return;
+                }
                 e.Handled = true;
-                _ = DeleteAsync([focused.Conversation], audioOnly: false);
+                _ = DeleteFromKeyboardAsync([focused.Conversation], selection: false);
                 break;
         }
     }
+
+    /// <summary>
+    /// The element is the list item of the open conversation's card (one opened with ↑/↓, a delete or a click): Space
+    /// plays it instead of opening it again (<see cref="MainWindow"/>'s TakesSpace).
+    /// </summary>
+    internal bool IsOpenCard(object? element) =>
+        element is ListViewItem { Content: ConversationCard card } && _model.Route.Kind == RouteKind.Conversation
+        && card.Conversation.Id == _model.Route.ConversationId;
 
     /// <summary>Cards are selected: the window's Esc ends the selection instead of going back (macOS <c>listSelectionActive</c>).</summary>
     internal bool HasSelection => !_selection.IsEmpty;
@@ -474,6 +596,7 @@ internal static class ConversationText
     {
         if (model.TranscriptionProgress.TryGetValue(conversation.Id, out var progress))
         {
+            if (model.IsStopping(conversation.Id)) return Loc.T("Stopping…");
             return progress.Step switch
             {
                 JobStep.NeedsModel => Loc.T("Needs model"),

@@ -126,6 +126,10 @@ public sealed partial class TranscriptView : UserControl
         RetryButton.Click += (_, _) => Transcribe(null);
         TranscribeButton.Click += (_, _) => Transcribe(null);
         CopyButton.Click += (_, _) => Copy();
+        StopTranscriptionButton.Click += (_, _) =>
+        {
+            if (_transcript is not null) _model?.StopTranscription(_transcript.ConversationId);
+        };
         SummarizeButton.Click += (_, _) => Summarize();
         NeedsModelBadge.Click += (_, _) => _model?.OpenLocalAI(ProvidersSettingsPage.TranscriptionGroup);
         NoticeDownloadButton.Click += (_, _) => _model?.OpenLocalAI(ProvidersSettingsPage.DiarizationGroup);
@@ -750,7 +754,7 @@ public sealed partial class TranscriptView : UserControl
             var queued = progress!.Step is JobStep.Queued or JobStep.Deferred;
             JobRing.IsIndeterminate = queued;
             JobRing.Value = queued ? 0 : progress.Fraction;
-            StepText.Text = ConversationCard.StepTitle(progress.Step);
+            StepText.Text = _model.IsStopping(c.Id) ? Loc.T("Stopping…") : ConversationCard.StepTitle(progress.Step);
             SetTip(ProgressPanel, progress.Fraction.ToString("P0", CultureInfo.CurrentCulture), ref _stepTip);
         }
         if (failed)
@@ -810,13 +814,20 @@ public sealed partial class TranscriptView : UserControl
         NoticeDownloadButton.Visibility = Shown(download);
     }
 
-    /// <summary>Copy, Re-transcribe (or "Transcribing…" while a job runs), Summarize, playback or the removed-audio note.</summary>
+    /// <summary>
+    /// Copy, Re-transcribe (or "Transcribing…" and Stop while a job runs, "Stopping…" once clicked), Summarize, playback
+    /// or the removed-audio note.
+    /// </summary>
     private void UpdateActions()
     {
-        if (_transcript is null) return;
+        if (_model is null || _transcript is null) return;
         var hasAudio = _transcript.Conversation?.HasAudio ?? false;
         var transcribing = _transcript.IsTranscribing;
+        var stopping = _model.IsStopping(_transcript.ConversationId);
         TranscribingPanel.Visibility = Shown(transcribing);
+        TranscribingText.Text = Loc.T(stopping ? "Stopping…" : "Transcribing…");
+        StopTranscriptionButton.Visibility = Shown(stopping || _model.CanStopTranscription(_transcript.ConversationId));
+        StopTranscriptionButton.IsEnabled = !stopping;
         RetranscribeButton.Visibility = Shown(!transcribing);
         RetranscribeButton.IsEnabled = _transcript.CanRetranscribe;
         SetTip(RetranscribeButton, Loc.T(hasAudio ? "Re-transcribe with another model or language" : "Audio has been removed"), ref _retranscribeTip);

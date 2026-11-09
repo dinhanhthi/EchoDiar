@@ -77,6 +77,8 @@ public sealed class TranscriptionPipeline(
     /// <paramref name="cloudDiarizer"/>: labels the system channel's speakers when the ASR does not (its text is
     /// dropped); unused when <see cref="TranscriptionJob.Diarize"/> is false. Both are resolved by the app, whose
     /// one-time confirmation of their destination comes first: the pipeline uploads to whatever it is given.
+    /// Cancelling <paramref name="cancellationToken"/> stops the job (queued or running): it ends as
+    /// <see cref="JobStep.Cancelled"/> and throws, unless its transcript was already written.
     /// </summary>
     public async Task<string> TranscribeAsync(
         TranscriptionJob job, CloudEngine? cloud, CloudEngine? cloudDiarizer, CancellationToken cancellationToken = default)
@@ -84,7 +86,19 @@ public sealed class TranscriptionPipeline(
         Emit(job, JobStep.Queued, 0);
         // Only local jobs queue: a cloud job loads no ASR model (a local diarization takes the gate on its own).
         var queued = cloud is null;
-        if (queued) await _queue.WaitAsync(cancellationToken).ConfigureAwait(false);
+        if (queued)
+        {
+            try
+            {
+                await _queue.WaitAsync(cancellationToken).ConfigureAwait(false);
+            }
+            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+            {
+                // Stopped while queued: the queue was never taken, so it is not released.
+                EndCancelled(job);
+                throw;
+            }
+        }
         try
         {
             return await RunAsync(job, cloud, job.Diarize ? cloudDiarizer : null, cancellationToken).ConfigureAwait(false);
@@ -205,15 +219,17 @@ public sealed class TranscriptionPipeline(
             Finished(job, session);
             return path;
         }
-        catch (OperationCanceledException) when (!started)
-        {
-            // Cancelled while it waited: nothing ran, so the conversation keeps its status.
-            throw;
-        }
         catch (TranscriptionException e) when (e.Kind == TranscriptionErrorKind.NeedsModel)
         {
             if (started) UpdateConversation(job.Folder, stored, c => c.Status = ConversationStatus.Ready);
             Emit(job, JobStep.NeedsModel, 0, e.Detail);
+            throw;
+        }
+        catch (Exception) when (cancellationToken.IsCancellationRequested)
+        {
+            // Stopped, whatever the error (an engine stopped mid-chunk may throw its own); only the token tells, so a
+            // cancellation that is no stop (an internal timeout) still fails the job.
+            EndCancelled(job);
             throw;
         }
         catch (Exception e)
@@ -773,6 +789,8 @@ public sealed class TranscriptionPipeline(
                 mic.Sort((a, b) => a.Start.CompareTo(b.Start));
                 system.Sort((a, b) => a.Start.CompareTo(b.Start));
             }
+            // The local diarizer may ignore cancellation: a job stopped meanwhile ends here.
+            cancellationToken.ThrowIfCancellationRequested();
             Emit(job, JobStep.Merging, 0.95);
             var providerSpeakers = system.Any(s => s.Speaker is not null);
             if (job.Diarize && localDiarizer is null && turns.Count == 0 && system.Count > 0 && !providerSpeakers)
@@ -787,6 +805,9 @@ public sealed class TranscriptionPipeline(
                 EngineFallback = engineFallback,
                 Notes = notes,
             };
+            // The commit point: past the write, a stop no longer cancels the job (it ends as finished, with its
+            // transcript).
+            cancellationToken.ThrowIfCancellationRequested();
             // A re-transcription keeps the transcript it replaces as a numbered version.
             transcript.Write(job.Folder, keepingPrevious: true);
             return Path.Combine(job.Folder, Transcript.FileName);
@@ -1007,6 +1028,21 @@ public sealed class TranscriptionPipeline(
         var peak = 0f;
         foreach (var sample in samples) peak = Math.Max(peak, Math.Abs(sample));
         return peak;
+    }
+
+    /// <summary>
+    /// A stopped job (Swift <c>endCancelled</c>): a conversation it (or a failed run before it) marked as transcribing or
+    /// failed goes back to transcribed with its old transcript, else ready, so Stop never shows "Failed — Retry". Only
+    /// an existing <c>conversation.json</c> is written: without one, the job changed nothing to undo.
+    /// </summary>
+    private void EndCancelled(TranscriptionJob job)
+    {
+        UpdateConversation(job.Folder, null, c =>
+        {
+            if (c.Status is not (ConversationStatus.Transcribing or ConversationStatus.TranscriptionFailed)) return;
+            c.Status = c.HasTranscript ? ConversationStatus.Transcribed : ConversationStatus.Ready;
+        });
+        Emit(job, JobStep.Cancelled, 0);
     }
 
     private void Emit(TranscriptionJob job, JobStep step, double fraction, string? detail = null) =>

@@ -403,7 +403,7 @@ public sealed partial class MainWindow : Window
     /// <summary>
     /// The in-app shortcuts (<see cref="ShortcutsSettingsPage.InAppShortcuts"/>: the macOS main menu's keys with Ctrl for
     /// ⌘, and its main window's Esc and Space) as the window's keyboard accelerators; Esc and Space in
-    /// <see cref="OnRootPreviewKeyDown"/> instead, with Delete (Windows only: not on the Shortcuts page).
+    /// <see cref="OnRootPreviewKeyDown"/> instead, with Delete and ↑/↓ (Windows only: not on the Shortcuts page).
     /// </summary>
     private void AddAccelerators()
     {
@@ -430,10 +430,16 @@ public sealed partial class MainWindow : Window
     /// <summary>
     /// Esc, Space and Delete before the focused control sees them: a list item or a button marks them handled in its KeyDown,
     /// which comes before keyboard accelerators, so a clicked card or button kept Space (<see cref="TakesSpace"/> decides
-    /// which control keeps it). Not with a modifier held; a held key's repeats do what its press did, once.
+    /// which control keeps it). Not with a modifier held; a held key's repeats do what its press did, once. ↑/↓ open the
+    /// previous or next card before the list moves its focus (<see cref="MoveInLibrary"/>), on every repeat.
     /// </summary>
     private void OnRootPreviewKeyDown(object sender, KeyRoutedEventArgs e)
     {
+        if (e.Key is VirtualKey.Up or VirtualKey.Down)
+        {
+            if (!ModifierDown(e) && MoveInLibrary(e.Key == VirtualKey.Up ? -1 : 1)) e.Handled = true;
+            return;
+        }
         if (!_plainKeys.TryGetValue(e.Key, out var action)) return;
         if (e.KeyStatus.WasKeyDown)
         {
@@ -507,6 +513,12 @@ public sealed partial class MainWindow : Window
             case InAppAction.DeleteSelection when plain && ListHost.Visibility == Visibility.Visible && _library.HasSelection:
                 _library.DeleteSelection();
                 return true;
+            // Else the open conversation, unless the focus is in a text field, anywhere in the library's cards (the list
+            // deletes a focused card; a button on a card is not the open conversation) or in another list or its item.
+            case InAppAction.DeleteSelection when plain && route == RouteKind.Conversation && ListHost.Visibility == Visibility.Visible
+                && !_model.GlobalChatOpen && !InTextInput(focused) && !(focused is DependencyObject inCards && InLibrary(inCards))
+                && focused is not (Selector or SelectorItem):
+                return _library.DeleteOpen();
             // Esc on Chat closes its History panel before going back (macOS: the panel's Close is the cancel action).
             case InAppAction.Back when plain && route == RouteKind.Conversation && RouteHost.Content is ConversationView conversation
                 && conversation.CloseHistory():
@@ -534,18 +546,56 @@ public sealed partial class MainWindow : Window
 
     /// <summary>
     /// A control reached with the keyboard that Space clicks, switches or opens (a button, a switch, a tab, a library card)
-    /// keeps Space. One that was clicked does not: Space plays, as on macOS, whose buttons take no focus.
+    /// keeps Space. One that was clicked does not: Space plays, as on macOS, whose buttons take no focus. Nor does the open
+    /// conversation's card: ↑/↓ and a delete focus it in code, which WinUI can report as Keyboard after a key.
     /// </summary>
     private bool TakesSpace(object? focused)
     {
         if (focused is not Control { FocusState: FocusState.Keyboard } control) return false;
         if (control is ButtonBase or ToggleSwitch or ComboBox or SelectorBarItem) return true;
-        for (DependencyObject? e = control; e is not null; e = VisualTreeHelper.GetParent(e))
+        return InLibrary(control) && !_library.IsOpenCard(control);
+    }
+
+    /// <summary>The element is in the library's cards (a card's item or a control on it).</summary>
+    private bool InLibrary(DependencyObject element)
+    {
+        for (DependencyObject? e = element; e is not null; e = VisualTreeHelper.GetParent(e))
         {
             if (e == _library) return true;
         }
         return false;
     }
+
+    /// <summary>Text is typed there: Delete and ↑/↓ are the field's.</summary>
+    private static bool InTextInput(object? focused) => focused is TextBox or PasswordBox or RichEditBox or AutoSuggestBox;
+
+    /// <summary>
+    /// ↑/↓ on the library page (list, conversation, recording; not the library chat, Settings or Calendar) with no card
+    /// selected open the previous or next card (macOS handleSidebarKey). Not while a dialog, menu or flyout is open, nor
+    /// from a control that uses the arrows (a text field, the playback slider, a combo, a selector or its item outside
+    /// the library, a radio button), nor from text with a selection (the transcript, the live captions: a click on a
+    /// timestamp leaves the arrows to the cards).
+    /// </summary>
+    private bool MoveInLibrary(int delta)
+    {
+        if (_closing || _model.IsCapturingHotKey || PopupOpen()) return false;
+        if (_model.Route.Kind is not (RouteKind.List or RouteKind.Conversation or RouteKind.Recording)) return false;
+        if (_model.GlobalChatOpen || ListHost.Visibility != Visibility.Visible || _library.HasSelection) return false;
+        var focused = RootGrid.XamlRoot is { } root ? FocusManager.GetFocusedElement(root) : null;
+        if (UsesArrows(focused)) return false;
+        return _library.Move(delta);
+    }
+
+    private bool UsesArrows(object? focused) => focused switch
+    {
+        _ when InTextInput(focused) => true,
+        RichTextBlock text => text.SelectedText.Length > 0,
+        TextBlock text => text.SelectedText.Length > 0,
+        Slider or ComboBox or RadioButton or RadioButtons or SelectorBarItem => true,
+        // The library's own list and items are the cards' (its model picker is a ComboBox, above).
+        DependencyObject element when element is Selector or SelectorItem => !InLibrary(element),
+        _ => false,
+    };
 
     private void OnTitleBarSizeChanged(object sender, SizeChangedEventArgs e) => UpdateCaptionInsets();
 

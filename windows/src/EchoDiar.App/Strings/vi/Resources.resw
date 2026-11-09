@@ -3010,6 +3010,10 @@
     <value>Dừng tóm tắt và giữ phần đã viết</value>
     <comment>Stop the summary and keep what is written so far</comment>
   </data>
+  <data name="StopTranscription" xml:space="preserve">
+    <value>Dừng chép lời</value>
+    <comment>Stop transcription</comment>
+  </data>
   <data name="StopWhenTheAppIsQuietFor" xml:space="preserve">
     <value>Dừng khi ứng dụng im lặng trong</value>
     <comment>Stop when the app is quiet for</comment>
@@ -3029,6 +3033,10 @@
   <data name="StoppedUsingAudioStopRecording" xml:space="preserve">
     <value>{0} đã ngừng dùng âm thanh — dừng ghi âm?</value>
     <comment>%@ stopped using audio — stop recording?</comment>
+  </data>
+  <data name="Stopping" xml:space="preserve">
+    <value>Đang dừng…</value>
+    <comment>Stopping…</comment>
   </data>
   <data name="StoppingInLldS" xml:space="preserve">
     <value>Dừng sau {0} giây</value>

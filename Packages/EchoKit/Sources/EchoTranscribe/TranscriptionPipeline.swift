@@ -4,6 +4,7 @@ import AVFoundation
 import EchoAI
 import EchoCore
 import Foundation
+import os
 
 /// Batch transcription of recording folders: extract each channel to 16 kHz mono, skip silent channels, ASR mic,
 /// ASR system, diarize system (the cloud diarizer when given, else or after its failure the local one), merge, write
@@ -83,17 +84,65 @@ public actor TranscriptionPipeline {
     /// replaces `job.engineID`'s resolution.
     /// `cloudDiarizer`: labels the system channel's speakers when the ASR does not (its text is dropped); unused
     /// when `job.diarize` is false.
+    /// Cancelling the caller stops the job (queued or running): it ends as `.cancelled` and throws
+    /// `CancellationError`, unless its transcript was already written.
     public func transcribe(
         _ job: TranscriptionJob, cloud: CloudEngine? = nil, cloudDiarizer: CloudEngine? = nil
     ) async throws -> URL {
         emit(job, .queued, 0)
         let previous = cloud == nil ? tail : nil
         let task = Task(priority: .utility) {
-            await previous?.value
+            do {
+                if let previous { try await Self.wait(for: previous) }
+                try Task.checkCancellation()
+            } catch {
+                endCancelled(job)
+                throw CancellationError()
+            }
             return try await self.run(job, cloud: cloud, cloudDiarizer: cloudDiarizer)
         }
-        if cloud == nil { tail = Task { _ = await task.result } }
-        return try await task.value
+        // Also waits for `previous`: a job stopped while queued must not let the next one start beside the one ahead.
+        if cloud == nil { tail = Task { await previous?.value; _ = await task.result } }
+        return try await withTaskCancellationHandler { try await task.value } onCancel: { task.cancel() }
+    }
+
+    /// Returns once `previous` ended, or throws `CancellationError` as soon as the task is cancelled: `previous.value`
+    /// ignores cancellation, so a watcher waits for it and whichever comes first resumes the wait, once.
+    private static func wait(for previous: Task<Void, Never>) async throws {
+        struct State {
+            var continuation: CheckedContinuation<Void, any Error>?
+            var finished = false
+            var cancelled = false
+        }
+        let state = OSAllocatedUnfairLock(initialState: State())
+        let watcher = Task {
+            await previous.value
+            let continuation = state.withLock { state in
+                state.finished = true
+                return state.continuation.take()
+            }
+            continuation?.resume()
+        }
+        defer { watcher.cancel() }
+        try await withTaskCancellationHandler {
+            try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, any Error>) in
+                let (finished, cancelled) = state.withLock { state in
+                    if !state.finished && !state.cancelled { state.continuation = continuation }
+                    return (state.finished, state.cancelled)
+                }
+                if cancelled {
+                    continuation.resume(throwing: CancellationError())
+                } else if finished {
+                    continuation.resume()
+                }
+            }
+        } onCancel: {
+            let continuation = state.withLock { state in
+                state.cancelled = true
+                return state.continuation.take()
+            }
+            continuation?.resume(throwing: CancellationError())
+        }
     }
 
     // MARK: - Job
@@ -115,6 +164,7 @@ public actor TranscriptionPipeline {
         // Creates `conversation.json` when missing (transcribed before compression); nil while unreadable.
         var stored: RecordingSession?
         do {
+            try Task.checkCancellation()
             if let cloud, let prior = job.prior, prior.engineID == cloud.engineID,
                let session = try? RecordingSession.read(from: job.folder),
                let sources = try? channelSources(session: session, job: job), sources.mic != nil,
@@ -132,6 +182,8 @@ public actor TranscriptionPipeline {
                     || (sources.system != nil && streamLabels && !prior.systemBridges.isEmpty)
                 let diarizes = sources.system != nil && (diarizer != nil || cloudDiarizer != nil)
                 if (fillsGaps || diarizes) && deferWhenConstrained && !job.processNow { await waitWhileConstrained(job) }
+                // The wait returns on cancellation too.
+                try Task.checkCancellation()
                 started = true
                 let url = try await transcribeCloudPrior(
                     job, prior: prior, session: session, sources: sources, cloud: cloud, streamLabels: streamLabels,
@@ -160,6 +212,8 @@ public actor TranscriptionPipeline {
                     modelFolder = folder
                 }
                 if (fillsGaps || diarizes) && deferWhenConstrained && !job.processNow { await waitWhileConstrained(job) }
+                // The wait returns on cancellation too.
+                try Task.checkCancellation()
                 started = true
                 let url = try await transcribePrior(
                     job, prior: prior, session: session, sources: sources, entry: entry, modelFolder: modelFolder,
@@ -173,6 +227,7 @@ public actor TranscriptionPipeline {
                 return url
             }
             if deferWhenConstrained && !job.processNow { await waitWhileConstrained(job) }
+            try Task.checkCancellation()
             guard var session = try? RecordingSession.read(from: job.folder) else {
                 throw TranscriptionError.sessionUnreadable
             }
@@ -232,6 +287,11 @@ public actor TranscriptionPipeline {
             if started { Self.updateConversation(in: job.folder, session: stored) { $0.status = .ready } }
             emit(job, .needsModel, 0, detail: id)
             throw TranscriptionError.needsModel(id)
+        } catch where Task.isCancelled {
+            // Stopped, whatever the error: a cancelled upload throws `TranscriptionError.cloud`, not
+            // `CancellationError`.
+            endCancelled(job)
+            throw CancellationError()
         } catch {
             // Also before `started`, so an unreadable session or audio shows "Failed — Retry" on the card.
             Self.updateConversation(in: job.folder, session: stored) { $0.status = .transcriptionFailed }
@@ -320,6 +380,8 @@ public actor TranscriptionPipeline {
             mic.sort { $0.start < $1.start }
             system.sort { $0.start < $1.start }
         }
+        // The local diarizer ignores cancellation: a job stopped meanwhile ends here.
+        try Task.checkCancellation()
         emit(job, .merging, 0.95)
         let providerSpeakers = system.contains { $0.speaker != nil }
         if job.diarize && diarizer == nil && turns.isEmpty && !system.isEmpty && !providerSpeakers {
@@ -333,6 +395,9 @@ public actor TranscriptionPipeline {
             engineFallback: engineFallback,
             notes: notes
         )
+        // The commit point: past the write, a stop no longer cancels the job (it ends as finished, with its
+        // transcript).
+        try Task.checkCancellation()
         // A re-transcription keeps the transcript it replaces as a numbered version.
         try transcript.write(to: job.folder, keepingPrevious: true)
         return job.folder.appendingPathComponent(Transcript.fileName)
@@ -931,6 +996,17 @@ public actor TranscriptionPipeline {
         _ job: TranscriptionJob, _ step: JobProgress.Step, _ fraction: Double, detail: String? = nil
     ) {
         continuation.yield(JobProgress(conversationID: job.conversationID, step: step, fraction: fraction, detail: detail))
+    }
+
+    /// A stopped job: a conversation it (or a failed run before it) marked as transcribing or failed goes back to
+    /// transcribed with its old transcript, else ready, so Stop never shows "Failed — Retry". Only an existing
+    /// `conversation.json` is written: without one, the job changed nothing to undo.
+    private nonisolated func endCancelled(_ job: TranscriptionJob) {
+        Self.updateConversation(in: job.folder, session: nil) {
+            guard $0.status == .transcribing || $0.status == .transcriptionFailed else { return }
+            $0.status = $0.hasTranscript ? .transcribed : .ready
+        }
+        emit(job, .cancelled, 0)
     }
 
     /// Read-modify-write of `conversation.json`. A missing one (transcribed before compression, or the DEBUG harness

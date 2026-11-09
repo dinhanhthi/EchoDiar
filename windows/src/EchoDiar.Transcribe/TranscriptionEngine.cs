@@ -197,7 +197,7 @@ public sealed record PriorTranscription
 public enum JobStep
 {
     Queued, Deferred, Extracting, TranscribingMic, TranscribingSystem, Diarizing, Merging,
-    Finished, NeedsModel, Failed,
+    Finished, NeedsModel, Failed, Cancelled,
 }
 
 /// <summary>Swift raw values (<c>"transcribingMic"</c>).</summary>

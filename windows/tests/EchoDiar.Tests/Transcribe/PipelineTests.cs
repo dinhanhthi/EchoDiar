@@ -234,6 +234,36 @@ public sealed class PipelineTests : IDisposable
         Assert.False(File.Exists(Path.Combine(folder, Transcript.FileName)));
     }
 
+    // Stop (Swift CancelPipelineTests): cancelling the job's token ends it as Cancelled, not Failed, the conversation
+    // goes back to ready and no transcript is written. The fake upload ends on its own after 10 s, so a job the cancel
+    // never reaches finishes instead of hanging.
+    [Fact(Timeout = 60_000)]
+    public async Task AStoppedJobEndsAsCancelledAndWritesNothing()
+    {
+        using var cts = CancellationTokenSource.CreateLinkedTokenSource(TestContext.Current.CancellationToken);
+        var (session, folder) = MakeRecording(1, toneOnMic: false);
+        var pipeline = new TranscriptionPipeline(
+            new Dictionary<ModelRuntime, TranscriptionPipeline.EngineFactory>(), null, _ => false,
+            e => Path.Combine(_root, "Models", e.Id), new ModelLoadGate(), exporter: new FakeExporter());
+        List<JobStep> steps = [];
+        pipeline.Progress += p =>
+        {
+            lock (steps) steps.Add(p.Step);
+            if (p.Step is not (JobStep.Queued or JobStep.Deferred)) cts.Cancel();
+        };
+        var cloud = new FakeCloud { Hold = Task.Delay(TimeSpan.FromSeconds(10), cts.Token) };
+        var job = new TranscriptionJob { ConversationID = session.Id, Folder = folder, ProcessNow = true, Diarize = false };
+
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(() => pipeline.TranscribeAsync(
+            job, new CloudEngine("cloud:fake", "Fake", "batch-model", cloud), null, cts.Token));
+
+        Assert.Equal(JobStep.Cancelled, steps[^1]);
+        Assert.DoesNotContain(JobStep.Failed, steps);
+        Assert.DoesNotContain(JobStep.Finished, steps);
+        Assert.Equal(ConversationStatus.Ready, Conversation.Read(folder).Status);
+        Assert.False(File.Exists(Path.Combine(folder, Transcript.FileName)));
+    }
+
     // A streaming-only model (scribe_v2_realtime) fails the job before any upload, with a reason that names it.
     [Fact]
     public async Task AStreamingOnlyCloudModelFailsBeforeUpload()

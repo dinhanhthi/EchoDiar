@@ -55,6 +55,16 @@ public sealed partial class AppViewModel : ObservableObject
     private readonly DispatcherQueue _dispatcher;
     private readonly DispatcherQueueTimer _pollTimer;
     private readonly Dictionary<string, CancellationTokenSource> _downloadTokens = [];
+    /// <summary>
+    /// Each submitted job's cancellation, by conversation id, so Stop can cancel it (macOS <c>transcriptionTasks</c>).
+    /// The token tells a job's own entry from a later job's for the same conversation, which it must not remove when it ends.
+    /// </summary>
+    private readonly Dictionary<Guid, (Guid Token, CancellationTokenSource Cts)> _transcriptionJobs = [];
+    /// <summary>
+    /// Jobs Stop cancelled that have not ended yet: their card shows "Stopping…" from the click on, while the job
+    /// unwinds (its progress stays until <see cref="JobStep.Cancelled"/>, so no second job starts beside it).
+    /// </summary>
+    private readonly HashSet<Guid> _stopping = [];
 
     /// <summary>
     /// Launch: settings load, then recovery. A recording starts only after it, so it uses the loaded settings and
@@ -578,14 +588,15 @@ public sealed partial class AppViewModel : ObservableObject
     public event Action<Guid>? ReleasingAudio;
 
     /// <summary>
-    /// Moves the conversation to the Recycle Bin; its page goes back to the list first, and once its AI job, cancelled
-    /// first without saving (also after a Stop), has ended: a summary or chat written after the move would recreate the
-    /// folder (macOS <c>deleteConversation</c>).
+    /// Moves the conversation to the Recycle Bin; its page goes back to the list first (to <paramref name="replacement"/>
+    /// instead, on the same tab: a delete from the keyboard opens the next card without showing the list), and once its AI
+    /// job, cancelled first without saving (also after a Stop), has ended: a summary or chat written after the move would
+    /// recreate the folder (macOS <c>deleteConversation</c>).
     /// </summary>
-    public async Task DeleteConversationAsync(Guid id)
+    public async Task DeleteConversationAsync(Guid id, Guid? replacement = null)
     {
         ReleasingAudio?.Invoke(id);
-        if (Route.ConversationId == id) Route = Route.List;
+        if (Route.ConversationId == id) Route = replacement is { } next ? Route.ForConversation(next) : Route.List;
         // Its AI job's stream now ends with an error, which must not show as the AI error.
         var added = _deletingConversationIds.Add(id);
         try
@@ -931,6 +942,32 @@ public sealed partial class AppViewModel : ObservableObject
     private bool HasJob(Guid id) =>
         TranscriptionProgress.TryGetValue(id, out var progress) && progress.Step != JobStep.NeedsModel;
 
+    /// <summary>Stop was clicked and the job has not ended yet ("Stopping…").</summary>
+    public bool IsStopping(Guid id) => _stopping.Contains(id);
+
+    /// <summary>
+    /// A submitted job is queued, deferred or running and not already stopping; <c>_finishing</c> alone (between the
+    /// transcription and the compression of a recording) has no job to stop.
+    /// </summary>
+    public bool CanStopTranscription(Guid id) =>
+        _transcriptionJobs.ContainsKey(id)
+        && TranscriptionProgress.TryGetValue(id, out var progress) && progress.Step != JobStep.NeedsModel
+        && !_stopping.Contains(id);
+
+    /// <summary>
+    /// Stop: cancels the conversation's job, which ends as <see cref="JobStep.Cancelled"/> (the conversation back to its
+    /// state before the job, its audio kept) unless its transcript was already written. Checked again here: a flyout
+    /// can outlive its job. The screens show "Stopping…" at once; the cancellation runs off the click.
+    /// </summary>
+    public void StopTranscription(Guid id)
+    {
+        if (!CanStopTranscription(id) || !_transcriptionJobs.TryGetValue(id, out var entry)) return;
+        _stopping.Add(id);
+        // The screens that read IsStopping follow TranscriptionProgress, so it is raised for them.
+        OnPropertyChanged(nameof(TranscriptionProgress));
+        _ = entry.Cts.CancelAsync();
+    }
+
     /// <summary>
     /// The conversation's Transcribe and Retry, and the transcript's Re-transcribe (<paramref name="engineId"/>: a
     /// catalog or cloud engine id from "Retry with another engine" or "Transcribe again with", null = the default resolution;
@@ -955,7 +992,7 @@ public sealed partial class AppViewModel : ObservableObject
     /// transcribed (see <see cref="TranscriptionJob.Prior"/>). <paramref name="processNow"/> runs it even while energy
     /// saver would defer it. A cloud engine or diarizer runs as <see cref="PlanCloud"/> decides; the first run per
     /// provider and destination waits for the main window's confirmation instead (nothing is queued or uploaded then).
-    /// Returns the job (true when it succeeded), null when none was queued.
+    /// Returns the job (true when it succeeded and was not stopped), null when none was queued.
     /// </summary>
     private Task<bool>? SubmitTranscription(
         string folder, RecordingSession session, string? engineId = null, string? language = null, bool? deleteAudioAfter = null,
@@ -989,15 +1026,22 @@ public sealed partial class AppViewModel : ObservableObject
         TranscriptionErrors = Without(TranscriptionErrors, id);
         // Set now so the screens show the job before the pipeline's first event arrives.
         TranscriptionProgress = With(TranscriptionProgress, id, new JobProgress(id, JobStep.Queued, 0));
-        return RunTranscriptionAsync(job, deleteAudioAfter, cloud);
+        var jobToken = Guid.NewGuid();
+        var cts = new CancellationTokenSource();
+        _transcriptionJobs[id] = (jobToken, cts);
+        return RunTranscriptionAsync(job, deleteAudioAfter, cloud, jobToken, cts.Token);
     }
 
     /// <summary>
-    /// True when the job succeeded; its audio then goes to the Recycle Bin when asked, before the reload. The cloud
-    /// engines of <paramref name="cloud"/> are made with their keys off the UI thread.
+    /// True when the job succeeded and was not stopped; its audio then goes to the Recycle Bin when asked, before the
+    /// reload. The cloud engines of <paramref name="cloud"/> are made with their keys off the UI thread.
+    /// <paramref name="cancellationToken"/> (Stop) goes to the pipeline only, so a stopped job always ends with its
+    /// event. Ends by removing the job's own <c>_transcriptionJobs</c> entry (<paramref name="jobToken"/>).
     /// </summary>
-    private async Task<bool> RunTranscriptionAsync(TranscriptionJob job, bool? deleteAudioAfter, CloudPlan cloud)
+    private async Task<bool> RunTranscriptionAsync(
+        TranscriptionJob job, bool? deleteAudioAfter, CloudPlan cloud, Guid jobToken, CancellationToken cancellationToken)
     {
+        var id = job.ConversationID;
         var succeeded = false;
         try
         {
@@ -1007,9 +1051,14 @@ public sealed partial class AppViewModel : ObservableObject
                 var diarizer = cloud.Diarizer is { } diarizerConfig
                     ? _services.MakeCloudEngine(diarizerConfig, CloudTranscription.DiarizationModel(diarizerConfig))
                     : null;
-                return _services.Pipeline.TranscribeAsync(job, asr, diarizer);
+                return _services.Pipeline.TranscribeAsync(job, asr, diarizer, cancellationToken);
             });
             succeeded = true;
+        }
+        catch (Exception) when (cancellationToken.IsCancellationRequested || _stopping.Contains(id))
+        {
+            // Stopped: the pipeline's Cancelled event carries it to the screens.
+            Debug.WriteLine($"EchoDiar: transcription cancelled for {job.Folder}");
         }
         catch (TranscriptionException e) when (e.Kind == TranscriptionErrorKind.Cloud)
         {
@@ -1021,7 +1070,9 @@ public sealed partial class AppViewModel : ObservableObject
             // The pipeline's Failed or NeedsModel event carries it to the screens.
             Debug.WriteLine($"EchoDiar: transcription failed for {job.Folder}: {e}");
         }
-        if (succeeded && !_closing && (deleteAudioAfter ?? Settings.DeleteAudioAfterTranscription))
+        // A Stop that lands after the transcript was written keeps the audio.
+        if (succeeded && !_closing && !cancellationToken.IsCancellationRequested && !_stopping.Contains(id)
+            && (deleteAudioAfter ?? Settings.DeleteAudioAfterTranscription))
         {
             await DeleteAudioAsync(job.ConversationID);
         }
@@ -1033,7 +1084,20 @@ public sealed partial class AppViewModel : ObservableObject
         {
             Debug.WriteLine($"EchoDiar: could not reload {job.Folder}: {e}");
         }
-        return succeeded;
+        // Before the mark is cleared below: a stopped job's caller must not trash its audio either.
+        var stopped = cancellationToken.IsCancellationRequested || _stopping.Contains(id);
+        if (_transcriptionJobs.TryGetValue(id, out var entry) && entry.Token == jobToken)
+        {
+            _transcriptionJobs.Remove(id);
+            entry.Cts.Dispose();
+            // No terminal event cleared the mark (e.g. the job's task ended first): no id stays "Stopping…".
+            if (_stopping.Remove(id))
+            {
+                if (TranscriptionProgress.ContainsKey(id)) TranscriptionProgress = Without(TranscriptionProgress, id);
+                else OnPropertyChanged(nameof(TranscriptionProgress));
+            }
+        }
+        return succeeded && !stopped;
     }
 
     /// <summary>The default ASR model from the settings when it is installed and handles <paramref name="language"/>; else null.</summary>
@@ -1053,13 +1117,22 @@ public sealed partial class AppViewModel : ObservableObject
         switch (progress.Step)
         {
             case JobStep.Finished:
+                _stopping.Remove(id);
                 TranscriptionProgress = Without(TranscriptionProgress, id);
                 break;
             case JobStep.Failed:
+                _stopping.Remove(id);
                 TranscriptionProgress = Without(TranscriptionProgress, id);
                 TranscriptionErrors = With(TranscriptionErrors, id, progress.Detail ?? Loc.T("Transcription failed"));
                 break;
+            case JobStep.Cancelled:
+                // Stopped: the card goes back to its state before the job, with no failure reason.
+                _stopping.Remove(id);
+                TranscriptionProgress = Without(TranscriptionProgress, id);
+                break;
             default:
+                // A NeedsModel job has ended too.
+                if (progress.Step == JobStep.NeedsModel) _stopping.Remove(id);
                 // Whole percents only: the screens redraw at most 100 times per job step.
                 if (previous is null || previous.Step != progress.Step || Percent(previous) != Percent(progress))
                 {
