@@ -238,12 +238,7 @@ private struct PillMeter: View {
     let scale: CGFloat
 
     var body: some View {
-        let level = LevelFeed.fraction(max(feed.mic, feed.system))
-        Capsule()
-            .fill(Palette.hoverFill)
-            .overlay(alignment: .leading) {
-                Capsule().fill(Color.green).frame(width: 28 * scale * level)
-            }
+        LevelBar(feed: feed, source: .louder)
             .frame(width: 28 * scale, height: 4 * scale)
             .accessibilityHidden(true)
             .task { await feed.attach() }

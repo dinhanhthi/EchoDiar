@@ -2019,10 +2019,23 @@ extension AppModel {
         return providers
     }
 
+    /// Asking the system costs ~1 ms and views ask on every redraw (the recording page's "Catch up" on each caption),
+    /// so an answer is reused for `foundationModelsReasonTTL`.
     static var foundationModelsUnavailableReason: String? {
-        if #available(macOS 26, *) { return AppleFoundationModelProvider.unavailableReason }
-        return String(localized: "Apple Foundation Models need macOS 26.")
+        let now = ContinuousClock.now
+        if let cached = foundationModelsReasonCache, now - cached.at < foundationModelsReasonTTL { return cached.reason }
+        let reason: String?
+        if #available(macOS 26, *) {
+            reason = AppleFoundationModelProvider.unavailableReason
+        } else {
+            reason = String(localized: "Apple Foundation Models need macOS 26.")
+        }
+        foundationModelsReasonCache = (reason, now)
+        return reason
     }
+
+    private static let foundationModelsReasonTTL = Duration.seconds(5)
+    private static var foundationModelsReasonCache: (reason: String?, at: ContinuousClock.Instant)?
 
     /// The settings pair (provider id, model) holding `purpose`'s default.
     private static func aiDefault(
@@ -3395,9 +3408,21 @@ final class LevelFeed {
     @ObservationIgnored private let engine: RecordingEngine
     @ObservationIgnored private var readers = 0
     @ObservationIgnored private var reader: Task<Void, Never>?
+    /// The `LevelBar`s, told each new level (mic, system) without redrawing any SwiftUI view.
+    @ObservationIgnored private var listeners: [ObjectIdentifier: (Float, Float) -> Void] = [:]
 
     init(engine: RecordingEngine) {
         self.engine = engine
+    }
+
+    /// Calls `listener` with the current levels, then with each change until `removeListener(owner)`.
+    func addListener(_ owner: AnyObject, _ listener: @escaping (Float, Float) -> Void) {
+        listeners[ObjectIdentifier(owner)] = listener
+        listener(mic, system)
+    }
+
+    func removeListener(_ owner: AnyObject) {
+        listeners[ObjectIdentifier(owner)] = nil
     }
 
     /// Returns when the calling task is cancelled (a meter's `.task`); the feed reads while any caller waits here.
@@ -3408,9 +3433,10 @@ final class LevelFeed {
                 while !Task.isCancelled {
                     let levels = engine.currentLevels()
                     // An unchanged level (a silent channel) would still redraw every meter that reads it.
-                    if let self {
+                    if let self, mic != levels.mic || system != levels.system {
                         if mic != levels.mic { mic = levels.mic }
                         if system != levels.system { system = levels.system }
+                        for listener in listeners.values { listener(levels.mic, levels.system) }
                     }
                     try? await Task.sleep(for: .milliseconds(67))
                 }

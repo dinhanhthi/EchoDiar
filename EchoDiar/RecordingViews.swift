@@ -425,16 +425,15 @@ struct ChannelMeters: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 3) {
-            bar("Mic", accessibilityLabel: "Mic level", feed.mic)
+            bar("Mic", accessibilityLabel: String(localized: "Mic level"), .mic)
             // Shares the "System" key with the App language picker: the word translates the same in every language.
-            bar("System", accessibilityLabel: "System audio level", feed.system)
+            bar("System", accessibilityLabel: String(localized: "System audio level"), .system)
         }
         .frame(width: 110)
         .task { await feed.attach() }
     }
 
-    private func bar(_ name: LocalizedStringKey, accessibilityLabel: LocalizedStringKey,
-                     _ level: Float) -> some View {
+    private func bar(_ name: LocalizedStringKey, accessibilityLabel: String, _ source: LevelBar.Source) -> some View {
         HStack(spacing: 6) {
             Text(name)
                 .font(.caption2)
@@ -442,17 +441,98 @@ struct ChannelMeters: View {
                 .lineLimit(1)
                 .minimumScaleFactor(0.75)
                 .frame(width: 38, alignment: .leading)
-            GeometryReader { proxy in
-                ZStack(alignment: .leading) {
-                    Capsule().fill(Palette.hoverFill)
-                    Capsule().fill(Color.green).frame(width: proxy.size.width * LevelFeed.fraction(level))
-                }
-            }
-            .frame(height: 5)
+                .accessibilityHidden(true)
+            LevelBar(feed: feed, source: source, accessibilityLabel: accessibilityLabel)
+                .frame(height: 5)
         }
-        .accessibilityElement(children: .ignore)
-        .accessibilityLabel(accessibilityLabel)
-        .accessibilityValue("\(Int((LevelFeed.fraction(level) * 100).rounded())) percent")
+    }
+}
+
+/// A capsule peak bar (the track, the level in green) drawn by Core Animation and set by `LevelFeed` directly: SwiftUI
+/// bars that read the feed re-laid out and redrew their whole window at 15 Hz (~8 % CPU with the main window open,
+/// ~4 % for the pill alone). An accessibility element (level indicator) only with an `accessibilityLabel`.
+struct LevelBar: NSViewRepresentable {
+    enum Source { case mic, system, louder }
+
+    let feed: LevelFeed
+    let source: Source
+    var accessibilityLabel: String?
+
+    func makeNSView(context: Context) -> LevelBarView {
+        let view = LevelBarView()
+        view.feed = feed
+        feed.addListener(view) { [weak view, source] mic, system in
+            let level = switch source {
+            case .mic: mic
+            case .system: system
+            case .louder: max(mic, system)
+            }
+            view?.fraction = LevelFeed.fraction(level)
+        }
+        return view
+    }
+
+    func updateNSView(_ view: LevelBarView, context: Context) {
+        view.setAccessibilityLabel(accessibilityLabel)
+        view.setAccessibilityElement(accessibilityLabel != nil)
+    }
+
+    static func dismantleNSView(_ view: LevelBarView, coordinator: ()) {
+        view.feed?.removeListener(view)
+    }
+}
+
+final class LevelBarView: NSView {
+    weak var feed: LevelFeed?
+    /// 0...1 of the width.
+    var fraction: CGFloat = 0 {
+        didSet { if fraction != oldValue { placeLayers() } }
+    }
+
+    private let track = CALayer()
+    private let fill = CALayer()
+
+    override init(frame: NSRect) {
+        super.init(frame: frame)
+        wantsLayer = true
+        layer?.addSublayer(track)
+        layer?.addSublayer(fill)
+        setAccessibilityRole(.levelIndicator)
+        applyColors()
+    }
+
+    required init?(coder: NSCoder) { fatalError("init(coder:) has not been implemented") }
+
+    override func layout() {
+        super.layout()
+        placeLayers()
+    }
+
+    override func viewDidChangeEffectiveAppearance() {
+        super.viewDidChangeEffectiveAppearance()
+        applyColors()
+    }
+
+    override func accessibilityValue() -> Any? {
+        String(localized: "\(Int((fraction * 100).rounded())) percent")
+    }
+
+    /// Without implicit animations: the bar jumps to each level, as the SwiftUI bars did.
+    private func placeLayers() {
+        CATransaction.begin()
+        CATransaction.setDisableActions(true)
+        track.frame = bounds
+        track.cornerRadius = bounds.height / 2
+        fill.frame = CGRect(x: 0, y: 0, width: bounds.width * fraction, height: bounds.height)
+        fill.cornerRadius = min(fill.frame.width, bounds.height) / 2
+        CATransaction.commit()
+    }
+
+    private func applyColors() {
+        effectiveAppearance.performAsCurrentDrawingAppearance {
+            track.backgroundColor = NSColor(Palette.hoverFill).cgColor
+            fill.backgroundColor = NSColor(Color.green).cgColor
+        }
     }
 }
 
@@ -462,21 +542,12 @@ private struct MiniMeters: View {
 
     var body: some View {
         VStack(spacing: 2) {
-            bar(feed.mic)
-            bar(feed.system)
+            LevelBar(feed: feed, source: .mic).frame(height: 3)
+            LevelBar(feed: feed, source: .system).frame(height: 3)
         }
         .frame(width: 44)
         .accessibilityHidden(true)
         .task { await feed.attach() }
-    }
-
-    private func bar(_ level: Float) -> some View {
-        Capsule()
-            .fill(Palette.hoverFill)
-            .overlay(alignment: .leading) {
-                Capsule().fill(Color.green).frame(width: 44 * LevelFeed.fraction(level))
-            }
-            .frame(height: 3)
     }
 }
 
