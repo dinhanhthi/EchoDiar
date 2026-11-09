@@ -588,14 +588,15 @@ public sealed partial class AppViewModel : ObservableObject
     public event Action<Guid>? ReleasingAudio;
 
     /// <summary>
-    /// Moves the conversation to the Recycle Bin; its page goes back to the list first, and once its AI job, cancelled
-    /// first without saving (also after a Stop), has ended: a summary or chat written after the move would recreate the
-    /// folder (macOS <c>deleteConversation</c>).
+    /// Moves the conversation to the Recycle Bin; its page goes back to the list first (to <paramref name="replacement"/>
+    /// instead, on the same tab: a delete from the keyboard opens the next card without showing the list), and once its AI
+    /// job, cancelled first without saving (also after a Stop), has ended: a summary or chat written after the move would
+    /// recreate the folder (macOS <c>deleteConversation</c>).
     /// </summary>
-    public async Task DeleteConversationAsync(Guid id)
+    public async Task DeleteConversationAsync(Guid id, Guid? replacement = null)
     {
         ReleasingAudio?.Invoke(id);
-        if (Route.ConversationId == id) Route = Route.List;
+        if (Route.ConversationId == id) Route = replacement is { } next ? Route.ForConversation(next) : Route.List;
         // Its AI job's stream now ends with an error, which must not show as the AI error.
         var added = _deletingConversationIds.Add(id);
         try

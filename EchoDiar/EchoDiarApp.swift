@@ -261,11 +261,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSMe
         }
     }
 
-    // MARK: - Esc and Space
+    // MARK: - Esc, Space and the sidebar keys
 
-    /// One local monitor for the main window: Esc goes back (not on the list without the library chat) and Space
-    /// plays or pauses the open transcript. Keys pass through with ⌘, ⌥ or ⌃, in other windows, while the Shortcuts
-    /// tab records a shortcut and while a text field or text view is edited (search, title, speaker name, chat).
+    /// One local monitor for the main window: Esc goes back (not on the list without the library chat), Space
+    /// plays or pauses the open transcript, and on the library page (not with the library chat) ⌘⌫ or Del deletes the
+    /// selected cards, else the open conversation, and ↑/↓ open the previous or next card. Keys pass through with
+    /// other modifiers (⌘, ⌥ or ⌃ for Esc and Space), in other windows, while the Shortcuts tab records a shortcut and
+    /// while a text field or text view is edited (search, title, speaker name, chat); ↑/↓ also with text selected in
+    /// the transcript or live captions, on the playback slider and while cards are selected.
     private func installKeyMonitor() {
         keyMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak self] event in
             let handled = MainActor.assumeIsolated { self?.handleKey(event) ?? false }
@@ -274,9 +277,18 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSMe
     }
 
     private func handleKey(_ event: NSEvent) -> Bool {
-        guard let window, event.window === window, !model.isCapturingHotKey,
-              event.modifierFlags.intersection([.command, .option, .control]).isEmpty
-        else { return false }
+        guard let window, event.window === window, !model.isCapturingHotKey else { return false }
+        // Arrows and forward Delete also carry `.function` (and arrows `.numericPad`): only these four count.
+        let modifiers = event.modifierFlags.intersection([.command, .option, .control, .shift])
+        switch event.keyCode {
+        case 51 where modifiers == .command, 117 where modifiers.isEmpty:  // kVK_Delete with ⌘, kVK_ForwardDelete
+            return handleSidebarKey(event, in: window, move: nil)
+        case 126 where modifiers.isEmpty, 125 where modifiers.isEmpty:  // kVK_UpArrow, kVK_DownArrow
+            return handleSidebarKey(event, in: window, move: event.keyCode == 126 ? -1 : 1)
+        default:
+            break
+        }
+        guard event.modifierFlags.intersection([.command, .option, .control]).isEmpty else { return false }
         if let text = window.firstResponder as? NSTextView, text.isEditable { return false }
         switch event.keyCode {
         case 53 where (model.route != .list || model.globalChatOpen) && !model.listSelectionActive:  // kVK_Escape
@@ -289,6 +301,33 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSMe
         default:
             return false
         }
+    }
+
+    /// ⌘⌫ or Del (`move` nil) and ↑/↓ (`move` -1 or 1) for the library's sidebar, which acts on them
+    /// (`ConversationListView`). A held ⌘⌫ or Del deletes one: its repeats are dropped, so they never delete the card
+    /// that opens next nor ask again. The delete is posted after the monitor returns, so its alert does not run inside it.
+    private func handleSidebarKey(_ event: NSEvent, in window: NSWindow, move delta: Int?) -> Bool {
+        let responder = window.firstResponder
+        if let text = responder as? NSTextView {
+            if text.isEditable { return false }
+            // A click on a timestamp focuses the read-only transcript: the arrows only stay with it for a selection.
+            if delta != nil && text.selectedRange().length > 0 { return false }
+        }
+        if delta != nil && responder is NSSlider { return false }
+        switch model.route {
+        case .list, .conversation, .recording: break
+        case .settings, .calendar: return false
+        }
+        guard !model.globalChatOpen else { return false }
+        guard let delta else {
+            if !event.isARepeat {
+                DispatchQueue.main.async { NotificationCenter.default.post(name: .deleteInSidebar, object: nil) }
+            }
+            return true
+        }
+        guard !model.listSelectionActive else { return false }
+        NotificationCenter.default.post(name: .moveInSidebar, object: nil, userInfo: ["delta": delta])
+        return true
     }
 
     /// App menu (About, Check for Updates, Settings, Hide, Quit), File (recording), Edit, View (pages, back, search) and Window menus.

@@ -577,9 +577,10 @@ public sealed partial class TitleBarToolbar : UserControl
     /// macOS DeleteMenuItems.delete, for this conversation and the library's cards and selection: only the
     /// conversations that can be deleted now (and have audio, for the audio only), asked once for all unless "Delete
     /// conversations without confirmation" is on; one is asked by its title. Then they are deleted one by one. True
-    /// when any was deleted (not cancelled, not none).
+    /// when any was deleted (not cancelled, not none). <paramref name="replacement"/>: the conversation that opens in place of
+    /// the open one when it is deleted (a delete from the keyboard), instead of the list.
     /// </summary>
-    public async Task<bool> DeleteAsync(IReadOnlyList<Conversation> conversations, bool audioOnly)
+    public async Task<bool> DeleteAsync(IReadOnlyList<Conversation> conversations, bool audioOnly, Guid? replacement = null)
     {
         if (_model is not { } model) return false;
         bool Eligible(Conversation c) => model.CanDelete(c) && (!audioOnly || c.HasAudio);
@@ -595,11 +596,13 @@ public sealed partial class TitleBarToolbar : UserControl
             .Where(Eligible)
             .Select(c => c.Id)
             .ToList();
+        // Gone, or deleted with them, while the dialog was open: the list.
+        if (replacement is { } next && (ids.Contains(next) || !model.Conversations.Any(c => c.Id == next))) replacement = null;
         // Each delete first has the open player let go of that conversation's audio (ReleasingAudio).
         foreach (var id in ids)
         {
             if (audioOnly) await model.DeleteAudioAsync(id);
-            else await model.DeleteConversationAsync(id);
+            else await model.DeleteConversationAsync(id, replacement);
         }
         return true;
     }

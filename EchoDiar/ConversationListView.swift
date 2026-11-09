@@ -1,10 +1,18 @@
 import EchoCore
 import SwiftUI
 
+extension Notification.Name {
+    /// ⌘⌫ or Del on the library page (posted by the app delegate's key monitor).
+    static let deleteInSidebar = Notification.Name("EchoDiar.deleteInSidebar")
+    /// ↑ or ↓ on the library page, `userInfo["delta"]` -1 or 1 (posted by the app delegate's key monitor).
+    static let moveInSidebar = Notification.Name("EchoDiar.moveInSidebar")
+}
+
 /// The library as compact cards under pinned day headers, in the library page's sidebar, the recording's card above
 /// them while recording. Shows the groups it is given, so callers can filter them. The open entry is selected and
 /// scrolled into view. ⌘-click and ⇧-click select cards (not the recording's), from the open entry as in Mail, and the
-/// selection bar shows at the top while any is selected.
+/// selection bar shows at the top while any is selected. ⌘⌫ or Del deletes the selection, else the open conversation;
+/// ↑/↓ open the previous or next entry.
 struct ConversationListView: View {
     let model: AppModel
     let groups: [DayGroup]
@@ -18,6 +26,7 @@ struct ConversationListView: View {
                 LazyVStack(alignment: .leading, spacing: 10, pinnedViews: .sectionHeaders) {
                     if model.isRecording {
                         RecordingCard(model: model, selected: model.route == .recording)
+                            .id(Self.recordingCardID)
                             .transition(cardTransition)
                     }
                     ForEach(groups) { group in
@@ -77,6 +86,60 @@ struct ConversationListView: View {
                 guard let selectedID else { return }
                 withAnimation(reduceMotion ? nil : Motion.standard) { proxy.scrollTo(selectedID) }
             }
+            // The recording's card, when ↑ opens it from below.
+            .onChange(of: model.route) {
+                guard model.route == .recording else { return }
+                withAnimation(reduceMotion ? nil : Motion.standard) { proxy.scrollTo(Self.recordingCardID) }
+            }
+            .onReceive(NotificationCenter.default.publisher(for: .deleteInSidebar)) { _ in deleteFromKeyboard() }
+            .onReceive(NotificationCenter.default.publisher(for: .moveInSidebar)) { note in
+                guard let delta = note.userInfo?["delta"] as? Int else { return }
+                move(by: delta)
+            }
+        }
+    }
+
+    private static let recordingCardID = "recordingCard"
+
+    /// ⌘⌫ or Del: the selected cards, else the open conversation (the recording's card never). When the open
+    /// conversation goes, the next card opens, the previous one for the last, else the list.
+    private func deleteFromKeyboard() {
+        var openID: UUID?
+        if case .conversation(let id) = model.route { openID = id }
+        if !selection.isEmpty {
+            let targets = selectedConversations
+            let deleting = Set(targets.filter { DeleteMenuItems.canDelete($0, model) }.map(\.id))
+            // Before the delete, which goes back to the list at once. The next card opens only from there: not over a
+            // page the route went to while the alert was up (a recording stopped, …), as on Windows.
+            let next = openID.flatMap { deleting.contains($0) ? neighbour(of: $0, skipping: deleting) : nil }
+            guard DeleteMenuItems.delete(audioOnly: false, targets, model) else { return }
+            selection.clear()
+            if let next, model.route == .list { model.open(next, tab: model.detailTab) }
+        } else if let openID, let conversation = model.conversations.first(where: { $0.id == openID }),
+                  DeleteMenuItems.canDelete(conversation, model) {
+            let next = neighbour(of: openID, skipping: [openID])
+            guard DeleteMenuItems.delete(audioOnly: false, conversation, model) else { return }
+            if let next, model.route == .list { model.open(next, tab: model.detailTab) }
+        }
+    }
+
+    /// The first card after `id` in list order that is not being deleted, else the nearest one before it.
+    private func neighbour(of id: UUID, skipping deleting: Set<UUID>) -> UUID? {
+        guard let index = order.firstIndex(of: id) else { return nil }
+        return order[(index + 1)...].first { !deleting.contains($0) }
+            ?? order[..<index].last { !deleting.contains($0) }
+    }
+
+    /// ↑/↓ with no card selected: the previous or next entry (the recording's card first while recording), opened as
+    /// a click on its card opens it; the first or the last when none is open. Stops at the ends.
+    private func move(by delta: Int) {
+        guard selection.isEmpty else { return }
+        let entries: [AppModel.Route] = (model.isRecording ? [.recording] : []) + order.map { .conversation($0) }
+        let target = entries.firstIndex(of: model.route).map { $0 + delta } ?? (delta > 0 ? 0 : entries.count - 1)
+        guard entries.indices.contains(target) else { return }
+        switch entries[target] {
+        case .conversation(let id): model.open(id, tab: model.detailTab)
+        default: model.route = .recording
         }
     }
 
