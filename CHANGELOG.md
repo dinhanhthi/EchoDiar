@@ -7,6 +7,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.5.3] - 2026-11-09
+
+### Added
+
+- You can stop a transcription that is running; the conversation keeps what was transcribed so far.
+- Library: press Delete to remove the selected conversation, and use the arrow keys to move through the list.
+
+### Changed
+
+- The microphone and system level meters sit on one row while recording.
+- macOS: the menu bar waveform turns green while transcribing, tinted to match the menu bar's appearance.
+
+### Fixed
+
+- macOS: lower CPU use while recording, since the level meters are now drawn with Core Animation and the Apple Intelligence check is cached.
+- Windows: pressing Space after moving with the arrow keys plays the selected conversation.
+
 ## [1.5.2] - 2026-11-06
 
 ### Changed

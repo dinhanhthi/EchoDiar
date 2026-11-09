@@ -15,7 +15,7 @@
   <Identity
     Name="dinh.thi.EchoDiar"
     Publisher="CN=EchoDiar Dev"
-    Version="1.5.2.0" />
+    Version="1.5.3.0" />
 
   <Properties>
     <DisplayName>EchoDiar</DisplayName>
