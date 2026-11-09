@@ -127,6 +127,14 @@ final class StatusItemController: NSObject, NSMenuDelegate {
     /// The logo cut out at the bottom-right; `startEffect` lays the animated waveform over the hole.
     private static let processingLogo = logoImage(knockout: processingBadge)
 
+    /// The processing waveform's green, by the menu bar's appearance: light on a dark bar, a little deeper on a light
+    /// one so it reads on both.
+    private static let processingTint = NSColor(name: nil) { appearance in
+        appearance.bestMatch(from: [.darkAqua, .aqua]) == .darkAqua
+            ? NSColor(srgbRed: 0.49, green: 0.88, blue: 0.53, alpha: 1)
+            : NSColor(srgbRed: 0.16, green: 0.62, blue: 0.27, alpha: 1)
+    }
+
     /// An 18 pt image: the logo, cut out by `knockout` (so a badge reads against it), then `badge` on top. Whole-point
     /// rects keep the badge crisp at 1x and 2x.
     private static func logoImage(knockout: NSRect? = nil, badge: @escaping () -> Void = {}) -> NSImage? {
@@ -172,6 +180,8 @@ final class StatusItemController: NSObject, NSMenuDelegate {
         view.autoresizingMask = [.minXMargin, .maxXMargin, .minYMargin, .maxYMargin]
         view.imageScaling = .scaleNone
         view.image = symbol("waveform", tint: nil)
+        // Tints the template symbol; the variable-color effect animates in that color.
+        view.contentTintColor = Self.processingTint
         view.setAccessibilityElement(false)
         button.addSubview(view)
         view.addSymbolEffect(.variableColor.iterative, options: .repeating)
