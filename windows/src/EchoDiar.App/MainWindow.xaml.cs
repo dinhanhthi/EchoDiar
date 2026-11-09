@@ -546,13 +546,14 @@ public sealed partial class MainWindow : Window
 
     /// <summary>
     /// A control reached with the keyboard that Space clicks, switches or opens (a button, a switch, a tab, a library card)
-    /// keeps Space. One that was clicked does not: Space plays, as on macOS, whose buttons take no focus.
+    /// keeps Space. One that was clicked does not: Space plays, as on macOS, whose buttons take no focus. Nor does the open
+    /// conversation's card: ↑/↓ and a delete focus it in code, which WinUI can report as Keyboard after a key.
     /// </summary>
     private bool TakesSpace(object? focused)
     {
         if (focused is not Control { FocusState: FocusState.Keyboard } control) return false;
         if (control is ButtonBase or ToggleSwitch or ComboBox or SelectorBarItem) return true;
-        return InLibrary(control);
+        return InLibrary(control) && !_library.IsOpenCard(control);
     }
 
     /// <summary>The element is in the library's cards (a card's item or a control on it).</summary>

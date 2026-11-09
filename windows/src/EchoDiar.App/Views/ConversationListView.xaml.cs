@@ -390,9 +390,9 @@ public sealed partial class ConversationListView : UserControl
 
     /// <summary>
     /// Scrolls the card into view and gives its item the focus. The items are their own containers: one scrolled far away
-    /// is realized by the next layout. Programmatic, not Keyboard: Space then plays the opened conversation, as on macOS,
-    /// instead of opening the card again (the window's TakesSpace and the list's Space keep Space only for a card reached
-    /// with Tab); Enter and Delete still act on it.
+    /// is realized by the next layout. WinUI can report a programmatic focus as the last input's (Keyboard after ↑/↓ or
+    /// Delete), so Space plays the opened conversation, as on macOS, because its card is the open one
+    /// (<see cref="IsOpenCard"/>), not because of its focus state; Enter and Delete still act on it.
     /// </summary>
     private void FocusCard(Guid id)
     {
@@ -463,7 +463,8 @@ public sealed partial class ConversationListView : UserControl
         switch (e.Key)
         {
             case VirtualKey.Enter:
-            case VirtualKey.Space when e.OriginalSource is ListViewItem { FocusState: FocusState.Keyboard }:
+            // Not the open conversation's card: Space plays it (the window's).
+            case VirtualKey.Space when e.OriginalSource is ListViewItem { FocusState: FocusState.Keyboard } && !IsOpenCard(e.OriginalSource):
                 if (FocusedCard(e) is not { } card) return;
                 e.Handled = true;
                 Open(card);
@@ -479,6 +480,14 @@ public sealed partial class ConversationListView : UserControl
                 break;
         }
     }
+
+    /// <summary>
+    /// The element is the list item of the open conversation's card (one opened with ↑/↓, a delete or a click): Space
+    /// plays it instead of opening it again (<see cref="MainWindow"/>'s TakesSpace).
+    /// </summary>
+    internal bool IsOpenCard(object? element) =>
+        element is ListViewItem { Content: ConversationCard card } && _model.Route.Kind == RouteKind.Conversation
+        && card.Conversation.Id == _model.Route.ConversationId;
 
     /// <summary>Cards are selected: the window's Esc ends the selection instead of going back (macOS <c>listSelectionActive</c>).</summary>
     internal bool HasSelection => !_selection.IsEmpty;
