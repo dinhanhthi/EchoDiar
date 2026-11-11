@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- macOS: when a new version is available, the menu bar icon gets a small green download badge, and its "Update Available…" item reads "Update to EchoDiar <version>…".
+
 ## [1.5.3] - 2026-11-09
 
 ### Added

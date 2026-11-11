@@ -6,18 +6,23 @@ import Sparkle
 /// Sparkle updater, started only when `SUPublicEDKey` is a base64 Ed25519 public key (32 bytes); an empty or
 /// malformed key would show a misconfiguration alert.
 /// Background checks (at launch, then every `SUScheduledCheckInterval`) never pop Sparkle's dialog: with
-/// `SUAutomaticallyUpdate` they download and prepare the update silently, then set `updateAvailable`, which shows the
-/// main window's Update button and turns the menus' item into "Install Update and Relaunch"; both install it and
-/// relaunch at once (Sparkle also installs it when the app quits). An update Sparkle does not download silently (a
-/// major upgrade, an informational one) sets the flag when Sparkle would show it, and the button opens Sparkle's dialog.
-/// The menus read the flags each time they open; the toolbar observes `updateAvailable`.
+/// `SUAutomaticallyUpdate` they download and prepare the update silently, then set `availableUpdateVersion`, which
+/// shows the main window's Update button and the menu bar icon's download badge, and turns the menus' item into
+/// "Install Update and Relaunch"; the button and the item install it and relaunch at once (Sparkle also installs it
+/// when the app quits). An update Sparkle does not download silently (a major upgrade, an informational one) sets it
+/// when Sparkle would show it, the item reads "Update to EchoDiar <version>…", and the button and the item open
+/// Sparkle's dialog; it is cleared when that update session ends. The menus read the flags each time they open; the
+/// toolbar observes `updateAvailable`, the menu bar item `onAvailableUpdateChange`.
 @MainActor
 @Observable
 final class Updater: NSObject {
     private(set) var canCheck = false
-    /// Set once a click can act on the update, not when it is found: while it downloads, Sparkle's session is busy
-    /// and `checkForUpdates` would do nothing.
-    private(set) var updateAvailable = false
+    /// The update's version, set once a click can act on it, not when it is found: while it downloads, Sparkle's
+    /// session is busy and `checkForUpdates` would do nothing.
+    private(set) var availableUpdateVersion: String? { didSet { onAvailableUpdateChange?() } }
+    var updateAvailable: Bool { availableUpdateVersion != nil }
+    /// Called when `availableUpdateVersion` is set. Set by the menu bar item; without it Sparkle shows its own dialog.
+    @ObservationIgnored var onAvailableUpdateChange: (() -> Void)?
 
     @ObservationIgnored private var controller: SPUStandardUpdaterController!
     /// Installs the silently downloaded update and relaunches the app; nil until it is ready.
@@ -31,13 +36,14 @@ final class Updater: NSObject {
     /// The app menu's and the menu bar menu's item for `checkForUpdates`.
     var menuTitle: String {
         if installNow != nil { return String(localized: "Install Update and Relaunch") }
-        return updateAvailable ? String(localized: "Update Available…") : String(localized: "Check for Updates…")
+        guard let availableUpdateVersion else { return String(localized: "Check for Updates…") }
+        return String(localized: "Update to EchoDiar \(availableUpdateVersion)…")
     }
 
     func start() {
         #if DEBUG
         // VM check of the Update button.
-        if ProcessInfo.processInfo.arguments.contains("--fake-update") { updateAvailable = true }
+        if ProcessInfo.processInfo.arguments.contains("--fake-update") { availableUpdateVersion = "9.9.9" }
         // Off unless asked: a Debug build left running downloads the release and keeps Sparkle's installer, which is
         // per bundle id, waiting for it to quit, so every other EchoDiar's update fails until then.
         guard ProcessInfo.processInfo.arguments.contains("--sparkle") else { return }
@@ -71,32 +77,39 @@ extension Updater: SPUUpdaterDelegate {
     func updater(_ updater: SPUUpdater, willInstallUpdateOnQuit item: SUAppcastItem,
                  immediateInstallationBlock immediateInstallHandler: @escaping () -> Void) -> Bool {
         installNow = immediateInstallHandler
-        updateAvailable = true
+        availableUpdateVersion = item.displayVersionString
         return true
     }
 
     func updaterDidNotFindUpdate(_ updater: SPUUpdater) {
-        updateAvailable = false
+        availableUpdateVersion = nil
     }
 
     func updater(_ updater: SPUUpdater, userDidMake choice: SPUUserUpdateChoice, forUpdate updateItem: SUAppcastItem,
                  state: SPUUserUpdateState) {
-        if choice == .skip { updateAvailable = false }
+        if choice == .skip { availableUpdateVersion = nil }
     }
 }
 
 extension Updater: @preconcurrency SPUStandardUserDriverDelegate {
     var supportsGentleScheduledUpdateReminders: Bool { true }
 
-    /// The Update button and the menu item stand in for Sparkle's dialog on background checks.
+    /// The menu bar badge, the Update button and the menu item stand in for Sparkle's dialog on background checks;
+    /// Sparkle shows it when no menu bar item listens.
     func standardUserDriverShouldHandleShowingScheduledUpdate(_ update: SUAppcastItem,
                                                               andInImmediateFocus immediateFocus: Bool) -> Bool {
-        false
+        onAvailableUpdateChange == nil
     }
 
-    /// An update shown in Sparkle's dialog, or on a background check by the Update button.
+    /// An update found by a background check, which the badge, the Update button and the menu item show.
     func standardUserDriverWillHandleShowingUpdate(_ handleShowingUpdate: Bool, forUpdate update: SUAppcastItem,
                                                    state: SPUUserUpdateState) {
-        updateAvailable = true
+        guard !handleShowingUpdate else { return }
+        availableUpdateVersion = update.displayVersionString
+    }
+
+    /// After an install, a skip, "Remind Me Later" or an error. Silent downloads (`installNow`) run no such session.
+    func standardUserDriverWillFinishUpdateSession() {
+        if availableUpdateVersion != nil { availableUpdateVersion = nil }
     }
 }

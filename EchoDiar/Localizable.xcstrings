@@ -8257,6 +8257,34 @@
         }
       }
     },
+    "EchoDiar, update available" : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "EchoDiar, actualización disponible"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "EchoDiar, mise à jour disponible"
+          }
+        },
+        "vi" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "EchoDiar, có bản cập nhật"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "EchoDiar，有可用更新"
+          }
+        }
+      }
+    },
     "Edit" : {
       "comment" : "Main menu",
       "localizations" : {
@@ -23139,6 +23167,7 @@
       }
     },
     "Update Available…" : {
+      "extractionState" : "stale",
       "localizations" : {
         "es" : {
           "stringUnit" : {
@@ -23162,6 +23191,34 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "有可用更新…"
+          }
+        }
+      }
+    },
+    "Update to EchoDiar %@…" : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Actualizar a EchoDiar %@…"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Mettre à jour vers EchoDiar %@…"
+          }
+        },
+        "vi" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Cập nhật lên EchoDiar %@…"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "更新到 EchoDiar %@…"
           }
         }
       }

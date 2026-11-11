@@ -45,7 +45,8 @@ struct RecordingMenuControls {
     var openMeetingLink: @MainActor (CalendarEvent) -> Void
 }
 
-/// Menu bar item with a plain AppKit menu (no SwiftUI, for footprint). The menu is rebuilt each time it opens.
+/// Menu bar item with a plain AppKit menu (no SwiftUI, for footprint). The menu is rebuilt each time it opens. While
+/// the updater has an update, the idle logo has a download badge and the updates item reads `updater.menuTitle`.
 @MainActor
 final class StatusItemController: NSObject, NSMenuDelegate {
     /// Set once at launch; the menu falls back to `onToggleRecording` without it.
@@ -80,16 +81,21 @@ final class StatusItemController: NSObject, NSMenuDelegate {
         menu.delegate = self
         menu.autoenablesItems = false
         statusItem.menu = menu
+        updater.onAvailableUpdateChange = { [weak self] in self?.updateIcon() }
         updateIcon()
     }
 
+    /// The update badge goes on the idle logo only: the other states have their own badge in that corner, and an
+    /// update can't be installed while recording.
     private func updateIcon() {
         guard let button = statusItem.button else { return }
-        button.setAccessibilityLabel(state.accessibilityLabel)
+        let update = state == .idle && updater.updateAvailable
+        button.setAccessibilityLabel(
+            update ? String(localized: "EchoDiar, update available") : state.accessibilityLabel)
         switch state {
         case .idle:
             stopEffect()
-            button.image = Self.logo
+            button.image = update ? Self.updateLogo : Self.logo
         case .recording:
             stopEffect()
             button.image = Self.recordingLogo
@@ -119,6 +125,25 @@ final class StatusItemController: NSObject, NSMenuDelegate {
         NSColor.white.setFill()
         NSRect(x: 12, y: 2, width: 1, height: 4).fill()
         NSRect(x: 15, y: 2, width: 1, height: 4).fill()
+    }
+
+    /// The logo with a download badge at the bottom-right: a white disc and a bold arrow in a deep green (the system
+    /// green, 45 % of the way to black). The knockout keeps the disc apart from the white logo on a dark menu bar.
+    private static let updateLogo = logoImage(knockout: NSRect(x: 8, y: -1, width: 11, height: 11)) {
+        let badge = NSRect(x: 9, y: 0, width: 9, height: 9)
+        NSColor.white.setFill()
+        NSBezierPath(ovalIn: badge).fill()
+        let green = NSColor.systemGreen.blended(withFraction: 0.45, of: .black) ?? .systemGreen
+        let configuration = NSImage.SymbolConfiguration(pointSize: 9, weight: .black)
+            .applying(NSImage.SymbolConfiguration(paletteColors: [green]))
+        guard let arrow = NSImage(systemSymbolName: "arrow.down", accessibilityDescription: nil)?
+            .withSymbolConfiguration(configuration) else { return }
+        // Aspect-fit in the disc's inner square, centred.
+        let inner = badge.insetBy(dx: 1, dy: 1)
+        let scale = min(inner.width / arrow.size.width, inner.height / arrow.size.height)
+        let size = NSSize(width: arrow.size.width * scale, height: arrow.size.height * scale)
+        arrow.draw(in: NSRect(x: badge.midX - size.width / 2, y: badge.midY - size.height / 2,
+                              width: size.width, height: size.height))
     }
 
     /// Where the processing badge sits on the 18 pt logo (bottom-right, image coordinates).
