@@ -67,7 +67,7 @@ brew install xcodegen
 scripts/dev.sh   # generate the project, build Debug, launch
 ```
 
-See [CONTRIBUTING.md](CONTRIBUTING.md). Releases are maintainer-only, see [docs/RELEASING.md](docs/RELEASING.md).
+See [CONTRIBUTING.md](CONTRIBUTING.md). Releases are maintainer-only.
 
 ## License
 
