@@ -1118,6 +1118,10 @@
     <value>EchoDiar 的更新</value>
     <comment>EchoDiar's updates</comment>
   </data>
+  <data name="EchoDiarUpdateAvailable" xml:space="preserve">
+    <value>EchoDiar，有可用更新</value>
+    <comment>EchoDiar, update available</comment>
+  </data>
   <data name="Edit" xml:space="preserve">
     <value>编辑</value>
     <comment>Edit</comment>
@@ -3713,6 +3717,10 @@
   <data name="UpdateAvailable_2" xml:space="preserve">
     <value>有可用更新…</value>
     <comment>Update available…</comment>
+  </data>
+  <data name="UpdateToEchoDiar" xml:space="preserve">
+    <value>更新到 EchoDiar {0}…</value>
+    <comment>Update to EchoDiar %@…</comment>
   </data>
   <data name="Updates" xml:space="preserve">
     <value>更新</value>

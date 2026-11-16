@@ -1166,6 +1166,10 @@
     <value>EchoDiar's updates</value>
     <comment>EchoDiar's updates</comment>
   </data>
+  <data name="EchoDiarUpdateAvailable" xml:space="preserve">
+    <value>EchoDiar, update available</value>
+    <comment>EchoDiar, update available</comment>
+  </data>
   <data name="Edit" xml:space="preserve">
     <value>Edit</value>
     <comment>Edit</comment>
@@ -3853,6 +3857,10 @@
   <data name="UpdateAvailable_2" xml:space="preserve">
     <value>Update available…</value>
     <comment>Update available…</comment>
+  </data>
+  <data name="UpdateToEchoDiar" xml:space="preserve">
+    <value>Update to EchoDiar {0}…</value>
+    <comment>Update to EchoDiar %@…</comment>
   </data>
   <data name="Updates" xml:space="preserve">
     <value>Updates</value>

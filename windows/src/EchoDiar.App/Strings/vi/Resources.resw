@@ -1118,6 +1118,10 @@
     <value>Bản cập nhật của EchoDiar</value>
     <comment>EchoDiar's updates</comment>
   </data>
+  <data name="EchoDiarUpdateAvailable" xml:space="preserve">
+    <value>EchoDiar, có bản cập nhật</value>
+    <comment>EchoDiar, update available</comment>
+  </data>
   <data name="Edit" xml:space="preserve">
     <value>Sửa</value>
     <comment>Edit</comment>
@@ -3713,6 +3717,10 @@
   <data name="UpdateAvailable_2" xml:space="preserve">
     <value>Có bản cập nhật…</value>
     <comment>Update available…</comment>
+  </data>
+  <data name="UpdateToEchoDiar" xml:space="preserve">
+    <value>Cập nhật lên EchoDiar {0}…</value>
+    <comment>Update to EchoDiar %@…</comment>
   </data>
   <data name="Updates" xml:space="preserve">
     <value>Cập nhật</value>
