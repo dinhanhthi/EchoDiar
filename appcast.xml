@@ -4,6 +4,16 @@
         <title>EchoDiar</title>
         <link>https://ed.dinhanhthi.com/appcast.xml</link>
         <item>
+            <title>1.5.4</title>
+            <pubDate>Mon, 16 Nov 2026 05:37:59 -0600</pubDate>
+            <sparkle:fullReleaseNotesLink>https://github.com/dinhanhthi/EchoDiar/blob/main/CHANGELOG.md</sparkle:fullReleaseNotesLink>
+            <sparkle:version>13</sparkle:version>
+            <sparkle:shortVersionString>1.5.4</sparkle:shortVersionString>
+            <sparkle:minimumSystemVersion>15.0</sparkle:minimumSystemVersion>
+            <sparkle:hardwareRequirements>arm64</sparkle:hardwareRequirements>
+            <enclosure url="https://github.com/dinhanhthi/EchoDiar/releases/download/v1.5.4/EchoDiar-1.5.4.zip" length="18574996" type="application/octet-stream" sparkle:edSignature="1MAHX7wp/W3CuoA0rciMDpEOmwcf312gMgDadLiv6OYcGm0ayvD0cvR0cZyS9X5ceyfHmj95vKf3CmlyzBdBBw=="/>
+        </item>
+        <item>
             <title>1.5.3</title>
             <pubDate>Mon, 09 Nov 2026 15:58:17 -0600</pubDate>
             <sparkle:fullReleaseNotesLink>https://github.com/dinhanhthi/EchoDiar/blob/main/CHANGELOG.md</sparkle:fullReleaseNotesLink>
