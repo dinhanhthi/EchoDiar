@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.5.5] - 2026-11-18
+
 ### Added
 
 - The mic follows the system mute: when the microphone is muted or its input volume is 0 in the system settings, EchoDiar records silence on the mic channel, and the mute button does nothing until the system unmutes it. A muted mic shows in yellow on the recording card and the floating pill.
