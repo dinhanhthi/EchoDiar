@@ -44,6 +44,9 @@ SHOpenFolderAndSelectItems
 ILCreateFromPathW
 ILFree
 IMMNotificationClient
+IAudioEndpointVolume
+IAudioEndpointVolumeCallback
+AUDIO_VOLUME_NOTIFICATION_DATA
 PKEY_AudioEngine_DeviceFormat
 PKEY_Device_EnumeratorName
 PKEY_Device_ContainerId

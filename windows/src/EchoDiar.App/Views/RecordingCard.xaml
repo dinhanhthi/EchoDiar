@@ -15,6 +15,13 @@
     IsTabStop="True"
     UseSystemFocusVisuals="True">
 
+    <UserControl.Resources>
+        <!-- The Mute button's glyph while the mic is muted, by Mute or by the system. -->
+        <Style x:Key="MutedMicIconStyle" TargetType="FontIcon">
+            <Setter Property="Foreground" Value="{ThemeResource SystemFillColorCautionBrush}" />
+        </Style>
+    </UserControl.Resources>
+
     <Grid Margin="0,3">
         <Grid.ContextFlyout>
             <MenuFlyout x:Name="CardMenu">

@@ -3,6 +3,7 @@ using EchoDiar.Core.Audio;
 using Windows.Win32;
 using Windows.Win32.Foundation;
 using Windows.Win32.Media.Audio;
+using Windows.Win32.Media.Audio.Endpoints;
 using Windows.Win32.System.Com;
 using Windows.Win32.System.Com.StructuredStorage;
 using Windows.Win32.System.Variant;
@@ -16,8 +17,10 @@ public readonly record struct AudioInputDevice(string Id, string Name);
 /// <summary>
 /// Route changes during a recording (the Windows counterpart of macOS AudioRouteMonitor), from an
 /// IMMNotificationClient: default device changes, endpoint state changes, added and removed endpoints, and
-/// device format (sample rate) changes. Notifications within 300 ms are coalesced and the state is compared as a
-/// whole, since a disconnect fires its notifications (state changed, removed, defaults changed) in no guaranteed order.
+/// device format (sample rate) changes; and, from IAudioEndpointVolumeCallback, the mute and volume of the input in use
+/// and, when following the default, of the default capture endpoint. Notifications within 300 ms are coalesced and the
+/// state is compared as a whole, since a disconnect fires its notifications (state changed, removed, defaults changed)
+/// in no guaranteed order.
 /// <para>
 /// The input in use is the picked endpoint while it is active, else <see cref="DefaultMicId"/> (as
 /// <see cref="MicCapture"/>); the output is the default render endpoint (eConsole, as <see cref="LoopbackCapture.Endpoint"/>).
@@ -34,6 +37,7 @@ public sealed class AudioRouteMonitor : IAudioRouteSource, IDisposable
 
     // The container id of the devices built into the computer (its own mic and speakers).
     private const string ComputerContainer = "00000000-0000-0000-ffff-ffffffffffff";
+    private const float SilentVolume = 0.001f; // a master volume at or below it counts as muted
 
     // Clients whose unregistration failed: the audio service may still call them, so they are never collected.
     private static readonly List<Listener> Unreleased = [];
@@ -45,6 +49,8 @@ public sealed class AudioRouteMonitor : IAudioRouteSource, IDisposable
     private string? _pinnedId;
     private Endpoint _input;
     private Endpoint _output;
+    private List<(string Id, IAudioEndpointVolume Volume)> _muteWatched = []; // see MuteEndpoints, under _lock
+    private volatile bool _inputMuted; // written under _lock, read without it
     private bool _disposed;
 
     /// <summary>The default output endpoint, or its sample rate, changed.</summary>
@@ -55,6 +61,15 @@ public sealed class AudioRouteMonitor : IAudioRouteSource, IDisposable
 
     /// <summary>The input in use was removed, unplugged or disabled; input now follows the default.</summary>
     public event Action? InputLost;
+
+    /// <summary><see cref="InputMuted"/> flipped.</summary>
+    public event Action? InputMuteChanged;
+
+    /// <summary>
+    /// A watched endpoint (see <see cref="MuteEndpoints"/>) is muted or at volume 0; false when stopped. The value cached
+    /// by the last start or evaluation: no COM call, no lock.
+    /// </summary>
+    public bool InputMuted => _inputMuted;
 
     /// <summary>
     /// Diagnostics (null: none): each notification, start and evaluation as a line. Called on audio service and
@@ -68,8 +83,9 @@ public sealed class AudioRouteMonitor : IAudioRouteSource, IDisposable
     /// endpoint notifications cannot be registered (no audio service).
     /// <para>
     /// The notification client is registered on the first Start and stays registered, rooted by this monitor, until
-    /// <see cref="Dispose"/>: Start and Stop only reset the routes and turn the events on or off. Registering a new
-    /// client per run left the audio service with a pointer to a client the GC could free.
+    /// <see cref="Dispose"/>: Start and Stop only reset the routes, turn the events on or off, and register or unregister
+    /// it as the volume callback of the watched endpoints. Registering a new client per run left the audio service with
+    /// a pointer to a client the GC could free.
     /// </para>
     /// </summary>
     public bool Start(string? inputEndpointId)
@@ -92,8 +108,9 @@ public sealed class AudioRouteMonitor : IAudioRouteSource, IDisposable
                         _input = input;
                         _output = output;
                         _running = true;
+                        _inputMuted = WatchMute(client, input);
                     }
-                    Log?.Invoke($"route monitor: start, picked {inputEndpointId ?? "none (default)"}, client {(registered ? "registered" : "reused")}, input {input}, output {output}");
+                    Log?.Invoke($"route monitor: start, picked {inputEndpointId ?? "none (default)"}, client {(registered ? "registered" : "reused")}, input {input}, output {output}, muted {_inputMuted}");
                 });
                 return true;
             }
@@ -178,8 +195,16 @@ public sealed class AudioRouteMonitor : IAudioRouteSource, IDisposable
 
     private void StopLocked()
     {
-        lock (_lock) _running = false;
+        List<(string Id, IAudioEndpointVolume Volume)> watched;
+        lock (_lock)
+        {
+            _running = false;
+            _inputMuted = false;
+            watched = _muteWatched;
+            _muteWatched = [];
+        }
         _client?.Disarm();
+        if (_client is { } client && watched.Count > 0) OnMta(() => UnwatchMute(client, watched));
     }
 
     /// <summary>
@@ -234,10 +259,13 @@ public sealed class AudioRouteMonitor : IAudioRouteSource, IDisposable
 
                 var output = DefaultEndpoint(enumerator, EDataFlow.eRender);
                 if (output != _output) events.Add(OutputChanged);
+                var muted = WatchMute(listener, input);
+                if (muted != _inputMuted) events.Add(InputMuteChanged);
                 Log?.Invoke($"route monitor: evaluate, input {_input} state {(state is { } s ? $"0x{(uint)s:X}" : "unreadable")} -> {input}, " +
-                    $"output {_output} -> {output}, raises [{string.Join(", ", new[] { inputEvent, output != _output ? nameof(OutputChanged) : null }.OfType<string>())}]");
+                    $"output {_output} -> {output}, muted {_inputMuted} -> {muted}, raises [{string.Join(", ", new[] { inputEvent, output != _output ? nameof(OutputChanged) : null, muted != _inputMuted ? nameof(InputMuteChanged) : null }.OfType<string>())}]");
                 _input = input;
                 _output = output;
+                _inputMuted = muted;
             }
         }
         catch (Exception e)
@@ -247,6 +275,97 @@ public sealed class AudioRouteMonitor : IAudioRouteSource, IDisposable
             return;
         }
         foreach (var handler in events) handler?.Invoke();
+    }
+
+    /// <summary>
+    /// The endpoints whose mute counts (the counterpart of macOS <c>InputMute.isSystemMuted</c>): the input in use and,
+    /// when following the default, the default capture endpoint (eConsole) when it differs. With a Bluetooth headset as
+    /// default input the replacement mic is opened (see <see cref="DefaultMicId"/>), but muting the headset is what the
+    /// user did.
+    /// </summary>
+    private List<string> MuteEndpoints(IMMDeviceEnumerator enumerator, Endpoint input)
+    {
+        var ids = new List<string>();
+        if (input.Id is { } id) ids.Add(id);
+        if (_pinnedId is null && DefaultEndpoint(enumerator, EDataFlow.eCapture).Id is { } fallback && fallback != input.Id) ids.Add(fallback);
+        return ids;
+    }
+
+    /// <summary>
+    /// Registers the volume callback on <see cref="MuteEndpoints"/> when they changed (unregistering the old ones), then
+    /// whether one is muted. An endpoint that cannot be activated, registered or read is not followed (fails open).
+    /// Inside <see cref="_lock"/>, on an MTA thread.
+    /// </summary>
+    private bool WatchMute(Listener client, Endpoint input)
+    {
+        var ids = MuteEndpoints(client.Enumerator, input);
+        if (!ids.SequenceEqual(_muteWatched.Select(w => w.Id)))
+        {
+            UnwatchMute(client, _muteWatched);
+            _muteWatched = [];
+            foreach (var id in ids)
+            {
+                IMMDevice? device = null;
+                IAudioEndpointVolume? volume = null;
+                try
+                {
+                    client.Enumerator.GetDevice(id, out device);
+                    device.Activate(typeof(IAudioEndpointVolume).GUID, CLSCTX.CLSCTX_ALL, null, out var activated);
+                    volume = (IAudioEndpointVolume)activated;
+                    volume.RegisterControlChangeNotify(client);
+                    _muteWatched.Add((id, volume));
+                    volume = null;
+                }
+                catch (Exception e)
+                {
+                    Log?.Invoke($"route monitor: mute of {id} not followed, {e.GetType().Name} 0x{e.HResult:X8} {e.Message}");
+                }
+                finally
+                {
+                    if (volume is not null) Marshal.ReleaseComObject(volume);
+                    if (device is not null) Marshal.ReleaseComObject(device);
+                }
+            }
+        }
+        return _muteWatched.Any(w => IsMuted(w.Volume));
+    }
+
+    /// <summary>
+    /// Unregisters the volume callback from <paramref name="watched"/> and releases them, on an MTA thread, never from
+    /// a notification. When unregistering fails the endpoint may still call the client: it is then kept alive for the
+    /// process's lifetime, and that endpoint is not released.
+    /// </summary>
+    private void UnwatchMute(Listener client, List<(string Id, IAudioEndpointVolume Volume)> watched)
+    {
+        foreach (var (id, volume) in watched)
+        {
+            try
+            {
+                volume.UnregisterControlChangeNotify(client);
+                Marshal.ReleaseComObject(volume);
+            }
+            catch (Exception e)
+            {
+                Log?.Invoke($"route monitor: mute of {id} not unregistered, {e.GetType().Name} 0x{e.HResult:X8} {e.Message}");
+                lock (Unreleased) if (!Unreleased.Contains(client)) Unreleased.Add(client);
+            }
+        }
+    }
+
+    /// <summary>Muted, or its master volume at 0; false when it cannot be read (removed meanwhile).</summary>
+    private static bool IsMuted(IAudioEndpointVolume volume)
+    {
+        try
+        {
+            volume.GetMute(out var muted);
+            if (muted) return true;
+            volume.GetMasterVolumeLevelScalar(out var level);
+            return level <= SilentVolume;
+        }
+        catch (Exception)
+        {
+            return false;
+        }
     }
 
     /// <summary>Runs COM work on an MTA thread, so the enumerator never belongs to the app's STA UI thread.</summary>
@@ -513,11 +632,11 @@ public sealed class AudioRouteMonitor : IAudioRouteSource, IDisposable
     }
 
     /// <summary>
-    /// The registered notification client: the enumerator it is registered with and the coalescing timer, for the
-    /// monitor's lifetime. Its callbacks run on an audio service thread and only arm the timer: no COM call, no lock,
-    /// no throw.
+    /// The registered notification client, also the volume callback of the watched endpoints: the enumerator it is
+    /// registered with and the coalescing timer, for the monitor's lifetime. Its callbacks run on an audio service
+    /// thread and only arm the timer: no COM call, no lock, no throw.
     /// </summary>
-    private sealed class Listener : IMMNotificationClient
+    private sealed class Listener : IMMNotificationClient, IAudioEndpointVolumeCallback
     {
         private readonly AudioRouteMonitor _monitor;
         private readonly Timer _timer;
@@ -576,6 +695,23 @@ public sealed class AudioRouteMonitor : IAudioRouteSource, IDisposable
             var format = PInvoke.PKEY_AudioEngine_DeviceFormat;
             if (key.fmtid == format.fmtid && key.pid == format.pid)
                 Schedule(_monitor.Log is null ? null : $"OnPropertyValueChanged {pwstrDeviceId} device format");
+        }
+
+        /// <summary>
+        /// Fires on every master-volume step (automatic gain control moves it all through a call): only a change
+        /// that could flip the cached state is evaluated. That state is "any watched endpoint muted": a muted report
+        /// cannot clear it, nor an unmuted one set it. A null pointer is evaluated, untraced.
+        /// </summary>
+        public unsafe void OnNotify(AUDIO_VOLUME_NOTIFICATION_DATA* pNotify)
+        {
+            if (pNotify == null)
+            {
+                Schedule(null);
+                return;
+            }
+            var muted = pNotify->bMuted || pNotify->fMasterVolume <= SilentVolume;
+            if (muted != _monitor._inputMuted)
+                Schedule(_monitor.Log is null ? null : $"OnNotify muted {(bool)pNotify->bMuted} volume {pNotify->fMasterVolume:0.###}");
         }
 
         /// <summary>

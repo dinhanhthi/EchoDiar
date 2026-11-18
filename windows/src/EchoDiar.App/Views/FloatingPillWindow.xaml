@@ -15,6 +15,12 @@
     Title="EchoDiar">
 
     <Canvas x:Name="RootCanvas" Background="{ThemeResource SolidBackgroundFillColorBaseBrush}">
+        <Canvas.Resources>
+            <!-- The Mute button's glyph while the mic is muted, by Mute or by the system (as RecordingCard's). -->
+            <Style x:Key="MutedMicIconStyle" TargetType="FontIcon">
+                <Setter Property="Foreground" Value="{ThemeResource SystemFillColorCautionBrush}" />
+            </Style>
+        </Canvas.Resources>
         <Grid
             x:Name="Capsule"
             Background="{ThemeResource SolidBackgroundFillColorBaseBrush}"
@@ -59,13 +65,13 @@
                         HorizontalAlignment="Left"
                         Background="{ThemeResource AccentFillColorDefaultBrush}" />
                 </Border>
-                <!-- The mic is muted; expanded, the Mute button shows it. -->
+                <!-- The mic is muted, by Mute or by the system; expanded, the Mute button shows it. -->
                 <FontIcon
                     x:Name="MutedIcon"
                     VerticalAlignment="Center"
                     AutomationProperties.Name="{local:T Text='Microphone muted'}"
                     FontFamily="{ThemeResource SymbolThemeFontFamily}"
-                    Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                    Foreground="{ThemeResource SystemFillColorCautionBrush}"
                     Glyph="&#xF781;"
                     Visibility="Collapsed" />
                 <!-- Shown while the pointer is over the pill. -->

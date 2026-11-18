@@ -180,9 +180,11 @@ public sealed partial class AppViewModel : ObservableObject
         private set
         {
             var muted = _recordingSnapshot.MicMuted;
+            var systemMuted = _recordingSnapshot.SystemMicMuted;
             if (!SetProperty(ref _recordingSnapshot, value)) return;
             OnPropertyChanged(nameof(IsRecording));
             if (value.MicMuted != muted) OnPropertyChanged(nameof(MicMuted));
+            if (value.SystemMicMuted != systemMuted) OnPropertyChanged(nameof(SystemMicMuted));
         }
     }
 

@@ -59,13 +59,17 @@ public sealed partial class AppViewModel
     /// <summary>The mic is muted in the current recording (its channel written as silence); false when idle.</summary>
     public bool MicMuted => RecordingSnapshot.MicMuted;
 
+    /// <summary>The system mutes the mic in use (device mute or input volume 0): its channel is silent and Mute does nothing.</summary>
+    public bool SystemMicMuted => RecordingSnapshot.SystemMicMuted;
+
     /// <summary>
     /// Mutes or unmutes the mic, off the UI thread: reopening the device can take a while. The engine flips its state
-    /// under its lock and publishes it, which <see cref="RecordingSnapshot"/> picks up (macOS <c>toggleMicMute</c>).
+    /// under its lock and publishes it, which <see cref="RecordingSnapshot"/> picks up (macOS <c>toggleMicMute</c>). Does
+    /// nothing while the system mutes the mic.
     /// </summary>
     public void ToggleMicMute()
     {
-        if (!IsRecording) return;
+        if (!IsRecording || SystemMicMuted) return;
         _ = Task.Run(() =>
         {
             try

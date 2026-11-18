@@ -65,7 +65,7 @@ public sealed partial class FloatingPillWindow : Window
     private readonly PointerEventHandler _anyReleased;
     private double _scale;
     private bool? _shownPaused;
-    private bool? _shownMuted;
+    private (bool Muted, bool SystemMuted)? _shownMuted;
     private SizeInt32 _reportedSize;
 
     public FloatingPillWindow(AppViewModel model)
@@ -210,7 +210,7 @@ public sealed partial class FloatingPillWindow : Window
         UpdateMutedIcon();
 
         // The snapshot changes at 15 Hz: a tooltip set again each time would close under the pointer.
-        UpdateMuteButton(snapshot.MicMuted);
+        UpdateMuteButton(snapshot.MicMuted, snapshot.SystemMicMuted);
         if (paused == _shownPaused) return;
         _shownPaused = paused;
         AutomationProperties.SetName(DotGrid, Loc.T(paused ? "Paused" : "Recording"));
@@ -219,15 +219,19 @@ public sealed partial class FloatingPillWindow : Window
         ToolTipService.SetToolTip(PauseButton, Loc.T(paused ? "Resume recording" : "Pause recording"));
     }
 
-    /// <summary>The Mute button's glyph, name and tooltip, when the state changed.</summary>
-    private void UpdateMuteButton(bool muted)
+    /// <summary>
+    /// The Mute button's glyph, colour, name and tooltip, when the state changed; as the card's, it stays enabled while
+    /// the system mutes the mic, and does nothing then.
+    /// </summary>
+    private void UpdateMuteButton(bool muted, bool systemMuted)
     {
-        if (muted == _shownMuted) return;
-        _shownMuted = muted;
-        MuteIcon.Glyph = muted ? RecordingCard.MicOffGlyph : RecordingCard.MicGlyph;
+        if ((muted, systemMuted) == _shownMuted) return;
+        _shownMuted = (muted, systemMuted);
+        RecordingCard.SetMuteIcon(MuteIcon, muted || systemMuted, (Style)RootCanvas.Resources["MutedMicIconStyle"]);
         var title = Loc.T(muted ? "Unmute microphone" : "Mute microphone");
-        AutomationProperties.SetName(MuteButton, title);
-        ToolTipService.SetToolTip(MuteButton, title);
+        var name = systemMuted ? Loc.T("Microphone muted in system settings") : title;
+        AutomationProperties.SetName(MuteButton, name);
+        ToolTipService.SetToolTip(MuteButton, name);
     }
 
     /// <summary>The hover controls show or hide; the muted mic's glyph shows only while they are hidden.</summary>
@@ -237,9 +241,9 @@ public sealed partial class FloatingPillWindow : Window
         UpdateMutedIcon();
     }
 
-    /// <summary>The muted mic's glyph, while muted and collapsed (expanded, the Mute button shows it).</summary>
+    /// <summary>The muted mic's glyph, while muted (by Mute or the system) and collapsed (expanded, the Mute button shows it).</summary>
     private void UpdateMutedIcon() =>
-        MutedIcon.Visibility = _model.MicMuted && Controls.Visibility == Visibility.Collapsed ? Visibility.Visible : Visibility.Collapsed;
+        MutedIcon.Visibility = (_model.MicMuted || _model.SystemMicMuted) && Controls.Visibility == Visibility.Collapsed ? Visibility.Visible : Visibility.Collapsed;
 
     /// <summary>"Record" on the detection or calendar prompt.</summary>
     private void OnRecordPromptClick()

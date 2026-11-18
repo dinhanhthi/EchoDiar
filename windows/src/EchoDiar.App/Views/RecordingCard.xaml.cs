@@ -30,7 +30,7 @@ public sealed partial class RecordingCard : UserControl
     private readonly FrameTicker _ticker;
     private bool _selected;
     private bool? _shownPaused;
-    private bool? _shownMuted;
+    private (bool Muted, bool SystemMuted)? _shownMuted;
     private bool _editing;
 
     /// <summary>The title's tooltip as last set: one set again while shown closes under the pointer (Update runs at 15 Hz).</summary>
@@ -115,7 +115,7 @@ public sealed partial class RecordingCard : UserControl
         if (!recording || paused) UpdateMeters();
 
         // The snapshot changes at 15 Hz: a tooltip set again each time would close under the pointer.
-        UpdateMute(snapshot.MicMuted);
+        UpdateMute(snapshot.MicMuted, snapshot.SystemMicMuted);
         if (paused == _shownPaused) return;
         _shownPaused = paused;
         PauseIcon.Glyph = paused ? ResumeGlyph : PauseGlyph;
@@ -125,16 +125,33 @@ public sealed partial class RecordingCard : UserControl
         PauseItem.Text = pauseTitle;
     }
 
-    /// <summary>The Mute button's glyph, name and tooltip and the menu item's text, when the state changed.</summary>
-    private void UpdateMute(bool muted)
+    /// <summary>
+    /// The Mute button's glyph, colour, name and tooltip and the menu item, when the state changed. Muted by Mute
+    /// or by the system, the glyph is crossed out in yellow. While the system mutes the mic the button stays enabled
+    /// (disabled would dim the yellow and hide the tooltip) and does nothing; the menu item is disabled.
+    /// </summary>
+    private void UpdateMute(bool muted, bool systemMuted)
     {
-        if (muted == _shownMuted) return;
-        _shownMuted = muted;
-        MuteIcon.Glyph = muted ? MicOffGlyph : MicGlyph;
+        if ((muted, systemMuted) == _shownMuted) return;
+        _shownMuted = (muted, systemMuted);
+        SetMuteIcon(MuteIcon, muted || systemMuted, (Style)Resources["MutedMicIconStyle"]);
         var title = Loc.T(muted ? "Unmute microphone" : "Mute microphone");
-        AutomationProperties.SetName(MuteButton, title);
-        ToolTipService.SetToolTip(MuteButton, title);
+        var name = systemMuted ? Loc.T("Microphone muted in system settings") : title;
+        AutomationProperties.SetName(MuteButton, name);
+        ToolTipService.SetToolTip(MuteButton, name);
         MuteItem.Text = Loc.T(muted ? "Unmute Microphone" : "Mute Microphone");
+        MuteItem.IsEnabled = !systemMuted;
+    }
+
+    /// <summary>
+    /// A Mute button's glyph: crossed out in the caution colour of <paramref name="mutedStyle"/> while muted, else
+    /// without a style so it follows the button's foreground (also the pill's).
+    /// </summary>
+    internal static void SetMuteIcon(FontIcon icon, bool muted, Style mutedStyle)
+    {
+        icon.Glyph = muted ? MicOffGlyph : MicGlyph;
+        if (muted) icon.Style = mutedStyle;
+        else icon.ClearValue(FrameworkElement.StyleProperty);
     }
 
     /// <summary>The mic and system peaks the model reads at 15 Hz; empty while paused or idle.</summary>

@@ -48,6 +48,15 @@ public interface IAudioRouteSource
     /// <summary>The input in use was removed, unplugged or disabled; input now follows the default.</summary>
     event Action? InputLost;
 
+    /// <summary>The system mute of the input in use, or of the default input when no mic is picked, flipped (the
+    /// device mute, or its volume at 0).</summary>
+    event Action? InputMuteChanged;
+
+    /// <summary>The input in use, or the default input when no mic is picked, is muted or its volume is 0; false when
+    /// not started. Read inside the engine's lock: a cached value that never waits on <see cref="Start"/> or
+    /// <see cref="Stop"/>.</summary>
+    bool InputMuted { get; }
+
     /// <summary>Starts listening, after stopping any previous run. <paramref name="inputEndpointId"/>: the picked mic,
     /// null for the default input. False when it cannot listen.</summary>
     bool Start(string? inputEndpointId);
@@ -126,6 +135,11 @@ public sealed class RecordingEngine : IDisposable
         /// <see cref="ToggleMicMuted"/>.</summary>
         public bool MicMuted { get; init; }
 
+        /// <summary>The OS mutes the mic in use, or the default input when following it, or its input volume is 0
+        /// (<see cref="IAudioRouteSource.InputMuted"/>): the device is closed and the channel written as silence, as
+        /// <see cref="MicMuted"/>.</summary>
+        public bool SystemMicMuted { get; init; }
+
         /// <summary>Set on the snapshot published when a recording ends.</summary>
         public EndReason? EndReason { get; init; }
 
@@ -174,10 +188,11 @@ public sealed class RecordingEngine : IDisposable
     private bool _silentTapSuspected;
     private int _micRoutesLost;
     private bool _micMuted;
+    private bool _systemMicMuted;
 
     // Behind _routeLock: the session the route source runs for (0: none) and the handlers subscribed for it.
     private long _routesGeneration;
-    private (Action Output, Action Input, Action Lost)? _routeHandlers;
+    private (Action Output, Action Input, Action Lost, Action Mute)? _routeHandlers;
 
     // Behind _shared.
     private Snapshot _snapshot = new();
@@ -240,8 +255,9 @@ public sealed class RecordingEngine : IDisposable
 
     /// <summary>
     /// Writes <c>session.json</c> before any IO, then starts the system source, the mic (silence if unavailable) and
-    /// the writer. Returns the session folder. Throws if the disk is nearly full or the system source cannot start; the
-    /// folder is then removed. <paramref name="micEndpointId"/> null (or an input that is gone) records the default input.
+    /// the writer; with a route source the mic opens just after the writer, once the system mute is known. Returns the
+    /// session folder. Throws if the disk is nearly full or the system source cannot start; the folder is then removed.
+    /// <paramref name="micEndpointId"/> null (or an input that is gone) records the default input.
     /// <paramref name="title"/> (e.g. the calendar event's) goes into the first <c>session.json</c>, trimmed; blank or
     /// null leaves the default title.
     /// </summary>
@@ -264,6 +280,7 @@ public sealed class RecordingEngine : IDisposable
             _silentTapSuspected = false;
             _micRoutesLost = 0;
             _micMuted = false;
+            _systemMicMuted = false;
             _target = target;
             _micEndpointId = micEndpointId;
 
@@ -289,7 +306,8 @@ public sealed class RecordingEngine : IDisposable
                 Discard(folder);
                 throw;
             }
-            var mic = OpenMic(micEndpointId);
+            // With a route source the mic opens once it has started and reports the system mute (OpenFirstMic).
+            var mic = _routes is null ? OpenMic(micEndpointId) : StandInMic();
 
             ChannelWriter? writer = null;
             try
@@ -392,13 +410,14 @@ public sealed class RecordingEngine : IDisposable
     /// Flips the mute. Muted, the mic device is closed (privacy indicator off) and the mic channel is written as
     /// silence, so the file stays time-aligned; unmuted, the picked input (else the default) is reopened, and while
     /// recording, if no input opens, the mute stays on. While paused only the flag changes and <see cref="Resume"/>
-    /// honours it; it is kept across pauses and cleared when the recording starts and stops. No-op when idle.
+    /// honours it; it is kept across pauses and cleared when the recording starts and stops. No-op when idle or while
+    /// the system mutes the mic (<see cref="Snapshot.SystemMicMuted"/>).
     /// </summary>
     public void ToggleMicMuted()
     {
         lock (_gate)
         {
-            if (_state == State.Idle || _session is null) return;
+            if (_state == State.Idle || _systemMicMuted || _session is null) return;
             _micMuted = !_micMuted;
             if (_state == State.Recording && _writer is not null)
             {
@@ -508,6 +527,7 @@ public sealed class RecordingEngine : IDisposable
         _sessionGeneration++;
         _state = State.Idle;
         _micMuted = false;
+        _systemMicMuted = false;
         _session = null;
         _folder = null;
         _writer = null;
@@ -528,13 +548,13 @@ public sealed class RecordingEngine : IDisposable
 
     /// <summary>
     /// The input <paramref name="endpointId"/> (null: the default), else the default input when that one is gone (as
-    /// on macOS), else a stand-in ring nothing writes to, which the writer fills with silence; never throws. Muted,
-    /// no device is opened: the stand-in.
+    /// on macOS), else a stand-in ring nothing writes to, which the writer fills with silence; never throws. Muted
+    /// (by the user or the system), no device is opened: the stand-in.
     /// </summary>
     private Capture OpenMic(string? endpointId)
     {
         var generation = ++_micGeneration;
-        if (_micMuted) return StandInMic();
+        if (_micMuted || _systemMicMuted) return StandInMic();
         Action<Exception> onFailed = _ => ThreadPool.QueueUserWorkItem(_ => MicFailed(generation));
         try
         {
@@ -581,7 +601,7 @@ public sealed class RecordingEngine : IDisposable
 
     // Routes
 
-    private enum RouteEvent { OutputChanged, InputChanged, InputLost }
+    private enum RouteEvent { OutputChanged, InputChanged, InputLost, InputMuteChanged }
 
     /// <summary>
     /// Starts the route source for the current session, or stops it once idle, with handlers bound to that session.
@@ -610,6 +630,7 @@ public sealed class RecordingEngine : IDisposable
                     _routes.OutputChanged -= old.Output;
                     _routes.InputChanged -= old.Input;
                     _routes.InputLost -= old.Lost;
+                    _routes.InputMuteChanged -= old.Mute;
                     _routes.Stop();
                     Log?.Invoke($"engine: route source stopped for session {_routesGeneration}");
                 }
@@ -618,11 +639,13 @@ public sealed class RecordingEngine : IDisposable
                 var handlers = (
                     Output: (Action)(() => RouteChanged(RouteEvent.OutputChanged, generation)),
                     Input: (Action)(() => RouteChanged(RouteEvent.InputChanged, generation)),
-                    Lost: (Action)(() => RouteChanged(RouteEvent.InputLost, generation)));
+                    Lost: (Action)(() => RouteChanged(RouteEvent.InputLost, generation)),
+                    Mute: (Action)(() => RouteChanged(RouteEvent.InputMuteChanged, generation)));
                 _routeHandlers = handlers;
                 _routes.OutputChanged += handlers.Output;
                 _routes.InputChanged += handlers.Input;
                 _routes.InputLost += handlers.Lost;
+                _routes.InputMuteChanged += handlers.Mute;
                 var listening = _routes.Start(endpointId);
                 Log?.Invoke($"engine: route source started for session {generation}, mic {endpointId ?? "default"}, listening {listening}");
             }
@@ -632,6 +655,33 @@ public sealed class RecordingEngine : IDisposable
                 Debug.WriteLine($"EchoDiar: could not sync the route monitor: {e}");
                 Log?.Invoke($"engine: could not sync the route source, {e.GetType().Name} 0x{e.HResult:X8} {e.Message}");
             }
+            // Also when the source could not start: the mic opens either way.
+            if (generation != 0) OpenFirstMic(generation);
+        }
+    }
+
+    /// <summary>
+    /// Opens the first mic of session <paramref name="generation"/> once the route source has started, from a single
+    /// read of its system mute, so a mic the system mutes is never opened. Inside <c>_routeLock</c>, which comes
+    /// before <c>_gate</c>.
+    /// </summary>
+    private void OpenFirstMic(long generation)
+    {
+        try
+        {
+            lock (_gate)
+            {
+                if (generation != _sessionGeneration || _state == State.Idle) return;
+                if (UpdateSystemMicMuted()) Publish();
+                // Opens the mic, or closes it if the system mutes it; the user's mute keeps the device closed.
+                if (_state == State.Recording && !_micMuted && (_mic?.Source is not null) == _systemMicMuted)
+                    ReopenMic(_micEndpointId);
+            }
+        }
+        catch (Exception e)
+        {
+            Debug.WriteLine($"EchoDiar: could not open the mic: {e}");
+            Log?.Invoke($"engine: could not open the mic, {e.GetType().Name} 0x{e.HResult:X8} {e.Message}");
         }
     }
 
@@ -639,8 +689,9 @@ public sealed class RecordingEngine : IDisposable
     /// A route change for session <paramref name="generation"/> (ignored once that session has ended), as on macOS: an
     /// output change rebuilds the global system source; a lost input is counted, moves the mic to the default input and
     /// raises <see cref="MicRouteLost"/>; a changed input reopens the picked mic (else the default). While paused only
-    /// the count changes: resume opens the sources anew. Input events are ignored while muted. Runs on the route
-    /// source's thread-pool thread: never throws.
+    /// the count changes: resume opens the sources anew. Input events first re-read the system mute; they are ignored
+    /// while muted, unless the system mute just flipped. A system mute flip reopens the mic (see
+    /// <see cref="FollowSystemMicMute"/>). Runs on the route source's thread-pool thread: never throws.
     /// </summary>
     private void RouteChanged(RouteEvent route, long generation)
     {
@@ -650,14 +701,26 @@ public sealed class RecordingEngine : IDisposable
             {
                 Log?.Invoke($"engine: {route} for session {generation} (current {_sessionGeneration}, {_state})");
                 if (generation != _sessionGeneration || _state == State.Idle) return;
-                // Muted, no input is open: unmuting opens the current one.
-                if (_micMuted && route != RouteEvent.OutputChanged) return;
+                // The new input may be muted in the system, or no longer.
+                var systemMuteChanged = route != RouteEvent.OutputChanged && UpdateSystemMicMuted();
+                if (route == RouteEvent.InputMuteChanged)
+                {
+                    if (systemMuteChanged) FollowSystemMicMute();
+                    return;
+                }
+                // Muted, no input is open: unmuting opens the current one. A system mute that just flipped swaps below.
+                if (route != RouteEvent.OutputChanged && (_micMuted || _systemMicMuted && !systemMuteChanged))
+                {
+                    if (systemMuteChanged) Publish();
+                    return;
+                }
                 switch (route)
                 {
                     case RouteEvent.OutputChanged:
                         RebuildSystem();
                         break;
                     case RouteEvent.InputChanged:
+                        if (systemMuteChanged) Publish();
                         ReopenMic(_micEndpointId);
                         break;
                     case RouteEvent.InputLost:
@@ -675,6 +738,53 @@ public sealed class RecordingEngine : IDisposable
         {
             Debug.WriteLine($"EchoDiar: route change {route} failed: {e}");
             Log?.Invoke($"engine: {route} failed, {e.GetType().Name} 0x{e.HResult:X8} {e.Message}");
+        }
+    }
+
+    /// <summary>
+    /// The system mute flipped: while recording, the mic is closed or reopened (unless the user muted it); a failed
+    /// reopen stays silent until the next mute or route change. While paused only the flag changes and
+    /// <see cref="Resume"/> honours it.
+    /// </summary>
+    private void FollowSystemMicMute()
+    {
+        if (_state == State.Recording && !_micMuted)
+        {
+            try
+            {
+                ReopenMic(_micEndpointId); // a silent stand-in while muted
+            }
+            catch (Exception e)
+            {
+                Debug.WriteLine($"EchoDiar: could not swap the mic: {e}");
+                Log?.Invoke($"engine: could not swap the mic, {e.GetType().Name} 0x{e.HResult:X8} {e.Message}");
+            }
+            if (!_systemMicMuted && _mic?.Source is null)
+                Log?.Invoke("engine: could not reopen the mic after the system unmute, staying silent");
+        }
+        Publish();
+    }
+
+    /// <summary>Re-reads the system mute of the input; returns whether it changed.</summary>
+    private bool UpdateSystemMicMuted()
+    {
+        var muted = ReadSystemMicMuted();
+        var changed = muted != _systemMicMuted;
+        _systemMicMuted = muted;
+        return changed;
+    }
+
+    /// <summary>The route source's <see cref="IAudioRouteSource.InputMuted"/>; false without one or when it throws.</summary>
+    private bool ReadSystemMicMuted()
+    {
+        try
+        {
+            return _routes?.InputMuted ?? false;
+        }
+        catch (Exception e)
+        {
+            Log?.Invoke($"engine: could not read the system mic mute, {e.GetType().Name} 0x{e.HResult:X8} {e.Message}");
+            return false;
         }
     }
 
@@ -796,6 +906,7 @@ public sealed class RecordingEngine : IDisposable
             LowDisk = _lowDisk,
             MicRoutesLost = _micRoutesLost,
             MicMuted = _micMuted,
+            SystemMicMuted = _systemMicMuted,
             EndReason = endReason,
         };
         if ((stats ?? _writer?.Stats) is { } current) snapshot = snapshot.Applying(current);

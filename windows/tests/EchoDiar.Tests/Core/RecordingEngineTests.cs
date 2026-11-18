@@ -124,6 +124,70 @@ public sealed class RecordingEngineTests : IDisposable
     }
 
     [Fact]
+    public void SystemMuteClosesTheMicAndItsChannelStaysTimeAlignedSilence()
+    {
+        var engine = Engine();
+        var folder = engine.Start(CaptureTarget.Global, "auto", micEndpointId: "mic-1", _root);
+        EmitBlock();
+
+        _now += TicksPerSecond / 10;
+        _routes.InputMuted = true;
+        _routes.InputMuteChanged?.Invoke();
+        Assert.True(_mics[0].Disposed); // the device is released
+        Assert.True(engine.CurrentSnapshot().SystemMicMuted);
+        engine.ToggleMicMuted(); // no-op while the system mutes the mic
+        Assert.False(engine.CurrentSnapshot().MicMuted);
+        Assert.Single(_mics);
+        _systems[^1].Emit(Enumerable.Repeat(0.25f, 1_600).ToArray(), _now);
+
+        _now += TicksPerSecond / 10;
+        _routes.InputMuted = false;
+        _routes.InputMuteChanged?.Invoke();
+        Assert.False(engine.CurrentSnapshot().SystemMicMuted);
+        Assert.Equal(["mic-1", "mic-1"], _mics.Select(mic => mic.EndpointId));
+        EmitBlock();
+        var stored = engine.Stop()!;
+
+        using var reader = new CafFile.Reader(Path.Combine(folder, stored.AudioFileName));
+        Assert.Equal(0.3, reader.Frames / 16_000.0, 0.005);
+        float Sample(int frame, int channel) => reader.Read(frame, 1)[channel];
+        Assert.Equal(0.25f, Sample(800, 0), 0.01f);
+        Assert.Equal(0f, Sample(2_400, 0), 0.001f);
+        Assert.Equal(0.25f, Sample(2_400, 1), 0.01f);
+        Assert.Equal(0.25f, Sample(4_000, 0), 0.01f);
+    }
+
+    [Fact]
+    public void UserMuteSurvivesASystemMuteAndUnmute()
+    {
+        var engine = Engine();
+        engine.Start(CaptureTarget.Global, "auto", micEndpointId: "mic-1", _root);
+        engine.ToggleMicMuted();
+
+        _routes.InputMuted = true;
+        _routes.InputMuteChanged?.Invoke();
+        _routes.InputMuted = false;
+        _routes.InputMuteChanged?.Invoke();
+
+        Assert.Single(_mics);
+        Assert.True(_mics[0].Disposed);
+        Assert.True(engine.CurrentSnapshot().MicMuted);
+        Assert.False(engine.CurrentSnapshot().SystemMicMuted);
+    }
+
+    [Fact]
+    public void StartingWhileTheSystemMutesTheMicOpensNoMic()
+    {
+        _routes.InputMuted = true;
+        var engine = Engine();
+        var folder = engine.Start(CaptureTarget.Global, "auto", micEndpointId: "mic-1", _root);
+
+        Assert.Empty(_mics);
+        Assert.True(engine.CurrentSnapshot().SystemMicMuted);
+        Assert.Null(RecordingSession.Read(folder).MicDeviceName);
+    }
+
+    [Fact]
     public void FailingSystemSourceRemovesTheFolder()
     {
         var engine = Engine(() => new FakeSource { StartError = new InvalidOperationException("no loopback") });
@@ -245,13 +309,16 @@ public sealed class RecordingEngineTests : IDisposable
         public Action? OutputChanged;
         public Action? InputChanged;
         public Action? InputLost;
+        public Action? InputMuteChanged;
 
+        public bool InputMuted { get; set; }
         public List<string?> Starts { get; } = [];
         public int Stops { get; private set; }
 
         event Action? IAudioRouteSource.OutputChanged { add => OutputChanged += value; remove => OutputChanged -= value; }
         event Action? IAudioRouteSource.InputChanged { add => InputChanged += value; remove => InputChanged -= value; }
         event Action? IAudioRouteSource.InputLost { add => InputLost += value; remove => InputLost -= value; }
+        event Action? IAudioRouteSource.InputMuteChanged { add => InputMuteChanged += value; remove => InputMuteChanged -= value; }
 
         public bool Start(string? inputEndpointId)
         {

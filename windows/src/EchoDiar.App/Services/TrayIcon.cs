@@ -200,7 +200,9 @@ internal sealed class TrayIcon : IDisposable
         var paused = snapshot.State == RecordingEngine.State.Paused;
         items.Add(new NotifyIconMenuItem($"{Loc.T(paused ? "Paused" : "Recording")} {ConversationText.Clock(snapshot.Elapsed)}", Enabled: false));
         items.Add(Item(Loc.T(paused ? "Resume" : "Pause"), () => _ = _model.TogglePauseAsync()));
-        items.Add(Item(Loc.T(snapshot.MicMuted ? "Unmute Microphone" : "Mute Microphone"), _model.ToggleMicMute));
+        // While the system mutes the mic, only the system can unmute it (macOS addRecordingItems).
+        items.Add(Item(Loc.T(snapshot.SystemMicMuted ? "Microphone muted in system settings"
+            : snapshot.MicMuted ? "Unmute Microphone" : "Mute Microphone"), _model.ToggleMicMute, enabled: !snapshot.SystemMicMuted));
         items.Add(Item(Loc.T("Stop recording"), () => _ = _model.StopRecordingAsync()));
         items.Add(LanguageItem());
         if (snapshot.SilentTapSuspected)
