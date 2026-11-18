@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.5.6] - 2026-11-18
+
 ### Changed
 
 - EchoDiar moved to Coprimal: source at github.com/Coprimal/EchoDiar, website and update feeds at echodiar.coprimal.dev. Older versions keep updating through the old addresses.
