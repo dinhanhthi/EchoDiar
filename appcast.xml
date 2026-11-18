@@ -2,136 +2,136 @@
 <rss xmlns:sparkle="http://www.andymatuschak.org/xml-namespaces/sparkle" version="2.0">
     <channel>
         <title>EchoDiar</title>
-        <link>https://ed.dinhanhthi.com/appcast.xml</link>
+        <link>https://echodiar.coprimal.dev/appcast.xml</link>
         <item>
             <title>1.5.5</title>
             <pubDate>Wed, 18 Nov 2026 07:11:07 -0600</pubDate>
-            <sparkle:fullReleaseNotesLink>https://github.com/dinhanhthi/EchoDiar/blob/main/CHANGELOG.md</sparkle:fullReleaseNotesLink>
+            <sparkle:fullReleaseNotesLink>https://github.com/Coprimal/EchoDiar/blob/main/CHANGELOG.md</sparkle:fullReleaseNotesLink>
             <sparkle:version>14</sparkle:version>
             <sparkle:shortVersionString>1.5.5</sparkle:shortVersionString>
             <sparkle:minimumSystemVersion>15.0</sparkle:minimumSystemVersion>
             <sparkle:hardwareRequirements>arm64</sparkle:hardwareRequirements>
-            <enclosure url="https://github.com/dinhanhthi/EchoDiar/releases/download/v1.5.5/EchoDiar-1.5.5.zip" length="18578269" type="application/octet-stream" sparkle:edSignature="TZ2aV9CB2MHwkfgY83cUxJizSH/9rcAVG68Ok+OmHXfJke4cz0gkXNANqSN+isri3JGYwRhXyhLfxk8La8uSAA=="/>
+            <enclosure url="https://github.com/Coprimal/EchoDiar/releases/download/v1.5.5/EchoDiar-1.5.5.zip" length="18578269" type="application/octet-stream" sparkle:edSignature="TZ2aV9CB2MHwkfgY83cUxJizSH/9rcAVG68Ok+OmHXfJke4cz0gkXNANqSN+isri3JGYwRhXyhLfxk8La8uSAA=="/>
         </item>
         <item>
             <title>1.5.4</title>
             <pubDate>Mon, 16 Nov 2026 05:37:59 -0600</pubDate>
-            <sparkle:fullReleaseNotesLink>https://github.com/dinhanhthi/EchoDiar/blob/main/CHANGELOG.md</sparkle:fullReleaseNotesLink>
+            <sparkle:fullReleaseNotesLink>https://github.com/Coprimal/EchoDiar/blob/main/CHANGELOG.md</sparkle:fullReleaseNotesLink>
             <sparkle:version>13</sparkle:version>
             <sparkle:shortVersionString>1.5.4</sparkle:shortVersionString>
             <sparkle:minimumSystemVersion>15.0</sparkle:minimumSystemVersion>
             <sparkle:hardwareRequirements>arm64</sparkle:hardwareRequirements>
-            <enclosure url="https://github.com/dinhanhthi/EchoDiar/releases/download/v1.5.4/EchoDiar-1.5.4.zip" length="18574996" type="application/octet-stream" sparkle:edSignature="1MAHX7wp/W3CuoA0rciMDpEOmwcf312gMgDadLiv6OYcGm0ayvD0cvR0cZyS9X5ceyfHmj95vKf3CmlyzBdBBw=="/>
+            <enclosure url="https://github.com/Coprimal/EchoDiar/releases/download/v1.5.4/EchoDiar-1.5.4.zip" length="18574996" type="application/octet-stream" sparkle:edSignature="1MAHX7wp/W3CuoA0rciMDpEOmwcf312gMgDadLiv6OYcGm0ayvD0cvR0cZyS9X5ceyfHmj95vKf3CmlyzBdBBw=="/>
         </item>
         <item>
             <title>1.5.3</title>
             <pubDate>Mon, 09 Nov 2026 15:58:17 -0600</pubDate>
-            <sparkle:fullReleaseNotesLink>https://github.com/dinhanhthi/EchoDiar/blob/main/CHANGELOG.md</sparkle:fullReleaseNotesLink>
+            <sparkle:fullReleaseNotesLink>https://github.com/Coprimal/EchoDiar/blob/main/CHANGELOG.md</sparkle:fullReleaseNotesLink>
             <sparkle:version>12</sparkle:version>
             <sparkle:shortVersionString>1.5.3</sparkle:shortVersionString>
             <sparkle:minimumSystemVersion>15.0</sparkle:minimumSystemVersion>
             <sparkle:hardwareRequirements>arm64</sparkle:hardwareRequirements>
-            <enclosure url="https://github.com/dinhanhthi/EchoDiar/releases/download/v1.5.3/EchoDiar-1.5.3.zip" length="18572388" type="application/octet-stream" sparkle:edSignature="VO7UeviiE6X9dpPLftrbrwEp02o+V+UYEp43WeKjgjUTz28rZdsw0BiHBOR6KP4vwsH0Rxj6SxKaDbMd5m6GAw=="/>
+            <enclosure url="https://github.com/Coprimal/EchoDiar/releases/download/v1.5.3/EchoDiar-1.5.3.zip" length="18572388" type="application/octet-stream" sparkle:edSignature="VO7UeviiE6X9dpPLftrbrwEp02o+V+UYEp43WeKjgjUTz28rZdsw0BiHBOR6KP4vwsH0Rxj6SxKaDbMd5m6GAw=="/>
         </item>
         <item>
             <title>1.5.2</title>
             <pubDate>Fri, 06 Nov 2026 17:29:32 -0600</pubDate>
-            <sparkle:fullReleaseNotesLink>https://github.com/dinhanhthi/EchoDiar/blob/main/CHANGELOG.md</sparkle:fullReleaseNotesLink>
+            <sparkle:fullReleaseNotesLink>https://github.com/Coprimal/EchoDiar/blob/main/CHANGELOG.md</sparkle:fullReleaseNotesLink>
             <sparkle:version>11</sparkle:version>
             <sparkle:shortVersionString>1.5.2</sparkle:shortVersionString>
             <sparkle:minimumSystemVersion>15.0</sparkle:minimumSystemVersion>
             <sparkle:hardwareRequirements>arm64</sparkle:hardwareRequirements>
-            <enclosure url="https://github.com/dinhanhthi/EchoDiar/releases/download/v1.5.2/EchoDiar-1.5.2.zip" length="18548037" type="application/octet-stream" sparkle:edSignature="LlkWo74jDW35Po+8zQnYoH5KpEs4S/ziCSgCNoWgUCdKO2Z6jJEbrRdY9pgXvIxzVgO3bwK/FxFwOw4wa8D6Ag=="/>
+            <enclosure url="https://github.com/Coprimal/EchoDiar/releases/download/v1.5.2/EchoDiar-1.5.2.zip" length="18548037" type="application/octet-stream" sparkle:edSignature="LlkWo74jDW35Po+8zQnYoH5KpEs4S/ziCSgCNoWgUCdKO2Z6jJEbrRdY9pgXvIxzVgO3bwK/FxFwOw4wa8D6Ag=="/>
         </item>
         <item>
             <title>1.5.1</title>
             <pubDate>Fri, 06 Nov 2026 13:00:48 -0600</pubDate>
-            <sparkle:fullReleaseNotesLink>https://github.com/dinhanhthi/EchoDiar/blob/main/CHANGELOG.md</sparkle:fullReleaseNotesLink>
+            <sparkle:fullReleaseNotesLink>https://github.com/Coprimal/EchoDiar/blob/main/CHANGELOG.md</sparkle:fullReleaseNotesLink>
             <sparkle:version>10</sparkle:version>
             <sparkle:shortVersionString>1.5.1</sparkle:shortVersionString>
             <sparkle:minimumSystemVersion>15.0</sparkle:minimumSystemVersion>
             <sparkle:hardwareRequirements>arm64</sparkle:hardwareRequirements>
-            <enclosure url="https://github.com/dinhanhthi/EchoDiar/releases/download/v1.5.1/EchoDiar-1.5.1.zip" length="18536553" type="application/octet-stream" sparkle:edSignature="VZdKHP2bKLyiZco3MHJtdX5R//u3wAmSmeqoe3LAdDcvy3SXfynr6P53Pp6El14re3KX/qkDBccK1P05F21nAA=="/>
+            <enclosure url="https://github.com/Coprimal/EchoDiar/releases/download/v1.5.1/EchoDiar-1.5.1.zip" length="18536553" type="application/octet-stream" sparkle:edSignature="VZdKHP2bKLyiZco3MHJtdX5R//u3wAmSmeqoe3LAdDcvy3SXfynr6P53Pp6El14re3KX/qkDBccK1P05F21nAA=="/>
         </item>
         <item>
             <title>1.5.0</title>
             <pubDate>Thu, 05 Nov 2026 11:53:14 -0600</pubDate>
-            <sparkle:fullReleaseNotesLink>https://github.com/dinhanhthi/EchoDiar/blob/main/CHANGELOG.md</sparkle:fullReleaseNotesLink>
+            <sparkle:fullReleaseNotesLink>https://github.com/Coprimal/EchoDiar/blob/main/CHANGELOG.md</sparkle:fullReleaseNotesLink>
             <sparkle:version>9</sparkle:version>
             <sparkle:shortVersionString>1.5.0</sparkle:shortVersionString>
             <sparkle:minimumSystemVersion>15.0</sparkle:minimumSystemVersion>
             <sparkle:hardwareRequirements>arm64</sparkle:hardwareRequirements>
-            <enclosure url="https://github.com/dinhanhthi/EchoDiar/releases/download/v1.5.0/EchoDiar-1.5.0.zip" length="18500014" type="application/octet-stream" sparkle:edSignature="wPdaMK3OMrp23drkfNSSA049IKEphxj0z4ZXDE77qxzxNgsAD4b1ww/4OYxrRxrZ/0yxPygNyFca/XS1/QzsAg=="/>
+            <enclosure url="https://github.com/Coprimal/EchoDiar/releases/download/v1.5.0/EchoDiar-1.5.0.zip" length="18500014" type="application/octet-stream" sparkle:edSignature="wPdaMK3OMrp23drkfNSSA049IKEphxj0z4ZXDE77qxzxNgsAD4b1ww/4OYxrRxrZ/0yxPygNyFca/XS1/QzsAg=="/>
         </item>
         <item>
             <title>1.4.0</title>
             <pubDate>Tue, 03 Nov 2026 22:30:50 -0600</pubDate>
-            <sparkle:fullReleaseNotesLink>https://github.com/dinhanhthi/EchoDiar/blob/main/CHANGELOG.md</sparkle:fullReleaseNotesLink>
+            <sparkle:fullReleaseNotesLink>https://github.com/Coprimal/EchoDiar/blob/main/CHANGELOG.md</sparkle:fullReleaseNotesLink>
             <sparkle:version>8</sparkle:version>
             <sparkle:shortVersionString>1.4.0</sparkle:shortVersionString>
             <sparkle:minimumSystemVersion>15.0</sparkle:minimumSystemVersion>
             <sparkle:hardwareRequirements>arm64</sparkle:hardwareRequirements>
-            <enclosure url="https://github.com/dinhanhthi/EchoDiar/releases/download/v1.4.0/EchoDiar-1.4.0.zip" length="18227196" type="application/octet-stream" sparkle:edSignature="3S98AfeeUay5afzPV8nvSBUUMcxPzK24RZ/rexwBroGBSDBxatxfLlOKjUXzAIBsDU4ry2RmDptT6Svle/DZAA=="/>
+            <enclosure url="https://github.com/Coprimal/EchoDiar/releases/download/v1.4.0/EchoDiar-1.4.0.zip" length="18227196" type="application/octet-stream" sparkle:edSignature="3S98AfeeUay5afzPV8nvSBUUMcxPzK24RZ/rexwBroGBSDBxatxfLlOKjUXzAIBsDU4ry2RmDptT6Svle/DZAA=="/>
         </item>
         <item>
             <title>1.3.0</title>
             <pubDate>Fri, 30 Oct 2026 16:11:19 +0100</pubDate>
-            <sparkle:fullReleaseNotesLink>https://github.com/dinhanhthi/EchoDiar/blob/main/CHANGELOG.md</sparkle:fullReleaseNotesLink>
+            <sparkle:fullReleaseNotesLink>https://github.com/Coprimal/EchoDiar/blob/main/CHANGELOG.md</sparkle:fullReleaseNotesLink>
             <sparkle:version>7</sparkle:version>
             <sparkle:shortVersionString>1.3.0</sparkle:shortVersionString>
             <sparkle:minimumSystemVersion>15.0</sparkle:minimumSystemVersion>
             <sparkle:hardwareRequirements>arm64</sparkle:hardwareRequirements>
-            <enclosure url="https://github.com/dinhanhthi/EchoDiar/releases/download/v1.3.0/EchoDiar-1.3.0.zip" length="18060841" type="application/octet-stream" sparkle:edSignature="tOIuMxuva5An7HL+Xaj2xgNNwGYp7nlZQjBZ7kWfr6+Wg38F3SRTpseGfWI+uDzJugSKTxVByL0J8EJYZ65aAA=="/>
+            <enclosure url="https://github.com/Coprimal/EchoDiar/releases/download/v1.3.0/EchoDiar-1.3.0.zip" length="18060841" type="application/octet-stream" sparkle:edSignature="tOIuMxuva5An7HL+Xaj2xgNNwGYp7nlZQjBZ7kWfr6+Wg38F3SRTpseGfWI+uDzJugSKTxVByL0J8EJYZ65aAA=="/>
         </item>
         <item>
             <title>1.2.0</title>
             <pubDate>Thu, 29 Oct 2026 11:11:55 +0100</pubDate>
-            <sparkle:fullReleaseNotesLink>https://github.com/dinhanhthi/EchoDiar/blob/main/CHANGELOG.md</sparkle:fullReleaseNotesLink>
+            <sparkle:fullReleaseNotesLink>https://github.com/Coprimal/EchoDiar/blob/main/CHANGELOG.md</sparkle:fullReleaseNotesLink>
             <sparkle:version>6</sparkle:version>
             <sparkle:shortVersionString>1.2.0</sparkle:shortVersionString>
             <sparkle:minimumSystemVersion>15.0</sparkle:minimumSystemVersion>
             <sparkle:hardwareRequirements>arm64</sparkle:hardwareRequirements>
-            <enclosure url="https://github.com/dinhanhthi/EchoDiar/releases/download/v1.2.0/EchoDiar-1.2.0.zip" length="18009747" type="application/octet-stream" sparkle:edSignature="utCZ9WiPWxxsnAif8uLb2KTTD95rCxe1iWxltSg1egwMgklLTpzzlWBPMquZtbFnkteBY9JndJ/NfUD8aSjaBQ=="/>
+            <enclosure url="https://github.com/Coprimal/EchoDiar/releases/download/v1.2.0/EchoDiar-1.2.0.zip" length="18009747" type="application/octet-stream" sparkle:edSignature="utCZ9WiPWxxsnAif8uLb2KTTD95rCxe1iWxltSg1egwMgklLTpzzlWBPMquZtbFnkteBY9JndJ/NfUD8aSjaBQ=="/>
         </item>
         <item>
             <title>1.1.0</title>
             <pubDate>Sun, 25 Oct 2026 17:21:02 +0100</pubDate>
-            <sparkle:fullReleaseNotesLink>https://github.com/dinhanhthi/EchoDiar/blob/main/CHANGELOG.md</sparkle:fullReleaseNotesLink>
+            <sparkle:fullReleaseNotesLink>https://github.com/Coprimal/EchoDiar/blob/main/CHANGELOG.md</sparkle:fullReleaseNotesLink>
             <sparkle:version>5</sparkle:version>
             <sparkle:shortVersionString>1.1.0</sparkle:shortVersionString>
             <sparkle:minimumSystemVersion>15.0</sparkle:minimumSystemVersion>
             <sparkle:hardwareRequirements>arm64</sparkle:hardwareRequirements>
-            <enclosure url="https://github.com/dinhanhthi/EchoDiar/releases/download/v1.1.0/EchoDiar-1.1.0.zip" length="17360953" type="application/octet-stream" sparkle:edSignature="MLOafOXlgPmGeKkq0Lec5gFf6hMw+hvJH+/ukwmiDn481CSZtHTHxqA/iKq9dereaEZ/WmR4Kn9QUL4PrEhJCQ=="/>
+            <enclosure url="https://github.com/Coprimal/EchoDiar/releases/download/v1.1.0/EchoDiar-1.1.0.zip" length="17360953" type="application/octet-stream" sparkle:edSignature="MLOafOXlgPmGeKkq0Lec5gFf6hMw+hvJH+/ukwmiDn481CSZtHTHxqA/iKq9dereaEZ/WmR4Kn9QUL4PrEhJCQ=="/>
         </item>
         <item>
             <title>1.0.2</title>
             <pubDate>Wed, 21 Oct 2026 15:02:19 +0200</pubDate>
-            <sparkle:fullReleaseNotesLink>https://github.com/dinhanhthi/EchoDiar/blob/main/CHANGELOG.md</sparkle:fullReleaseNotesLink>
+            <sparkle:fullReleaseNotesLink>https://github.com/Coprimal/EchoDiar/blob/main/CHANGELOG.md</sparkle:fullReleaseNotesLink>
             <sparkle:version>4</sparkle:version>
             <sparkle:shortVersionString>1.0.2</sparkle:shortVersionString>
             <sparkle:minimumSystemVersion>15.0</sparkle:minimumSystemVersion>
             <sparkle:hardwareRequirements>arm64</sparkle:hardwareRequirements>
-            <enclosure url="https://github.com/dinhanhthi/EchoDiar/releases/download/v1.0.2/EchoDiar-1.0.2.zip" length="16544196" type="application/octet-stream" sparkle:edSignature="bBEsD4IhlzJ5flAx6xSV6mOQIZuT6qk+0PXvAvwcuA2b0GrO1o/wdLtO43hEoAuwkt5vDyjbrbbAURQcE5pJAA=="/>
+            <enclosure url="https://github.com/Coprimal/EchoDiar/releases/download/v1.0.2/EchoDiar-1.0.2.zip" length="16544196" type="application/octet-stream" sparkle:edSignature="bBEsD4IhlzJ5flAx6xSV6mOQIZuT6qk+0PXvAvwcuA2b0GrO1o/wdLtO43hEoAuwkt5vDyjbrbbAURQcE5pJAA=="/>
         </item>
         <item>
             <title>1.0.1</title>
             <pubDate>Wed, 21 Oct 2026 12:55:42 +0200</pubDate>
-            <sparkle:fullReleaseNotesLink>https://github.com/dinhanhthi/EchoDiar/blob/main/CHANGELOG.md</sparkle:fullReleaseNotesLink>
+            <sparkle:fullReleaseNotesLink>https://github.com/Coprimal/EchoDiar/blob/main/CHANGELOG.md</sparkle:fullReleaseNotesLink>
             <sparkle:version>3</sparkle:version>
             <sparkle:shortVersionString>1.0.1</sparkle:shortVersionString>
             <sparkle:minimumSystemVersion>15.0</sparkle:minimumSystemVersion>
             <sparkle:hardwareRequirements>arm64</sparkle:hardwareRequirements>
-            <enclosure url="https://github.com/dinhanhthi/EchoDiar/releases/download/v1.0.1/EchoDiar-1.0.1.zip" length="16525751" type="application/octet-stream" sparkle:edSignature="TQomm0UGE4qCE+MtBrRGdIfLOg4QNIgS/9Bwkpa6PCkF12U7jIMATN/LVqnK2AS6qXAsfA7rjpM9Q2RFQyJeDA=="/>
+            <enclosure url="https://github.com/Coprimal/EchoDiar/releases/download/v1.0.1/EchoDiar-1.0.1.zip" length="16525751" type="application/octet-stream" sparkle:edSignature="TQomm0UGE4qCE+MtBrRGdIfLOg4QNIgS/9Bwkpa6PCkF12U7jIMATN/LVqnK2AS6qXAsfA7rjpM9Q2RFQyJeDA=="/>
         </item>
         <item>
             <title>1.0.0</title>
             <pubDate>Wed, 21 Oct 2026 08:06:40 +0200</pubDate>
-            <sparkle:fullReleaseNotesLink>https://github.com/dinhanhthi/EchoDiar/blob/main/CHANGELOG.md</sparkle:fullReleaseNotesLink>
+            <sparkle:fullReleaseNotesLink>https://github.com/Coprimal/EchoDiar/blob/main/CHANGELOG.md</sparkle:fullReleaseNotesLink>
             <sparkle:version>2</sparkle:version>
             <sparkle:shortVersionString>1.0.0</sparkle:shortVersionString>
             <sparkle:minimumSystemVersion>15.0</sparkle:minimumSystemVersion>
             <sparkle:hardwareRequirements>arm64</sparkle:hardwareRequirements>
-            <enclosure url="https://github.com/dinhanhthi/EchoDiar/releases/download/v1.0.0/EchoDiar-1.0.0.zip" length="16524237" type="application/octet-stream" sparkle:edSignature="JEerfqvvVKN+VRPryx4Qn7SgXaktYm8S3+qiAwvmj3b/KCVwCMVjKhX8eUJGvTwjuPCDKOkIlgm9e2laTvMkAA=="/>
+            <enclosure url="https://github.com/Coprimal/EchoDiar/releases/download/v1.0.0/EchoDiar-1.0.0.zip" length="16524237" type="application/octet-stream" sparkle:edSignature="JEerfqvvVKN+VRPryx4Qn7SgXaktYm8S3+qiAwvmj3b/KCVwCMVjKhX8eUJGvTwjuPCDKOkIlgm9e2laTvMkAA=="/>
         </item>
     </channel>
 </rss>

@@ -56,7 +56,7 @@
 set -euo pipefail
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
-GH_REPO="dinhanhthi/EchoDiar"
+GH_REPO="Coprimal/EchoDiar"
 WORKFLOW="windows-release.yml"
 WORKFLOW_PATH=".github/workflows/$WORKFLOW"
 RELEASE_ENV="windows-release-signing"
@@ -65,7 +65,7 @@ STORE_VARS=(WINDOWS_STORE_IDENTITY_NAME WINDOWS_STORE_PUBLISHER WINDOWS_STORE_PU
   WINDOWS_STORE_PRODUCT_ID)
 STORE_SECRETS=(STORE_TENANT_ID STORE_SELLER_ID STORE_CLIENT_ID STORE_CLIENT_SECRET)
 DEV_PUBLISHER="CN=EchoDiar Dev"
-APPINSTALLER_URI="https://ed.dinhanhthi.com/windows/EchoDiar.appinstaller"
+APPINSTALLER_URI="https://echodiar.coprimal.dev/windows/EchoDiar.appinstaller"
 APP_CSPROJ="windows/src/EchoDiar.App/EchoDiar.App.csproj"
 FEED="windows/EchoDiar.appinstaller"
 DEV_PIN_FILE="windows/packaging/dev-cert.sha256"
@@ -147,7 +147,7 @@ set_version() {
 check_origin() {
   local url
   url="$(git remote get-url origin 2>/dev/null || true)"
-  [[ "$url" =~ ^(https://github\.com/|git@github\.com:|ssh://git@github\.com/)dinhanhthi/EchoDiar(\.git)?/?$ ]] \
+  [[ "$url" =~ ^(https://github\.com/|git@github\.com:|ssh://git@github\.com/)Coprimal/EchoDiar(\.git)?/?$ ]] \
     || die "origin is '${url:-unset}', expected github.com/$GH_REPO."
 }
 
@@ -1083,7 +1083,7 @@ attach() {
 
   echo
   echo "Done. Windows is attached to $TAG -> https://github.com/$GH_REPO/releases/tag/$TAG"
-  echo "  docs  : https://ed.dinhanhthi.com/docs.html#install-windows"
+  echo "  docs  : https://echodiar.coprimal.dev/docs.html#install-windows"
   echo "  feed  : $APPINSTALLER_URI"
   echo "  next  : curl -fsSI $APPINSTALLER_URI   (Pages deploys the feed within minutes)"
 }

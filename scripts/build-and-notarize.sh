@@ -147,7 +147,7 @@ ED_KEY_BYTES="$(printf '%s' "$ED_KEY" | base64 -D 2>/dev/null | wc -c | tr -d ' 
 FEED_URL="$(/usr/libexec/PlistBuddy -c "Print :SUFeedURL" "$INFO_PLIST" 2>/dev/null | tr -d '[:space:]' || true)"
 [[ "$FEED_URL" == https://* ]] \
   || { echo "error: SUFeedURL in $INFO_PLIST is '${FEED_URL:-unset}', expected an https:// URL." >&2
-       echo "       Point it at https://ed.dinhanhthi.com/appcast.xml (docs/RELEASING.md)." >&2
+       echo "       Point it at https://echodiar.coprimal.dev/appcast.xml (docs/RELEASING.md)." >&2
        exit 1; }
 
 xcrun notarytool history --keychain-profile "$PROFILE" >/dev/null 2>&1 \

@@ -7,7 +7,7 @@
 # appcast.xml (so older items keep their original download URLs, and the history
 # survives a deleted release/ folder), copies the result back to the repo root,
 # commits, and pushes to main (the Pages workflow then deploys it to
-# https://ed.dinhanhthi.com/appcast.xml).
+# https://echodiar.coprimal.dev/appcast.xml).
 #
 # The zip must already be notarized + stapled (build-and-notarize.sh) and the GitHub
 # Release must exist (publish-release.sh), since the appcast points at its asset URL.
@@ -31,7 +31,7 @@
 set -euo pipefail
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-GH_REPO="dinhanhthi/EchoDiar"
+GH_REPO="Coprimal/EchoDiar"
 TEAM_ID="86H6CNLN4C"
 ARCHIVES="release/appcast-archives"
 
@@ -137,4 +137,4 @@ git push origin main
 
 echo
 echo "Done. appcast.xml pushed - Pages deploy triggered (~1 min to go live)."
-echo "  Verify: curl -fsSL https://ed.dinhanhthi.com/appcast.xml | grep shortVersionString"
+echo "  Verify: curl -fsSL https://echodiar.coprimal.dev/appcast.xml | grep shortVersionString"

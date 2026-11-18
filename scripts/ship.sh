@@ -23,8 +23,8 @@
 # When step 4 fails, re-run it (or /cf-ship Resume) to finish Windows; when step 5 fails, re-run step 5.
 #
 # Windows install:
-#   Docs : https://ed.dinhanhthi.com/docs.html#install-windows
-#   Feed : https://ed.dinhanhthi.com/windows/EchoDiar.appinstaller
+#   Docs : https://echodiar.coprimal.dev/docs.html#install-windows
+#   Feed : https://echodiar.coprimal.dev/windows/EchoDiar.appinstaller
 #
 # Prereqs (one-time - docs/RELEASING.md):
 #   - "Developer ID Application" cert in the login Keychain
@@ -136,9 +136,9 @@ fi
 echo
 echo "========================================"
 echo "  EchoDiar v$VERSION shipped!"
-echo "  GitHub : https://github.com/dinhanhthi/EchoDiar/releases/tag/v$VERSION"
-echo "  Appcast: https://ed.dinhanhthi.com/appcast.xml (live in ~1 min)"
-echo "  Docs   : https://ed.dinhanhthi.com/docs.html#install-windows"
-echo "  Feed   : https://ed.dinhanhthi.com/windows/EchoDiar.appinstaller (live in a few min)"
+echo "  GitHub : https://github.com/Coprimal/EchoDiar/releases/tag/v$VERSION"
+echo "  Appcast: https://echodiar.coprimal.dev/appcast.xml (live in ~1 min)"
+echo "  Docs   : https://echodiar.coprimal.dev/docs.html#install-windows"
+echo "  Feed   : https://echodiar.coprimal.dev/windows/EchoDiar.appinstaller (live in a few min)"
 echo "  Store  : see step 5 (submitted by CI, manual Store upload pending, Store not set up yet, or no Store bundle for this tag)"
 echo "========================================"

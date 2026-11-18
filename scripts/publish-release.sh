@@ -26,7 +26,7 @@ set -euo pipefail
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 CHANGELOG="$REPO_ROOT/CHANGELOG.md"
-GH_REPO="dinhanhthi/EchoDiar"
+GH_REPO="Coprimal/EchoDiar"
 
 # --- 0. Args & tools -------------------------------------------------------
 YES=false
@@ -120,7 +120,7 @@ gh auth status >/dev/null 2>&1 || { echo "error: gh is not authenticated - run '
 
 # The tag is pushed to origin: origin must be this repo, and HEAD must already be on origin/main.
 ORIGIN_URL="$(git remote get-url origin 2>/dev/null || true)"
-[[ "$ORIGIN_URL" =~ ^(https://github\.com/|git@github\.com:|ssh://git@github\.com/)dinhanhthi/EchoDiar(\.git)?/?$ ]] \
+[[ "$ORIGIN_URL" =~ ^(https://github\.com/|git@github\.com:|ssh://git@github\.com/)Coprimal/EchoDiar(\.git)?/?$ ]] \
   || { echo "error: origin is '${ORIGIN_URL:-unset}', expected github.com/$GH_REPO." >&2; exit 1; }
 git fetch -q origin main \
   || { echo "error: git fetch origin main failed" >&2; exit 1; }

@@ -19,7 +19,7 @@
     Name="dinh.thi.EchoDiar"
     Publisher="CN=Anh-Thi Dinh"
     Version="1.5.5.0"
-    Uri="https://github.com/dinhanhthi/EchoDiar/releases/download/v1.5.5/EchoDiar_1.5.5.0.msixbundle" />
+    Uri="https://github.com/Coprimal/EchoDiar/releases/download/v1.5.5/EchoDiar_1.5.5.0.msixbundle" />
 
   <UpdateSettings>
     <OnLaunch HoursBetweenUpdateChecks="0" />

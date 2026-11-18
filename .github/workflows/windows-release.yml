@@ -21,7 +21,7 @@ name: Windows release
 #   - dev: the dev certificate (WINDOWS_DEV_CERT_PFX / WINDOWS_DEV_CERT_PASSWORD, secrets of the windows-dev-signing
 #     environment), Publisher CN=EchoDiar Dev, public certificate EchoDiarDev.cer. Its feed Uri is the
 #     EchoDiar.appinstaller of its own prerelease; the release channel uses
-#     https://ed.dinhanhthi.com/windows/EchoDiar.appinstaller.
+#     https://echodiar.coprimal.dev/windows/EchoDiar.appinstaller.
 #   - release: the self-signed release certificate (WINDOWS_RELEASE_CERT_PFX / WINDOWS_RELEASE_CERT_PASSWORD, secrets
 #     of the windows-release-signing environment, which needs a reviewer's approval), Publisher = the variable
 #     WINDOWS_PUBLIC_PUBLISHER, public certificate EchoDiar.cer. prepare fails when that variable is empty or
@@ -141,7 +141,7 @@ jobs:
           # App Installer always fetches a feed from its own Uri: the dev feed names its prerelease asset, so a dev
           # prerelease installs from its own feed when its EchoDiar.appinstaller is opened; the release channel names
           # the public feed on main.
-          appinstaller_uri=https://ed.dinhanhthi.com/windows/EchoDiar.appinstaller
+          appinstaller_uri=https://echodiar.coprimal.dev/windows/EchoDiar.appinstaller
           case "$channel" in
             dev)
               publisher='CN=EchoDiar Dev'

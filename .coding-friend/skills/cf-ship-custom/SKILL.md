@@ -73,10 +73,10 @@ xcrun notarytool history --keychain-profile apple-notary
 
 # 5. GitHub CLI and Pages source
 gh auth status
-gh api repos/dinhanhthi/EchoDiar/pages --jq .build_type
+gh api repos/Coprimal/EchoDiar/pages --jq .build_type
 
 # 6. Repo visibility
-gh repo view dinhanhthi/EchoDiar --json visibility --jq .visibility
+gh repo view Coprimal/EchoDiar --json visibility --jq .visibility
 
 # 7. Windows release channel (read-only): environment, reviewer, tag policy, secrets, Publisher, pin
 windows/scripts/release.sh --preflight
@@ -161,21 +161,21 @@ windows/scripts/release.sh --preflight
   (other commits may sit on top of an interrupted `scripts/ship.sh`). It never blocks a normal next
   release: before Step B4 bumps, `project.yml` still holds the last shipped version, whose appcast
   entry exists, so that case goes on to (d), (e) and (f). List the release assets:
-  `gh release view vX.Y.Z --repo dinhanhthi/EchoDiar --json assets --jq '.assets[].name'`.
+  `gh release view vX.Y.Z --repo Coprimal/EchoDiar --json assets --jq '.assets[].name'`.
   - Release missing (the command fails) → if `release/export/EchoDiar-X.Y.Z.zip` exists, write
     the notes file from the `## [X.Y.Z]` section of `CHANGELOG.md`, then a blank line and the
     tag's Windows install block `windows/packaging/release-notes.md`, as `publish-release.sh` does:
     `{ awk '/^## \[X\.Y\.Z\]/{f=1;next} f&&/^## /{exit} f' CHANGELOG.md; if git cat-file -e vX.Y.Z:windows/packaging/release-notes.md 2>/dev/null; then echo; git show vX.Y.Z:windows/packaging/release-notes.md; fi; } > release/export/EchoDiar-X.Y.Z.md`,
-    then `gh release create vX.Y.Z release/export/EchoDiar-X.Y.Z.zip --repo dinhanhthi/EchoDiar --title "EchoDiar X.Y.Z" --notes-file release/export/EchoDiar-X.Y.Z.md`
+    then `gh release create vX.Y.Z release/export/EchoDiar-X.Y.Z.zip --repo Coprimal/EchoDiar --title "EchoDiar X.Y.Z" --notes-file release/export/EchoDiar-X.Y.Z.md`
     and, if `release/export/EchoDiar-X.Y.Z.dmg` exists,
-    `gh release upload vX.Y.Z release/export/EchoDiar-X.Y.Z.dmg --repo dinhanhthi/EchoDiar`.
+    `gh release upload vX.Y.Z release/export/EchoDiar-X.Y.Z.dmg --repo Coprimal/EchoDiar`.
   - Release exists but `EchoDiar-X.Y.Z.zip` or `EchoDiar-X.Y.Z.dmg` is missing →
-    `gh release upload vX.Y.Z release/export/<missing file> --repo dinhanhthi/EchoDiar`.
+    `gh release upload vX.Y.Z release/export/<missing file> --repo Coprimal/EchoDiar`.
   - A local file needed above is missing → STOP: "The notarized build of vX.Y.Z is gone.
     Delete the tag (docs/RELEASING.md §2 rollback) and run /cf-ship again."
   - Then ALWAYS fetch the published zip, into its own fresh dir (never over
     `release/export/`), so the appcast signs the bytes on GitHub:
-    `rm -rf release/download && mkdir -p release/download && gh release download vX.Y.Z --repo dinhanhthi/EchoDiar --pattern 'EchoDiar-X.Y.Z.zip' --dir release/download`.
+    `rm -rf release/download && mkdir -p release/download && gh release download vX.Y.Z --repo Coprimal/EchoDiar --pattern 'EchoDiar-X.Y.Z.zip' --dir release/download`.
   - Then run `scripts/publish-appcast.sh release/download/EchoDiar-X.Y.Z.zip`. Before signing,
     the script requires the downloaded zip to have the same SHA-256 as
     `release/export/EchoDiar-X.Y.Z.zip` when that exists, and always checks the app inside:
@@ -192,9 +192,9 @@ windows/scripts/release.sh --preflight
   ```bash
   T=$(git describe --tags --abbrev=0 --match 'v[0-9]*' origin/main); V=${T#v}; echo "latest tag: $T"
   git cat-file -e "$T:windows/src/EchoDiar.App/EchoDiar.App.csproj" 2>/dev/null && echo "windows app: yes"
-  gh release view "$T" --repo dinhanhthi/EchoDiar --json isDraft --jq .isDraft   # false = published
+  gh release view "$T" --repo Coprimal/EchoDiar --json isDraft --jq .isDraft   # false = published
   git show origin/main:appcast.xml 2>/dev/null | grep -qF "/$T/" && echo "appcast: yes"
-  gh release view "$T" --repo dinhanhthi/EchoDiar --json assets --jq '.assets[].name' \
+  gh release view "$T" --repo Coprimal/EchoDiar --json assets --jq '.assets[].name' \
     | grep -cxF -e "EchoDiar_$V.0.msixbundle" -e EchoDiar.appinstaller -e EchoDiar.cer -e SHA256SUMS-windows.txt \
     | grep -qx 4 && echo "windows assets: yes"
   git show origin/main:windows/EchoDiar.appinstaller 2>/dev/null \
@@ -260,7 +260,7 @@ echo "== Windows"; git log "$RANGE" --oneline --no-merges -- windows/ '.github/w
 
 # Exception check: the last release has the Windows app but not all four Windows assets (a failed attach)
 [ -n "$LAST_TAG" ] && git cat-file -e "$LAST_TAG:windows/src/EchoDiar.App/EchoDiar.App.csproj" 2>/dev/null \
-  && assets=$(gh release view "$LAST_TAG" --repo dinhanhthi/EchoDiar --json assets --jq '.assets[].name') \
+  && assets=$(gh release view "$LAST_TAG" --repo Coprimal/EchoDiar --json assets --jq '.assets[].name') \
   && test "$(grep -cxF -e "EchoDiar_${LAST_TAG#v}.0.msixbundle" -e EchoDiar.appinstaller -e EchoDiar.cer \
     -e SHA256SUMS-windows.txt <<<"$assets")" -ne 4 && echo "exception: Windows release-path commits are user-facing"
 ```
@@ -476,16 +476,32 @@ Store` instead: there is no Store step for it.
 
 ### Step A2: Print summary
 
-First check the feed on Pages: `curl -fsSI https://ed.dinhanhthi.com/windows/EchoDiar.appinstaller`
-(status line only; a 404 right after the feed push means "not live yet", not a failure).
+First wait for Pages to publish the feeds. `ship.sh` (or a Resume attempt) pushes the appcast and
+the Windows feed in up to two separate commits to main, so run this once they are done: `HEAD` is
+then the commit of the last push, and the `pages.yml` run of that commit deploys both files. When
+this run pushed neither file (e.g. the feed was already at that version), skip the wait and go
+straight to the two `curl`s. Repeat the `gh run list` (about every 10 s, up to ~5 min) until it
+prints an id:
+
+```bash
+id=$(gh run list --repo Coprimal/EchoDiar --workflow pages.yml --commit "$(git rev-parse HEAD)" --json databaseId --jq '.[0].databaseId // empty')
+gh run watch "$id" --repo Coprimal/EchoDiar --exit-status
+curl -fsSL https://echodiar.coprimal.dev/appcast.xml | grep -F '/vX.Y.Z/'
+curl -fsSL https://echodiar.coprimal.dev/windows/EchoDiar.appinstaller | grep -F 'Version="X.Y.Z.0"'
+```
+
+The last `curl` applies only when Windows was attached (a macOS-only tag leaves the feed on the
+previous version). No id after ~5 min, a failed run or a missing match → note it in the summary
+(`Pages: <what failed>`); never re-run `ship.sh` for it. After the wait a 404 is a real Pages
+failure, not "not live yet". The summary's `(Pages: <curl status>)` is the result of these checks.
 
 ```
 Shipped (local flow):
   EchoDiar vX.Y.Z — one release, Latest, for macOS and Windows
-  GitHub Release: https://github.com/dinhanhthi/EchoDiar/releases/tag/vX.Y.Z
-  macOS  : notarized zip + dmg; Appcast: https://ed.dinhanhthi.com/appcast.xml
-  Windows: Docs : https://ed.dinhanhthi.com/docs.html#install-windows
-           Feed : https://ed.dinhanhthi.com/windows/EchoDiar.appinstaller (Pages: <curl status>)
+  GitHub Release: https://github.com/Coprimal/EchoDiar/releases/tag/vX.Y.Z
+  macOS  : notarized zip + dmg; Appcast: https://echodiar.coprimal.dev/appcast.xml
+  Windows: Docs : https://echodiar.coprimal.dev/docs.html#install-windows
+           Feed : https://echodiar.coprimal.dev/windows/EchoDiar.appinstaller (Pages: <curl status>)
   Store  : <the summary line of Step A1's "Store outcomes">
 ```
 
