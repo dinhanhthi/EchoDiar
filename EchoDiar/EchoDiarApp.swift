@@ -197,7 +197,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSMe
             string: String(localized: "Licensed under AGPL-3.0") + "\n", attributes: attributes)
         var link = attributes
         link[.link] = AboutInfo.repository
-        credits.append(NSAttributedString(string: "github.com/dinhanhthi/EchoDiar", attributes: link))
+        credits.append(NSAttributedString(string: "github.com/Coprimal/EchoDiar", attributes: link))
         return credits
     }
 

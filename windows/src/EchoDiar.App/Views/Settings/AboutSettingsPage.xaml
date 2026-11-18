@@ -61,9 +61,9 @@
 
             <controls:SettingsCard
                 x:Name="RepositoryCard"
-                Header="{local:T Text='github.com/dinhanhthi/EchoDiar'}"
+                Header="{local:T Text='github.com/Coprimal/EchoDiar'}"
                 IsClickEnabled="True"
-                Tag="github.com/dinhanhthi/EchoDiar">
+                Tag="github.com/Coprimal/EchoDiar">
                 <controls:SettingsCard.HeaderIcon>
                     <FontIcon FontFamily="{ThemeResource SymbolThemeFontFamily}" Glyph="&#xE71B;" />
                 </controls:SettingsCard.HeaderIcon>

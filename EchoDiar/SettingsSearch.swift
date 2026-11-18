@@ -220,7 +220,7 @@ struct SettingsSearchItem: Identifiable {
         // About
         .init(title: "Version", keywords: ["about", "build", "update"], tab: .about),
         .init(title: "Licensed under AGPL-3.0", keywords: ["license", "open source"], tab: .about),
-        .init(title: "github.com/dinhanhthi/EchoDiar", keywords: ["GitHub", "source code", "repository"], tab: .about),
+        .init(title: "github.com/Coprimal/EchoDiar", keywords: ["GitHub", "source code", "repository"], tab: .about),
 
         // Acknowledgements
         .init(title: "Open-source software", keywords: ["acknowledgements", "credits", "licenses", "libraries"]

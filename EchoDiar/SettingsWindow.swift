@@ -229,7 +229,7 @@ private struct AboutSettingsView: View {
                 .foregroundStyle(.secondary)
             Text("Licensed under AGPL-3.0")
                 .foregroundStyle(.secondary)
-            Link("github.com/dinhanhthi/EchoDiar", destination: AboutInfo.repository)
+            Link("github.com/Coprimal/EchoDiar", destination: AboutInfo.repository)
             if let copyright = AboutInfo.copyright {
                 Text(copyright)
                     .font(.caption)
@@ -242,7 +242,7 @@ private struct AboutSettingsView: View {
 
 /// Shared by the Settings About section and the About panel.
 enum AboutInfo {
-    static let repository = URL(string: "https://github.com/dinhanhthi/EchoDiar")!
+    static let repository = URL(string: "https://github.com/Coprimal/EchoDiar")!
 
     static var logo: NSImage? { NSImage(named: "logo_square_512") }
 

@@ -17,10 +17,10 @@ namespace EchoDiar.App.Views;
 public sealed partial class AboutSettingsPage : UserControl
 {
     /// <summary>macOS <c>AboutInfo.repository</c>.</summary>
-    private static readonly Uri Repository = new("https://github.com/dinhanhthi/EchoDiar");
+    private static readonly Uri Repository = new("https://github.com/Coprimal/EchoDiar");
 
     /// <summary>The website's explanation of the certificate import and its warnings (Windows only).</summary>
-    private static readonly Uri WindowsWarnings = new("https://ed.dinhanhthi.com/docs.html#windows-warnings");
+    private static readonly Uri WindowsWarnings = new("https://echodiar.coprimal.dev/docs.html#windows-warnings");
 
     /// <summary>The searchable rows (macOS SettingsSearch.swift, About), each the Tag of its card.</summary>
     public static IReadOnlyList<SettingsEntry> SearchEntries { get; } =
@@ -31,7 +31,7 @@ public sealed partial class AboutSettingsPage : UserControl
             "Why Windows warns about EchoDiar",
             ["SmartScreen", "certificate", "signature", "unknown publisher", "UAC", "security"]),
         new("Licensed under AGPL-3.0", ["license", "open source"]),
-        new("github.com/dinhanhthi/EchoDiar", ["GitHub", "source code", "repository"]),
+        new("github.com/Coprimal/EchoDiar", ["GitHub", "source code", "repository"]),
     ];
 
     private readonly AppViewModel _model;

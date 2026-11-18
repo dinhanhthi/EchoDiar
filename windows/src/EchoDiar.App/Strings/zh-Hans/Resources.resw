@@ -1262,9 +1262,9 @@
     <value>获取 API 密钥</value>
     <comment>Get an API key</comment>
   </data>
-  <data name="GithubComDinhanhthiEchoDiar" xml:space="preserve">
-    <value>github.com/dinhanhthi/EchoDiar</value>
-    <comment>github.com/dinhanhthi/EchoDiar</comment>
+  <data name="GithubComCoprimalEchoDiar" xml:space="preserve">
+    <value>github.com/Coprimal/EchoDiar</value>
+    <comment>github.com/Coprimal/EchoDiar</comment>
   </data>
   <data name="GlobalPauseShortcut" xml:space="preserve">
     <value>全局暂停快捷键</value>

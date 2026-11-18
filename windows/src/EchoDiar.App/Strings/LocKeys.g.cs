@@ -986,7 +986,7 @@ public static partial class Loc
         "billed by connection time, about %@ per hour for each connection",
         "billed per streamed minute, about %@ per hour for each connection",
         "days",
-        "github.com/dinhanhthi/EchoDiar",
+        "github.com/Coprimal/EchoDiar",
         "http://127.0.0.1:8080/v1",
         "https://<resource>.openai.azure.com/openai/v1",
         "macOS %lld+",
