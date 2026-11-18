@@ -1770,6 +1770,10 @@
     <value>麦克风已静音</value>
     <comment>Microphone muted</comment>
   </data>
+  <data name="MicrophoneMutedInSystemSettings" xml:space="preserve">
+    <value>麦克风已在系统设置中静音</value>
+    <comment>Microphone muted in system settings</comment>
+  </data>
   <data name="Min" xml:space="preserve">
     <value>分钟</value>
     <comment>min</comment>

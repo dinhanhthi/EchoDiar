@@ -445,6 +445,7 @@ public static partial class Loc
         "Microphone disconnected — stop recording?",
         "Microphone level",
         "Microphone muted",
+        "Microphone muted in system settings",
         "Minimize",
         "Minutes after the end",
         "Model",

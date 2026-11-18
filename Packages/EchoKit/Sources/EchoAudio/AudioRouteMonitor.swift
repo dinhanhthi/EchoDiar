@@ -2,7 +2,8 @@ import CoreAudio
 import Foundation
 
 /// Route changes during a recording, from Core Audio listeners: default input and output device, the device list,
-/// and `DeviceIsAlive`/`NominalSampleRate` of the input device in use and of the default output; plus the MacBook lid,
+/// `DeviceIsAlive`/`NominalSampleRate` of the input device in use and of the default output, and the input mute and
+/// volume (`InputMute`) of the input in use and, when following the default, of the default input; plus the MacBook lid,
 /// polled each second, since closing it cuts off the built-in mic without any Core Audio change.
 /// Events within 300 ms are coalesced and the state is compared as a whole, since a disconnect fires its
 /// notifications (device dead, defaults changed, list changed) in no guaranteed order.
@@ -16,6 +17,8 @@ public final class AudioRouteMonitor: @unchecked Sendable {
         case inputChanged
         /// The input device in use died or disappeared (AirPods disconnected); input now follows the default.
         case inputLost
+        /// `InputMute.isSystemMuted(micDeviceUID:)` flipped.
+        case inputMuteChanged
     }
 
     private static let coalesce = DispatchTimeInterval.milliseconds(300)
@@ -41,6 +44,10 @@ public final class AudioRouteMonitor: @unchecked Sendable {
     private var output = (device: AudioDeviceID(kAudioObjectUnknown), rate: 0.0)
     /// Devices whose `deviceSelectors` are listened to.
     private var watched: [AudioDeviceID] = []
+    /// Devices whose input mute and volume are listened to (see `muteDevices`), with the addresses added.
+    private var muteWatched: [(device: AudioDeviceID, addresses: [AudioObjectPropertyAddress])] = []
+    /// The last `InputMute.isSystemMuted(micDeviceUID:)`.
+    private var inputMuted = false
 
     public init() {
         queue.setSpecific(key: queueKey, value: ())
@@ -72,6 +79,7 @@ public final class AudioRouteMonitor: @unchecked Sendable {
             input.rate = Self.nominalRate(input.device)
             let device = Self.defaultDevice(kAudioHardwarePropertyDefaultOutputDevice)
             output = (device, Self.nominalRate(device))
+            inputMuted = InputMute.isSystemMuted(micDeviceUID: inputDeviceUID)
             watchDevices()
             pollLid(generation: generation)
         }
@@ -151,10 +159,16 @@ public final class AudioRouteMonitor: @unchecked Sendable {
         }
         output = (outputDevice, outputRate)
 
-        if watched != [input.device, output.device] {
+        if watched != [input.device, output.device] || muteWatched.map(\.device) != muteDevices() {
             unwatchDevices()
             watchDevices()
         }
+
+        let muted = InputMute.isSystemMuted(micDeviceUID: pinnedUID)
+        if muted != inputMuted {
+            events.append(.inputMuteChanged)
+        }
+        inputMuted = muted
         events.forEach(handler)
     }
 
@@ -173,6 +187,13 @@ public final class AudioRouteMonitor: @unchecked Sendable {
                 _ = AudioObjectAddPropertyListenerBlock(device, &address, listenerQueue, listener)
             }
         }
+        muteWatched = muteDevices().map { device in
+            let addresses = InputMute.propertyAddresses(device)
+            for var address in addresses {
+                _ = AudioObjectAddPropertyListenerBlock(device, &address, listenerQueue, listener)
+            }
+            return (device, addresses)
+        }
     }
 
     /// Fails harmlessly for devices that are already gone.
@@ -184,7 +205,21 @@ public final class AudioRouteMonitor: @unchecked Sendable {
                 _ = AudioObjectRemovePropertyListenerBlock(device, &address, listenerQueue, listener)
             }
         }
+        for (device, addresses) in muteWatched {
+            for var address in addresses {
+                _ = AudioObjectRemovePropertyListenerBlock(device, &address, listenerQueue, listener)
+            }
+        }
         watched = []
+        muteWatched = []
+    }
+
+    /// The input in use and, when following the default, the default input (see `InputMute.isSystemMuted`).
+    private func muteDevices() -> [AudioDeviceID] {
+        var devices = [input.device]
+        let fallback = Self.defaultDevice(kAudioHardwarePropertyDefaultInputDevice)
+        if pinnedUID == nil, fallback != input.device { devices.append(fallback) }
+        return devices.filter { $0 != kAudioObjectUnknown }
     }
 
     // MARK: - Core Audio

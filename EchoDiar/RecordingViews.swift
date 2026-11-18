@@ -17,6 +17,7 @@ struct RecordingCard: View {
     var body: some View {
         let paused = model.snapshot.state == .paused
         let muted = model.micMuted
+        let systemMuted = model.systemMicMuted
         HStack(spacing: 12) {
             AppIcon(bundleID: model.sourceApp?.appBundleID)
             VStack(alignment: .leading, spacing: 4) {
@@ -47,8 +48,11 @@ struct RecordingCard: View {
                               action: model.togglePause)
                         .help(paused ? "Resume recording (⇧⌘P)" : "Pause recording (⇧⌘P)")
                     rowButton(muted ? "Unmute microphone" : "Mute microphone",
-                              systemImage: muted ? "mic.slash.circle" : "mic.circle", action: model.toggleMicMute)
-                        .help(muted ? "Unmute microphone" : "Mute microphone")
+                              systemImage: muted || systemMuted ? "mic.slash.circle" : "mic.circle",
+                              tint: muted || systemMuted ? .yellow : nil, action: model.toggleMicMute)
+                        // Not `.disabled`: it would dim the yellow and hide the tooltip; the toggle is a no-op then.
+                        .help(systemMuted ? "Microphone muted in system settings"
+                              : muted ? "Unmute microphone" : "Mute microphone")
                     languageMenu
                     Spacer(minLength: 0)
                 }
@@ -75,6 +79,7 @@ struct RecordingCard: View {
                 .disabled(model.isStarting)
             Button(paused ? "Resume" : "Pause", action: model.togglePause)
             Button(muted ? "Unmute Microphone" : "Mute Microphone", action: model.toggleMicMute)
+                .disabled(systemMuted)
         }
     }
 
@@ -125,7 +130,8 @@ struct RecordingCard: View {
         editing = true
     }
 
-    private func rowButton(_ title: LocalizedStringKey, systemImage: String,
+    /// `tint` nil keeps the secondary style.
+    private func rowButton(_ title: LocalizedStringKey, systemImage: String, tint: Color? = nil,
                            action: @escaping () -> Void) -> some View {
         Button(action: action) {
             Label(title, systemImage: systemImage)
@@ -133,7 +139,7 @@ struct RecordingCard: View {
                 .font(.system(size: 15))
         }
         .buttonStyle(RowIconButtonStyle())
-        .foregroundStyle(.secondary)
+        .foregroundStyle(tint.map(AnyShapeStyle.init) ?? AnyShapeStyle(.secondary))
     }
 
     /// Picking a language adds a marker at the current recording time.

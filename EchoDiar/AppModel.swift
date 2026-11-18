@@ -296,6 +296,9 @@ final class AppModel {
     /// The mic is muted in the current recording (its channel written as silence); false when idle.
     var micMuted: Bool { snapshot.micMuted }
 
+    /// The system mutes the mic in use (device mute or input volume 0): its channel is silent and Mute does nothing.
+    var systemMicMuted: Bool { snapshot.systemMicMuted }
+
     /// Library indexing waits while any of these runs, so it never competes with them for the model gate or the CPU.
     var indexingPaused: Bool { isRecording || compressionJobs > 0 || transcriptionJobs > 0 || !aiJobs.isEmpty }
 
@@ -412,6 +415,7 @@ final class AppModel {
             toggleRecording: { [weak self] in self?.toggleRecording() },
             togglePause: { [weak self] in self?.togglePause() },
             micMuted: { [weak self] in self?.micMuted ?? false },
+            systemMicMuted: { [weak self] in self?.systemMicMuted ?? false },
             toggleMicMute: { [weak self] in self?.toggleMicMute() },
             stop: { [weak self] in self?.stopRecording() },
             language: { [weak self] in self?.recordingLanguage ?? LanguageOptions.auto },
@@ -827,9 +831,9 @@ final class AppModel {
     }
 
     /// The engine flips its own state on its queue (quick toggles stay in order) and publishes it, which `snapshot`
-    /// picks up.
+    /// picks up. Does nothing while the system mutes the mic.
     func toggleMicMute() {
-        guard isRecording else { return }
+        guard isRecording, !systemMicMuted else { return }
         Task.detached(priority: .userInitiated) { [engine] in
             engine.toggleMicMuted()
         }

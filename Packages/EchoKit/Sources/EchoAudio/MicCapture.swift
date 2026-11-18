@@ -295,7 +295,7 @@ public final class MicCapture: @unchecked Sendable {
         return devices
     }
 
-    private static func defaultDevice(_ selector: AudioObjectPropertySelector) -> AudioDeviceID? {
+    static func defaultDevice(_ selector: AudioObjectPropertySelector) -> AudioDeviceID? {
         let device = property(AudioObjectID(kAudioObjectSystemObject), selector, initial: AudioDeviceID(kAudioObjectUnknown))
         return device == kAudioObjectUnknown ? nil : device
     }

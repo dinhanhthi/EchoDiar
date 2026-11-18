@@ -11604,6 +11604,34 @@
         }
       }
     },
+    "Microphone muted in system settings" : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Micrófono silenciado en los ajustes del sistema"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Micro coupé dans les réglages du système"
+          }
+        },
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Micrô đang tắt trong cài đặt hệ thống"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "麦克风已在系统设置中静音"
+          }
+        }
+      }
+    },
     "Minimize" : {
       "localizations" : {
         "es" : {

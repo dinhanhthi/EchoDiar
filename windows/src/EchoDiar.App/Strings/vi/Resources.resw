@@ -1770,6 +1770,10 @@
     <value>Đã tắt tiếng micrô</value>
     <comment>Microphone muted</comment>
   </data>
+  <data name="MicrophoneMutedInSystemSettings" xml:space="preserve">
+    <value>Micrô đang tắt trong cài đặt hệ thống</value>
+    <comment>Microphone muted in system settings</comment>
+  </data>
   <data name="Min" xml:space="preserve">
     <value>phút</value>
     <comment>min</comment>

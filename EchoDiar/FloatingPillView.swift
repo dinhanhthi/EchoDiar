@@ -78,10 +78,10 @@ struct FloatingPillView: View {
                 PillMeter(feed: model.levels, scale: scale)
             }
             // Expanded, the Mute button shows it.
-            if model.micMuted && !expanded {
+            if (model.micMuted || model.systemMicMuted) && !expanded {
                 Image(systemName: "mic.slash")
                     .font(.system(size: 11 * scale))
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(.yellow)
                     .accessibilityLabel("Microphone muted")
             }
             if expanded {
@@ -100,16 +100,20 @@ struct FloatingPillView: View {
     }
 
     private func controls(paused: Bool) -> some View {
-        HStack(spacing: 12 * scale) {
+        let muted = model.micMuted || model.systemMicMuted
+        return HStack(spacing: 12 * scale) {
             Button(action: model.togglePause) {
                 Label(paused ? "Resume" : "Pause", systemImage: paused ? "play.fill" : "pause.fill")
             }
             .help(paused ? "Resume recording" : "Pause recording")
             Button(action: model.toggleMicMute) {
                 Label(model.micMuted ? "Unmute microphone" : "Mute microphone",
-                      systemImage: model.micMuted ? "mic.slash.fill" : "mic.fill")
+                      systemImage: muted ? "mic.slash.fill" : "mic.fill")
             }
-            .help(model.micMuted ? "Unmute microphone" : "Mute microphone")
+            .foregroundStyle(muted ? AnyShapeStyle(.yellow) : AnyShapeStyle(.foreground))
+            // Not `.disabled`, as in `RecordingCard`: the toggle is a no-op while the system mutes the mic.
+            .help(model.systemMicMuted ? "Microphone muted in system settings"
+                  : model.micMuted ? "Unmute microphone" : "Mute microphone")
             Button(action: model.stopRecording) {
                 Label("Stop", systemImage: "stop.fill")
             }

@@ -97,6 +97,9 @@ public final class RecordingEngine: @unchecked Sendable {
         public var micRoutesLost = 0
         /// The mic device is closed (privacy indicator off) and its channel is written as silence; see `toggleMicMuted`.
         public var micMuted = false
+        /// The OS mutes the mic in use, or the default input when following it, or its input volume is 0
+        /// (`InputMute`): the device is closed and the channel written as silence, as `micMuted`.
+        public var systemMicMuted = false
         /// Set on the snapshot published when a recording ends.
         public var endReason: EndReason?
 
@@ -161,6 +164,7 @@ public final class RecordingEngine: @unchecked Sendable {
     private var silentTapSuspected = false
     private var micRoutesLost = 0
     private var micMuted = false
+    private var systemMicMuted = false
 
     public init() {
         (snapshots, continuation) = AsyncStream.makeStream(of: Snapshot.self, bufferingPolicy: .bufferingNewest(16))
@@ -204,7 +208,7 @@ public final class RecordingEngine: @unchecked Sendable {
     /// indicator off) and the mic channel is written as silence, so the file stays time-aligned; unmuted, the picked
     /// device (else the default input) is reopened, and while recording, if it cannot be, the mute stays on. While
     /// paused only the flag changes and `resume()` honours it; it is kept across pauses and cleared when the recording stops, so
-    /// every recording starts unmuted. No-op when idle.
+    /// every recording starts unmuted. No-op when idle or while the system mutes the mic (`Snapshot.systemMicMuted`).
     public func toggleMicMuted() {
         onQueue { toggleMicMutedLocked() }
     }
@@ -280,6 +284,7 @@ public final class RecordingEngine: @unchecked Sendable {
         micMuted = false
         self.target = target
         self.micDeviceUID = micDeviceUID
+        systemMicMuted = InputMute.isSystemMuted(micDeviceUID: micDeviceUID)
 
         var session = RecordingSession(
             state: .recording,
@@ -379,7 +384,7 @@ public final class RecordingEngine: @unchecked Sendable {
     }
 
     private func toggleMicMutedLocked() {
-        guard state != .idle, var session else { return }
+        guard state != .idle, !systemMicMuted, var session else { return }
         micMuted.toggle()
         if state == .recording, let writer {
             // A failed unmute stays muted, so the controls say so and offer Unmute again; the mic channel stays silent.
@@ -417,6 +422,7 @@ public final class RecordingEngine: @unchecked Sendable {
         sessionGeneration &+= 1
         state = .idle
         micMuted = false
+        systemMicMuted = false
         self.session = nil
         self.folder = nil
         writer = nil
@@ -447,12 +453,12 @@ public final class RecordingEngine: @unchecked Sendable {
         return (source.ring, ChannelWriter.SourceFormat(source.format))
     }
 
-    /// Falls back to a ring nothing writes to, which the writer fills with silence. Muted, the mic is closed and
-    /// not reopened, and that silent ring is returned.
+    /// Falls back to a ring nothing writes to, which the writer fills with silence. Muted (by the user or the system),
+    /// the mic is closed and not reopened, and that silent ring is returned.
     private func startMic() -> (ring: RingBuffer, format: ChannelWriter.SourceFormat, isLive: Bool) {
         micGeneration &+= 1
         let generation = micGeneration
-        if micMuted {
+        if micMuted || systemMicMuted {
             mic.stop()
             return (Self.silentRing(), Self.silentFormat, false)
         }
@@ -486,7 +492,7 @@ public final class RecordingEngine: @unchecked Sendable {
     /// `MicCapture` has already rebuilt itself; only its new ring is swapped in.
     /// A rejected replace is skipped, keeping the mic open: the next change event applies.
     private func micChanged(generation: UInt64) {
-        guard state == .recording, !micMuted, generation == micGeneration, let writer,
+        guard state == .recording, !micMuted, !systemMicMuted, generation == micGeneration, let writer,
               let source = mic.currentSource else { return }
         guard (try? writer.replaceRing(channel: .mic, ring: source.ring, format: ChannelWriter.SourceFormat(source.format))) != nil else { return }
         shared.withLock { $0.micRing = source.ring }
@@ -510,21 +516,42 @@ public final class RecordingEngine: @unchecked Sendable {
             save(session)
             rebuildTap(generation: tapGeneration)
         case .inputLost, .inputChanged:
-            // Muted, no device is open: unmuting opens the current one.
-            guard !micMuted else { return }
-            if event == .inputLost {
-                micRoutesLost += 1
-                publish()
+            // The new device may be muted in the system, or no longer.
+            let systemMuteChanged = updateSystemMicMuted()
+            // Muted, no device is open: unmuting opens the current one. A system mute that just flipped swaps below.
+            guard !micMuted, !systemMicMuted || systemMuteChanged else {
+                if systemMuteChanged { publish() }
+                return
             }
+            if event == .inputLost { micRoutesLost += 1 }
+            if event == .inputLost || systemMuteChanged { publish() }
             // While paused the mic is closed; resume opens the new device.
             guard state == .recording, let writer else { return }
             swapMic(&session, writer: writer)
             save(session)
+        case .inputMuteChanged:
+            guard updateSystemMicMuted() else { return }
+            // While paused only the flag changes; resume opens per the flags. The user's mute keeps the device closed.
+            if state == .recording, !micMuted, let writer {
+                // A failed reopen stays silent; the next mute or route change retries.
+                if !swapMic(&session, writer: writer), !systemMicMuted {
+                    NSLog("EchoDiar: could not reopen the microphone after the system unmute, staying silent")
+                }
+                save(session)
+            }
+            publish()
         }
     }
 
-    /// Swaps a fresh `startMic()` source (silence while muted) into the writer and the meter while recording. Returns
-    /// whether a live mic now feeds the writer.
+    /// Re-reads the system mute of the mic; returns whether it changed.
+    private func updateSystemMicMuted() -> Bool {
+        let muted = InputMute.isSystemMuted(micDeviceUID: micDeviceUID)
+        defer { systemMicMuted = muted }
+        return muted != systemMicMuted
+    }
+
+    /// Swaps a fresh `startMic()` source (silence while either mute is on) into the writer and the meter while
+    /// recording. Returns whether a live mic now feeds the writer.
     @discardableResult
     private func swapMic(_ session: inout RecordingSession, writer: ChannelWriter) -> Bool {
         // `startMic` has closed the previous device either way.
@@ -582,6 +609,7 @@ public final class RecordingEngine: @unchecked Sendable {
         var snapshot = Snapshot(state: state, globalTapFallback: target.globalTapFallback, lowDisk: lowDisk, endReason: endReason)
         snapshot.micRoutesLost = micRoutesLost
         snapshot.micMuted = micMuted
+        snapshot.systemMicMuted = systemMicMuted
         if let stats = stats ?? writer?.stats { snapshot.apply(stats) }
         shared.withLock { $0.snapshot = snapshot }
         continuation.yield(snapshot)

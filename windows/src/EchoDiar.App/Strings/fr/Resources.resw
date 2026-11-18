@@ -1858,6 +1858,10 @@
     <value>Micro coupé</value>
     <comment>Microphone muted</comment>
   </data>
+  <data name="MicrophoneMutedInSystemSettings" xml:space="preserve">
+    <value>Micro coupé dans les réglages du système</value>
+    <comment>Microphone muted in system settings</comment>
+  </data>
   <data name="Min" xml:space="preserve">
     <value>min</value>
     <comment>min</comment>

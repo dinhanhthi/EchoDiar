@@ -31,6 +31,7 @@ struct RecordingMenuControls {
     var toggleRecording: @MainActor () -> Void
     var togglePause: @MainActor () -> Void
     var micMuted: @MainActor () -> Bool
+    var systemMicMuted: @MainActor () -> Bool
     var toggleMicMute: @MainActor () -> Void
     var stop: @MainActor () -> Void
     var language: @MainActor () -> String
@@ -277,9 +278,12 @@ final class StatusItemController: NSObject, NSMenuDelegate {
         menu.addItem(status)
         let pause = state == .paused ? String(localized: "Resume") : String(localized: "Pause")
         menu.addItem(item(pause, #selector(togglePause)))
-        let mute = controls.micMuted()
-            ? String(localized: "Unmute Microphone") : String(localized: "Mute Microphone")
-        menu.addItem(item(mute, #selector(toggleMicMute)))
+        let systemMuted = controls.systemMicMuted()
+        let mute = systemMuted ? String(localized: "Microphone muted in system settings")
+            : controls.micMuted() ? String(localized: "Unmute Microphone") : String(localized: "Mute Microphone")
+        let muteItem = item(mute, #selector(toggleMicMute))
+        muteItem.isEnabled = !systemMuted
+        menu.addItem(muteItem)
         let stop = item(String(localized: "Stop Recording"), #selector(stopRecording))
         stop.isEnabled = recordingEnabled
         menu.addItem(stop)
