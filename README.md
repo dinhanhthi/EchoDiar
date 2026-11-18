@@ -6,12 +6,12 @@
 
 **Record any meeting on your Mac, see who said what, and ask AI about it.**
 
-[![Latest release](https://img.shields.io/github/v/release/dinhanhthi/EchoDiar)](https://github.com/dinhanhthi/EchoDiar/releases/latest)
+[![Latest release](https://img.shields.io/github/v/release/Coprimal/EchoDiar)](https://github.com/Coprimal/EchoDiar/releases/latest)
 [![License: AGPLv3](https://img.shields.io/badge/license-AGPLv3-blue)](LICENSE)
 ![macOS 15+](https://img.shields.io/badge/macOS-15%2B-blue)
 ![Windows 11](https://img.shields.io/badge/Windows-11-blue)
 
-[Website](https://ed.dinhanhthi.com) · [Download](https://github.com/dinhanhthi/EchoDiar/releases/latest) · [Docs](https://ed.dinhanhthi.com/docs.html) · [Changelog](CHANGELOG.md)
+[Website](https://echodiar.coprimal.dev) · [Download](https://github.com/Coprimal/EchoDiar/releases/latest) · [Docs](https://echodiar.coprimal.dev/docs.html) · [Changelog](CHANGELOG.md)
 
 <img src="assets/poster.jpg" width="100%" alt="EchoDiar: a transcript with speakers and an AI answer that cites timestamps">
 
@@ -31,13 +31,13 @@
 
 ### macOS
 
-Download the `.dmg` from [Releases](https://github.com/dinhanhthi/EchoDiar/releases/latest), drag EchoDiar to `/Applications` and launch it. Requires macOS 15 or later on Apple Silicon.
+Download the `.dmg` from [Releases](https://github.com/Coprimal/EchoDiar/releases/latest), drag EchoDiar to `/Applications` and launch it. Requires macOS 15 or later on Apple Silicon.
 
 ### Windows 11 (x64, Arm64)
 
 Get EchoDiar from the [Microsoft Store](https://apps.microsoft.com/detail/9N5X564S1F2D?mode=direct): the Store installs it in one click and keeps it updated.
 
-Installed EchoDiar earlier with its certificate (`EchoDiar.cer`)? [Move to the Microsoft Store](https://ed.dinhanhthi.com/docs.html#windows-warnings): your recordings and API keys stay.
+Installed EchoDiar earlier with its certificate (`EchoDiar.cer`)? [Move to the Microsoft Store](https://echodiar.coprimal.dev/docs.html#windows-warnings): your recordings and API keys stay.
 
 ## Permissions
 
@@ -54,7 +54,7 @@ Always tell the other participants that you are recording, and follow the law wh
 - API keys are stored in the Keychain.
 - Calendars are read on this Mac; EchoDiar writes only to its own "EchoDiar" calendar (On My Mac when available, otherwise your default calendar account, e.g. iCloud, which then syncs those events like any other) and stores only that calendar's id, the ids of calendars you don't watch and the ids of meetings you skip. Don't share the EchoDiar calendar: anyone who can add events to it could start a recording. A recording started from an event takes the event's title, which goes to an AI provider only like any other conversation title, when you use one.
 - Audio or transcripts go to a cloud provider or a CLI only when you choose one; cloud transcription asks once for each destination before sending audio.
-- Models are downloaded from Hugging Face only when you click Download. Update checks use the Sparkle feed at `ed.dinhanhthi.com`.
+- Models are downloaded from Hugging Face only when you click Download. Update checks use the Sparkle feed at `echodiar.coprimal.dev`.
 
 ## Resource usage
 
@@ -71,4 +71,4 @@ See [CONTRIBUTING.md](CONTRIBUTING.md). Releases are maintainer-only.
 
 ## License
 
-© 2026 Anh-Thi Dinh. Licensed under the GNU Affero General Public License v3.0 (AGPL-3.0), see [LICENSE](LICENSE).
+© 2026 [Coprimal](https://coprimal.dev). Licensed under the GNU Affero General Public License v3.0 (AGPL-3.0), see [LICENSE](LICENSE).

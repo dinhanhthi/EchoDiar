@@ -1,6 +1,6 @@
 # EchoDiar website
 
-Static site (HTML + CSS + a little vanilla JS, no build step) for https://ed.dinhanhthi.com.
+Static site (HTML + CSS + a little vanilla JS, no build step) for https://echodiar.coprimal.dev.
 
 ## Preview
 
@@ -26,6 +26,6 @@ Open http://localhost:8080.
 One-time setup:
 
 1. Settings > Pages > Source = "GitHub Actions".
-2. DNS: add a `CNAME` record `ed` pointing to `dinhanhthi.github.io`.
-3. Settings > Pages: set the custom domain to `ed.dinhanhthi.com` and enable "Enforce HTTPS".
+2. DNS: add a `CNAME` record `echodiar` in the `coprimal.dev` zone pointing to `coprimal.github.io`, DNS only (not proxied, or Pages cannot issue its certificate).
+3. Settings > Pages: set the custom domain to `echodiar.coprimal.dev` and enable "Enforce HTTPS".
 

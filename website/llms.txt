@@ -6,13 +6,13 @@ EchoDiar is a native app on both systems: a Swift app in the Mac menu bar and a 
 
 ## Pages
 
-- [Home](https://ed.dinhanhthi.com/): what EchoDiar is and how to get it
-- [Docs](https://ed.dinhanhthi.com/docs.html): how to use EchoDiar
-- [Privacy](https://ed.dinhanhthi.com/privacy.html): what EchoDiar collects, stores and sends
+- [Home](https://echodiar.coprimal.dev/): what EchoDiar is and how to get it
+- [Docs](https://echodiar.coprimal.dev/docs.html): how to use EchoDiar
+- [Privacy](https://echodiar.coprimal.dev/privacy.html): what EchoDiar collects, stores and sends
 
 ## Links
 
-- [Source code](https://github.com/dinhanhthi/EchoDiar)
-- [Releases](https://github.com/dinhanhthi/EchoDiar/releases)
-- [Changelog](https://github.com/dinhanhthi/EchoDiar/blob/main/CHANGELOG.md)
+- [Source code](https://github.com/Coprimal/EchoDiar)
+- [Releases](https://github.com/Coprimal/EchoDiar/releases)
+- [Changelog](https://github.com/Coprimal/EchoDiar/blob/main/CHANGELOG.md)
 

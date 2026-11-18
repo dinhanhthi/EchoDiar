@@ -120,6 +120,34 @@ The UI is in English (source), Vietnamese, French, Spanish and Simplified Chines
 
 One-line conventional commits: `<type>(<scope>): <summary>`, for example `fix(audio): keep the CAF when the encode fails`. Types: `feat`, `fix`, `docs`, `style`, `refactor`, `test`, `chore`. No body.
 
+## Update feed
+
+- macOS: `SUFeedURL` is `https://echodiar.coprimal.dev/appcast.xml`.
+- Windows (self-signed copies): the feed is `https://echodiar.coprimal.dev/windows/EchoDiar.appinstaller`.
+- `.github/workflows/pages.yml` deploys both from `main` to the GitHub Pages of `Coprimal/EchoDiar` (Source = "GitHub Actions", custom domain `echodiar.coprimal.dev`).
+- Builds up to 1.5.5 read `https://ed.dinhanhthi.com/...` and reach the new host through a permanent 301 ([Old addresses](#old-addresses)). Sparkle and App Installer both follow it, and a Windows install takes the new feed Uri once it updates to 1.5.6 or later.
+
+Check:
+
+```sh
+curl -sI https://echodiar.coprimal.dev/appcast.xml                          # 200, no location
+curl -sI https://echodiar.coprimal.dev/windows/EchoDiar.appinstaller        # 200, no location
+curl -s https://echodiar.coprimal.dev/appcast.xml | cmp - appcast.xml       # equal
+curl -s https://echodiar.coprimal.dev/windows/EchoDiar.appinstaller | cmp - windows/EchoDiar.appinstaller   # equal
+curl -sI 'https://ed.dinhanhthi.com/docs.html?x=1'                          # 301, location: https://echodiar.coprimal.dev/docs.html?x=1
+curl -sIL https://ed.dinhanhthi.com/appcast.xml                             # 301, then 200
+curl -sIL https://ed.dinhanhthi.com/windows/EchoDiar.appinstaller           # 301, then 200
+```
+
+## Old addresses
+
+- `ed.dinhanhthi.com` answers with a 301 to the same path and query on `echodiar.coprimal.dev`: a Cloudflare redirect rule in the zone `dinhanhthi.com` plus the proxied `ed` DNS record. Installed copies up to 1.5.5 update through it, so never delete either.
+- Never create a repo named `dinhanhthi/EchoDiar`: it would take over the old path and end GitHub's redirects to `Coprimal/EchoDiar`.
+- What stays personal, on purpose:
+  - Developer ID "Anh-Thi Dinh": Gatekeeper trusts the app through it; changing it needs an organization Apple developer account.
+  - Windows Publisher `CN=Anh-Thi Dinh`: a different Publisher is a different app, so installed copies would stop updating.
+  - Microsoft Store publisher "Anh-Thi DINH": it is the Partner Center account.
+
 ## Releasing
 
 Releases are built, signed, notarized and published from a maintainer's Mac, not in CI. Run `/cf-ship` (guide: `.coding-friend/skills/cf-ship-custom/SKILL.md`): it picks the version, writes the `CHANGELOG.md` section, commits `chore(release): vX.Y.Z` and runs `scripts/ship.sh`, which chains `build-and-notarize.sh`, `publish-release.sh` and `publish-appcast.sh`. See [docs/RELEASING.md](docs/RELEASING.md) for the one-time setup (Developer ID, notary profile, Sparkle key), the manual steps and rollback.
