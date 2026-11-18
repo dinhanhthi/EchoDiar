@@ -12,14 +12,14 @@
 -->
 <AppInstaller
   xmlns="http://schemas.microsoft.com/appx/appinstaller/2018"
-  Version="1.5.5.0"
-  Uri="https://ed.dinhanhthi.com/windows/EchoDiar.appinstaller">
+  Version="1.5.6.0"
+  Uri="https://echodiar.coprimal.dev/windows/EchoDiar.appinstaller">
 
   <MainBundle
     Name="dinh.thi.EchoDiar"
     Publisher="CN=Anh-Thi Dinh"
-    Version="1.5.5.0"
-    Uri="https://github.com/Coprimal/EchoDiar/releases/download/v1.5.5/EchoDiar_1.5.5.0.msixbundle" />
+    Version="1.5.6.0"
+    Uri="https://github.com/Coprimal/EchoDiar/releases/download/v1.5.6/EchoDiar_1.5.6.0.msixbundle" />
 
   <UpdateSettings>
     <OnLaunch HoursBetweenUpdateChecks="0" />
