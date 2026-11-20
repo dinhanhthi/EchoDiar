@@ -13,6 +13,7 @@
     <link rel="icon" href="logo.png" type="image/png" />
     <link rel="stylesheet" href="styles.css" />
     <script>
+      document.documentElement.classList.add("js");
       try {
         const stored = localStorage.getItem("echodiar.theme");
         if (stored) document.documentElement.dataset.theme = stored;
@@ -22,11 +23,12 @@
     </script>
   </head>
   <body>
-    <div class="page">
-      <header class="site-header">
+    <a class="skip-link" href="#main">Skip to content</a>
+    <header class="site-header">
+      <div class="site-header__inner">
         <div class="brand-group">
           <a class="brand" href="./">
-            <img src="logo.png" alt="" width="32" height="32" />
+            <img src="logo.png" alt="" width="28" height="28" />
             <span>EchoDiar</span>
           </a>
           <a
@@ -41,8 +43,10 @@
           >
         </div>
         <nav aria-label="Primary navigation">
-          <a class="nav-link" href="docs.html">Docs</a>
-          <button type="button" class="nav-link" id="theme-toggle" aria-label="Switch theme" title="Switch theme">
+          <a class="nav-link nav-link--text hide-sm" href="./#features">Features</a>
+          <a class="nav-link nav-link--text" href="docs.html">Docs</a>
+          <a class="nav-link nav-link--text hide-sm" href="privacy.html">Privacy</a>
+          <button type="button" class="nav-link nav-link--icon" id="theme-toggle" aria-label="Switch theme" title="Switch theme">
             <svg class="icon-sun" viewBox="0 0 24 24" aria-hidden="true">
               <circle cx="12" cy="12" r="4" />
               <path d="M12 2v2m0 16v2M4.93 4.93l1.41 1.41m11.32 11.32 1.41 1.41M2 12h2m16 0h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41" />
@@ -52,7 +56,7 @@
             </svg>
           </button>
           <a
-            class="nav-link"
+            class="nav-link nav-link--icon"
             href="https://github.com/Coprimal/EchoDiar"
             target="_blank"
             rel="noopener noreferrer"
@@ -63,162 +67,523 @@
               <path d="M12 .5a12 12 0 0 0-3.79 23.4c.6.11.82-.26.82-.58v-2.2c-3.34.73-4.04-1.43-4.04-1.43-.55-1.4-1.34-1.77-1.34-1.77-1.09-.75.08-.73.08-.73 1.21.08 1.84 1.24 1.84 1.24 1.07 1.83 2.81 1.3 3.5.99.11-.78.42-1.3.76-1.6-2.67-.3-5.47-1.33-5.47-5.93 0-1.31.47-2.38 1.24-3.22-.13-.3-.54-1.52.12-3.18 0 0 1.01-.32 3.3 1.23a11.5 11.5 0 0 1 6.01 0c2.29-1.55 3.3-1.23 3.3-1.23.66 1.66.25 2.88.12 3.18.77.84 1.24 1.91 1.24 3.22 0 4.61-2.81 5.62-5.49 5.92.43.37.81 1.1.81 2.22v3.29c0 .32.21.7.83.58A12 12 0 0 0 12 .5Z" />
             </svg>
           </a>
+          <a class="button button--primary button--small" href="./#download">Download</a>
         </nav>
-      </header>
+      </div>
+    </header>
 
-      <main>
-        <section class="hero">
-          <h1>EchoDiar</h1>
-          <p>Record any meeting on your Mac or Windows PC, see who said what, and ask AI about it — local-first and lightweight.</p>
-          <div class="actions">
-            <a
-              class="button button--primary"
-              href="https://github.com/Coprimal/EchoDiar/releases/latest"
-              target="_blank"
-              rel="noopener noreferrer"
-              >Download for Mac</a
-            >
-            <a
-              class="button button--secondary"
-              href="https://apps.microsoft.com/detail/9N5X564S1F2D?mode=direct"
-              target="_blank"
-              rel="noopener noreferrer"
-              >Get it from Microsoft Store</a
-            >
-            <a
-              class="button button--secondary"
-              href="https://github.com/Coprimal/EchoDiar"
-              target="_blank"
-              rel="noopener noreferrer"
-              >GitHub</a
-            >
+    <main id="main">
+      <section class="hero wrap">
+        <div class="hero__copy">
+          <h1>Record any meeting, see who said what, and ask AI about it.</h1>
+          <p class="lede">A lightweight meeting recorder for Mac and Windows. Transcription and AI can run fully on your computer.</p>
+          <div class="actions" id="download">
+            <a class="button button--primary" href="https://github.com/Coprimal/EchoDiar/releases/latest" target="_blank" rel="noopener noreferrer">
+              <svg class="fill" viewBox="0 0 24 24" aria-hidden="true">
+                <path d="M16.37 12.62c-.02-2.3 1.88-3.4 1.96-3.46-1.07-1.56-2.73-1.78-3.32-1.8-1.41-.14-2.76.83-3.48.83-.72 0-1.82-.81-3-.79-1.54.02-2.96.9-3.76 2.27-1.6 2.78-.41 6.9 1.15 9.16.76 1.1 1.67 2.34 2.86 2.3 1.15-.05 1.58-.74 2.97-.74 1.38 0 1.77.74 2.98.72 1.23-.02 2.01-1.12 2.76-2.23.87-1.28 1.23-2.51 1.25-2.58-.03-.01-2.4-.92-2.42-3.66ZM14.1 5.86c.63-.77 1.06-1.83.94-2.89-.91.04-2.01.61-2.67 1.37-.58.67-1.09 1.76-.96 2.8 1.02.08 2.06-.52 2.69-1.28Z" />
+              </svg>
+              Download for Mac
+            </a>
+            <a class="button button--secondary" href="https://apps.microsoft.com/detail/9N5X564S1F2D?mode=direct" target="_blank" rel="noopener noreferrer">
+              <svg class="fill" viewBox="0 0 24 24" aria-hidden="true">
+                <path d="M3 3h8.5v8.5H3zM12.5 3H21v8.5h-8.5zM3 12.5h8.5V21H3zM12.5 12.5H21V21h-8.5z" />
+              </svg>
+              Get it from Microsoft Store
+            </a>
           </div>
-          <p class="note">macOS 15+ · Apple Silicon · Windows 11 (x64, Arm64) · Free &amp; open source (AGPLv3)</p>
-          <p class="note">Installed EchoDiar on Windows with its certificate before? <a href="docs.html#windows-warnings">Move to the Microsoft Store</a>; your recordings stay.</p>
-        </section>
-
-        <button class="poster-button" type="button" data-zoom aria-label="View screenshot full screen">
-          <img
-            class="poster"
-            src="poster.jpg"
-            alt="EchoDiar transcript window with speakers and a cited AI answer"
-            width="1600"
-            height="840"
-            loading="eager"
-          />
-        </button>
-
-        <div class="shots">
-          <button class="shot" type="button" data-zoom aria-label="View screenshot full screen">
-            <img
-              src="screenshots/echodiar_s_1.webp"
-              alt="EchoDiar recording a call: the recording card on top of the conversation list and the floating indicator with its timer and level"
-              width="1412"
-              height="979"
-              loading="lazy"
-            />
-          </button>
-          <button class="shot" type="button" data-zoom aria-label="View screenshot full screen">
-            <img
-              src="screenshots/echodiar_s_2.webp"
-              alt="EchoDiar Settings, AI Providers, Local AI, Transcription: on-device Whisper and Parakeet models and the installed default model"
-              width="1412"
-              height="979"
-              loading="lazy"
-            />
-          </button>
-          <button class="shot" type="button" data-zoom aria-label="View screenshot full screen">
-            <img
-              src="screenshots/echodiar_s_3.webp"
-              alt="EchoDiar transcript of a sprint meeting with named speakers, the line being played back highlighted"
-              width="1412"
-              height="979"
-              loading="lazy"
-            />
-          </button>
-          <button class="shot" type="button" data-zoom aria-label="View screenshot full screen">
-            <img
-              src="screenshots/echodiar_s_4.webp"
-              alt="EchoDiar AI summary of a meeting with timestamped key points, decisions and action items"
-              width="1412"
-              height="979"
-              loading="lazy"
-            />
-          </button>
-          <button class="shot" type="button" data-zoom aria-label="View screenshot full screen">
-            <img
-              src="screenshots/echodiar_s_5.webp"
-              alt="EchoDiar chat about a meeting with answers that cite timestamps"
-              width="1412"
-              height="979"
-              loading="lazy"
-            />
-          </button>
-          <button class="shot" type="button" data-zoom aria-label="View screenshot full screen">
-            <img
-              src="screenshots/echodiar_s_6.webp"
-              alt="EchoDiar library chat answering from four meetings, with numbered sources, next to the cited transcript"
-              width="1412"
-              height="979"
-              loading="lazy"
-            />
-          </button>
+          <ul class="platforms">
+            <li>macOS 15+ on Apple Silicon</li>
+            <li>Windows 11, x64 and Arm64</li>
+            <li>Free and open source, AGPLv3</li>
+          </ul>
         </div>
 
-        <section id="features">
-          <h2>Features</h2>
-          <ul class="list">
-            <li><strong>Lightweight and native</strong>: a Swift app in the Mac menu bar, a WinUI app in the Windows notification area. Models load only while they work.</li>
-            <li><strong>Private</strong>: transcription and AI can run fully on your computer. Audio goes to the cloud only if you choose a cloud engine.</li>
-            <li><strong>Any meeting app, any AI</strong>: record Zoom, Teams, Meet in a browser or all system audio. Ask local models, cloud APIs or your Claude Code or Codex subscription.</li>
-            <li><strong>Who said what</strong>: your mic and the meeting audio on separate channels, the other speakers told apart and renamable.</li>
-            <li><strong>On-device transcription</strong>: Whisper and Parakeet on Mac and Windows, plus Qwen3-ASR and Apple Speech (macOS 26) on Mac. Whisper and Parakeet transcribe while you record, with live captions, so the transcript is ready seconds after you stop.</li>
-            <li><strong>AI summaries and chat</strong>: answers cite timestamps that jump to that moment in the recording.</li>
-            <li><strong>Copy as prompt</strong>: the transcript and your question, ready to paste into any chat app.</li>
-            <li><strong>Meeting detection</strong>: offers to record when a call starts, shows a floating indicator and offers to stop when the meeting ends.</li>
-            <li><strong>Library and search</strong>: conversations by day, search over titles and transcripts, auto-delete of old recordings.</li>
-          </ul>
-        </section>
+        <figure class="stage" data-stage>
+          <div class="win" aria-hidden="true">
+            <div class="win__bar">
+              <span class="win__lights"><i></i><i></i><i></i></span>
+              <span class="win__title">
+                <strong>Sprint planning: the 2.4 release date</strong>
+                <span>Oct 20, 2026 at 10:00 AM</span>
+              </span>
+              <span class="rec-pill"><i></i><span data-rec-time>17:30</span></span>
+            </div>
 
-        <section id="transcription">
-          <h2>Transcription</h2>
-          <ul class="list">
-            <li><strong>On your computer</strong>: Whisper (WhisperKit on Mac, whisper.cpp on Windows) and Parakeet, plus Qwen3-ASR and Apple Speech (macOS 26) on Mac.</li>
-            <li><strong>Speakers</strong>: diarization of the meeting audio (FluidAudio on Mac, sherpa-onnx on Windows), when "Tell speakers apart" is on (off by default).</li>
-            <li><strong>Transcribe while recording</strong>: Whisper or Parakeet transcribes each channel as you speak, and the live captions come from it. On a Mac, for a 15-minute call, the transcript is ready 0.8 seconds after Stop (about 10 seconds with speakers told apart) instead of about a minute and a half. Other engines transcribe the whole recording after Stop.</li>
-            <li><strong>Cloud</strong> (optional): OpenAI, Groq, Mistral, Gemini, xAI, ElevenLabs, Deepgram, AssemblyAI, Speechmatics, Soniox, Gladia or an OpenAI-compatible endpoint, with keys in Settings &gt; AI Providers &gt; Cloud. Asks once before audio goes to each one. A live transcript can then come from a local model (free) or the provider's realtime stream (paid, on top of the transcription after Stop).</li>
-          </ul>
-        </section>
+            <div class="channels">
+              <div class="channel" data-channel="me">
+                <span class="channel__label"><i class="dot dot--me"></i>Me</span>
+                <span class="wave" data-wave></span>
+              </div>
+              <div class="channel" data-channel="others">
+                <span class="channel__label"><i class="dot dot--others"></i>Others</span>
+                <span class="wave" data-wave></span>
+              </div>
+            </div>
 
-        <section id="ai-providers">
-          <h2>AI providers</h2>
-          <ul class="list">
-            <li><strong>On-device</strong>: MLX models and Apple Foundation Models (macOS 26) on Mac; GGUF models, and Phi Silica on Copilot+ PCs, on Windows.</li>
-            <li><strong>Local servers</strong>: LM Studio, Ollama, Jan, llama.cpp and vLLM, plus Foundry Local on Windows.</li>
-            <li><strong>Cloud APIs</strong>: OpenAI, Anthropic, xAI, Gemini, Mistral, Azure OpenAI, OpenRouter, Groq, DeepSeek or a custom endpoint, with your own key in Settings &gt; AI Providers &gt; Cloud.</li>
-            <li><strong>Subscription CLIs</strong>: Claude Code, Codex, OpenCode and Gemini CLI.</li>
-          </ul>
-        </section>
+            <ol class="tx">
+              <li class="tx__line" data-speaker="lan" data-at="03:55">
+                <time>03:55</time>
+                <span class="tx__who"><i class="dot dot--lan"></i>Lan</span>
+                <span class="tx__text">Great. Minh, start with the backend.</span>
+              </li>
+              <li class="tx__line" data-speaker="minh" data-at="05:10">
+                <time>05:10</time>
+                <span class="tx__who"><i class="dot dot--minh"></i>Minh</span>
+                <span class="tx__text">The new payments API is about eighty percent done.</span>
+              </li>
+              <li class="tx__line" data-speaker="minh" data-at="12:00">
+                <time>12:00</time>
+                <span class="tx__who"><i class="dot dot--minh"></i>Minh</span>
+                <span class="tx__text">It's tight. If QA finds a bug in refunds, I'd move the release to the 22nd.</span>
+              </li>
+              <li class="tx__line" data-speaker="me" data-at="14:42">
+                <time>14:42</time>
+                <span class="tx__who"><i class="dot dot--me"></i>Me</span>
+                <span class="tx__text">Let's keep the 15th, but split refunds out and ship them in 2.5.</span>
+              </li>
+              <li class="tx__line" data-speaker="lan" data-at="17:23" data-cited>
+                <time>17:23</time>
+                <span class="tx__who"><i class="dot dot--lan"></i>Lan</span>
+                <span class="tx__text">Okay, that's decided. 2.4 ships on November 15, and refunds move to 2.5.</span>
+              </li>
+            </ol>
 
-        <section id="get-started">
-          <h2>Get started</h2>
-          <ol class="steps">
-            <li>On Mac, download the signed and notarized DMG from the <a href="https://github.com/Coprimal/EchoDiar/releases/latest" target="_blank" rel="noopener noreferrer">releases page</a> and drag EchoDiar to Applications. On Windows 11, get EchoDiar from the <a href="https://apps.microsoft.com/detail/9N5X564S1F2D?mode=direct" target="_blank" rel="noopener noreferrer">Microsoft Store</a>.</li>
-            <li>Allow the microphone (and System Audio Recording on Mac), then download a model in Settings &gt; AI Providers &gt; Local AI.</li>
-            <li>Start and stop recording from any app with <code>Cmd+Option+R</code> on Mac or <code>Ctrl+Alt+R</code> on Windows. The transcript follows.</li>
-          </ol>
-          <p class="note">More in the <a href="docs.html">docs</a>. EchoDiar updates itself.</p>        </section>
-      </main>
+            <div class="ask">
+              <p class="ask__q">When does 2.4 ship?</p>
+              <p class="ask__a">
+                On November 15. Refunds were split out and move to 2.5 <span class="cite">17:23</span>
+              </p>
+            </div>
+          </div>
+          <figcaption class="visually-hidden">
+            An EchoDiar window during a sprint planning call: your mic and the meeting audio on two channels, the transcript
+            appearing line by line with each speaker named, and an AI answer that cites the moment it comes from.
+          </figcaption>
+        </figure>
+      </section>
 
-      <footer class="site-footer">
-        AGPLv3 · by
-        <a href="https://coprimal.dev" target="_blank" rel="noopener noreferrer">Coprimal</a>
-        ·
-        <a href="https://github.com/Coprimal/EchoDiar/blob/main/CHANGELOG.md" target="_blank" rel="noopener noreferrer">Changelog</a>
-        ·
-        <a href="privacy.html">Privacy</a>
-      </footer>
-    </div>
+      <section class="section wrap" id="how" aria-labelledby="how-title">
+        <div class="section__head">
+          <h2 id="how-title">From call to answer</h2>
+        </div>
+        <ol class="flow">
+          <li class="flow__step">
+            <div class="vignette vignette--detect" aria-hidden="true">
+              <div class="indicator">
+                <span class="indicator__app">Z</span>
+                <span class="indicator__text"><strong>Zoom started a call</strong><span>Record this meeting?</span></span>
+                <span class="indicator__actions">
+                  <span class="indicator__btn indicator__btn--go">Record</span>
+                  <span class="indicator__btn">Not now</span>
+                </span>
+              </div>
+            </div>
+            <h3>A call starts</h3>
+            <p>EchoDiar offers to record when a meeting takes the mic.</p>
+          </li>
+          <li class="flow__step">
+            <div class="vignette vignette--channels" aria-hidden="true">
+              <div class="mini-channel">
+                <span>Me</span>
+                <span class="mini-wave mini-wave--me" data-wave="30"></span>
+              </div>
+              <div class="mini-channel">
+                <span>Meeting</span>
+                <span class="mini-wave mini-wave--others" data-wave="30"></span>
+              </div>
+              <span class="file-chip">audio.caf <em>ch0 mic, ch1 system</em></span>
+            </div>
+            <h3>Two channels, one file</h3>
+            <p>Your mic and the meeting, kept apart.</p>
+          </li>
+          <li class="flow__step">
+            <div class="vignette vignette--speed" aria-hidden="true">
+              <div class="speed">
+                <span class="speed__label">Transcript ready after Stop, 15-minute call</span>
+                <div class="speed__row">
+                  <span class="speed__name">Whole file after Stop</span>
+                  <span class="speed__bar speed__bar--slow"><i></i></span>
+                  <span class="speed__value">95 s</span>
+                </div>
+                <div class="speed__row">
+                  <span class="speed__name">While recording</span>
+                  <span class="speed__bar speed__bar--fast"><i></i></span>
+                  <span class="speed__value">0.8 s</span>
+                </div>
+              </div>
+            </div>
+            <h3>Transcribed while you talk</h3>
+            <p>Live captions, and a transcript ready at Stop.</p>
+          </li>
+          <li class="flow__step">
+            <div class="vignette vignette--cite" aria-hidden="true">
+              <div class="cite-demo">
+                <p class="cite-demo__q">What are the action items?</p>
+                <ul>
+                  <li>Minh finishes the payments API by Thursday <span class="cite">05:10</span></li>
+                  <li>Refunds move to 2.5 <span class="cite">17:23</span></li>
+                </ul>
+              </div>
+            </div>
+            <h3>Ask, then jump to the moment</h3>
+            <p>Every answer cites the moment it comes from.</p>
+          </li>
+        </ol>
+      </section>
+
+      <section class="section wrap catchup" id="catch-up" aria-labelledby="catchup-title">
+        <div class="catchup__copy">
+          <h2 id="catchup-title">Catch up mid-meeting</h2>
+          <p>Missed a few minutes? One click sums them up, and the recording keeps going.</p>
+        </div>
+        <div class="catchup__art" aria-hidden="true">
+          <div class="cu-track">
+            <span class="cu-track__wave" data-wave="60"></span>
+            <span class="cu-track__span"><em>Last 5 min</em></span>
+            <span class="rec-pill"><i></i><span>12:40</span></span>
+          </div>
+          <div class="cu-card">
+            <span class="cu-card__btn">
+              <svg viewBox="0 0 24 24"><rect x="5" y="4" width="14" height="17" rx="2" /><path d="M9 4h6v3H9zM9 11h6M9 15h4" /></svg>
+              Catch up
+            </span>
+            <ul class="cu-card__points">
+              <li>The release date is tight</li>
+              <li>A refunds bug would move it to the 22nd</li>
+              <li>Nothing decided yet</li>
+            </ul>
+          </div>
+        </div>
+      </section>
+
+      <section class="section wrap" aria-labelledby="shots-title">
+        <div class="section__head">
+          <h2 id="shots-title">A look inside</h2>
+        </div>
+        <div class="shots">
+          <figure class="shot">
+            <button type="button" data-zoom aria-label="View screenshot full screen: recording a call">
+              <img
+                src="screenshots/echodiar_s_1.webp"
+                alt="EchoDiar recording a call: the recording card on top of the conversation list and the floating indicator with its timer and level"
+                width="1412"
+                height="979"
+                loading="lazy"
+              />
+            </button>
+            <figcaption>Recording a call</figcaption>
+          </figure>
+          <figure class="shot">
+            <button type="button" data-zoom aria-label="View screenshot full screen: transcript with speakers">
+              <img
+                src="screenshots/echodiar_s_3.webp"
+                alt="EchoDiar transcript of a sprint meeting with named speakers, the line being played back highlighted"
+                width="1412"
+                height="979"
+                loading="lazy"
+              />
+            </button>
+            <figcaption>Who said what</figcaption>
+          </figure>
+          <figure class="shot">
+            <button type="button" data-zoom aria-label="View screenshot full screen: AI summary">
+              <img
+                src="screenshots/echodiar_s_4.webp"
+                alt="EchoDiar AI summary of a meeting with timestamped key points, decisions and action items"
+                width="1412"
+                height="979"
+                loading="lazy"
+              />
+            </button>
+            <figcaption>Summary</figcaption>
+          </figure>
+          <figure class="shot">
+            <button type="button" data-zoom aria-label="View screenshot full screen: chat with citations">
+              <img
+                src="screenshots/echodiar_s_5.webp"
+                alt="EchoDiar chat about a meeting with answers that cite timestamps"
+                width="1412"
+                height="979"
+                loading="lazy"
+              />
+            </button>
+            <figcaption>Chat with citations</figcaption>
+          </figure>
+          <figure class="shot">
+            <button type="button" data-zoom aria-label="View screenshot full screen: library chat">
+              <img
+                src="screenshots/echodiar_s_6.webp"
+                alt="EchoDiar library chat answering from four meetings, with numbered sources, next to the cited transcript"
+                width="1412"
+                height="979"
+                loading="lazy"
+              />
+            </button>
+            <figcaption>Ask your whole library</figcaption>
+          </figure>
+          <figure class="shot">
+            <button type="button" data-zoom aria-label="View screenshot full screen: on-device models">
+              <img
+                src="screenshots/echodiar_s_2.webp"
+                alt="EchoDiar Settings, AI Providers, Local AI, Transcription: on-device Whisper and Parakeet models and the installed default model"
+                width="1412"
+                height="979"
+                loading="lazy"
+              />
+            </button>
+            <figcaption>On-device models</figcaption>
+          </figure>
+        </div>
+      </section>
+
+      <section class="section wrap" id="features" aria-labelledby="features-title">
+        <div class="section__head">
+          <h2 id="features-title">Features</h2>
+        </div>
+        <ul class="tiles">
+          <li class="tile">
+            <div class="tile__art art-menu" aria-hidden="true">
+              <div class="menubar">
+                <span class="menubar__icons"><i></i><i></i><i></i></span>
+                <span class="menubar__app"><img src="logo.png" alt="" width="14" height="14" /><i></i></span>
+                <span class="menubar__clock">10:02</span>
+              </div>
+              <div class="menu">
+                <span class="menu__item menu__item--on">Stop Recording <em>⌥⌘R</em></span>
+                <span class="menu__item">Pause <em>⌥⌘P</em></span>
+                <span class="menu__sep"></span>
+                <span class="menu__item">Sprint planning <em>10:00</em></span>
+                <span class="menu__item">Weekly 1:1 with Lan <em>16:00</em></span>
+              </div>
+            </div>
+            <h3>Lives in the menu bar</h3>
+            <p>Or the notification area on Windows.</p>
+          </li>
+          <li class="tile">
+            <div class="tile__art art-apps" aria-hidden="true">
+              <span class="app-tile" style="--app: oklch(60% 0.17 255)">Zoom</span>
+              <span class="app-tile" style="--app: oklch(52% 0.15 285)">Teams</span>
+              <span class="app-tile" style="--app: oklch(62% 0.15 150)">Meet</span>
+              <span class="app-tile" style="--app: oklch(45% 0.12 330)">Slack</span>
+              <span class="app-tile" style="--app: oklch(60% 0.12 200)">Webex</span>
+              <span class="app-tile" style="--app: oklch(56% 0.17 270)">Discord</span>
+              <span class="app-tile app-tile--all">All system audio</span>
+            </div>
+            <h3>Any meeting app</h3>
+            <p>Or everything your computer plays.</p>
+          </li>
+          <li class="tile">
+            <div class="tile__art art-event" aria-hidden="true">
+              <div class="event">
+                <span class="event__bar"></span>
+                <span class="event__title">Sprint planning</span>
+                <span class="event__time">10:00 to 10:30 <em>meet.google.com</em></span>
+                <span class="event__actions"><b class="is-go">Record</b><b>Join</b><b>Skip</b></span>
+              </div>
+            </div>
+            <h3>Knows your calendar</h3>
+            <p>Join, record or skip what's next.</p>
+          </li>
+          <li class="tile">
+            <div class="tile__art art-summary" aria-hidden="true">
+              <span class="sum__head">Key points</span>
+              <span class="sum__line" style="--w: 88%"></span>
+              <span class="sum__line" style="--w: 64%"><span class="cite">05:10</span></span>
+              <span class="sum__head">Decisions</span>
+              <span class="sum__line" style="--w: 72%"><span class="cite">17:23</span></span>
+              <span class="sum__head">Action items</span>
+              <span class="sum__todo"><i></i><span class="sum__line" style="--w: 58%"></span></span>
+            </div>
+            <h3>Summaries</h3>
+            <p>Key points, decisions and action items.</p>
+          </li>
+          <li class="tile">
+            <div class="tile__art art-search" aria-hidden="true">
+              <span class="search">
+                <svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="6" /><path d="m20 20-4.5-4.5" /></svg>
+                refunds<i class="caret"></i>
+              </span>
+              <span class="result"><strong>Sprint planning: the 2.4 release date</strong><span>…split <mark>refunds</mark> out and ship them in 2.5</span></span>
+              <span class="result"><strong>Customer feedback review</strong><span>…three <mark>refunds</mark> were late last week…</span></span>
+            </div>
+            <h3>Search everything</h3>
+            <p>Every title and transcript.</p>
+          </li>
+          <li class="tile">
+            <div class="tile__art art-prompt" aria-hidden="true">
+              <div class="prompt">
+                <span class="prompt__part"><i class="sum__line" style="--w: 90%"></i><i class="sum__line" style="--w: 70%"></i><em>Transcript, 24 min</em></span>
+                <span class="prompt__plus">+</span>
+                <span class="prompt__part prompt__part--q">What did we decide?</span>
+              </div>
+              <span class="prompt__copy">Copy as prompt</span>
+            </div>
+            <h3>Copy as prompt</h3>
+            <p>Paste a meeting into any chat app.</p>
+          </li>
+        </ul>
+      </section>
+
+      <section class="section wrap" id="local" aria-labelledby="local-title">
+        <div class="section__head">
+          <h2 id="local-title">Your computer first, the cloud only if you ask</h2>
+        </div>
+
+        <div class="where" aria-hidden="true">
+          <div class="where__device">
+            <span class="where__caption">Your Mac or PC</span>
+            <div class="where__chips">
+              <span class="chip chip--solid">Recording</span>
+              <span class="chip chip--solid">Whisper, Parakeet</span>
+              <span class="chip chip--solid">Speakers</span>
+              <span class="chip chip--solid">Local AI</span>
+              <span class="chip chip--solid">Transcripts, summaries, chats</span>
+            </div>
+          </div>
+          <div class="where__link">
+            <span class="where__line"></span>
+            <span class="where__gate">only if you choose</span>
+          </div>
+          <div class="where__cloud">
+            <span class="where__caption">Cloud</span>
+            <span class="where__sub">only the provider you set up</span>
+          </div>
+        </div>
+
+        <ul class="badges">
+          <li>
+            <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="8" r="3.5" /><path d="M5 20a7 7 0 0 1 14 0" /><path d="m4 4 16 16" /></svg>
+            No account
+          </li>
+          <li>
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20V10m6 10V4m6 16v-7" /><path d="m3 3 18 18" /></svg>
+            No analytics
+          </li>
+          <li>
+            <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="8" cy="15" r="4" /><path d="m11 12 9-9m-3 3 3 3m-6 0 2 2" /></svg>
+            Keys in Keychain or Credential Manager
+          </li>
+          <li>
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v12m-5-5 5 5 5-5" /><path d="M4 19h16" /></svg>
+            Models download only when you ask
+          </li>
+        </ul>
+
+        <div class="engines">
+          <div class="engine" id="transcription">
+            <h3>Transcription</h3>
+            <dl>
+              <dt>On your computer</dt>
+              <dd>
+                <span class="chip">Whisper</span><span class="chip">Parakeet</span><span class="chip">Qwen3-ASR <em>Mac</em></span
+                ><span class="chip">Apple Speech <em>macOS 26</em></span>
+              </dd>
+              <dt>Speakers</dt>
+              <dd><span class="chip">FluidAudio <em>Mac</em></span><span class="chip">sherpa-onnx <em>Windows</em></span></dd>
+              <dt>Cloud, optional</dt>
+              <dd>
+                <span class="chip">OpenAI</span><span class="chip">Groq</span><span class="chip">Mistral</span><span class="chip">Gemini</span
+                ><span class="chip">xAI</span><span class="chip">ElevenLabs</span><span class="chip">Deepgram</span><span class="chip">AssemblyAI</span
+                ><span class="chip">Speechmatics</span><span class="chip">Soniox</span><span class="chip">Gladia</span
+                ><span class="chip">OpenAI-compatible</span>
+              </dd>
+            </dl>
+          </div>
+
+          <div class="engine" id="ai-providers">
+            <h3>AI providers</h3>
+            <dl>
+              <dt>On-device</dt>
+              <dd>
+                <span class="chip">MLX <em>Mac</em></span><span class="chip">Apple Foundation Models <em>macOS 26</em></span
+                ><span class="chip">GGUF <em>Windows</em></span><span class="chip">Phi Silica <em>Copilot+ PCs</em></span>
+              </dd>
+              <dt>Local servers</dt>
+              <dd>
+                <span class="chip">LM Studio</span><span class="chip">Ollama</span><span class="chip">Jan</span><span class="chip">llama.cpp</span
+                ><span class="chip">vLLM</span><span class="chip">Foundry Local <em>Windows</em></span>
+              </dd>
+              <dt>Cloud APIs</dt>
+              <dd>
+                <span class="chip">OpenAI</span><span class="chip">Anthropic</span><span class="chip">xAI</span><span class="chip">Gemini</span
+                ><span class="chip">Mistral</span><span class="chip">Azure OpenAI</span><span class="chip">OpenRouter</span><span class="chip">Groq</span
+                ><span class="chip">DeepSeek</span><span class="chip">Custom endpoint</span>
+              </dd>
+              <dt>Subscription CLIs</dt>
+              <dd>
+                <span class="chip">Claude Code</span><span class="chip">Codex</span><span class="chip">OpenCode</span><span class="chip">Gemini CLI</span>
+              </dd>
+            </dl>
+          </div>
+        </div>
+        <p class="more"><a href="privacy.html">What EchoDiar sends and stores</a></p>
+      </section>
+
+      <section class="section wrap" id="get-started" aria-labelledby="start-title">
+        <div class="start">
+          <div class="start__copy">
+            <h2 id="start-title">Get started</h2>
+            <ol class="quick">
+              <li>
+                <span class="quick__art" aria-hidden="true">
+                  <svg viewBox="0 0 24 24"><path d="M12 3v12m-5-5 5 5 5-5" /><path d="M4 19h16" /></svg>
+                </span>
+                <strong>Install</strong>
+                <span>DMG on Mac, Microsoft Store on Windows</span>
+              </li>
+              <li>
+                <span class="quick__art" aria-hidden="true">
+                  <svg viewBox="0 0 24 24"><rect x="9" y="3" width="6" height="11" rx="3" /><path d="M5 11a7 7 0 0 0 14 0M12 18v3" /></svg>
+                  <span class="toggle"><i></i></span>
+                </span>
+                <strong>Allow the mic</strong>
+                <span>Then download a model in Settings</span>
+              </li>
+              <li>
+                <span class="quick__art quick__art--keys" aria-hidden="true"><kbd>⌘</kbd><kbd>⌥</kbd><kbd>R</kbd></span>
+                <strong>Record from any app</strong>
+                <span><kbd>Ctrl+Alt+R</kbd> on Windows</span>
+              </li>
+            </ol>
+            <p class="more">
+              More in the <a href="docs.html">docs</a>. Installed on Windows with its certificate before?
+              <a href="docs.html#windows-warnings">Move to the Microsoft Store</a>.
+            </p>
+          </div>
+          <div class="start__card">
+            <img src="logo.png" alt="" width="72" height="72" loading="lazy" />
+            <p>Free and open source. No account to create.</p>
+            <div class="actions actions--stack">
+              <a class="button button--primary" href="https://github.com/Coprimal/EchoDiar/releases/latest" target="_blank" rel="noopener noreferrer"
+                >Download for Mac</a
+              >
+              <a class="button button--secondary" href="https://apps.microsoft.com/detail/9N5X564S1F2D?mode=direct" target="_blank" rel="noopener noreferrer"
+                >Get it from Microsoft Store</a
+              >
+            </div>
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <footer class="site-footer">
+      <div class="site-footer__inner">
+        <div class="site-footer__brand">
+          <a class="brand" href="./">
+            <img src="logo.png" alt="" width="24" height="24" />
+            <span>EchoDiar</span>
+          </a>
+          <p>Local-first meeting recorder for Mac and Windows. AGPLv3, by <a href="https://coprimal.dev" target="_blank" rel="noopener noreferrer">Coprimal</a>.</p>
+        </div>
+        <nav class="site-footer__links" aria-label="Footer">
+          <a href="./#features">Features</a>
+          <a href="docs.html">Docs</a>
+          <a href="privacy.html">Privacy</a>
+          <a href="https://github.com/Coprimal/EchoDiar/blob/main/CHANGELOG.md" target="_blank" rel="noopener noreferrer">Changelog</a>
+          <a href="https://github.com/Coprimal/EchoDiar" target="_blank" rel="noopener noreferrer">GitHub</a>
+        </nav>
+      </div>
+    </footer>
     <script src="site.js"></script>
   </body>
 </html>

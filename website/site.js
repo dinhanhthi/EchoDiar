@@ -187,3 +187,149 @@
     close();
   });
 })();
+
+// Header: a hairline appears once the page scrolls under it.
+(() => {
+  const header = document.querySelector(".site-header");
+  if (!header) return;
+  const update = () => header.classList.toggle("is-scrolled", scrollY > 4);
+  addEventListener("scroll", update, { passive: true });
+  update();
+})();
+
+// Waveforms: fill each [data-wave] with bars. A fixed pseudo-random sequence keeps the shape
+// the same on every load; each bar gets its own speed and range so the motion never lines up.
+(() => {
+  let seed = 7;
+  const random = () => ((seed = (seed * 16807) % 2147483647) - 1) / 2147483646;
+  for (const wave of document.querySelectorAll("[data-wave]")) {
+    const count = Number(wave.dataset.wave) || 64;
+    const fragment = document.createDocumentFragment();
+    for (let i = 0; i < count; i++) {
+      const bar = document.createElement("i");
+      const envelope = 0.45 + 0.55 * Math.sin((i / count) * Math.PI);
+      const hi = (0.35 + random() * 0.65) * envelope;
+      bar.style.setProperty("--hi", hi.toFixed(2));
+      bar.style.setProperty("--lo", (0.08 + random() * 0.12).toFixed(2));
+      bar.style.setProperty("--still", (hi * 0.7).toFixed(2));
+      bar.style.setProperty("--rest", (0.08 + random() * 0.08).toFixed(2));
+      bar.style.setProperty("--d", `${Math.round(380 + random() * 520)}ms`);
+      bar.style.setProperty("--delay", `${-Math.round(random() * 900)}ms`);
+      fragment.append(bar);
+    }
+    wave.append(fragment);
+  }
+})();
+
+// Illustrations pause their loops while off screen or while the tab is hidden.
+const watchVisibility = (element, onChange) => {
+  let inView = true;
+  const apply = () => {
+    const visible = inView && !document.hidden;
+    element.classList.toggle("is-paused", !visible);
+    if (visible) element.classList.add("is-visible");
+    onChange?.(visible);
+  };
+  if ("IntersectionObserver" in window) {
+    new IntersectionObserver(
+      ([entry]) => {
+        inView = entry.isIntersecting;
+        apply();
+      },
+      { threshold: 0.2 }
+    ).observe(element);
+  }
+  document.addEventListener("visibilitychange", apply);
+  apply();
+};
+
+document.querySelectorAll(".vignette, .catchup__art").forEach((element) => watchVisibility(element));
+
+// Hero stage: the call plays out line by line. A new line shows grey (the draft the live
+// model refreshes) and turns solid when its chunk is final; then a question is asked and the
+// answer's timestamp lights up the line it cites. Reduced motion shows the finished window.
+(() => {
+  const stage = document.querySelector("[data-stage]");
+  if (!stage || matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+
+  const lines = [...stage.querySelectorAll(".tx__line")];
+  const question = stage.querySelector(".ask__q");
+  const answer = stage.querySelector(".ask__a");
+  const cite = stage.querySelector(".ask .cite");
+  const me = stage.querySelector('[data-channel="me"]');
+  const others = stage.querySelector('[data-channel="others"]');
+  const clock = stage.querySelector("[data-rec-time]");
+  if (!lines.length || !question || !answer || !me || !others) return;
+
+  let visible = true;
+  let waiting = [];
+  watchVisibility(stage, (now) => {
+    visible = now;
+    if (now) {
+      waiting.forEach((resume) => resume());
+      waiting = [];
+    }
+  });
+  const whenVisible = () => (visible ? Promise.resolve() : new Promise((resume) => waiting.push(resume)));
+  const wait = async (ms) => {
+    await new Promise((done) => setTimeout(done, ms));
+    await whenVisible();
+  };
+
+  // Recording clock: jumps to each line's time, then ticks.
+  let seconds = 17 * 60 + 30;
+  const showClock = () => {
+    if (clock) clock.textContent = `${String(Math.floor(seconds / 60)).padStart(2, "0")}:${String(seconds % 60).padStart(2, "0")}`;
+  };
+  setInterval(() => {
+    if (!visible || stage.classList.contains("is-stopped")) return;
+    seconds += 1;
+    showClock();
+  }, 1000);
+
+  const speak = (speaker) => {
+    me.classList.toggle("is-speaking", speaker === "me");
+    others.classList.toggle("is-speaking", speaker === "lan" || speaker === "minh");
+    others.classList.toggle("is-minh", speaker === "minh");
+  };
+
+  const reset = () => {
+    for (const line of lines) line.classList.remove("is-in", "is-final", "is-cited");
+    question.classList.remove("is-in");
+    answer.classList.remove("is-in");
+    cite?.classList.remove("is-active");
+    stage.classList.remove("is-stopped");
+  };
+
+  stage.classList.add("is-live");
+  reset();
+
+  (async () => {
+    for (;;) {
+      await wait(700);
+      for (const line of lines) {
+        const [m, s] = (line.dataset.at || "0:0").split(":").map(Number);
+        seconds = m * 60 + s;
+        showClock();
+        speak(line.dataset.speaker);
+        line.classList.add("is-in");
+        await wait(1500);
+        line.classList.add("is-final");
+        await wait(450);
+      }
+      // Stop, then ask: local AI runs once the recording has stopped.
+      speak(null);
+      stage.classList.add("is-stopped");
+      await wait(700);
+      question.classList.add("is-in");
+      await wait(1000);
+      answer.classList.add("is-in");
+      await wait(900);
+      cite?.classList.add("is-active");
+      stage.querySelector("[data-cited]")?.classList.add("is-cited");
+      await wait(5000);
+      reset();
+      await wait(500);
+    }
+  })();
+})();
