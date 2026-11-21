@@ -23,7 +23,10 @@ public sealed record CatchUp
     [JsonPropertyName("throughLineID")] public int ThroughLineID { get; set; } = -1;
     /// <summary>Seconds from the recording start of that line.</summary>
     [JsonPropertyName("throughTime")] public double ThroughTime { get; set; }
-    /// <summary>Made from all the lines, without a previous catch-up (the first one, or the "from the start" setting).</summary>
+    /// <summary>
+    /// Covers every line from the start: made from all the lines, without a previous catch-up (the first one, or the
+    /// "from the start" setting). A full pass cut to fit is saved as false.
+    /// </summary>
     [JsonPropertyName("fullPass")] public bool FullPass { get; set; }
     /// <summary>Markdown.</summary>
     [JsonPropertyName("text")] public string Text { get; set; } = "";

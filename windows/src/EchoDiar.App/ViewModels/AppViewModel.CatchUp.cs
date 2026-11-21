@@ -328,7 +328,8 @@ public sealed partial class AppViewModel
         int contextWindow, IReadOnlyList<CatchUpLine> lines, string title, DateTimeOffset startedAt, double elapsed,
         OutputLanguage? language)
     {
-        var empty = new CatchUpPlan(null, [], [], Omitted: true, FullPass: true, ThroughLineID: -1, ThroughTime: 0);
+        var empty = new CatchUpPlan(
+            null, Context: [], Transcript: [], Omitted: true, FullPass: true, ThroughLineID: -1, ThroughTime: 0);
         var instructions = PromptBuilder.CatchUpMessages(empty, title, startedAt, elapsed, language)
             .Sum(m => TranscriptChunker.EstimateTokens(m.Content));
         var bytes = TranscriptChunker.Budget(contextWindow, instructions) * 4;

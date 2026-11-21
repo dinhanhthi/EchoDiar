@@ -2452,7 +2452,8 @@ extension AppModel {
         language: OutputLanguage?
     ) -> Int {
         let empty = CatchUpPlan(
-            previous: nil, transcript: [], recent: [], omitted: true, fullPass: true, throughLineID: -1, throughTime: 0)
+            previous: nil, context: [], transcript: [], omitted: true, fullPass: true, throughLineID: -1,
+            throughTime: 0)
         let instructions = PromptBuilder.catchUpMessages(
             plan: empty, title: title, startedAt: startedAt, elapsed: elapsed, language: language
         ).reduce(0) { $0 + TranscriptChunker.estimateTokens($1.content) }

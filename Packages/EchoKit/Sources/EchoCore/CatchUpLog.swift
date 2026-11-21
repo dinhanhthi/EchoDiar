@@ -10,7 +10,8 @@ public struct CatchUp: Codable, Equatable, Identifiable, Sendable {
     public var throughLineID: Int
     /// Seconds from the recording start of that line.
     public var throughTime: Double
-    /// Made from all the lines, without a previous catch-up (the first one, or the "from the start" setting).
+    /// Covers every line from the start: made from all the lines, without a previous catch-up (the first one, or the
+    /// "from the start" setting). A full pass cut to fit is saved as false.
     public var fullPass: Bool
     /// Markdown.
     public var text: String
