@@ -570,6 +570,10 @@
     <value>Chọn nội dung cần ghi âm và ngôn ngữ</value>
     <comment>Choose what to record and the language</comment>
   </data>
+  <data name="ClearSearch" xml:space="preserve">
+    <value>Xoá tìm kiếm</value>
+    <comment>Clear search</comment>
+  </data>
   <data name="ClickToRecordANewShortcut" xml:space="preserve">
     <value>Bấm để nhập phím tắt mới</value>
     <comment>Click to record a new shortcut</comment>
@@ -1182,6 +1186,10 @@
     <value>Nhập mô hình nhúng của {0} trong Cài đặt › RAG</value>
     <comment>Enter the embedding model of %@ in Settings › RAG</comment>
   </data>
+  <data name="EntriesPerPage" xml:space="preserve">
+    <value>Số mục mỗi trang</value>
+    <comment>Entries per page</comment>
+  </data>
   <data name="EveryLicenseAboveInOneTextFile" xml:space="preserve">
     <value>Mọi giấy phép ở trên trong một tệp văn bản.</value>
     <comment>Every license above in one text file.</comment>
@@ -1301,6 +1309,14 @@
   <data name="HideItWhileAnEchoDiarWindowIsInFront" xml:space="preserve">
     <value>Ẩn khi một cửa sổ EchoDiar ở phía trước</value>
     <comment>Hide it while an EchoDiar window is in front</comment>
+  </data>
+  <data name="HideSidebar" xml:space="preserve">
+    <value>Ẩn thanh bên</value>
+    <comment>Hide Sidebar</comment>
+  </data>
+  <data name="HideSidebarS" xml:space="preserve">
+    <value>Ẩn thanh bên (⌃⌘S)</value>
+    <comment>Hide Sidebar (⌃⌘S)</comment>
   </data>
   <data name="History" xml:space="preserve">
     <value>Lịch sử</value>
@@ -1522,6 +1538,14 @@
     <value>Cuộc hội thoại lớn nhất</value>
     <comment>Largest conversations</comment>
   </data>
+  <data name="Last30Days" xml:space="preserve">
+    <value>30 ngày gần nhất</value>
+    <comment>Last 30 days</comment>
+  </data>
+  <data name="Last7Days" xml:space="preserve">
+    <value>7 ngày gần nhất</value>
+    <comment>Last 7 days</comment>
+  </data>
   <data name="LastChecked" xml:space="preserve">
     <value>Kiểm tra lần cuối: {0}</value>
     <comment>Last checked %@</comment>
@@ -1621,6 +1645,10 @@
   <data name="LldLanguages" xml:space="preserve">
     <value>{0} ngôn ngữ</value>
     <comment>%lld languages</comment>
+  </data>
+  <data name="LldLldOfLld" xml:space="preserve">
+    <value>{0}–{1} trên {2}</value>
+    <comment>%lld–%lld of %lld</comment>
   </data>
   <data name="LldMB" xml:space="preserve">
     <value>{0} MB</value>
@@ -1922,6 +1950,10 @@
     <value>Sự kiện mới…</value>
     <comment>New Event…</comment>
   </data>
+  <data name="NextPage" xml:space="preserve">
+    <value>Trang sau</value>
+    <comment>Next page</comment>
+  </data>
   <data name="NextRunLldConversations" xml:space="preserve">
     <value>Lần chạy tới: {0} cuộc hội thoại</value>
     <comment>Next run: %lld conversations</comment>
@@ -2129,6 +2161,10 @@
   <data name="OffersToRecordWhenAMeetingAppStartsUsingTheMicrophone" xml:space="preserve">
     <value>Đề nghị ghi âm khi một ứng dụng họp bắt đầu dùng micrô.</value>
     <comment>Offers to record when a meeting app starts using the microphone.</comment>
+  </data>
+  <data name="Older" xml:space="preserve">
+    <value>Cũ hơn</value>
+    <comment>Older</comment>
   </data>
   <data name="OlderThan" xml:space="preserve">
     <value>Cũ hơn</value>
@@ -2409,6 +2445,14 @@
   <data name="PressToStartRecordingFromAnywhere" xml:space="preserve">
     <value>Nhấn {0} để bắt đầu ghi âm từ bất kỳ đâu.</value>
     <comment>Press %@ to start recording from anywhere.</comment>
+  </data>
+  <data name="Previous3Days" xml:space="preserve">
+    <value>3 ngày gần nhất</value>
+    <comment>Previous 3 days</comment>
+  </data>
+  <data name="PreviousPage" xml:space="preserve">
+    <value>Trang trước</value>
+    <comment>Previous page</comment>
   </data>
   <data name="PricesAreApproximateListPricesPerAudioHourTheMicAndSystemCha" xml:space="preserve">
     <value>Giá là giá niêm yết ước tính cho mỗi giờ âm thanh; kênh micrô và kênh hệ thống được gửi và tính phí riêng.</value>
@@ -2833,6 +2877,14 @@
   <data name="ShowOnboardingAgain" xml:space="preserve">
     <value>Xem lại phần giới thiệu ban đầu</value>
     <comment>Show onboarding again</comment>
+  </data>
+  <data name="ShowSidebar" xml:space="preserve">
+    <value>Hiện thanh bên</value>
+    <comment>Show Sidebar</comment>
+  </data>
+  <data name="ShowSidebarS" xml:space="preserve">
+    <value>Hiện thanh bên (⌃⌘S)</value>
+    <comment>Show Sidebar (⌃⌘S)</comment>
   </data>
   <data name="ShowTheOtherSpeakers" xml:space="preserve">
     <value>Hiện những người nói khác</value>

@@ -594,6 +594,10 @@
     <value>Elige qué grabar y el idioma</value>
     <comment>Choose what to record and the language</comment>
   </data>
+  <data name="ClearSearch" xml:space="preserve">
+    <value>Borrar la búsqueda</value>
+    <comment>Clear search</comment>
+  </data>
   <data name="ClickToRecordANewShortcut" xml:space="preserve">
     <value>Haz clic para definir un nuevo atajo</value>
     <comment>Click to record a new shortcut</comment>
@@ -1230,6 +1234,10 @@
     <value>Introduce el modelo de embeddings de {0} en Ajustes › RAG</value>
     <comment>Enter the embedding model of %@ in Settings › RAG</comment>
   </data>
+  <data name="EntriesPerPage" xml:space="preserve">
+    <value>Entradas por página</value>
+    <comment>Entries per page</comment>
+  </data>
   <data name="EveryLicenseAboveInOneTextFile" xml:space="preserve">
     <value>Todas las licencias anteriores en un solo archivo de texto.</value>
     <comment>Every license above in one text file.</comment>
@@ -1349,6 +1357,14 @@
   <data name="HideItWhileAnEchoDiarWindowIsInFront" xml:space="preserve">
     <value>Ocultarlo cuando haya una ventana de EchoDiar delante</value>
     <comment>Hide it while an EchoDiar window is in front</comment>
+  </data>
+  <data name="HideSidebar" xml:space="preserve">
+    <value>Ocultar la barra lateral</value>
+    <comment>Hide Sidebar</comment>
+  </data>
+  <data name="HideSidebarS" xml:space="preserve">
+    <value>Ocultar la barra lateral (⌃⌘S)</value>
+    <comment>Hide Sidebar (⌃⌘S)</comment>
   </data>
   <data name="History" xml:space="preserve">
     <value>Historial</value>
@@ -1574,6 +1590,14 @@
     <value>Conversaciones más grandes</value>
     <comment>Largest conversations</comment>
   </data>
+  <data name="Last30Days" xml:space="preserve">
+    <value>Últimos 30 días</value>
+    <comment>Last 30 days</comment>
+  </data>
+  <data name="Last7Days" xml:space="preserve">
+    <value>Últimos 7 días</value>
+    <comment>Last 7 days</comment>
+  </data>
   <data name="LastChecked" xml:space="preserve">
     <value>Última comprobación: {0}</value>
     <comment>Last checked %@</comment>
@@ -1689,6 +1713,10 @@
   <data name="LldLanguages__One" xml:space="preserve">
     <value>{0} idioma</value>
     <comment>%lld languages</comment>
+  </data>
+  <data name="LldLldOfLld" xml:space="preserve">
+    <value>{0}–{1} de {2}</value>
+    <comment>%lld–%lld of %lld</comment>
   </data>
   <data name="LldMB" xml:space="preserve">
     <value>{0} MB</value>
@@ -2010,6 +2038,10 @@
     <value>Nuevo evento…</value>
     <comment>New Event…</comment>
   </data>
+  <data name="NextPage" xml:space="preserve">
+    <value>Página siguiente</value>
+    <comment>Next page</comment>
+  </data>
   <data name="NextRunLldConversations" xml:space="preserve">
     <value>Próxima ejecución: {0} conversaciones</value>
     <comment>Next run: %lld conversations</comment>
@@ -2221,6 +2253,10 @@
   <data name="OffersToRecordWhenAMeetingAppStartsUsingTheMicrophone" xml:space="preserve">
     <value>Ofrece grabar cuando una app de reuniones empieza a usar el micrófono.</value>
     <comment>Offers to record when a meeting app starts using the microphone.</comment>
+  </data>
+  <data name="Older" xml:space="preserve">
+    <value>Más antiguas</value>
+    <comment>Older</comment>
   </data>
   <data name="OlderThan" xml:space="preserve">
     <value>Con más de</value>
@@ -2501,6 +2537,14 @@
   <data name="PressToStartRecordingFromAnywhere" xml:space="preserve">
     <value>Pulsa {0} para empezar a grabar desde cualquier lugar.</value>
     <comment>Press %@ to start recording from anywhere.</comment>
+  </data>
+  <data name="Previous3Days" xml:space="preserve">
+    <value>3 días anteriores</value>
+    <comment>Previous 3 days</comment>
+  </data>
+  <data name="PreviousPage" xml:space="preserve">
+    <value>Página anterior</value>
+    <comment>Previous page</comment>
   </data>
   <data name="PricesAreApproximateListPricesPerAudioHourTheMicAndSystemCha" xml:space="preserve">
     <value>Los precios son precios de lista aproximados por hora de audio; los canales del micrófono y del sistema se envían y se facturan por separado.</value>
@@ -2925,6 +2969,14 @@
   <data name="ShowOnboardingAgain" xml:space="preserve">
     <value>Volver a mostrar la introducción</value>
     <comment>Show onboarding again</comment>
+  </data>
+  <data name="ShowSidebar" xml:space="preserve">
+    <value>Mostrar la barra lateral</value>
+    <comment>Show Sidebar</comment>
+  </data>
+  <data name="ShowSidebarS" xml:space="preserve">
+    <value>Mostrar la barra lateral (⌃⌘S)</value>
+    <comment>Show Sidebar (⌃⌘S)</comment>
   </data>
   <data name="ShowTheOtherSpeakers" xml:space="preserve">
     <value>Mostrar los demás hablantes</value>

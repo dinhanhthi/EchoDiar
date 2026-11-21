@@ -570,6 +570,10 @@
     <value>选择要录制的内容和语言</value>
     <comment>Choose what to record and the language</comment>
   </data>
+  <data name="ClearSearch" xml:space="preserve">
+    <value>清除搜索</value>
+    <comment>Clear search</comment>
+  </data>
   <data name="ClickToRecordANewShortcut" xml:space="preserve">
     <value>点按以录制新的快捷键</value>
     <comment>Click to record a new shortcut</comment>
@@ -1182,6 +1186,10 @@
     <value>在“设置 › RAG”中输入 {0} 的嵌入模型</value>
     <comment>Enter the embedding model of %@ in Settings › RAG</comment>
   </data>
+  <data name="EntriesPerPage" xml:space="preserve">
+    <value>每页条目数</value>
+    <comment>Entries per page</comment>
+  </data>
   <data name="EveryLicenseAboveInOneTextFile" xml:space="preserve">
     <value>上述所有许可证，汇总在一个文本文件中。</value>
     <comment>Every license above in one text file.</comment>
@@ -1301,6 +1309,14 @@
   <data name="HideItWhileAnEchoDiarWindowIsInFront" xml:space="preserve">
     <value>EchoDiar 窗口位于最前面时隐藏</value>
     <comment>Hide it while an EchoDiar window is in front</comment>
+  </data>
+  <data name="HideSidebar" xml:space="preserve">
+    <value>隐藏边栏</value>
+    <comment>Hide Sidebar</comment>
+  </data>
+  <data name="HideSidebarS" xml:space="preserve">
+    <value>隐藏边栏（⌃⌘S）</value>
+    <comment>Hide Sidebar (⌃⌘S)</comment>
   </data>
   <data name="History" xml:space="preserve">
     <value>历史记录</value>
@@ -1522,6 +1538,14 @@
     <value>最大的对话</value>
     <comment>Largest conversations</comment>
   </data>
+  <data name="Last30Days" xml:space="preserve">
+    <value>最近 30 天</value>
+    <comment>Last 30 days</comment>
+  </data>
+  <data name="Last7Days" xml:space="preserve">
+    <value>最近 7 天</value>
+    <comment>Last 7 days</comment>
+  </data>
   <data name="LastChecked" xml:space="preserve">
     <value>上次检查：{0}</value>
     <comment>Last checked %@</comment>
@@ -1621,6 +1645,10 @@
   <data name="LldLanguages" xml:space="preserve">
     <value>{0} 种语言</value>
     <comment>%lld languages</comment>
+  </data>
+  <data name="LldLldOfLld" xml:space="preserve">
+    <value>第 {0}–{1} 条，共 {2} 条</value>
+    <comment>%lld–%lld of %lld</comment>
   </data>
   <data name="LldMB" xml:space="preserve">
     <value>{0} MB</value>
@@ -1922,6 +1950,10 @@
     <value>新建日程…</value>
     <comment>New Event…</comment>
   </data>
+  <data name="NextPage" xml:space="preserve">
+    <value>下一页</value>
+    <comment>Next page</comment>
+  </data>
   <data name="NextRunLldConversations" xml:space="preserve">
     <value>下次运行：{0} 个对话</value>
     <comment>Next run: %lld conversations</comment>
@@ -2129,6 +2161,10 @@
   <data name="OffersToRecordWhenAMeetingAppStartsUsingTheMicrophone" xml:space="preserve">
     <value>会议应用开始使用麦克风时提示录制。</value>
     <comment>Offers to record when a meeting app starts using the microphone.</comment>
+  </data>
+  <data name="Older" xml:space="preserve">
+    <value>更早</value>
+    <comment>Older</comment>
   </data>
   <data name="OlderThan" xml:space="preserve">
     <value>超过</value>
@@ -2409,6 +2445,14 @@
   <data name="PressToStartRecordingFromAnywhere" xml:space="preserve">
     <value>在任何地方按下 {0} 即可开始录音。</value>
     <comment>Press %@ to start recording from anywhere.</comment>
+  </data>
+  <data name="Previous3Days" xml:space="preserve">
+    <value>前 3 天</value>
+    <comment>Previous 3 days</comment>
+  </data>
+  <data name="PreviousPage" xml:space="preserve">
+    <value>上一页</value>
+    <comment>Previous page</comment>
   </data>
   <data name="PricesAreApproximateListPricesPerAudioHourTheMicAndSystemCha" xml:space="preserve">
     <value>价格为每音频小时的大致标价；麦克风声道和系统声道会分别发送和计费。</value>
@@ -2833,6 +2877,14 @@
   <data name="ShowOnboardingAgain" xml:space="preserve">
     <value>再次显示引导</value>
     <comment>Show onboarding again</comment>
+  </data>
+  <data name="ShowSidebar" xml:space="preserve">
+    <value>显示边栏</value>
+    <comment>Show Sidebar</comment>
+  </data>
+  <data name="ShowSidebarS" xml:space="preserve">
+    <value>显示边栏（⌃⌘S）</value>
+    <comment>Show Sidebar (⌃⌘S)</comment>
   </data>
   <data name="ShowTheOtherSpeakers" xml:space="preserve">
     <value>显示其他说话人</value>

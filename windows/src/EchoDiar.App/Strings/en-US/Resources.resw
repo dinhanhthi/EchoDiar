@@ -594,6 +594,10 @@
     <value>Choose what to record and the language</value>
     <comment>Choose what to record and the language</comment>
   </data>
+  <data name="ClearSearch" xml:space="preserve">
+    <value>Clear search</value>
+    <comment>Clear search</comment>
+  </data>
   <data name="ClickToRecordANewShortcut" xml:space="preserve">
     <value>Click to record a new shortcut</value>
     <comment>Click to record a new shortcut</comment>
@@ -1230,6 +1234,10 @@
     <value>Enter the embedding model of {0} in Settings › RAG</value>
     <comment>Enter the embedding model of %@ in Settings › RAG</comment>
   </data>
+  <data name="EntriesPerPage" xml:space="preserve">
+    <value>Entries per page</value>
+    <comment>Entries per page</comment>
+  </data>
   <data name="EveryLicenseAboveInOneTextFile" xml:space="preserve">
     <value>Every license above in one text file.</value>
     <comment>Every license above in one text file.</comment>
@@ -1349,6 +1357,14 @@
   <data name="HideItWhileAnEchoDiarWindowIsInFront" xml:space="preserve">
     <value>Hide it while an EchoDiar window is in front</value>
     <comment>Hide it while an EchoDiar window is in front</comment>
+  </data>
+  <data name="HideSidebar" xml:space="preserve">
+    <value>Hide Sidebar</value>
+    <comment>Hide Sidebar</comment>
+  </data>
+  <data name="HideSidebarS" xml:space="preserve">
+    <value>Hide Sidebar (⌃⌘S)</value>
+    <comment>Hide Sidebar (⌃⌘S)</comment>
   </data>
   <data name="History" xml:space="preserve">
     <value>History</value>
@@ -1574,6 +1590,14 @@
     <value>Largest conversations</value>
     <comment>Largest conversations</comment>
   </data>
+  <data name="Last30Days" xml:space="preserve">
+    <value>Last 30 days</value>
+    <comment>Last 30 days</comment>
+  </data>
+  <data name="Last7Days" xml:space="preserve">
+    <value>Last 7 days</value>
+    <comment>Last 7 days</comment>
+  </data>
   <data name="LastChecked" xml:space="preserve">
     <value>Last checked {0}</value>
     <comment>Last checked %@</comment>
@@ -1697,6 +1721,10 @@
   <data name="LldLld" xml:space="preserve">
     <value>{0}–{1} {2}</value>
     <comment>%lld–%lld %@</comment>
+  </data>
+  <data name="LldLldOfLld" xml:space="preserve">
+    <value>{0}–{1} of {2}</value>
+    <comment>%lld–%lld of %lld</comment>
   </data>
   <data name="LldMB" xml:space="preserve">
     <value>{0} MB</value>
@@ -2018,6 +2046,10 @@
     <value>New Event…</value>
     <comment>New Event…</comment>
   </data>
+  <data name="NextPage" xml:space="preserve">
+    <value>Next page</value>
+    <comment>Next page</comment>
+  </data>
   <data name="NextRunLldConversations" xml:space="preserve">
     <value>Next run: {0} conversations</value>
     <comment>Next run: %lld conversations</comment>
@@ -2229,6 +2261,10 @@
   <data name="OffersToRecordWhenAMeetingAppStartsUsingTheMicrophone" xml:space="preserve">
     <value>Offers to record when a meeting app starts using the microphone.</value>
     <comment>Offers to record when a meeting app starts using the microphone.</comment>
+  </data>
+  <data name="Older" xml:space="preserve">
+    <value>Older</value>
+    <comment>Older</comment>
   </data>
   <data name="OlderThan" xml:space="preserve">
     <value>Older than</value>
@@ -2509,6 +2545,14 @@
   <data name="PressToStartRecordingFromAnywhere" xml:space="preserve">
     <value>Press {0} to start recording from anywhere.</value>
     <comment>Press %@ to start recording from anywhere.</comment>
+  </data>
+  <data name="Previous3Days" xml:space="preserve">
+    <value>Previous 3 days</value>
+    <comment>Previous 3 days</comment>
+  </data>
+  <data name="PreviousPage" xml:space="preserve">
+    <value>Previous page</value>
+    <comment>Previous page</comment>
   </data>
   <data name="PricesAreApproximateListPricesPerAudioHourTheMicAndSystemCha" xml:space="preserve">
     <value>Prices are approximate list prices per audio hour; the mic and system channels are sent and billed separately.</value>
@@ -2945,6 +2989,14 @@
   <data name="ShowOnboardingAgain" xml:space="preserve">
     <value>Show onboarding again</value>
     <comment>Show onboarding again</comment>
+  </data>
+  <data name="ShowSidebar" xml:space="preserve">
+    <value>Show Sidebar</value>
+    <comment>Show Sidebar</comment>
+  </data>
+  <data name="ShowSidebarS" xml:space="preserve">
+    <value>Show Sidebar (⌃⌘S)</value>
+    <comment>Show Sidebar (⌃⌘S)</comment>
   </data>
   <data name="ShowTheOtherSpeakers" xml:space="preserve">
     <value>Show the other speakers</value>
