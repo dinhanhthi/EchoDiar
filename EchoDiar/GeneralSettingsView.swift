@@ -52,6 +52,15 @@ struct GeneralSettingsView: View {
                     Text("Large").tag(PillSize.large)
                 }
             }
+            Section("Recording window") {
+                Picker(selection: model.setting(\.recordingLayout)) {
+                    Text("Tabs").tag(RecordingLayout.tabs)
+                    Text("Side by side").tag(RecordingLayout.sideBySide)
+                } label: {
+                    Text("Recording layout")
+                    Text("Side by side shows the live transcript next to Catch-up and Chat and hides the sidebar while recording.")
+                }
+            }
             Section("Library") {
                 Toggle(isOn: model.setting(\.deleteWithoutConfirmation)) {
                     Text("Delete conversations without confirmation")

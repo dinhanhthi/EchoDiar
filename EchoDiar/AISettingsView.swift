@@ -85,7 +85,7 @@ struct AISettingsView: View {
         let external = catchUpProviders
         let picked = external.first { $0.id == model.settings.catchUpProviderID }
         return Section {
-            Picker("Catch-up provider", selection: catchUpProviderBinding(external)) {
+            Picker(selection: catchUpProviderBinding(external)) {
                 if let automatic = model.automaticCatchUpProvider {
                     let label = String(localized: "Automatic (\(automatic.name))")
                     Text(automatic.leavesMac ? String(localized: "\(label) (leaves this Mac)") : label).tag("")
@@ -96,6 +96,9 @@ struct AISettingsView: View {
                     Text(provider.leavesMac ? String(localized: "\(provider.name) (leaves this Mac)") : provider.name)
                         .tag(provider.id)
                 }
+            } label: {
+                Text("Catch-up provider")
+                Text("Also answers the Chat tab while recording.")
             }
             .disabled(external.isEmpty)
             if let picked {

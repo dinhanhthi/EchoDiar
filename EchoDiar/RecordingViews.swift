@@ -169,35 +169,90 @@ struct RecordingCard: View {
     }
 }
 
-/// The recording in the library page's detail: the header, the calendar suggestion if any, the catch-ups if any,
-/// then the live transcript, or the wave and why there is none
-/// (the conditions of `AppModel.startRecordingTranscriber`, read from the settings), with the Settings page that
-/// changes it.
+/// The recording in the library page's detail: the header and the calendar suggestion if any, pinned on top on every
+/// tab, then by `settings.recordingLayout`: Tabs, the tab of `model.recordingTab` (the toolbar's tabs); side by side,
+/// the transcript beside a panel with its own Catch-up | Chat tabs. The transcript is the live one, or the wave and why
+/// there is none (the conditions of `AppModel.startRecordingTranscriber`, read from the settings), with the Settings
+/// page that changes it.
 struct RecordingDetailView: View {
     let model: AppModel
+
+    /// The Tabs layout's tabs, in order.
+    static let tabs: [AppModel.RecordingTab] = [.transcript, .catchUp, .chat]
+    /// The side by side panel's tabs, in order.
+    private static let panelTabs: [AppModel.RecordingTab] = [.catchUp, .chat]
+
+    static func tabTitle(_ tab: AppModel.RecordingTab) -> LocalizedStringKey {
+        switch tab {
+        case .transcript: "Transcript"
+        case .catchUp: "Catch-up"
+        case .chat: "Chat"
+        }
+    }
 
     var body: some View {
         VStack(spacing: 12) {
             RecordingHeader(model: model)
             if let event = model.calendarSuggestion { suggestionRow(event) }
-            CatchUpPanel(model: model)
-            if let captions = model.recordingCaptions {
-                LiveTranscriptView(snapshot: captions, providerName: model.defaultCloudConfig?.displayName)
-            } else {
-                VStack(spacing: 16) {
-                    RecordingWave(model: model)
-                    Text(Self.noCaptionsReason(model: model))
-                        .font(.callout)
-                        .foregroundStyle(.secondary)
-                        .multilineTextAlignment(.center)
-                    Button("Open Settings") { openReasonSettings() }
-                        .buttonStyle(.link)
+            switch model.settings.recordingLayout {
+            case .tabs: tabContent
+            case .sideBySide:
+                HStack(spacing: 12) {
+                    transcript
+                    sidePanel
                 }
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
             }
         }
         .padding(12)
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+    }
+
+    /// Only the selected tab's view: a hidden chat would still take the keyboard focus.
+    @ViewBuilder private var tabContent: some View {
+        switch model.recordingTab {
+        case .transcript: transcript
+        case .catchUp: CatchUpPanel(model: model)
+        case .chat: LiveChatView(model: model)
+        }
+    }
+
+    /// One card with the Catch-up | Chat tabs over the selected one, whose own cards it replaces. `.transcript` (the
+    /// Tabs layout's) shows Catch-up, so the panel is never empty.
+    private var sidePanel: some View {
+        let selection = Binding<AppModel.RecordingTab>(
+            get: { model.recordingTab == .chat ? .chat : .catchUp },
+            set: { model.recordingTab = $0 })
+        return VStack(spacing: 10) {
+            CapsuleTabs(selection: selection, tabs: Self.panelTabs, title: { Text(Self.tabTitle($0)) },
+                        drawsTrack: true)
+                .fixedSize()
+            if selection.wrappedValue == .chat {
+                LiveChatView(model: model, framed: false)
+            } else {
+                CatchUpPanel(model: model, framed: false)
+            }
+        }
+        .padding(.top, 10)
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+        .modifier(GlassCard(cornerRadius: 14))
+    }
+
+    /// The live transcript, or the wave and why there is none.
+    @ViewBuilder private var transcript: some View {
+        if let captions = model.recordingCaptions {
+            LiveTranscriptView(snapshot: captions, providerName: model.defaultCloudConfig?.displayName)
+        } else {
+            VStack(spacing: 16) {
+                RecordingWave(model: model)
+                Text(Self.noCaptionsReason(model: model))
+                    .font(.callout)
+                    .foregroundStyle(.secondary)
+                    .multilineTextAlignment(.center)
+                Button("Open Settings") { openReasonSettings() }
+                    .buttonStyle(.link)
+            }
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+        }
     }
 
     /// Offers the calendar event the recording likely belongs to: "Rename" links it and takes its title, "Not now"

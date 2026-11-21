@@ -382,7 +382,8 @@ struct MainView: View {
     private static let titleMaxWidth: CGFloat = 360
     private static let titleMinWidth: CGFloat = 120
     /// Approximate widths of the other items: the traffic lights, the sidebar button, Back and the record capsule; the
-    /// tabs; Reveal in Finder with Delete, Settings, Calendar and the library chat.
+    /// tabs; Reveal in Finder with Delete, Settings, Calendar and the library chat. Only the conversation page has a
+    /// title: the recording's toolbar tabs (Tabs layout) or none (side by side) never meet it, so they need no width.
     private static let leadingWidth: CGFloat = 302
     private static let tabsWidth: CGFloat = 240
     private static let trailingButtonsWidth: CGFloat = 244
@@ -446,11 +447,15 @@ struct MainView: View {
     }
 
     /// A conversation's tabs, in a capsule of their own like the buttons', at the trailing edge after Settings and the
-    /// library chat.
+    /// library chat; in the same place the recording's Transcript / Catch-up / Chat tabs in the Tabs layout (side by
+    /// side, its right panel has its own tabs).
     @ToolbarContentBuilder private var tabsItem: some ToolbarContent {
         if toolbarConversation != nil {
             fixedSpacer
             ToolbarItem { tabs }
+        } else if model.route == .recording && model.isRecording && model.settings.recordingLayout == .tabs {
+            fixedSpacer
+            ToolbarItem { recordingTabs }
         }
     }
 
@@ -460,6 +465,16 @@ struct MainView: View {
         CapsuleTabs(
             selection: Binding(get: { model.detailTab }, set: { model.detailTab = $0 }),
             tabs: TranscriptView.tabs, title: { Text(TranscriptView.tabTitle($0)) }
+        )
+        .padding(.horizontal, 4)
+        .fixedSize()
+    }
+
+    /// Padded like `tabs`.
+    private var recordingTabs: some View {
+        CapsuleTabs(
+            selection: Binding(get: { model.recordingTab }, set: { model.recordingTab = $0 }),
+            tabs: RecordingDetailView.tabs, title: { Text(RecordingDetailView.tabTitle($0)) }
         )
         .padding(.horizontal, 4)
         .fixedSize()
