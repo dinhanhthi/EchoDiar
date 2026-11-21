@@ -202,6 +202,10 @@
     <value>Allow Microphone</value>
     <comment>Allow Microphone</comment>
   </data>
+  <data name="AlsoAnswersTheChatTabWhileRecording" xml:space="preserve">
+    <value>Also answers the Chat tab while recording.</value>
+    <comment>Also answers the Chat tab while recording.</comment>
+  </data>
   <data name="AlwaysFor" xml:space="preserve">
     <value>Always for {0}</value>
     <comment>Always for %@</comment>
@@ -209,6 +213,10 @@
   <data name="AlwaysRecord" xml:space="preserve">
     <value>Always record</value>
     <comment>Always record</comment>
+  </data>
+  <data name="AnAnswerIsBeingWritten" xml:space="preserve">
+    <value>An answer is being written.</value>
+    <comment>An answer is being written.</comment>
   </data>
   <data name="AnUpdateIsAvailableUpdateInTheToolbarInstallsIt" xml:space="preserve">
     <value>An update is available: Update in the toolbar installs it.</value>
@@ -305,6 +313,10 @@
   <data name="AskAQuestionAboutThisConversationBelow" xml:space="preserve">
     <value>Ask a question about this conversation below.</value>
     <comment>Ask a question about this conversation below.</comment>
+  </data>
+  <data name="AskAboutTheMeetingSoFar" xml:space="preserve">
+    <value>Ask about the meeting so far.</value>
+    <comment>Ask about the meeting so far.</comment>
   </data>
   <data name="AskAboutThisConversation" xml:space="preserve">
     <value>Ask about this conversation</value>
@@ -1638,6 +1650,10 @@
     <value>Listening…</value>
     <comment>Listening…</comment>
   </data>
+  <data name="Live" xml:space="preserve">
+    <value>Live</value>
+    <comment>Live</comment>
+  </data>
   <data name="LiveModel" xml:space="preserve">
     <value>Live model</value>
     <comment>Live model</comment>
@@ -2078,6 +2094,10 @@
     <value>No calendar account can hold EchoDiar's calendar.</value>
     <comment>No calendar account can hold EchoDiar's calendar.</comment>
   </data>
+  <data name="NoCatchUpYetPressCatchUpToSummarizeTheMeetingSoFar" xml:space="preserve">
+    <value>No catch-up yet. Press Catch up to summarize the meeting so far.</value>
+    <comment>No catch-up yet. Press Catch up to summarize the meeting so far.</comment>
+  </data>
   <data name="NoConversationsMatch" xml:space="preserve">
     <value>No conversations match "{0}"</value>
     <comment>No conversations match "%@"</comment>
@@ -2221,6 +2241,10 @@
   <data name="NothingNewSinceTheLastCatchUp" xml:space="preserve">
     <value>Nothing new since the last catch-up</value>
     <comment>Nothing new since the last catch-up</comment>
+  </data>
+  <data name="NothingToAskAboutYet" xml:space="preserve">
+    <value>Nothing to ask about yet.</value>
+    <comment>Nothing to ask about yet.</comment>
   </data>
   <data name="NothingToCatchUpOnYet" xml:space="preserve">
     <value>Nothing to catch up on yet.</value>
@@ -2690,6 +2714,10 @@
     <value>Recording laws differ from place to place. Many require everyone on the call to agree.</value>
     <comment>Recording laws differ from place to place. Many require everyone on the call to agree.</comment>
   </data>
+  <data name="RecordingLayout" xml:space="preserve">
+    <value>Recording layout</value>
+    <comment>Recording layout</comment>
+  </data>
   <data name="RecordingOptions" xml:space="preserve">
     <value>Recording options</value>
     <comment>Recording options</comment>
@@ -2717,6 +2745,10 @@
   <data name="RecordingSwitchesToTheDefaultInput" xml:space="preserve">
     <value>Recording switches to the default input.</value>
     <comment>Recording switches to the default input.</comment>
+  </data>
+  <data name="RecordingWindow" xml:space="preserve">
+    <value>Recording window</value>
+    <comment>Recording window</comment>
   </data>
   <data name="Recording_2" xml:space="preserve">
     <value>Recording {0}</value>
@@ -3042,6 +3074,14 @@
     <value>Shows the transcript while recording with a model on this PC. Free: nothing is uploaded while recording, but it uses CPU, memory and battery. The saved transcript still comes from {0} after Stop, so it can differ from what you saw.</value>
     <comment>Shows the transcript while recording with a model on this PC. Free: nothing is uploaded while recording, but it uses CPU, memory and battery. The saved transcript still comes from %@ after Stop, so it can differ from what you saw.</comment>
   </data>
+  <data name="SideBySide" xml:space="preserve">
+    <value>Side by side</value>
+    <comment>Side by side</comment>
+  </data>
+  <data name="SideBySideShowsTheLiveTranscriptNextToCatchUpAndChatAndHides" xml:space="preserve">
+    <value>Side by side shows the live transcript next to Catch-up and Chat and hides the sidebar while recording.</value>
+    <comment>Side by side shows the live transcript next to Catch-up and Chat and hides the sidebar while recording.</comment>
+  </data>
   <data name="SimulateState" xml:space="preserve">
     <value>Simulate state</value>
     <comment>Simulate state</comment>
@@ -3238,6 +3278,10 @@
     <value>Summarize the meeting so far, mostly its last 5 minutes</value>
     <comment>Summarize the meeting so far, mostly its last 5 minutes</comment>
   </data>
+  <data name="SummarizeWhatIsNewSinceTheLastCatchUp" xml:space="preserve">
+    <value>Summarize what is new since the last catch-up</value>
+    <comment>Summarize what is new since the last catch-up</comment>
+  </data>
   <data name="Summarizing" xml:space="preserve">
     <value>Summarizing</value>
     <comment>Summarizing</comment>
@@ -3293,6 +3337,10 @@
   <data name="SystemModelLanguageAssetsInstalledOnDemandAutoUsesTheDefault" xml:space="preserve">
     <value>System model — language assets installed on demand. Auto uses the default language (no language detection).</value>
     <comment>System model — language assets installed on demand. Auto uses the default language (no language detection).</comment>
+  </data>
+  <data name="Tabs" xml:space="preserve">
+    <value>Tabs</value>
+    <comment>Tabs</comment>
   </data>
   <data name="TellSpeakersApart" xml:space="preserve">
     <value>Tell speakers apart</value>

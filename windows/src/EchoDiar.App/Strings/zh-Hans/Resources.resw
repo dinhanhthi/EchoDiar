@@ -178,6 +178,10 @@
     <value>允许使用麦克风</value>
     <comment>Allow Microphone</comment>
   </data>
+  <data name="AlsoAnswersTheChatTabWhileRecording" xml:space="preserve">
+    <value>录音时也用于回答“聊天”标签页中的问题。</value>
+    <comment>Also answers the Chat tab while recording.</comment>
+  </data>
   <data name="AlwaysFor" xml:space="preserve">
     <value>始终录制 {0}</value>
     <comment>Always for %@</comment>
@@ -185,6 +189,10 @@
   <data name="AlwaysRecord" xml:space="preserve">
     <value>始终录制</value>
     <comment>Always record</comment>
+  </data>
+  <data name="AnAnswerIsBeingWritten" xml:space="preserve">
+    <value>正在生成回答。</value>
+    <comment>An answer is being written.</comment>
   </data>
   <data name="AnUpdateIsAvailableUpdateInTheToolbarInstallsIt" xml:space="preserve">
     <value>有可用更新：点击工具栏中的“更新”即可安装。</value>
@@ -281,6 +289,10 @@
   <data name="AskAQuestionAboutThisConversationBelow" xml:space="preserve">
     <value>在下方就此对话提问。</value>
     <comment>Ask a question about this conversation below.</comment>
+  </data>
+  <data name="AskAboutTheMeetingSoFar" xml:space="preserve">
+    <value>就会议至今的内容提问。</value>
+    <comment>Ask about the meeting so far.</comment>
   </data>
   <data name="AskAboutThisConversation" xml:space="preserve">
     <value>就此对话提问</value>
@@ -1586,6 +1598,10 @@
     <value>正在聆听…</value>
     <comment>Listening…</comment>
   </data>
+  <data name="Live" xml:space="preserve">
+    <value>实时</value>
+    <comment>Live</comment>
+  </data>
   <data name="LiveModel" xml:space="preserve">
     <value>实时转写模型</value>
     <comment>Live model</comment>
@@ -1978,6 +1994,10 @@
     <value>没有日历账户可以存放 EchoDiar 的日历。</value>
     <comment>No calendar account can hold EchoDiar's calendar.</comment>
   </data>
+  <data name="NoCatchUpYetPressCatchUpToSummarizeTheMeetingSoFar" xml:space="preserve">
+    <value>还没有回顾。点按“快速回顾”即可总结会议至今的内容。</value>
+    <comment>No catch-up yet. Press Catch up to summarize the meeting so far.</comment>
+  </data>
   <data name="NoConversationsMatch" xml:space="preserve">
     <value>没有与“{0}”匹配的对话</value>
     <comment>No conversations match "%@"</comment>
@@ -2121,6 +2141,10 @@
   <data name="NothingNewSinceTheLastCatchUp" xml:space="preserve">
     <value>自上次回顾以来没有新内容</value>
     <comment>Nothing new since the last catch-up</comment>
+  </data>
+  <data name="NothingToAskAboutYet" xml:space="preserve">
+    <value>暂时还没有可提问的内容。</value>
+    <comment>Nothing to ask about yet.</comment>
   </data>
   <data name="NothingToCatchUpOnYet" xml:space="preserve">
     <value>暂时还没有可回顾的内容。</value>
@@ -2590,6 +2614,10 @@
     <value>各地的录音法规不尽相同。许多地方要求通话中的每个人都同意。</value>
     <comment>Recording laws differ from place to place. Many require everyone on the call to agree.</comment>
   </data>
+  <data name="RecordingLayout" xml:space="preserve">
+    <value>录音布局</value>
+    <comment>Recording layout</comment>
+  </data>
   <data name="RecordingOptions" xml:space="preserve">
     <value>录音选项</value>
     <comment>Recording options</comment>
@@ -2617,6 +2645,10 @@
   <data name="RecordingSwitchesToTheDefaultInput" xml:space="preserve">
     <value>录音会切换到默认输入设备。</value>
     <comment>Recording switches to the default input.</comment>
+  </data>
+  <data name="RecordingWindow" xml:space="preserve">
+    <value>录音窗口</value>
+    <comment>Recording window</comment>
   </data>
   <data name="Recording_2" xml:space="preserve">
     <value>正在录制 {0}</value>
@@ -2930,6 +2962,14 @@
     <value>录音时使用这台电脑上的模型显示转写文本。免费：录音期间不会上传任何内容，但会占用 CPU、内存和电量。保存的转写文本仍会在停止后由 {0} 生成，因此可能与你看到的不同。</value>
     <comment>Shows the transcript while recording with a model on this PC. Free: nothing is uploaded while recording, but it uses CPU, memory and battery. The saved transcript still comes from %@ after Stop, so it can differ from what you saw.</comment>
   </data>
+  <data name="SideBySide" xml:space="preserve">
+    <value>并排</value>
+    <comment>Side by side</comment>
+  </data>
+  <data name="SideBySideShowsTheLiveTranscriptNextToCatchUpAndChatAndHides" xml:space="preserve">
+    <value>“并排”会在录音时将实时转写显示在“回顾”和“聊天”旁边，并隐藏边栏。</value>
+    <comment>Side by side shows the live transcript next to Catch-up and Chat and hides the sidebar while recording.</comment>
+  </data>
   <data name="SimulateState" xml:space="preserve">
     <value>模拟状态</value>
     <comment>Simulate state</comment>
@@ -3126,6 +3166,10 @@
     <value>总结会议至今的内容，重点是最近 5 分钟</value>
     <comment>Summarize the meeting so far, mostly its last 5 minutes</comment>
   </data>
+  <data name="SummarizeWhatIsNewSinceTheLastCatchUp" xml:space="preserve">
+    <value>总结自上次回顾以来的新内容</value>
+    <comment>Summarize what is new since the last catch-up</comment>
+  </data>
   <data name="Summarizing" xml:space="preserve">
     <value>正在生成摘要</value>
     <comment>Summarizing</comment>
@@ -3181,6 +3225,10 @@
   <data name="SystemModelLanguageAssetsInstalledOnDemandAutoUsesTheDefault" xml:space="preserve">
     <value>系统模型 — 语言资源按需安装。“自动”使用默认语言（不检测语言）。</value>
     <comment>System model — language assets installed on demand. Auto uses the default language (no language detection).</comment>
+  </data>
+  <data name="Tabs" xml:space="preserve">
+    <value>标签页</value>
+    <comment>Tabs</comment>
   </data>
   <data name="TellSpeakersApart" xml:space="preserve">
     <value>区分说话人</value>

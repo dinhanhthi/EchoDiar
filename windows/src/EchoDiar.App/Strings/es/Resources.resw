@@ -202,6 +202,10 @@
     <value>Permitir micrófono</value>
     <comment>Allow Microphone</comment>
   </data>
+  <data name="AlsoAnswersTheChatTabWhileRecording" xml:space="preserve">
+    <value>También responde en la pestaña Chat durante la grabación.</value>
+    <comment>Also answers the Chat tab while recording.</comment>
+  </data>
   <data name="AlwaysFor" xml:space="preserve">
     <value>Siempre para {0}</value>
     <comment>Always for %@</comment>
@@ -209,6 +213,10 @@
   <data name="AlwaysRecord" xml:space="preserve">
     <value>Grabar siempre</value>
     <comment>Always record</comment>
+  </data>
+  <data name="AnAnswerIsBeingWritten" xml:space="preserve">
+    <value>Se está escribiendo una respuesta.</value>
+    <comment>An answer is being written.</comment>
   </data>
   <data name="AnUpdateIsAvailableUpdateInTheToolbarInstallsIt" xml:space="preserve">
     <value>Hay una actualización disponible: Actualizar, en la barra de herramientas, la instala.</value>
@@ -305,6 +313,10 @@
   <data name="AskAQuestionAboutThisConversationBelow" xml:space="preserve">
     <value>Haz una pregunta sobre esta conversación aquí abajo.</value>
     <comment>Ask a question about this conversation below.</comment>
+  </data>
+  <data name="AskAboutTheMeetingSoFar" xml:space="preserve">
+    <value>Pregunta sobre la reunión hasta ahora.</value>
+    <comment>Ask about the meeting so far.</comment>
   </data>
   <data name="AskAboutThisConversation" xml:space="preserve">
     <value>Pregunta sobre esta conversación</value>
@@ -1638,6 +1650,10 @@
     <value>Escuchando…</value>
     <comment>Listening…</comment>
   </data>
+  <data name="Live" xml:space="preserve">
+    <value>En directo</value>
+    <comment>Live</comment>
+  </data>
   <data name="LiveModel" xml:space="preserve">
     <value>Modelo en directo</value>
     <comment>Live model</comment>
@@ -2070,6 +2086,10 @@
     <value>Ninguna cuenta de calendario puede alojar el calendario de EchoDiar.</value>
     <comment>No calendar account can hold EchoDiar's calendar.</comment>
   </data>
+  <data name="NoCatchUpYetPressCatchUpToSummarizeTheMeetingSoFar" xml:space="preserve">
+    <value>Aún no hay ninguna puesta al día. Pulsa Ponerse al día para resumir la reunión hasta ahora.</value>
+    <comment>No catch-up yet. Press Catch up to summarize the meeting so far.</comment>
+  </data>
   <data name="NoConversationsMatch" xml:space="preserve">
     <value>Ninguna conversación coincide con "{0}"</value>
     <comment>No conversations match "%@"</comment>
@@ -2213,6 +2233,10 @@
   <data name="NothingNewSinceTheLastCatchUp" xml:space="preserve">
     <value>Nada nuevo desde la última puesta al día</value>
     <comment>Nothing new since the last catch-up</comment>
+  </data>
+  <data name="NothingToAskAboutYet" xml:space="preserve">
+    <value>Aún no hay nada sobre lo que preguntar.</value>
+    <comment>Nothing to ask about yet.</comment>
   </data>
   <data name="NothingToCatchUpOnYet" xml:space="preserve">
     <value>Aún no hay nada que resumir.</value>
@@ -2682,6 +2706,10 @@
     <value>Las leyes sobre grabaciones varían según el lugar. Muchas exigen que todos los participantes de la llamada estén de acuerdo.</value>
     <comment>Recording laws differ from place to place. Many require everyone on the call to agree.</comment>
   </data>
+  <data name="RecordingLayout" xml:space="preserve">
+    <value>Diseño durante la grabación</value>
+    <comment>Recording layout</comment>
+  </data>
   <data name="RecordingOptions" xml:space="preserve">
     <value>Opciones de grabación</value>
     <comment>Recording options</comment>
@@ -2709,6 +2737,10 @@
   <data name="RecordingSwitchesToTheDefaultInput" xml:space="preserve">
     <value>La grabación pasa a la entrada predeterminada.</value>
     <comment>Recording switches to the default input.</comment>
+  </data>
+  <data name="RecordingWindow" xml:space="preserve">
+    <value>Ventana de grabación</value>
+    <comment>Recording window</comment>
   </data>
   <data name="Recording_2" xml:space="preserve">
     <value>Grabando {0}</value>
@@ -3022,6 +3054,14 @@
     <value>Muestra la transcripción durante la grabación con un modelo de este PC. Gratis: no se sube nada durante la grabación, pero usa CPU, memoria y batería. La transcripción guardada sigue viniendo de {0} después de Detener, así que puede diferir de lo que viste.</value>
     <comment>Shows the transcript while recording with a model on this PC. Free: nothing is uploaded while recording, but it uses CPU, memory and battery. The saved transcript still comes from %@ after Stop, so it can differ from what you saw.</comment>
   </data>
+  <data name="SideBySide" xml:space="preserve">
+    <value>Lado a lado</value>
+    <comment>Side by side</comment>
+  </data>
+  <data name="SideBySideShowsTheLiveTranscriptNextToCatchUpAndChatAndHides" xml:space="preserve">
+    <value>Lado a lado muestra la transcripción en directo junto a Puesta al día y Chat, y oculta la barra lateral durante la grabación.</value>
+    <comment>Side by side shows the live transcript next to Catch-up and Chat and hides the sidebar while recording.</comment>
+  </data>
   <data name="SimulateState" xml:space="preserve">
     <value>Simular estado</value>
     <comment>Simulate state</comment>
@@ -3218,6 +3258,10 @@
     <value>Resumir la reunión hasta ahora, sobre todo sus últimos 5 minutos</value>
     <comment>Summarize the meeting so far, mostly its last 5 minutes</comment>
   </data>
+  <data name="SummarizeWhatIsNewSinceTheLastCatchUp" xml:space="preserve">
+    <value>Resumir lo nuevo desde la última puesta al día</value>
+    <comment>Summarize what is new since the last catch-up</comment>
+  </data>
   <data name="Summarizing" xml:space="preserve">
     <value>Resumiendo</value>
     <comment>Summarizing</comment>
@@ -3273,6 +3317,10 @@
   <data name="SystemModelLanguageAssetsInstalledOnDemandAutoUsesTheDefault" xml:space="preserve">
     <value>Modelo del sistema — recursos de idioma instalados cuando hacen falta. Automático usa el idioma predeterminado (sin detección de idioma).</value>
     <comment>System model — language assets installed on demand. Auto uses the default language (no language detection).</comment>
+  </data>
+  <data name="Tabs" xml:space="preserve">
+    <value>Pestañas</value>
+    <comment>Tabs</comment>
   </data>
   <data name="TellSpeakersApart" xml:space="preserve">
     <value>Distinguir hablantes</value>
