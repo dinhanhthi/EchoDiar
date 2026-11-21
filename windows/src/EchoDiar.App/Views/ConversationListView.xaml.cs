@@ -578,8 +578,35 @@ public sealed partial class ConversationListView : UserControl
 
     // Search
 
-    /// <summary>Ctrl+F (macOS <c>showSearch</c>): the focus goes to the search box.</summary>
-    public void FocusSearch() => SearchBox.Focus(FocusState.Programmatic);
+    /// <summary>
+    /// Ctrl+F (macOS <c>showSearch</c>): the focus goes to the search box. The view put back in the sidebar in place of
+    /// the library chat is not loaded yet: the box takes the focus once it is.
+    /// </summary>
+    public void FocusSearch()
+    {
+        if (IsLoaded)
+        {
+            FocusSearchBox();
+            return;
+        }
+        Loaded -= OnLoadedFocusSearch;
+        Loaded += OnLoadedFocusSearch;
+    }
+
+    private void OnLoadedFocusSearch(object sender, RoutedEventArgs e)
+    {
+        Loaded -= OnLoadedFocusSearch;
+        FocusSearchBox();
+    }
+
+    /// <summary>A box just laid out may not take the focus at once: it tries once more after the layout.</summary>
+    private void FocusSearchBox()
+    {
+        if (!SearchBox.Focus(FocusState.Programmatic))
+        {
+            DispatcherQueue.TryEnqueue(DispatcherQueuePriority.Low, () => SearchBox.Focus(FocusState.Programmatic));
+        }
+    }
 
     /// <summary>
     /// The model cleared the search (another page of the window, the window hidden, the library chat opened): the box
