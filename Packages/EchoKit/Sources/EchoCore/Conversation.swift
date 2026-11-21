@@ -269,10 +269,12 @@ public struct ChatLog: Codable, Equatable, Sendable {
         public var timestamp: Date?
         /// The numbered conversation sources of a library-chat answer; nil elsewhere.
         public var references: [Reference]?
+        /// True for a message of the live chat during the recording; nil (omitted from the file) elsewhere.
+        public var live: Bool?
 
         public init(
             role: Role, text: String, provider: String? = nil, model: String? = nil, timestamp: Date? = Date(),
-            references: [Reference]? = nil
+            references: [Reference]? = nil, live: Bool? = nil
         ) {
             self.role = role
             self.text = text
@@ -280,6 +282,7 @@ public struct ChatLog: Codable, Equatable, Sendable {
             self.model = model
             self.timestamp = timestamp
             self.references = references
+            self.live = live
         }
     }
 

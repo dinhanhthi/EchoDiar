@@ -246,6 +246,8 @@ public sealed record ChatLog
         public DateTimeOffset? Timestamp { get; set; }
         /// <summary>The numbered conversation sources of a library-chat answer; null elsewhere.</summary>
         [JsonPropertyName("references")] public List<Reference>? References { get; set; }
+        /// <summary>True for a message of the live chat during recording; null (omitted) elsewhere.</summary>
+        [JsonPropertyName("live")] public bool? Live { get; set; }
     }
 
     /// <summary>A conversation source of a library-chat answer: <see cref="Number"/> is the <c>n</c> its citations use.</summary>
