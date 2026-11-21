@@ -3,14 +3,16 @@ import EchoAudio
 import EchoCore
 import SwiftUI
 
-/// The main window, three pages: the library (the cards as a sidebar, then a conversation, the open recording while
-/// recording, or the welcome pane), Settings and the Calendar. Back, Record (or Stop and Pause) and a conversation's
-/// title on the leading side; a conversation's Reveal in Finder, Settings, Calendar, the library chat and Search, then
-/// the conversation's tabs on the trailing side. The library chat takes the sidebar's place.
+/// The main window, three pages: the library (the cards as a sidebar with its own search field and pages, then a
+/// conversation, the open recording while recording, or the welcome pane), Settings and the Calendar. The sidebar
+/// button, Back, Record (or Stop and Pause) and a conversation's title on the leading side; a conversation's Reveal in
+/// Finder, Settings, Calendar and the library chat, then the conversation's tabs on the trailing side. The library
+/// chat takes the sidebar's place.
 struct MainView: View {
     let model: AppModel
     let updater: Updater
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    /// The sidebar's search query.
     @State private var query = ""
     /// `query` once typing pauses for 200 ms (at once when cleared): what the cards are filtered by.
     @State private var debouncedQuery = ""
@@ -18,12 +20,12 @@ struct MainView: View {
     /// query is typed; read again when the conversation's size changes (a new transcript) or an AI job ends (a new
     /// summary or chat). Released with the window.
     @State private var searchDocuments: [UUID: SearchDocument] = [:]
-    /// The search bar fills the toolbar in place of its buttons, from the Search button or ⌘F until it is closed.
-    @State private var searchExpanded = false
-    /// The window's width, which the search bar fills from its leading edge.
+    /// The Settings page's search query: while not empty, Settings lists only the matching settings.
+    @State private var settingsQuery = ""
+    /// The sidebar's page (0-based) of the sorted, searched list; shown clamped to the pages that exist.
+    @State private var listPage = 0
+    /// The window's width, which the toolbar title's room is measured from.
     @State private var windowWidth: CGFloat = 0
-    /// Where the closed search bar was, in the window, while it shrinks back into the Search button.
-    @State private var searchBarGhost: CGRect?
     /// The route on screen; it follows `model.route`, with a slide when the page changes.
     @State private var shownRoute = AppModel.Route.list
     /// The last page change went to a page further right (library, Settings, Calendar).
@@ -80,7 +82,8 @@ struct MainView: View {
                 case .library: libraryPage.transition(pageTransition)
                 // Capsule buttons on these two pages only; the toolbar and the library keep their own styles.
                 case .settings:
-                    SettingsView(model: model, query: $query).buttonBorderShape(.capsule).transition(pageTransition)
+                    SettingsView(model: model, query: $settingsQuery)
+                        .buttonBorderShape(.capsule).transition(pageTransition)
                 case .calendar: CalendarView(model: model).buttonBorderShape(.capsule).transition(pageTransition)
                 }
             }
@@ -94,13 +97,12 @@ struct MainView: View {
             }
             forward = Page(new).rawValue >= Page(old).rawValue
             withAnimation(Self.paneAnimation) { shownRoute = new }
-            // Another page closes the search bar back into the Search button and clears the query; another entry or
-            // the welcome pane keeps it, for the sidebar it filters. Search on the Calendar page (which never has the
-            // bar open) goes back to the library to open it there.
+            // Another page clears both queries; another entry or the welcome pane keeps the sidebar's. ⌘F on the
+            // Calendar page goes back to the library to focus the sidebar's field there.
             query = ""
+            settingsQuery = ""
             guard !(Page(old) == .calendar && model.searchPresented) else { return }
             model.searchPresented = false
-            searchExpanded = false
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(WindowGlass().ignoresSafeArea())
@@ -116,16 +118,6 @@ struct MainView: View {
             .allowsHitTesting(false)
         }
         .modifier(HardTopScrollEdge())
-        .overlay {
-            if let searchBarGhost {
-                Color.clear
-                    .overlay(alignment: .topLeading) {
-                        SearchBarGhost(frame: searchBarGhost) { self.searchBarGhost = nil }
-                    }
-                    .ignoresSafeArea()
-                    .allowsHitTesting(false)
-            }
-        }
         .onGeometryChange(for: CGFloat.self) { $0.size.width } action: { windowWidth = $0 }
         .task(id: query) {
             if !query.isEmpty { try? await Task.sleep(for: .milliseconds(200)) }
@@ -137,65 +129,53 @@ struct MainView: View {
                                 transcriptEdits: model.transcriptEdits, chatChanges: model.chatHistoryChanges)) {
             await loadSearchDocuments()
         }
-        .onChange(of: model.searchPresented, initial: true) { _, presented in
-            guard presented else { return }
-            searchExpanded = true
-            // Search filters the cards: they come back in place of the library chat. Settings search keeps it, for
-            // the page Settings returns to.
-            if model.route != .settings { model.globalChatOpen = false }
+        // A new search or page size starts on the first page.
+        .onChange(of: debouncedQuery) { listPage = 0 }
+        .onChange(of: model.settings.libraryPageSize) { listPage = 0 }
+        // A conversation opened from outside the list (Calendar, a citation) shows on its page. Only here: paging
+        // with a conversation open stays on the new page.
+        .onChange(of: selectedID) { _, id in
+            guard let id, let index = pagedList.firstIndex(where: { $0.id == id }) else { return }
+            listPage = LibraryPaging.page(containing: index, size: model.settings.libraryPageSize)
         }
         .toolbar {
-            // The search bar replaces Reveal in Finder, Settings, the library chat and Search; Back, the title,
-            // Record, Update and the tabs stay.
             leadingItems
-            if searchExpanded {
-                flexibleSpacer
-                updateItem
-                searchBarItem
-                tabsItem
-            } else {
-                // Pushes the other capsules to the trailing edge.
-                flexibleSpacer
-                updateItem
-                revealItem
-                ToolbarItemGroup {
-                    Toggle(isOn: Binding(
-                        get: { model.route == .settings },
-                        set: { if $0 { model.openSettings() } else { model.goBack() } }
-                    )) {
-                        Label("Settings", systemImage: "slider.horizontal.3")
-                    }
-                    .help("Settings")
-                    Toggle(isOn: Binding(
-                        get: { model.route == .calendar },
-                        set: { if $0 { model.openCalendar() } else { model.goBack() } }
-                    )) {
-                        Label("Calendar", systemImage: "calendar")
-                    }
-                    .help("Calendar")
-                    Toggle(isOn: Binding(
-                        get: { model.globalChatOpen && Page(model.route) == .library },
-                        set: { open in
-                            // Settings opened from the Calendar page goes back twice, to the library.
-                            if model.route == .settings { model.goBack() }
-                            if model.route == .calendar { model.goBack() }
-                            model.globalChatOpen = open
-                            guard open else { return }
-                            query = ""
-                            searchExpanded = false
-                            model.searchPresented = false
-                        }
-                    )) {
-                        Label("Ask across conversations", systemImage: "sparkles")
-                    }
-                    .help("Ask across conversations")
-                    Button(action: model.showSearch) {
-                        Label("Search", systemImage: "magnifyingglass")
-                    }
-                    .help(model.route == .settings ? "Search settings (⌘F)" : "Search conversations (⌘F)")
+            // Pushes the other capsules to the trailing edge.
+            flexibleSpacer
+            updateItem
+            revealItem
+            ToolbarItemGroup {
+                Toggle(isOn: Binding(
+                    get: { model.route == .settings },
+                    set: { if $0 { model.openSettings() } else { model.goBack() } }
+                )) {
+                    Label("Settings", systemImage: "slider.horizontal.3")
                 }
-                tabsItem
+                .help("Settings")
+                Toggle(isOn: Binding(
+                    get: { model.route == .calendar },
+                    set: { if $0 { model.openCalendar() } else { model.goBack() } }
+                )) {
+                    Label("Calendar", systemImage: "calendar")
+                }
+                .help("Calendar")
+                Toggle(isOn: Binding(
+                    get: { model.globalChatOpen && Page(model.route) == .library },
+                    set: { open in
+                        // Settings opened from the Calendar page goes back twice, to the library.
+                        if model.route == .settings { model.goBack() }
+                        if model.route == .calendar { model.goBack() }
+                        model.globalChatOpen = open
+                        guard open else { return }
+                        query = ""
+                        model.searchPresented = false
+                    }
+                )) {
+                    Label("Ask across conversations", systemImage: "sparkles")
+                }
+                .help("Ask across conversations")
             }
+            tabsItem
         }
         .task { model.refreshTargets() }
         .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in
@@ -222,11 +202,21 @@ struct MainView: View {
         }
     }
 
-    /// Back in its own capsule (not on the list without the library chat), the record capsule, then a conversation's
-    /// title. The record capsule: while idle Record and a chevron menu that picks the target and the language; while
-    /// recording, Stop (red, pulsing unless paused or Reduce Motion) and Pause/Resume. ⌘R and ⇧⌘P come from the main
-    /// menu. In a narrow window the other buttons go to the overflow menu first.
+    /// On the library page the sidebar button in its own capsule, then Back in its own capsule (not on the list without
+    /// the library chat), the record capsule, then a conversation's title. The record capsule: while idle Record and a
+    /// chevron menu that picks the target and the language; while recording, Stop (red, pulsing unless paused or Reduce
+    /// Motion) and Pause/Resume. ⌘R and ⇧⌘P come from the main menu. In a narrow window the other buttons go to the
+    /// overflow menu first.
     @ToolbarContentBuilder private var leadingItems: some ToolbarContent {
+        if Page(model.route) == .library {
+            ToolbarItem(placement: leadingPlacement) {
+                SingleToolbarButton(title: model.sidebarHidden ? "Show Sidebar" : "Hide Sidebar",
+                                    systemImage: "sidebar.left", action: model.toggleSidebar)
+                    .help(model.sidebarHidden ? "Show Sidebar (⌃⌘S)" : "Hide Sidebar (⌃⌘S)")
+            }
+            .highVisibilityPriority()
+            fixedSpacer
+        }
         if model.route != .list || model.globalChatOpen {
             ToolbarItem(placement: leadingPlacement) {
                 SingleToolbarButton(title: "Back", systemImage: "chevron.left", action: model.goBack)
@@ -305,7 +295,7 @@ struct MainView: View {
         }
     }
 
-    /// Its own capsule, green, before Settings and Search (or a conversation's Reveal in Finder), while Sparkle has an
+    /// Its own capsule, green, before Settings (or a conversation's Reveal in Finder), while Sparkle has an
     /// update. Hidden while recording: installing relaunches the app.
     @ToolbarContentBuilder private var updateItem: some ToolbarContent {
         if showsUpdate {
@@ -391,33 +381,27 @@ struct MainView: View {
 
     private static let titleMaxWidth: CGFloat = 360
     private static let titleMinWidth: CGFloat = 120
-    /// Approximate widths of the other items: the traffic lights, Back and the record capsule; the tabs; Reveal in
-    /// Finder with Delete, Settings, Calendar, the library chat and Search.
-    private static let leadingWidth: CGFloat = 250
+    /// Approximate widths of the other items: the traffic lights, the sidebar button, Back and the record capsule; the
+    /// tabs; Reveal in Finder with Delete, Settings, Calendar and the library chat. Only the conversation page has a
+    /// title: the recording's toolbar tabs (Tabs layout) or none (side by side) never meet it, so they need no width.
+    private static let leadingWidth: CGFloat = 302
     private static let tabsWidth: CGFloat = 240
-    private static let trailingButtonsWidth: CGFloat = 280
+    private static let trailingButtonsWidth: CGFloat = 244
 
     private var updateWidth: CGFloat { showsUpdate ? 52 : 0 }
 
-    /// What the toolbar's other items leave of the window (the search bar in place of the trailing buttons), at most
-    /// `titleMaxWidth`: the title truncates instead of pushing buttons into the overflow menu.
+    /// What the toolbar's other items leave of the window, at most `titleMaxWidth`: the title truncates instead of
+    /// pushing buttons into the overflow menu.
     private var titleWidth: CGFloat {
-        let trailing = searchExpanded ? searchBarWidth + ToolbarSearchBar.trailingInset : Self.trailingButtonsWidth
-        return min(Self.titleMaxWidth, windowWidth - Self.leadingWidth - Self.tabsWidth - trailing - updateWidth)
-    }
-
-    /// The search bar: shorter when the tabs beside it leave less room, so it stays out of the overflow menu.
-    private var searchBarWidth: CGFloat {
-        let tabs = toolbarConversation == nil ? 0 : Self.tabsWidth
-        let free = windowWidth - Self.leadingWidth - tabs - ToolbarSearchBar.trailingInset - updateWidth
-        return max(min(ToolbarSearchBar.wideWidth, free), ToolbarSearchBar.height)
+        min(Self.titleMaxWidth,
+            windowWidth - Self.leadingWidth - Self.tabsWidth - Self.trailingButtonsWidth - updateWidth)
     }
 
     /// Too short a title is left out.
     private var titleFits: Bool { titleWidth >= Self.titleMinWidth }
 
     /// A conversation's Reveal in Finder and Delete menu (the audio or the whole conversation) in one capsule, before
-    /// Settings and Search; hidden with them while the search bar is open.
+    /// Settings.
     @ToolbarContentBuilder private var revealItem: some ToolbarContent {
         if let conversation = toolbarConversation {
             ToolbarItemGroup {
@@ -440,10 +424,11 @@ struct MainView: View {
     }
 
     /// The Settings section's inner tabs, in a capsule like a conversation's tabs, after the record capsule. Hidden
-    /// while the search bar is open: its results replace the section, and the bar takes the room.
+    /// while Settings is searched: its results replace the section.
     @ToolbarContentBuilder private var settingsTabsItem: some ToolbarContent {
         let section = model.settingsTab
-        if model.route == .settings, !searchExpanded, !section.subTabs.isEmpty {
+        if model.route == .settings, settingsQuery.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
+           !section.subTabs.isEmpty {
             fixedSpacer
             ToolbarItem(placement: leadingPlacement) {
                 CapsuleTabs(
@@ -461,12 +446,16 @@ struct MainView: View {
         }
     }
 
-    /// A conversation's tabs, in a capsule of their own like the buttons', at the trailing edge after Settings and
-    /// Search (or the search bar).
+    /// A conversation's tabs, in a capsule of their own like the buttons', at the trailing edge after Settings and the
+    /// library chat; in the same place the recording's Transcript / Catch-up / Chat tabs in the Tabs layout (side by
+    /// side, its right panel has its own tabs).
     @ToolbarContentBuilder private var tabsItem: some ToolbarContent {
         if toolbarConversation != nil {
             fixedSpacer
             ToolbarItem { tabs }
+        } else if model.route == .recording && model.isRecording && model.settings.recordingLayout == .tabs {
+            fixedSpacer
+            ToolbarItem { recordingTabs }
         }
     }
 
@@ -476,6 +465,16 @@ struct MainView: View {
         CapsuleTabs(
             selection: Binding(get: { model.detailTab }, set: { model.detailTab = $0 }),
             tabs: TranscriptView.tabs, title: { Text(TranscriptView.tabTitle($0)) }
+        )
+        .padding(.horizontal, 4)
+        .fixedSize()
+    }
+
+    /// Padded like `tabs`.
+    private var recordingTabs: some View {
+        CapsuleTabs(
+            selection: Binding(get: { model.recordingTab }, set: { model.recordingTab = $0 }),
+            tabs: RecordingDetailView.tabs, title: { Text(RecordingDetailView.tabTitle($0)) }
         )
         .padding(.horizontal, 4)
         .fixedSize()
@@ -535,14 +534,18 @@ struct MainView: View {
     }
 
     /// The library page: the cards (or the library chat) as a sidebar, then the detail. The sidebar stays while the
-    /// detail changes.
+    /// detail changes; hidden (⌃⌘S, the toolbar's sidebar button), it slides out and the detail takes the window.
     private var libraryPage: some View {
         // Both panes pad 12 pt on every side; overlapping those paddings by 6 pt leaves an 18 pt gap between them.
         HStack(spacing: -6) {
-            chatOr(libraryWell(libraryPane(selectedID: selectedID)))
-                .frame(width: 360)
+            if !model.sidebarHidden {
+                chatOr(libraryWell(libraryPane(selectedID: selectedID)))
+                    .frame(width: 360)
+                    .transition(reduceMotion ? .opacity : .move(edge: .leading).combined(with: .opacity))
+            }
             detail
         }
+        .animation(reduceMotion ? nil : Self.paneAnimation, value: model.sidebarHidden)
         // The toolbar's safe area already leaves room above the panes: 4 pt of their 12 pt top padding is enough.
         .padding(.top, -8)
     }
@@ -590,21 +593,106 @@ struct MainView: View {
         }
     }
 
-    /// The sidebar's cards matching the search, or why there are none; the recording's card stays on top while
-    /// recording, alone when the library is still empty and nothing is searched.
-    @ViewBuilder private func libraryPane(selectedID: UUID?) -> some View {
-        let groups = DayGroup.groups(from: searchResults.filter(listed))
-        if groups.isEmpty && model.isRecording && searchTerm.isEmpty {
-            ConversationListView(model: model, groups: [], selectedID: selectedID)
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
-        } else if !model.conversations.contains(where: listed) {
-            emptyState("No conversations yet")
-        } else if groups.isEmpty {
-            emptyState("No conversations match \"\(searchTerm)\"")
-        } else {
-            ConversationListView(model: model, groups: groups, selectedID: selectedID)
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
+    /// The sidebar's search field, then the cards of the current page matching the search (or why there are none),
+    /// then the page bar while there is more than one page. The recording's card stays on top while recording, alone
+    /// when the library is still empty and nothing is searched.
+    private func libraryPane(selectedID: UUID?) -> some View {
+        let list = pagedList
+        let size = model.settings.libraryPageSize
+        let page = LibraryPaging.clamp(page: listPage, total: list.count, size: size)
+        let range = LibraryPaging.range(page: page, total: list.count, size: size)
+        let sections = LibrarySections.sections(from: Array(list[range]), now: .now)
+        return VStack(spacing: 0) {
+            sidebarSearchField
+                .padding([.horizontal, .top], 12)
+            Group {
+                if sections.isEmpty && model.isRecording && searchTerm.isEmpty {
+                    ConversationListView(model: model, sections: [], selectedID: selectedID)
+                } else if !model.conversations.contains(where: listed) {
+                    emptyState("No conversations yet")
+                } else if sections.isEmpty {
+                    emptyState("No conversations match \"\(searchTerm)\"")
+                } else {
+                    ConversationListView(model: model, sections: sections, selectedID: selectedID)
+                        // A new page starts at the top (centered on the open card when it is on that page).
+                        .id(page)
+                }
+            }
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            if LibraryPaging.pageCount(total: list.count, size: size) > 1 {
+                pageBar(page: page, range: range, total: list.count, size: size)
+            }
         }
+        // Conversations added or deleted: still on a page that exists.
+        .onChange(of: list.count) { _, total in
+            listPage = LibraryPaging.clamp(page: listPage, total: total, size: size)
+        }
+    }
+
+    /// The listed conversations matching the search, newest first: what the sidebar's pages slice.
+    private var pagedList: [Conversation] {
+        LibrarySections.sorted(searchResults.filter(listed))
+    }
+
+    /// "‹ 1–100 of 742 ›" under the cards; the arrows are dimmed at the first and last page.
+    private func pageBar(page: Int, range: Range<Int>, total: Int, size: Int) -> some View {
+        let last = LibraryPaging.pageCount(total: total, size: size) - 1
+        return HStack(spacing: 12) {
+            Button {
+                listPage = page - 1
+            } label: {
+                Image(systemName: "chevron.left").frame(width: 20, height: 20)
+            }
+            .disabled(page == 0)
+            .help("Previous page")
+            .accessibilityLabel("Previous page")
+            Text(String(localized: "\(range.lowerBound + 1)–\(range.upperBound) of \(total)"))
+                .font(.callout)
+                .monospacedDigit()
+                .foregroundStyle(.secondary)
+            Button {
+                listPage = page + 1
+            } label: {
+                Image(systemName: "chevron.right").frame(width: 20, height: 20)
+            }
+            .disabled(page >= last)
+            .help("Next page")
+            .accessibilityLabel("Next page")
+        }
+        .buttonStyle(RowIconButtonStyle())
+        .frame(maxWidth: .infinity)
+        .padding(.vertical, 8)
+        .overlay(alignment: .top) { Divider() }
+    }
+
+    /// The sidebar's search field, above the cards and the empty states. ⌘F focuses it (`model.searchPresented`);
+    /// Esc clears the query, then gives up the focus.
+    private var sidebarSearchField: some View {
+        HStack(spacing: 6) {
+            Image(systemName: "magnifyingglass")
+                .foregroundStyle(.secondary)
+            SearchTextField(text: $query, focusRequest: searchPresented,
+                            accessibilityLabel: String(localized: "Search conversations")) {
+                if query.isEmpty {
+                    NSApp.keyWindow?.makeFirstResponder(nil)
+                } else {
+                    query = ""
+                }
+            }
+            if !query.isEmpty {
+                Button {
+                    query = ""
+                } label: {
+                    Image(systemName: "xmark.circle.fill").foregroundStyle(.secondary)
+                }
+                .buttonStyle(.plain)
+                .help("Clear search")
+                .accessibilityLabel("Clear search")
+            }
+        }
+        .padding(.horizontal, 10)
+        .frame(height: 30)
+        .modifier(InputCapsule())
     }
 
     /// The recording's own entry is hidden while recording: its card is the recording card.
@@ -631,30 +719,6 @@ struct MainView: View {
 
     private var searchPresented: Binding<Bool> {
         Binding(get: { model.searchPresented }, set: { model.searchPresented = $0 })
-    }
-
-    /// The search bar in its own toolbar item, with its own capsule: the toolbar's shared capsule would not follow its
-    /// width while it grows and shrinks.
-    @ToolbarContentBuilder private var searchBarItem: some ToolbarContent {
-        if #available(macOS 26, *) {
-            ToolbarItem { searchBar }.sharedBackgroundVisibility(.hidden)
-        } else {
-            ToolbarItem { searchBar }
-        }
-    }
-
-    private var searchBar: some View {
-        ToolbarSearchBar(
-            text: $query, focusRequest: searchPresented, windowWidth: windowWidth,
-            maxWidth: searchBarWidth,
-            accessibilityLabel: model.route == .settings
-                ? String(localized: "Search settings") : String(localized: "Search conversations")
-        ) { frame in
-            query = ""
-            // The toolbar fades its buttons in, in an animated transaction, while the bar's ghost shrinks.
-            if !reduceMotion { searchBarGhost = frame }
-            withAnimation(reduceMotion ? nil : ToolbarSearchBar.animation) { searchExpanded = false }
-        }
     }
 
     private var searchTerm: String { debouncedQuery.trimmingCharacters(in: .whitespacesAndNewlines) }
@@ -709,85 +773,9 @@ struct MainView: View {
     }
 }
 
-/// The main window's search bar, in place of the toolbar's trailing buttons: it grows out of the Search button's place
-/// to `maxWidth` at the trailing edge, and shrinks back before the buttons return. Not `.searchable`: the system search
-/// item widened when focused and pushed Record, Settings and AI into the toolbar's overflow menu in a narrow window.
-private struct ToolbarSearchBar: View {
-    static let height: CGFloat = 34
-    /// From the window's trailing edge, like the toolbar's buttons.
-    static let trailingInset: CGFloat = 8
-    /// At most, which keeps Back, Record, Update and the tabs beside the bar.
-    static let wideWidth: CGFloat = 360
-    /// Growing and shrinking.
-    static let animation = Animation.snappy(duration: 0.3)
-
-    @Binding var text: String
-    /// ⌘F sets it to focus the field; false again once focused.
-    @Binding var focusRequest: Bool
-    let windowWidth: CGFloat
-    /// A fixed width after a flexible spacer (the bar then sits at the trailing edge); nil fills the toolbar from the
-    /// bar's leading edge.
-    let maxWidth: CGFloat?
-    /// The field's label and placeholder, which name what it searches.
-    let accessibilityLabel: String
-    /// X or Escape, with the bar's frame in the window (top-left origin).
-    let onClose: (CGRect) -> Void
-    @State private var expanded = false
-    /// The toolbar does not stretch its items: the bar reaches from its leading edge in the window, measured, to the
-    /// window's trailing edge. It grows once measured, from where the Search button was.
-    @State private var origin: CGPoint?
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
-
-    var body: some View {
-        HStack(spacing: 0) {
-            // The Search button's icon, at its place.
-            Image(systemName: "magnifyingglass")
-                .font(.body)
-                .imageScale(.large)
-                .frame(width: Self.height, height: Self.height)
-            SearchTextField(
-                text: $text, focusRequest: $focusRequest, accessibilityLabel: accessibilityLabel, onEscape: close
-            )
-                .opacity(expanded ? 1 : 0)
-            // As big as the Search button; its highlight, inset from the bar's top and bottom like a group button's.
-            Button(action: close) {
-                Image(systemName: "xmark")
-                    .font(.body)
-                    .imageScale(.large)
-                    .frame(width: Self.height - 16, height: Self.height - 16)
-            }
-            .buttonStyle(RowIconButtonStyle())
-            .frame(width: Self.height, height: Self.height)
-            .help("Close search (Esc)")
-            .opacity(expanded ? 1 : 0)
-        }
-        .frame(width: expanded ? nil : Self.height, height: Self.height, alignment: .leading)
-        .clipped()
-        .modifier(InputCapsule())
-        .frame(minWidth: Self.height, idealWidth: width, maxWidth: width, alignment: .trailing)
-        .opacity(origin == nil ? 0 : 1)
-        .background(WindowOriginReader { point in
-            guard origin != point else { return }
-            let first = origin == nil
-            origin = point
-            if first { withAnimation(reduceMotion ? nil : Self.animation) { expanded = true } }
-        })
-    }
-
-    private var width: CGFloat {
-        guard let origin else { return Self.height }
-        if let maxWidth { return maxWidth }
-        return max(windowWidth - origin.x - Self.trailingInset, Self.height)
-    }
-
-    private func close() {
-        onClose(CGRect(origin: origin ?? .zero, size: CGSize(width: width, height: Self.height)))
-    }
-}
-
-/// The search bar's text field. AppKit's: a SwiftUI field in a toolbar item that was just added did not take the
-/// focus.
-private struct SearchTextField: NSViewRepresentable {
+/// A search field's text field (the library sidebar's, Settings'), drawn by its container. AppKit's: it takes the
+/// focus asked for before it is in a window (⌘F from the Calendar page, or with the sidebar hidden) once it is.
+struct SearchTextField: NSViewRepresentable {
     @Binding var text: String
     /// ⌘F sets it to focus the field; false again once asked.
     @Binding var focusRequest: Bool
@@ -811,7 +799,7 @@ private struct SearchTextField: NSViewRepresentable {
         field.placeholderString = accessibilityLabel
         if field.stringValue != text { field.stringValue = text }
         if focusRequest {
-            // A new toolbar item may not be in the window yet: it focuses itself once it is.
+            // A field just shown may not be in the window yet: it focuses itself once it is.
             field.focusInWindow = true
             DispatchQueue.main.async {
                 field.focusIfInWindow()
@@ -849,7 +837,7 @@ private struct SearchTextField: NSViewRepresentable {
             parent.text = field.stringValue
         }
 
-        /// Escape closes the search bar.
+        /// Escape is the container's.
         func control(_ control: NSControl, textView: NSTextView, doCommandBy selector: Selector) -> Bool {
             guard selector == #selector(NSResponder.cancelOperation(_:)) else { return false }
             parent.onEscape()
@@ -858,70 +846,12 @@ private struct SearchTextField: NSViewRepresentable {
     }
 }
 
-/// The closed search bar, under the toolbar where it was: it shrinks back into the Search button and fades out while
-/// the toolbar's buttons fade in. The toolbar removes the bar's own item at once.
-private struct SearchBarGhost: View {
-    let frame: CGRect
-    let onDone: () -> Void
-    @State private var collapsed = false
-
-    var body: some View {
-        Image(systemName: "magnifyingglass")
-            .font(.body)
-            .imageScale(.large)
-            .frame(width: frame.height, height: frame.height)
-            .frame(width: collapsed ? frame.height : frame.width, alignment: .leading)
-            .modifier(InputCapsule())
-            // Seen while it shrinks, gone as it reaches the Search button.
-            .animation(.easeIn(duration: 0.3)) { $0.opacity(collapsed ? 0 : 1) }
-            .frame(width: frame.width, alignment: .trailing)
-            .offset(x: frame.minX, y: frame.minY)
-            .onAppear {
-                withAnimation(ToolbarSearchBar.animation) { collapsed = true } completion: { onDone() }
-            }
-    }
-}
-
-/// The search bar's capsule, an input: `Palette.inputSurface` with the cards' edge. The bar and its ghost share it so
-/// the close animation keeps the same color.
-private struct InputCapsule: ViewModifier {
+/// The sidebar search fields' capsule (the library's, Settings'), an input: `Palette.inputSurface` with the cards' edge.
+struct InputCapsule: ViewModifier {
     func body(content: Content) -> some View {
         content
             .background(Capsule().fill(Palette.inputSurface))
             .overlay(Capsule().strokeBorder(Palette.surfaceBorder, lineWidth: 1).allowsHitTesting(false))
-    }
-}
-
-/// Reports this view's top-left corner in its window (top-left origin), each time it is laid out there.
-private struct WindowOriginReader: NSViewRepresentable {
-    let onChange: (CGPoint) -> Void
-
-    func makeNSView(context: Context) -> Probe { Probe() }
-
-    func updateNSView(_ probe: Probe, context: Context) {
-        probe.onChange = onChange
-    }
-
-    final class Probe: NSView {
-        var onChange: ((CGPoint) -> Void)?
-
-        override func viewDidMoveToWindow() {
-            super.viewDidMoveToWindow()
-            report()
-        }
-
-        override func layout() {
-            super.layout()
-            report()
-        }
-
-        /// On the next turn: SwiftUI may be laying out the toolbar.
-        private func report() {
-            guard let window else { return }
-            let frame = convert(bounds, to: nil)
-            let origin = CGPoint(x: frame.minX, y: window.frame.height - frame.maxY)
-            DispatchQueue.main.async { self.onChange?(origin) }
-        }
     }
 }
 

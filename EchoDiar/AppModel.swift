@@ -24,6 +24,10 @@ final class AppModel {
     /// The open conversation's tab.
     enum DetailTab { case transcript, summary, chat }
 
+    /// The recording page's tab (Tabs layout), or the right panel's Catchup | Chat (side by side, never `.transcript`
+    /// once a recording runs in it).
+    enum RecordingTab { case transcript, catchUp, chat }
+
     /// Which AI default a job or menu uses: summaries (and catch-ups) or chat (questions, library chat, chat titles).
     enum AIPurpose { case summary, chat }
 
@@ -35,6 +39,9 @@ final class AppModel {
     private(set) var settings = AppSettings()
     var route: Route = .list
     var detailTab: DetailTab = .transcript
+    /// The recording page's tab: `.transcript` at start (`.catchUp` side by side); the finished recording opens on
+    /// the matching `DetailTab` when its page was showing at Stop.
+    var recordingTab: RecordingTab = .transcript
     /// Where Back leaves Settings to: the route Settings was opened from.
     private(set) var settingsReturnRoute: Route = .list
     /// Where Back leaves the Calendar page to: a library route, never Settings, so Back cannot cycle between the two.
@@ -149,6 +156,10 @@ final class AppModel {
     private(set) var catchUpRun: CatchUpRun?
     /// The current recording's saved catch-ups (its `catchups.json`), oldest first.
     private(set) var recordingCatchUps: [CatchUp] = []
+    /// The current recording's live chat answer being written (or the last one that failed); nil otherwise.
+    private(set) var liveChatRun: LiveChatRun?
+    /// The current recording's chat (its `chat.json`), oldest first; read at start and after each answer.
+    private(set) var liveChatMessages: [ChatLog.Message] = []
     /// The app whose detection ("Always") started the recording, or the calendar event's title for a calendar start:
     /// the pill shows "Recording <name>" for its first 10 s even when the indicator is hidden.
     private(set) var autoStartedAppName: String?
@@ -156,14 +167,22 @@ final class AppModel {
     private(set) var hotKeyError: String?
     /// Why the global pause shortcut could not be registered; nil when registered or off.
     private(set) var pauseHotKeyError: String?
-    /// ⌘F asks the main window's search field to take the focus; false again once it stops editing.
+    /// ⌘F asks the library sidebar's search field to take the focus; false again once it stops editing. Kept until
+    /// the field is on screen (from Calendar, with the library chat open or with the sidebar hidden it is not yet).
     var searchPresented = false
+    /// ⌘F on the Settings page asks the Settings sidebar's search field to take the focus.
+    var settingsSearchPresented = false
+    /// The library sidebar is hidden (⌃⌘S, the toolbar button); this session only. Hide it with `setSidebarHidden(_:)`.
+    var sidebarHidden = false
     /// Cards are selected in the list: Esc cancels the selection instead of going back.
     var listSelectionActive = false
     /// The conversation whose sidebar title is being renamed: opening Chat then leaves the cursor in its field.
     var renamingConversation: UUID?
-    /// The library chat is shown: in place of the cards on the list, or of the sidebar beside a conversation.
-    var globalChatOpen = false
+    /// The library chat is shown: in place of the cards on the list, or of the sidebar beside a conversation. It lives
+    /// in the sidebar pane: opening it shows the sidebar (written directly, so the two never call each other back).
+    var globalChatOpen = false {
+        didSet { if globalChatOpen { sidebarHidden = false } }
+    }
     /// What the library index (RAG) is doing, for Settings › AI Settings › Library chat.
     var ragStatus = RAGStatus()
 
@@ -224,6 +243,23 @@ final class AppModel {
         var statusLine: String?
         var error: String?
         /// Stop was asked for: the text streamed until then is saved, marked stopped.
+        var stopping = false
+
+        var isRunning: Bool { status != .failed }
+    }
+
+    /// A live chat question of the current recording (`askLive`): its `AIService` job id, for `aiService.stop(_:)`.
+    struct LiveChatRun {
+        enum Status: Equatable { case starting, streaming, failed }
+        let jobID: UUID
+        let question: String
+        var status: Status = .starting
+        /// The answer streamed so far (every 50 ms), Markdown.
+        var text = ""
+        /// What the job is doing before its text starts.
+        var statusLine: String?
+        var error: String?
+        /// Stop was asked for: the question and the answer streamed until then are saved.
         var stopping = false
 
         var isRunning: Bool { status != .failed }
@@ -339,6 +375,11 @@ final class AppModel {
     @ObservationIgnored private var activeFolder: URL?
     /// Folder of the recording that ended on its page; opened once the library lists it, dropped if the list is left.
     @ObservationIgnored private var pendingOpenFolder: URL?
+    /// The tab `pendingOpenFolder` opens on: the recording page's tab at Stop.
+    @ObservationIgnored private var pendingOpenTab: DetailTab = .transcript
+    /// The side-by-side layout hid the sidebar at this recording's start and the user has not toggled it since: the
+    /// end of the recording shows it again.
+    @ObservationIgnored private var sidebarAutoHidden = false
     @ObservationIgnored private var terminateObserver: (any NSObjectProtocol)?
     /// `supportedLanguages(engineID:)` by catalog id, sorted by name once.
     @ObservationIgnored private var languageCache: [String: [String]] = [:]
@@ -350,6 +391,9 @@ final class AppModel {
     /// The catch-up text streamed since the last flush into `catchUpRun`, and that flush.
     @ObservationIgnored private var pendingCatchUpText = ""
     @ObservationIgnored private var catchUpFlush: Task<Void, Never>?
+    /// The live chat answer streamed since the last flush into `liveChatRun`, and that flush.
+    @ObservationIgnored private var pendingLiveChatText = ""
+    @ObservationIgnored private var liveChatFlush: Task<Void, Never>?
     /// Conversations `deleteConversation` is moving to the Trash: their AI job's error is not shown, and no new job
     /// starts for them.
     @ObservationIgnored private var deletingConversationIDs: Set<UUID> = []
@@ -453,11 +497,13 @@ final class AppModel {
                     guard let pending = pendingOpenFolder else { continue }
                     if route != .list {
                         pendingOpenFolder = nil
+                        pendingOpenTab = .transcript
                     } else if let match = conversations.first(where: {
                         $0.folder.standardizedFileURL == pending.standardizedFileURL
                     }) {
                         pendingOpenFolder = nil
-                        open(match.id)
+                        open(match.id, tab: pendingOpenTab)
+                        pendingOpenTab = .transcript
                     }
                 }
             }
@@ -493,6 +539,16 @@ final class AppModel {
         // A catch-up still writing for the previous recording finishes and saves in its folder, out of sight.
         catchUpRun = nil
         recordingCatchUps = []
+        liveChatRun = nil
+        liveChatMessages = []
+        liveChatFlush?.cancel()
+        liveChatFlush = nil
+        pendingLiveChatText = ""
+        let sideBySide = settings.recordingLayout == .sideBySide
+        recordingTab = sideBySide ? .catchUp : .transcript
+        // Through the user's path, so an open library chat closes; a sidebar already hidden stays so at the end.
+        sidebarAutoHidden = sideBySide && !sidebarHidden
+        if sidebarAutoHidden { setSidebarHidden(true) }
         if settings.endPromptNotification { requestNotificationAccess() }
         if bringForward {
             route = .recording
@@ -522,6 +578,7 @@ final class AppModel {
                 activeFolder = folder
                 recordingEvent = event
                 beginEndWatch(target: resolved)
+                loadLiveChat(folder)
             } catch {
                 let transcriber = recordingTranscriber
                 recordingTranscriber = nil
@@ -533,6 +590,7 @@ final class AppModel {
                 recordingEvent = nil
                 recordingTitle = nil
                 recordingError = Self.captureFailureMessage(error, action: .start)
+                restoreAutoHiddenSidebar()
                 // The recording page opened before the start; nothing to show there now.
                 if route == .recording { route = .list }
             }
@@ -920,8 +978,14 @@ final class AppModel {
                 // A start navigates in `startRecording`. An end on the recording page shows the list, then the
                 // finished entry once the library lists it; Settings opened from that page returns to the list.
                 if wasRecording && !isRecording {
+                    restoreAutoHiddenSidebar()
                     if route == .recording {
                         pendingOpenFolder = activeFolder
+                        pendingOpenTab = switch recordingTab {
+                        case .transcript: .transcript
+                        case .catchUp: .summary
+                        case .chat: .chat
+                        }
                         route = .list
                     } else if route == .settings && settingsReturnRoute == .recording {
                         settingsReturnRoute = .list
@@ -1862,6 +1926,9 @@ final class AppModel {
             || updated.globalPauseHotKeyEnabled != settings.globalPauseHotKeyEnabled
         let notificationTurnedOn = updated.endPromptNotification && !settings.endPromptNotification
         let notificationTurnedOff = !updated.endPromptNotification && settings.endPromptNotification
+        // Side by side has no Transcript tab on the right: a switch to it mid-recording shows Catchup there.
+        let switchedToSideBySide = updated.recordingLayout == .sideBySide && settings.recordingLayout != .sideBySide
+            && (isRecording || isStarting)
         let ragChanged = updated.ragEnabled != settings.ragEnabled
             || updated.embeddingModelID != settings.embeddingModelID
             // An edit of the API embedder's `embeddingModel` changes `providers`.
@@ -1878,6 +1945,7 @@ final class AppModel {
         if hotKeyChanged { syncHotKey() }
         if notificationTurnedOn { requestNotificationAccess() }
         if notificationTurnedOff { endPromptNotifier.dismiss() }
+        if switchedToSideBySide && recordingTab == .transcript { recordingTab = .catchUp }
         // A pass still running would keep embedding with the old choice.
         if ragChanged { syncLibraryIndex(restart: true) }
     }
@@ -1888,11 +1956,37 @@ final class AppModel {
         OnboardingWindow.shared.show(model: self)
     }
 
-    /// ⌘F: the search field focused, on the current page: the query filters the cards or the sidebar, or on Settings
-    /// the settings. The Calendar page has nothing to search: back to the library first.
+    /// ⌘F: the library sidebar's search field focused (the library chat closed and the sidebar shown), or on Settings
+    /// the Settings sidebar's. The Calendar page has nothing to search: back to the library first.
     func showSearch() {
+        if route == .settings {
+            settingsSearchPresented = true
+            return
+        }
         if route == .calendar { goBack() }
+        globalChatOpen = false
+        setSidebarHidden(false)
         searchPresented = true
+    }
+
+    /// ⌃⌘S and the toolbar's sidebar button. During a recording, the user's choice outlasts its end.
+    func toggleSidebar() {
+        sidebarAutoHidden = false
+        setSidebarHidden(!sidebarHidden)
+    }
+
+    /// The end of a recording (or its failed start): the sidebar the side-by-side layout hid at its start shows again,
+    /// unless the user toggled it since.
+    private func restoreAutoHiddenSidebar() {
+        guard sidebarAutoHidden else { return }
+        sidebarAutoHidden = false
+        setSidebarHidden(false)
+    }
+
+    /// The one path that hides or shows the library sidebar: hiding it closes the library chat, which lives in it.
+    func setSidebarHidden(_ hidden: Bool) {
+        if hidden { globalChatOpen = false }
+        sidebarHidden = hidden
     }
 
     /// The Calendar page of the main window; Back returns to the library page it was opened from (from Settings, to
@@ -2452,7 +2546,8 @@ extension AppModel {
         language: OutputLanguage?
     ) -> Int {
         let empty = CatchUpPlan(
-            previous: nil, transcript: [], recent: [], omitted: true, fullPass: true, throughLineID: -1, throughTime: 0)
+            previous: nil, context: [], transcript: [], omitted: true, fullPass: true, throughLineID: -1,
+            throughTime: 0)
         let instructions = PromptBuilder.catchUpMessages(
             plan: empty, title: title, startedAt: startedAt, elapsed: elapsed, language: language
         ).reduce(0) { $0 + TranscriptChunker.estimateTokens($1.content) }
@@ -2510,6 +2605,158 @@ extension AppModel {
         flushCatchUpText()
         catchUpRun?.status = .failed
         catchUpRun?.error = message
+    }
+}
+
+// MARK: - Live chat
+
+extension AppModel {
+    /// Why a live chat question cannot be asked now; nil when it can. Same provider as Catch up
+    /// (`catchUpProvider`), so the same reason when there is none.
+    var liveChatDisabledReason: String? {
+        guard let captions = recordingCaptions, recordingTranscriber != nil else {
+            return RecordingDetailView.noCaptionsReason(model: self)
+        }
+        if liveChatRun?.isRunning == true { return String(localized: "An answer is being written.") }
+        if catchUpProvider == nil {
+            return String(localized: "Catch up needs an AI provider outside the app: a cloud API, a local server or a command-line tool. Add one in Settings › AI Providers.")
+        }
+        if captions.lines.isEmpty { return String(localized: "Nothing to ask about yet.") }
+        return nil
+    }
+
+    /// Answers `question` about the current recording so far with `catchUpProvider`, streamed into `liveChatRun`
+    /// (shown at once), then saved with the answer in the recording's `chat.json` (marked live) and shown in
+    /// `liveChatMessages`. The transcript, or the catch-ups and the newest lines, fit the provider's context window
+    /// beside the last `chatContextMessages` messages. A run still going at Stop finishes and saves in that folder.
+    func askLive(_ question: String) {
+        let question = question.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !question.isEmpty, liveChatDisabledReason == nil, let provider = catchUpProvider,
+              let transcriber = recordingTranscriber, let folder = activeFolder else { return }
+        let jobID = UUID()
+        let elapsed = engine.currentSnapshot().elapsed
+        liveChatFlush?.cancel()
+        liveChatFlush = nil
+        pendingLiveChatText = ""
+        let model = catchUpModel(for: provider)
+        liveChatRun = LiveChatRun(jobID: jobID, question: question)
+        let client: (any LLMProvider)?
+        do {
+            client = try llmClient(for: provider)
+        } catch {
+            return failLiveChat(jobID, "\(provider.name): \(error.localizedDescription)")
+        }
+        guard let client else {
+            return failLiveChat(jobID, String(localized: "\(provider.name) is not available."))
+        }
+        let title = recordingTitle ?? recordingEvent?.title ?? ""
+        let language = OutputLanguage.answer(setting: settings.summaryLanguage)
+        let history = PromptBuilder.historyTurns(liveChatMessages, limit: settings.chatContextMessages)
+        Task { [weak self, aiService] in
+            let lines = await transcriber.finalizedLines(after: nil).map {
+                CatchUpLine(id: $0.id, start: $0.start, speaker: $0.speaker == .me ? .me : .others, text: $0.text)
+            }
+            let files = await Task.detached(priority: .userInitiated) {
+                Result { (try CatchUpLog.load(from: folder), try RecordingSession.read(from: folder).startedAt) }
+            }.value
+            let context = await client.contextWindow(model: model)
+            guard let self, liveChatRun?.jobID == jobID else { return }
+            let (log, startedAt): (CatchUpLog, Date)
+            switch files {
+            case .success(let read): (log, startedAt) = read
+            case .failure(let error): return failLiveChat(jobID, error.localizedDescription)
+            }
+            // Stopped before anything was sent: nothing to save.
+            if liveChatRun?.stopping == true {
+                liveChatRun = nil
+                return
+            }
+            let maxCharacters = LiveChatPlan.characterBudget(
+                contextWindow: context, lines: lines, title: title, startedAt: startedAt, elapsed: elapsed,
+                question: question, history: history, language: language)
+            let plan = LiveChatPlan.make(lines: lines, catchUps: log.catchUps, maxCharacters: maxCharacters)
+            let messages = PromptBuilder.liveQuestionMessages(
+                plan: plan, title: title, startedAt: startedAt, elapsed: elapsed, question: question,
+                history: history, language: language)
+            let stream = aiService.askLive(
+                question: question, messages: messages, provider: client, providerID: provider.id, model: model,
+                folder: folder, jobID: jobID)
+            do {
+                for try await update in stream { applyLiveChatUpdate(update, jobID: jobID) }
+            } catch {
+                return failLiveChat(jobID, error.localizedDescription)
+            }
+            await finishLiveChat(jobID, folder: folder)
+        }
+    }
+
+    /// Ends the running live chat answer early: the question and the text streamed until then are saved; nothing
+    /// when no text came yet.
+    func stopLiveChat() {
+        guard let run = liveChatRun, run.isRunning, !run.stopping else { return }
+        liveChatRun?.stopping = true
+        aiService.stop(run.jobID)
+    }
+
+    /// The recording's `chat.json` into `liveChatMessages`, read off the main thread, while `folder` is still the
+    /// recording's.
+    private func loadLiveChat(_ folder: URL) {
+        Task { [weak self] in
+            let messages = await Task.detached(priority: .userInitiated) { ChatLog.read(from: folder).messages }.value
+            guard let self, activeFolder == folder else { return }
+            liveChatMessages = messages
+        }
+    }
+
+    /// Shows an update of live chat `jobID` while it is `liveChatRun`, flushed as `applyCatchUpUpdate` does.
+    private func applyLiveChatUpdate(_ update: AIService.Update, jobID: UUID) {
+        guard liveChatRun?.jobID == jobID else { return }
+        switch update {
+        case .status(let line): liveChatRun?.statusLine = line
+        case .text(let text):
+            pendingLiveChatText += text
+            if liveChatRun?.status != .streaming {
+                liveChatRun?.status = .streaming
+                liveChatRun?.statusLine = nil
+                return flushLiveChatText()
+            }
+            guard liveChatFlush == nil else { return }
+            liveChatFlush = Task { [weak self] in
+                try? await Task.sleep(for: .milliseconds(50))
+                guard !Task.isCancelled else { return }
+                self?.flushLiveChatText()
+            }
+        }
+    }
+
+    private func flushLiveChatText() {
+        liveChatFlush?.cancel()
+        liveChatFlush = nil
+        guard !pendingLiveChatText.isEmpty else { return }
+        liveChatRun?.text += pendingLiveChatText
+        pendingLiveChatText = ""
+    }
+
+    /// Live chat `jobID` ended (saved, or stopped before any text): `liveChatMessages` from its `chat.json`, read off
+    /// the main thread, replaces the streamed answer in the same update.
+    private func finishLiveChat(_ jobID: UUID, folder: URL) async {
+        // Before the guards, which fail once a new recording has started: an answer still writing at Stop reaches
+        // the finished conversation's Chat tab.
+        chatHistoryChanges += 1
+        guard liveChatRun?.jobID == jobID else { return }
+        flushLiveChatText()
+        let messages = await Task.detached(priority: .userInitiated) { ChatLog.read(from: folder).messages }.value
+        guard liveChatRun?.jobID == jobID else { return }
+        liveChatMessages = messages
+        liveChatRun = nil
+    }
+
+    /// Live chat `jobID` failed: the streamed answer keeps its text so far and shows `message`; asking runs again.
+    private func failLiveChat(_ jobID: UUID, _ message: String) {
+        guard liveChatRun?.jobID == jobID else { return }
+        flushLiveChatText()
+        liveChatRun?.status = .failed
+        liveChatRun?.error = message
     }
 }
 

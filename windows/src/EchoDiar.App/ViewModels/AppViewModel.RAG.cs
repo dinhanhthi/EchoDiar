@@ -74,12 +74,17 @@ public sealed partial class AppViewModel
 
     /// <summary>
     /// The library chat is shown (macOS <c>globalChatOpen</c>): in place of the cards on the list, or of the sidebar beside
-    /// a conversation or the recording.
+    /// a conversation or the recording. It lives in the sidebar column: opening it shows the sidebar (written directly,
+    /// so this and <see cref="SetSidebarHidden"/> never call each other back).
     /// </summary>
     public bool GlobalChatOpen
     {
         get => _globalChatOpen;
-        set => SetProperty(ref _globalChatOpen, value);
+        set
+        {
+            SetProperty(ref _globalChatOpen, value);
+            if (value) SidebarHidden = false;
+        }
     }
 
     /// <summary>A library citation's conversation and time, shown once that conversation's transcript is read.</summary>

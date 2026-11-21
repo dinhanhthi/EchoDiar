@@ -32,6 +32,8 @@ struct SettingsStoreTests {
             #expect(store.load().calendar.ownCalendarID == nil)
             #expect(store.load().rememberRecordingLanguage == false)
             #expect(store.load().lastRecordingLanguage == nil)
+            #expect(store.load().libraryPageSize == 100)
+            #expect(store.load().recordingLayout == .tabs)
             #expect(FileManager.default.fileExists(atPath: store.fileURL.path))
         }
     }
@@ -132,6 +134,12 @@ struct SettingsStoreTests {
     @Test func pillSizeLargeRoundTrips() throws {
         let data = try JSONEncoder().encode(AppSettings(pillSize: .large))
         #expect(try JSONDecoder().decode(AppSettings.self, from: data).pillSize == .large)
+    }
+
+    /// A layout written by another build shows the tabs instead of discarding the whole file.
+    @Test func recordingLayoutUnknownFallsBackToTabs() throws {
+        let settings = try JSONDecoder().decode(AppSettings.self, from: Data(#"{"recordingLayout":"bogus"}"#.utf8))
+        #expect(settings.recordingLayout == .tabs)
     }
 
     @Test func corruptFileFallsBackToDefaultsAndIsMovedAside() throws {

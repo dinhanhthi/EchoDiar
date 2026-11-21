@@ -113,6 +113,7 @@ struct CrossPlatformFixturesTests {
             role: .assistant, text: "Ship on Friday [00:05] / Thứ Sáu.", provider: "anthropic",
             model: "claude-sonnet-5-5", timestamp: at.addingTimeInterval(5),
             references: [ChatLog.Reference(number: 1, conversationID: conversationID, title: vietnamese)]),
+        ChatLog.Message(role: .user, text: "Live: " + vietnamese, timestamp: at.addingTimeInterval(10), live: true),
     ])
 
     // MARK: - Windows → macOS
@@ -154,9 +155,10 @@ struct CrossPlatformFixturesTests {
 
         let chat = try ChatLog.decode(entry(ChatLog.fileName))
         #expect(chat.title == Self.vietnamese)
-        #expect(chat.messages.map(\.role) == [.user, .assistant])
+        #expect(chat.messages.map(\.role) == [.user, .assistant, .user])
         #expect(chat.messages.first?.text == Self.vietnamese)
-        #expect(chat.messages.last?.references?.first?.conversationID == Self.conversationID)
+        #expect(chat.messages.first { $0.role == .assistant }?.references?.first?.conversationID == Self.conversationID)
+        #expect(chat.messages.contains { $0.live == true })
         Self.expectDate(try #require(chat.messages.first?.timestamp), Self.atSeconds)
 
         let chats = try ChatArchive.Index.decode(entry(ChatArchive.indexFileName)).chats

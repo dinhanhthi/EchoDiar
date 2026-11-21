@@ -83,6 +83,29 @@ public sealed class ProviderRequestTests
         ExpectSecretsOnlyWhereAllowed(request);
     }
 
+    // Prompt caching: a message with a cache mark is sent as text blocks, cache_control only on the marked part; others stay strings.
+    [Fact]
+    public async Task AnthropicSendsCacheMarkedPartsAsTextBlocks()
+    {
+        LLMMessage[] messages =
+        [
+            new(LLMRole.System, "Answer from the transcript."),
+            LLMMessage.FromParts(LLMRole.User, [new(Transcript, true), new("Question: q", false)]),
+            new(LLMRole.Assistant, "a"),
+        ];
+        using var request = AnthropicClient.MakeRequest(Preset("anthropic"), Key, messages, "m", 100);
+
+        var body = await Json(request);
+        Assert.Equal("Answer from the transcript.", body["system"]!.GetValue<string>());
+        Assert.False(body.ContainsKey("cache_control"));
+        var expected = $$$"""
+            [{"role":"user","content":[{"type":"text","text":"{{{Transcript}}}","cache_control":{"type":"ephemeral"}},
+                                       {"type":"text","text":"Question: q"}]},
+             {"role":"assistant","content":"a"}]
+            """;
+        Assert.True(JsonNode.DeepEquals(JsonNode.Parse(expected), body["messages"]), body["messages"]!.ToJsonString());
+    }
+
     // Ollama's native chat API, so num_ctx can be raised: (UTF-8 bytes / 4 + maxTokens) in 4096 steps, 4096..32768.
     [Theory]
     [InlineData(0, 100, 4096)]

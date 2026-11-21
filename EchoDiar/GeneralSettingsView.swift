@@ -52,10 +52,22 @@ struct GeneralSettingsView: View {
                     Text("Large").tag(PillSize.large)
                 }
             }
+            Section("Recording window") {
+                Picker(selection: model.setting(\.recordingLayout)) {
+                    Text("Tabs").tag(RecordingLayout.tabs)
+                    Text("Side by side").tag(RecordingLayout.sideBySide)
+                } label: {
+                    Text("Recording layout")
+                    Text("Side by side shows the live transcript next to Catch-up and Chat and hides the sidebar while recording.")
+                }
+            }
             Section("Library") {
                 Toggle(isOn: model.setting(\.deleteWithoutConfirmation)) {
                     Text("Delete conversations without confirmation")
                     Text("They still go to the Trash.")
+                }
+                Picker("Entries per page", selection: model.setting(\.libraryPageSize)) {
+                    ForEach(LibraryPaging.sizeOptions, id: \.self) { Text(verbatim: String($0)).tag($0) }
                 }
             }
             Section("Consent") {

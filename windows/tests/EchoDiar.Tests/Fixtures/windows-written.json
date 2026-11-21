@@ -36,6 +36,12 @@
         "role": "assistant",
         "text": "Ship on Friday [00:05].",
         "timestamp": "2026-10-21T09:30:20Z"
+      },
+      {
+        "live": true,
+        "role": "user",
+        "text": "Live: Xin chào, cuộc họp",
+        "timestamp": "2026-10-21T09:30:25Z"
       }
     ],
     "title": "Xin chào, cuộc họp",

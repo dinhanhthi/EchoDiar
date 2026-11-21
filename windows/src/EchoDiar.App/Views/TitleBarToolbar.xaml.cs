@@ -4,15 +4,12 @@ using EchoDiar.App.Services;
 using EchoDiar.App.ViewModels;
 using EchoDiar.Core.Audio;
 using EchoDiar.Core.Model;
+using EchoDiar.Core.Settings;
 using EchoDiar.Platform.SystemServices;
 using Microsoft.UI.Dispatching;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Automation;
 using Microsoft.UI.Xaml.Controls;
-using Microsoft.UI.Xaml.Input;
-using Microsoft.UI.Xaml.Media;
-using Windows.Foundation;
-using VirtualKey = Windows.System.VirtualKey;
 using Windows.UI.ViewManagement;
 
 namespace EchoDiar.App.Views;
@@ -20,16 +17,16 @@ namespace EchoDiar.App.Views;
 /// <summary>
 /// The window's header (macOS MainView.swift toolbar) in two rows. The title row is the window's title bar: the logo,
 /// then the conversation's title with its date and duration, or the page's name (Settings, Calendar, Recording while
-/// recording, else EchoDiar). The toolbar row: Back, always shown and enabled off the list (and on it while the library
+/// recording, else EchoDiar). The toolbar row: the sidebar button on the library pages (list, conversation, recording),
+/// which hides or shows the library sidebar; Back, always shown and enabled off the list (and on it while the library
 /// chat shows); Record with its menu of targets and the language (Stop, blinking, and Pause or Resume while recording);
 /// Reveal and Delete, always shown and enabled on a conversation; Settings (opens the Settings page, or goes back from
 /// it), Calendar (the same for the Calendar page), Ask across conversations (opens or closes the library chat); Update
 /// while an App Installer update is available and nothing runs that installing would cut off (macOS hides it while
-/// recording). At the right edge: a conversation's tabs (a SelectorBar) or a Settings section's inner tabs, then Search
-/// everywhere, an icon button that opens the box where the box does not fit. It also hosts the window's dialogs (it
-/// lives as long as the window): the delete confirmations (of this conversation, and of the library's cards and
-/// selection), "Recording problem", the cloud confirmations (audio for transcription, transcripts for the library
-/// index), the update's confirmation and answers, and the Settings pages' confirmations
+/// recording). At the right edge: a conversation's tabs (a SelectorBar) or a Settings section's inner tabs. It also
+/// hosts the window's dialogs (it lives as long as the window): the delete confirmations (of this conversation, and of
+/// the library's cards and selection), "Recording problem", the cloud confirmations (audio for transcription,
+/// transcripts for the library index), the update's confirmation and answers, and the Settings pages' confirmations
 /// (<see cref="AppViewModel.Confirm"/>), one at a time. The lost-mic question is the pill's end prompt.
 /// </summary>
 public sealed partial class TitleBarToolbar : UserControl
@@ -40,15 +37,6 @@ public sealed partial class TitleBarToolbar : UserControl
     /// <summary>The recording indicator dims every other second (macOS RecordingBlink).</summary>
     private static readonly TimeSpan BlinkInterval = TimeSpan.FromSeconds(1);
 
-    /// <summary>The cards are filtered once typing pauses this long (at once when cleared).</summary>
-    private static readonly TimeSpan SearchDelay = TimeSpan.FromMilliseconds(200);
-
-    /// <summary>The search box's narrowest width that still shows its placeholder whole.</summary>
-    private const double SearchMinWidth = 120;
-
-    /// <summary>The search column's star weight (XAML): it dwarfs the spacer's, so the box takes the free space first.</summary>
-    private const double SearchWeight = 1000;
-
     private static readonly UISettings UISettings = new();
 
     private AppViewModel? _model;
@@ -57,10 +45,6 @@ public sealed partial class TitleBarToolbar : UserControl
     private ContentDialog? _dialog;
 
     private DispatcherQueueTimer? _blinkTimer;
-    private DispatcherQueueTimer? _searchTimer;
-
-    /// <summary>The route's page (<see cref="AppViewModel.PageOf"/>) when last shown.</summary>
-    private int _page;
 
     /// <summary>The Settings section the inner tabs were built for.</summary>
     private string? _tabsSection;
@@ -68,29 +52,20 @@ public sealed partial class TitleBarToolbar : UserControl
     /// <summary>The inner tabs or their selection are being set from the model: not a pick.</summary>
     private bool _syncingSettingsTabs;
 
+    /// <summary>The tabs or their selection are being set from the model: not a pick.</summary>
+    private bool _syncingTabs;
+
+    /// <summary>Whether the middle tab was last labeled for the recording (Catch-up) or the conversation (Summary).</summary>
+    private bool? _shownRecordingTabs;
+
     /// <summary>Record's tooltip, "Record" and the target; set again only when the target changes.</summary>
     private string? _recordTip;
 
     /// <summary>The pause state Pause or Resume was last labeled for.</summary>
     private bool? _shownPaused;
 
-    /// <summary>The search box does not fit next to the other columns: Search shows as an icon button.</summary>
-    private bool _searchAsIcon;
-
-    /// <summary>
-    /// The icon button (or narrowing with text in the box) opened the box, which takes the action buttons' place until
-    /// it is left empty.
-    /// </summary>
-    private bool _searchOpened;
-
-    /// <summary>The action buttons' width when last shown, which the opened box takes over.</summary>
-    private double _actionsWidth;
-
-    /// <summary>
-    /// The width the window gives the header: ActualWidth is never less than the desired width (an overflowing toolbar
-    /// is clipped), so it cannot tell that the box does not fit.
-    /// </summary>
-    private double _availableWidth = double.PositiveInfinity;
+    /// <summary>The sidebar state the sidebar button was last labeled for.</summary>
+    private bool? _shownSidebarHidden;
 
     /// <summary>The Record menu's end: a separator and the Language submenu, kept while the targets are rebuilt.</summary>
     private readonly MenuFlyoutSeparator _languageSeparator = new();
@@ -99,6 +74,7 @@ public sealed partial class TitleBarToolbar : UserControl
     public TitleBarToolbar()
     {
         InitializeComponent();
+        SidebarButton.Click += (_, _) => _model?.ToggleSidebar();
         BackButton.Click += (_, _) => _model?.GoBack();
         SettingsButton.Click += (_, _) => ToggleSettings();
         CalendarButton.Click += (_, _) => ToggleCalendar();
@@ -114,19 +90,6 @@ public sealed partial class TitleBarToolbar : UserControl
         DeleteMenu.Opening += (_, _) => UpdateDeleteMenu();
         DeleteAudioItem.Click += async (_, _) => await DeleteShownAsync(audioOnly: true);
         DeleteConversationItem.Click += async (_, _) => await DeleteShownAsync(audioOnly: false);
-        SearchBox.TextChanged += (_, _) => OnSearchTextChanged();
-        // The inner text field handles Esc first.
-        SearchBox.AddHandler(KeyDownEvent, new KeyEventHandler(OnSearchKeyDown), handledEventsToo: true);
-        SearchBox.LostFocus += (_, _) => OnSearchLostFocus();
-        // Search filters the cards: they come back in place of the library chat. Settings search keeps it, for the page
-        // Settings returns to (macOS searchPresented).
-        SearchBox.GotFocus += (_, _) =>
-        {
-            LeaveCalendar();
-            if (_model is { Route.Kind: not RouteKind.Settings }) _model.GlobalChatOpen = false;
-        };
-        SearchButton.Click += (_, _) => OpenSearch();
-        LayoutUpdated += (_, _) => UpdateSearchMode();
         TabsBar.SelectedItem = TranscriptTab;
         TabsBar.SelectionChanged += (_, _) => OnTabSelected();
         SettingsTabsBar.SelectionChanged += (_, _) => OnSettingsTabSelected();
@@ -146,14 +109,7 @@ public sealed partial class TitleBarToolbar : UserControl
         _blinkTimer = DispatcherQueue.CreateTimer();
         _blinkTimer.Interval = BlinkInterval;
         _blinkTimer.Tick += (_, _) => Blink();
-        _searchTimer = DispatcherQueue.CreateTimer();
-        _searchTimer.Interval = SearchDelay;
-        _searchTimer.IsRepeating = false;
-        _searchTimer.Tick += (timer, _) =>
-        {
-            timer.Stop();
-            if (_model is not null) _model.SearchTerm = SearchBox.Text;
-        };
+        UpdateSidebarButton();
         Update();
     }
 
@@ -168,8 +124,6 @@ public sealed partial class TitleBarToolbar : UserControl
         _model = null;
         _blinkTimer?.Stop();
         _blinkTimer = null;
-        _searchTimer?.Stop();
-        _searchTimer = null;
     }
 
     /// <summary>The title row, the window's title bar (<c>MainWindow.SetTitleBar</c>): all of it drags the window.</summary>
@@ -215,6 +169,9 @@ public sealed partial class TitleBarToolbar : UserControl
                 ShowNextDialog();
                 break;
             case nameof(AppViewModel.DetailTab):
+            case nameof(AppViewModel.RecordingTab):
+            // The recording layout: Tabs shows the recording's tabs here, side by side none.
+            case nameof(AppViewModel.Settings):
                 UpdateTabs();
                 break;
             case nameof(AppViewModel.AIJobs):
@@ -222,10 +179,11 @@ public sealed partial class TitleBarToolbar : UserControl
                 break;
             case nameof(AppViewModel.SettingsSection):
             case nameof(AppViewModel.SettingsSubTab):
+            case nameof(AppViewModel.SettingsSearchTerm):
                 UpdateSettingsTabs();
                 break;
-            case nameof(AppViewModel.SearchTerm):
-                OnSearchTermChanged();
+            case nameof(AppViewModel.SidebarHidden):
+                UpdateSidebarButton();
                 break;
             case nameof(AppViewModel.RecordTargets):
                 // Apps that started playing since the menu opened show up in it.
@@ -237,20 +195,9 @@ public sealed partial class TitleBarToolbar : UserControl
     private void Update()
     {
         if (_model is null) return;
+        // The library pages (macOS Page.library: the list, a conversation, the recording).
+        SidebarButton.Visibility = Shown(_model.Route.Kind is RouteKind.List or RouteKind.Conversation or RouteKind.Recording);
         BackButton.IsEnabled = _model.Route.Kind != RouteKind.List || _model.GlobalChatOpen;
-        // Another page (list, entry, Settings) clears the search (the model has cleared the term: AppViewModel.Route);
-        // another conversation keeps it, for the sidebar it filters. Typing not applied yet is dropped too.
-        var page = AppViewModel.PageOf(_model.Route);
-        if (page != _page)
-        {
-            _page = page;
-            _searchTimer?.Stop();
-            CloseSearch();
-            SearchBox.Text = "";
-            var searchLabel = Loc.T(_model.Route.Kind == RouteKind.Settings ? "Search settings" : "Search conversations");
-            AutomationProperties.SetName(SearchBox, searchLabel);
-            AutomationProperties.SetName(SearchButton, searchLabel);
-        }
         UpdateSettingsTabs();
 
         var recording = _model.IsRecording;
@@ -279,7 +226,6 @@ public sealed partial class TitleBarToolbar : UserControl
         var onConversation = conversation is not null;
         RevealButton.IsEnabled = onConversation;
         DeleteButton.IsEnabled = conversation is not null && _model.CanDelete(conversation);
-        TabsBar.Visibility = Shown(onConversation);
         UpdateTabs();
         TitleText.Text = conversation?.Title ?? _model.Route.Kind switch
         {
@@ -300,28 +246,82 @@ public sealed partial class TitleBarToolbar : UserControl
 
     private static Visibility Shown(bool visible) => visible ? Visibility.Visible : Visibility.Collapsed;
 
+    /// <summary>"Hide Sidebar" or "Show Sidebar", set again only when the state changes.</summary>
+    private void UpdateSidebarButton()
+    {
+        if (_model is null || _model.SidebarHidden == _shownSidebarHidden) return;
+        _shownSidebarHidden = _model.SidebarHidden;
+        var label = Loc.T(_model.SidebarHidden ? "Show Sidebar" : "Hide Sidebar");
+        AutomationProperties.SetName(SidebarButton, label);
+        ToolTipService.SetToolTip(SidebarButton, label);
+    }
+
     // Tabs
 
-    /// <summary>Selects the model's tab.</summary>
+    /// <summary>
+    /// The recording page's tabs take the conversation's place (macOS MainView <c>recordingTabs</c>): on the recording
+    /// page, while recording, in the Tabs layout; side by side has its own Catch-up | Chat on the page.
+    /// </summary>
+    private bool RecordingTabsShown() =>
+        _model is { Route.Kind: RouteKind.Recording, IsRecording: true }
+        && _model.Settings.RecordingLayout == RecordingLayout.Tabs;
+
+    /// <summary>
+    /// Shows the conversation's or the recording's tabs, the middle one labeled Summary or Catch-up, with the model's
+    /// tab selected; each set only when it changes (the recording's snapshot calls this at 15 Hz).
+    /// </summary>
     private void UpdateTabs()
     {
         if (_model is null) return;
-        var item = _model.DetailTab switch
+        var recordingTabs = RecordingTabsShown();
+        var visibility = Shown(recordingTabs || ShownConversation() is not null);
+        if (TabsBar.Visibility != visibility) TabsBar.Visibility = visibility;
+        var item = recordingTabs
+            ? _model.RecordingTab switch
+            {
+                RecordingTab.CatchUp => SummaryTab,
+                RecordingTab.Chat => ChatTab,
+                _ => TranscriptTab,
+            }
+            : _model.DetailTab switch
+            {
+                DetailTab.Summary => SummaryTab,
+                DetailTab.Chat => ChatTab,
+                _ => TranscriptTab,
+            };
+        _syncingTabs = true;
+        try
         {
-            DetailTab.Summary => SummaryTab,
-            DetailTab.Chat => ChatTab,
-            _ => TranscriptTab,
-        };
-        if (TabsBar.SelectedItem != item) TabsBar.SelectedItem = item;
+            if (recordingTabs != _shownRecordingTabs)
+            {
+                _shownRecordingTabs = recordingTabs;
+                SummaryTab.Text = recordingTabs ? Loc.T("Catch-up") : Loc.T("Summary");
+            }
+            if (TabsBar.SelectedItem != item) TabsBar.SelectedItem = item;
+        }
+        finally
+        {
+            _syncingTabs = false;
+        }
     }
 
-    /// <summary>A picked tab shows on the conversation page.</summary>
+    /// <summary>A picked tab shows on the recording page, or else on the conversation page.</summary>
     private void OnTabSelected()
     {
-        if (_model is null) return;
-        _model.DetailTab = TabsBar.SelectedItem == SummaryTab ? DetailTab.Summary
-            : TabsBar.SelectedItem == ChatTab ? DetailTab.Chat
-            : DetailTab.Transcript;
+        if (_syncingTabs || _model is null || TabsBar.Visibility != Visibility.Visible
+            || TabsBar.SelectedItem is not { } item) return;
+        if (RecordingTabsShown())
+        {
+            _model.RecordingTab = item == SummaryTab ? RecordingTab.CatchUp
+                : item == ChatTab ? RecordingTab.Chat
+                : RecordingTab.Transcript;
+        }
+        else
+        {
+            _model.DetailTab = item == SummaryTab ? DetailTab.Summary
+                : item == ChatTab ? DetailTab.Chat
+                : DetailTab.Transcript;
+        }
     }
 
     // Update
@@ -423,15 +423,15 @@ public sealed partial class TitleBarToolbar : UserControl
 
     /// <summary>
     /// The shown section's inner tabs, built again when another section shows (its own tabs, not the old ones'
-    /// selection), with the model's tab selected. Hidden off Settings, for a section without tabs, and while the search
-    /// lists results in the section's place.
+    /// selection), with the model's tab selected. Hidden off Settings, for a section without tabs, and while the Settings
+    /// search lists results in the section's place.
     /// </summary>
     private void UpdateSettingsTabs()
     {
         if (_model is null) return;
         var section = _model.Route.Kind == RouteKind.Settings ? SettingsSearch.Section(_model.SettingsSection) : null;
         var hasTabs = section is { SubTabs.Count: > 0 };
-        SettingsTabsBar.Visibility = Shown(hasTabs && _model.SearchTerm.Length == 0);
+        SettingsTabsBar.Visibility = Shown(hasTabs && _model.SettingsSearchTerm.Length == 0);
         if (section is null || !hasTabs) return;
         _syncingSettingsTabs = true;
         try
@@ -468,15 +468,6 @@ public sealed partial class TitleBarToolbar : UserControl
         else _model.OpenCalendar();
     }
 
-    /// <summary>
-    /// Search on the Calendar page goes back to the library first, to search there (macOS <c>showSearch</c>); before the
-    /// box opens, since the page change closes an opened box.
-    /// </summary>
-    private void LeaveCalendar()
-    {
-        if (_model is { Route.Kind: RouteKind.Calendar }) _model.GoBack();
-    }
-
     // Library chat
 
     /// <summary>
@@ -490,11 +481,8 @@ public sealed partial class TitleBarToolbar : UserControl
         if (_model.Route.Kind == RouteKind.Settings) _model.GoBack();
         if (_model.Route.Kind == RouteKind.Calendar) _model.GoBack();
         _model.GlobalChatOpen = open;
-        if (!open) return;
-        _searchTimer?.Stop();
-        CloseSearch();
-        SearchBox.Text = "";
-        _model.SearchTerm = "";
+        // The library's search box follows the cleared term (ConversationListView).
+        if (open) _model.SearchTerm = "";
     }
 
     // Record menu
@@ -647,144 +635,6 @@ public sealed partial class TitleBarToolbar : UserControl
         var confirmed = false;
         await ShowAsync(dialog, result => confirmed = result == ContentDialogResult.Primary);
         return confirmed;
-    }
-
-    // Search
-
-    /// <summary>
-    /// The model cleared the search (a Settings result or section was picked): the box follows, and typing not applied
-    /// yet is dropped. The box's own clearing, or a blank term, leaves it as it is.
-    /// </summary>
-    private void OnSearchTermChanged()
-    {
-        if (_model is null) return;
-        UpdateSettingsTabs();
-        if (_model.SearchTerm.Length > 0 || SearchBox.Text.Trim().Length == 0) return;
-        _searchTimer?.Stop();
-        SearchBox.Text = "";
-    }
-
-    /// <summary>Filters once typing pauses; a cleared field shows every conversation at once.</summary>
-    private void OnSearchTextChanged()
-    {
-        if (_model is null || _searchTimer is null) return;
-        _searchTimer.Stop();
-        if (SearchBox.Text.Length == 0) _model.SearchTerm = "";
-        else _searchTimer.Start();
-    }
-
-    /// <summary>Esc clears the search (macOS closes its search bar); on an empty opened box it goes back to the icon.</summary>
-    private void OnSearchKeyDown(object sender, KeyRoutedEventArgs e)
-    {
-        if (e.Key != VirtualKey.Escape) return;
-        if (SearchBox.Text.Length > 0)
-        {
-            e.Handled = true;
-            SearchBox.Text = "";
-        }
-        else if (_searchOpened)
-        {
-            e.Handled = true;
-            CloseSearch();
-            DispatcherQueue.TryEnqueue(() =>
-            {
-                if (_model is not null) SearchButton.Focus(FocusState.Keyboard);
-            });
-        }
-    }
-
-    /// <summary>
-    /// Search is an icon button where the box would get less than <see cref="SearchMinWidth"/> next to the other columns
-    /// (the spacer aside), and the box again once it fits. A box with text stays shown, opened in the action buttons'
-    /// place; once the normal box fits again it goes back to it.
-    /// </summary>
-    private void UpdateSearchMode()
-    {
-        if (_model is null || double.IsInfinity(_availableWidth) || ToolbarGrid.ActualWidth <= 0) return;
-        if (!_searchOpened) _actionsWidth = ActionsColumn.ActualWidth;
-        var others = ToolbarGrid.Padding.Left + ToolbarGrid.Padding.Right + LeadingColumn.ActualWidth + _actionsWidth
-            + TabsColumn.ActualWidth;
-        var asIcon = _availableWidth - others < SearchMinWidth;
-        if (_searchOpened)
-        {
-            if (asIcon) return;
-            _searchOpened = false;
-        }
-        else if (asIcon == _searchAsIcon)
-        {
-            return;
-        }
-        else if (asIcon && SearchBox.Text.Length > 0)
-        {
-            // The filter stays visible; LostFocus and Esc close the box once it is empty.
-            _searchOpened = true;
-        }
-        _searchAsIcon = asIcon;
-        StartupTrace.Write($"search as icon {asIcon} (available {_availableWidth:0}, other columns {others:0})");
-        ApplySearchMode();
-    }
-
-    protected override Size MeasureOverride(Size availableSize)
-    {
-        _availableWidth = availableSize.Width;
-        return base.MeasureOverride(availableSize);
-    }
-
-    private void ApplySearchMode()
-    {
-        var box = !_searchAsIcon || _searchOpened;
-        SearchBox.Visibility = Shown(box);
-        SearchButton.Visibility = Shown(!box);
-        SearchColumn.Width = box ? new GridLength(SearchWeight, GridUnitType.Star) : GridLength.Auto;
-        SearchColumn.MinWidth = box ? SearchMinWidth : 0;
-        ActionsPanel.Visibility = Shown(!_searchOpened);
-    }
-
-    /// <summary>Ctrl+F (macOS <c>showSearch</c>): the focus goes to the page's search box, opened first where Search is an icon.</summary>
-    public void FocusSearch()
-    {
-        LeaveCalendar();
-        if (SearchBox.Visibility == Visibility.Visible) SearchBox.Focus(FocusState.Programmatic);
-        else OpenSearch();
-    }
-
-    private void OpenSearch()
-    {
-        LeaveCalendar();
-        _searchOpened = true;
-        ApplySearchMode();
-        DispatcherQueue.TryEnqueue(() =>
-        {
-            if (_model is not null) SearchBox.Focus(FocusState.Programmatic);
-        });
-    }
-
-    private void CloseSearch()
-    {
-        if (!_searchOpened) return;
-        _searchOpened = false;
-        ApplySearchMode();
-    }
-
-    /// <summary>The opened box, left empty, goes back to the icon.</summary>
-    private void OnSearchLostFocus()
-    {
-        if (!_searchOpened) return;
-        // Focus moving inside the box (its text field, its buttons) is not leaving it.
-        DispatcherQueue.TryEnqueue(() =>
-        {
-            if (_model is not null && SearchBox.Text.Length == 0 && !SearchHasFocus()) CloseSearch();
-        });
-    }
-
-    private bool SearchHasFocus()
-    {
-        var focused = XamlRoot is null ? null : FocusManager.GetFocusedElement(XamlRoot) as DependencyObject;
-        for (var e = focused; e is not null; e = VisualTreeHelper.GetParent(e))
-        {
-            if (e == SearchBox) return true;
-        }
-        return false;
     }
 
     // Recording dialogs and indicator

@@ -7,7 +7,8 @@ import Testing
 /// Guards the summary job: map-reduce sends status lines and streams only the final reduce, the result is saved as a
 /// version, a cancelled job saves nothing (also after a stop, and `cancel` waits for it), a stopped job saves what it
 /// streamed (stopping one job leaves the others running), and an in-app model is unloaded before the gate is released. Also guards how many earlier chat messages a
-/// question sends, and the catch-up job (appended to `catchups.json`, never on an in-app model).
+/// question sends, the catch-up job (appended to `catchups.json`, never on an in-app model) and the live question
+/// (appended to `chat.json` marked `live`).
 struct AIServiceTests {
     /// Answers every request with `reply`, in two pieces, and reports a small context to force map-reduce.
     final class FakeProvider: LLMProvider {
@@ -240,9 +241,16 @@ struct AIServiceTests {
             history: history, historyLimit: limit, provider: provider, providerID: "fake", model: "fake",
             language: "en") {}
 
-        let sent = try #require(provider.received.withLock { $0.last }).filter { $0.content.hasPrefix("History ") }
-        #expect(sent.map(\.content) == expected)
-        #expect(sent.first?.role == .user)
+        // Between the system message and the new question; the first question carries the meeting context.
+        let sent = try #require(provider.received.withLock { $0.last })
+        let window = Array(sent.dropFirst().dropLast())
+        #expect(sent.last?.content == "Question: What was decided?")
+        #expect(window.map(\.role) == expected.indices.map { $0.isMultiple(of: 2) ? .user : .assistant })
+        #expect(window.first?.content.hasPrefix("Meeting: ") == true)
+        #expect(window.first?.content.hasSuffix("</transcript>\n\nQuestion: \(expected[0])") == true)
+        #expect(window.dropFirst().map(\.content) == expected.indices.dropFirst().map {
+            ($0.isMultiple(of: 2) ? "Question: " : "") + expected[$0]
+        })
     }
 
     @Test
@@ -421,10 +429,10 @@ struct AIServiceTests {
         let messages = [LLMMessage(role: .user, content: "Catch me up.")]
         let provider = FakeProvider(reply: "So far: the roadmap.", context: 128_000)
         let first = CatchUpPlan(
-            previous: nil, transcript: [], recent: [], omitted: false, fullPass: true, throughLineID: 7,
+            previous: nil, context: [], transcript: [], omitted: false, fullPass: true, throughLineID: 7,
             throughTime: 42.5)
         let second = CatchUpPlan(
-            previous: "So far: the roadmap.", transcript: [], recent: [], omitted: false, fullPass: false,
+            previous: "So far: the roadmap.", context: [], transcript: [], omitted: false, fullPass: false,
             throughLineID: 12, throughTime: 95)
 
         for try await _ in service.catchUp(
@@ -449,11 +457,33 @@ struct AIServiceTests {
     }
 
     @Test
+    func aFullPassCutToFitIsSavedAsNotFull() async throws {
+        let folder = FileManager.default.temporaryDirectory.appendingPathComponent("AIServiceTests-\(UUID().uuidString)")
+        try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: folder) }
+        let service = AIService(gate: ModelLoadGate())
+        let provider = FakeProvider(reply: "So far: the roadmap.", context: 128_000)
+
+        for omitted in [true, false] {
+            let plan = CatchUpPlan(
+                previous: nil, context: [], transcript: [], omitted: omitted, fullPass: true, throughLineID: 7,
+                throughTime: 42.5)
+            for try await _ in service.catchUp(
+                plan: plan, messages: [LLMMessage(role: .user, content: "Catch me up.")], provider: provider,
+                providerID: "cfg-1", model: "fake", elapsed: 60, folder: folder) {}
+        }
+
+        // A cut full pass does not cover the start, so a live question still sends the catch-ups before it.
+        #expect(try CatchUpLog.load(from: folder).catchUps.map(\.fullPass) == [false, true])
+    }
+
+    @Test
     func catchUpOnAnInAppModelFailsWithoutWaitingForTheGate() async throws {
         let gate = ModelLoadGate()
         let service = AIService(gate: gate)
         let plan = CatchUpPlan(
-            previous: nil, transcript: [], recent: [], omitted: false, fullPass: true, throughLineID: 7, throughTime: 42)
+            previous: nil, context: [], transcript: [], omitted: false, fullPass: true, throughLineID: 7,
+            throughTime: 42)
         let folder = FileManager.default.temporaryDirectory.appendingPathComponent("AIServiceTests-\(UUID().uuidString)")
 
         // Held by the live transcriber for the whole recording: a job waiting for it would send its waiting status.
@@ -474,6 +504,29 @@ struct AIServiceTests {
 
         #expect(updates.isEmpty)
         #expect(message == "A catch-up needs a provider outside the app.")
+    }
+
+    @Test
+    func liveQuestionAppendsTheQuestionAndAnswerMarkedLive() async throws {
+        let folder = FileManager.default.temporaryDirectory.appendingPathComponent("AIServiceTests-\(UUID().uuidString)")
+        try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: folder) }
+        let service = AIService(gate: ModelLoadGate())
+        let provider = FakeProvider(reply: "The budget is 2 M€ [01:05].", context: 128_000)
+        let messages = [LLMMessage(role: .user, content: "Now: [02:00]\nQuestion: What budget?")]
+
+        for try await _ in service.askLive(
+            question: "What budget?", messages: messages, provider: provider, providerID: "cfg-1", model: "fake",
+            folder: folder) {}
+
+        #expect(provider.received.withLock { $0 } == [messages])
+        let saved = ChatLog.read(from: folder).messages
+        #expect(saved.map(\.role) == [.user, .assistant])
+        #expect(saved.map(\.text) == ["What budget?", "The budget is 2 M€ [01:05]."])
+        #expect(saved.map(\.live) == [true, true])
+        #expect(saved.map(\.provider) == [nil, "cfg-1"])
+        #expect(saved.map(\.model) == [nil, "fake"])
+        #expect(saved[0].timestamp != nil)
     }
 
     @Test

@@ -333,6 +333,10 @@ public sealed partial class MainWindow : Window
             case nameof(AppViewModel.GlobalChatOpen):
                 ShowLibraryOrChat();
                 break;
+            // Only the column: ShowRoute would rebuild the detail (playback, the live chat's input, the recording page).
+            case nameof(AppViewModel.SidebarHidden):
+                UpdateSidebar();
+                break;
             case nameof(AppViewModel.SelectedTarget):
                 UpdateGlobalTapNote();
                 break;
@@ -359,10 +363,9 @@ public sealed partial class MainWindow : Window
     }
 
     /// <summary>
-    /// Shows the route's page: the library as a 360 px sidebar, then the detail; the window keeps its size. Settings
-    /// takes the whole window, with its own sidebar instead of the library, and so does the Calendar page (macOS
-    /// MainView.swift). The recording page shows the welcome pane until the recording runs and once it has ended (macOS
-    /// <c>detail</c>).
+    /// Shows the route's page: the library as a 360 px sidebar (<see cref="UpdateSidebar"/>), then the detail; the
+    /// window keeps its size. The recording page shows the welcome pane until the recording runs and once it has ended
+    /// (macOS <c>detail</c>).
     /// </summary>
     private void ShowRoute()
     {
@@ -376,9 +379,7 @@ public sealed partial class MainWindow : Window
             { Kind: RouteKind.Calendar } => new CalendarPage(_model) { ShowDialog = Toolbar.ShowDialogAsync },
             _ => _welcome ??= new WelcomeView(_model),
         };
-        var fullWidth = route.Kind is RouteKind.Settings or RouteKind.Calendar;
-        SidebarColumn.Width = new GridLength(fullWidth ? 0 : 360);
-        ListHost.Visibility = fullWidth ? Visibility.Collapsed : Visibility.Visible;
+        UpdateSidebar();
         _library.ShowAsSidebar(route.ConversationId);
         ShowLibraryOrChat();
         StartupTrace.Write($"end route {route.Kind} {route.ConversationId}");
@@ -386,6 +387,17 @@ public sealed partial class MainWindow : Window
         // Click -> selection and detail on screen, for the timings of the VM QA.
         AfterNextFrame(() => StartupTrace.Write($"route {route.Kind} {route.ConversationId} drawn"));
 #endif
+    }
+
+    /// <summary>
+    /// The library sidebar's column: none on Settings, which has its own sidebar instead of the library, nor on the
+    /// Calendar page (macOS MainView.swift), nor while the sidebar is hidden; else 360 px beside the detail.
+    /// </summary>
+    private void UpdateSidebar()
+    {
+        var hidden = _model.Route.Kind is RouteKind.Settings or RouteKind.Calendar || _model.SidebarHidden;
+        SidebarColumn.Width = new GridLength(hidden ? 0 : 360);
+        ListHost.Visibility = hidden ? Visibility.Collapsed : Visibility.Visible;
     }
 
     /// <summary>
@@ -498,8 +510,20 @@ public sealed partial class MainWindow : Window
             case InAppAction.CopyPrompt when route == RouteKind.Conversation && _model.DetailTab != DetailTab.Transcript
                 && RouteHost.Content is ConversationView conversation:
                 return conversation.CopyPrompt();
+            // On Settings, Ctrl+F focuses the page's own search box (macOS settingsSearchPresented), once the key is done.
+            case InAppAction.Search when route == RouteKind.Settings:
+            {
+                if (RouteHost.Content is SettingsPage settings)
+                {
+                    DispatcherQueue.TryEnqueue(() =>
+                    {
+                        if (!_closing) settings.FocusSearch();
+                    });
+                }
+                return true;
+            }
             case InAppAction.Search:
-                Toolbar.FocusSearch();
+                ShowSearch();
                 return true;
             case InAppAction.Settings:
                 _model.OpenSettings();
@@ -540,6 +564,22 @@ public sealed partial class MainWindow : Window
         }
     }
 
+    /// <summary>
+    /// Ctrl+F off Settings (macOS <c>showSearch</c>): leaves the Calendar page, closes the library chat and shows the
+    /// sidebar, then focuses the library's search box once it is shown (a box just made visible cannot take the focus
+    /// in the same tick).
+    /// </summary>
+    private void ShowSearch()
+    {
+        if (_model.Route.Kind == RouteKind.Calendar) _model.GoBack();
+        _model.GlobalChatOpen = false;
+        _model.SetSidebarHidden(false);
+        DispatcherQueue.TryEnqueue(() =>
+        {
+            if (!_closing) _library.FocusSearch();
+        });
+    }
+
     /// <summary>A dialog, menu or flyout is open on the window (tooltips are popups too, and do not count).</summary>
     private bool PopupOpen() =>
         RootGrid.XamlRoot is { } root && VisualTreeHelper.GetOpenPopupsForXamlRoot(root).Any(p => p.Child is not ToolTip);
@@ -570,17 +610,18 @@ public sealed partial class MainWindow : Window
     private static bool InTextInput(object? focused) => focused is TextBox or PasswordBox or RichEditBox or AutoSuggestBox;
 
     /// <summary>
-    /// ↑/↓ on the library page (list, conversation, recording; not the library chat, Settings or Calendar) with no card
-    /// selected open the previous or next card (macOS handleSidebarKey). Not while a dialog, menu or flyout is open, nor
-    /// from a control that uses the arrows (a text field, the playback slider, a combo, a selector or its item outside
-    /// the library, a radio button), nor from text with a selection (the transcript, the live captions: a click on a
-    /// timestamp leaves the arrows to the cards).
+    /// ↑/↓ on the library page (list, conversation, recording; not the library chat, a hidden sidebar, Settings or
+    /// Calendar) with no card selected open the previous or next card (macOS handleSidebarKey). Not while a dialog, menu
+    /// or flyout is open, nor from a control that uses the arrows (a text field, the playback slider, a combo, a selector
+    /// or its item outside the library, a radio button), nor from text with a selection (the transcript, the live
+    /// captions: a click on a timestamp leaves the arrows to the cards).
     /// </summary>
     private bool MoveInLibrary(int delta)
     {
         if (_closing || _model.IsCapturingHotKey || PopupOpen()) return false;
         if (_model.Route.Kind is not (RouteKind.List or RouteKind.Conversation or RouteKind.Recording)) return false;
-        if (_model.GlobalChatOpen || ListHost.Visibility != Visibility.Visible || _library.HasSelection) return false;
+        if (_model.GlobalChatOpen || _model.SidebarHidden || ListHost.Visibility != Visibility.Visible) return false;
+        if (_library.HasSelection) return false;
         var focused = RootGrid.XamlRoot is { } root ? FocusManager.GetFocusedElement(root) : null;
         if (UsesArrows(focused)) return false;
         return _library.Move(delta);

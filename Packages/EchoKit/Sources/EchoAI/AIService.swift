@@ -191,18 +191,43 @@ public actor AIService {
             if Task.isCancelled && !isStopped() { throw CancellationError() }
             try await appendCatchUp(CatchUp(
                 id: jobID, createdAt: asked, elapsed: elapsed, throughLineID: plan.throughLineID,
-                throughTime: plan.throughTime, fullPass: plan.fullPass, text: text, provider: providerID, model: model,
-                stopped: cut), folder: folder)
+                throughTime: plan.throughTime, fullPass: plan.fullPass && !plan.omitted, text: text,
+                provider: providerID, model: model, stopped: cut), folder: folder)
         }
     }
 
-    /// The last `limit` messages of `history` (0 or less = all of them), starting with a question: some APIs reject a
-    /// conversation whose first turn is an answer.
-    private static func turns(_ history: [ChatLog.Message], limit: Int) -> [LLMMessage] {
-        let recent = limit > 0 ? history.suffix(limit) : history[...]
-        return recent.drop { $0.role != .user }.map {
-            LLMMessage(role: $0.role == .user ? .user : .assistant, content: $0.text)
+    /// Streams the answer to a question asked while recording: `messages` (`PromptBuilder.liveQuestionMessages`), then
+    /// appends `question` and the answer, both marked `live`, to `folder`'s `chat.json`, also when stopped with some
+    /// text. `providerID` is saved with the answer. Fails at once with an in-app model (`LocalLLMProvider`), as
+    /// `catchUp` does.
+    public nonisolated func askLive(
+        question: String, messages: [LLMMessage], provider: any LLMProvider, providerID: String, model: String,
+        folder: URL, jobID: UUID = UUID()
+    ) -> AsyncThrowingStream<Update, Error> {
+        guard !(provider is any LocalLLMProvider) else {
+            return AsyncThrowingStream {
+                $0.finish(throwing: LLMError.provider("A catch-up needs a provider outside the app."))
+            }
         }
+        let asked = Date()
+        return job(id: jobID, provider: provider, model: model) { [self] backend, yield, isStopped in
+            let context = await provider.contextWindow(model: model)
+            let answer: String
+            do {
+                answer = try await Self.answer(messages, backend: backend, model: model, context: context, yield: yield)
+            } catch let interrupted as Interrupted where isStopped() && !interrupted.text.isEmpty {
+                answer = interrupted.text
+            }
+            if Task.isCancelled && !isStopped() { throw CancellationError() }
+            try await appendChat([
+                ChatLog.Message(role: .user, text: question, timestamp: asked, live: true),
+                ChatLog.Message(role: .assistant, text: answer, provider: providerID, model: model, live: true),
+            ], folder: folder)
+        }
+    }
+
+    private static func turns(_ history: [ChatLog.Message], limit: Int) -> [LLMMessage] {
+        PromptBuilder.historyTurns(history, limit: limit)
     }
 
     /// The response-language `setting`, English when Foundation Models cannot write it.

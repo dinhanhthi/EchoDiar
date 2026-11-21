@@ -128,7 +128,10 @@
                         <TextBlock Style="{StaticResource BodyStrongTextBlockStyle}" Text="{local:T Text='Catch-up'}" />
                         <TextBlock Style="{StaticResource SectionDescriptionStyle}" Text="{local:T Text='Quick summaries of the meeting so far, asked for while recording.'}" />
                     </StackPanel>
-                    <controls:SettingsCard Header="{local:T Text='Catch-up provider'}" Tag="Catch-up provider">
+                    <controls:SettingsCard
+                        Description="{local:T Text='Also answers the Chat tab while recording.'}"
+                        Header="{local:T Text='Catch-up provider'}"
+                        Tag="Catch-up provider">
                         <ComboBox
                             x:Name="CatchUpProviderCombo"
                             MinWidth="260"

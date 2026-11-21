@@ -4,10 +4,11 @@ import EchoCore
 import EchoTranscribe
 import SwiftUI
 
-/// One conversation of the library's sidebar: source app icon, title (double-click to rename), time, duration, size
-/// and status, then a row with the transcription progress or its action. The actions are in the context menu and the
-/// detail. A click elsewhere opens the conversation on the detail's tab; selected adds an accent fill and stroke.
-/// ⌘-click and ⇧-click select cards instead of opening.
+/// One conversation of the library's sidebar, as a compact row: source app icon, title on one line (double-click to
+/// rename), then "date time · duration" and status on one smaller line (the size in its tooltip), then a row with the
+/// transcription progress or its action. The actions are in the context menu and the detail. A click elsewhere opens
+/// the conversation on the detail's tab; selected adds an accent fill and stroke. ⌘-click and ⇧-click select cards
+/// instead of opening.
 struct ConversationCard: View {
     let conversation: Conversation
     let model: AppModel
@@ -33,10 +34,10 @@ struct ConversationCard: View {
                             .allowsHitTesting(false)
                     }
                 }
-            VStack(alignment: .leading, spacing: 4) {
+            VStack(alignment: .leading, spacing: 2) {
                 title
                 details
-                TranscriptionFailureReason(conversation: conversation, model: model)
+                TranscriptionFailureReason(conversation: conversation, model: model, lines: 1)
                 // The status has its own row under the title and details, from the same leading edge; often empty.
                 HStack(spacing: 12) {
                     TranscriptionStatus(conversation: conversation, model: model)
@@ -45,8 +46,8 @@ struct ConversationCard: View {
                 }
             }
         }
-        .padding(.horizontal, 10)
-        .padding(.vertical, 8)
+        .padding(.horizontal, 8)
+        .padding(.vertical, 6)
         // The fill sits under the content, on the surface; the stroke on top.
         .background {
             if selected { Self.shape.fill(Color.accentColor.opacity(0.18)) }
@@ -87,7 +88,7 @@ struct ConversationCard: View {
         if editing {
             TextField("Title", text: $draft)
                 .textFieldStyle(.plain)
-                .font(.headline)
+                .font(Self.titleFont)
                 .focused($titleFocused)
                 .onAppear { titleFocused = true }
                 .onSubmit {
@@ -99,7 +100,7 @@ struct ConversationCard: View {
                 .onChange(of: titleFocused) { _, focused in if !focused { editing = false } }
         } else {
             Text(conversation.title)
-                .font(.headline)
+                .font(Self.titleFont)
                 .lineLimit(1)
                 .truncationMode(.tail)
                 // Side by side, so the first click opens at once instead of waiting out the double click, which then
@@ -110,15 +111,16 @@ struct ConversationCard: View {
         }
     }
 
+    /// The title and its rename field, so renaming does not move the row.
+    private static let titleFont = Font.callout.weight(.medium)
+
+    /// "date time · duration" (no duration while it is 0), the size in its tooltip; then the status badge.
     private var details: some View {
-        HStack(spacing: 8) {
-            Text(conversation.createdAt.formatted(date: .abbreviated, time: .shortened))
-            if conversation.duration > 0 {
-                Text(Self.durationText(conversation.duration)).monospacedDigit()
-            }
-            if conversation.sizeBytes > 0 {
-                Text(ByteCountFormatter.string(fromByteCount: conversation.sizeBytes, countStyle: .file))
-            }
+        HStack(spacing: 6) {
+            Text(detailText)
+                .monospacedDigit()
+                .help(conversation.sizeBytes > 0
+                      ? ByteCountFormatter.string(fromByteCount: conversation.sizeBytes, countStyle: .file) : "")
             if let badge = StatusBadge(status: conversation.status) { badge }
             // A failed recording may never have had audio: its badge says so.
             if !conversation.hasAudio && conversation.status != .recording && conversation.status != .failed {
@@ -130,6 +132,12 @@ struct ConversationCard: View {
         .font(.caption)
         .foregroundStyle(.secondary)
         .lineLimit(1)
+    }
+
+    private var detailText: String {
+        let date = conversation.createdAt.formatted(date: .abbreviated, time: .shortened)
+        guard conversation.duration > 0 else { return date }
+        return "\(date) · \(Self.durationText(conversation.duration))"
     }
 
     /// m:ss, or h:mm:ss from one hour.
@@ -362,11 +370,13 @@ struct TranscriptionStatus: View {
     }
 }
 
-/// Why the last transcription failed, in red under the details, up to two lines (the full text on hover); only in
+/// Why the last transcription failed, in red under the details, up to `lines` lines (the full text on hover); only in
 /// the failed state. The reason is kept in memory, so after a relaunch it reads "Transcription failed".
 struct TranscriptionFailureReason: View {
     let conversation: Conversation
     let model: AppModel
+    /// One on the sidebar's compact rows.
+    var lines = 2
 
     var body: some View {
         if TranscriptionStatus.showsFailure(conversation, model) {
@@ -374,7 +384,7 @@ struct TranscriptionFailureReason: View {
             Text(reason)
                 .font(.caption)
                 .foregroundStyle(.red)
-                .lineLimit(2)
+                .lineLimit(lines)
                 .truncationMode(.tail)
                 .fixedSize(horizontal: false, vertical: true)
                 .help(reason)

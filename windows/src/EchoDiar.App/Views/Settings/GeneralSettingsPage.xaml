@@ -1,7 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!--
     Settings › General (macOS GeneralSettingsView.swift): launch at login, the app language, the floating indicator,
-    deleting without confirmation, the consent message and "Show onboarding again", as Windows 11 Settings cards under section headers.
+    the recording window's layout, deleting without confirmation, the library's entries per page, the consent message
+    and "Show onboarding again", as Windows 11 Settings cards under section headers.
     Each searchable card's Tag is its search entry's title (SearchEntries), so a search result can bring it into view.
 -->
 <UserControl
@@ -88,6 +89,24 @@
             </controls:SettingsCard>
 
             <StackPanel Style="{StaticResource SectionHeaderStyle}">
+                <TextBlock Style="{StaticResource BodyStrongTextBlockStyle}" Text="{local:T Text='Recording window'}" />
+            </StackPanel>
+
+            <!-- The items are in RecordingLayout's order. -->
+            <controls:SettingsCard
+                Description="{local:T Text='Side by side shows the live transcript next to Catch-up and Chat and hides the sidebar while recording.'}"
+                Header="{local:T Text='Recording layout'}"
+                Tag="Recording layout">
+                <ComboBox
+                    x:Name="RecordingLayoutCombo"
+                    MinWidth="200"
+                    AutomationProperties.Name="{local:T Text='Recording layout'}">
+                    <ComboBoxItem Content="{local:T Text='Tabs'}" />
+                    <ComboBoxItem Content="{local:T Text='Side by side'}" />
+                </ComboBox>
+            </controls:SettingsCard>
+
+            <StackPanel Style="{StaticResource SectionHeaderStyle}">
                 <TextBlock Style="{StaticResource BodyStrongTextBlockStyle}" Text="{local:T Text='Library'}" />
             </StackPanel>
 
@@ -96,6 +115,16 @@
                 Header="{local:T Text='Delete conversations without confirmation'}"
                 Tag="Delete conversations without confirmation">
                 <ToggleSwitch x:Name="DeleteToggle" AutomationProperties.Name="{local:T Text='Delete conversations without confirmation'}" />
+            </controls:SettingsCard>
+
+            <!-- The sizes are plain numbers (LibraryPaging.SizeOptions), filled in code. -->
+            <controls:SettingsCard
+                Header="{local:T Text='Entries per page'}"
+                Tag="Entries per page">
+                <ComboBox
+                    x:Name="PageSizeCombo"
+                    MinWidth="200"
+                    AutomationProperties.Name="{local:T Text='Entries per page'}" />
             </controls:SettingsCard>
 
             <StackPanel Style="{StaticResource SectionHeaderStyle}">

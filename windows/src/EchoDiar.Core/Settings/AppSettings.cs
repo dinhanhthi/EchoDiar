@@ -142,6 +142,9 @@ public sealed record AppSettings : IJsonOnDeserializing, IJsonOnDeserialized
     [JsonPropertyName("cloudLiveModelID")] public string? CloudLiveModelID { get; set; }
     /// <summary>With <see cref="CloudLiveSource.Realtime"/>, keep the realtime transcript as the final one instead of a cloud batch.</summary>
     [JsonPropertyName("realtimeAsFinal")] public bool RealtimeAsFinal { get; set; }
+    /// <summary>Library sidebar entries per page, one of <see cref="LibraryPaging.SizeOptions"/>.</summary>
+    [JsonPropertyName("libraryPageSize")] public int LibraryPageSize { get; set; } = 100;
+    [JsonPropertyName("recordingLayout")] public RecordingLayout RecordingLayout { get; set; } = RecordingLayout.Tabs;
 
     /// <summary>Keys not modeled here, written back as read.</summary>
     [JsonExtensionData] public Dictionary<string, JsonElement> Extra { get; set; } = [];
@@ -376,6 +379,18 @@ public sealed class RetentionModeConverter() : TolerantEnumConverter<RetentionMo
 public enum PillSize { Small, Medium, Large }
 
 public sealed class PillSizeConverter() : TolerantEnumConverter<PillSize>(PillSize.Medium);
+
+/// <summary>How the recording page shows its transcript, catch-ups and chat. An unknown value reads as <see cref="Tabs"/>.</summary>
+[JsonConverter(typeof(RecordingLayoutConverter))]
+public enum RecordingLayout
+{
+    /// <summary>One tab at a time: Transcript, Catchup, Chat.</summary>
+    Tabs,
+    /// <summary>The transcript beside a Catchup | Chat panel.</summary>
+    SideBySide,
+}
+
+public sealed class RecordingLayoutConverter() : TolerantEnumConverter<RecordingLayout>(RecordingLayout.Tabs);
 
 /// <summary>A synthesized Swift <c>String</c> enum: camelCase raw values; an unknown value or a number throws.</summary>
 public sealed class StrictCamelCaseEnumConverter<T>() : JsonStringEnumConverter<T>(JsonNamingPolicy.CamelCase, allowIntegerValues: false)

@@ -66,7 +66,9 @@ public sealed partial class AppViewModel
     private CatchUpRun? _catchUpRun;
     private IReadOnlyList<CatchUp> _recordingCatchUps = [];
 
-    /// <summary>Catch-up jobs not ended yet, also of an earlier recording: quit stops them (<see cref="ShutdownAI"/>).</summary>
+    /// <summary>
+    /// Catch-up and live chat jobs not ended yet, also of an earlier recording: quit stops them (<see cref="ShutdownAI"/>).
+    /// </summary>
     private int _runningCatchUps;
 
     /// <summary>
@@ -167,7 +169,7 @@ public sealed partial class AppViewModel
     {
         get
         {
-            List<string> lines = [Loc.T("Summarize the meeting so far, mostly its last 5 minutes")];
+            List<string> lines = [Loc.T("Summarize what is new since the last catch-up")];
             if (CatchUpProvider is { } provider)
             {
                 lines.Add(Loc.Format("%@: %@", Loc.T("Catch-up provider"), provider.Name));
@@ -328,7 +330,8 @@ public sealed partial class AppViewModel
         int contextWindow, IReadOnlyList<CatchUpLine> lines, string title, DateTimeOffset startedAt, double elapsed,
         OutputLanguage? language)
     {
-        var empty = new CatchUpPlan(null, [], [], Omitted: true, FullPass: true, ThroughLineID: -1, ThroughTime: 0);
+        var empty = new CatchUpPlan(
+            null, Context: [], Transcript: [], Omitted: true, FullPass: true, ThroughLineID: -1, ThroughTime: 0);
         var instructions = PromptBuilder.CatchUpMessages(empty, title, startedAt, elapsed, language)
             .Sum(m => TranscriptChunker.EstimateTokens(m.Content));
         var bytes = TranscriptChunker.Budget(contextWindow, instructions) * 4;

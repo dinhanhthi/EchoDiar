@@ -9,18 +9,13 @@ using EchoDiar.Platform.SystemServices;
 
 namespace EchoDiar.App.ViewModels;
 
-/// <summary>Swift <c>DayGroup</c>: the conversations of one local day, newest first.</summary>
-/// <param name="Day">The day's start, in local time.</param>
-public sealed record DayGroup(DateTime Day, IReadOnlyList<Conversation> Conversations)
-{
-    /// <summary>Groups by local day, newest day first, each group newest first.</summary>
-    public static IReadOnlyList<DayGroup> Groups(IEnumerable<Conversation> conversations) =>
-        conversations
-            .GroupBy(c => c.CreatedAt.ToLocalTime().Date)
-            .Select(g => new DayGroup(g.Key, g.OrderByDescending(c => c.CreatedAt).ToList()))
-            .OrderByDescending(g => g.Day)
-            .ToList();
-}
+/// <summary>
+/// The library sidebar's current page (macOS MainView listPane): its index (0-based, clamped to the pages that exist),
+/// the page count, the first entry's index and the entry count in the listed conversations, their total, and the
+/// page's conversations by section.
+/// </summary>
+public sealed record LibraryPageContent(
+    int Page, int PageCount, int Start, int Count, int Total, IReadOnlyList<LibrarySection> Sections);
 
 /// <summary>Asks the user with a dialog (a title, a message and the confirming button's text, with Cancel); true when confirmed.</summary>
 public delegate Task<bool> ConfirmDialog(string title, string message, string confirm);
@@ -33,6 +28,9 @@ public delegate Task<bool> ConfirmDialog(string title, string message, string co
 public sealed partial class AppViewModel
 {
     private string _searchTerm = "";
+    private string _settingsSearchTerm = "";
+    private int _libraryPage;
+    private bool _sidebarHidden;
 
     /// <summary>
     /// Searchable text by conversation (speakers, transcript, summary, chat), read off the UI thread only while a term
@@ -67,8 +65,110 @@ public sealed partial class AppViewModel
         set
         {
             if (!SetProperty(ref _searchTerm, value.Trim())) return;
+            // A new search starts on the first page, before the results change.
+            LibraryPage = 0;
             OnPropertyChanged(nameof(SearchResults));
             _ = LoadSearchDocumentsAsync();
+        }
+    }
+
+    /// <summary>The Settings page's search, trimmed: while not empty, Settings lists only the matching settings.</summary>
+    public string SettingsSearchTerm
+    {
+        get => _settingsSearchTerm;
+        set => SetProperty(ref _settingsSearchTerm, value.Trim());
+    }
+
+    /// <summary>
+    /// The library sidebar's page (0-based) of <see cref="LibraryList"/>: first page on a new search or page size,
+    /// clamped when the listed conversations change, and the open conversation's page when the route opens another
+    /// one (from outside the list: Calendar, a citation); paging with a conversation open stays on the new page.
+    /// </summary>
+    public int LibraryPage
+    {
+        get => _libraryPage;
+        set => SetProperty(ref _libraryPage, value);
+    }
+
+    /// <summary>
+    /// The library sidebar is hidden (the title bar's sidebar button); this session only. Hidden and shown only through
+    /// <see cref="SetSidebarHidden"/>; opening the library chat, which lives in the sidebar column, shows it.
+    /// </summary>
+    public bool SidebarHidden
+    {
+        get => _sidebarHidden;
+        private set => SetProperty(ref _sidebarHidden, value);
+    }
+
+    /// <summary>The title bar's sidebar button. During a recording, the user's choice outlasts its end.</summary>
+    public void ToggleSidebar()
+    {
+        _sidebarAutoHidden = false;
+        SetSidebarHidden(!SidebarHidden);
+    }
+
+    /// <summary>
+    /// The one path that hides or shows the library sidebar (macOS <c>setSidebarHidden</c>): hiding it closes the
+    /// library chat, which lives in it.
+    /// </summary>
+    public void SetSidebarHidden(bool hidden)
+    {
+        if (hidden) GlobalChatOpen = false;
+        SidebarHidden = hidden;
+    }
+
+    /// <summary>
+    /// The recording's own entry is hidden while recording: its card is the recording card (macOS MainView
+    /// <c>listed</c>).
+    /// </summary>
+    internal bool Listed(Conversation conversation) =>
+        !(IsRecording && conversation.Status == ConversationStatus.Recording);
+
+    /// <summary>
+    /// The listed conversations matching the search, newest first: what the sidebar's pages slice (macOS
+    /// <c>pagedList</c>).
+    /// </summary>
+    private IReadOnlyList<Conversation> LibraryList() => LibrarySections.Sorted(SearchResults.Where(Listed));
+
+    /// <summary>The sidebar's current page of <see cref="LibraryList"/>, by section (today's sections, in local time).</summary>
+    public LibraryPageContent CurrentLibraryPage()
+    {
+        var list = LibraryList();
+        var size = Settings.LibraryPageSize;
+        var page = LibraryPaging.Clamp(LibraryPage, list.Count, size);
+        var (start, count) = LibraryPaging.Range(page, list.Count, size);
+        var sections = LibrarySections.Sections(list.Skip(start).Take(count), DateTimeOffset.Now, TimeZoneInfo.Local);
+        var pageCount = LibraryPaging.PageCount(list.Count, size);
+        return new LibraryPageContent(page, pageCount, start, count, list.Count, sections);
+    }
+
+    /// <summary>Conversations added or deleted, or found by the search: still on a page that exists.</summary>
+    private void ClampLibraryPage()
+    {
+        // The first page always exists.
+        if (LibraryPage == 0) return;
+        LibraryPage = LibraryPaging.Clamp(LibraryPage, LibraryList().Count, Settings.LibraryPageSize);
+    }
+
+    /// <summary>
+    /// A new page size starts on the first page; the change is raised even when already on it, as the pages are cut
+    /// again.
+    /// </summary>
+    private void ResetLibraryPage()
+    {
+        _libraryPage = 0;
+        OnPropertyChanged(nameof(LibraryPage));
+    }
+
+    /// <summary>The page that lists conversation <paramref name="id"/>; the page stays when it is not listed.</summary>
+    private void ShowLibraryPageOf(Guid id)
+    {
+        var list = LibraryList();
+        for (var i = 0; i < list.Count; i++)
+        {
+            if (list[i].Id != id) continue;
+            LibraryPage = LibraryPaging.PageContaining(i, Settings.LibraryPageSize);
+            return;
         }
     }
 
@@ -137,6 +237,7 @@ public sealed partial class AppViewModel
         {
             foreach (var (id, document) in loaded) _searchDocuments[id] = document;
             // Outside the try: a failure while the views update is not a read failure, and must not leave them half done.
+            ClampLibraryPage();
             OnPropertyChanged(nameof(SearchResults));
         }
         if (!_searchReloadPending) return;

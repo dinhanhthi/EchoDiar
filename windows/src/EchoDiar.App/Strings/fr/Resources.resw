@@ -202,6 +202,10 @@
     <value>Autoriser le microphone</value>
     <comment>Allow Microphone</comment>
   </data>
+  <data name="AlsoAnswersTheChatTabWhileRecording" xml:space="preserve">
+    <value>Répond aussi dans l’onglet Discussion pendant l’enregistrement.</value>
+    <comment>Also answers the Chat tab while recording.</comment>
+  </data>
   <data name="AlwaysFor" xml:space="preserve">
     <value>Toujours pour {0}</value>
     <comment>Always for %@</comment>
@@ -209,6 +213,10 @@
   <data name="AlwaysRecord" xml:space="preserve">
     <value>Toujours enregistrer</value>
     <comment>Always record</comment>
+  </data>
+  <data name="AnAnswerIsBeingWritten" xml:space="preserve">
+    <value>Une réponse est en cours de rédaction.</value>
+    <comment>An answer is being written.</comment>
   </data>
   <data name="AnUpdateIsAvailableUpdateInTheToolbarInstallsIt" xml:space="preserve">
     <value>Une mise à jour est disponible : le bouton Mettre à jour de la barre d’outils l’installe.</value>
@@ -305,6 +313,10 @@
   <data name="AskAQuestionAboutThisConversationBelow" xml:space="preserve">
     <value>Posez une question sur cette conversation ci-dessous.</value>
     <comment>Ask a question about this conversation below.</comment>
+  </data>
+  <data name="AskAboutTheMeetingSoFar" xml:space="preserve">
+    <value>Posez une question sur la réunion jusqu’ici.</value>
+    <comment>Ask about the meeting so far.</comment>
   </data>
   <data name="AskAboutThisConversation" xml:space="preserve">
     <value>Poser une question sur cette conversation</value>
@@ -593,6 +605,10 @@
   <data name="ChooseWhatToRecordAndTheLanguage" xml:space="preserve">
     <value>Choisir quoi enregistrer et la langue</value>
     <comment>Choose what to record and the language</comment>
+  </data>
+  <data name="ClearSearch" xml:space="preserve">
+    <value>Effacer la recherche</value>
+    <comment>Clear search</comment>
   </data>
   <data name="ClickToRecordANewShortcut" xml:space="preserve">
     <value>Cliquez pour saisir un nouveau raccourci</value>
@@ -1230,6 +1246,10 @@
     <value>Saisissez le modèle d’embedding de {0} dans Réglages › RAG</value>
     <comment>Enter the embedding model of %@ in Settings › RAG</comment>
   </data>
+  <data name="EntriesPerPage" xml:space="preserve">
+    <value>Entrées par page</value>
+    <comment>Entries per page</comment>
+  </data>
   <data name="EveryLicenseAboveInOneTextFile" xml:space="preserve">
     <value>Toutes les licences ci-dessus dans un seul fichier texte.</value>
     <comment>Every license above in one text file.</comment>
@@ -1349,6 +1369,14 @@
   <data name="HideItWhileAnEchoDiarWindowIsInFront" xml:space="preserve">
     <value>Le masquer quand une fenêtre d’EchoDiar est au premier plan</value>
     <comment>Hide it while an EchoDiar window is in front</comment>
+  </data>
+  <data name="HideSidebar" xml:space="preserve">
+    <value>Masquer la barre latérale</value>
+    <comment>Hide Sidebar</comment>
+  </data>
+  <data name="HideSidebarS" xml:space="preserve">
+    <value>Masquer la barre latérale (⌃⌘S)</value>
+    <comment>Hide Sidebar (⌃⌘S)</comment>
   </data>
   <data name="History" xml:space="preserve">
     <value>Historique</value>
@@ -1574,6 +1602,14 @@
     <value>Conversations les plus volumineuses</value>
     <comment>Largest conversations</comment>
   </data>
+  <data name="Last30Days" xml:space="preserve">
+    <value>30 derniers jours</value>
+    <comment>Last 30 days</comment>
+  </data>
+  <data name="Last7Days" xml:space="preserve">
+    <value>7 derniers jours</value>
+    <comment>Last 7 days</comment>
+  </data>
   <data name="LastChecked" xml:space="preserve">
     <value>Dernière vérification : {0}</value>
     <comment>Last checked %@</comment>
@@ -1613,6 +1649,10 @@
   <data name="Listening" xml:space="preserve">
     <value>Écoute…</value>
     <comment>Listening…</comment>
+  </data>
+  <data name="Live" xml:space="preserve">
+    <value>En direct</value>
+    <comment>Live</comment>
   </data>
   <data name="LiveModel" xml:space="preserve">
     <value>Modèle en direct</value>
@@ -1689,6 +1729,10 @@
   <data name="LldLanguages__One" xml:space="preserve">
     <value>{0} langue</value>
     <comment>%lld languages</comment>
+  </data>
+  <data name="LldLldOfLld" xml:space="preserve">
+    <value>{0}–{1} sur {2}</value>
+    <comment>%lld–%lld of %lld</comment>
   </data>
   <data name="LldMB" xml:space="preserve">
     <value>{0} Mo</value>
@@ -2010,6 +2054,10 @@
     <value>Nouvel événement…</value>
     <comment>New Event…</comment>
   </data>
+  <data name="NextPage" xml:space="preserve">
+    <value>Page suivante</value>
+    <comment>Next page</comment>
+  </data>
   <data name="NextRunLldConversations" xml:space="preserve">
     <value>Prochain passage : {0} conversations</value>
     <comment>Next run: %lld conversations</comment>
@@ -2037,6 +2085,10 @@
   <data name="NoCalendarAccountCanHoldEchoDiarSCalendar" xml:space="preserve">
     <value>Aucun compte de calendrier ne peut accueillir le calendrier d’EchoDiar.</value>
     <comment>No calendar account can hold EchoDiar's calendar.</comment>
+  </data>
+  <data name="NoCatchUpYetPressCatchUpToSummarizeTheMeetingSoFar" xml:space="preserve">
+    <value>Aucun récapitulatif pour l’instant. Appuyez sur Récapituler pour résumer la réunion jusqu’ici.</value>
+    <comment>No catch-up yet. Press Catch up to summarize the meeting so far.</comment>
   </data>
   <data name="NoConversationsMatch" xml:space="preserve">
     <value>Aucune conversation ne correspond à "{0}"</value>
@@ -2182,6 +2234,10 @@
     <value>Rien de nouveau depuis le dernier récapitulatif</value>
     <comment>Nothing new since the last catch-up</comment>
   </data>
+  <data name="NothingToAskAboutYet" xml:space="preserve">
+    <value>Rien à demander pour l’instant.</value>
+    <comment>Nothing to ask about yet.</comment>
+  </data>
   <data name="NothingToCatchUpOnYet" xml:space="preserve">
     <value>Rien à récapituler pour l’instant.</value>
     <comment>Nothing to catch up on yet.</comment>
@@ -2221,6 +2277,10 @@
   <data name="OffersToRecordWhenAMeetingAppStartsUsingTheMicrophone" xml:space="preserve">
     <value>Propose d’enregistrer quand une app de réunion commence à utiliser le microphone.</value>
     <comment>Offers to record when a meeting app starts using the microphone.</comment>
+  </data>
+  <data name="Older" xml:space="preserve">
+    <value>Plus anciennes</value>
+    <comment>Older</comment>
   </data>
   <data name="OlderThan" xml:space="preserve">
     <value>Plus anciennes que</value>
@@ -2502,6 +2562,14 @@
     <value>Appuyez sur {0} pour lancer l’enregistrement depuis n’importe où.</value>
     <comment>Press %@ to start recording from anywhere.</comment>
   </data>
+  <data name="Previous3Days" xml:space="preserve">
+    <value>3 jours précédents</value>
+    <comment>Previous 3 days</comment>
+  </data>
+  <data name="PreviousPage" xml:space="preserve">
+    <value>Page précédente</value>
+    <comment>Previous page</comment>
+  </data>
   <data name="PricesAreApproximateListPricesPerAudioHourTheMicAndSystemCha" xml:space="preserve">
     <value>Les prix sont des prix catalogue approximatifs par heure d’audio ; les canaux micro et système sont envoyés et facturés séparément.</value>
     <comment>Prices are approximate list prices per audio hour; the mic and system channels are sent and billed separately.</comment>
@@ -2638,6 +2706,10 @@
     <value>Les lois sur l’enregistrement varient d’un endroit à l’autre. Beaucoup exigent l’accord de toutes les personnes présentes à l’appel.</value>
     <comment>Recording laws differ from place to place. Many require everyone on the call to agree.</comment>
   </data>
+  <data name="RecordingLayout" xml:space="preserve">
+    <value>Disposition pendant l’enregistrement</value>
+    <comment>Recording layout</comment>
+  </data>
   <data name="RecordingOptions" xml:space="preserve">
     <value>Options d’enregistrement</value>
     <comment>Recording options</comment>
@@ -2665,6 +2737,10 @@
   <data name="RecordingSwitchesToTheDefaultInput" xml:space="preserve">
     <value>L’enregistrement passe à l’entrée par défaut.</value>
     <comment>Recording switches to the default input.</comment>
+  </data>
+  <data name="RecordingWindow" xml:space="preserve">
+    <value>Fenêtre d’enregistrement</value>
+    <comment>Recording window</comment>
   </data>
   <data name="Recording_2" xml:space="preserve">
     <value>Enregistrement de {0}</value>
@@ -2926,6 +3002,14 @@
     <value>Afficher à nouveau la prise en main</value>
     <comment>Show onboarding again</comment>
   </data>
+  <data name="ShowSidebar" xml:space="preserve">
+    <value>Afficher la barre latérale</value>
+    <comment>Show Sidebar</comment>
+  </data>
+  <data name="ShowSidebarS" xml:space="preserve">
+    <value>Afficher la barre latérale (⌃⌘S)</value>
+    <comment>Show Sidebar (⌃⌘S)</comment>
+  </data>
   <data name="ShowTheOtherSpeakers" xml:space="preserve">
     <value>Afficher les autres intervenants</value>
     <comment>Show the other speakers</comment>
@@ -2969,6 +3053,14 @@
   <data name="ShowsTheTranscriptWhileRecordingWithAModelOnThisPCFreeNothin" xml:space="preserve">
     <value>Affiche la transcription pendant l’enregistrement avec un modèle sur ce PC. Gratuit : rien n’est envoyé pendant l’enregistrement, mais cela utilise processeur, mémoire et batterie. La transcription enregistrée vient toujours de {0} après l’arrêt et peut donc différer de ce que vous avez vu.</value>
     <comment>Shows the transcript while recording with a model on this PC. Free: nothing is uploaded while recording, but it uses CPU, memory and battery. The saved transcript still comes from %@ after Stop, so it can differ from what you saw.</comment>
+  </data>
+  <data name="SideBySide" xml:space="preserve">
+    <value>Côte à côte</value>
+    <comment>Side by side</comment>
+  </data>
+  <data name="SideBySideShowsTheLiveTranscriptNextToCatchUpAndChatAndHides" xml:space="preserve">
+    <value>Côte à côte affiche la transcription en direct à côté de Récapitulatif et de Discussion, et masque la barre latérale pendant l’enregistrement.</value>
+    <comment>Side by side shows the live transcript next to Catch-up and Chat and hides the sidebar while recording.</comment>
   </data>
   <data name="SimulateState" xml:space="preserve">
     <value>Simuler un état</value>
@@ -3166,6 +3258,10 @@
     <value>Résumer la réunion jusqu’ici, surtout ses 5 dernières minutes</value>
     <comment>Summarize the meeting so far, mostly its last 5 minutes</comment>
   </data>
+  <data name="SummarizeWhatIsNewSinceTheLastCatchUp" xml:space="preserve">
+    <value>Résumer ce qui est nouveau depuis le dernier récapitulatif</value>
+    <comment>Summarize what is new since the last catch-up</comment>
+  </data>
   <data name="Summarizing" xml:space="preserve">
     <value>Résumé en cours</value>
     <comment>Summarizing</comment>
@@ -3221,6 +3317,10 @@
   <data name="SystemModelLanguageAssetsInstalledOnDemandAutoUsesTheDefault" xml:space="preserve">
     <value>Modèle du système — ressources linguistiques installées à la demande. Auto utilise la langue par défaut (pas de détection de la langue).</value>
     <comment>System model — language assets installed on demand. Auto uses the default language (no language detection).</comment>
+  </data>
+  <data name="Tabs" xml:space="preserve">
+    <value>Onglets</value>
+    <comment>Tabs</comment>
   </data>
   <data name="TellSpeakersApart" xml:space="preserve">
     <value>Distinguer les intervenants</value>

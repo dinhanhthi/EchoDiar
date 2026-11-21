@@ -178,6 +178,10 @@
     <value>允许使用麦克风</value>
     <comment>Allow Microphone</comment>
   </data>
+  <data name="AlsoAnswersTheChatTabWhileRecording" xml:space="preserve">
+    <value>录音时也用于回答“聊天”标签页中的问题。</value>
+    <comment>Also answers the Chat tab while recording.</comment>
+  </data>
   <data name="AlwaysFor" xml:space="preserve">
     <value>始终录制 {0}</value>
     <comment>Always for %@</comment>
@@ -185,6 +189,10 @@
   <data name="AlwaysRecord" xml:space="preserve">
     <value>始终录制</value>
     <comment>Always record</comment>
+  </data>
+  <data name="AnAnswerIsBeingWritten" xml:space="preserve">
+    <value>正在生成回答。</value>
+    <comment>An answer is being written.</comment>
   </data>
   <data name="AnUpdateIsAvailableUpdateInTheToolbarInstallsIt" xml:space="preserve">
     <value>有可用更新：点击工具栏中的“更新”即可安装。</value>
@@ -281,6 +289,10 @@
   <data name="AskAQuestionAboutThisConversationBelow" xml:space="preserve">
     <value>在下方就此对话提问。</value>
     <comment>Ask a question about this conversation below.</comment>
+  </data>
+  <data name="AskAboutTheMeetingSoFar" xml:space="preserve">
+    <value>就会议至今的内容提问。</value>
+    <comment>Ask about the meeting so far.</comment>
   </data>
   <data name="AskAboutThisConversation" xml:space="preserve">
     <value>就此对话提问</value>
@@ -569,6 +581,10 @@
   <data name="ChooseWhatToRecordAndTheLanguage" xml:space="preserve">
     <value>选择要录制的内容和语言</value>
     <comment>Choose what to record and the language</comment>
+  </data>
+  <data name="ClearSearch" xml:space="preserve">
+    <value>清除搜索</value>
+    <comment>Clear search</comment>
   </data>
   <data name="ClickToRecordANewShortcut" xml:space="preserve">
     <value>点按以录制新的快捷键</value>
@@ -1182,6 +1198,10 @@
     <value>在“设置 › RAG”中输入 {0} 的嵌入模型</value>
     <comment>Enter the embedding model of %@ in Settings › RAG</comment>
   </data>
+  <data name="EntriesPerPage" xml:space="preserve">
+    <value>每页条目数</value>
+    <comment>Entries per page</comment>
+  </data>
   <data name="EveryLicenseAboveInOneTextFile" xml:space="preserve">
     <value>上述所有许可证，汇总在一个文本文件中。</value>
     <comment>Every license above in one text file.</comment>
@@ -1301,6 +1321,14 @@
   <data name="HideItWhileAnEchoDiarWindowIsInFront" xml:space="preserve">
     <value>EchoDiar 窗口位于最前面时隐藏</value>
     <comment>Hide it while an EchoDiar window is in front</comment>
+  </data>
+  <data name="HideSidebar" xml:space="preserve">
+    <value>隐藏边栏</value>
+    <comment>Hide Sidebar</comment>
+  </data>
+  <data name="HideSidebarS" xml:space="preserve">
+    <value>隐藏边栏（⌃⌘S）</value>
+    <comment>Hide Sidebar (⌃⌘S)</comment>
   </data>
   <data name="History" xml:space="preserve">
     <value>历史记录</value>
@@ -1522,6 +1550,14 @@
     <value>最大的对话</value>
     <comment>Largest conversations</comment>
   </data>
+  <data name="Last30Days" xml:space="preserve">
+    <value>最近 30 天</value>
+    <comment>Last 30 days</comment>
+  </data>
+  <data name="Last7Days" xml:space="preserve">
+    <value>最近 7 天</value>
+    <comment>Last 7 days</comment>
+  </data>
   <data name="LastChecked" xml:space="preserve">
     <value>上次检查：{0}</value>
     <comment>Last checked %@</comment>
@@ -1561,6 +1597,10 @@
   <data name="Listening" xml:space="preserve">
     <value>正在聆听…</value>
     <comment>Listening…</comment>
+  </data>
+  <data name="Live" xml:space="preserve">
+    <value>实时</value>
+    <comment>Live</comment>
   </data>
   <data name="LiveModel" xml:space="preserve">
     <value>实时转写模型</value>
@@ -1621,6 +1661,10 @@
   <data name="LldLanguages" xml:space="preserve">
     <value>{0} 种语言</value>
     <comment>%lld languages</comment>
+  </data>
+  <data name="LldLldOfLld" xml:space="preserve">
+    <value>第 {0}–{1} 条，共 {2} 条</value>
+    <comment>%lld–%lld of %lld</comment>
   </data>
   <data name="LldMB" xml:space="preserve">
     <value>{0} MB</value>
@@ -1922,6 +1966,10 @@
     <value>新建日程…</value>
     <comment>New Event…</comment>
   </data>
+  <data name="NextPage" xml:space="preserve">
+    <value>下一页</value>
+    <comment>Next page</comment>
+  </data>
   <data name="NextRunLldConversations" xml:space="preserve">
     <value>下次运行：{0} 个对话</value>
     <comment>Next run: %lld conversations</comment>
@@ -1945,6 +1993,10 @@
   <data name="NoCalendarAccountCanHoldEchoDiarSCalendar" xml:space="preserve">
     <value>没有日历账户可以存放 EchoDiar 的日历。</value>
     <comment>No calendar account can hold EchoDiar's calendar.</comment>
+  </data>
+  <data name="NoCatchUpYetPressCatchUpToSummarizeTheMeetingSoFar" xml:space="preserve">
+    <value>还没有回顾。点按“快速回顾”即可总结会议至今的内容。</value>
+    <comment>No catch-up yet. Press Catch up to summarize the meeting so far.</comment>
   </data>
   <data name="NoConversationsMatch" xml:space="preserve">
     <value>没有与“{0}”匹配的对话</value>
@@ -2090,6 +2142,10 @@
     <value>自上次回顾以来没有新内容</value>
     <comment>Nothing new since the last catch-up</comment>
   </data>
+  <data name="NothingToAskAboutYet" xml:space="preserve">
+    <value>暂时还没有可提问的内容。</value>
+    <comment>Nothing to ask about yet.</comment>
+  </data>
   <data name="NothingToCatchUpOnYet" xml:space="preserve">
     <value>暂时还没有可回顾的内容。</value>
     <comment>Nothing to catch up on yet.</comment>
@@ -2129,6 +2185,10 @@
   <data name="OffersToRecordWhenAMeetingAppStartsUsingTheMicrophone" xml:space="preserve">
     <value>会议应用开始使用麦克风时提示录制。</value>
     <comment>Offers to record when a meeting app starts using the microphone.</comment>
+  </data>
+  <data name="Older" xml:space="preserve">
+    <value>更早</value>
+    <comment>Older</comment>
   </data>
   <data name="OlderThan" xml:space="preserve">
     <value>超过</value>
@@ -2410,6 +2470,14 @@
     <value>在任何地方按下 {0} 即可开始录音。</value>
     <comment>Press %@ to start recording from anywhere.</comment>
   </data>
+  <data name="Previous3Days" xml:space="preserve">
+    <value>前 3 天</value>
+    <comment>Previous 3 days</comment>
+  </data>
+  <data name="PreviousPage" xml:space="preserve">
+    <value>上一页</value>
+    <comment>Previous page</comment>
+  </data>
   <data name="PricesAreApproximateListPricesPerAudioHourTheMicAndSystemCha" xml:space="preserve">
     <value>价格为每音频小时的大致标价；麦克风声道和系统声道会分别发送和计费。</value>
     <comment>Prices are approximate list prices per audio hour; the mic and system channels are sent and billed separately.</comment>
@@ -2546,6 +2614,10 @@
     <value>各地的录音法规不尽相同。许多地方要求通话中的每个人都同意。</value>
     <comment>Recording laws differ from place to place. Many require everyone on the call to agree.</comment>
   </data>
+  <data name="RecordingLayout" xml:space="preserve">
+    <value>录音布局</value>
+    <comment>Recording layout</comment>
+  </data>
   <data name="RecordingOptions" xml:space="preserve">
     <value>录音选项</value>
     <comment>Recording options</comment>
@@ -2573,6 +2645,10 @@
   <data name="RecordingSwitchesToTheDefaultInput" xml:space="preserve">
     <value>录音会切换到默认输入设备。</value>
     <comment>Recording switches to the default input.</comment>
+  </data>
+  <data name="RecordingWindow" xml:space="preserve">
+    <value>录音窗口</value>
+    <comment>Recording window</comment>
   </data>
   <data name="Recording_2" xml:space="preserve">
     <value>正在录制 {0}</value>
@@ -2834,6 +2910,14 @@
     <value>再次显示引导</value>
     <comment>Show onboarding again</comment>
   </data>
+  <data name="ShowSidebar" xml:space="preserve">
+    <value>显示边栏</value>
+    <comment>Show Sidebar</comment>
+  </data>
+  <data name="ShowSidebarS" xml:space="preserve">
+    <value>显示边栏（⌃⌘S）</value>
+    <comment>Show Sidebar (⌃⌘S)</comment>
+  </data>
   <data name="ShowTheOtherSpeakers" xml:space="preserve">
     <value>显示其他说话人</value>
     <comment>Show the other speakers</comment>
@@ -2877,6 +2961,14 @@
   <data name="ShowsTheTranscriptWhileRecordingWithAModelOnThisPCFreeNothin" xml:space="preserve">
     <value>录音时使用这台电脑上的模型显示转写文本。免费：录音期间不会上传任何内容，但会占用 CPU、内存和电量。保存的转写文本仍会在停止后由 {0} 生成，因此可能与你看到的不同。</value>
     <comment>Shows the transcript while recording with a model on this PC. Free: nothing is uploaded while recording, but it uses CPU, memory and battery. The saved transcript still comes from %@ after Stop, so it can differ from what you saw.</comment>
+  </data>
+  <data name="SideBySide" xml:space="preserve">
+    <value>并排</value>
+    <comment>Side by side</comment>
+  </data>
+  <data name="SideBySideShowsTheLiveTranscriptNextToCatchUpAndChatAndHides" xml:space="preserve">
+    <value>“并排”会在录音时将实时转写显示在“回顾”和“聊天”旁边，并隐藏边栏。</value>
+    <comment>Side by side shows the live transcript next to Catch-up and Chat and hides the sidebar while recording.</comment>
   </data>
   <data name="SimulateState" xml:space="preserve">
     <value>模拟状态</value>
@@ -3074,6 +3166,10 @@
     <value>总结会议至今的内容，重点是最近 5 分钟</value>
     <comment>Summarize the meeting so far, mostly its last 5 minutes</comment>
   </data>
+  <data name="SummarizeWhatIsNewSinceTheLastCatchUp" xml:space="preserve">
+    <value>总结自上次回顾以来的新内容</value>
+    <comment>Summarize what is new since the last catch-up</comment>
+  </data>
   <data name="Summarizing" xml:space="preserve">
     <value>正在生成摘要</value>
     <comment>Summarizing</comment>
@@ -3129,6 +3225,10 @@
   <data name="SystemModelLanguageAssetsInstalledOnDemandAutoUsesTheDefault" xml:space="preserve">
     <value>系统模型 — 语言资源按需安装。“自动”使用默认语言（不检测语言）。</value>
     <comment>System model — language assets installed on demand. Auto uses the default language (no language detection).</comment>
+  </data>
+  <data name="Tabs" xml:space="preserve">
+    <value>标签页</value>
+    <comment>Tabs</comment>
   </data>
   <data name="TellSpeakersApart" xml:space="preserve">
     <value>区分说话人</value>

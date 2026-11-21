@@ -107,6 +107,7 @@ public sealed class SettingsTests : IDisposable
     [InlineData("""{"playbackChannels":"surround"}""", "playbackChannels", "\"mixed\"")]
     [InlineData("""{"autoDeleteMode":"shred"}""", "autoDeleteMode", "\"audioOnly\"")]
     [InlineData("""{"pillSize":"huge"}""", "pillSize", "\"medium\"")]
+    [InlineData("""{"recordingLayout":"bogus"}""", "recordingLayout", "\"tabs\"")]
     [InlineData("""{"perAppBehavior":null}""", "perAppBehavior", "{}")]
     [InlineData("""{"globalHotKeyWindows":{"virtualKey":65,"modifiers":4}}""", "globalHotKeyWindows",
         """{"virtualKey":82,"modifiers":3}""")]
@@ -447,7 +448,7 @@ public sealed class SettingsTests : IDisposable
           "globalHotKeyWindows": {"virtualKey": 82, "modifiers": 3}, "globalHotKeyEnabled": true,
           "globalPauseHotKeyWindows": {"virtualKey": 80, "modifiers": 3}, "globalPauseHotKeyEnabled": true,
           "autoExcludedProviderIDs": [], "providerAvailabilityMigrated": false, "aiSettingsMigrated": false,
-          "cloudLiveSource": "off", "realtimeAsFinal": false
+          "cloudLiveSource": "off", "realtimeAsFinal": false, "libraryPageSize": 100, "recordingLayout": "tabs"
         }
         """;
 }

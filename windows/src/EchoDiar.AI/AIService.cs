@@ -265,8 +265,36 @@ public sealed class AIService(ModelLoadGate gate)
             AppendCatchUp(folder, new CatchUp
             {
                 Id = job.Id, CreatedAt = asked, Elapsed = elapsed, ThroughLineID = plan.ThroughLineID, ThroughTime = plan.ThroughTime,
-                FullPass = plan.FullPass, Text = text, Provider = providerID, Model = model, Stopped = cut,
+                FullPass = plan.FullPass && !plan.Omitted, Text = text, Provider = providerID, Model = model, Stopped = cut,
             });
+        }, cancellationToken);
+    }
+
+    /// <summary>
+    /// Streams the answer to a question asked while recording: <paramref name="messages"/>
+    /// (<see cref="PromptBuilder.LiveQuestionMessages"/>), then appends <paramref name="question"/> and the answer, both
+    /// marked <c>Live</c>, to <paramref name="folder"/>'s <c>chat.json</c>, also when stopped with some text.
+    /// <paramref name="providerID"/> is saved with the answer. Fails at once with an in-app model
+    /// (<see cref="ILocalLLMProvider"/>), as <see cref="CatchUpAsync"/> does.
+    /// </summary>
+    public IAsyncEnumerable<AIUpdate> AskLiveAsync(
+        string question, IReadOnlyList<LLMMessage> messages, ILLMProvider provider, string providerID, string model,
+        string folder, CancellationToken cancellationToken = default, Guid? jobId = null)
+    {
+        if (provider is ILocalLLMProvider) return Failing(LLMException.Provider("A catch-up needs a provider outside the app."));
+        var asked = DateTimeOffset.UtcNow;
+        return RunAsync(jobId, provider, model, async (backend, yield, job) =>
+        {
+            var context = await provider.ContextWindowAsync(model, job.Token);
+            var answer = await StoppableAnswerAsync(messages, backend, model, context, yield, job);
+            AppendChat(folder, [
+                new ChatLog.Message { Role = ChatRole.User, Text = question, Timestamp = asked, Live = true },
+                new ChatLog.Message
+                {
+                    Role = ChatRole.Assistant, Text = answer, Provider = providerID, Model = model,
+                    Timestamp = DateTimeOffset.UtcNow, Live = true,
+                },
+            ]);
         }, cancellationToken);
     }
 
@@ -305,15 +333,8 @@ public sealed class AIService(ModelLoadGate gate)
         return "";
     }
 
-    /// <summary>
-    /// The last <paramref name="limit"/> messages of <paramref name="history"/> (0 or less = all of them), starting with
-    /// a question: some APIs reject a conversation whose first turn is an answer.
-    /// </summary>
     private static List<LLMMessage> Turns(IReadOnlyList<ChatLog.Message> history, int limit) =>
-        (limit > 0 ? history.TakeLast(limit) : history)
-        .SkipWhile(m => m.Role != ChatRole.User)
-        .Select(m => new LLMMessage(m.Role == ChatRole.User ? LLMRole.User : LLMRole.Assistant, m.Text))
-        .ToList();
+        PromptBuilder.HistoryTurns(history, limit);
 
     /// <summary>Serialized so two answers finishing together cannot drop each other's messages.</summary>
     private void AppendChat(string folder, IEnumerable<ChatLog.Message> messages)

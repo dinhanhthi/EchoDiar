@@ -1,5 +1,6 @@
 using System.ComponentModel;
 using System.Diagnostics;
+using System.Globalization;
 using EchoDiar.App.Services;
 using EchoDiar.App.ViewModels;
 using EchoDiar.Core;
@@ -34,7 +35,9 @@ public sealed partial class GeneralSettingsPage : UserControl
         new("Hide it while an EchoDiar window is in front", ["floating indicator", "pill", "hide"]),
         new("Show it in screenshots and screen recordings", ["floating indicator", "pill", "screenshot", "screen sharing", "capture"]),
         new("Indicator size", ["floating indicator", "pill", "small", "medium", "large"]),
+        new("Recording layout", ["layout", "side by side", "tabs", "recording window", "live chat", "catch-up", "catch up"]),
         new("Delete conversations without confirmation", ["confirm", "Recycle Bin", "trash", "library"]),
+        new("Entries per page", ["page", "pagination", "sidebar", "list", "library"]),
         new("Copy consent message", ["consent", "privacy", "tell people"]),
         new("Show onboarding again", ["permissions", "welcome", "setup"]),
     ];
@@ -53,6 +56,7 @@ public sealed partial class GeneralSettingsPage : UserControl
         ConsentText.Text = $"\"{Loc.T(ConsentMessage)}\"";
         var system = Loc.T("System");
         LanguageCombo.ItemsSource = AppLanguages.All.Select(language => language.DisplayName(system)).ToList();
+        foreach (var size in LibraryPaging.SizeOptions) PageSizeCombo.Items.Add(size.ToString(CultureInfo.CurrentCulture));
         _syncing = true;
         LanguageCombo.SelectedIndex = IndexOf(AppLanguages.Matching(ReadLanguageOverride()));
         _syncing = false;
@@ -65,9 +69,17 @@ public sealed partial class GeneralSettingsPage : UserControl
         {
             if (!_syncing && PillSizeCombo.SelectedIndex >= 0) _settings.PillSize = (PillSize)PillSizeCombo.SelectedIndex;
         };
+        RecordingLayoutCombo.SelectionChanged += (_, _) =>
+        {
+            if (!_syncing && RecordingLayoutCombo.SelectedIndex >= 0) _settings.RecordingLayout = (RecordingLayout)RecordingLayoutCombo.SelectedIndex;
+        };
         LanguageCombo.SelectionChanged += (_, _) => OnLanguageChosen();
         RelaunchButton.Click += (_, _) => OnRelaunchClicked();
         DeleteToggle.Toggled += (_, _) => Set(() => _settings.DeleteWithoutConfirmation = DeleteToggle.IsOn);
+        PageSizeCombo.SelectionChanged += (_, _) =>
+        {
+            if (!_syncing && PageSizeCombo.SelectedIndex >= 0) _settings.LibraryPageSize = LibraryPaging.SizeOptions[PageSizeCombo.SelectedIndex];
+        };
         CopyConsentButton.Click += (_, _) => CopyConsent();
         ShowOnboardingButton.Click += (_, _) => _model.ShowOnboarding();
 
@@ -125,7 +137,10 @@ public sealed partial class GeneralSettingsPage : UserControl
             HidePillCard.IsEnabled = _settings.ShowPill;
             CapturesToggle.IsOn = _settings.ShowPillInScreenCaptures;
             PillSizeCombo.SelectedIndex = (int)_settings.PillSize;
+            RecordingLayoutCombo.SelectedIndex = (int)_settings.RecordingLayout;
             DeleteToggle.IsOn = _settings.DeleteWithoutConfirmation;
+            // A size outside the choices (an edited settings file) selects none.
+            PageSizeCombo.SelectedIndex = LibraryPaging.SizeOptions.ToList().IndexOf(_settings.LibraryPageSize);
         }
         finally
         {

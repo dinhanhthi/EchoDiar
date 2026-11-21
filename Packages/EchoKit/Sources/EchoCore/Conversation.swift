@@ -269,10 +269,12 @@ public struct ChatLog: Codable, Equatable, Sendable {
         public var timestamp: Date?
         /// The numbered conversation sources of a library-chat answer; nil elsewhere.
         public var references: [Reference]?
+        /// True for a message of the live chat during the recording; nil (omitted from the file) elsewhere.
+        public var live: Bool?
 
         public init(
             role: Role, text: String, provider: String? = nil, model: String? = nil, timestamp: Date? = Date(),
-            references: [Reference]? = nil
+            references: [Reference]? = nil, live: Bool? = nil
         ) {
             self.role = role
             self.text = text
@@ -280,6 +282,7 @@ public struct ChatLog: Codable, Equatable, Sendable {
             self.model = model
             self.timestamp = timestamp
             self.references = references
+            self.live = live
         }
     }
 
@@ -356,27 +359,5 @@ public enum ConversationFiles {
         let parent = url.standardizedFileURL.deletingLastPathComponent().standardizedFileURL
         guard parent.path == folder.standardizedFileURL.path else { return nil }
         return url
-    }
-}
-
-/// Conversations that started on the same local day.
-public struct DayGroup: Equatable, Identifiable, Sendable {
-    /// Start of the day.
-    public var day: Date
-    /// Newest first.
-    public var conversations: [Conversation]
-
-    public var id: Date { day }
-
-    public init(day: Date, conversations: [Conversation]) {
-        self.day = day
-        self.conversations = conversations
-    }
-
-    /// Groups by local day, newest day first, each group newest first.
-    public static func groups(from conversations: [Conversation], calendar: Calendar = .current) -> [DayGroup] {
-        Dictionary(grouping: conversations) { calendar.startOfDay(for: $0.createdAt) }
-            .map { DayGroup(day: $0.key, conversations: $0.value.sorted { $0.createdAt > $1.createdAt }) }
-            .sorted { $0.day > $1.day }
     }
 }

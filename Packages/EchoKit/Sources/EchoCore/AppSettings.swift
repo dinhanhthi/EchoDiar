@@ -136,6 +136,10 @@ public struct AppSettings: Codable, Equatable, Sendable {
     public var cloudLiveModelID: String?
     /// With `cloudLiveSource == .realtime`, keep the realtime transcript as the final one instead of a cloud batch.
     public var realtimeAsFinal: Bool
+    /// Conversations per page in the library sidebar; offered sizes are `LibraryPaging.sizeOptions`.
+    public var libraryPageSize: Int
+    /// How the recording's live transcript and notes are laid out.
+    public var recordingLayout: RecordingLayout
 
     public static let defaultEmbeddingModelID = "mlx-qwen3-embedding-0.6b"
 
@@ -202,7 +206,9 @@ public struct AppSettings: Codable, Equatable, Sendable {
         aiSettingsMigrated: Bool = true,
         cloudLiveSource: CloudLiveSource = .off,
         cloudLiveModelID: String? = nil,
-        realtimeAsFinal: Bool = false
+        realtimeAsFinal: Bool = false,
+        libraryPageSize: Int = 100,
+        recordingLayout: RecordingLayout = .tabs
     ) {
         self.launchAtLogin = launchAtLogin
         self.defaultLanguage = defaultLanguage
@@ -267,6 +273,8 @@ public struct AppSettings: Codable, Equatable, Sendable {
         self.cloudLiveSource = cloudLiveSource
         self.cloudLiveModelID = cloudLiveModelID
         self.realtimeAsFinal = realtimeAsFinal
+        self.libraryPageSize = libraryPageSize
+        self.recordingLayout = recordingLayout
     }
 
     public static let autoDeleteDaysRange = 1...3650
@@ -294,6 +302,7 @@ public struct AppSettings: Codable, Equatable, Sendable {
         case deleteWithoutConfirmation, globalHotKey, globalHotKeyEnabled, globalPauseHotKey, globalPauseHotKeyEnabled
         case autoExcludedProviderIDs, providerAvailabilityMigrated, aiSettingsMigrated
         case cloudLiveSource, cloudLiveModelID, realtimeAsFinal
+        case libraryPageSize, recordingLayout
     }
 
     public init(from decoder: Decoder) throws {
@@ -376,6 +385,8 @@ public struct AppSettings: Codable, Equatable, Sendable {
         cloudLiveSource = try container.decodeIfPresent(CloudLiveSource.self, forKey: .cloudLiveSource) ?? .off
         cloudLiveModelID = try container.decodeIfPresent(String.self, forKey: .cloudLiveModelID)
         realtimeAsFinal = try container.decodeIfPresent(Bool.self, forKey: .realtimeAsFinal) ?? false
+        libraryPageSize = try container.decodeIfPresent(Int.self, forKey: .libraryPageSize) ?? 100
+        recordingLayout = try container.decodeIfPresent(RecordingLayout.self, forKey: .recordingLayout) ?? .tabs
     }
 
     /// One-time move to "key saved = available" for cloud providers (settings only, no Keychain read). Every cloud
@@ -530,6 +541,19 @@ public enum PillSize: String, Codable, Sendable {
     /// An unrecognized raw value (written by another build) falls back to `medium`.
     public init(from decoder: Decoder) throws {
         self = PillSize(rawValue: try decoder.singleValueContainer().decode(String.self)) ?? .medium
+    }
+}
+
+/// How the recording view lays out the live transcript and the notes.
+public enum RecordingLayout: String, Codable, Sendable {
+    /// One tab at a time.
+    case tabs
+    /// Both panes next to each other.
+    case sideBySide
+
+    /// An unrecognized raw value (written by another build) falls back to `tabs`.
+    public init(from decoder: Decoder) throws {
+        self = RecordingLayout(rawValue: try decoder.singleValueContainer().decode(String.self)) ?? .tabs
     }
 }
 

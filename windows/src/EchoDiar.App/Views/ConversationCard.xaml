@@ -1,9 +1,10 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!--
-    One conversation of the library (macOS ConversationCard.swift): the source icon with its activity badge, the title (double-click to rename),
-    the source app's name, the date, duration, size, status pill and "Audio has been removed" marker, the reason of a
-    failed transcription, then a row with the transcription progress or its action. The actions are in the context
-    menu and the detail. A Fluent card (subtle fill, card stroke, overlay corners) in theme resources (Light and Dark),
+    One conversation of the library as a compact row (macOS ConversationCard.swift): the source icon with its activity
+    badge, the title on one line (double-click to rename), then one caption line with the source app's name,
+    "date time · duration" (the size in its tooltip), status pill and "Audio has been removed" marker, the reason of a
+    failed transcription on one line, then a row with the transcription progress or its action. The actions are in the
+    context menu and the detail. A Fluent card (subtle fill, card stroke, overlay corners) in theme resources (Light and Dark),
     on the sidebar's card panel. Selected adds the accent fill and edge.
 -->
 <UserControl
@@ -12,7 +13,7 @@
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
     xmlns:local="using:EchoDiar.App">
 
-    <Grid Margin="0,5">
+    <Grid Margin="0,2">
         <Grid.ContextFlyout>
             <MenuFlyout x:Name="CardMenu">
                 <MenuFlyoutItem x:Name="RenameItem" Text="{local:T Text='Rename'}" />
@@ -40,7 +41,7 @@
             Opacity="0.12"
             Visibility="Collapsed" />
 
-        <Grid x:Name="ContentGrid" Padding="12,8" ColumnSpacing="12">
+        <Grid x:Name="ContentGrid" Padding="8,6" ColumnSpacing="12">
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="Auto" />
                 <ColumnDefinition Width="*" />
@@ -79,7 +80,7 @@
                 </Border>
             </Grid>
 
-            <StackPanel Grid.Column="1" Spacing="4">
+            <StackPanel Grid.Column="1" Spacing="2">
                 <Grid>
                     <TextBlock
                         x:Name="TitleText"
@@ -87,16 +88,22 @@
                         MaxLines="1"
                         TextTrimming="CharacterEllipsis"
                         TextWrapping="NoWrap" />
+                    <!--
+                        The title's font; the negative margin takes back the field's vertical padding and border, so
+                        renaming does not move the row.
+                    -->
                     <TextBox
                         x:Name="TitleBox"
+                        Margin="0,-3"
                         Padding="4,2"
                         MinHeight="0"
+                        FontWeight="SemiBold"
                         AutomationProperties.Name="{local:T Text='Title'}"
                         PlaceholderText="{local:T Text='Title'}"
                         Visibility="Collapsed" />
                 </Grid>
 
-                <StackPanel x:Name="DetailsRow" Orientation="Horizontal" Spacing="8">
+                <StackPanel x:Name="DetailsRow" Orientation="Horizontal" Spacing="6">
                     <!-- The source app (macOS shows its icon; Windows keeps only its name and exe). -->
                     <TextBlock
                         x:Name="SourceAppText"
@@ -107,21 +114,14 @@
                         MaxLines="1"
                         TextWrapping="NoWrap"
                         Visibility="Collapsed" />
+                    <!-- "date time · duration" (no duration while it is 0); the size on hover. -->
                     <TextBlock
-                        x:Name="DateText"
+                        x:Name="DetailText"
                         VerticalAlignment="Center"
                         Style="{StaticResource CaptionTextBlockStyle}"
-                        Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
-                    <TextBlock
-                        x:Name="DurationText"
-                        VerticalAlignment="Center"
-                        Style="{StaticResource CaptionTextBlockStyle}"
-                        Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
-                    <TextBlock
-                        x:Name="SizeText"
-                        VerticalAlignment="Center"
-                        Style="{StaticResource CaptionTextBlockStyle}"
-                        Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                        Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                        MaxLines="1"
+                        TextWrapping="NoWrap" />
                     <!-- The statuses that need attention: one pill per severity, in the theme's status colors. -->
                     <Border
                         x:Name="CriticalBadge"
@@ -172,14 +172,14 @@
                         Visibility="Collapsed" />
                 </StackPanel>
 
-                <!-- Why the last transcription failed, up to two lines (the full text on hover). -->
+                <!-- Why the last transcription failed, on one line (the full text on hover). -->
                 <TextBlock
                     x:Name="FailureText"
                     Style="{StaticResource CaptionTextBlockStyle}"
                     Foreground="{ThemeResource SystemFillColorCriticalBrush}"
-                    MaxLines="2"
+                    MaxLines="1"
                     TextTrimming="CharacterEllipsis"
-                    TextWrapping="Wrap"
+                    TextWrapping="NoWrap"
                     Visibility="Collapsed" />
 
                 <!-- The transcription progress or its action; collapsed when there is none. -->

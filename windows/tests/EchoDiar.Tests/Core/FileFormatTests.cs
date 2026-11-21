@@ -265,6 +265,7 @@ public sealed class FileFormatTests : IDisposable
             .AsObject();
 
         Assert.Equal(Fixtures().Keys.Order(StringComparer.Ordinal), macos.Select(p => p.Key).Order(StringComparer.Ordinal));
+        Assert.Contains(ChatLog.Decode(Encoding.UTF8.GetBytes(macos[ChatLog.FileName]!.ToJsonString())).Messages, m => m.Live == true);
         foreach (var (name, json) in macos)
         {
             var bytes = Encoding.UTF8.GetBytes(json!.ToJsonString());
@@ -410,6 +411,7 @@ public sealed class FileFormatTests : IDisposable
                 Timestamp = At.AddSeconds(5),
                 References = [new ChatLog.Reference { Number = 1, ConversationID = ConversationId, Title = Vietnamese }],
             },
+            new ChatLog.Message { Role = ChatRole.User, Text = "Live: " + Vietnamese, Timestamp = At.AddSeconds(10), Live = true },
         ],
     };
 

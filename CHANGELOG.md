@@ -7,6 +7,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- Library: conversations are in sections (Today, Previous 3 days, Last 7 days, Last 30 days, Older) and shown one page at a time, with a page bar at the bottom ("1–100 of 742"). Set "Entries per page" (50, 100, 200 or 500; 100 by default) in Settings > General > Library.
+- A sidebar button hides or shows the library's sidebar. macOS: also View > Hide Sidebar (⌃⌘S).
+- Settings has its own search field.
+- While recording, the page has three tabs: Transcript, Catch-up and Chat. When the recording ends, the conversation opens on the matching tab (Catch-up opens Summary).
+- Settings > General > Recording window > "Recording layout": Tabs, or Side by side, which shows the live transcript next to Catch-up and Chat and hides the sidebar until Stop (unless you show or hide it yourself).
+- Chat while recording, on the catch-up provider (on-device models can't be used until Stop). Its questions and answers are saved in the conversation's chat, marked "Live".
+
+### Changed
+
+- Library: search moved from the header to a field at the top of the sidebar; ⌘F (Ctrl+F on Windows) puts the cursor in it.
+- A catch-up sums up only what is new since the last one, in more detail: what happened, in order with [mm:ss] times, what is happening right now, and new decisions, action items and open questions. The setting to start from the beginning still makes every catch-up cover the whole meeting.
+- Chats with providers that cache prompts, such as Anthropic, answer follow-up questions faster and for less.
+
 ## [1.5.6] - 2026-11-18
 
 ### Changed

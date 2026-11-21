@@ -75,8 +75,8 @@ struct SectionHeader: View {
 /// is the selection, so `openSettings(tab:)` deep-links.
 struct SettingsView: View {
     @Bindable var model: AppModel
-    /// The toolbar's search query on this page: while not empty, the sidebar lists the sections with hits and the
-    /// detail shows the matching settings.
+    /// The sidebar search field's query: while not empty, the sidebar lists the sections with hits and the detail
+    /// shows the matching settings.
     @Binding var query: String
     /// Sections opened so far: kept alive like TabView's tabs, so leaving AI does not rerun its scans.
     @State private var opened: Set<SettingsTab> = []
@@ -84,21 +84,26 @@ struct SettingsView: View {
 
     var body: some View {
         HStack(spacing: 0) {
-            // Custom rows, not a sidebar `List`: no public API hides its rounded-rect selection highlight, and the
-            // selected row is an accent capsule like the toolbar's tabs.
-            ScrollView {
-                VStack(spacing: 4) {
-                    ForEach(visibleTabs) { tab in
-                        SidebarRow(tab: tab, selected: tab == model.settingsTab && !searching) { select(tab) }
+            VStack(spacing: 0) {
+                searchField
+                    .padding([.horizontal, .top], 8)
+                // Custom rows, not a sidebar `List`: no public API hides its rounded-rect selection highlight, and the
+                // selected row is an accent capsule like the toolbar's tabs.
+                ScrollView {
+                    VStack(spacing: 4) {
+                        ForEach(visibleTabs) { tab in
+                            SidebarRow(tab: tab, selected: tab == model.settingsTab && !searching) { select(tab) }
+                        }
                     }
+                    .padding(8)
                 }
-                .padding(8)
+                // `.edit`: focusable on click and on appear even with the system's Keyboard Navigation off, as a List
+                // is.
+                .focusable(interactions: .edit)
+                .focusEffectDisabled()
+                .focused($sidebarFocused)
+                .onMoveCommand(perform: move)
             }
-            // `.edit`: focusable on click and on appear even with the system's Keyboard Navigation off, as a List is.
-            .focusable(interactions: .edit)
-            .focusEffectDisabled()
-            .focused($sidebarFocused)
-            .onMoveCommand(perform: move)
             .frame(width: 200)
             // A raised card like the toolbar's capsules, instead of a divider beside the sections.
             .modifier(GlassCard(cornerRadius: 20, raised: true))
@@ -125,6 +130,36 @@ struct SettingsView: View {
     }
 
     private var searching: Bool { !query.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }
+
+    /// The sidebar's search field, above the sections, like the library sidebar's. ⌘F focuses it
+    /// (`model.settingsSearchPresented`); Esc clears the query, then gives up the focus.
+    private var searchField: some View {
+        HStack(spacing: 6) {
+            Image(systemName: "magnifyingglass")
+                .foregroundStyle(.secondary)
+            SearchTextField(text: $query, focusRequest: $model.settingsSearchPresented,
+                            accessibilityLabel: String(localized: "Search settings")) {
+                if query.isEmpty {
+                    NSApp.keyWindow?.makeFirstResponder(nil)
+                } else {
+                    query = ""
+                }
+            }
+            if !query.isEmpty {
+                Button {
+                    query = ""
+                } label: {
+                    Image(systemName: "xmark.circle.fill").foregroundStyle(.secondary)
+                }
+                .buttonStyle(.plain)
+                .help("Clear search")
+                .accessibilityLabel("Clear search")
+            }
+        }
+        .padding(.horizontal, 10)
+        .frame(height: 30)
+        .modifier(InputCapsule())
+    }
 
     /// Every section, or while searching only those with a matching setting.
     private var visibleTabs: [SettingsTab] {

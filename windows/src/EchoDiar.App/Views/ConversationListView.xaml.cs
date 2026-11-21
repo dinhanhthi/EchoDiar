@@ -14,16 +14,19 @@ using Microsoft.UI.Xaml.Automation;
 using Microsoft.UI.Xaml.Automation.Peers;
 using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Input;
+using Microsoft.UI.Xaml.Media;
 using VirtualKey = Windows.System.VirtualKey;
 using Windows.UI.Core;
 
 namespace EchoDiar.App.Views;
 
 /// <summary>
-/// The library (macOS ConversationListView.swift and MainView.swift libraryPane): conversation cards under day headers
-/// (Today, Yesterday, then the date), filtered by the toolbar's search, with the model download banner (MVP). While
-/// recording, the recording's card sits above them and the recording's own entry is left out. Ctrl-click and
-/// Shift-click select cards (from the open entry in the sidebar, as in Mail); the selection bar then shows above the
+/// The library (macOS ConversationListView.swift and MainView.swift libraryPane): the search box, then the current
+/// page's conversation cards under section headers (Today, Previous 3 days, Last 7 days, Last 30 days, Older), filtered
+/// by the search, with the model download banner (MVP) and the page bar under the cards while there is more than one
+/// page. While recording, the recording's card sits above them on every page and with a search, outside the pages and
+/// their count, and the recording's own entry is left out. Ctrl-click and Shift-click select cards (from the open
+/// entry in the sidebar, as in Mail); the selection bar then shows above the
 /// list, which moves down, with Delete and Cancel (Esc, the window's: <see cref="MainWindow"/>). Delete deletes the selection (the
 /// window's key too), else the focused card, else the open conversation (the window's key); when the open conversation goes,
 /// the next card opens. The ListView itself never selects: the cards draw the open conversation and the selection. The
@@ -31,18 +34,22 @@ namespace EchoDiar.App.Views;
 /// </summary>
 public sealed partial class ConversationListView : UserControl
 {
+    /// <summary>The cards are filtered once typing pauses this long (at once when cleared).</summary>
+    private static readonly TimeSpan SearchDelay = TimeSpan.FromMilliseconds(200);
+
     private readonly AppViewModel _model;
+    private readonly DispatcherQueueTimer _searchTimer;
 
     /// <summary>
-    /// Day headers and cards, in list order, each in its own ListViewItem (so a card is never moved between item
-    /// containers). Cards are kept by id and headers by day, so updates keep them. Each is kept with its content, never
+    /// Section headers and cards, in list order, each in its own ListViewItem (so a card is never moved between item
+    /// containers). Cards are kept by id and headers by section, so updates keep them. Each is kept with its content, never
     /// read back from the item: WinUI clears a list item's Content when it clears it as the container of another item
     /// (Selector.ClearContainerForItemOverride, for a recycled item whose link to itself was already undone), so it is
     /// put back when that happened.
     /// </summary>
     private readonly ObservableCollection<ListViewItem> _items = [];
     private readonly Dictionary<Guid, (ListViewItem Item, ConversationCard Card)> _cards = [];
-    private readonly Dictionary<DateTime, (ListViewItem Item, TextBlock Text)> _headers = [];
+    private readonly Dictionary<LibraryBucket, (ListViewItem Item, TextBlock Text)> _headers = [];
 
     private readonly ListSelection _selection = new();
     private readonly RecordingCard _card;
@@ -52,6 +59,9 @@ public sealed partial class ConversationListView : UserControl
 
     /// <summary>The recording state the rows were last listed for.</summary>
     private bool _listedWhileRecording;
+
+    /// <summary>The page (clamped) the rows were last listed for: another one clears the selection and scrolls to the top.</summary>
+    private int _listedPage;
 
     /// <summary>The sidebar's selected card: the shown conversation.</summary>
     private Guid? _selectedId;
@@ -71,16 +81,36 @@ public sealed partial class ConversationListView : UserControl
         SelectionDeleteAudioItem.Click += (_, _) => _ = DeleteSelectionAsync(audioOnly: true);
         SelectionDeleteConversationsItem.Click += (_, _) => _ = DeleteSelectionAsync(audioOnly: false);
         SelectionCancelButton.Click += (_, _) => ClearSelection();
+        PreviousPageButton.Click += (_, _) => StepPage(-1);
+        NextPageButton.Click += (_, _) => StepPage(1);
+        _searchTimer = DispatcherQueue.CreateTimer();
+        _searchTimer.Interval = SearchDelay;
+        _searchTimer.IsRepeating = false;
+        _searchTimer.Tick += (timer, _) =>
+        {
+            timer.Stop();
+            _model.SearchTerm = SearchBox.Text;
+        };
+        SearchBox.TextChanged += (_, _) => OnSearchTextChanged();
+        // The inner text field handles Esc first.
+        SearchBox.AddHandler(KeyDownEvent, new KeyEventHandler(OnSearchKeyDown), handledEventsToo: true);
         // Also the keys a focused item or the list already handled (Space, Enter).
         AddHandler(KeyDownEvent, new KeyEventHandler(OnKeyDown), handledEventsToo: true);
         Loaded += (_, _) =>
         {
             StartupTrace.Write("library view Loaded");
             _model.PropertyChanged += OnModelChanged;
+            // The search may have been cleared while the library chat was shown in this view's place.
+            OnSearchTermChanged();
             UpdateRows();
             UpdateBanner();
         };
-        Unloaded += (_, _) => _model.PropertyChanged -= OnModelChanged;
+        Unloaded += (_, _) =>
+        {
+            _model.PropertyChanged -= OnModelChanged;
+            // Typing not applied yet is dropped: a later tick would bring back a search the model has cleared since.
+            _searchTimer.Stop();
+        };
     }
 
     /// <summary>
@@ -93,8 +123,12 @@ public sealed partial class ConversationListView : UserControl
     {
         switch (e.PropertyName)
         {
+            case nameof(AppViewModel.SearchTerm):
+                OnSearchTermChanged();
+                break;
             case nameof(AppViewModel.Conversations):
             case nameof(AppViewModel.SearchResults):
+            case nameof(AppViewModel.LibraryPage):
             case nameof(AppViewModel.TranscriptionProgress):
             case nameof(AppViewModel.TranscriptionErrors):
                 UpdateRows();
@@ -117,24 +151,27 @@ public sealed partial class ConversationListView : UserControl
     }
 
     /// <summary>
-    /// The search results by day; moves, adds and removes only the items that changed, so the list keeps its scroll
-    /// position, and updates every card in place. Then the empty state, and the selection without the cards that left.
+    /// The current page of the search results by section; moves, adds and removes only the items that changed, so the
+    /// list keeps its scroll position, and updates every card in place. Another page starts at the top, without a
+    /// selection. Then the empty state, the page bar, and the selection without the cards that left.
     /// </summary>
     private void UpdateRows()
     {
         var recording = _model.IsRecording;
         _listedWhileRecording = recording;
         _card.Visibility = recording ? Visibility.Visible : Visibility.Collapsed;
-        // The recording's own entry is hidden while recording: its card is the recording card.
-        bool Listed(Conversation c) => !(recording && c.Status == ConversationStatus.Recording);
-        var groups = DayGroup.Groups(_model.SearchResults.Where(Listed));
+        // The recording's own entry is left out (AppViewModel.Listed): its card is the recording card.
+        var page = _model.CurrentLibraryPage();
+        var sections = page.Sections;
+        var pageChanged = page.Page != _listedPage;
+        _listedPage = page.Page;
 
         var wanted = new List<ListViewItem>();
         var shown = new List<Conversation>();
-        foreach (var group in groups)
+        foreach (var section in sections)
         {
-            wanted.Add(Header(group.Day));
-            foreach (var conversation in group.Conversations)
+            wanted.Add(Header(section.Bucket));
+            foreach (var conversation in section.Conversations)
             {
                 if (!_cards.TryGetValue(conversation.Id, out var row))
                 {
@@ -153,19 +190,58 @@ public sealed partial class ConversationListView : UserControl
         }
         _shown = shown;
         Sync(wanted);
+        // At once, not enqueued: a conversation opened from outside the list changes the page first, then the window
+        // scrolls its card into view (ShowAsSidebar).
+        if (pageChanged) ScrollToTop();
 
-        // Cards of deleted conversations, headers of days no longer listed.
+        // Cards of deleted conversations, headers of sections no longer listed.
         var ids = _model.Conversations.Select(c => c.Id).ToHashSet();
         foreach (var id in _cards.Keys.Where(id => !ids.Contains(id)).ToList()) _cards.Remove(id);
-        var days = groups.Select(g => g.Day).ToHashSet();
-        foreach (var day in _headers.Keys.Where(day => !days.Contains(day)).ToList()) _headers.Remove(day);
+        var buckets = sections.Select(s => s.Bucket).ToHashSet();
+        foreach (var bucket in _headers.Keys.Where(bucket => !buckets.Contains(bucket)).ToList()) _headers.Remove(bucket);
 
-        // Cards that left the list (search filter, deletion) are not selected.
-        _selection.Prune(shown.Select(c => c.Id).ToList());
+        // Cards that left the list (search filter, deletion) are not selected; nor any on another page.
+        if (pageChanged) _selection.Clear();
+        else _selection.Prune(shown.Select(c => c.Id).ToList());
         UpdateCards();
-        UpdateEmptyState(groups.Count == 0, recording, _model.Conversations.Any(Listed));
+        UpdateEmptyState(sections.Count == 0, recording, _model.Conversations.Any(_model.Listed));
+        UpdatePageBar(page);
         StartupTrace.Write($"library rows updated ({shown.Count} rows)");
     }
+
+    /// <summary>The list's own scroller at the top, with the recording's card (the list's header).</summary>
+    private void ScrollToTop()
+    {
+        if (Scroller(ConversationList) is { } scroller) scroller.ChangeView(null, 0, null, disableAnimation: true);
+    }
+
+    /// <summary>The first ScrollViewer under <paramref name="parent"/>; none before the list's template is applied.</summary>
+    private static ScrollViewer? Scroller(DependencyObject parent)
+    {
+        for (var i = 0; i < VisualTreeHelper.GetChildrenCount(parent); i++)
+        {
+            var child = VisualTreeHelper.GetChild(parent, i);
+            if (child is ScrollViewer scroller) return scroller;
+            if (Scroller(child) is { } found) return found;
+        }
+        return null;
+    }
+
+    /// <summary>
+    /// macOS pageBar: "1–100 of 742" with the arrows, disabled at the first and the last page; hidden with one page.
+    /// </summary>
+    private void UpdatePageBar(LibraryPageContent page)
+    {
+        var paged = page.PageCount > 1;
+        PageBar.Visibility = paged ? Visibility.Visible : Visibility.Collapsed;
+        if (!paged) return;
+        PreviousPageButton.IsEnabled = page.Page > 0;
+        NextPageButton.IsEnabled = page.Page < page.PageCount - 1;
+        RecordingCard.SetText(PageText, Loc.Format("%lld–%lld of %lld", page.Start + 1, page.Start + page.Count, page.Total));
+    }
+
+    /// <summary>The page bar's arrows: from the shown page, as the stored one may be past the last.</summary>
+    private void StepPage(int delta) => _model.LibraryPage = _model.CurrentLibraryPage().Page + delta;
 
     /// <summary>Makes <see cref="_items"/> equal to <paramref name="wanted"/> (same instances, same order) with few changes.</summary>
     private void Sync(List<ListViewItem> wanted)
@@ -192,10 +268,10 @@ public sealed partial class ConversationListView : UserControl
         }
     }
 
-    /// <summary>"Today", "Yesterday", or the long date without the weekday, as muted left-aligned text; not focusable.</summary>
-    private ListViewItem Header(DateTime day)
+    /// <summary>The section's title, as muted left-aligned text; not focusable.</summary>
+    private ListViewItem Header(LibraryBucket bucket)
     {
-        if (!_headers.TryGetValue(day, out var header))
+        if (!_headers.TryGetValue(bucket, out var header))
         {
             var text = new TextBlock { Style = (Style)Resources["DayHeaderText"] };
             header = (new ListViewItem
@@ -207,21 +283,21 @@ public sealed partial class ConversationListView : UserControl
                 Content = text,
             }, text);
             AutomationProperties.SetHeadingLevel(header.Item, AutomationHeadingLevel.Level2);
-            _headers[day] = header;
+            _headers[bucket] = header;
         }
         if (!ReferenceEquals(header.Item.Content, header.Text)) header.Item.Content = header.Text;
-        // Today and Yesterday move on at midnight.
-        RecordingCard.SetText(header.Text, DayTitle(day));
+        RecordingCard.SetText(header.Text, BucketTitle(bucket));
         return header.Item;
     }
 
-    private static string DayTitle(DateTime day)
+    private static string BucketTitle(LibraryBucket bucket) => bucket switch
     {
-        var today = DateTime.Today;
-        if (day == today) return Loc.T("Today");
-        if (day == today.AddDays(-1)) return Loc.T("Yesterday");
-        return LongDate(day);
-    }
+        LibraryBucket.Today => Loc.T("Today"),
+        LibraryBucket.Previous3Days => Loc.T("Previous 3 days"),
+        LibraryBucket.Last7Days => Loc.T("Last 7 days"),
+        LibraryBucket.Last30Days => Loc.T("Last 30 days"),
+        _ => Loc.T("Older"),
+    };
 
     /// <summary>macOS .long without a time: "October 22, 2026"; Windows' long date also names the weekday.</summary>
     internal static string LongDate(DateTime day)
@@ -235,10 +311,10 @@ public sealed partial class ConversationListView : UserControl
     /// macOS libraryPane: the recording's card alone while recording with nothing listed yet and nothing searched;
     /// "No conversations yet" for an empty library; "No conversations match" for a search without results.
     /// </summary>
-    private void UpdateEmptyState(bool noGroups, bool recording, bool anyListed)
+    private void UpdateEmptyState(bool noSections, bool recording, bool anyListed)
     {
         string? text = null;
-        if (noGroups && !(recording && _model.SearchTerm.Length == 0))
+        if (noSections && !(recording && _model.SearchTerm.Length == 0))
         {
             text = anyListed
                 ? Loc.Format("No conversations match \"%@\"", _model.SearchTerm)
@@ -351,9 +427,10 @@ public sealed partial class ConversationListView : UserControl
     }
 
     /// <summary>
-    /// The window's ↑/↓ (<paramref name="delta"/> -1 or 1) with no card selected: the previous or next entry (the
-    /// recording's card first while recording), opened as a click on its card opens it; the first or the last when none
-    /// is open. Stops at the ends. False while cards are selected (the key goes on).
+    /// The window's ↑/↓ (<paramref name="delta"/> -1 or 1) with no card selected: the previous or next entry of the
+    /// current page (the recording's card first while recording), opened as a click on its card opens it; the first or
+    /// the last when none of them is open. Stops at the page's ends: ↑/↓ never change the page. False while cards are
+    /// selected (the key goes on).
     /// </summary>
     internal bool Move(int delta)
     {
@@ -499,6 +576,65 @@ public sealed partial class ConversationListView : UserControl
     internal static bool IsKeyDown(VirtualKey key) =>
         InputKeyboardSource.GetKeyStateForCurrentThread(key).HasFlag(CoreVirtualKeyStates.Down);
 
+    // Search
+
+    /// <summary>
+    /// Ctrl+F (macOS <c>showSearch</c>): the focus goes to the search box. The view put back in the sidebar in place of
+    /// the library chat is not loaded yet: the box takes the focus once it is.
+    /// </summary>
+    public void FocusSearch()
+    {
+        if (IsLoaded)
+        {
+            FocusSearchBox();
+            return;
+        }
+        Loaded -= OnLoadedFocusSearch;
+        Loaded += OnLoadedFocusSearch;
+    }
+
+    private void OnLoadedFocusSearch(object sender, RoutedEventArgs e)
+    {
+        Loaded -= OnLoadedFocusSearch;
+        FocusSearchBox();
+    }
+
+    /// <summary>A box just laid out may not take the focus at once: it tries once more after the layout.</summary>
+    private void FocusSearchBox()
+    {
+        if (!SearchBox.Focus(FocusState.Programmatic))
+        {
+            DispatcherQueue.TryEnqueue(DispatcherQueuePriority.Low, () => SearchBox.Focus(FocusState.Programmatic));
+        }
+    }
+
+    /// <summary>
+    /// The model cleared the search (another page of the window, the window hidden, the library chat opened): the box
+    /// follows, and typing not applied yet is dropped. The box's own clearing, or a blank term, leaves it as it is.
+    /// </summary>
+    private void OnSearchTermChanged()
+    {
+        if (_model.SearchTerm.Length > 0 || SearchBox.Text.Trim().Length == 0) return;
+        _searchTimer.Stop();
+        SearchBox.Text = "";
+    }
+
+    /// <summary>Filters once typing pauses; a cleared field shows every conversation at once.</summary>
+    private void OnSearchTextChanged()
+    {
+        _searchTimer.Stop();
+        if (SearchBox.Text.Length == 0) _model.SearchTerm = "";
+        else _searchTimer.Start();
+    }
+
+    /// <summary>Esc clears the search (macOS clears the query first).</summary>
+    private void OnSearchKeyDown(object sender, KeyRoutedEventArgs e)
+    {
+        if (e.Key != VirtualKey.Escape || SearchBox.Text.Length == 0) return;
+        e.Handled = true;
+        SearchBox.Text = "";
+    }
+
     /// <summary>
     /// The models still missing: speech models until one is installed, then speaker models while "Tell speakers
     /// apart" is on and none is installed.
@@ -508,6 +644,7 @@ public sealed partial class ConversationListView : UserControl
         var needsSpeech = !_model.HasTranscriptionModel;
         var visible = needsSpeech || _model.NeedsDiarizer;
         ModelBanner.IsOpen = visible;
+        ModelBanner.Visibility = visible ? Visibility.Visible : Visibility.Collapsed;
         if (!visible) return;
 
         // Windows-only texts (Strings/Windows.xcstrings).

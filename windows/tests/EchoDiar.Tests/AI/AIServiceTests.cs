@@ -8,9 +8,9 @@ namespace EchoDiar.Tests.AI;
 // Guards the summary job: map-reduce sends status lines and streams only the final reduce, the result is saved as a
 // version, a cancelled job saves nothing (also after a stop, and CancelAsync waits for it), a stopped job saves what it
 // streamed, and an in-app model is unloaded before the gate is released. Also guards how many earlier chat messages a
-// question sends, the library question's sources and references, the clickable citations, and the catch-up job
-// (appended to catchups.json, never on an in-app model). AIServiceTests.swift +
-// AIStorageTests.swift (citations).
+// question sends, the library question's sources and references, the clickable citations, the catch-up job
+// (appended to catchups.json, never on an in-app model) and the live question (appended to chat.json marked Live).
+// AIServiceTests.swift + AIStorageTests.swift (citations).
 public sealed class AIServiceTests : IDisposable
 {
     /// <summary>Answers every request with <c>reply</c>, in two pieces, and reports a small context to force map-reduce.</summary>
@@ -338,10 +338,16 @@ public sealed class AIServiceTests : IDisposable
             "What was decided?", conversation, MakeTranscript(3), summary: null, history, historyLimit: limit, provider,
             providerID: "fake", model: "fake", language: "en", cancellationToken: Ct));
 
-        var sent = Assert.IsAssignableFrom<IReadOnlyList<LLMMessage>>(provider.LastReceived)
-            .Where(m => m.Content.StartsWith("History ", StringComparison.Ordinal)).ToList();
-        Assert.Equal(expected, sent.Select(m => m.Content));
-        Assert.Equal(LLMRole.User, sent[0].Role);
+        // Between the system message and the new question; the first question carries the meeting context.
+        var sent = Assert.IsAssignableFrom<IReadOnlyList<LLMMessage>>(provider.LastReceived);
+        var window = sent.Skip(1).SkipLast(1).ToList();
+        Assert.Equal("Question: What was decided?", sent[^1].Content);
+        Assert.Equal(expected.Select((_, i) => i % 2 == 0 ? LLMRole.User : LLMRole.Assistant), window.Select(m => m.Role));
+        Assert.StartsWith("Meeting: ", window[0].Content);
+        Assert.EndsWith($"</transcript>\n\nQuestion: {expected[0]}", window[0].Content);
+        Assert.Equal(
+            expected.Select((text, i) => (i % 2 == 0 ? "Question: " : "") + text).Skip(1),
+            window.Skip(1).Select(m => m.Content));
     }
 
     [Fact]
@@ -537,9 +543,11 @@ public sealed class AIServiceTests : IDisposable
         var service = new AIService(new ModelLoadGate());
         LLMMessage[] messages = [new(LLMRole.User, "Catch me up.")];
         var provider = new FakeProvider("So far: the roadmap.", context: 128_000);
-        var first = new CatchUpPlan(null, [], [], Omitted: false, FullPass: true, ThroughLineID: 7, ThroughTime: 42.5);
+        var first = new CatchUpPlan(
+            null, Context: [], Transcript: [], Omitted: false, FullPass: true, ThroughLineID: 7, ThroughTime: 42.5);
         var second = new CatchUpPlan(
-            "So far: the roadmap.", [], [], Omitted: false, FullPass: false, ThroughLineID: 12, ThroughTime: 95);
+            "So far: the roadmap.", Context: [], Transcript: [], Omitted: false, FullPass: false, ThroughLineID: 12,
+            ThroughTime: 95);
 
         await Collect(service.CatchUpAsync(
             first, messages, provider, providerID: "cfg-1", model: "fake", elapsed: 60, folder, Ct));
@@ -563,11 +571,56 @@ public sealed class AIServiceTests : IDisposable
     }
 
     [Fact]
+    public async Task AFullPassCutToFitIsSavedAsNotFull()
+    {
+        var folder = NewFolderPath();
+        Directory.CreateDirectory(folder);
+        var service = new AIService(new ModelLoadGate());
+        var provider = new FakeProvider("So far: the roadmap.", context: 128_000);
+
+        foreach (var omitted in new[] { true, false })
+        {
+            var plan = new CatchUpPlan(
+                null, Context: [], Transcript: [], Omitted: omitted, FullPass: true, ThroughLineID: 7, ThroughTime: 42.5);
+            await Collect(service.CatchUpAsync(
+                plan, [new(LLMRole.User, "Catch me up.")], provider, providerID: "cfg-1", model: "fake", elapsed: 60,
+                folder, Ct));
+        }
+
+        // A cut full pass does not cover the start, so a live question still sends the catch-ups before it.
+        Assert.Equal([false, true], CatchUpLog.Load(folder).CatchUps.Select(c => c.FullPass));
+    }
+
+    [Fact]
+    public async Task LiveQuestionAppendsTheQuestionAndAnswerMarkedLive()
+    {
+        var folder = NewFolderPath();
+        Directory.CreateDirectory(folder);
+        var service = new AIService(new ModelLoadGate());
+        var provider = new FakeProvider("The budget is 2 M€ [01:05].", context: 128_000);
+        LLMMessage[] messages = [new(LLMRole.User, "Now: [02:00]\nQuestion: What budget?")];
+
+        await Collect(service.AskLiveAsync(
+            "What budget?", messages, provider, providerID: "cfg-1", model: "fake", folder, Ct));
+
+        Assert.Equal(1, provider.Calls);
+        Assert.Equal(messages, provider.LastReceived!);
+        var saved = ChatLog.Read(folder).Messages;
+        Assert.Equal([ChatRole.User, ChatRole.Assistant], saved.Select(m => m.Role));
+        Assert.Equal(["What budget?", "The budget is 2 M€ [01:05]."], saved.Select(m => m.Text));
+        Assert.Equal([true, true], saved.Select(m => m.Live));
+        Assert.Equal([null, "cfg-1"], saved.Select(m => m.Provider));
+        Assert.Equal([null, "fake"], saved.Select(m => m.Model));
+        Assert.NotNull(saved[0].Timestamp);
+    }
+
+    [Fact]
     public async Task CatchUpOnAnInAppModelFailsWithoutWaitingForTheGate()
     {
         var gate = new ModelLoadGate();
         var service = new AIService(gate);
-        var plan = new CatchUpPlan(null, [], [], Omitted: false, FullPass: true, ThroughLineID: 7, ThroughTime: 42);
+        var plan = new CatchUpPlan(
+            null, Context: [], Transcript: [], Omitted: false, FullPass: true, ThroughLineID: 7, ThroughTime: 42);
         // Held by the live transcriber for the whole recording: a job waiting for it would send its waiting status.
         using var lease = await gate.AcquireAsync(ModelLoadGate.Owner.LiveTranscript, Ct);
 

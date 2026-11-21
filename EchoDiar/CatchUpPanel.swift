@@ -2,9 +2,9 @@ import AppKit
 import EchoCore
 import SwiftUI
 
-/// "Catch up" in the recording header: a quick summary of the meeting so far (`AppModel.startCatchUp`); disabled
-/// with `catchUpDisabledReason` as its help, else its help names the provider and where the data goes. Its own view,
-/// so the live captions it follows redraw only it.
+/// "Catch up" in the recording header: a quick summary of what is new (`AppModel.startCatchUp`), written in the
+/// Catch-up tab, which it selects; disabled with `catchUpDisabledReason` as its help, else its help names the provider
+/// and where the data goes. Its own view, so the live captions it follows redraw only it.
 struct CatchUpButton: View {
     let model: AppModel
 
@@ -12,7 +12,7 @@ struct CatchUpButton: View {
         let reason = model.catchUpDisabledReason
         // The help sits on a wrapper: a disabled button may show none of its own.
         HStack {
-            Button(action: model.startCatchUp) {
+            Button(action: catchUp) {
                 Label("Catch up", systemImage: "list.bullet.clipboard")
             }
             .buttonBorderShape(.capsule)
@@ -22,10 +22,16 @@ struct CatchUpButton: View {
         .help(Text(reason ?? help))
     }
 
+    /// Side by side too: there `recordingTab` is the right panel's Catch-up | Chat.
+    private func catchUp() {
+        model.startCatchUp()
+        model.recordingTab = .catchUp
+    }
+
     /// What it does, the provider it runs on, and, as the AI pane's data notes, whether the data leaves this Mac and
     /// how far a CLI agent is contained.
     private var help: String {
-        var lines = [String(localized: "Summarize the meeting so far, mostly its last 5 minutes")]
+        var lines = [String(localized: "Summarize what is new since the last catch-up")]
         if let provider = model.catchUpProvider {
             lines.append(String(localized: "\(String(localized: "Catch-up provider")): \(provider.name)"))
             lines += [provider.leavesMacNote, provider.containmentNote].compactMap { $0 }
@@ -34,22 +40,27 @@ struct CatchUpButton: View {
     }
 }
 
-/// The current recording's catch-ups, between its header and its live transcript, newest first: the one being written
+/// The current recording's catch-ups, filling the recording page's Catch-up tab, newest first: the one being written
 /// on top (a placeholder until its text comes, then its streamed Markdown, with Stop), then the saved ones. The
-/// newest is open and the others collapsed, each opening or closing with a click on its header; each has Copy. At
-/// most `maxHeight` tall, scrolled past it; hidden while there are none.
+/// newest is open and the others collapsed, each opening or closing with a click on its header; each has Copy. While
+/// there are none, a hint to press Catch up.
 struct CatchUpPanel: View {
     let model: AppModel
+    /// In its own card; false inside a panel that draws one (side by side).
+    var framed = true
     /// The open state the user gave cards with a click; the others: the newest open, the older ones collapsed.
     @State private var openStates: [UUID: Bool] = [:]
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
-    private static let maxHeight: CGFloat = 280
-
     var body: some View {
         let cards = self.cards
-        if !cards.isEmpty {
-            HeightCap(maxHeight: Self.maxHeight) {
+        Group {
+            if cards.isEmpty {
+                Text("No catch-up yet. Press Catch up to summarize the meeting so far.")
+                    .foregroundStyle(.secondary)
+                    .multilineTextAlignment(.center)
+                    .padding(20)
+            } else {
                 ScrollView {
                     VStack(spacing: 6) {
                         ForEach(Array(cards.enumerated()), id: \.element.id) { index, card in
@@ -62,10 +73,11 @@ struct CatchUpPanel: View {
                 }
                 .scrollBounceBehavior(.basedOnSize)
             }
-            .modifier(GlassCard(cornerRadius: 14))
-            // Model Markdown: citations and web links open nothing on the recording page.
-            .environment(\.openURL, OpenURLAction { _ in .discarded })
         }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .modifier(FramedCard(framed: framed))
+        // Model Markdown: citations and web links open nothing on the recording page.
+        .environment(\.openURL, OpenURLAction { _ in .discarded })
     }
 
     /// The run first, then the saved catch-ups, newest first.
@@ -243,18 +255,17 @@ private struct DelayedSpinner: View {
     }
 }
 
-/// Its content at its ideal height (a scroll view's: its content's), at most `maxHeight`, at the proposed width; in
-/// one layout pass, so a new card shows in the frame it is added.
-private struct HeightCap: Layout {
-    let maxHeight: CGFloat
+/// `GlassCard` when `framed`; nothing for content inside a panel that draws its own card (the recording's side by
+/// side panel), so no card sits on a card of the same surface.
+struct FramedCard: ViewModifier {
+    let framed: Bool
+    var cornerRadius: CGFloat = 14
 
-    func sizeThatFits(proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) -> CGSize {
-        guard let content = subviews.first else { return .zero }
-        let ideal = content.sizeThatFits(ProposedViewSize(width: proposal.width, height: nil))
-        return CGSize(width: proposal.width ?? ideal.width, height: min(ideal.height, maxHeight))
-    }
-
-    func placeSubviews(in bounds: CGRect, proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) {
-        subviews.first?.place(at: bounds.origin, proposal: ProposedViewSize(width: bounds.width, height: bounds.height))
+    func body(content: Content) -> some View {
+        if framed {
+            content.modifier(GlassCard(cornerRadius: cornerRadius))
+        } else {
+            content
+        }
     }
 }

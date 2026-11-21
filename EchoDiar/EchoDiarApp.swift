@@ -140,6 +140,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSMe
         guard let closing = notification.object as? NSWindow, closing === window else { return }
         // The next window opens without the search field focused.
         model.searchPresented = false
+        model.settingsSearchPresented = false
         model.mainWindowVisible = false
         // Release the window and its SwiftUI hierarchy after it finishes closing; it is recreated on the next open.
         Task { @MainActor [weak self] in
@@ -201,7 +202,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSMe
         return credits
     }
 
-    // MARK: - Main menu actions (the menu owns ⌘R, ⇧⌘P, ⌘1, ⌘2, ⌘I, ⌘[ and ⌘F, so they work from every window)
+    // MARK: - Main menu actions (the menu owns ⌘R, ⇧⌘P, ⌘1, ⌘2, ⌘I, ⌘[, ⌃⌘S and ⌘F, so they work from every window)
     // The route is set before the window is shown, so a new window opens on that page.
 
     @objc private func toggleRecording() { model.toggleRecording() }
@@ -229,7 +230,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSMe
 
     @objc private func checkForUpdates() { updater.checkForUpdates() }
 
-    /// Focuses the toolbar search of the current page (conversations, or settings on the Settings page).
+    @objc private func toggleSidebar() { model.toggleSidebar() }
+
+    /// Focuses the sidebar search of the current page (conversations, or settings on the Settings page).
     @objc private func showSearch() {
         showMainWindow()
         model.showSearch()
@@ -252,6 +255,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSMe
             return false
         case #selector(goBack):
             return model.route != .list || model.globalChatOpen
+        case #selector(toggleSidebar):
+            item.title = model.sidebarHidden ? String(localized: "Show Sidebar") : String(localized: "Hide Sidebar")
+            switch model.route {
+            case .list, .conversation, .recording: return true
+            case .settings, .calendar: return false
+            }
         case #selector(checkForUpdates):
             // Disabled while the updater is off (no SUPublicEDKey yet), and while recording: an update relaunches.
             item.title = updater.menuTitle
@@ -319,6 +328,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSMe
         case .settings, .calendar: return false
         }
         guard !model.globalChatOpen else { return false }
+        // A hidden sidebar unmounts the list that acts on these keys: they go to the responder under them.
+        guard !model.sidebarHidden else { return false }
         guard let delta else {
             if !event.isARepeat {
                 DispatchQueue.main.async { NotificationCenter.default.post(name: .deleteInSidebar, object: nil) }
@@ -363,6 +374,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSMe
                          action: #selector(showLibrary), keyEquivalent: "2").target = self
         viewMenu.addItem(withTitle: String(localized: "Chat"), action: #selector(openChat), keyEquivalent: "i").target = self
         viewMenu.addItem(withTitle: String(localized: "Back"), action: #selector(goBack), keyEquivalent: "[").target = self
+        let sidebarItem = viewMenu.addItem(withTitle: String(localized: "Hide Sidebar"),
+                                           action: #selector(toggleSidebar), keyEquivalent: "s")
+        sidebarItem.keyEquivalentModifierMask = [.control, .command]
+        sidebarItem.target = self
         viewMenu.addItem(withTitle: String(localized: "Search"), action: #selector(showSearch), keyEquivalent: "f")
             .target = self
         let windowMenu = NSMenu(title: String(localized: "Window", comment: "Main menu"))

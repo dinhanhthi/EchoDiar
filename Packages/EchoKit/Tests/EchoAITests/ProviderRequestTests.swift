@@ -54,6 +54,29 @@ struct ProviderRequestTests {
         expectSecretsOnlyWhereAllowed(request)
     }
 
+    @Test func anthropicSendsCachedPartsAsMarkedBlocks() throws {
+        let context = "Transcript:\n\(transcript)\n\n"
+        let request = try AnthropicClient.makeRequest(
+            config: try preset("anthropic"), apiKey: key,
+            messages: [
+                LLMMessage(role: .system, content: "Answer from the meeting."),
+                LLMMessage(role: .assistant, content: "Earlier answer."),
+                LLMMessage(role: .user, parts: [.init(text: context, cache: true), .init(text: "Question: q")]),
+            ],
+            model: "m", maxTokens: 100)
+
+        let body = try json(request)
+        #expect(body["system"] as? String == "Answer from the meeting.")
+        #expect(body["cache_control"] == nil)
+        let sent = try #require(body["messages"] as? [[String: Any]])
+        #expect(sent[0]["content"] as? String == "Earlier answer.")
+        let blocks = try #require(sent[1]["content"] as? [[String: Any]])
+        #expect(blocks.map { $0["type"] as? String } == ["text", "text"])
+        #expect(blocks.map { $0["text"] as? String } == [context, "Question: q"])
+        #expect(blocks[0]["cache_control"] as? [String: String] == ["type": "ephemeral"])
+        #expect(blocks[1]["cache_control"] == nil)
+    }
+
     @Test func openAICompatibleEmbeddingsRequestPostsModelAndInputs() throws {
         let request = try OpenAICompatibleClient.makeEmbeddingsRequest(
             config: try preset("openai"), apiKey: key, model: "e", inputs: [transcript, "b"])

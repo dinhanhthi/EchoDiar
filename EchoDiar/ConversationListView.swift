@@ -8,14 +8,15 @@ extension Notification.Name {
     static let moveInSidebar = Notification.Name("EchoDiar.moveInSidebar")
 }
 
-/// The library as compact cards under pinned day headers, in the library page's sidebar, the recording's card above
-/// them while recording. Shows the groups it is given, so callers can filter them. The open entry is selected and
+/// The library as compact cards under pinned section headers (Today, Previous 3 days, …), in the library page's
+/// sidebar, the recording's card above them while recording. Shows the sections it is given (one page of the
+/// library), so callers can filter and page them. The open entry is selected and
 /// scrolled into view. ⌘-click and ⇧-click select cards (not the recording's), from the open entry as in Mail, and the
 /// selection bar shows at the top while any is selected. ⌘⌫ or Del deletes the selection, else the open conversation;
 /// ↑/↓ open the previous or next entry.
 struct ConversationListView: View {
     let model: AppModel
-    let groups: [DayGroup]
+    let sections: [LibrarySection]
     var selectedID: UUID?
     @State private var selection = ListSelection()
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
@@ -23,15 +24,15 @@ struct ConversationListView: View {
     var body: some View {
         ScrollViewReader { proxy in
             ScrollView {
-                LazyVStack(alignment: .leading, spacing: 10, pinnedViews: .sectionHeaders) {
+                LazyVStack(alignment: .leading, spacing: 4, pinnedViews: .sectionHeaders) {
                     if model.isRecording {
                         RecordingCard(model: model, selected: model.route == .recording)
                             .id(Self.recordingCardID)
                             .transition(cardTransition)
                     }
-                    ForEach(groups) { group in
+                    ForEach(sections) { section in
                         Section {
-                            ForEach(group.conversations) { conversation in
+                            ForEach(section.conversations) { conversation in
                                 ConversationCard(
                                     conversation: conversation, model: model,
                                     selected: selection.isEmpty
@@ -47,13 +48,13 @@ struct ConversationListView: View {
                                 .transition(cardTransition)
                             }
                         } header: {
-                            DayHeader(day: group.day)
+                            BucketHeader(bucket: section.bucket)
                         }
                     }
                 }
                 .padding(12)
                 .background(OverlayScrollers())
-                .animation(reduceMotion ? nil : Motion.standard, value: groups)
+                .animation(reduceMotion ? nil : Motion.standard, value: sections)
                 .animation(reduceMotion ? nil : Motion.standard, value: model.isRecording)
             }
             .safeAreaInset(edge: .top, spacing: 0) {
@@ -69,8 +70,9 @@ struct ConversationListView: View {
                 }
             }
             .animation(reduceMotion ? nil : Motion.standard, value: selection.isEmpty)
-            // Cards that left the list (search filter, deletion) are not selected.
-            .onChange(of: groups) { selection.prune(keeping: order) }
+            // Cards that left the list (search filter, deletion) are not selected. A new page is a new list
+            // (`.id(page)` at the call site), so its selection starts empty.
+            .onChange(of: sections) { selection.prune(keeping: order) }
             // Esc cancels the selection instead of leaving the entry.
             .onChange(of: selection.isEmpty) { model.listSelectionActive = !selection.isEmpty }
             .onDisappear { model.listSelectionActive = false }
@@ -143,12 +145,12 @@ struct ConversationListView: View {
         }
     }
 
-    /// The cards' ids in list order, across day groups.
-    private var order: [UUID] { groups.flatMap(\.conversations).map(\.id) }
+    /// The cards' ids in list order, across sections: the page's, so ↑/↓ and ⇧-click stay on the page.
+    private var order: [UUID] { sections.flatMap(\.conversations).map(\.id) }
 
     /// The selected conversations in list order.
     private var selectedConversations: [Conversation] {
-        groups.flatMap(\.conversations).filter { selection.ids.contains($0.id) }
+        sections.flatMap(\.conversations).filter { selection.ids.contains($0.id) }
     }
 
     /// A small scale with a fade; only the fade with Reduce Motion.
@@ -208,10 +210,10 @@ private struct SelectionBar: View {
     }
 }
 
-/// "Today", "Yesterday", or the date as muted text, centered. On the sidebar's panel, so cards scrolling under the
-/// pinned header do not show through.
-private struct DayHeader: View {
-    let day: Date
+/// The section's title ("Today", "Previous 3 days", …) as muted text, centered. On the sidebar's panel, so cards
+/// scrolling under the pinned header do not show through.
+private struct BucketHeader: View {
+    let bucket: LibraryBucket
 
     var body: some View {
         Text(title)
@@ -225,10 +227,13 @@ private struct DayHeader: View {
     }
 
     private var title: String {
-        let calendar = Calendar.current
-        if calendar.isDateInToday(day) { return String(localized: "Today") }
-        if calendar.isDateInYesterday(day) { return String(localized: "Yesterday") }
-        return day.formatted(date: .long, time: .omitted)
+        switch bucket {
+        case .today: String(localized: "Today")
+        case .previous3Days: String(localized: "Previous 3 days")
+        case .last7Days: String(localized: "Last 7 days")
+        case .last30Days: String(localized: "Last 30 days")
+        case .older: String(localized: "Older")
+        }
     }
 }
 
