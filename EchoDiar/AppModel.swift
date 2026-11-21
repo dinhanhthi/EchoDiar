@@ -156,14 +156,22 @@ final class AppModel {
     private(set) var hotKeyError: String?
     /// Why the global pause shortcut could not be registered; nil when registered or off.
     private(set) var pauseHotKeyError: String?
-    /// ⌘F asks the main window's search field to take the focus; false again once it stops editing.
+    /// ⌘F asks the library sidebar's search field to take the focus; false again once it stops editing. Kept until
+    /// the field is on screen (from Calendar, with the library chat open or with the sidebar hidden it is not yet).
     var searchPresented = false
+    /// ⌘F on the Settings page asks the Settings sidebar's search field to take the focus.
+    var settingsSearchPresented = false
+    /// The library sidebar is hidden (⌃⌘S, the toolbar button); this session only. Hide it with `setSidebarHidden(_:)`.
+    var sidebarHidden = false
     /// Cards are selected in the list: Esc cancels the selection instead of going back.
     var listSelectionActive = false
     /// The conversation whose sidebar title is being renamed: opening Chat then leaves the cursor in its field.
     var renamingConversation: UUID?
-    /// The library chat is shown: in place of the cards on the list, or of the sidebar beside a conversation.
-    var globalChatOpen = false
+    /// The library chat is shown: in place of the cards on the list, or of the sidebar beside a conversation. It lives
+    /// in the sidebar pane: opening it shows the sidebar (written directly, so the two never call each other back).
+    var globalChatOpen = false {
+        didSet { if globalChatOpen { sidebarHidden = false } }
+    }
     /// What the library index (RAG) is doing, for Settings › AI Settings › Library chat.
     var ragStatus = RAGStatus()
 
@@ -1888,11 +1896,26 @@ final class AppModel {
         OnboardingWindow.shared.show(model: self)
     }
 
-    /// ⌘F: the search field focused, on the current page: the query filters the cards or the sidebar, or on Settings
-    /// the settings. The Calendar page has nothing to search: back to the library first.
+    /// ⌘F: the library sidebar's search field focused (the library chat closed and the sidebar shown), or on Settings
+    /// the Settings sidebar's. The Calendar page has nothing to search: back to the library first.
     func showSearch() {
+        if route == .settings {
+            settingsSearchPresented = true
+            return
+        }
         if route == .calendar { goBack() }
+        globalChatOpen = false
+        setSidebarHidden(false)
         searchPresented = true
+    }
+
+    /// ⌃⌘S and the toolbar's sidebar button.
+    func toggleSidebar() { setSidebarHidden(!sidebarHidden) }
+
+    /// The one path that hides or shows the library sidebar: hiding it closes the library chat, which lives in it.
+    func setSidebarHidden(_ hidden: Bool) {
+        if hidden { globalChatOpen = false }
+        sidebarHidden = hidden
     }
 
     /// The Calendar page of the main window; Back returns to the library page it was opened from (from Settings, to

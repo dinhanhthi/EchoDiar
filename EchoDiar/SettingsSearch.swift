@@ -48,6 +48,7 @@ struct SettingsSearchItem: Identifiable {
         .init(title: "Indicator size", keywords: ["floating indicator", "pill", "small", "medium", "large"],
               tab: .general),
         .init(title: "Delete conversations without confirmation", keywords: ["confirm", "trash", "library"], tab: .general),
+        .init(title: "Entries per page", keywords: ["page", "pagination", "sidebar", "list", "library"], tab: .general),
         .init(title: "Copy consent message", keywords: ["consent", "privacy", "tell people"], tab: .general),
         .init(title: "Show onboarding again", keywords: ["permissions", "welcome", "setup"], tab: .general),
 

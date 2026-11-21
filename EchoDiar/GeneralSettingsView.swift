@@ -57,6 +57,9 @@ struct GeneralSettingsView: View {
                     Text("Delete conversations without confirmation")
                     Text("They still go to the Trash.")
                 }
+                Picker("Entries per page", selection: model.setting(\.libraryPageSize)) {
+                    ForEach(LibraryPaging.sizeOptions, id: \.self) { Text(verbatim: String($0)).tag($0) }
+                }
             }
             Section("Consent") {
                 VStack(alignment: .leading, spacing: 8) {

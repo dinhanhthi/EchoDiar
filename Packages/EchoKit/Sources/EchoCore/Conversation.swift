@@ -361,25 +361,3 @@ public enum ConversationFiles {
         return url
     }
 }
-
-/// Conversations that started on the same local day.
-public struct DayGroup: Equatable, Identifiable, Sendable {
-    /// Start of the day.
-    public var day: Date
-    /// Newest first.
-    public var conversations: [Conversation]
-
-    public var id: Date { day }
-
-    public init(day: Date, conversations: [Conversation]) {
-        self.day = day
-        self.conversations = conversations
-    }
-
-    /// Groups by local day, newest day first, each group newest first.
-    public static func groups(from conversations: [Conversation], calendar: Calendar = .current) -> [DayGroup] {
-        Dictionary(grouping: conversations) { calendar.startOfDay(for: $0.createdAt) }
-            .map { DayGroup(day: $0.key, conversations: $0.value.sorted { $0.createdAt > $1.createdAt }) }
-            .sorted { $0.day > $1.day }
-    }
-}
