@@ -66,7 +66,9 @@ public sealed partial class AppViewModel
     private CatchUpRun? _catchUpRun;
     private IReadOnlyList<CatchUp> _recordingCatchUps = [];
 
-    /// <summary>Catch-up jobs not ended yet, also of an earlier recording: quit stops them (<see cref="ShutdownAI"/>).</summary>
+    /// <summary>
+    /// Catch-up and live chat jobs not ended yet, also of an earlier recording: quit stops them (<see cref="ShutdownAI"/>).
+    /// </summary>
     private int _runningCatchUps;
 
     /// <summary>

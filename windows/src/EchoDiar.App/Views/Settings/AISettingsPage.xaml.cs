@@ -45,7 +45,7 @@ public sealed partial class AISettingsPage : UserControl
         new("Summary model", ["summary", "summaries", "LLM", "default model"], SummaryTab),
         new("AI answer language", ["language", "output language", "answers", "summaries"], SummaryTab),
         new("Catch-up", ["catch up", "live summary", "recording", "meeting so far"], CatchUpTab),
-        new("Catch-up provider", ["catch up", "live summary", "cloud", "CLI", "local server"], CatchUpTab),
+        new("Catch-up provider", ["catch up", "live summary", "cloud", "CLI", "local server", "live chat"], CatchUpTab),
         new("Catch-up model", ["catch up", "live summary", "LLM"], CatchUpTab),
         new("Re-summarize from the start each time", ["catch up", "incremental", "whole recording", "from start"], CatchUpTab),
         new("Default transcription model",

@@ -262,8 +262,10 @@
             </StackPanel>
 
             <!--
-                The conversation page's tab (AppViewModel.DetailTab): Transcript, or Summary and Chat (the AI panel). Never
-                shown with the Settings tabs below, which take the same place.
+                The conversation page's tab (AppViewModel.DetailTab): Transcript, or Summary and Chat (the AI panel); during
+                a recording in the Tabs layout, the recording page's tab (AppViewModel.RecordingTab): Transcript,
+                Catch-up (the middle item relabeled) and Chat. Never shown with the Settings tabs below, which take the
+                same place.
             -->
             <SelectorBar
                 x:Name="TabsBar"

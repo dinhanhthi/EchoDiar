@@ -35,6 +35,7 @@ public sealed partial class GeneralSettingsPage : UserControl
         new("Hide it while an EchoDiar window is in front", ["floating indicator", "pill", "hide"]),
         new("Show it in screenshots and screen recordings", ["floating indicator", "pill", "screenshot", "screen sharing", "capture"]),
         new("Indicator size", ["floating indicator", "pill", "small", "medium", "large"]),
+        new("Recording layout", ["layout", "side by side", "tabs", "recording window", "live chat", "catch-up", "catch up"]),
         new("Delete conversations without confirmation", ["confirm", "Recycle Bin", "trash", "library"]),
         new("Entries per page", ["page", "pagination", "sidebar", "list", "library"]),
         new("Copy consent message", ["consent", "privacy", "tell people"]),
@@ -67,6 +68,10 @@ public sealed partial class GeneralSettingsPage : UserControl
         PillSizeCombo.SelectionChanged += (_, _) =>
         {
             if (!_syncing && PillSizeCombo.SelectedIndex >= 0) _settings.PillSize = (PillSize)PillSizeCombo.SelectedIndex;
+        };
+        RecordingLayoutCombo.SelectionChanged += (_, _) =>
+        {
+            if (!_syncing && RecordingLayoutCombo.SelectedIndex >= 0) _settings.RecordingLayout = (RecordingLayout)RecordingLayoutCombo.SelectedIndex;
         };
         LanguageCombo.SelectionChanged += (_, _) => OnLanguageChosen();
         RelaunchButton.Click += (_, _) => OnRelaunchClicked();
@@ -132,6 +137,7 @@ public sealed partial class GeneralSettingsPage : UserControl
             HidePillCard.IsEnabled = _settings.ShowPill;
             CapturesToggle.IsOn = _settings.ShowPillInScreenCaptures;
             PillSizeCombo.SelectedIndex = (int)_settings.PillSize;
+            RecordingLayoutCombo.SelectedIndex = (int)_settings.RecordingLayout;
             DeleteToggle.IsOn = _settings.DeleteWithoutConfirmation;
             // A size outside the choices (an edited settings file) selects none.
             PageSizeCombo.SelectedIndex = LibraryPaging.SizeOptions.ToList().IndexOf(_settings.LibraryPageSize);

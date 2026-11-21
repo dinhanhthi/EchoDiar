@@ -100,8 +100,12 @@ public sealed partial class AppViewModel
         private set => SetProperty(ref _sidebarHidden, value);
     }
 
-    /// <summary>The title bar's sidebar button.</summary>
-    public void ToggleSidebar() => SetSidebarHidden(!SidebarHidden);
+    /// <summary>The title bar's sidebar button. During a recording, the user's choice outlasts its end.</summary>
+    public void ToggleSidebar()
+    {
+        _sidebarAutoHidden = false;
+        SetSidebarHidden(!SidebarHidden);
+    }
 
     /// <summary>
     /// The one path that hides or shows the library sidebar (macOS <c>setSidebarHidden</c>): hiding it closes the

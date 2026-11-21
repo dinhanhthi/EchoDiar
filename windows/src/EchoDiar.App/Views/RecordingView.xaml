@@ -1,8 +1,10 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!--
     The recording page (macOS RecordingViews.swift RecordingDetailView and RecordingHeader): the header with the
-    title, the state, the elapsed time, the mic and system meters, "Catch up" and the language, the calendar suggestion,
-    the capture warnings, the catch-ups, then the live transcript, or the wave and why there is none.
+    title, the state, the elapsed time, the mic and system meters, "Catch up" and the language, the calendar suggestion
+    and the capture warnings, pinned on every tab and in both layouts; under them the tab's content: the live
+    transcript (or the wave and why there is none), the catch-ups, or the live chat; side by side, the transcript on
+    the left and the catch-ups or the chat on the right.
 -->
 <UserControl
     x:Class="EchoDiar.App.Views.RecordingView"
@@ -21,11 +23,17 @@
         <Style x:Key="PausedWaveBarStyle" TargetType="Rectangle">
             <Setter Property="Fill" Value="{ThemeResource TextFillColorDisabledBrush}" />
         </Style>
+        <!-- A card: the catch-ups in the Tabs layout, the right panel side by side (set in code). -->
+        <Style x:Key="PaneStyle" TargetType="Border">
+            <Setter Property="Background" Value="{ThemeResource CardBackgroundFillColorDefaultBrush}" />
+            <Setter Property="BorderBrush" Value="{ThemeResource CardStrokeColorDefaultBrush}" />
+            <Setter Property="BorderThickness" Value="1" />
+            <Setter Property="CornerRadius" Value="{StaticResource OverlayCornerRadius}" />
+        </Style>
     </UserControl.Resources>
 
     <Grid Padding="12" RowSpacing="8">
         <Grid.RowDefinitions>
-            <RowDefinition Height="Auto" />
             <RowDefinition Height="Auto" />
             <RowDefinition Height="Auto" />
             <RowDefinition Height="Auto" />
@@ -209,50 +217,94 @@
             Severity="Warning"
             Title="{local:T Text='No system audio'}" />
 
-        <!-- The catch-ups (CatchUpCard, set in code), newest first; at most 280 px tall, scrolled past it; hidden while none. -->
-        <Border
-            x:Name="CatchUpPanel"
-            Grid.Row="4"
-            Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
-            BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
-            BorderThickness="1"
-            CornerRadius="{StaticResource OverlayCornerRadius}"
-            Visibility="Collapsed">
-            <ScrollViewer MaxHeight="280" VerticalScrollBarVisibility="Auto">
-                <StackPanel x:Name="CatchUpCards" Padding="8" Spacing="6" />
-            </ScrollViewer>
-        </Border>
+        <!--
+            The tab's content (AppViewModel.RecordingTab), placed in code by Settings.RecordingLayout: Tabs, the
+            transcript or the panel across the width; side by side, the transcript on the left and the panel on the
+            right, in a card, with its own Catch-up | Chat tabs (Transcript shown as Catch-up).
+        -->
+        <Grid Grid.Row="4" ColumnSpacing="12">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="*" />
+            </Grid.ColumnDefinitions>
 
-        <!-- LiveTranscriptView, set in code; shown while the recording has a live transcriber. -->
-        <Border x:Name="LiveHost" Grid.Row="5" Visibility="Collapsed" />
+            <!-- The live transcript, or the wave and why there is none; kept while hidden (its view holds the stream). -->
+            <Grid x:Name="TranscriptPane" Grid.ColumnSpan="2">
+                <!-- LiveTranscriptView, set in code; shown while the recording has a live transcriber. -->
+                <Border x:Name="LiveHost" Visibility="Collapsed" />
 
-        <StackPanel
-            x:Name="NoLivePanel"
-            Grid.Row="5"
-            MaxWidth="560"
-            HorizontalAlignment="Center"
-            VerticalAlignment="Center"
-            Spacing="16">
-            <!-- RecordingWave: 24 bars, built in code. -->
-            <StackPanel
-                x:Name="Wave"
-                Height="64"
-                HorizontalAlignment="Center"
-                AutomationProperties.AccessibilityView="Raw"
-                Orientation="Horizontal"
-                Spacing="4" />
-            <TextBlock
-                x:Name="ReasonText"
-                HorizontalAlignment="Center"
-                Style="{StaticResource BodyTextBlockStyle}"
-                Foreground="{ThemeResource TextFillColorSecondaryBrush}"
-                TextAlignment="Center"
-                TextWrapping="Wrap" />
-            <!-- Opens the Settings page the reason names. -->
-            <HyperlinkButton
-                x:Name="OpenSettingsLink"
-                HorizontalAlignment="Center"
-                Content="{local:T Text='Open Settings'}" />
-        </StackPanel>
+                <StackPanel
+                    x:Name="NoLivePanel"
+                    MaxWidth="560"
+                    HorizontalAlignment="Center"
+                    VerticalAlignment="Center"
+                    Spacing="16">
+                    <!-- RecordingWave: 24 bars, built in code. -->
+                    <StackPanel
+                        x:Name="Wave"
+                        Height="64"
+                        HorizontalAlignment="Center"
+                        AutomationProperties.AccessibilityView="Raw"
+                        Orientation="Horizontal"
+                        Spacing="4" />
+                    <TextBlock
+                        x:Name="ReasonText"
+                        HorizontalAlignment="Center"
+                        Style="{StaticResource BodyTextBlockStyle}"
+                        Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                        TextAlignment="Center"
+                        TextWrapping="Wrap" />
+                    <!-- Opens the Settings page the reason names. -->
+                    <HyperlinkButton
+                        x:Name="OpenSettingsLink"
+                        HorizontalAlignment="Center"
+                        Content="{local:T Text='Open Settings'}" />
+                </StackPanel>
+            </Grid>
+
+            <!-- The catch-ups or the chat; side by side, one card with the Catch-up | Chat tabs over them. -->
+            <Border x:Name="SidePanel" Grid.ColumnSpan="2" Visibility="Collapsed">
+                <Grid>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="*" />
+                    </Grid.RowDefinitions>
+                    <SelectorBar
+                        x:Name="PanelTabsBar"
+                        Margin="0,10"
+                        Padding="0"
+                        HorizontalAlignment="Center"
+                        Visibility="Collapsed">
+                        <SelectorBarItem x:Name="CatchUpPanelTab" Text="{local:T Text='Catch-up'}" />
+                        <SelectorBarItem x:Name="ChatPanelTab" Text="{local:T Text='Chat'}" />
+                    </SelectorBar>
+
+                    <!--
+                        The catch-ups (CatchUpCard, set in code), newest first, filling the tab, in a card of their own
+                        in the Tabs layout; while there are none, a hint to press Catch up.
+                    -->
+                    <Border x:Name="CatchUpPanel" Grid.Row="1" Style="{StaticResource PaneStyle}">
+                        <Grid>
+                            <TextBlock
+                                x:Name="CatchUpEmptyText"
+                                Margin="20"
+                                HorizontalAlignment="Center"
+                                VerticalAlignment="Center"
+                                Style="{StaticResource BodyTextBlockStyle}"
+                                Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                                TextAlignment="Center"
+                                TextWrapping="Wrap"
+                                Text="{local:T Text='No catch-up yet. Press Catch up to summarize the meeting so far.'}" />
+                            <ScrollViewer x:Name="CatchUpScroller" VerticalScrollBarVisibility="Auto" Visibility="Collapsed">
+                                <StackPanel x:Name="CatchUpCards" Padding="8" Spacing="6" />
+                            </ScrollViewer>
+                        </Grid>
+                    </Border>
+
+                    <!-- LiveChatView, made in code while the Chat tab is shown. -->
+                    <Border x:Name="ChatHost" Grid.Row="1" />
+                </Grid>
+            </Border>
+        </Grid>
     </Grid>
 </UserControl>

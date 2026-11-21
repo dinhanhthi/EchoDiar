@@ -244,6 +244,13 @@ public sealed partial class SettingsViewModel : ObservableObject
         set => Update(s => s with { DeleteWithoutConfirmation = value });
     }
 
+    /// <summary>"Recording layout": the recording window's tabs, or the live transcript beside Catch-up and Chat.</summary>
+    public RecordingLayout RecordingLayout
+    {
+        get => Settings.RecordingLayout;
+        set => Update(s => s with { RecordingLayout = value });
+    }
+
     /// <summary>"Entries per page" of the library sidebar, one of <see cref="EchoDiar.Core.LibraryPaging.SizeOptions"/>.</summary>
     public int LibraryPageSize
     {

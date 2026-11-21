@@ -21,6 +21,9 @@ public enum RouteKind { List, Conversation, Recording, Settings, Calendar }
 /// <summary>The conversation page's tab (macOS <c>AppModel.DetailTab</c>).</summary>
 public enum DetailTab { Transcript, Summary, Chat }
 
+/// <summary>The recording page's tab (macOS <c>AppModel.RecordingTab</c>); side by side, the right panel's Catchup | Chat.</summary>
+public enum RecordingTab { Transcript, CatchUp, Chat }
+
 /// <summary>What the main window shows: the library list, one conversation, the recording page, Settings or the Calendar page.</summary>
 public sealed record Route(RouteKind Kind, Guid? ConversationId = null)
 {
@@ -169,6 +172,9 @@ public sealed partial class AppViewModel : ObservableObject
             SyncMeetingDetection();
             OnCalendarSettingsChanged(old.Calendar, value.Calendar);
             if (value.LibraryPageSize != old.LibraryPageSize) ResetLibraryPage();
+            // Side by side has no Transcript tab on the right: a switch to it mid-recording shows Catchup there.
+            if (value.RecordingLayout == RecordingLayout.SideBySide && old.RecordingLayout != RecordingLayout.SideBySide
+                && (IsRecording || IsStarting) && RecordingTab == RecordingTab.Transcript) RecordingTab = RecordingTab.CatchUp;
         }
     }
 
@@ -670,6 +676,7 @@ public sealed partial class AppViewModel : ObservableObject
         RecordingTitle = eventTitle;
         // A catch-up still writing for the previous recording finishes and saves in its folder, out of sight.
         ResetCatchUps();
+        ResetRecordingPage();
         if (bringForward)
         {
             ShowRecording();
@@ -706,6 +713,7 @@ public sealed partial class AppViewModel : ObservableObject
             if (_closing) return;
             _activeFolder = folder;
             if (_activeFolder is null) return;
+            _ = LoadLiveChatAsync(_activeFolder);
             _pollTimer.Start();
             BeginEndWatch(target);
             CalendarRecordingStarted(calendarEvent);
@@ -723,6 +731,7 @@ public sealed partial class AppViewModel : ObservableObject
             RecordingError = e is RecordingDiskFullException
                 ? Loc.T("There is not enough free disk space to record.")
                 : $"{Loc.T("The recording could not start.")} ({e.Message})";
+            RestoreAutoHiddenSidebar();
             // The recording page opened before the start; nothing to show there now.
             if (Route.Kind == RouteKind.Recording) Route = Route.List;
         }
@@ -893,6 +902,7 @@ public sealed partial class AppViewModel : ObservableObject
         CalendarSuggestion = null;
         _dismissedSuggestionIds.Clear();
         if (snapshot.EndReason is not { } reason) return;
+        RestoreAutoHiddenSidebar();
         EndEndWatch();
         TakeRecordingEvent();
         // The next recording starts with the remembered or default language again.
@@ -915,6 +925,13 @@ public sealed partial class AppViewModel : ObservableObject
     /// </summary>
     private async Task FinishRecordingAsync(string folder, RecordingTranscriber? transcriber)
     {
+        // The recording page's tab at Stop, before a new recording can reset it.
+        var openTab = RecordingTab switch
+        {
+            RecordingTab.CatchUp => DetailTab.Summary,
+            RecordingTab.Chat => DetailTab.Chat,
+            _ => DetailTab.Transcript,
+        };
         var prior = transcriber is null ? null : FinishRecordingTranscriberAsync(transcriber);
         if (_closing) return;
         try
@@ -924,8 +941,16 @@ public sealed partial class AppViewModel : ObservableObject
             if (_closing) return;
             if (Route.Kind == RouteKind.Recording)
             {
-                DetailTab = DetailTab.Transcript;
-                Route = session is not null && list.Any(c => c.Id == session.Id) ? Route.ForConversation(session.Id) : Route.List;
+                if (session is not null && list.Any(c => c.Id == session.Id))
+                {
+                    DetailTab = openTab;
+                    Route = Route.ForConversation(session.Id);
+                }
+                else
+                {
+                    DetailTab = DetailTab.Transcript;
+                    Route = Route.List;
+                }
             }
             await CompressAndTranscribeAsync(folder, session, prior);
         }
