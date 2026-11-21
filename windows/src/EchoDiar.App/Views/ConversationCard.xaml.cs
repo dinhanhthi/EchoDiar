@@ -37,6 +37,7 @@ public sealed partial class ConversationCard : UserControl
     private string? _retryTip;
     private string? _transcribeTip;
     private string? _badgeTip;
+    private string? _sizeTip;
 
     internal ConversationCard(AppViewModel model, ConversationListView list, Conversation conversation)
     {
@@ -102,18 +103,23 @@ public sealed partial class ConversationCard : UserControl
     }
 
     /// <summary>
-    /// The source app's name when known, the date, the duration and size when known, the status badge, and whether
-    /// the audio was removed.
+    /// The source app's name when known, "date time · duration" (no duration while it is 0; a plain string, as macOS,
+    /// so no localization key) with the size in its tooltip when known, the status badge, and whether the audio was
+    /// removed.
     /// </summary>
     private void UpdateDetails(Conversation c)
     {
         SourceAppText.Visibility = Shown(!string.IsNullOrWhiteSpace(c.SourceAppName));
         RecordingCard.SetText(SourceAppText, c.SourceAppName ?? "");
-        RecordingCard.SetText(DateText, c.CreatedAt.ToLocalTime().ToString("g", CultureInfo.CurrentCulture));
-        DurationText.Visibility = Shown(c.Duration > 0);
-        RecordingCard.SetText(DurationText, ConversationText.Clock(c.Duration));
-        SizeText.Visibility = Shown(c.SizeBytes > 0);
-        RecordingCard.SetText(SizeText, FileSize(c.SizeBytes));
+        var date = c.CreatedAt.ToLocalTime().ToString("g", CultureInfo.CurrentCulture);
+        RecordingCard.SetText(DetailText, c.Duration > 0 ? $"{date} · {ConversationText.Clock(c.Duration)}" : date);
+        // No tooltip without a size; set only when it changes (Update runs at each job percent).
+        var size = c.SizeBytes > 0 ? FileSize(c.SizeBytes) : null;
+        if (size != _sizeTip)
+        {
+            _sizeTip = size;
+            ToolTipService.SetToolTip(DetailText, size);
+        }
 
         // macOS StatusBadge: red, orange or blue, here the theme's critical, caution and attention colors.
         (string Text, Border Badge, TextBlock Label)? badge = c.Status switch

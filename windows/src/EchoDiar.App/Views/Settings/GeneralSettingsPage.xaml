@@ -1,7 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!--
     Settings › General (macOS GeneralSettingsView.swift): launch at login, the app language, the floating indicator,
-    deleting without confirmation, the consent message and "Show onboarding again", as Windows 11 Settings cards under section headers.
+    deleting without confirmation, the library's entries per page, the consent message and "Show onboarding again", as
+    Windows 11 Settings cards under section headers.
     Each searchable card's Tag is its search entry's title (SearchEntries), so a search result can bring it into view.
 -->
 <UserControl
@@ -96,6 +97,16 @@
                 Header="{local:T Text='Delete conversations without confirmation'}"
                 Tag="Delete conversations without confirmation">
                 <ToggleSwitch x:Name="DeleteToggle" AutomationProperties.Name="{local:T Text='Delete conversations without confirmation'}" />
+            </controls:SettingsCard>
+
+            <!-- The sizes are plain numbers (LibraryPaging.SizeOptions), filled in code. -->
+            <controls:SettingsCard
+                Header="{local:T Text='Entries per page'}"
+                Tag="Entries per page">
+                <ComboBox
+                    x:Name="PageSizeCombo"
+                    MinWidth="200"
+                    AutomationProperties.Name="{local:T Text='Entries per page'}" />
             </controls:SettingsCard>
 
             <StackPanel Style="{StaticResource SectionHeaderStyle}">

@@ -244,6 +244,13 @@ public sealed partial class SettingsViewModel : ObservableObject
         set => Update(s => s with { DeleteWithoutConfirmation = value });
     }
 
+    /// <summary>"Entries per page" of the library sidebar, one of <see cref="EchoDiar.Core.LibraryPaging.SizeOptions"/>.</summary>
+    public int LibraryPageSize
+    {
+        get => Settings.LibraryPageSize;
+        set => Update(s => s with { LibraryPageSize = value });
+    }
+
     // Shortcuts
 
     /// <summary>"Global record shortcut" on.</summary>

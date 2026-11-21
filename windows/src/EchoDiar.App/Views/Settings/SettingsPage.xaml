@@ -1,9 +1,9 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!--
     The Settings page of the main window (macOS SettingsWindow.swift SettingsView): a 200 px sidebar of the sections
-    (Services/SettingsSearch.cs) with their icons, the selected section's page on the right. While the toolbar's search
-    has a term, the sidebar lists only the sections with a matching row, none selected, and the right side lists the
-    matching rows (macOS SettingsSearchResults); a row opens its section and inner tab and clears the search.
+    (Services/SettingsSearch.cs) with their icons, the selected section's page on the right. While the search box at the
+    top of the sidebar has a term, the sidebar lists only the sections with a matching row, none selected, and the right
+    side lists the matching rows (macOS SettingsSearchResults); a row opens its section and inner tab and clears the search.
     A NavigationView in Left mode, pane always open: it sits below the custom title bar, so it never draws its own. Its
     content area draws no layer of its own: it sits on the window body's layer, like the other pages. The selected
     section is an accent capsule, like macOS.
@@ -11,7 +11,8 @@
 <UserControl
     x:Class="EchoDiar.App.Views.SettingsPage"
     xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
-    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:local="using:EchoDiar.App">
 
     <NavigationView
         x:Name="Nav"
@@ -75,6 +76,18 @@
                 </Style>
             </ResourceDictionary>
         </NavigationView.Resources>
+
+        <!--
+            Filters the settings as typed (macOS SettingsWindow searchField), above the sections, like the library
+            sidebar's box; Ctrl+F focuses it, Esc clears it.
+        -->
+        <NavigationView.AutoSuggestBox>
+            <AutoSuggestBox
+                x:Name="SearchBox"
+                AutomationProperties.Name="{local:T Text='Search settings'}"
+                PlaceholderText="{local:T Text='Search settings'}"
+                QueryIcon="Find" />
+        </NavigationView.AutoSuggestBox>
 
         <Grid>
             <!-- The selected section's page; each section's page is made the first time it shows, then kept. -->

@@ -6,7 +6,7 @@
     xmlns:local="using:EchoDiar.App">
 
     <UserControl.Resources>
-        <!-- The day headers (macOS DayHeader): muted, semibold caption text, left-aligned with the cards. -->
+        <!-- The section headers (macOS DayHeader): muted, semibold caption text, left-aligned with the cards. -->
         <Style x:Key="DayHeaderText" TargetType="TextBlock" BasedOn="{StaticResource CaptionTextBlockStyle}">
             <Setter Property="Margin" Value="0,8,0,0" />
             <Setter Property="HorizontalAlignment" Value="Left" />
@@ -15,21 +15,38 @@
         </Style>
     </UserControl.Resources>
 
-    <Grid Padding="12,8,12,12" RowSpacing="12">
+    <Grid Padding="12,8,12,12">
         <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
             <RowDefinition Height="Auto" />
             <RowDefinition Height="*" />
         </Grid.RowDefinitions>
 
         <!--
+            Filters the cards as typed (macOS sidebarSearchField), above the cards and the empty states; Ctrl+F focuses
+            it, Esc clears it.
+        -->
+        <AutoSuggestBox
+            x:Name="SearchBox"
+            Margin="0,0,0,12"
+            HorizontalAlignment="Stretch"
+            AutomationProperties.Name="{local:T Text='Search conversations'}"
+            PlaceholderText="{local:T Text='Search conversations'}"
+            QueryIcon="Find" />
+
+        <!--
             Shown until a speech model is installed (and a speaker model, with "Tell speakers apart" on), at the top of
             the 360 px sidebar: the model on its own row (long names end in an ellipsis), then Download or Cancel.
+            Collapsed while closed, so its margin goes too.
         -->
         <InfoBar
             x:Name="ModelBanner"
+            Grid.Row="1"
+            Margin="0,0,0,12"
             IsClosable="False"
             IsOpen="False"
-            Severity="Informational">
+            Severity="Informational"
+            Visibility="Collapsed">
             <StackPanel Margin="0,0,16,16" Spacing="8">
                 <ComboBox
                     x:Name="ModelPicker"
@@ -64,7 +81,7 @@
 
         <!-- The cards on a card panel like the detail's (macOS libraryWell); the cards a subtle fill above it. -->
         <Border
-            Grid.Row="1"
+            Grid.Row="2"
             Padding="0,8"
             Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
             BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
@@ -74,11 +91,12 @@
                 <Grid.RowDefinitions>
                     <RowDefinition Height="Auto" />
                     <RowDefinition Height="*" />
+                    <RowDefinition Height="Auto" />
                 </Grid.RowDefinitions>
 
                 <!--
-                    Day headers and conversation cards (ListViewItems made in code), newest first; the header is the
-                    recording's card while recording. No ListView selection: the cards draw the open conversation and the
+                    Section headers and the current page's conversation cards (ListViewItems made in code), newest
+                    first; the header is the recording's card while recording, on every page and with a search. No ListView selection: the cards draw the open conversation and the
                     Ctrl/Shift selection themselves. The window's ↑/↓ open the previous or next card (and focus it) before the
                     ListView sees them.
                 -->
@@ -156,6 +174,49 @@
                             <FontIcon FontFamily="{ThemeResource SymbolThemeFontFamily}" FontSize="16" Glyph="&#xE711;" />
                         </Button>
                     </Grid>
+                </Border>
+
+                <!--
+                    "‹ 1–100 of 742 ›" under the cards while there is more than one page (macOS pageBar); the arrows are
+                    disabled at the first and the last page.
+                -->
+                <Border
+                    x:Name="PageBar"
+                    Grid.Row="2"
+                    Margin="0,8,0,0"
+                    Padding="0,8,0,0"
+                    BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
+                    BorderThickness="0,1,0,0"
+                    Visibility="Collapsed">
+                    <StackPanel HorizontalAlignment="Center" Orientation="Horizontal" Spacing="12">
+                        <Button
+                            x:Name="PreviousPageButton"
+                            Width="32"
+                            Height="32"
+                            Padding="0"
+                            Style="{StaticResource SubtleButtonStyle}"
+                            AutomationProperties.Name="{local:T Text='Previous page'}"
+                            ToolTipService.ToolTip="{local:T Text='Previous page'}">
+                            <FontIcon FontFamily="{ThemeResource SymbolThemeFontFamily}" FontSize="12" Glyph="&#xE76B;" />
+                        </Button>
+                        <TextBlock
+                            x:Name="PageText"
+                            VerticalAlignment="Center"
+                            Style="{StaticResource BodyTextBlockStyle}"
+                            Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                            MaxLines="1"
+                            TextWrapping="NoWrap" />
+                        <Button
+                            x:Name="NextPageButton"
+                            Width="32"
+                            Height="32"
+                            Padding="0"
+                            Style="{StaticResource SubtleButtonStyle}"
+                            AutomationProperties.Name="{local:T Text='Next page'}"
+                            ToolTipService.ToolTip="{local:T Text='Next page'}">
+                            <FontIcon FontFamily="{ThemeResource SymbolThemeFontFamily}" FontSize="12" Glyph="&#xE76C;" />
+                        </Button>
+                    </StackPanel>
                 </Border>
             </Grid>
         </Border>

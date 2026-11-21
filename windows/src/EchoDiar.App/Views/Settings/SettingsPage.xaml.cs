@@ -6,19 +6,25 @@ using EchoDiar.Core;
 using Microsoft.UI.Dispatching;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
+using Microsoft.UI.Xaml.Input;
 using Microsoft.UI.Xaml.Media;
+using VirtualKey = Windows.System.VirtualKey;
 
 namespace EchoDiar.App.Views;
 
 /// <summary>
 /// The Settings route (macOS SettingsWindow.swift <c>SettingsView</c> and SettingsSearch.swift
-/// <c>SettingsSearchResults</c>): the sidebar of sections, the selected one's page, and the results of the toolbar's
-/// search. <see cref="AppViewModel.SettingsSection"/> is the selection, so <see cref="AppViewModel.OpenSettings"/>
-/// deep-links. Picking a section clears the search.
+/// <c>SettingsSearchResults</c>): the sidebar of sections with its search box, the selected one's page, and the
+/// search's results. <see cref="AppViewModel.SettingsSection"/> is the selection, so
+/// <see cref="AppViewModel.OpenSettings"/> deep-links. Picking a section clears the search.
 /// </summary>
 public sealed partial class SettingsPage : UserControl
 {
+    /// <summary>The settings are filtered once typing pauses this long (at once when cleared), as the library's box.</summary>
+    private static readonly TimeSpan SearchDelay = TimeSpan.FromMilliseconds(200);
+
     private readonly AppViewModel _model;
+    private readonly DispatcherQueueTimer _searchTimer;
 
     /// <summary>Sections shown so far: kept while the page lives, like the macOS sections (their scans run once).</summary>
     private readonly Dictionary<string, FrameworkElement> _pages = [];
@@ -61,6 +67,17 @@ public sealed partial class SettingsPage : UserControl
             Nav.MenuItems.Add(item);
         }
         Nav.SelectionChanged += OnSelectionChanged;
+        _searchTimer = DispatcherQueue.CreateTimer();
+        _searchTimer.Interval = SearchDelay;
+        _searchTimer.IsRepeating = false;
+        _searchTimer.Tick += (timer, _) =>
+        {
+            timer.Stop();
+            _model.SettingsSearchTerm = SearchBox.Text;
+        };
+        SearchBox.TextChanged += (_, _) => OnSearchTextChanged();
+        // The inner text field handles Esc first.
+        SearchBox.AddHandler(KeyDownEvent, new KeyEventHandler(OnSearchKeyDown), handledEventsToo: true);
         Loaded += (_, _) =>
         {
             _model.PropertyChanged += OnModelChanged;
@@ -71,7 +88,12 @@ public sealed partial class SettingsPage : UserControl
                 if (!_model.IsClosing && Nav.SelectedItem is Control selected) selected.Focus(FocusState.Programmatic);
             });
         };
-        Unloaded += (_, _) => _model.PropertyChanged -= OnModelChanged;
+        Unloaded += (_, _) =>
+        {
+            _model.PropertyChanged -= OnModelChanged;
+            // Typing not applied yet is dropped: a later tick would bring back a search the model has cleared since.
+            _searchTimer.Stop();
+        };
     }
 
     private void OnModelChanged(object? sender, PropertyChangedEventArgs e)
@@ -79,7 +101,7 @@ public sealed partial class SettingsPage : UserControl
         if (_opening) return;
         switch (e.PropertyName)
         {
-            case nameof(AppViewModel.SearchTerm):
+            case nameof(AppViewModel.SettingsSearchTerm):
             case nameof(AppViewModel.SettingsSection):
                 Update();
                 break;
@@ -89,7 +111,8 @@ public sealed partial class SettingsPage : UserControl
     /// <summary>The search's sections and results while a term is searched, else every section and the selected one's page.</summary>
     private void Update()
     {
-        var term = _model.SearchTerm;
+        SyncSearchBox();
+        var term = _model.SettingsSearchTerm;
         var searching = term.Length > 0;
         var hits = searching ? SettingsSearch.SectionsWithHits(term).Select(s => s.Id).ToHashSet() : null;
         foreach (var (id, item) in _items)
@@ -250,7 +273,7 @@ public sealed partial class SettingsPage : UserControl
         _opening = true;
         try
         {
-            _model.SearchTerm = "";
+            _model.SettingsSearchTerm = "";
             _model.OpenSettings(section, subTab);
         }
         finally
@@ -258,5 +281,37 @@ public sealed partial class SettingsPage : UserControl
             _opening = false;
         }
         Update();
+    }
+
+    // Search
+
+    /// <summary>Ctrl+F (macOS <c>settingsSearchPresented</c>): the focus goes to the search box.</summary>
+    public void FocusSearch() => SearchBox.Focus(FocusState.Programmatic);
+
+    /// <summary>
+    /// The model cleared the search (a picked section or result, another page of the window, the window hidden): the box
+    /// follows, and typing not applied yet is dropped. The box's own clearing, or a blank term, leaves it as it is.
+    /// </summary>
+    private void SyncSearchBox()
+    {
+        if (_model.SettingsSearchTerm.Length > 0 || SearchBox.Text.Trim().Length == 0) return;
+        _searchTimer.Stop();
+        SearchBox.Text = "";
+    }
+
+    /// <summary>Filters once typing pauses; a cleared field shows the sections at once.</summary>
+    private void OnSearchTextChanged()
+    {
+        _searchTimer.Stop();
+        if (SearchBox.Text.Length == 0) _model.SettingsSearchTerm = "";
+        else _searchTimer.Start();
+    }
+
+    /// <summary>Esc clears the search (macOS clears the query first).</summary>
+    private void OnSearchKeyDown(object sender, KeyRoutedEventArgs e)
+    {
+        if (e.Key != VirtualKey.Escape || SearchBox.Text.Length == 0) return;
+        e.Handled = true;
+        SearchBox.Text = "";
     }
 }

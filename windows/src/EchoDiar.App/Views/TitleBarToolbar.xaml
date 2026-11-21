@@ -3,9 +3,10 @@
     The window's header (macOS MainView.swift toolbar) in two rows on the window's Mica, like Paint. The title row is
     the window's title bar (MainWindow.SetTitleBar): the logo, the page's or the conversation's title and, for a
     conversation, its date and duration; all of it drags the window, the caption buttons sit at its right. The toolbar
-    row below, from the left: Back, the record group, Reveal and Delete, Settings, Calendar and Ask across conversations,
-    Update; at the right edge the conversation's tabs (or a Settings section's inner tabs), then Search. Icon buttons
-    are 32 x 32 subtle buttons with 16 px Segoe Fluent Icons; 4 px between the buttons of a group, 8 px between groups.
+    row below, from the left: the sidebar button (library pages), Back, the record group, Reveal and Delete, Settings,
+    Calendar and Ask across conversations, Update; at the right edge the conversation's tabs (or a Settings section's
+    inner tabs). Icon buttons are 32 x 32 subtle buttons with 16 px Segoe Fluent Icons; 4 px between the buttons of a
+    group, 8 px between groups.
 -->
 <UserControl
     x:Class="EchoDiar.App.Views.TitleBarToolbar"
@@ -69,10 +70,8 @@
         </Grid>
 
         <!--
-            The toolbar: ordinary content, it does not drag the window. Search takes the free space first (its weight
-            dwarfs the spacer's), from 120 up to 280; the spacer takes the rest, so the tabs and Search keep to the right
-            edge. Where even 120 does not fit, Search becomes an icon button that opens the box (code-behind). Margins
-            space the columns, since a collapsed group's column would keep a ColumnSpacing.
+            The toolbar: ordinary content, it does not drag the window. The spacer takes the free space, so the tabs keep
+            to the right edge. Margins space the columns, since a collapsed group's column would keep a ColumnSpacing.
         -->
         <Grid x:Name="ToolbarGrid" Grid.Row="1" Padding="8,0,8,0">
             <Grid.ColumnDefinitions>
@@ -80,10 +79,21 @@
                 <ColumnDefinition x:Name="ActionsColumn" Width="Auto" />
                 <ColumnDefinition x:Name="SpacerColumn" Width="*" />
                 <ColumnDefinition x:Name="TabsColumn" Width="Auto" />
-                <ColumnDefinition x:Name="SearchColumn" Width="1000*" MinWidth="120" MaxWidth="280" />
             </Grid.ColumnDefinitions>
 
             <StackPanel Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
+                <!-- On the library pages (list, conversation, recording): hides or shows the library sidebar. -->
+                <Button
+                    x:Name="SidebarButton"
+                    Width="32"
+                    Height="32"
+                    Padding="0"
+                    Style="{StaticResource SubtleButtonStyle}"
+                    AutomationProperties.Name="{local:T Text='Hide Sidebar'}"
+                    ToolTipService.ToolTip="{local:T Text='Hide Sidebar'}">
+                    <FontIcon FontFamily="{ThemeResource SymbolThemeFontFamily}" FontSize="16" Glyph="&#xE90C;" />
+                </Button>
+
                 <!-- Always shown; enabled where there is a page to go back to (or the library chat to close). -->
                 <Button
                     x:Name="BackButton"
@@ -258,7 +268,6 @@
             <SelectorBar
                 x:Name="TabsBar"
                 Grid.Column="3"
-                Margin="0,0,8,0"
                 Padding="0"
                 VerticalAlignment="Center"
                 Visibility="Collapsed">
@@ -274,34 +283,9 @@
             <SelectorBar
                 x:Name="SettingsTabsBar"
                 Grid.Column="3"
-                Margin="0,0,8,0"
                 Padding="0"
                 VerticalAlignment="Center"
                 Visibility="Collapsed" />
-
-            <!-- Filters the library and the sidebar as typed, or on Settings the settings; Esc clears it. -->
-            <AutoSuggestBox
-                x:Name="SearchBox"
-                Grid.Column="4"
-                HorizontalAlignment="Stretch"
-                VerticalAlignment="Center"
-                AutomationProperties.Name="{local:T Text='Search conversations'}"
-                PlaceholderText="{local:T Text='Search'}"
-                QueryIcon="Find" />
-
-            <!-- Where the box does not fit: opens it in place of the action buttons until it is left empty. -->
-            <Button
-                x:Name="SearchButton"
-                Grid.Column="4"
-                Width="32"
-                Height="32"
-                Padding="0"
-                Style="{StaticResource SubtleButtonStyle}"
-                AutomationProperties.Name="{local:T Text='Search conversations'}"
-                ToolTipService.ToolTip="{local:T Text='Search'}"
-                Visibility="Collapsed">
-                <FontIcon FontFamily="{ThemeResource SymbolThemeFontFamily}" FontSize="16" Glyph="&#xE721;" />
-            </Button>
         </Grid>
     </Grid>
 </UserControl>

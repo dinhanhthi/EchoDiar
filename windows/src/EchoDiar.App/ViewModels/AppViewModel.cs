@@ -132,8 +132,16 @@ public sealed partial class AppViewModel : ObservableObject
         {
             // Another page (list, entry, Settings) clears the search (macOS MainView.swift), before the route changes: the
             // library lists every conversation again before the page and the sidebar are shown. Another conversation or
-            // the recording keeps it, for the sidebar it filters.
-            if (PageOf(value) != PageOf(_route)) SearchTerm = "";
+            // the recording keeps it, for the sidebar it filters. The Settings page's search goes with it.
+            if (PageOf(value) != PageOf(_route))
+            {
+                SearchTerm = "";
+                SettingsSearchTerm = "";
+            }
+            // Another conversation opened (from outside the list too: Calendar, a citation) shows on its sidebar page,
+            // before the route changes so the sidebar finds its card. Only here: paging with a conversation open stays
+            // on the new page.
+            if (value.ConversationId is { } id && id != _route.ConversationId) ShowLibraryPageOf(id);
             SetProperty(ref _route, value);
         }
     }
@@ -160,6 +168,7 @@ public sealed partial class AppViewModel : ObservableObject
             OnPropertyChanged(nameof(RecordingLanguage));
             SyncMeetingDetection();
             OnCalendarSettingsChanged(old.Calendar, value.Calendar);
+            if (value.LibraryPageSize != old.LibraryPageSize) ResetLibraryPage();
         }
     }
 
@@ -169,7 +178,9 @@ public sealed partial class AppViewModel : ObservableObject
         get => _conversations;
         private set
         {
-            if (SetProperty(ref _conversations, value)) _ = LoadSearchDocumentsAsync();
+            if (!SetProperty(ref _conversations, value)) return;
+            ClampLibraryPage();
+            _ = LoadSearchDocumentsAsync();
         }
     }
 
@@ -513,6 +524,7 @@ public sealed partial class AppViewModel : ObservableObject
         if (_closing) return;
         Route = Route.List;
         SearchTerm = "";
+        SettingsSearchTerm = "";
     }
 
     /// <summary>
