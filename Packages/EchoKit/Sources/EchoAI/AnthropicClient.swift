@@ -44,9 +44,33 @@ public struct AnthropicClient: LLMProvider {
         let system = messages.filter { $0.role == .system }.map(\.content).joined(separator: "\n\n")
         let body = MessagesBody(
             model: model, maxTokens: maxTokens, system: system.isEmpty ? nil : system,
-            messages: messages.filter { $0.role != .system }, stream: true)
+            messages: bodyMessages(messages.filter { $0.role != .system }), stream: true)
         try ProviderHTTP.setJSONBody(&request, body)
         return request
+    }
+
+    /// The API takes at most 4 cache breakpoints per request; 3 leaves one spare.
+    static let maxCacheMarks = 3
+
+    /// Cache marks become `cache_control` (5-minute TTL) on text blocks. Empty-text parts are dropped first: they
+    /// never count as marks and are never sent. Of the rest, only the last `maxCacheMarks` marked parts are kept
+    /// (message order, then part order); earlier marks count as unmarked. A message with a kept mark is sent as one
+    /// text block per non-empty part; any other message, including one whose marks were all dropped, stays a plain
+    /// string, as before. Same rule as the Windows client.
+    private static func bodyMessages(_ messages: [LLMMessage]) -> [BodyMessage] {
+        let marks = messages.indices.flatMap { m in
+            messages[m].parts.indices.filter { messages[m].parts[$0].cache && !messages[m].parts[$0].text.isEmpty }
+                .map { (m, $0) }
+        }
+        let kept = marks.suffix(maxCacheMarks)
+        return messages.enumerated().map { m, message in
+            let keptParts = Set(kept.filter { $0.0 == m }.map(\.1))
+            guard !keptParts.isEmpty else { return BodyMessage(role: message.role, content: .text(message.content)) }
+            let blocks = message.parts.enumerated().filter { !$1.text.isEmpty }.map { p, part in
+                TextBlock(text: part.text, cacheControl: keptParts.contains(p) ? .ephemeral : nil)
+            }
+            return BodyMessage(role: message.role, content: .blocks(blocks))
+        }
     }
 
     /// `GET {base}/v1/models?limit=1000` (one page holds every model).
@@ -86,8 +110,37 @@ private struct MessagesBody: Encodable {
     var model: String
     var maxTokens: Int
     var system: String?
-    var messages: [LLMMessage]
+    var messages: [BodyMessage]
     var stream: Bool
+}
+
+private struct BodyMessage: Encodable {
+    enum Content: Encodable {
+        case text(String)
+        case blocks([TextBlock])
+
+        func encode(to encoder: any Encoder) throws {
+            var container = encoder.singleValueContainer()
+            switch self {
+            case .text(let text): try container.encode(text)
+            case .blocks(let blocks): try container.encode(blocks)
+            }
+        }
+    }
+
+    var role: LLMMessage.Role
+    var content: Content
+}
+
+private struct TextBlock: Encodable {
+    struct CacheControl: Encodable {
+        static let ephemeral = CacheControl(type: "ephemeral")
+        var type: String
+    }
+
+    var type = "text"
+    var text: String
+    var cacheControl: CacheControl?
 }
 
 private struct Event: Decodable {

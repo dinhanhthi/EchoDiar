@@ -338,10 +338,16 @@ public sealed class AIServiceTests : IDisposable
             "What was decided?", conversation, MakeTranscript(3), summary: null, history, historyLimit: limit, provider,
             providerID: "fake", model: "fake", language: "en", cancellationToken: Ct));
 
-        var sent = Assert.IsAssignableFrom<IReadOnlyList<LLMMessage>>(provider.LastReceived)
-            .Where(m => m.Content.StartsWith("History ", StringComparison.Ordinal)).ToList();
-        Assert.Equal(expected, sent.Select(m => m.Content));
-        Assert.Equal(LLMRole.User, sent[0].Role);
+        // Between the system message and the new question; the first question carries the meeting context.
+        var sent = Assert.IsAssignableFrom<IReadOnlyList<LLMMessage>>(provider.LastReceived);
+        var window = sent.Skip(1).SkipLast(1).ToList();
+        Assert.Equal("Question: What was decided?", sent[^1].Content);
+        Assert.Equal(expected.Select((_, i) => i % 2 == 0 ? LLMRole.User : LLMRole.Assistant), window.Select(m => m.Role));
+        Assert.StartsWith("Meeting: ", window[0].Content);
+        Assert.EndsWith($"</transcript>\n\nQuestion: {expected[0]}", window[0].Content);
+        Assert.Equal(
+            expected.Select((text, i) => (i % 2 == 0 ? "Question: " : "") + text).Skip(1),
+            window.Skip(1).Select(m => m.Content));
     }
 
     [Fact]

@@ -6,12 +6,51 @@ public struct LLMMessage: Codable, Equatable, Sendable {
         case system, user, assistant
     }
 
+    /// A piece of a message's text; `cache` marks the end of a prefix a provider may cache (Anthropic only).
+    public struct Part: Equatable, Sendable {
+        public var text: String
+        public var cache: Bool
+
+        public init(text: String, cache: Bool = false) {
+            self.text = text
+            self.cache = cache
+        }
+    }
+
     public var role: Role
-    public var content: String
+    public var parts: [Part]
+
+    /// The parts' text joined with no separator (parts carry their own newlines); setting it leaves one uncached part.
+    public var content: String {
+        get { parts.map(\.text).joined() }
+        set { parts = [Part(text: newValue)] }
+    }
 
     public init(role: Role, content: String) {
         self.role = role
-        self.content = content
+        self.parts = [Part(text: content)]
+    }
+
+    public init(role: Role, parts: [Part]) {
+        self.role = role
+        self.parts = parts
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case role, content
+    }
+
+    /// Only `{role, content}`: cache marks never reach the JSON bodies.
+    public init(from decoder: any Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        self.init(
+            role: try container.decode(Role.self, forKey: .role), content: try container.decode(String.self, forKey: .content))
+    }
+
+    public func encode(to encoder: any Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(role, forKey: .role)
+        try container.encode(content, forKey: .content)
     }
 }
 

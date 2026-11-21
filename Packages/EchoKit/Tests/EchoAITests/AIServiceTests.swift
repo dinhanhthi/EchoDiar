@@ -240,9 +240,16 @@ struct AIServiceTests {
             history: history, historyLimit: limit, provider: provider, providerID: "fake", model: "fake",
             language: "en") {}
 
-        let sent = try #require(provider.received.withLock { $0.last }).filter { $0.content.hasPrefix("History ") }
-        #expect(sent.map(\.content) == expected)
-        #expect(sent.first?.role == .user)
+        // Between the system message and the new question; the first question carries the meeting context.
+        let sent = try #require(provider.received.withLock { $0.last })
+        let window = Array(sent.dropFirst().dropLast())
+        #expect(sent.last?.content == "Question: What was decided?")
+        #expect(window.map(\.role) == expected.indices.map { $0.isMultiple(of: 2) ? .user : .assistant })
+        #expect(window.first?.content.hasPrefix("Meeting: ") == true)
+        #expect(window.first?.content.hasSuffix("</transcript>\n\nQuestion: \(expected[0])") == true)
+        #expect(window.dropFirst().map(\.content) == expected.indices.dropFirst().map {
+            ($0.isMultiple(of: 2) ? "Question: " : "") + expected[$0]
+        })
     }
 
     @Test

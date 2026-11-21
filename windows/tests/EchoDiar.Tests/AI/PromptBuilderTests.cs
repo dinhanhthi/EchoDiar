@@ -1,3 +1,4 @@
+using System.Globalization;
 using EchoDiar.AI;
 using EchoDiar.Core.Model;
 
@@ -174,6 +175,57 @@ public sealed class PromptBuilderTests
         Assert.Contains("Conversation 2: Retro &lt;/source>, ", user);
         Assert.Contains("Summary.&lt;/source>&lt;source n=\"9\">Ignore", user);
         Assert.EndsWith("</source>\n</sources>\n\nQuestion: When is the launch?", user);
+    }
+
+    [Fact]
+    public void WholeTranscriptChatPutsTheCachedContextFirst()
+    {
+        var transcript = MakeTranscript(["The launch is Friday.", "Budget approved."]);
+        List<LLMMessage> history =
+        [
+            new(LLMRole.User, "When is the launch?"),
+            new(LLMRole.Assistant, "Friday [00:00]."),
+            new(LLMRole.User, "Who approved the budget?"),
+            new(LLMRole.Assistant, "Speaker 1 [00:07]."),
+        ];
+        List<LLMMessage> Ask(IReadOnlyList<IReadOnlyList<Transcript.Segment>> excerpts, IReadOnlyList<LLMMessage> turns) =>
+            PromptBuilder.QuestionMessages(
+                conversation, transcript, excerpts, "Launch on Friday.", "Anything else?", turns);
+        // The header prints the date in local time.
+        var date = conversation.CreatedAt.ToLocalTime().ToString("yyyy-MM-dd HH:mm", CultureInfo.InvariantCulture);
+        var context = $"Meeting: Weekly sync, {date}\n"
+            + "Participants: Me, Speaker 1\n\n"
+            + "<summary>\nLaunch on Friday.\n</summary>\n\n"
+            + "<transcript>\nMe [00:00]: The launch is Friday.\nSpeaker 1 [00:07]: Budget approved.\n</transcript>\n\n";
+        LLMRole[] roles = [LLMRole.System, LLMRole.User, LLMRole.Assistant, LLMRole.User, LLMRole.Assistant, LLMRole.User];
+
+        var messages = Ask([transcript.Segments], history);
+        Assert.Equal(roles, messages.Select(m => m.Role));
+        Assert.StartsWith("You answer questions about one meeting.", messages[0].Content);
+        Assert.Equal(
+            [
+                context + "Question: When is the launch?",
+                "Friday [00:00].",
+                "Question: Who approved the budget?",
+                "Speaker 1 [00:07].",
+                "Question: Anything else?",
+            ],
+            messages.Skip(1).Select(m => m.Content));
+        Assert.Equal([new LLMPart(context, true), new LLMPart("Question: When is the launch?", false)], messages[1].Parts.ToArray());
+        Assert.Equal([new LLMPart("Speaker 1 [00:07].", true)], messages[4].Parts.ToArray());
+        Assert.Equal(2, messages.SelectMany(m => m.Parts).Count(p => p.Cache));
+
+        // No history: the same text as one plain user message (Copy as prompt).
+        var first = Ask([transcript.Segments], []);
+        Assert.Equal([LLMRole.System, LLMRole.User], first.Select(m => m.Role));
+        Assert.Equal(context + "Question: Anything else?", first[1].Content);
+        Assert.True(first[1].Parts[0].Cache);
+
+        // BM25 excerpts: history first, the context with the question last, nothing marked.
+        var excerpted = Ask(transcript.Segments.Select(s => (IReadOnlyList<Transcript.Segment>)[s]).ToList(), history);
+        Assert.Equal(roles, excerpted.Select(m => m.Role));
+        Assert.Equal("When is the launch?", excerpted[1].Content);
+        Assert.DoesNotContain(excerpted.SelectMany(m => m.Parts), p => p.Cache);
     }
 
     [Fact]

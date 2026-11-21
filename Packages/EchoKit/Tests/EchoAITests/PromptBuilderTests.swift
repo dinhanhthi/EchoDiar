@@ -190,6 +190,58 @@ struct PromptBuilderTests {
     }
 
     @Test
+    func wholeTranscriptChatPutsTheCachedContextFirst() {
+        let transcript = transcript(["The launch is Friday.", "Budget approved."])
+        let history = [
+            LLMMessage(role: .user, content: "When is the launch?"),
+            LLMMessage(role: .assistant, content: "Friday [00:00]."),
+            LLMMessage(role: .user, content: "Who approved the budget?"),
+            LLMMessage(role: .assistant, content: "Speaker 1 [00:07]."),
+        ]
+        let ask = { (excerpts: [[Transcript.Segment]], history: [LLMMessage]) in
+            PromptBuilder.questionMessages(
+                conversation: self.conversation, transcript: transcript, excerpts: excerpts,
+                summary: "Launch on Friday.", question: "Anything else?", history: history)
+        }
+        // The header prints the date in local time.
+        let formatter = DateFormatter()
+        formatter.locale = Locale(identifier: "en_US_POSIX")
+        formatter.dateFormat = "yyyy-MM-dd HH:mm"
+        let context = "Meeting: Weekly sync, \(formatter.string(from: conversation.createdAt))\n"
+            + "Participants: Me, Speaker 1\n\n"
+            + "<summary>\nLaunch on Friday.\n</summary>\n\n"
+            + "<transcript>\nMe [00:00]: The launch is Friday.\nSpeaker 1 [00:07]: Budget approved.\n</transcript>\n\n"
+
+        let messages = ask([transcript.segments], history)
+        #expect(messages.map(\.role) == [.system, .user, .assistant, .user, .assistant, .user])
+        #expect(messages[0].content.hasPrefix("You answer questions about one meeting."))
+        #expect(messages.dropFirst().map(\.content) == [
+            context + "Question: When is the launch?",
+            "Friday [00:00].",
+            "Question: Who approved the budget?",
+            "Speaker 1 [00:07].",
+            "Question: Anything else?",
+        ])
+        #expect(messages[1].parts == [
+            LLMMessage.Part(text: context, cache: true), LLMMessage.Part(text: "Question: When is the launch?"),
+        ])
+        #expect(messages[4].parts == [LLMMessage.Part(text: "Speaker 1 [00:07].", cache: true)])
+        #expect(messages.flatMap(\.parts).filter(\.cache).count == 2)
+
+        // No history: the same text as one plain user message (Copy as prompt).
+        let first = ask([transcript.segments], [])
+        #expect(first.map(\.role) == [.system, .user])
+        #expect(first[1].content == context + "Question: Anything else?")
+        #expect(first[1].parts.first?.cache == true)
+
+        // BM25 excerpts: history first, the context with the question last, nothing marked.
+        let excerpted = ask(transcript.segments.map { [$0] }, history)
+        #expect(excerpted.map(\.role) == [.system, .user, .assistant, .user, .assistant, .user])
+        #expect(excerpted[1].content == "When is the launch?")
+        #expect(excerpted.flatMap(\.parts).filter(\.cache).isEmpty)
+    }
+
+    @Test
     func answersFollowTheResponseLanguageSetting() {
         let transcript = transcript(["Bonjour.", "On lance vendredi."])
         let asked = { (language: OutputLanguage?) in

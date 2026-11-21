@@ -201,15 +201,29 @@ public enum PromptBuilder {
     /// chunks in time order (`TranscriptChunker.questionExcerpts`); `summary` is the saved summary, if any.
     /// `history`: earlier questions and answers (user and assistant turns only, escaped), before the new question.
     /// `language`: `nil` = the question's language.
+    /// Whole transcript: the context (header, summary, transcript) is a cached first part of the first user turn, so
+    /// it stays a stable prefix; every user turn is "Question: …" and the last history turn is cached too (leading
+    /// answers dropped, so turns alternate from a question). Excerpts: the history, then the context with the
+    /// question, nothing cached.
     public static func questionMessages(
         conversation: Conversation, transcript: Transcript, excerpts: [[Transcript.Segment]], summary: String?,
         question: String, history: [LLMMessage] = [], language: OutputLanguage? = nil
     ) -> [LLMMessage] {
-        [LLMMessage(role: .system, content: questionInstructions(language: language))]
-            + history.filter { $0.role != .system }.map { LLMMessage(role: $0.role, content: escape($0.content)) }
-            + [LLMMessage(role: .user, content: questionUser(
-                conversation: conversation, transcript: transcript, excerpts: excerpts, summary: summary,
-                question: question))]
+        let system = LLMMessage(role: .system, content: questionInstructions(language: language))
+        let context = questionContext(
+            conversation: conversation, transcript: transcript, excerpts: excerpts, summary: summary)
+        let asked = "Question: " + escape(question)
+        let turns = history.filter { $0.role != .system }
+        guard excerpts == [transcript.segments] else {
+            return [system] + turns.map { LLMMessage(role: $0.role, content: escape($0.content)) }
+                + [LLMMessage(role: .user, content: context + asked)]
+        }
+        var messages = turns.drop { $0.role != .user }.map { turn in
+            LLMMessage(role: turn.role, content: (turn.role == .user ? "Question: " : "") + escape(turn.content))
+        } + [LLMMessage(role: .user, content: asked)]
+        if messages.count > 1 { markLast(&messages[messages.count - 2]) }
+        messages[0].parts.insert(LLMMessage.Part(text: context, cache: true), at: 0)
+        return [system] + messages
     }
 
     /// One conversation's retrieved passages for a library question: transcript lines (`line`, with `[mm:ss]`) or
@@ -233,9 +247,15 @@ public enum PromptBuilder {
     public static func libraryQuestionMessages(
         question: String, sources: [LibrarySource], history: [LLMMessage] = [], language: OutputLanguage? = nil
     ) -> [LLMMessage] {
-        [LLMMessage(role: .system, content: libraryQuestionInstructions(language: language))]
-            + history.filter { $0.role != .system }.map { LLMMessage(role: $0.role, content: escape($0.content)) }
+        var turns = history.filter { $0.role != .system }.map { LLMMessage(role: $0.role, content: escape($0.content)) }
+        if !turns.isEmpty { markLast(&turns[turns.count - 1]) }
+        return [LLMMessage(role: .system, content: libraryQuestionInstructions(language: language))] + turns
             + [LLMMessage(role: .user, content: libraryQuestionUser(question: question, sources: sources))]
+    }
+
+    /// Marks the end of `message` as a prefix a provider may cache (the last history turn of a chat).
+    private static func markLast(_ message: inout LLMMessage) {
+        message.parts[message.parts.count - 1].cache = true
     }
 
     /// A title for an archived chat, from its questions only (escaped, at most 2000 characters of them).
@@ -414,15 +434,14 @@ public enum PromptBuilder {
         """
     }
 
-    private static func questionUser(
-        conversation: Conversation, transcript: Transcript, excerpts: [[Transcript.Segment]], summary: String?,
-        question: String
+    /// The header, the summary block (if any) and the transcript block, ending with a blank line.
+    private static func questionContext(
+        conversation: Conversation, transcript: Transcript, excerpts: [[Transcript.Segment]], summary: String?
     ) -> String {
-        var user = meetingHeader(conversation, transcript)
-        if let summary, !summary.isEmpty { user += block("summary", summary) + "\n\n" }
+        var context = meetingHeader(conversation, transcript)
+        if let summary, !summary.isEmpty { context += block("summary", summary) + "\n\n" }
         let lines = excerpts.map { $0.map { line($0, transcript: transcript) + "\n" }.joined() }
-        user += "<transcript>\n" + lines.joined(separator: "...\n") + "</transcript>\n\n"
-        return user + "Question: " + escape(question)
+        return context + "<transcript>\n" + lines.joined(separator: "...\n") + "</transcript>\n\n"
     }
 
     private static func libraryQuestionInstructions(language: OutputLanguage?) -> String {

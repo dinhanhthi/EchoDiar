@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using System.Diagnostics;
 using System.Net;
 using System.Net.Http.Headers;
@@ -14,8 +15,54 @@ namespace EchoDiar.AI;
 /// <summary>Swift <c>LLMMessage.Role</c>; sent as <c>"system"</c>, <c>"user"</c>, <c>"assistant"</c>.</summary>
 public enum LLMRole { System, User, Assistant }
 
-/// <summary>One chat message. Callers put transcript text only in user messages; system messages carry instructions.</summary>
-public sealed record LLMMessage(LLMRole Role, string Content);
+/// <summary>
+/// A piece of a message's text (macOS LLMProvider.swift LLMMessage.Part). <paramref name="Cache"/> marks the end of a
+/// prefix the native Anthropic client may cache; every other backend only reads the joined <see cref="LLMMessage.Content"/>.
+/// </summary>
+public sealed record LLMPart(string Text, bool Cache);
+
+/// <summary>
+/// One chat message. Callers put transcript text only in user messages; system messages carry instructions.
+/// <see cref="Content"/> is <see cref="Parts"/>' text joined with no separator; only role and content are serialized.
+/// </summary>
+public sealed record LLMMessage
+{
+    /// <summary>A message of one uncached part.</summary>
+    public LLMMessage(LLMRole Role, string Content) : this(Role, [new LLMPart(Content, false)]) { }
+
+    private LLMMessage(LLMRole role, ImmutableArray<LLMPart> parts)
+    {
+        this.Role = role;
+        this.Parts = parts;
+        this.Content = string.Concat(parts.Select(part => part.Text));
+    }
+
+    /// <summary>A message built from parts (macOS LLMProvider.swift LLMMessage.Part); its content is their text joined with no separator.</summary>
+    public static LLMMessage FromParts(LLMRole role, IEnumerable<LLMPart> parts) => new(role, [.. parts]);
+
+    public LLMRole Role { get; }
+
+    public string Content { get; }
+
+    /// <summary>Never default: every constructor sets it, and <c>with</c> copies it.</summary>
+    [JsonIgnore]
+    public ImmutableArray<LLMPart> Parts { get; }
+
+    public void Deconstruct(out LLMRole Role, out string Content) => (Role, Content) = (this.Role, this.Content);
+
+    /// <summary>Compares the parts item by item (record equality would compare the <see cref="ImmutableArray{T}"/> by reference).</summary>
+    public bool Equals(LLMMessage? other) =>
+        other is not null && Role == other.Role && Content == other.Content && Parts.SequenceEqual(other.Parts);
+
+    public override int GetHashCode()
+    {
+        var hash = new HashCode();
+        hash.Add(Role);
+        hash.Add(Content);
+        foreach (var part in Parts) hash.Add(part);
+        return hash.ToHashCode();
+    }
+}
 
 /// <summary>A chat model backend (Swift <c>LLMProvider</c>).</summary>
 public interface ILLMProvider

@@ -46,8 +46,37 @@ public sealed class AnthropicClient : ILLMProvider
         var request = BaseRequest("v1/messages", config, apiKey, ProviderHttp.StreamTimeout);
         var system = string.Join("\n\n", messages.Where(m => m.Role == LLMRole.System).Select(m => m.Content));
         ProviderHttp.SetJsonBody(request, new MessagesBody(
-            model, maxTokens, system.Length == 0 ? null : system, messages.Where(m => m.Role != LLMRole.System).ToList(), true));
+            model, maxTokens, system.Length == 0 ? null : system, BodyMessages(messages.Where(m => m.Role != LLMRole.System).ToList()), true));
         return request;
+    }
+
+    /// <summary>The API takes at most 4 cache breakpoints per request; 3 leaves one spare.</summary>
+    internal const int MaxCacheMarks = 3;
+
+    /// <summary>
+    /// Cache marks become <c>cache_control</c> (5-minute TTL) on text blocks. Only the last <see cref="MaxCacheMarks"/>
+    /// marks on non-empty parts are kept (message order, then part order). A message with a kept mark is sent as one
+    /// text block per non-empty part; any other message, including one whose marks were all dropped, stays a plain
+    /// string, as before (macOS AnthropicClient.swift bodyMessages).
+    /// </summary>
+    private static List<BodyMessage> BodyMessages(List<LLMMessage> messages)
+    {
+        var kept = messages
+            .SelectMany((message, m) => message.Parts.Select((part, p) => (part, m, p)))
+            .Where(x => x.part.Cache && x.part.Text.Length > 0)
+            .Select(x => (x.m, x.p))
+            .TakeLast(MaxCacheMarks)
+            .ToHashSet();
+        return messages.Select((message, m) =>
+        {
+            if (!kept.Any(k => k.m == m)) return new BodyMessage(message.Role, message.Content);
+            object blocks = message.Parts
+                .Select((part, p) => (part, p))
+                .Where(x => x.part.Text.Length > 0)
+                .Select(x => new TextBlock("text", x.part.Text, kept.Contains((m, x.p)) ? CacheControl.Ephemeral : null))
+                .ToList();
+            return new BodyMessage(message.Role, blocks);
+        }).ToList();
     }
 
     /// <summary><c>GET {base}/v1/models?limit=1000</c> (one page holds every model).</summary>
@@ -88,7 +117,17 @@ public sealed class AnthropicClient : ILLMProvider
     }
 
     private sealed record MessagesBody(
-        string Model, int MaxTokens, string? System, IReadOnlyList<LLMMessage> Messages, bool Stream);
+        string Model, int MaxTokens, string? System, IReadOnlyList<BodyMessage> Messages, bool Stream);
+
+    /// <summary><paramref name="Content"/>: a plain string, or a list of <see cref="TextBlock"/>s (serialized by runtime type).</summary>
+    private sealed record BodyMessage(LLMRole Role, object Content);
+
+    private sealed record TextBlock(string Type, string Text, CacheControl? CacheControl);
+
+    private sealed record CacheControl(string Type)
+    {
+        public static readonly CacheControl Ephemeral = new("ephemeral");
+    }
 
     private sealed record Event(string Type, Event.EventDelta? Delta = null, APIErrorBody? Error = null)
     {
