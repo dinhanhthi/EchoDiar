@@ -346,10 +346,12 @@
             <li>Open the AI panel with <kbd>Cmd+I</kbd> on Mac, <kbd>Ctrl+I</kbd> on Windows. Generate a summary or ask questions about a conversation.</li>
             <li>Answers cite <code>[mm:ss]</code> timestamps. Click one to jump to that moment in the transcript and recording.</li>
             <li>Response language, for summaries and answers: automatic (the transcript's language for summaries, the question's for answers), English, French or Vietnamese.</li>
-            <li><strong>Catch up</strong> while recording: the button in the recording header sums up the meeting so far from the live captions, mostly its last 5 minutes (or from the start, with a setting). Each catch-up is saved with the conversation and listed under <strong>Catch-ups</strong> in the Summary tab. It runs on a provider outside the app (a local server, a cloud API or a CLI), chosen in <strong>Settings &gt; AI Settings</strong>, and says when data leaves the computer.</li>
+            <li>While recording, the page has three tabs: <strong>Transcript</strong>, <strong>Catch-up</strong> and <strong>Chat</strong>. With <strong>Settings &gt; General &gt; Recording window &gt; Recording layout</strong> set to <strong>Side by side</strong>, the live transcript sits next to Catch-up and Chat, and the sidebar hides until Stop (unless you show or hide it yourself). After Stop, the conversation opens on the matching tab (Catch-up opens Summary).</li>
+            <li><strong>Catch up</strong> while recording: the button sums up what is new since the last catch-up, from the live captions (or the whole meeting, with a setting). It lists <strong>What happened</strong> (in order, with <code>[mm:ss]</code>), <strong>Right now</strong>, and new decisions, action items and open questions. Each catch-up is saved with the conversation and listed under <strong>Catch-ups</strong> in the Summary tab. It runs on a provider outside the app (a local server, a cloud API or a CLI), chosen in <strong>Settings &gt; AI Settings</strong>, and says when data leaves the computer.</li>
+            <li><strong>Chat</strong> while recording asks the catch-up provider about the meeting so far (on-device models can't be used until Stop). Questions and answers are saved in the conversation's chat, marked <strong>Live</strong>, so you can follow up after Stop.</li>
             <li><strong>On-device:</strong> on Mac, MLX models, and Apple Foundation Models on macOS 26. On Windows, GGUF models (Qwen3.5 2B, 4B or 9B, Gemma 4 E2B or E4B), and Phi Silica on Copilot+ PCs.</li>
             <li><strong>Local servers:</strong> LM Studio, Ollama, Jan, llama.cpp, vLLM, plus Foundry Local on Windows. <strong>Scan</strong> finds the ones running on this computer.</li>
-            <li><strong>Cloud APIs:</strong> OpenAI, Anthropic, xAI, Gemini, Mistral, Azure OpenAI, OpenRouter, Groq, DeepSeek or a custom endpoint. Keys go in <strong>Settings &gt; AI Providers &gt; Cloud</strong>, stored in the Keychain on Mac, in Credential Manager on Windows.</li>
+            <li><strong>Cloud APIs:</strong> OpenAI, Anthropic, xAI, Gemini, Mistral, Azure OpenAI, OpenRouter, Groq, DeepSeek or a custom endpoint. Keys go in <strong>Settings &gt; AI Providers &gt; Cloud</strong>, stored in the Keychain on Mac, in Credential Manager on Windows. With providers that cache prompts, such as Anthropic, follow-up questions in a chat are answered faster and cost less.</li>
             <li><strong>Subscription CLIs:</strong> Claude Code, Codex, OpenCode or Gemini CLI, with your own login.</li>
             <li><strong>Copy as prompt</strong> copies the transcript and your question, ready to paste into any chat app. On Windows, <kbd>Ctrl+Shift+C</kbd> does it from the Summary or Chat tab.</li>
 </ul>
@@ -358,9 +360,11 @@
           <section id="library" class="doc">
             <h2>Library &amp; search</h2>
 <ul class="list">
-            <li>Conversations grouped by day, with their size on disk.</li>
+            <li>Conversations in sections: Today, Previous 3 days, Last 7 days, Last 30 days and Older. Hover one to see its size on disk.</li>
+            <li>The list shows one page at a time, with a page bar at the bottom ("1–100 of 742"). Set <strong>Entries per page</strong> (50, 100, 200 or 500; 100 by default) in <strong>Settings &gt; General &gt; Library</strong>.</li>
             <li>Rename, reveal in Finder (Explorer on Windows) or move to the Trash (the Recycle Bin on Windows).</li>
-            <li>Search titles and transcripts with <kbd>Cmd+F</kbd> on Mac, <kbd>Ctrl+F</kbd> on Windows.</li>
+            <li>Search titles and transcripts in the field at the top of the sidebar. <kbd>Cmd+F</kbd> on Mac, <kbd>Ctrl+F</kbd> on Windows, puts the cursor in it.</li>
+            <li>The sidebar button hides or shows the sidebar. On Mac, also <strong>View &gt; Hide Sidebar</strong> or <kbd>Ctrl+Cmd+S</kbd>.</li>
 </ul>
           </section>
 

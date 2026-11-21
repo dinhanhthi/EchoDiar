@@ -169,7 +169,7 @@ public sealed partial class AppViewModel
     {
         get
         {
-            List<string> lines = [Loc.T("Summarize the meeting so far, mostly its last 5 minutes")];
+            List<string> lines = [Loc.T("Summarize what is new since the last catch-up")];
             if (CatchUpProvider is { } provider)
             {
                 lines.Add(Loc.Format("%@: %@", Loc.T("Catch-up provider"), provider.Name));

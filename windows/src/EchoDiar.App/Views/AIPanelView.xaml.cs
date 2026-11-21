@@ -378,7 +378,10 @@ public sealed partial class AIPanelView : UserControl
             _streamRendered = null;
             _streamSlot = null;
             MessagesPanel.Children.Clear();
-            foreach (var message in _panel.Chat) MessagesPanel.Children.Add(MessageView(message.Role, message.Text, message.Model));
+            foreach (var message in _panel.Chat)
+            {
+                MessagesPanel.Children.Add(MessageView(message.Role, message.Text, message.Model, live: message.Live == true));
+            }
             if (job is not null)
             {
                 MessagesPanel.Children.Add(MessageView(ChatRole.User, job.Question ?? "", null));
@@ -422,33 +425,34 @@ public sealed partial class AIPanelView : UserControl
         ScrollChatToEnd();
     }
 
-    /// <summary>A question in a bubble at the trailing edge; an answer's Markdown with its model's badge and Copy.</summary>
-    private UIElement MessageView(ChatRole role, string text, string? model, bool streaming = false)
+    /// <summary>
+    /// A question in a bubble at the trailing edge; an answer's Markdown with its model's badge and Copy. A message of
+    /// the live chat (asked while recording) shows a "Live" badge: under the question, before the answer's model badge.
+    /// </summary>
+    private UIElement MessageView(ChatRole role, string text, string? model, bool streaming = false, bool live = false)
     {
         if (role == ChatRole.User)
         {
-            return new Border
+            var bubble = new Border
             {
                 Style = (Style)Resources["UserBubbleStyle"],
                 Child = new TextBlock { Text = text, TextWrapping = TextWrapping.Wrap, IsTextSelectionEnabled = true },
             };
+            if (!live) return bubble;
+            var question = new StackPanel { Spacing = 6 };
+            question.Children.Add(bubble);
+            var liveBadge = Badge(Loc.T("Live"));
+            liveBadge.HorizontalAlignment = HorizontalAlignment.Right;
+            question.Children.Add(liveBadge);
+            return question;
         }
         var answer = new StackPanel { Spacing = 6 };
         var markdown = new RichTextBlock();
         MarkdownView.Render(markdown, text, Links());
         answer.Children.Add(markdown);
         var footer = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 6 };
-        if (model is { Length: > 0 })
-        {
-            footer.Children.Add(new Border
-            {
-                Style = (Style)Resources["BadgeStyle"],
-                Child = new TextBlock
-                {
-                    Text = model, VerticalAlignment = VerticalAlignment.Center, Style = (Style)Resources["CaptionStyle"],
-                },
-            });
-        }
+        if (live) footer.Children.Add(Badge(Loc.T("Live")));
+        if (model is { Length: > 0 }) footer.Children.Add(Badge(model));
         if (!streaming)
         {
             var copy = new Button
@@ -465,6 +469,16 @@ public sealed partial class AIPanelView : UserControl
         if (footer.Children.Count > 0) answer.Children.Add(footer);
         return answer;
     }
+
+    /// <summary>A caption in a capsule: an answer's model, or "Live" on a message of the live chat.</summary>
+    private Border Badge(string text) => new()
+    {
+        Style = (Style)Resources["BadgeStyle"],
+        Child = new TextBlock
+        {
+            Text = text, VerticalAlignment = VerticalAlignment.Center, Style = (Style)Resources["CaptionStyle"],
+        },
+    };
 
     /// <summary>Once laid out, so the new height is known.</summary>
     private void ScrollChatToEnd() => DispatcherQueue.TryEnqueue(DispatcherQueuePriority.Low, () =>
